@@ -20,6 +20,7 @@
     nonisolated(unsafe) private let IDC_ARROW: LPCWSTR? = unsafe UnsafePointer<WCHAR>(bitPattern: UInt(32512))
     private let adaEngineWorkMessage = UINT(WM_APP + 1)
     nonisolated(unsafe) private var windowMinimumSizes: [UIWindow.ID: Size] = [:]
+    nonisolated(unsafe) private var enumeratedWindowsScreens: [Screen] = []
 
     // Static storage for window class name (must persist for RegisterClassW)
     private let windowClassName: [WCHAR] = "AdaEngineWindow".wide
@@ -1125,33 +1126,28 @@
         }
 
         func getScreens() -> [Screen] {
-            final class ScreensCollector: @unchecked Sendable {
-                var screens: [Screen] = []
-            }
-
-            let collector = ScreensCollector()
-            let collectorPtr = unsafe Unmanaged.passUnretained(collector).toOpaque()
+            // EnumDisplayMonitors invokes the callback synchronously. Keeping the
+            // temporary storage outside the C callback avoids passing a Swift
+            // reference through LPARAM, which crashes Swift 6.2.3's Windows
+            // SendNonSendable compiler pass.
+            unsafe enumeratedWindowsScreens.removeAll(keepingCapacity: true)
 
             unsafe EnumDisplayMonitors(
                 nil,
                 nil,
-                { hMonitor, _, _, lParam in
-                    guard let hMonitor = unsafe hMonitor, lParam != 0 else {
+                { hMonitor, _, _, _ in
+                    guard let hMonitor = unsafe hMonitor else {
                         return WindowsBool(true)
                     }
-                    guard let collectorPointer = UnsafeRawPointer(bitPattern: Int(lParam)) else {
-                        return WindowsBool(true)
-                    }
-                    let collector = unsafe Unmanaged<ScreensCollector>.fromOpaque(collectorPointer).takeUnretainedValue()
                     if let screen = unsafe Self.shared?.makeScreen(from: hMonitor) {
-                        collector.screens.append(screen)
+                        unsafe enumeratedWindowsScreens.append(screen)
                     }
                     return WindowsBool(true)
                 },
-                LPARAM(Int(bitPattern: collectorPtr))
+                0
             )
 
-            return collector.screens
+            return unsafe enumeratedWindowsScreens
         }
 
         func getScreenScale(for screen: Screen) -> Float {
