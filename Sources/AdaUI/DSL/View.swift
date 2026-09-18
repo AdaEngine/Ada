@@ -7,7 +7,7 @@
 
 /// A type that represents part of your user interface and provides modifiers that you use to configure views.
 @_typeEraser(AnyView)
-@MainActor @preconcurrency 
+@MainActor @preconcurrency
 public protocol View {
     /// The type of view representing the body of this view.
     associatedtype Body: View
@@ -39,8 +39,8 @@ extension View {
         // work and subscribes an observing ancestor to the child's dependencies.
         // Class bodies retain the dynamic check for builder-conforming subclasses.
         if resolvedInputs.propertyStorages.isEmpty,
-           Self.Body.self is any ViewNodeBuilder.Type || Self.Body.self is AnyClass,
-           let builder = view[\.body].value as? ViewNodeBuilder {
+            Self.Body.self is any ViewNodeBuilder.Type || Self.Body.self is AnyClass,
+            let builder = view[\.body].value as? ViewNodeBuilder {
             let node = builder.buildViewNode(in: inputs)
             node.updateEnvironment(inputs.environment)
             node.stateContainer = stateContainer
@@ -77,7 +77,7 @@ extension View {
             resolvedInputs.registerNodeForStorages(node)
             return _ViewListOutputs(outputs: [_ViewOutputs(node: node)])
         }
-        
+
         if stateContainer != nil {
             let node = LayoutViewContainerNode(
                 layout: AnyLayout(inputs.input.layout),
@@ -112,26 +112,26 @@ extension View {
 
 extension View where Body == Never {
     package var body: Never {
-        fatalError()
+        fatalError("Unreachable code")
     }
 }
 
-public extension Never {
-    typealias Body = Never
+extension Never {
+    public typealias Body = Never
 
-    var body: Never {
-        fatalError()
+    public var body: Never {
+        fatalError("Unreachable code")
     }
 }
 
-extension Never: View { }
+extension Never: View {}
 
 extension Optional: View where Wrapped: View {
     public var body: some View {
         switch self {
         case .none:
             EmptyView()
-        case .some(let wrapped):
+        case let .some(wrapped):
             wrapped
         }
     }

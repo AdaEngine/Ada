@@ -53,8 +53,10 @@ final class AnnotatedGravityResourceView: @unchecked Sendable {
             reportDiagnostic("Unknown resource field '\(fieldName)'")
             return false
         }
-        guard let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
-              parameter.write(field: field, value: fieldValue) else {
+        guard
+            let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
+            parameter.write(field: field, value: fieldValue)
+        else {
             reportDiagnostic("Invalid value for resource field '\(fieldName)'")
             return false
         }

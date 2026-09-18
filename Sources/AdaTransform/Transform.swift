@@ -12,16 +12,15 @@ import Math
 /// A component that defines the scale, rotation, and translation of an entity.
 @Component(required: [GlobalTransform.self])
 public struct Transform: Codable, Hashable, Sendable {
-    
     /// The rotation of the entity specified as a unit quaternion.
     public var rotation: Quat
-    
+
     /// The scaling factor applied to the entity.
     public var scale: Vector3
-    
+
     /// The position of the entity along the x, y, and z axes.
     public var position: Vector3
-    
+
     /// Create a new transform component from rotation, scale and position.
     public init(
         rotation: Quat = .identity,
@@ -32,7 +31,7 @@ public struct Transform: Codable, Hashable, Sendable {
         self.scale = scale
         self.position = position
     }
-    
+
     /// Create a new transform component from transformation matrix.
     public init(matrix: Transform3D) {
         self.rotation = matrix.rotation
@@ -41,9 +40,9 @@ public struct Transform: Codable, Hashable, Sendable {
     }
 }
 
-public extension Transform {
+extension Transform {
     /// Return matrix
-    var matrix: Transform3D {
+    public var matrix: Transform3D {
         Transform3D(
             translation: self.position,
             rotation: self.rotation,
@@ -64,11 +63,11 @@ extension GlobalTransform: DefaultValue {
     public static let defaultValue: GlobalTransform = GlobalTransform(matrix: .identity)
 }
 
-public extension GlobalTransform {
-    func getTransform() -> Transform {
+extension GlobalTransform {
+    public func getTransform() -> Transform {
         Transform(
             rotation: self.matrix.rotation,
-            scale: self.matrix.scale, 
+            scale: self.matrix.scale,
             position: self.matrix.origin
         )
     }

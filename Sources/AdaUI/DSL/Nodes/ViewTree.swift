@@ -12,13 +12,12 @@ import Math
 
 @MainActor
 final class ViewTree<Content: View> {
-
     let rootView: Content
     private(set) var rootNode: ViewRootNode
 
     init(rootView: Content, environment: EnvironmentValues = EnvironmentValues()) {
         self.rootView = rootView
-        
+
         let inputs = _ViewInputs(
             parentNode: nil,
             environment: environment
@@ -40,7 +39,6 @@ final class ViewTree<Content: View> {
 
 /// The root node that holds user view.
 final class ViewRootNode: ViewNode {
-
     let contentNode: ViewNode
 
     static let rootCoordinateSpace = NamedViewCoordinateSpace(UUID().uuidString)
@@ -52,7 +50,7 @@ final class ViewRootNode: ViewNode {
     init<Root: View>(contentNode: ViewNode, content: Root) {
         self.contentNode = contentNode
         super.init(content: content)
-        
+
         self.contentNode.parent = self
         self.environment.coordinateSpaces.compact()
         self.environment.coordinateSpaces.containers[Self.rootCoordinateSpace.name] = WeakBox(self)
@@ -62,7 +60,7 @@ final class ViewRootNode: ViewNode {
         UILayoutDebugCounters.recordContentInvalidation()
         UILayoutDebugCounters.recordRebuild()
         let inputs = _ViewInputs(parentNode: nil, environment: self.environment)
-        
+
         func makeView<V: View>(_ view: V) -> _ViewOutputs {
             V._makeView(_ViewGraphNode(value: view), inputs: inputs)
         }
@@ -75,10 +73,10 @@ final class ViewRootNode: ViewNode {
 
     override func performLayout() {
         let insets = environment.safeAreaInsets
-        let safeWidth  = max(0, frame.width  - insets.leading - insets.trailing)
-        let safeHeight = max(0, frame.height - insets.top     - insets.bottom)
-        let centerX = insets.leading + safeWidth  * 0.5
-        let centerY = insets.top     + safeHeight * 0.5
+        let safeWidth = max(0, frame.width - insets.leading - insets.trailing)
+        let safeHeight = max(0, frame.height - insets.top - insets.bottom)
+        let centerX = insets.leading + safeWidth * 0.5
+        let centerY = insets.top + safeHeight * 0.5
         contentNode.place(
             in: Point(centerX, centerY),
             anchor: .center,
@@ -89,14 +87,16 @@ final class ViewRootNode: ViewNode {
     override func updateEnvironment(_ environment: EnvironmentValues) {
         let prevVersion = self.environment.version
         super.updateEnvironment(environment)
-        guard self.environment.version != prevVersion else { return }
+        guard self.environment.version != prevVersion else {
+            return
+        }
         contentNode.mergeEnvironment(environment)
     }
 
     override func update(_ deltaTime: AdaUtils.TimeInterval) {
         contentNode.update(deltaTime)
     }
-    
+
     override func draw(with context: UIGraphicsContext) {
         contentNode.draw(with: context)
         super.draw(with: context)

@@ -47,24 +47,34 @@ struct EditorTransformGizmo {
     let shapes: [Shape]
 
     init?(tool: EditorSceneViewportTool, transform: Transform, parent: Transform3D, camera: EditorSceneViewportModel.CameraState, size: Size, is2D: Bool) {
-        guard tool != .select, size.width > 0, size.height > 0, abs(parent.determinant) > 0.000001 else { return nil }
+        guard tool != .select, size.width > 0, size.height > 0, abs(parent.determinant) > 0.000001 else {
+            return nil
+        }
         self.tool = tool
         self.parentMatrix = parent
         self.size = size
         origin = (parent * Vector4(transform.position, 1)).xyz
         viewProjection = camera.projection.makeClipView() * camera.transform.matrix.inverse
         let clip = viewProjection * Vector4(origin, 1)
-        guard clip.w > 0.00001 else { return nil }
+        guard clip.w > 0.00001 else {
+            return nil
+        }
         depth = clip.z / clip.w
-        guard let projected = Self.project(origin, matrix: viewProjection, size: size) else { return nil }
+        guard let projected = Self.project(origin, matrix: viewProjection, size: size) else {
+            return nil
+        }
         screenOrigin = projected
-        guard let neighbor = Self.unproject(projected + Vector2(1, 0), depth: depth, inverse: viewProjection.inverse, size: size) else { return nil }
+        guard let neighbor = Self.unproject(projected + Vector2(1, 0), depth: depth, inverse: viewProjection.inverse, size: size) else {
+            return nil
+        }
         worldLength = (neighbor - origin).length * 80
-        guard worldLength.isFinite, worldLength > 0.000001 else { return nil }
+        guard worldLength.isFinite, worldLength > 0.000001 else {
+            return nil
+        }
         let orientation = tool == .translate ? Transform3D.identity : parent * Transform(rotation: transform.rotation).matrix
         basis = Transform3D(columns: [
             Vector4(orientation.x.xyz.normalized, 0), Vector4(orientation.y.xyz.normalized, 0),
-            Vector4(orientation.z.xyz.normalized, 0), Vector4(origin, 1)
+            Vector4(orientation.z.xyz.normalized, 0), Vector4(origin, 1),
         ])
         let handles: [Handle] = is2D ? (tool == .rotate ? [.z] : [.x, .y]) : [.x, .y, .z]
         var shapes: [Shape] = []
@@ -75,10 +85,14 @@ struct EditorTransformGizmo {
                 for index in 0...64 {
                     let angle = Float(index) * .pi * 2 / 64
                     let local = (u * Math.cos(angle) + v * Math.sin(angle)) * worldLength * 0.8
-                    guard let point = Self.project((basis * Vector4(local, 1)).xyz, matrix: viewProjection, size: size) else { break }
+                    guard let point = Self.project((basis * Vector4(local, 1)).xyz, matrix: viewProjection, size: size) else {
+                        break
+                    }
                     points.append(point)
                 }
-                if points.count == 65 { shapes.append(Shape(handle: handle, points: points)) }
+                if points.count == 65 {
+                    shapes.append(Shape(handle: handle, points: points))
+                }
             } else {
                 let direction = (basis * Vector4(handle.axis, 0)).xyz
                 if let end = Self.project(origin + direction * worldLength, matrix: viewProjection, size: size), (end - projected).squaredLength > 256 {
@@ -91,14 +105,18 @@ struct EditorTransformGizmo {
     }
 
     func hitTest(_ point: Vector2) -> Handle? {
-        if tool != .rotate, abs(point.x - screenOrigin.x) <= 8, abs(point.y - screenOrigin.y) <= 8 { return .center }
+        if tool != .rotate, abs(point.x - screenOrigin.x) <= 8, abs(point.y - screenOrigin.y) <= 8 {
+            return .center
+        }
         var closest: (Handle, Float)?
         for shape in shapes {
             for (a, b) in zip(shape.points, shape.points.dropFirst()) {
                 let segment = b - a
                 let t = max(0, min(1, (point - a).dot(segment) / max(0.0001, segment.squaredLength)))
                 let distance = (point - (a + segment * t)).squaredLength
-                if distance <= 64, distance < (closest?.1 ?? .infinity) { closest = (shape.handle, distance) }
+                if distance <= 64, distance < (closest?.1 ?? .infinity) {
+                    closest = (shape.handle, distance)
+                }
             }
         }
         return closest?.0
@@ -109,11 +127,15 @@ struct EditorTransformGizmo {
         for shape in shapes {
             let color = shape.handle == highlighted ? Color.yellow : shape.handle.color
             var path = Path()
-            if let first = shape.points.first { path.move(to: first) }
+            if let first = shape.points.first {
+                path.move(to: first)
+            }
             for point in shape.points.dropFirst() { path.addLine(to: point) }
             context.stroke(path, with: .black.opacity(0.75), style: StrokeStyle(lineWidth: 5))
             context.stroke(path, with: color, style: StrokeStyle(lineWidth: 2.5))
-            guard tool != .rotate, let end = shape.points.last, let start = shape.points.first else { continue }
+            guard tool != .rotate, let end = shape.points.last, let start = shape.points.first else {
+                continue
+            }
             if tool == .translate {
                 let direction = (end - start).normalized
                 let normal = Vector2(-direction.y, direction.x)
@@ -135,45 +157,65 @@ struct EditorTransformGizmo {
 
     func ray(at point: Vector2) -> Ray? {
         let inverse = viewProjection.inverse
-        guard let near = Self.unproject(point, depth: 0, inverse: inverse, size: size),
-              let far = Self.unproject(point, depth: 0.99, inverse: inverse, size: size) else { return nil }
+        guard
+            let near = Self.unproject(point, depth: 0, inverse: inverse, size: size),
+            let far = Self.unproject(point, depth: 0.99, inverse: inverse, size: size)
+        else {
+            return nil
+        }
         return Ray(origin: near, direction: (far - near).normalized)
     }
 
     func axisParameter(at point: Vector2, handle: Handle) -> Float? {
-        guard let ray = ray(at: point) else { return nil }
+        guard let ray = ray(at: point) else {
+            return nil
+        }
         let axis = (basis * Vector4(handle.axis, 0)).xyz.normalized
         let b = ray.direction.dot(axis)
         let denominator = 1 - b * b
-        guard denominator > 0.00001 else { return nil }
+        guard denominator > 0.00001 else {
+            return nil
+        }
         let w = ray.origin - origin
         return (axis.dot(w) - b * ray.direction.dot(w)) / denominator
     }
 
     func rotationAngle(at point: Vector2, handle: Handle) -> Float? {
-        guard let ray = ray(at: point) else { return nil }
+        guard let ray = ray(at: point) else {
+            return nil
+        }
         let inverse = basis.inverse
         let origin = (inverse * Vector4(ray.origin, 1)).xyz
         let direction = (inverse * Vector4(ray.direction, 0)).xyz
         let divisor = direction.dot(handle.axis)
-        guard abs(divisor) > 0.00001 else { return nil }
+        guard abs(divisor) > 0.00001 else {
+            return nil
+        }
         let local = origin + direction * (-origin.dot(handle.axis) / divisor)
         let (u, v) = handle.planeAxes
-        guard local.squaredLength > 0.000001 else { return nil }
+        guard local.squaredLength > 0.000001 else {
+            return nil
+        }
         return Math.atan2(local.dot(v), local.dot(u))
     }
 
     static func project(_ point: Vector3, matrix: Transform3D, size: Size) -> Vector2? {
         let clip = matrix * Vector4(point, 1)
-        guard clip.w > 0.00001 else { return nil }
+        guard clip.w > 0.00001 else {
+            return nil
+        }
         let ndc = clip.xyz / clip.w
-        guard ndc.x.isFinite, ndc.y.isFinite, ndc.z >= 0, ndc.z <= 1 else { return nil }
+        guard ndc.x.isFinite, ndc.y.isFinite, ndc.z >= 0, ndc.z <= 1 else {
+            return nil
+        }
         return Vector2((ndc.x + 1) * size.width / 2, (1 - ndc.y) * size.height / 2)
     }
 
     static func unproject(_ point: Vector2, depth: Float, inverse: Transform3D, size: Size) -> Vector3? {
         let world = inverse * Vector4(point.x * 2 / size.width - 1, 1 - point.y * 2 / size.height, depth, 1)
-        guard abs(world.w) > 0.000001 else { return nil }
+        guard abs(world.w) > 0.000001 else {
+            return nil
+        }
         let value = world.xyz / world.w
         return value.x.isFinite && value.y.isFinite && value.z.isFinite ? value : nil
     }
@@ -198,18 +240,26 @@ extension EditorTransformGizmo {
 
         mutating func updated(at point: Vector2) -> Transform {
             var result = transform
-            if point == start, accumulatedAngle == 0 { return result }
+            if point == start, accumulatedAngle == 0 {
+                return result
+            }
             let delta = point - start
             switch gizmo.tool {
             case .select: break
             case .translate:
                 let worldDelta: Vector3
                 if handle == .center {
-                    guard let a = EditorTransformGizmo.unproject(start, depth: gizmo.depth, inverse: gizmo.viewProjection.inverse, size: gizmo.size),
-                          let b = EditorTransformGizmo.unproject(point, depth: gizmo.depth, inverse: gizmo.viewProjection.inverse, size: gizmo.size) else { return result }
+                    guard
+                        let a = EditorTransformGizmo.unproject(start, depth: gizmo.depth, inverse: gizmo.viewProjection.inverse, size: gizmo.size),
+                        let b = EditorTransformGizmo.unproject(point, depth: gizmo.depth, inverse: gizmo.viewProjection.inverse, size: gizmo.size)
+                    else {
+                        return result
+                    }
                     worldDelta = b - a
                 } else {
-                    guard let a = gizmo.axisParameter(at: start, handle: handle), let b = gizmo.axisParameter(at: point, handle: handle) else { return result }
+                    guard let a = gizmo.axisParameter(at: start, handle: handle), let b = gizmo.axisParameter(at: point, handle: handle) else {
+                        return result
+                    }
                     worldDelta = handle.axis * (b - a)
                 }
                 result.position += (gizmo.parentMatrix.inverse * Vector4(worldDelta, 0)).xyz
@@ -219,7 +269,9 @@ extension EditorTransformGizmo {
                     factor = max(0.01, 1 + (delta.x - delta.y) / 120)
                     result.scale = transform.scale * factor
                 } else {
-                    guard let a = gizmo.axisParameter(at: start, handle: handle), let b = gizmo.axisParameter(at: point, handle: handle) else { return result }
+                    guard let a = gizmo.axisParameter(at: start, handle: handle), let b = gizmo.axisParameter(at: point, handle: handle) else {
+                        return result
+                    }
                     factor = max(0.01, 1 + (b - a) / gizmo.worldLength)
                     result.scale[handle.rawValue] *= factor
                 }

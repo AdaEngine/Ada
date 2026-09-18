@@ -16,24 +16,27 @@ extension EditorInspectorSidebar {
     @ViewBuilder
     var addComponentPicker: some View {
         if let selectedEntity = viewModel.selectedEntity, !selectedEntity.addableComponents.isEmpty {
-            Button(action: {
-                activeSceneFieldID = nil
-                viewModel.presentComponentPicker()
-            }, label: {
-                HStack(spacing: 6) {
-                    Text("+").font(.system(size: 15))
-                    Text("Add Component").font(.system(size: 11))
-                    Spacer()
-                    Text("\u{E5CC}")
-                        .font(AdaEditorMaterialSymbolFont.font(size: 16))
+            Button(
+                action: {
+                    activeSceneFieldID = nil
+                    viewModel.presentComponentPicker()
+                },
+                label: {
+                    HStack(spacing: 6) {
+                        Text("+").font(.system(size: 15))
+                        Text("Add Component").font(.system(size: 11))
+                        Spacer()
+                        Text("\u{E5CC}")
+                            .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                    }
+                    .foregroundColor(theme.editorColors.blue)
+                    .padding(.horizontal, 9)
+                    .frame(height: 30)
+                    .frame(maxWidth: .infinity)
+                    .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.12)))
+                    .overlay { RoundedRectangleShape(cornerRadius: 6).stroke(theme.editorColors.blue.opacity(0.35), lineWidth: 1) }
                 }
-                .foregroundColor(theme.editorColors.blue)
-                .padding(.horizontal, 9)
-                .frame(height: 30)
-                .frame(maxWidth: .infinity)
-                .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.12)))
-                .overlay { RoundedRectangleShape(cornerRadius: 6).stroke(theme.editorColors.blue.opacity(0.35), lineWidth: 1) }
-            })
+            )
             .buttonStyle(DefaultButtonStyle())
             .accessibilityIdentifier("AdaEditor.Inspector.AddComponent")
         }
@@ -46,12 +49,15 @@ extension EditorInspectorSidebar {
                     .font(.system(size: 11))
                     .foregroundColor(theme.editorColors.text)
                 Spacer()
-                Button(action: { viewModel.removeScriptableObjectRequested(object.identifier) }, label: {
-                    Text("\u{E872}")
-                        .font(AdaEditorMaterialSymbolFont.font(size: 16))
-                        .foregroundColor(.red)
-                        .frame(width: 24, height: 24)
-                })
+                Button(
+                    action: { viewModel.removeScriptableObjectRequested(object.identifier) },
+                    label: {
+                        Text("\u{E872}")
+                            .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                            .foregroundColor(.red)
+                            .frame(width: 24, height: 24)
+                    }
+                )
                 .buttonStyle(DefaultButtonStyle())
             }
             ForEach(object.fields, id: \.field.id) { field in
@@ -72,22 +78,25 @@ extension EditorInspectorSidebar {
     }
 
     func addScriptableObjectButton(_ descriptor: EditorScriptableObjectDescriptor) -> some View {
-        Button(action: { viewModel.addScriptableObjectRequested(descriptor) }, label: {
-            HStack(spacing: 6) {
-                Text("+")
-                    .foregroundColor(theme.editorColors.purple)
-                Text(descriptor.name)
-                    .foregroundColor(theme.editorColors.text)
-                Spacer()
-                Text(descriptor.sourcePath)
-                    .foregroundColor(theme.editorColors.muted)
-                    .lineLimit(1)
+        Button(
+            action: { viewModel.addScriptableObjectRequested(descriptor) },
+            label: {
+                HStack(spacing: 6) {
+                    Text("+")
+                        .foregroundColor(theme.editorColors.purple)
+                    Text(descriptor.name)
+                        .foregroundColor(theme.editorColors.text)
+                    Spacer()
+                    Text(descriptor.sourcePath)
+                        .foregroundColor(theme.editorColors.muted)
+                        .lineLimit(1)
+                }
+                .font(.system(size: 10))
+                .padding(.horizontal, 8)
+                .frame(height: 26)
+                .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surface))
             }
-            .font(.system(size: 10))
-            .padding(.horizontal, 8)
-            .frame(height: 26)
-            .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surface))
-        })
+        )
         .buttonStyle(DefaultButtonStyle())
         .accessibilityIdentifier("AdaEditor.Inspector.AddScriptableObject.\(descriptor.identifier)")
     }
@@ -183,12 +192,15 @@ struct EditorAddComponentDialog: View {
                 .frame(minWidth: 0, maxWidth: .infinity)
                 .accessibilityIdentifier("AdaEditor.Inspector.ComponentSearch")
             if !viewModel.componentSearchText.isEmpty {
-                Button(action: { viewModel.componentSearchText = "" }, label: {
-                    Text("\u{E5CD}")
-                        .font(AdaEditorMaterialSymbolFont.font(size: 16))
-                        .foregroundColor(theme.editorColors.muted)
-                        .frame(width: 26, height: 26)
-                })
+                Button(
+                    action: { viewModel.componentSearchText = "" },
+                    label: {
+                        Text("\u{E5CD}")
+                            .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                            .foregroundColor(theme.editorColors.muted)
+                            .frame(width: 26, height: 26)
+                    }
+                )
                 .buttonStyle(DefaultButtonStyle())
                 .accessibilityIdentifier("AdaEditor.AddComponent.ClearSearch")
             }
@@ -285,14 +297,17 @@ private struct EditorAddComponentRow: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        Button(action: onAdd, label: {
-            content
-                .padding(.horizontal, 12)
-                .frame(minHeight: 64)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(rowBackground)
-                .overlay { rowBorder }
-        })
+        Button(
+            action: onAdd,
+            label: {
+                content
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 64)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(rowBackground)
+                    .overlay { rowBorder }
+            }
+        )
         .buttonStyle(DefaultButtonStyle())
         .onHover(perform: onHover)
         .accessibilityIdentifier("AdaEditor.Inspector.AddComponent.\(component.typeName)")

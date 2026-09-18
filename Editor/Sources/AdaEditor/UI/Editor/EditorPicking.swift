@@ -41,14 +41,16 @@ enum EditorPicking {
             (point.x / safeWidth) * 2 - 1,
             1 - (point.y / safeHeight) * 2
         )
-        let up = right.cross(front).normalized
+        // Match the camera basis used by EditorSceneViewportModel.cameraState.
+        // Reversing these operands mirrors every off-center ray vertically.
+        let up = front.cross(right).normalized
         let verticalScale = Math.tanf(verticalFieldOfView.radians * 0.5)
         let horizontalScale = verticalScale * safeWidth / safeHeight
-        let direction = (
-            front
-                + right * ndc.x * horizontalScale
-                + up * ndc.y * verticalScale
-        ).normalized
+        let direction =
+            (front
+            + right * ndc.x * horizontalScale
+            + up * ndc.y * verticalScale)
+            .normalized
         return Ray(origin: cameraPosition, direction: direction)
     }
 
@@ -95,7 +97,7 @@ enum EditorPicking {
             return .empty
         }
         switch bounds.bounds {
-        case .aabb(let aabb):
+        case let .aabb(aabb):
             return aabb
         }
     }

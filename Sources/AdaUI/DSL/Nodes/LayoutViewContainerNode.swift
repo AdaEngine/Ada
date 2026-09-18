@@ -5,12 +5,11 @@
 //  Created by Vladislav Prusakov on 02.07.2024.
 //
 
-import Math
 import AdaUtils
+import Math
 
 /// The container that can layout it childs with specific ``Layout``.
 class LayoutViewContainerNode: ViewContainerNode {
-    
     private(set) var layout: AnyLayout
     private var inherentLayoutProperties: LayoutProperties
     private var bypassSingleChildLayout: Bool
@@ -212,5 +211,4 @@ class LayoutViewContainerNode: ViewContainerNode {
         self.cache = cache
         cacheNeedsUpdate = false
     }
-
 }

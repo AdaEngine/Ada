@@ -37,7 +37,7 @@ public struct TextEditorColors: Hashable, Sendable {
         self.selection = selection
     }
 
-    static let standard = TextEditorColors(
+    static let standard = Self(
         background: Color.fromHex(0xFAFAFA),
         border: Color.fromHex(0x969696),
         focusedBorder: Color.fromHex(0x2D7EFF),
@@ -103,9 +103,9 @@ public struct TextEditorSourceHighlight: Hashable, Sendable {
 public struct TextEditorContextMenuItem {
     public var title: String
     public var action: (() -> Void)?
-    public var submenu: [TextEditorContextMenuItem]
+    public var submenu: [Self]
 
-    public init(title: String, action: (() -> Void)? = nil, submenu: [TextEditorContextMenuItem] = []) {
+    public init(title: String, action: (() -> Void)? = nil, submenu: [Self] = []) {
         self.title = title
         self.action = action
         self.submenu = submenu
@@ -256,12 +256,11 @@ public struct TextEditor: View {
         self.sourceInteraction = sourceInteraction
         self.showsLineNumbers = showsLineNumbers
     }
-
 }
 
 struct TextEditorPrimitive: View, ViewNodeBuilder {
     typealias Body = Never
-    var body: Never { fatalError() }
+    var body: Never { fatalError("Unreachable code") }
 
     let placeholder: String
     let text: Binding<String>
@@ -274,13 +273,13 @@ struct TextEditorPrimitive: View, ViewNodeBuilder {
     }
 }
 
-public extension View {
+extension View {
     /// Sets colors for text editors within this view.
-    func textEditorColors(_ colors: TextEditorColors) -> some View {
+    public func textEditorColors(_ colors: TextEditorColors) -> some View {
         self.environment(\.textEditorColors, colors)
     }
 }
 
-public extension EnvironmentValues {
-    @Entry var textEditorColors: TextEditorColors = .standard
+extension EnvironmentValues {
+    @Entry public var textEditorColors: TextEditorColors = .standard
 }

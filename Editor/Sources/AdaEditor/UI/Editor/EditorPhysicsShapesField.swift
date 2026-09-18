@@ -20,8 +20,10 @@ struct EditorPhysicsShapesField: View {
             ForEach(Array(shapes.indices), id: \.self) { index in
                 shapeRow(index)
             }
-            if let errorMessage { Text(errorMessage).foregroundColor(.red) }
-            Button("+ Add Shape") { }
+            if let errorMessage {
+                Text(errorMessage).foregroundColor(.red)
+            }
+            Button("+ Add Shape") {}
                 .contextMenu(opensOnPrimaryAction: true) {
                     ForEach(EditorPhysicsShapeValue.kinds(is3D: is3D), id: \.rawValue) { kind in
                         Button(kind.rawValue.capitalized) {
@@ -59,7 +61,9 @@ struct EditorPhysicsShapesField: View {
                 if !is3D || kind == .sphere {
                     numberField("Offset X", index: index, kind: kind, property: is3D ? "center.x" : "offset.x")
                     numberField("Offset Y", index: index, kind: kind, property: is3D ? "center.y" : "offset.y")
-                    if is3D { numberField("Offset Z", index: index, kind: kind, property: "center.z") }
+                    if is3D {
+                        numberField("Offset Z", index: index, kind: kind, property: "center.z")
+                    }
                 }
             }
         }
@@ -73,11 +77,14 @@ struct EditorPhysicsShapesField: View {
         case .box:
             numberField("Width", index: index, kind: kind, property: is3D ? "halfExtents.x" : "halfWidth", scale: 2, positive: true)
             numberField("Height", index: index, kind: kind, property: is3D ? "halfExtents.y" : "halfHeight", scale: 2, positive: true)
-            if is3D { numberField("Depth", index: index, kind: kind, property: "halfExtents.z", scale: 2, positive: true) }
-        case .circle, .sphere:
+            if is3D {
+                numberField("Depth", index: index, kind: kind, property: "halfExtents.z", scale: 2, positive: true)
+            }
+        case .circle,
+            .sphere:
             numberField("Radius", index: index, kind: kind, property: "radius", positive: true)
         case .polygon:
-            if case .array(let vertices) = shapes[index].value(at: EditorPhysicsShapeValue.path(kind, "verticies")[...]) {
+            if case let .array(vertices) = shapes[index].value(at: EditorPhysicsShapeValue.path(kind, "verticies")[...]) {
                 ForEach(Array(vertices.indices), id: \.self) { vertex in
                     numberField("Point \(vertex + 1) X", index: index, kind: kind, property: "verticies.\(vertex).x")
                     numberField("Point \(vertex + 1) Y", index: index, kind: kind, property: "verticies.\(vertex).y")
@@ -87,20 +94,23 @@ struct EditorPhysicsShapesField: View {
     }
 
     private func kindBinding(_ index: Int) -> Binding<String> {
-        Binding(get: {
-            guard shapes.indices.contains(index) else {
-                return "box"
+        Binding(
+            get: {
+                guard shapes.indices.contains(index) else {
+                    return "box"
+                }
+                return EditorPhysicsShapeValue.kind(of: shapes[index])?.rawValue ?? "box"
+            },
+            set: { rawValue in
+                guard let kind = EditorPhysicsShapeValue.Kind(rawValue: rawValue), shapes.indices.contains(index) else {
+                    return
+                }
+                var values = shapes
+                values[index] = EditorPhysicsShapeValue.make(kind, is3D: is3D)
+                numericDrafts = [:]
+                save(values)
             }
-            return EditorPhysicsShapeValue.kind(of: shapes[index])?.rawValue ?? "box"
-        }, set: { rawValue in
-            guard let kind = EditorPhysicsShapeValue.Kind(rawValue: rawValue), shapes.indices.contains(index) else {
-                return
-            }
-            var values = shapes
-            values[index] = EditorPhysicsShapeValue.make(kind, is3D: is3D)
-            numericDrafts = [:]
-            save(values)
-        })
+        )
     }
 
     private func numberField(
@@ -113,23 +123,33 @@ struct EditorPhysicsShapesField: View {
     ) -> some View {
         HStack {
             Text(title).frame(width: 90, alignment: .leading)
-            TextField("0", text: Binding(get: {
-                if let draft = numericDrafts["\(index).\(property)"] {
-                    return draft
-                }
-                guard shapes.indices.contains(index) else {
-                    return "0"
-                }
-                let value = shapes[index].value(at: EditorPhysicsShapeValue.path(kind, property)[...])?.doubleValue ?? 0
-                return EditorSceneModelFormatting.format(value * scale)
-            }, set: { rawValue in
-                numericDrafts["\(index).\(property)"] = rawValue
-                guard let number = Double(rawValue), Float(number).isFinite, !positive || number > 0,
-                      shapes.indices.contains(index) else { return }
-                var values = shapes
-                values[index].setValue(.double(number / scale), at: EditorPhysicsShapeValue.path(kind, property)[...])
-                save(values)
-            }))
+            TextField(
+                "0",
+                text: Binding(
+                    get: {
+                        if let draft = numericDrafts["\(index).\(property)"] {
+                            return draft
+                        }
+                        guard shapes.indices.contains(index) else {
+                            return "0"
+                        }
+                        let value = shapes[index].value(at: EditorPhysicsShapeValue.path(kind, property)[...])?.doubleValue ?? 0
+                        return EditorSceneModelFormatting.format(value * scale)
+                    },
+                    set: { rawValue in
+                        numericDrafts["\(index).\(property)"] = rawValue
+                        guard
+                            let number = Double(rawValue), Float(number).isFinite, !positive || number > 0,
+                            shapes.indices.contains(index)
+                        else {
+                            return
+                        }
+                        var values = shapes
+                        values[index].setValue(.double(number / scale), at: EditorPhysicsShapeValue.path(kind, property)[...])
+                        save(values)
+                    }
+                )
+            )
             .textFieldStyle(PlainTextFieldStyle())
             .padding(.horizontal, 8)
             .frame(height: 28)

@@ -77,7 +77,7 @@ struct AdaEngineStyleLayoutMetrics: Hashable {
         let minimumWidth: Float = size.width < 520 ? 120 : 180
         return clamped(availableWidth, min: minimumWidth, max: 520)
     }
-    
+
     var workspaceSpacer: Float = 4
 
     var panelSpacing: Float {
@@ -133,7 +133,7 @@ struct AdaEngineStyleLayoutMetrics: Hashable {
         }
         return AdaEngineStyleContent.aiChips
     }
-    
+
     var panelsRoundedCorner: Float = 12
 
     var outputTabs: [String] {

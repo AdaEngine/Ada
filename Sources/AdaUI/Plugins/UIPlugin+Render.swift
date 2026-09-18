@@ -8,7 +8,6 @@
 import AdaApp
 import AdaCorePipelines
 import AdaECS
-import AdaRender
 @_spi(Internal) import AdaRender
 import AdaText
 import AdaUtils
@@ -107,17 +106,20 @@ public func ExtractUIComponents(
     extractedUIComponents.components.removeAll(keepingCapacity: true)
     extractedUIContexts.contexts.removeAll(keepingCapacity: true)
 
-    pendingViews().windows.forEach {
-        extractedUIComponents.components.append(
-            UIComponent(view: $0, behaviour: .default, windowRef: .windowId($0.id))
-        )
-    }
-    uiComponents().forEach {
-        extractedUIComponents.components.append($0)
-    }
+    pendingViews().windows
+        .forEach {
+            extractedUIComponents.components.append(
+                UIComponent(view: $0, behaviour: .default, windowRef: .windowId($0.id))
+            )
+        }
+    uiComponents()
+        .forEach {
+            extractedUIComponents.components.append($0)
+        }
     extractedUIContexts.contexts.append(contentsOf: contexts().contexts)
 
-    buildState.needsRebuild = redrawRequest().needsRedraw
+    buildState.needsRebuild =
+        redrawRequest().needsRedraw
         || !pendingViews().windows.isEmpty
         || !contexts().contexts.isEmpty
 }
@@ -156,7 +158,6 @@ public func UIRenderPreparing(
 /// System that tessellates UI draw commands into vertex and index data.
 @PlainSystem
 public struct UIRenderTesselationSystem {
-
     /// Maximum number of textures per batch.
     private static let maxTexturesPerBatch = 16
 
@@ -181,9 +182,9 @@ public struct UIRenderTesselationSystem {
     @Res<UIRenderPipelines>
     private var renderPipelines
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         guard buildState.needsRebuild else {
             return
         }
@@ -218,9 +219,10 @@ public struct UIRenderTesselationSystem {
                         rootState.drawDataItems.removeAll(keepingCapacity: true)
                         inheritedState = rootState
                     } else if layerStack[layerStack.count - 1].mode == .building {
-                        flushStateIfNeeded(&layerStack[layerStack.count - 1].state, renderDevice: renderDevice.renderDevice).map {
-                            layerStack[layerStack.count - 1].state.drawDataItems.append($0)
-                        }
+                        flushStateIfNeeded(&layerStack[layerStack.count - 1].state, renderDevice: renderDevice.renderDevice)
+                            .map {
+                                layerStack[layerStack.count - 1].state.drawDataItems.append($0)
+                            }
                         appendRenderItems(layerStack[layerStack.count - 1].state.drawDataItems, sortKey: &sortKey, windowId: windowId)
                         layerStack[layerStack.count - 1].state.drawDataItems.removeAll(keepingCapacity: true)
                         inheritedState = layerStack[layerStack.count - 1].state
@@ -228,11 +230,11 @@ public struct UIRenderTesselationSystem {
 
                     let canUseLayerCache = cacheable
                     if canUseLayerCache,
-                       let cached = layerDrawCache.entries[id],
-                       cached.version == version,
-                       cached.cacheable,
-                       cached.clipRect == inheritedState.currentClipRect,
-                       cached.clipPolygons == inheritedState.currentClipPolygons {
+                        let cached = layerDrawCache.entries[id],
+                        cached.version == version,
+                        cached.cacheable,
+                        cached.clipRect == inheritedState.currentClipRect,
+                        cached.clipPolygons == inheritedState.currentClipPolygons {
                         appendRenderItems(cached.drawDataItems, sortKey: &sortKey, windowId: windowId)
                         layerStack.append(ActiveLayer(id: id, version: version, mode: .skipping, cacheable: cacheable, state: inheritedState))
                     } else {
@@ -285,7 +287,8 @@ public struct UIRenderTesselationSystem {
             flushStateIfNeeded(
                 &rootState,
                 renderDevice: renderDevice.renderDevice
-            ).map { rootState.drawDataItems.append($0) }
+            )
+            .map { rootState.drawDataItems.append($0) }
             appendRenderItems(rootState.drawDataItems, sortKey: &sortKey, windowId: windowId)
         }
 
@@ -430,8 +433,11 @@ public struct UIRenderTesselationSystem {
         tessellator: UITessellator,
         renderDevice: any RenderDevice
     ) {
+        // These stacks contain optional values, making popLast() doubly optional.
+        // swiftlint:disable redundant_nil_coalescing
         switch command {
-        case .beginLayer, .endLayer:
+        case .beginLayer,
+            .endLayer:
             break
         case let .pushClipRect(rect):
             flushStateIfNeeded(&state, renderDevice: renderDevice).map { state.drawDataItems.append($0) }
@@ -708,14 +714,15 @@ public struct UIRenderTesselationSystem {
 
             for line in textLayout.textLines {
                 let lineBounds = textLayout.visualBounds(for: line)
-                let lineOffsetX: Float = switch textAlignment {
-                case .center:
-                    -((lineBounds.minX + lineBounds.maxX) / 2)
-                case .leading:
-                    -lineBounds.minX
-                case .trailing:
-                    -lineBounds.maxX
-                }
+                let lineOffsetX: Float =
+                    switch textAlignment {
+                    case .center:
+                        -((lineBounds.minX + lineBounds.maxX) / 2)
+                    case .leading:
+                        -lineBounds.minX
+                    case .trailing:
+                        -lineBounds.maxX
+                    }
 
                 for run in line {
                     for glyph in run {
@@ -770,6 +777,7 @@ public struct UIRenderTesselationSystem {
         case .commit:
             flushStateIfNeeded(&state, renderDevice: renderDevice).map { state.drawDataItems.append($0) }
         }
+        // swiftlint:enable redundant_nil_coalescing
     }
 
     // MARK: - Private Helpers
@@ -940,7 +948,7 @@ public struct UITransparentRenderItem: RenderItem {
     public var windowId: WindowID?
     public var entity: Entity.ID
     public var drawPass: any DrawPass
-    public var batchRange: Range<Int32>? = nil
+    public var batchRange: Range<Int32>?
     public var renderPipeline: UIRenderPipelines
     public var drawData: UIDrawData
 

@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 @_spi(Internal) import AdaUI
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor preview viewport")
 @MainActor

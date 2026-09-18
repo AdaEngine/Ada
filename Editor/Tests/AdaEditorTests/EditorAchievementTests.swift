@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorAchievementTests {
@@ -98,12 +99,16 @@ struct EditorAchievementTests {
         var scene = EditorSceneModel.default(projectName: "Bindings")
         let entity = scene.addEntity()
         let index = try #require(scene.entities.firstIndex { $0.id == entity.id })
-        let binding = try String(decoding: JSONEncoder().encode(["value": UIScriptFieldBinding(script: "Counter", field: "count")]), as: UTF8.self)
+        let binding = try #require(
+            String(bytes: JSONEncoder().encode(["value": UIScriptFieldBinding(script: "Counter", field: "count")]), encoding: .utf8)
+        )
         scene.entities[index].components[EditorBuiltInComponentType.uiComponent] = ["scriptBindings": .string(binding)]
         #expect(EditorAchievementRules.playedScene(scene, adaScript: true)[.binding] == nil)
-        scene.entities[index].components[EditorBuiltInComponentType.scriptableComponents] = ["scripts": .array([
-            .object(["type": .string("Counter"), "payload": .object(["count": .int(0)])])
-        ])]
+        scene.entities[index].components[EditorBuiltInComponentType.scriptableComponents] = [
+            "scripts": .array([
+                .object(["type": .string("Counter"), "payload": .object(["count": .int(0)])])
+            ])
+        ]
         #expect(EditorAchievementRules.playedScene(scene, adaScript: true)[.binding] == 1)
         #expect(EditorAchievementRules.playedScene(scene, adaScript: false)[.binding] == nil)
     }
@@ -235,13 +240,29 @@ struct EditorAchievementTests {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let original = try UISceneDocument().encodedYAML()
-        let ui = UISceneDocument(root: .init(type: "VStack", children: [.init(type: "HStack", children:
-            (0..<5).map { _ in .init(type: "Text", arguments: ["text": .init(value: .string("Hello, Ada!"))]) }
-        )]))
+        let ui = UISceneDocument(
+            root: .init(
+                type: "VStack",
+                children: [
+                    .init(
+                        type: "HStack",
+                        children: (0..<5).map { _ in .init(type: "Text", arguments: ["text": .init(value: .string("Hello, Ada!"))]) }
+                    )
+                ]
+            )
+        )
         let url = root.appendingPathComponent("Screen.ui")
         try original.write(to: url, atomically: true, encoding: .utf8)
-        let text = EditorTextDocument(id: "ui", title: "Screen.ui", relativePath: "Screen.ui", absolutePath: url.path,
-                                      language: .plainText, content: try ui.encodedYAML(), lastSavedContent: original, isDirty: true)
+        let text = EditorTextDocument(
+            id: "ui",
+            title: "Screen.ui",
+            relativePath: "Screen.ui",
+            absolutePath: url.path,
+            language: .plainText,
+            content: try ui.encodedYAML(),
+            lastSavedContent: original,
+            isDirty: true
+        )
         let center = EditorAchievementCenter()
         let workbench = EditorWorkbenchViewModel(openDocuments: [.ui(text)], activeDocumentID: "ui")
         workbench.achievements = center
@@ -277,9 +298,17 @@ struct EditorAchievementTests {
     }
 
     private func makeWorkbench(_ scene: EditorSceneModel, url: URL, content: String, center: EditorAchievementCenter) -> EditorWorkbenchViewModel {
-        let document = EditorSceneDocument(id: "scene", title: "Main.ascn", relativePath: "Main.ascn", absolutePath: url.path,
-                                          content: content, lastSavedContent: content, sceneModel: scene, isDirty: false,
-                                          loadSummary: .empty)
+        let document = EditorSceneDocument(
+            id: "scene",
+            title: "Main.ascn",
+            relativePath: "Main.ascn",
+            absolutePath: url.path,
+            content: content,
+            lastSavedContent: content,
+            sceneModel: scene,
+            isDirty: false,
+            loadSummary: .empty
+        )
         let workbench = EditorWorkbenchViewModel(openDocuments: [.scene(document)], activeDocumentID: "scene")
         workbench.achievements = center
         return workbench
@@ -304,15 +333,23 @@ private final class AchievementTestProvider: EditorAchievementProvider {
     var loads = 0
     var continuation: CheckedContinuation<[EditorAchievementID: Double], Never>?
 
-    func authenticate() { authenticationCount += 1; playerID = "A"; onPlayerChanged?(playerID) }
+    func authenticate() {
+        authenticationCount += 1
+        playerID = "A"
+        onPlayerChanged?(playerID)
+    }
     func load() async throws -> [EditorAchievementID: Double] {
         loads += 1
-        if pauseLoad { return await withCheckedContinuation { continuation = $0 } }
+        if pauseLoad {
+            return await withCheckedContinuation { continuation = $0 }
+        }
         return remote
     }
     func report(_ progress: [EditorAchievementID: Double]) async throws {
         reports.append(progress)
-        if failReports { throw CocoaError(.fileReadUnknown) }
+        if failReports {
+            throw CocoaError(.fileReadUnknown)
+        }
         remote.merge(progress) { max($0, $1) }
     }
     func showAchievements() {}

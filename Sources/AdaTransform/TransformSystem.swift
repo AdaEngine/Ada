@@ -12,7 +12,6 @@ import Math
 /// A system that updates the global transform of the entity.
 @PlainSystem
 public struct TransformSystem {
-    
     @FilterQuery<
         Entity,
         Transform,
@@ -28,9 +27,9 @@ public struct TransformSystem {
     @Commands
     private var commands
 
-    public init(world: World) { }
-    
-    public func update(context: UpdateContext) async {
+    public init(world _: World) {}
+
+    public func update(context _: UpdateContext) async {
         self.query.forEach { _, transform, globalTransform in
             globalTransform.wrappedValue = GlobalTransform(matrix: transform.matrix)
         }
@@ -42,7 +41,6 @@ public struct TransformSystem {
     .after(TransformSystem.self)
 ])
 public struct ChildTransformSystem {
-    
     @FilterQuery<
         Entity,
         Transform,
@@ -59,8 +57,8 @@ public struct ChildTransformSystem {
     @Commands
     private var commands
 
-    public init(world: World) { }
-    
+    public init(world _: World) {}
+
     public func update(context: UpdateContext) async {
         self.query.forEach { entity, transform, relationship in
             let globalTransform = resolveGlobalTransform(
@@ -93,16 +91,15 @@ public struct ChildTransformSystem {
         var visited = Set([entity.id])
 
         while let currentParentId = parentId,
-              visited.insert(currentParentId).inserted,
-              let parentTransform = world.get(Transform.self, from: currentParentId)
-        {
+            visited.insert(currentParentId).inserted,
+            let parentTransform = world.get(Transform.self, from: currentParentId) {
             matrix = parentTransform.matrix * matrix
             parentId = world.get(RelationshipComponent.self, from: currentParentId)?.parent
         }
 
         return GlobalTransform(matrix: matrix)
     }
-    
+
     /// Update the children of the entity.
     ///
     /// - Parameter children: The children of the entity.

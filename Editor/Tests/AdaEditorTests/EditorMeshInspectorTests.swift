@@ -26,15 +26,21 @@ struct EditorMeshInspectorTests {
         container.layoutIfNeeded()
         let context = UIGraphicsContext()
         container.viewTree.rootNode.draw(with: context)
-        let strokes = context.getDrawCommands().compactMap { command -> Path? in
-            guard case .drawPath(let path, _, .stroke) = command else {
-                return nil
+        let strokes = context.getDrawCommands()
+            .compactMap { command -> Path? in
+                guard case let .drawPath(path, _, .stroke) = command else {
+                    return nil
+                }
+                return path
             }
-            return path
-        }
         #expect(strokes.count == 1)
         var lines = 0
-        strokes.first?.forEach { if case .line = $0 { lines += 1 } }
+        strokes.first?
+            .forEach {
+                if case .line = $0 {
+                    lines += 1
+                }
+            }
         #expect(lines == 2)
         #expect(ContextMenuMetrics.titleWidth(menuWidth: 184, hasSubmenu: false, hasSelection: true) == 144)
     }
@@ -64,7 +70,7 @@ struct EditorMeshInspectorTests {
         let type = is3D ? EditorBuiltInComponentType.mesh3D : EditorBuiltInComponentType.mesh2D
         let descriptor = try #require(EditorComponentRegistry.descriptor(named: type))
         let field = try #require(descriptor.fields.first { $0.key == "mesh" })
-        guard case .enumeration(let choices) = field.kind else {
+        guard case let .enumeration(choices) = field.kind else {
             Issue.record("Missing mesh picker")
             return
         }
@@ -137,7 +143,11 @@ struct EditorMeshInspectorTests {
             let action = try #require(menu?.items.first { $0.title == choice }?.action)
             action()
             selected = choice
-            for _ in 0..<10 { await Task.yield(); container.update(1.0 / 60.0); container.layoutIfNeeded() }
+            for _ in 0..<10 {
+                await Task.yield()
+                container.update(1.0 / 60.0)
+                container.layoutIfNeeded()
+            }
             let payload = try #require(scene.entities.first { $0.id == entity.id }?.components[EditorBuiltInComponentType.mesh2D])
             let live = try #require(EditorComponentRegistry.decode(typeName: EditorBuiltInComponentType.mesh2D, payload: payload) as? Mesh2D)
             #expect(live.mesh.models.first?.parts.first?.meshDescriptor.name == choice)

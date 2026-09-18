@@ -32,7 +32,6 @@ import AdaAssets
 /// When you declared material struct, you can pass it to the ``CustomMaterial`` object where main magic happens.
 ///
 public protocol ReflectedMaterial: ShaderBindable {
-    
     /// Configure and pass shader source for custom material.
     /// - Returns: A shader sources for vertex shader.
     static func vertexShader() throws -> AssetHandle<ShaderSource>
@@ -40,7 +39,7 @@ public protocol ReflectedMaterial: ShaderBindable {
     /// Configure and pass shader source for custom material.
     /// - Returns: A shader sources for fragment shader.
     static func fragmentShader() throws -> AssetHandle<ShaderSource>
-    
+
     /// Configure shader defines for specific vertex descriptor and keys.
     /// You can use this method to configure definitions specificly for you shader code.
     /// - Parameter keys: The set of keys for specific environment.
@@ -50,7 +49,7 @@ public protocol ReflectedMaterial: ShaderBindable {
         keys: Set<String>,
         vertexDescriptor: VertexDescriptor
     ) -> [ShaderDefine]
-    
+
     /// Configure render pipeline with given keys, shaders and vertex descriptor.
     /// You can use this method to configure render pipeline whatever you want.
     /// - Parameter keys: The set of keys for specific environment.

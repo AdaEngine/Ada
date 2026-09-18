@@ -33,11 +33,11 @@ struct EditorRegistryAgent: Codable, Identifiable, Equatable, Sendable {
 
     static var platform: String {
         #if os(macOS) && arch(arm64)
-        "darwin-aarch64"
+            "darwin-aarch64"
         #elseif os(macOS)
-        "darwin-x86_64"
+            "darwin-x86_64"
         #else
-        "unsupported"
+            "unsupported"
         #endif
     }
 }
@@ -62,9 +62,10 @@ enum EditorAgentDiscovery {
     static func searchPaths(environment: [String: String], home: URL, fileManager: FileManager = .default) -> [String] {
         var paths = (environment["PATH"] ?? "").components(separatedBy: ":").filter { $0.hasPrefix("/") }
         paths += ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
-        paths += [".local/bin", ".npm-global/bin", ".bun/bin", ".volta/bin", ".cargo/bin", ".opencode/bin"].map {
-            home.appendingPathComponent($0).path
-        }
+        paths += [".local/bin", ".npm-global/bin", ".bun/bin", ".volta/bin", ".cargo/bin", ".opencode/bin"]
+            .map {
+                home.appendingPathComponent($0).path
+            }
         let nvm = home.appendingPathComponent(".nvm/versions/node")
         let versions = (try? fileManager.contentsOfDirectory(atPath: nvm.path)) ?? []
         paths += versions.sorted { $0.compare($1, options: .numeric) == .orderedDescending }
@@ -79,7 +80,9 @@ enum EditorAgentDiscovery {
             let path = URL(fileURLWithPath: directory).appendingPathComponent(name).path
             var isDirectory: ObjCBool = false
             if fileManager.fileExists(atPath: path, isDirectory: &isDirectory), !isDirectory.boolValue,
-               fileManager.isExecutableFile(atPath: path) { return path }
+                fileManager.isExecutableFile(atPath: path) {
+                return path
+            }
         }
         return nil
     }
@@ -91,14 +94,19 @@ enum EditorAgentDiscovery {
             ("gemini", "Gemini CLI", [("gemini", ["--acp"])]),
             ("opencode", "OpenCode", [("opencode", ["acp"])]),
             ("github-copilot-cli", "GitHub Copilot", [("copilot", ["--acp"])]),
-            ("sloppy-acp", "Sloppy", [("sloppy-acp", [])])
+            ("sloppy-acp", "Sloppy", [("sloppy-acp", [])]),
         ]
         return candidates.compactMap { id, name, commands in
             for (command, arguments) in commands {
                 if let path = executable(command, paths: paths) {
-                    return EditorDiscoveredAgent(id: id, name: name, path: path, target: arguments.map {
-                        AdaProjectAgentTarget(command: path, arguments: $0, environment: ["PATH": paths.joined(separator: ":")])
-                    })
+                    return EditorDiscoveredAgent(
+                        id: id,
+                        name: name,
+                        path: path,
+                        target: arguments.map {
+                            AdaProjectAgentTarget(command: path, arguments: $0, environment: ["PATH": paths.joined(separator: ":")])
+                        }
+                    )
                 }
             }
             return nil

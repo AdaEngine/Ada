@@ -17,8 +17,10 @@ extension EditorSceneModel {
 
     mutating func renameEntity(_ entityID: String, to rawName: String) -> Bool {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty,
-              let index = entities.firstIndex(where: { $0.id == entityID }) else {
+        guard
+            !name.isEmpty,
+            let index = entities.firstIndex(where: { $0.id == entityID })
+        else {
             return false
         }
         entities[index].name = name
@@ -34,8 +36,10 @@ extension EditorSceneModel {
     }
 
     mutating func deleteEntity(_ entityID: String) -> Bool {
-        guard !isRootEntity(entityID),
-              let entity = entities.first(where: { $0.id == entityID }) else {
+        guard
+            !isRootEntity(entityID),
+            let entity = entities.first(where: { $0.id == entityID })
+        else {
             return false
         }
 
@@ -55,13 +59,16 @@ extension EditorSceneModel {
     }
 
     mutating func duplicateEntity(_ entityID: String) -> EditorSceneEntity? {
-        guard !isRootEntity(entityID),
-              let entity = entities.first(where: { $0.id == entityID }) else {
+        guard
+            !isRootEntity(entityID),
+            let entity = entities.first(where: { $0.id == entityID })
+        else {
             return nil
         }
-        let sourceEntities = subtreeEntityIDs(rootedAt: entityID).compactMap { sourceID in
-            entities.first(where: { $0.id == sourceID })
-        }
+        let sourceEntities = subtreeEntityIDs(rootedAt: entityID)
+            .compactMap { sourceID in
+                entities.first(where: { $0.id == sourceID })
+            }
         return cloneSubtree(
             sourceEntities,
             rootEntityID: entityID,
@@ -71,15 +78,18 @@ extension EditorSceneModel {
     }
 
     func clipboardPayload(for entityID: String) -> String? {
-        let copiedEntities = subtreeEntityIDs(rootedAt: entityID).compactMap { sourceID in
-            entities.first(where: { $0.id == sourceID })
-        }
+        let copiedEntities = subtreeEntityIDs(rootedAt: entityID)
+            .compactMap { sourceID in
+                entities.first(where: { $0.id == sourceID })
+            }
         guard !copiedEntities.isEmpty else {
             return nil
         }
         let payload = EditorSceneEntityClipboardPayload(rootEntityID: entityID, entities: copiedEntities)
-        guard let data = try? JSONEncoder().encode(payload),
-              let json = String(data: data, encoding: .utf8) else {
+        guard
+            let data = try? JSONEncoder().encode(payload),
+            let json = String(bytes: data, encoding: .utf8)
+        else {
             return nil
         }
         return EditorSceneEntityClipboardPayload.prefix + json
@@ -90,8 +100,10 @@ extension EditorSceneModel {
     }
 
     mutating func pasteEntity(from value: String, parentID: String?) -> EditorSceneEntity? {
-        guard let payload = Self.decodeClipboardPayload(value),
-              let sourceRoot = payload.entities.first(where: { $0.id == payload.rootEntityID }) else {
+        guard
+            let payload = Self.decodeClipboardPayload(value),
+            let sourceRoot = payload.entities.first(where: { $0.id == payload.rootEntityID })
+        else {
             return nil
         }
         let resolvedParentID = parentID.flatMap { requestedID in
@@ -106,18 +118,22 @@ extension EditorSceneModel {
     }
 
     func canReparentEntity(_ entityID: String, to parentID: String) -> Bool {
-        guard entityID != parentID,
-              !isRootEntity(entityID),
-              entities.contains(where: { $0.id == entityID }),
-              entities.contains(where: { $0.id == parentID }) else {
+        guard
+            entityID != parentID,
+            !isRootEntity(entityID),
+            entities.contains(where: { $0.id == entityID }),
+            entities.contains(where: { $0.id == parentID })
+        else {
             return false
         }
         return !Set(subtreeEntityIDs(rootedAt: entityID)).contains(parentID)
     }
 
     mutating func reparentEntity(_ entityID: String, to parentID: String) -> Bool {
-        guard canReparentEntity(entityID, to: parentID),
-              let index = entities.firstIndex(where: { $0.id == entityID }) else {
+        guard
+            canReparentEntity(entityID, to: parentID),
+            let index = entities.firstIndex(where: { $0.id == entityID })
+        else {
             return false
         }
         entities[index].parent = parentID
@@ -131,8 +147,8 @@ extension EditorSceneModel {
     }
 }
 
-private extension EditorSceneModel {
-    func subtreeEntityIDs(rootedAt rootID: String) -> [String] {
+extension EditorSceneModel {
+    private func subtreeEntityIDs(rootedAt rootID: String) -> [String] {
         guard entities.contains(where: { $0.id == rootID }) else {
             return []
         }
@@ -154,18 +170,20 @@ private extension EditorSceneModel {
         return result
     }
 
-    mutating func cloneSubtree(
+    private mutating func cloneSubtree(
         _ sourceEntities: [EditorSceneEntity],
         rootEntityID: String,
         parentID: String?,
         rootName: String
     ) -> EditorSceneEntity? {
         let sourceIDs = Set(sourceEntities.map(\.id))
-        guard sourceIDs.count == sourceEntities.count,
-              sourceIDs.contains(rootEntityID),
-              sourceEntities.allSatisfy({ entity in
-                  entity.id == rootEntityID || entity.parent.map(sourceIDs.contains) == true
-              }) else {
+        guard
+            sourceIDs.count == sourceEntities.count,
+            sourceIDs.contains(rootEntityID),
+            sourceEntities.allSatisfy({ entity in
+                entity.id == rootEntityID || entity.parent.map(sourceIDs.contains) == true
+            })
+        else {
             return nil
         }
 
@@ -182,9 +200,11 @@ private extension EditorSceneModel {
             }
             return clone
         }
-        guard clonedEntities.count == sourceEntities.count,
-              let clonedRootID = idMapping[rootEntityID],
-              let clonedRoot = clonedEntities.first(where: { $0.id == clonedRootID }) else {
+        guard
+            clonedEntities.count == sourceEntities.count,
+            let clonedRootID = idMapping[rootEntityID],
+            let clonedRoot = clonedEntities.first(where: { $0.id == clonedRootID })
+        else {
             return nil
         }
 
@@ -200,7 +220,7 @@ private extension EditorSceneModel {
         return clonedRoot
     }
 
-    func uniqueCopyName(for sourceName: String, parentID: String?) -> String {
+    private func uniqueCopyName(for sourceName: String, parentID: String?) -> String {
         let baseName = sourceName.hasSuffix(" Copy") ? sourceName : "\(sourceName) Copy"
         let siblingNames = Set(entities.filter { $0.parent == parentID }.map(\.name))
         guard siblingNames.contains(baseName) else {
@@ -213,27 +233,31 @@ private extension EditorSceneModel {
         return "\(baseName) \(suffix)"
     }
 
-    static func decodeClipboardPayload(_ value: String) -> EditorSceneEntityClipboardPayload? {
+    private static func decodeClipboardPayload(_ value: String) -> EditorSceneEntityClipboardPayload? {
         guard value.hasPrefix(EditorSceneEntityClipboardPayload.prefix) else {
             return nil
         }
         let json = String(value.dropFirst(EditorSceneEntityClipboardPayload.prefix.count))
-        guard let data = json.data(using: .utf8),
-              let payload = try? JSONDecoder().decode(EditorSceneEntityClipboardPayload.self, from: data),
-              payload.version == EditorSceneEntityClipboardPayload.currentVersion,
-              isValidClipboardSubtree(payload) else {
+        guard
+            let data = json.data(using: .utf8),
+            let payload = try? JSONDecoder().decode(EditorSceneEntityClipboardPayload.self, from: data),
+            payload.version == EditorSceneEntityClipboardPayload.currentVersion,
+            isValidClipboardSubtree(payload)
+        else {
             return nil
         }
         return payload
     }
 
-    static func isValidClipboardSubtree(_ payload: EditorSceneEntityClipboardPayload) -> Bool {
+    private static func isValidClipboardSubtree(_ payload: EditorSceneEntityClipboardPayload) -> Bool {
         let entityIDs = Set(payload.entities.map(\.id))
-        guard entityIDs.count == payload.entities.count,
-              entityIDs.contains(payload.rootEntityID),
-              payload.entities.allSatisfy({ entity in
-                  entity.id == payload.rootEntityID || entity.parent.map(entityIDs.contains) == true
-              }) else {
+        guard
+            entityIDs.count == payload.entities.count,
+            entityIDs.contains(payload.rootEntityID),
+            payload.entities.allSatisfy({ entity in
+                entity.id == payload.rootEntityID || entity.parent.map(entityIDs.contains) == true
+            })
+        else {
             return false
         }
 

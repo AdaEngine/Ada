@@ -21,7 +21,7 @@ public enum ImageRenderMode: Codable, Sendable {
 
 extension Image: View, ViewNodeBuilder {
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     func buildViewNode(in context: BuildContext) -> ViewNode {
         ImageViewNode(
@@ -35,9 +35,7 @@ extension Image: View, ViewNodeBuilder {
     }
 }
 
-
-public extension Image {
-
+extension Image {
     private enum Keys: String {
         case capInsets
         case resizable
@@ -47,7 +45,7 @@ public extension Image {
     /// Make the image resizable.
     ///
     /// - Returns: The image view.
-    func resizable() -> Image {
+    public func resizable() -> Image {
         var newValue = self
         newValue.options[Keys.resizable.rawValue] = true
         return newValue
@@ -55,7 +53,7 @@ public extension Image {
 
     /// Stretches the center and edges while preserving corners in source-pixel units.
     /// If the destination is smaller than the corners, opposing corners shrink proportionally.
-    func resizable(capInsets: ImageCapInsets) -> Image {
+    public func resizable(capInsets: ImageCapInsets) -> Image {
         var image = resizable()
         image.options[Keys.capInsets.rawValue] = capInsets
         return image
@@ -65,16 +63,14 @@ public extension Image {
     ///
     /// - Parameter mode: The render mode.
     /// - Returns: The image view.
-    func renderMode(_ mode: ImageRenderMode) -> Image {
+    public func renderMode(_ mode: ImageRenderMode) -> Image {
         var newValue = self
         newValue.options[Keys.renderMode.rawValue] = mode
         return newValue
     }
 }
 
-
 final class ImageViewNode: ViewNode {
-
     /// The texture.
     let texture: Texture2D
     private let slices: [(column: Int, row: Int, texture: Texture2D)]
@@ -99,11 +95,13 @@ final class ImageViewNode: ViewNode {
             let grid = ImageSliceGrid(width: image.width, height: image.height, insets: capInsets)
             self.texture = atlas
             self.sliceGrid = grid
-            self.slices = (0..<3).flatMap { row in
-                (0..<3).compactMap { column in
-                    atlas.textureSlice(in: grid.sourceRect(column: column, row: row)).map { (column, row, $0 as Texture2D) }
+            self.slices = (0..<3)
+                .flatMap { row in
+                    (0..<3)
+                        .compactMap { column in
+                            atlas.textureSlice(in: grid.sourceRect(column: column, row: row)).map { (column, row, $0 as Texture2D) }
+                        }
                 }
-            }
         } else {
             self.texture = Texture2D(image: image)
             self.sliceGrid = nil

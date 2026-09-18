@@ -9,15 +9,17 @@ extension UIGraphicsContext {
         for command in source.getDrawCommands() {
             let transformed: DrawCommand
             switch command {
-            case .beginLayer, .endLayer:
+            case .beginLayer,
+                .endLayer:
                 // The source cache is valid before composition; its ID must not cache
                 // vertices with a previous zoom or viewport transform in the destination.
                 continue
             case let .pushClipRect(rect):
                 let points = [
                     Vector4(rect.minX / scale, -rect.minY / scale, 0, 1),
-                    Vector4(rect.maxX / scale, -rect.maxY / scale, 0, 1)
-                ].map { transform * $0 }
+                    Vector4(rect.maxX / scale, -rect.maxY / scale, 0, 1),
+                ]
+                .map { transform * $0 }
                 let minX = max(0, min(points[0].x, points[1].x) * scale)
                 let minY = max(0, -max(points[0].y, points[1].y) * scale)
                 let maxX = max(0, max(points[0].x, points[1].x) * scale)
@@ -50,7 +52,9 @@ extension UIGraphicsContext {
                 )
             case let .setLineWidth(width):
                 transformed = .setLineWidth(width * transform.x.xyz.length)
-            case .popClipRect, .popClipPath, .commit:
+            case .popClipRect,
+                .popClipPath,
+                .commit:
                 transformed = command
             }
             commandQueue.push(transformed)

@@ -15,7 +15,7 @@ extension EditorSceneValue {
         guard let data = try? JSONEncoder().encode(self) else {
             return ""
         }
-        return String(data: data, encoding: .utf8) ?? ""
+        return String(bytes: data, encoding: .utf8) ?? ""
     }
 
     func value(at path: ArraySlice<String>) -> Self? {
@@ -23,8 +23,8 @@ extension EditorSceneValue {
             return self
         }
         switch self {
-        case .object(let object): return object[key]?.value(at: path.dropFirst())
-        case .array(let values):
+        case let .object(object): return object[key]?.value(at: path.dropFirst())
+        case let .array(values):
             guard let index = Int(key), values.indices.contains(index) else {
                 return nil
             }
@@ -38,11 +38,16 @@ extension EditorSceneValue {
             self = value
             return
         }
-        if case .array(var values) = self, let index = Int(key), values.indices.contains(index) {
+        if case var .array(values) = self, let index = Int(key), values.indices.contains(index) {
             values[index].setValue(value, at: path.dropFirst())
             self = .array(values)
         } else {
-            var object: [String: Self] = if case .object(let current) = self { current } else { [:] }
+            var object: [String: Self] =
+                if case let .object(current) = self {
+                    current
+                } else {
+                    [:]
+                }
             var child = object[key] ?? .object([:])
             child.setValue(value, at: path.dropFirst())
             object[key] = child

@@ -1,10 +1,12 @@
-@testable import AdaEditor
-#if os(macOS)
-import AppKit
-import SwiftUI
-#endif
 import Foundation
 import Testing
+
+@testable import AdaEditor
+
+#if os(macOS)
+    import AppKit
+    import SwiftUI
+#endif
 
 @Suite(.serialized)
 @MainActor
@@ -49,33 +51,33 @@ struct EditorDocumentationTests {
     }
 
     #if os(macOS)
-    @Test
-    func nativeReaderHostsBundledDocumentation() throws {
-        _ = NSApplication.shared
-        let model = EditorDocumentationViewModel()
-        let window = EditorDocumentationWindowController.makeWindow(viewModel: model)
-        defer { window.close() }
-        #expect(window.title == "AdaEngine Documentation")
-        #expect(window.contentViewController is NSHostingController<EditorDocumentationView>)
-        #expect(window.minSize.width == 760)
-        model.select("AdaScripting")
-        window.contentView?.layoutSubtreeIfNeeded()
-        #expect(model.selectedArticle?.title == "AdaScript")
-        #expect(model.errorMessage == nil)
-    }
+        @Test
+        func nativeReaderHostsBundledDocumentation() throws {
+            _ = NSApplication.shared
+            let model = EditorDocumentationViewModel()
+            let window = EditorDocumentationWindowController.makeWindow(viewModel: model)
+            defer { window.close() }
+            #expect(window.title == "AdaEngine Documentation")
+            #expect(window.contentViewController is NSHostingController<EditorDocumentationView>)
+            #expect(window.minSize.width == 760)
+            model.select("AdaScripting")
+            window.contentView?.layoutSubtreeIfNeeded()
+            #expect(model.selectedArticle?.title == "AdaScript")
+            #expect(model.errorMessage == nil)
+        }
 
-    @Test
-    func nativeReaderReusesWindowAndRoutesClose() throws {
-        _ = NSApplication.shared
-        #expect(EditorDocumentationWindowController.open())
-        let window = try #require(NSApp.windows.first { $0.title == "AdaEngine Documentation" && $0.isVisible })
-        defer { window.close() }
-        #expect(EditorDocumentationWindowController.open())
-        #expect(NSApp.windows.filter { $0.title == "AdaEngine Documentation" && $0.isVisible }.count == 1)
-        // The test runner has no foreground key window. Supply the actual reader window as the routing target.
-        #expect(EditorDocumentationWindowController.handleMenuCommand(.closeEditor, keyWindow: nil) == nil)
-        #expect(EditorDocumentationWindowController.handleMenuCommand(.closeEditor, keyWindow: window) == true)
-        #expect(!window.isVisible)
-    }
+        @Test
+        func nativeReaderReusesWindowAndRoutesClose() throws {
+            _ = NSApplication.shared
+            #expect(EditorDocumentationWindowController.open())
+            let window = try #require(NSApp.windows.first { $0.title == "AdaEngine Documentation" && $0.isVisible })
+            defer { window.close() }
+            #expect(EditorDocumentationWindowController.open())
+            #expect(NSApp.windows.filter { $0.title == "AdaEngine Documentation" && $0.isVisible }.count == 1)
+            // The test runner has no foreground key window. Supply the actual reader window as the routing target.
+            #expect(EditorDocumentationWindowController.handleMenuCommand(.closeEditor, keyWindow: nil) == nil)
+            #expect(EditorDocumentationWindowController.handleMenuCommand(.closeEditor, keyWindow: window) == true)
+            #expect(!window.isVisible)
+        }
     #endif
 }

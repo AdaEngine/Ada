@@ -35,7 +35,7 @@ public struct AdaProjectRuntimePluginID: Codable, Equatable, Hashable, RawRepres
 
     public static let knownValues: Set<Self> = [
         .audio, .core2D, .core3D, .light2D, .mesh2D, .model3D,
-        .physics2D, .physics3D, .sprite, .tilemap, .upscale
+        .physics2D, .physics3D, .sprite, .tilemap, .upscale,
     ]
 }
 

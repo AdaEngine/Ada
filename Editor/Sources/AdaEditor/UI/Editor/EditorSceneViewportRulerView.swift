@@ -4,6 +4,8 @@ extension EditorSceneViewportView {
     var viewportCoordinateRulerLayer: some View {
         let revision = viewportRevision
         return GeometryReader { proxy in
+            // A declaration is required inside AdaUI's result builder.
+            // swiftlint:disable:next redundant_discardable_let
             let _ = revision
             let ruler = viewportModel.coordinateRuler(in: proxy.size)
             ZStack(anchor: .topLeading) {

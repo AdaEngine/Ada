@@ -36,7 +36,6 @@ public enum TabLabelStyle: Sendable {
 
 /// The properties of a tab view style.
 public struct TabViewStyleConfiguration {
-
     /// A single tab item exposed to the style.
     public struct Tab: Identifiable {
         /// The value that uniquely identifies this tab (matches the `Tab` view's `value`).
@@ -55,11 +54,11 @@ public struct TabViewStyleConfiguration {
     /// Place this in your custom style body to control where tab content appears.
     public struct Content: View, ViewNodeBuilder {
         public typealias Body = Never
-        public var body: Never { fatalError() }
+        public var body: Never { fatalError("Unreachable code") }
 
         let proxy: TabContentProxyNode
 
-        func buildViewNode(in context: BuildContext) -> ViewNode {
+        func buildViewNode(in _: BuildContext) -> ViewNode {
             proxy
         }
     }
@@ -89,12 +88,11 @@ public struct TabViewStyleConfiguration {
 
 /// The built-in tab bar appearance used when no custom style is applied.
 public struct DefaultTabViewStyle: TabViewStyle {
-
     public init() {}
 
     /// Not called at runtime — `TabViewNode` special-cases `DefaultTabViewStyle`
     /// and uses its own imperative tab bar builder instead.
-    public func makeBody(configuration: Configuration) -> some View {
+    public func makeBody(configuration _: Configuration) -> some View {
         EmptyView()
     }
 }
@@ -103,7 +101,6 @@ public struct DefaultTabViewStyle: TabViewStyle {
 
 /// A type-erased tab view style.
 public struct AnyTabViewStyle: TabViewStyle {
-
     let style: any TabViewStyle
 
     public init<S: TabViewStyle>(erasing style: S) {
@@ -141,9 +138,8 @@ protocol _TabItem {
 /// A single tab item with a label, optional image, and associated content.
 @MainActor @preconcurrency
 public struct Tab<Value: Hashable, Content: View>: View, ViewNodeBuilder {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let label: String?
     let image: Image?
@@ -198,9 +194,8 @@ extension Tab: _TabItem {
 /// A labeled group of tabs in a TabView.
 @MainActor @preconcurrency
 public struct TabSection<Content: View>: View, ViewNodeBuilder {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let title: String
     let content: () -> Content
@@ -229,13 +224,13 @@ extension TabSection: _TabItem {
 // MARK: - Spacer + Divider as tab bar items
 
 extension Spacer: _TabItem {
-    @MainActor func _extractTabBarElements(inputs: _ViewInputs) -> [TabBarElement] {
+    @MainActor func _extractTabBarElements(inputs _: _ViewInputs) -> [TabBarElement] {
         [.spacer]
     }
 }
 
 extension Divider: _TabItem {
-    @MainActor func _extractTabBarElements(inputs: _ViewInputs) -> [TabBarElement] {
+    @MainActor func _extractTabBarElements(inputs _: _ViewInputs) -> [TabBarElement] {
         [.divider]
     }
 }
@@ -245,9 +240,8 @@ extension Divider: _TabItem {
 /// A view that switches between multiple child views using a tab bar.
 @MainActor @preconcurrency
 public struct TabView<Selection: Hashable, Content: View>: View, ViewNodeBuilder {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let selection: Binding<Selection>
     let content: () -> Content
@@ -298,19 +292,19 @@ extension EnvironmentValues {
     }
 }
 
-public extension View {
+extension View {
     /// Sets the position of the tab bar in a TabView.
-    func tabViewPosition(_ position: TabViewPosition) -> some View {
+    public func tabViewPosition(_ position: TabViewPosition) -> some View {
         self.environment(\.tabViewPosition, position)
     }
 
     /// Sets the label style for tabs in a TabView.
-    func tabLabelStyle(_ style: TabLabelStyle) -> some View {
+    public func tabLabelStyle(_ style: TabLabelStyle) -> some View {
         self.environment(\.tabLabelStyle, style)
     }
 
     /// Sets the style for tab views within this view.
-    func tabViewStyle<S: TabViewStyle>(_ style: S) -> some View {
+    public func tabViewStyle<S: TabViewStyle>(_ style: S) -> some View {
         self.environment(\.tabViewStyle, style)
     }
 }
@@ -370,7 +364,6 @@ private enum TabViewConstants {
 /// mutable target node. Used by custom `TabViewStyle` implementations to embed
 /// the currently-selected tab content anywhere in their view hierarchy.
 final class TabContentProxyNode: ViewNode {
-
     init() {
         super.init(content: EmptyView())
     }
@@ -380,7 +373,9 @@ final class TabContentProxyNode: ViewNode {
             oldValue?.parent = nil
             if let target {
                 target.parent = self
-                if let owner { target.updateViewOwner(owner) }
+                if let owner {
+                    target.updateViewOwner(owner)
+                }
             }
             performLayout()
             invalidateNearestLayer()
@@ -393,7 +388,9 @@ final class TabContentProxyNode: ViewNode {
     }
 
     override func performLayout() {
-        guard let target else { return }
+        guard let target else {
+            return
+        }
         target.place(
             in: Point(x: frame.width * 0.5, y: frame.height * 0.5),
             anchor: .center,
@@ -409,7 +406,9 @@ final class TabContentProxyNode: ViewNode {
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event), let target else { return nil }
+        guard self.point(inside: point, with: event), let target else {
+            return nil
+        }
         let targetPoint = target.convert(point, from: self)
         return target.hitTest(targetPoint, with: event)
     }
@@ -440,7 +439,6 @@ final class TabContentProxyNode: ViewNode {
 // MARK: - TabViewNode
 
 final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
-
     private var elements: [TabBarElement]
     private var selectionBinding: Binding<Selection>
     private var position: TabViewPosition
@@ -608,9 +606,10 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         )
     }
 
-
     override func update(from newNode: ViewNode) {
-        guard let other = newNode as? TabViewNode<Selection, Content> else { return }
+        guard let other = newNode as? TabViewNode<Selection, Content> else {
+            return
+        }
         let oldValues = Self.tabValues(from: elements)
         let newValues = Self.tabValues(from: other.elements)
         let elementsChanged = oldValues != newValues
@@ -651,7 +650,9 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
     override func updateEnvironment(_ environment: EnvironmentValues) {
         let prevVersion = self.environment.version
         super.updateEnvironment(environment)
-        guard self.environment.version != prevVersion else { return }
+        guard self.environment.version != prevVersion else {
+            return
+        }
         viewInputs.environment = self.environment
 
         tabBarNode.updateEnvironment(self.environment)
@@ -660,10 +661,10 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         // don't add redundant inset for an edge the tab bar already covers.
         var contentEnv = self.environment
         switch position {
-        case .top:    contentEnv.safeAreaInsets.top = 0
+        case .top: contentEnv.safeAreaInsets.top = 0
         case .bottom: contentEnv.safeAreaInsets.bottom = 0
-        case .left:   contentEnv.safeAreaInsets.leading = 0
-        case .right:  contentEnv.safeAreaInsets.trailing = 0
+        case .left: contentEnv.safeAreaInsets.leading = 0
+        case .right: contentEnv.safeAreaInsets.trailing = 0
         }
         // Keep offscreen cached tabs lazy: propagating environment through every cached
         // subtree on each layout/env tick makes tab switches scale with the total number
@@ -685,7 +686,9 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
 
         let tabBarPoint = tabBarNode.convert(point, from: self)
         if let hit = tabBarNode.hitTest(tabBarPoint, with: event) {
@@ -693,7 +696,9 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         }
 
         // For custom styles, content is embedded in tabBarNode via the proxy.
-        guard !isCustomStyle else { return nil }
+        guard !isCustomStyle else {
+            return nil
+        }
         let contentPoint = contentNode.convert(point, from: self)
         return contentNode.hitTest(contentPoint, with: event)
     }
@@ -726,7 +731,9 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
     }
 
     override func findNodyByAccessibilityIdentifier(_ identifier: String) -> ViewNode? {
-        if let result = super.findNodyByAccessibilityIdentifier(identifier) { return result }
+        if let result = super.findNodyByAccessibilityIdentifier(identifier) {
+            return result
+        }
         return tabBarNode.findNodyByAccessibilityIdentifier(identifier)
             ?? contentNode.findNodyByAccessibilityIdentifier(identifier)
     }
@@ -769,8 +776,12 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
     }
 
     private func selectTab(_ value: AnyHashable) {
-        guard let typedValue = value.base as? Selection,
-              selectionBinding.wrappedValue != typedValue else { return }
+        guard
+            let typedValue = value.base as? Selection,
+            selectionBinding.wrappedValue != typedValue
+        else {
+            return
+        }
         // Setting wrappedValue triggers StateStorage.update() → invalidateContent() on
         // the parent State owner → body re-evaluation → TabViewNode.update(from:) →
         // updateSelectionOnly(). The explicit rebuildAll() that used to follow was redundant.
@@ -783,16 +794,18 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         let selected = AnyHashable(selectionBinding.wrappedValue)
         var contentEnv = environment
         switch position {
-        case .top:    contentEnv.safeAreaInsets.top = 0
+        case .top: contentEnv.safeAreaInsets.top = 0
         case .bottom: contentEnv.safeAreaInsets.bottom = 0
-        case .left:   contentEnv.safeAreaInsets.leading = 0
-        case .right:  contentEnv.safeAreaInsets.trailing = 0
+        case .left: contentEnv.safeAreaInsets.leading = 0
+        case .right: contentEnv.safeAreaInsets.trailing = 0
         }
 
         if let defaultBarNode = tabBarNode as? LayoutViewContainerNode {
             // Default style: update selection state on existing tab bar buttons in-place (no rebuild)
             for node in defaultBarNode.nodes {
-                guard let button = node as? TabItemButtonNode else { continue }
+                guard let button = node as? TabItemButtonNode else {
+                    continue
+                }
                 button.updateSelection(selected)
             }
         } else {
@@ -828,7 +841,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
 
         // Offscreen cached tabs no longer receive environment updates eagerly, so the
         // newly selected tab must always be refreshed before it becomes visible.
-        if let owner, (!wasAlreadyCached || newContentNode.owner !== owner) {
+        if let owner, !wasAlreadyCached || newContentNode.owner !== owner {
             newContentNode.updateViewOwner(owner)
         }
         newContentNode.updateEnvironment(contentEnv)
@@ -851,7 +864,9 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
             onSelect: onSelect
         )
         tabBarNode.parent = self
-        if let owner { tabBarNode.updateViewOwner(owner) }
+        if let owner {
+            tabBarNode.updateViewOwner(owner)
+        }
         tabBarNode.updateEnvironment(environment)
     }
 
@@ -875,10 +890,10 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         }
         var contentEnv = environment
         switch position {
-        case .top:    contentEnv.safeAreaInsets.top = 0
+        case .top: contentEnv.safeAreaInsets.top = 0
         case .bottom: contentEnv.safeAreaInsets.bottom = 0
-        case .left:   contentEnv.safeAreaInsets.leading = 0
-        case .right:  contentEnv.safeAreaInsets.trailing = 0
+        case .left: contentEnv.safeAreaInsets.leading = 0
+        case .right: contentEnv.safeAreaInsets.trailing = 0
         }
         if let owner {
             contentNode.updateViewOwner(owner)
@@ -894,7 +909,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
 
     private func getOrCreateContentNode(for value: AnyHashable) -> ViewNode {
         for element in elements {
-            if case .tab(_, _, let v, let makeContent) = element, v == value {
+            if case let .tab(_, _, v, makeContent) = element, v == value {
                 if let cached = cachedContentNodes[value] {
                     let newNode = makeContent(viewInputs)
                     cached.update(from: newNode)
@@ -911,10 +926,14 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
     }
 
     private static func tabValues(from elements: [TabBarElement]) -> Set<AnyHashable> {
-        Set(elements.compactMap { elem -> AnyHashable? in
-            if case .tab(_, _, let v, _) = elem { return v }
-            return nil
-        })
+        Set(
+            elements.compactMap { elem -> AnyHashable? in
+                if case let .tab(_, _, v, _) = elem {
+                    return v
+                }
+                return nil
+            }
+        )
     }
 
     /// Routes tab bar construction to either the built-in imperative path (DefaultTabViewStyle)
@@ -932,7 +951,9 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
             return buildTabBar(elements: elements, selected: selected, position: position, inputs: inputs, onSelect: onSelect)
         }
         let tabs = elements.compactMap { element -> TabViewStyleConfiguration.Tab? in
-            guard case .tab(let label, let image, let value, _) = element else { return nil }
+            guard case let .tab(label, image, value, _) = element else {
+                return nil
+            }
             return TabViewStyleConfiguration.Tab(
                 id: value,
                 label: label,
@@ -962,7 +983,8 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
             inputs: inputs,
             onSelect: onSelect
         )
-        let layout: any Layout = isHorizontal
+        let layout: any Layout =
+            isHorizontal
             ? EqualWidthTabBarLayout()
             : VStackLayout(alignment: .leading, spacing: 0)
         return LayoutViewContainerNode(layout: layout, content: EmptyView(), nodes: nodes)
@@ -978,7 +1000,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         var nodes: [ViewNode] = []
         for element in elements {
             switch element {
-            case .tab(let label, let image, let value, _):
+            case let .tab(label, image, value, _):
                 let button = TabItemButton(
                     label: label,
                     image: image,
@@ -989,8 +1011,10 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
                 )
                 let node = TabItemButtonNode(content: button, inputs: inputs)
                 nodes.append(node)
-            case .sectionHeader(let title):
-                guard !isHorizontal else { continue }
+            case let .sectionHeader(title):
+                guard !isHorizontal else {
+                    continue
+                }
                 let header = TabSectionHeader(title: title)
                 let node = TabSectionHeaderNode(content: header, inputs: inputs)
                 nodes.append(node)
@@ -1009,7 +1033,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         inputs: _ViewInputs
     ) -> ViewNode {
         for element in elements {
-            if case .tab(_, _, let value, let makeContent) = element, value == selected {
+            if case let .tab(_, _, value, makeContent) = element, value == selected {
                 return makeContent(inputs)
             }
         }
@@ -1023,14 +1047,16 @@ private struct EqualWidthTabBarLayout: Layout {
     typealias AnimatableData = EmptyAnimatableData
     static var layoutProperties = LayoutProperties(stackOrientation: .horizontal)
 
-    func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> Size {
+    func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) -> Size {
         let width = proposal.width ?? (Float(subviews.count) * TabViewConstants.tabBarHeight)
         let height = proposal.height ?? TabViewConstants.tabBarHeight
         return Size(width: width, height: height)
     }
 
-    func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
-        guard !subviews.isEmpty else { return }
+    func placeSubviews(in bounds: Rect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout Void) {
+        guard !subviews.isEmpty else {
+            return
+        }
         let itemWidth = bounds.width / Float(subviews.count)
         var x = bounds.minX
         for subview in subviews {
@@ -1045,7 +1071,7 @@ private struct EqualWidthTabBarLayout: Layout {
 
 private struct TabItemButton: View, ViewNodeBuilder {
     typealias Body = Never
-    var body: Never { fatalError() }
+    var body: Never { fatalError("Unreachable code") }
 
     let label: String?
     let image: Image?
@@ -1060,7 +1086,6 @@ private struct TabItemButton: View, ViewNodeBuilder {
 }
 
 private final class TabItemButtonNode: ViewNode {
-
     private var label: String?
     private var image: Image?
     private var isSelected: Bool
@@ -1095,7 +1120,9 @@ private final class TabItemButtonNode: ViewNode {
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
         return self
     }
 
@@ -1108,7 +1135,9 @@ private final class TabItemButtonNode: ViewNode {
         case .ended:
             let was = isHighlighted
             isHighlighted = false
-            if was { action() }
+            if was {
+                action()
+            }
         case .cancelled:
             isHighlighted = false
         }
@@ -1121,7 +1150,9 @@ private final class TabItemButtonNode: ViewNode {
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
-        guard let touch = touches.first else { return }
+        guard let touch = touches.first else {
+            return
+        }
 
         switch touch.phase {
         case .began:
@@ -1140,7 +1171,9 @@ private final class TabItemButtonNode: ViewNode {
             let was = isHighlighted
             isHighlighted = false
             touchStartLocation = nil
-            if was { action() }
+            if was {
+                action()
+            }
         case .cancelled:
             isHighlighted = false
             touchStartLocation = nil
@@ -1166,7 +1199,9 @@ private final class TabItemButtonNode: ViewNode {
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
-        guard let other = newNode as? TabItemButtonNode else { return }
+        guard let other = newNode as? TabItemButtonNode else {
+            return
+        }
         self.label = other.label
         self.image = other.image
         self.isSelected = other.isSelected
@@ -1180,7 +1215,9 @@ private final class TabItemButtonNode: ViewNode {
 
     func updateSelection(_ selected: AnyHashable) {
         let shouldBeSelected = AnyHashable(value) == selected
-        guard isSelected != shouldBeSelected else { return }
+        guard isSelected != shouldBeSelected else {
+            return
+        }
         isSelected = shouldBeSelected
         requestDisplay()
     }
@@ -1190,7 +1227,7 @@ private final class TabItemButtonNode: ViewNode {
     private func drawContent(in bounds: Rect, with context: UIGraphicsContext) {
         let isCompact = environment.tabLabelStyle == .compact
         let hasIcon = iconTexture != nil
-        let hasLabel = !isCompact && label != nil && !label!.isEmpty
+        let hasLabel = !isCompact && label?.isEmpty == false
 
         switch (hasIcon, hasLabel) {
         case (true, false):
@@ -1209,7 +1246,9 @@ private final class TabItemButtonNode: ViewNode {
     }
 
     private func drawIcon(centeredIn bounds: Rect, with context: UIGraphicsContext) {
-        guard let texture = iconTexture else { return }
+        guard let texture = iconTexture else {
+            return
+        }
         let size = TabViewConstants.iconSize
         let iconRect = Rect(
             x: (bounds.width - size) * 0.5,
@@ -1222,14 +1261,18 @@ private final class TabItemButtonNode: ViewNode {
     }
 
     private func drawLabel(centeredIn bounds: Rect, with context: UIGraphicsContext) {
-        guard let text = label, let font = resolvedFont() else { return }
+        guard let text = label, let font = resolvedFont() else {
+            return
+        }
         let pointSize = resolvedPointSize()
         let textColor: Color = isSelected ? TabViewConstants.selectedTabTextColor : TabViewConstants.tabTextColor
         renderText(text, font: font, color: textColor, centerX: bounds.width * 0.5, centerY: bounds.height * 0.5, pointSize: pointSize, in: context)
     }
 
     private func drawIconAboveLabel(in bounds: Rect, with context: UIGraphicsContext) {
-        guard let texture = iconTexture, let text = label, let font = resolvedFont() else { return }
+        guard let texture = iconTexture, let text = label, let font = resolvedFont() else {
+            return
+        }
         let pointSize = resolvedPointSize()
         let tint: Color = isSelected ? TabViewConstants.selectedTabTextColor : TabViewConstants.tabTextColor
         let iconSize = TabViewConstants.iconSize
@@ -1251,7 +1294,9 @@ private final class TabItemButtonNode: ViewNode {
     }
 
     private func drawIconBesideLabel(in bounds: Rect, with context: UIGraphicsContext) {
-        guard let texture = iconTexture, let text = label, let font = resolvedFont() else { return }
+        guard let texture = iconTexture, let text = label, let font = resolvedFont() else {
+            return
+        }
         let pointSize = resolvedPointSize()
         let tint: Color = isSelected ? TabViewConstants.selectedTabTextColor : TabViewConstants.tabTextColor
         let iconSize = TabViewConstants.iconSize
@@ -1272,7 +1317,9 @@ private final class TabItemButtonNode: ViewNode {
     }
 
     private func drawIndicator(in bounds: Rect, with context: UIGraphicsContext) {
-        guard isSelected else { return }
+        guard isSelected else {
+            return
+        }
         let t = TabViewConstants.selectedIndicatorThickness
         switch isHorizontalBar {
         case true:
@@ -1331,8 +1378,12 @@ private final class TabItemButtonNode: ViewNode {
     }
 
     private func resolvedFont() -> Font? {
-        if let font = environment.font { return font }
-        if unsafe RenderEngine.shared != nil { return .system(size: 14) }
+        if let font = environment.font {
+            return font
+        }
+        if unsafe RenderEngine.shared != nil {
+            return .system(size: 14)
+        }
         return nil
     }
 
@@ -1346,7 +1397,7 @@ private final class TabItemButtonNode: ViewNode {
 
 private struct TabSectionHeader: View, ViewNodeBuilder {
     typealias Body = Never
-    var body: Never { fatalError() }
+    var body: Never { fatalError("Unreachable code") }
     let title: String
 
     func buildViewNode(in context: BuildContext) -> ViewNode {
@@ -1355,7 +1406,6 @@ private struct TabSectionHeader: View, ViewNodeBuilder {
 }
 
 private final class TabSectionHeaderNode: ViewNode {
-
     private var title: String
 
     init(content: TabSectionHeader, inputs: _ViewInputs) {
@@ -1374,7 +1424,9 @@ private final class TabSectionHeaderNode: ViewNode {
         ctx.environment = environment
         ctx.translateBy(x: frame.origin.x, y: -frame.origin.y)
 
-        guard let font = resolvedFont() else { return }
+        guard let font = resolvedFont() else {
+            return
+        }
         let pointSize = TabViewConstants.sectionHeaderFontSize
         var attributes = TextAttributeContainer()
         attributes.font = font
@@ -1399,7 +1451,9 @@ private final class TabSectionHeaderNode: ViewNode {
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
-        guard let other = newNode as? TabSectionHeaderNode else { return }
+        guard let other = newNode as? TabSectionHeaderNode else {
+            return
+        }
         self.title = other.title
     }
 

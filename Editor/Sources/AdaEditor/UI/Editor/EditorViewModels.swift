@@ -20,15 +20,15 @@ struct EditorCodeColorPalette: Hashable, Sendable {
     var lineNumber: Color
     var currentLineBackground: Color
     var selection: Color
-    var annotation: Color? = nil
-    var function: Color? = nil
-    var member: Color? = nil
+    var annotation: Color?
+    var function: Color?
+    var member: Color?
 
     var annotationColor: Color { annotation ?? keyword }
     var functionColor: Color { function ?? type }
     var memberColor: Color { member ?? type }
 
-    static let dark = EditorCodeColorPalette(
+    static let dark = Self(
         plainText: Color(red: 214 / 255, green: 217 / 255, blue: 224 / 255),
         keyword: Color(red: 197 / 255, green: 134 / 255, blue: 252 / 255),
         type: Color(red: 78 / 255, green: 201 / 255, blue: 176 / 255),
@@ -41,7 +41,7 @@ struct EditorCodeColorPalette: Hashable, Sendable {
         selection: Color(red: 53 / 255, green: 116 / 255, blue: 240 / 255).opacity(0.24)
     )
 
-    static let godot = EditorCodeColorPalette(
+    static let godot = Self(
         plainText: Color.fromHex(0xB0CCE1),
         keyword: Color.fromHex(0xFF7085),
         type: Color.fromHex(0x42E0BB),
@@ -57,7 +57,7 @@ struct EditorCodeColorPalette: Hashable, Sendable {
         member: Color.fromHex(0xB0CCE1)
     )
 
-    static let monokai = EditorCodeColorPalette(
+    static let monokai = Self(
         plainText: Color(red: 248 / 255, green: 248 / 255, blue: 242 / 255),
         keyword: Color(red: 249 / 255, green: 38 / 255, blue: 114 / 255),
         type: Color(red: 166 / 255, green: 226 / 255, blue: 46 / 255),
@@ -70,7 +70,7 @@ struct EditorCodeColorPalette: Hashable, Sendable {
         selection: Color(red: 73 / 255, green: 72 / 255, blue: 62 / 255)
     )
 
-    static let solarized = EditorCodeColorPalette(
+    static let solarized = Self(
         plainText: Color(red: 131 / 255, green: 148 / 255, blue: 150 / 255),
         keyword: Color(red: 133 / 255, green: 153 / 255, blue: 0 / 255),
         type: Color(red: 38 / 255, green: 139 / 255, blue: 210 / 255),
@@ -116,7 +116,7 @@ enum EditorCodePalettePreset: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    static func matching(_ palette: EditorCodeColorPalette) -> EditorCodePalettePreset {
+    static func matching(_ palette: EditorCodeColorPalette) -> Self {
         allCases.first { $0.palette == palette } ?? .adaDark
     }
 }
@@ -161,7 +161,7 @@ enum EditorSourceLanguage: String, Sendable {
     case swift
     case yaml
 
-    static func detect(fileName: String) -> EditorSourceLanguage {
+    static func detect(fileName: String) -> Self {
         let lowercasedName = fileName.lowercased()
         let fileExtension = URL(fileURLWithPath: lowercasedName).pathExtension
 
@@ -170,25 +170,41 @@ enum EditorSourceLanguage: String, Sendable {
         }
 
         switch fileExtension {
-        case "ada", "gravity":
+        case "ada",
+            "gravity":
             return .ada
-        case "c", "h":
+        case "c",
+            "h":
             return .c
-        case "cc", "cpp", "cxx", "hpp", "hxx":
+        case "cc",
+            "cpp",
+            "cxx",
+            "hpp",
+            "hxx":
             return .cpp
-        case "comp", "frag", "geom", "glsl", "shader", "tesc", "tese", "vert":
+        case "comp",
+            "frag",
+            "geom",
+            "glsl",
+            "shader",
+            "tesc",
+            "tese",
+            "vert":
             return .glsl
         case "wgsl":
             return .wgsl
         case "json":
             return .json
-        case "md", "markdown":
+        case "md",
+            "markdown":
             return .markdown
         case "metal":
             return .metal
         case "swift":
             return .swift
-        case "yaml", "yml", "tileset":
+        case "yaml",
+            "yml",
+            "tileset":
             return .yaml
         default:
             return .plainText
@@ -222,10 +238,10 @@ struct EditorTextDocument: Equatable, Sendable {
     var id: String
     var title: String
     var relativePath: String
-    var absolutePath: String? = nil
+    var absolutePath: String?
     var language: EditorSourceLanguage
     var content: String
-    var lastSavedContent: String? = nil
+    var lastSavedContent: String?
     var isReadOnly: Bool = false
     var errorMessage: String?
     var isDirty: Bool = false
@@ -249,7 +265,7 @@ struct EditorSceneDocument: Equatable, Sendable {
     var relativePath: String
     var absolutePath: String?
     var content: String
-    var lastSavedContent: String? = nil
+    var lastSavedContent: String?
     var isReadOnly: Bool = false
     var sceneModel: EditorSceneModel?
     var errorMessage: String?
@@ -280,63 +296,69 @@ enum EditorWorkbenchDocument: Equatable, Sendable {
 
     var id: String {
         switch self {
-        case .scene(let document):
+        case let .scene(document):
             document.id
-        case .text(let document), .ui(let document):
+        case let .text(document),
+            let .ui(document):
             document.id
-        case .git(let document):
+        case let .git(document):
             document.id
-        case .asset(let document):
+        case let .asset(document):
             document.id
         }
     }
 
     var title: String {
         switch self {
-        case .scene(let document):
+        case let .scene(document):
             document.title
-        case .text(let document), .ui(let document):
+        case let .text(document),
+            let .ui(document):
             document.title
-        case .git(let document):
+        case let .git(document):
             document.title
-        case .asset(let document):
+        case let .asset(document):
             document.title
         }
     }
 
     var relativePath: String {
         switch self {
-        case .scene(let document):
+        case let .scene(document):
             document.relativePath
-        case .text(let document), .ui(let document):
+        case let .text(document),
+            let .ui(document):
             document.relativePath
         case .git:
             ""
-        case .asset(let document):
+        case let .asset(document):
             document.relativePath
         }
     }
 
     var absolutePath: String? {
         switch self {
-        case .scene(let document):
+        case let .scene(document):
             document.absolutePath
-        case .text(let document), .ui(let document):
+        case let .text(document),
+            let .ui(document):
             document.absolutePath
         case .git:
             nil
-        case .asset(let document):
+        case let .asset(document):
             document.absolutePath
         }
     }
 
     var isDirty: Bool {
         switch self {
-        case .scene(let document):
+        case let .scene(document):
             document.isDirty
-        case .text(let document), .ui(let document):
+        case let .text(document),
+            let .ui(document):
             document.isDirty
-        case .asset, .git:
+        case .asset,
+            .git:
             false
         }
     }
@@ -360,11 +382,11 @@ enum EditorWorkspaceStatus: Equatable, Sendable {
             "Resolving"
         case .indexing:
             "Indexing"
-        case .preparing(let progress):
+        case let .preparing(progress):
             progress.progressText
         case .ready:
             "Ready"
-        case .running(let command):
+        case let .running(command):
             "Running \(command)"
         case .failed:
             "Failed"

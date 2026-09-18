@@ -5,15 +5,14 @@
 //  Created by Vladislav Prusakov on 26.07.2024.
 //
 
-public extension View {
+extension View {
     /// Binds a view’s identity to the given proxy value.
-    func id<H: Hashable>(_ identifier: H) -> some View {
+    public func id<H: Hashable>(_ identifier: H) -> some View {
         IDView(id: identifier, content: self)
     }
 }
 
 final class IDViewNodeModifier: ViewModifierNode {
-
     var identifier: AnyHashable?
 
     override func update(from newNode: ViewNode) {
@@ -32,7 +31,6 @@ final class IDViewNodeModifier: ViewModifierNode {
 }
 
 struct IDView<V: View>: View, ViewNodeBuilder {
-
     typealias Body = Never
 
     let id: AnyHashable
@@ -45,9 +43,9 @@ struct IDView<V: View>: View, ViewNodeBuilder {
     }
 }
 
-public extension View {
+extension View {
     /// Uses the string you specify to identify the view.
-    func accessibilityIdentifier(_ identifier: String) -> some View {
+    public func accessibilityIdentifier(_ identifier: String) -> some View {
         modifier(AccessibilityAttachmentModifier(identifier: identifier))
     }
 }
@@ -61,7 +59,7 @@ struct AccessibilityAttachmentModifier: ViewModifier, _ViewOutputsViewModifier {
     }
 
     static func _makeView(
-        for modifier: _ViewGraphNode<AccessibilityAttachmentModifier>,
+        for modifier: _ViewGraphNode<Self>,
         inputs: _ViewInputs,
         body: @escaping (_ViewInputs) -> _ViewOutputs
     ) -> _ViewOutputs {
@@ -72,7 +70,7 @@ struct AccessibilityAttachmentModifier: ViewModifier, _ViewOutputsViewModifier {
     }
 
     static func _makeListView(
-        for modifier: _ViewGraphNode<AccessibilityAttachmentModifier>,
+        for modifier: _ViewGraphNode<Self>,
         inputs: _ViewListInputs,
         body: @escaping (_ViewListInputs) -> _ViewListOutputs
     ) -> _ViewListOutputs {
@@ -84,7 +82,7 @@ struct AccessibilityAttachmentModifier: ViewModifier, _ViewOutputsViewModifier {
         return outputs
     }
 
-    static func _makeModifier(_ modifier: _ViewGraphNode<AccessibilityAttachmentModifier>, outputs: inout _ViewOutputs) {
+    static func _makeModifier(_ modifier: _ViewGraphNode<Self>, outputs: inout _ViewOutputs) {
         outputs.node.accessibilityIdentifier = modifier[\.identifier].value
     }
 }

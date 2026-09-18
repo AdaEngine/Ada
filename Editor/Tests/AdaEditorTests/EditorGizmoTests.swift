@@ -1,6 +1,7 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor Gizmos")
 @MainActor
@@ -88,53 +89,53 @@ struct EditorGizmoTests {
 }
 
 private let sceneYAML = """
-format: ada.scene
-schemaVersion: 1
-scene:
-  id: test-scene
-  name: Test
-entities:
-  - id: root
-    name: Root
-    enabled: true
-    parent:
-    components:
-      AdaTransform.Transform:
-        position: [0, 0, 0]
-        rotation: [0, 0, 0, 1]
-        scale: [1, 1, 1]
-  - id: light
-    name: Light
-    enabled: true
-    parent:
-    components:
-      AdaTransform.Transform:
-        position: [10, 20, 0]
-        rotation: [0, 0, 0, 1]
-        scale: [1, 1, 1]
-      Example.UnknownComponent:
-        value: 42
-"""
+    format: ada.scene
+    schemaVersion: 1
+    scene:
+      id: test-scene
+      name: Test
+    entities:
+      - id: root
+        name: Root
+        enabled: true
+        parent:
+        components:
+          AdaTransform.Transform:
+            position: [0, 0, 0]
+            rotation: [0, 0, 0, 1]
+            scale: [1, 1, 1]
+      - id: light
+        name: Light
+        enabled: true
+        parent:
+        components:
+          AdaTransform.Transform:
+            position: [10, 20, 0]
+            rotation: [0, 0, 0, 1]
+            scale: [1, 1, 1]
+          Example.UnknownComponent:
+            value: 42
+    """
 
 private let sceneYAMLWithGizmo = """
-format: ada.scene
-schemaVersion: 1
-scene:
-  id: test-scene
-  name: Test
-entities:
-  - id: root
-    name: Root
-    enabled: true
-    parent:
-    components:
-      AdaTransform.Transform:
-        position: [0, 0, 0]
-        rotation: [0, 0, 0, 1]
-        scale: [1, 1, 1]
-      AdaScene.EditorGizmo:
-        name: Root Gizmo
-        kind: custom
-        isEnabled: true
-        size: 1
-"""
+    format: ada.scene
+    schemaVersion: 1
+    scene:
+      id: test-scene
+      name: Test
+    entities:
+      - id: root
+        name: Root
+        enabled: true
+        parent:
+        components:
+          AdaTransform.Transform:
+            position: [0, 0, 0]
+            rotation: [0, 0, 0, 1]
+            scale: [1, 1, 1]
+          AdaScene.EditorGizmo:
+            name: Root Gizmo
+            kind: custom
+            isEnabled: true
+            size: 1
+    """

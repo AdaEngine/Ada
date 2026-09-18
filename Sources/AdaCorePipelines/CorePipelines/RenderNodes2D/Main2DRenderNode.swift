@@ -12,7 +12,6 @@ import Math
 
 /// This render node responsible for rendering ``Transparent2DRenderItem``.
 public struct Main2DRenderNode: RenderNode {
-
     /// Input slots of render node.
     public enum InputNode {
         public static let view: RenderSlot.Label = "view"
@@ -56,11 +55,12 @@ public struct Main2DRenderNode: RenderNode {
             guard let mainTex = target.mainTexture else {
                 return
             }
-            let texture: Texture = if target.lighting2DUsesDeferredTargets, let scene = target.sceneColorTexture {
-                scene
-            } else {
-                mainTex
-            }
+            let texture: Texture =
+                if target.lighting2DUsesDeferredTargets, let scene = target.sceneColorTexture {
+                    scene
+                } else {
+                    mainTex
+                }
 
             let renderPass = commandBuffer.beginRenderPass(
                 RenderPassDescriptor(
@@ -88,7 +88,7 @@ public struct Main2DRenderNode: RenderNode {
 
             renderPass.endRenderPass()
             if let outputTexture = target.outputTexture,
-               texture === outputTexture {
+                texture === outputTexture {
                 commandBuffer.addCompletedHandler { [outputTexture] in
                     outputTexture.notifyRenderCompleted()
                 }
@@ -102,7 +102,6 @@ public struct Main2DRenderNode: RenderNode {
 
 /// An object describe 2D render item.
 public struct Transparent2DRenderItem: RenderItem {
-
     /// An entity that hold additional information about render item.
     public var entity: Entity.ID
 

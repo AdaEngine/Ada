@@ -7,8 +7,8 @@
 
 import Math
 
-public extension View {
-    func zIndex(_ index: Int) -> some View {
+extension View {
+    public func zIndex(_ index: Int) -> some View {
         self.modifier(ZIndexModifier(index: index, content: self))
     }
 }

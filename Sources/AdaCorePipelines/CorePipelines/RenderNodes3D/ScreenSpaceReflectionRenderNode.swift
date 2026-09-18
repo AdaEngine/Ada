@@ -11,7 +11,6 @@ import Math
 
 /// Composites screen-space reflections and the camera skybox into the main target.
 public struct ScreenSpaceReflectionRenderNode: RenderNode {
-
     public static let name: RenderNodeLabel = .screenSpaceReflection
 
     @Query<Entity, Camera, RenderViewTarget, GlobalViewUniform, ExtractedCameraSource>
@@ -49,12 +48,13 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
         }
 
         query.forEach { entity, camera, target, viewUniform, source in
-            guard entity == view,
-                  target.rendering3DUsesEnvironmentTargets,
-                  let sceneColor = target.sceneColor3DTexture,
-                  let normalRoughness = target.normalRoughness3DTexture,
-                  let viewPositionMetallic = target.viewPositionMetallic3DTexture,
-                  let mainTexture = target.mainTexture
+            guard
+                entity == view,
+                target.rendering3DUsesEnvironmentTargets,
+                let sceneColor = target.sceneColor3DTexture,
+                let normalRoughness = target.normalRoughness3DTexture,
+                let viewPositionMetallic = target.viewPositionMetallic3DTexture,
+                let mainTexture = target.mainTexture
             else {
                 return
             }
@@ -133,7 +133,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
             pass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
             pass.endRenderPass()
             if notifiesCompletion, let outputTexture = target.outputTexture,
-               mainTexture === outputTexture {
+                mainTexture === outputTexture {
                 commandBuffer.addCompletedHandler { [outputTexture] in
                     outputTexture.notifyRenderCompleted()
                 }

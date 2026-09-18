@@ -1,10 +1,11 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaInput
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorInputBindingsTests {
@@ -77,26 +78,37 @@ struct EditorInputBindingsTests {
 
     @Test func systemCallbacksReceiveCurrentWorldInput() async throws {
         InputActionProbe.registerComponent()
-        let plugin = try AdaScriptPlugin(source: """
-        @system(scheduler: "update", id: "input.probe")
-        class ProbeSystem {
-            @res var input: Input;
-            @query(InputActionProbe) var probes;
-            func update(context) {
-                for (var row in probes) {
-                    row.inputActionProbe.value += input.getActionStrength("Move");
+        let plugin = try AdaScriptPlugin(
+            source: """
+                @system(scheduler: "update", id: "input.probe")
+                class ProbeSystem {
+                    @res var input: Input;
+                    @query(InputActionProbe) var probes;
+                    func update(context) {
+                        for (var row in probes) {
+                            row.inputActionProbe.value += input.getActionStrength("Move");
+                        }
+                    }
                 }
-            }
-        }
-        """, name: "InputProbe")
+                """,
+            name: "InputProbe"
+        )
         let world = World(name: "InputSystem")
         let app = AppWorlds(main: world)
         InputPlugin(actions: [InputAction(name: "Move", bindings: [.key(.d)])]).setup(in: app)
         plugin.setup(in: app)
         let entity = world.spawn { InputActionProbe(value: 0) }
-        world.getRefResource(Input.self).wrappedValue.receiveEvent(KeyEvent(
-            window: .empty, keyCode: .d, modifiers: [], status: .down, time: 0, isRepeated: false
-        ))
+        world.getRefResource(Input.self).wrappedValue
+            .receiveEvent(
+                KeyEvent(
+                    window: .empty,
+                    keyCode: .d,
+                    modifiers: [],
+                    status: .down,
+                    time: 0,
+                    isRepeated: false
+                )
+            )
         await world.runScheduler(.preUpdate)
         await world.runScheduler(.update)
         #expect(plugin.diagnostics.isEmpty)
@@ -109,17 +121,17 @@ struct EditorInputBindingsTests {
         try FileManager.default.createDirectory(at: root.appendingPathComponent("Sources"), withIntermediateDirectories: true)
         let scriptID = "test.input.\(UUID().uuidString)"
         let source = """
-        @scriptable(id: "\(scriptID)")
-        class InputProbe {
-            @res var input: Input;
-            @export var count = 0;
-            func update(context) {
-                if (input.isActionPressed("Jump")) { count += 1; }
-                if (input.isActionJustPressed("Jump")) { count += 10; }
-                if (input.isActionJustReleased("Jump")) { count += 100; }
+            @scriptable(id: "\(scriptID)")
+            class InputProbe {
+                @res var input: Input;
+                @export var count = 0;
+                func update(context) {
+                    if (input.isActionPressed("Jump")) { count += 1; }
+                    if (input.isActionJustPressed("Jump")) { count += 10; }
+                    if (input.isActionJustReleased("Jump")) { count += 100; }
+                }
             }
-        }
-        """
+            """
         try source.write(to: root.appendingPathComponent("Sources/Probe.ada"), atomically: true, encoding: .utf8)
         var project = ProjectSystem.defaultProject(projectName: "Game", buildSystem: .adaScript)
         project.inputActions = [InputAction(name: "Jump", bindings: [.key(.space)])]
@@ -135,9 +147,17 @@ struct EditorInputBindingsTests {
         world.spawn { ScriptableComponents(scripts: [script]) }
         func frame(_ status: KeyEvent.Status?) async {
             if let status {
-                world.getRefResource(Input.self).wrappedValue.receiveEvent(KeyEvent(
-                    window: .empty, keyCode: .space, modifiers: [], status: status, time: 0, isRepeated: false
-                ))
+                world.getRefResource(Input.self).wrappedValue
+                    .receiveEvent(
+                        KeyEvent(
+                            window: .empty,
+                            keyCode: .space,
+                            modifiers: [],
+                            status: status,
+                            time: 0,
+                            isRepeated: false
+                        )
+                    )
             }
             await world.runScheduler(.preUpdate)
             await world.runScheduler(.update)

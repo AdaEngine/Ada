@@ -21,11 +21,11 @@ final class EditorPreviewResizeState {
 struct EditorPreviewPanelsLayout: Layout {
     let state: EditorPreviewResizeState
 
-    func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> Size {
+    func sizeThatFits(_ proposal: ProposedViewSize, subviews _: Subviews, cache _: inout ()) -> Size {
         proposal.replacingUnspecifiedDimensions()
     }
 
-    func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
         guard subviews.count == 3 else {
             return
         }

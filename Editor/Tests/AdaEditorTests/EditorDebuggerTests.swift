@@ -1,6 +1,7 @@
 import AdaDebugging
 import Foundation
 import Testing
+
 @testable import AdaEditor
 
 @Suite("Editor debugger state")

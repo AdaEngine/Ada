@@ -9,7 +9,8 @@ actor EditorAgentSessionStore {
     private let decoder: JSONDecoder
 
     init(projectURL: URL) {
-        self.rootURL = projectURL
+        self.rootURL =
+            projectURL
             .appendingPathComponent(ProjectSystem.metadataDirectoryName, isDirectory: true)
             .appendingPathComponent("workspace", isDirectory: true)
             .appendingPathComponent("agent", isDirectory: true)

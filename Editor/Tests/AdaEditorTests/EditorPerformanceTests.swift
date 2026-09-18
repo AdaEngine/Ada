@@ -1,10 +1,11 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaMCPCore
 @_spi(Internal) import AdaUI
 import Math
 import MCP
 import Testing
+
+@testable import AdaEditor
 
 @Suite(.serialized)
 @MainActor
@@ -22,6 +23,7 @@ struct EditorPerformanceTests {
         session.attach(game, title: "Test game")
         let id = try #require(session.targetID)
         #expect(game.profilingTargetID == id)
+        #expect(game.main.getResource(PhysicsPerformanceMetrics.self) != nil)
         let model = EditorPerformanceModel()
         model.appear()
         #expect(model.target?.id == id)

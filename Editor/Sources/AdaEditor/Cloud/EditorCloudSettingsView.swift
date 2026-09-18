@@ -1,10 +1,11 @@
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 import UniformTypeIdentifiers
+
 #if os(macOS)
-import AppKit
+    import AppKit
 #elseif os(iOS)
-import UIKit
+    import UIKit
 #endif
 
 @MainActor
@@ -18,12 +19,14 @@ struct EditorCloudSettingsView: View {
                 Text(account.accountID == nil ? "Sign in to Ada" : "Ada account")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(theme.editorColors.text)
-                Text(account.accountID == nil
-                     ? "Sync your editor settings and share web builds. Continue securely on the Ada website."
-                     : (!account.cloudServicesAvailable ? "Cloud Services will open soon." : account.pro ? "Pro · Web publishing enabled" : "Free · Editor settings sync"))
-                    .font(.system(size: 12))
-                    .foregroundColor(theme.editorColors.muted)
-                    .lineLimit(3)
+                Text(
+                    account.accountID == nil
+                        ? "Sync your editor settings and share web builds. Continue securely on the Ada website."
+                        : (!account.cloudServicesAvailable ? "Cloud Services will open soon." : account.pro ? "Pro · Web publishing enabled" : "Free · Editor settings sync")
+                )
+                .font(.system(size: 12))
+                .foregroundColor(theme.editorColors.muted)
+                .lineLimit(3)
             }
             if account.accountID == nil {
                 actionButton(account.busy ? "Waiting for browser…" : "Sign in", primary: true, id: "SignIn") {
@@ -35,28 +38,33 @@ struct EditorCloudSettingsView: View {
                 }
                 HStack(spacing: 10) {
                     if account.cloudServicesAvailable {
-                    actionButton("Sync now", id: "Sync") { account.perform {
-                        try await account.sync(); try await account.refreshPlan()
-                        account.status = account.cloudServicesAvailable ? "Settings synced." : "Cloud Services will open soon."
-                    } }
+                        actionButton("Sync now", id: "Sync") {
+                            account.perform {
+                                try await account.sync()
+                                try await account.refreshPlan()
+                                account.status = account.cloudServicesAvailable ? "Settings synced." : "Cloud Services will open soon."
+                            }
+                        }
                     }
                     actionButton("Manage account", id: "Manage") { EditorCloudFilePicker.open(account.server + "/cloud") }
                 }
                 HStack(spacing: 10) {
                     if account.billingAvailable {
-                    actionButton("Subscribe to Pro", id: "Subscribe") { account.perform { try await account.buyPro() } }
+                        actionButton("Subscribe to Pro", id: "Subscribe") { account.perform { try await account.buyPro() } }
                     }
                     actionButton("Restore purchases", id: "Restore") { account.perform { try await account.restorePurchases() } }
                 }
                 if account.cloudServicesAvailable {
-                Text("One active build · ZIP up to 300 MB · Secret links last 48 hours")
-                    .font(.system(size: 11)).foregroundColor(theme.editorColors.muted).lineLimit(2)
-                actionButton("Choose ZIP and publish", id: "Publish") {
-                    account.perform {
-                        guard let url = try await EditorCloudFilePicker.shared.pick() else { return }
-                        try await account.publish(zip: url)
+                    Text("One active build · ZIP up to 300 MB · Secret links last 48 hours")
+                        .font(.system(size: 11)).foregroundColor(theme.editorColors.muted).lineLimit(2)
+                    actionButton("Choose ZIP and publish", id: "Publish") {
+                        account.perform {
+                            guard let url = try await EditorCloudFilePicker.shared.pick() else {
+                                return
+                            }
+                            try await account.publish(zip: url)
+                        }
                     }
-                }
                 }
                 if let url = account.publicationURL {
                     Text(url).font(.system(size: 11)).foregroundColor(theme.editorColors.muted).lineLimit(2)
@@ -81,7 +89,11 @@ struct EditorCloudSettingsView: View {
     }
 
     private func actionButton(_ title: String, primary: Bool = false, id: String, action: @escaping () -> Void) -> some View {
-        Button { if !account.busy { action() } } label: {
+        Button {
+            if !account.busy {
+                action()
+            }
+        } label: {
             Text(title).font(.system(size: 12))
                 .foregroundColor(primary ? .white : theme.editorColors.text)
                 .padding(.horizontal, 14)
@@ -101,8 +113,11 @@ struct EditorCloudSettingsView: View {
             appearance.agentActivityGlowEnabled = values["appearance.agentActivityGlowEnabled"].bool ?? true
             appearance.agentGlowRadius = values["appearance.agentGlowRadius"] == .null ? EditorAppearanceSettings.defaultRadius : values["appearance.agentGlowRadius"].seconds
             appearance.agentGlowOpacity = values["appearance.agentGlowOpacity"] == .null ? EditorAppearanceSettings.defaultOpacity : values["appearance.agentGlowOpacity"].seconds
-            if let hex = values["appearance.agentGlowAccent"].string, let color = EditorUIColorField.color(hex) { appearance.setAccentColor(color) }
-            else { appearance.useThemeAccent() }
+            if let hex = values["appearance.agentGlowAccent"].string, let color = EditorUIColorField.color(hex) {
+                appearance.setAccentColor(color)
+            } else {
+                appearance.useThemeAccent()
+            }
         }
         EditorCloudAccount.shared.start()
     }
@@ -112,46 +127,61 @@ struct EditorCloudSettingsView: View {
 private final class EditorCloudFilePicker: NSObject {
     static let shared = EditorCloudFilePicker()
     #if os(iOS)
-    private var continuation: CheckedContinuation<URL?, Error>?
+        private var continuation: CheckedContinuation<URL?, Error>?
     #endif
     func pick() async throws -> URL? {
         #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = [.zip]
-        return await panel.begin() == .OK ? panel.url : nil
+            let panel = NSOpenPanel()
+            panel.canChooseDirectories = false
+            panel.allowsMultipleSelection = false
+            panel.allowedContentTypes = [.zip]
+            return await panel.begin() == .OK ? panel.url : nil
         #elseif os(iOS)
-        guard let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap(\.windows).first(where: \.isKeyWindow), var controller = window.rootViewController else { return nil }
-        while let next = controller.presentedViewController { controller = next }
-        return try await withCheckedThrowingContinuation { continuation in
-            self.continuation = continuation
-            let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.zip], asCopy: false)
-            picker.delegate = self
-            controller.present(picker, animated: true)
-        }
+            guard
+                let window = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap(\.windows).first(where: \.isKeyWindow),
+                var controller = window.rootViewController
+            else {
+                return nil
+            }
+            while let next = controller.presentedViewController { controller = next }
+            return try await withCheckedThrowingContinuation { continuation in
+                self.continuation = continuation
+                let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.zip], asCopy: false)
+                picker.delegate = self
+                controller.present(picker, animated: true)
+            }
         #else
-        return nil
+            return nil
         #endif
     }
     static func open(_ text: String) {
-        guard let url = URL(string: text), url.scheme == "https" else { return }
+        guard let url = URL(string: text), url.scheme == "https" else {
+            return
+        }
         #if os(macOS)
-        NSWorkspace.shared.open(url)
+            NSWorkspace.shared.open(url)
         #elseif os(iOS)
-        UIApplication.shared.open(url)
+            UIApplication.shared.open(url)
         #endif
     }
     static func copy(_ text: String) {
         #if os(macOS)
-        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
         #elseif os(iOS)
-        UIPasteboard.general.string = text
+            UIPasteboard.general.string = text
         #endif
     }
 }
 #if os(iOS)
-extension EditorCloudFilePicker: UIDocumentPickerDelegate {
-    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { continuation?.resume(returning: urls.first); continuation = nil }
-    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { continuation?.resume(returning: nil); continuation = nil }
-}
+    extension EditorCloudFilePicker: UIDocumentPickerDelegate {
+        func documentPicker(_: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            continuation?.resume(returning: urls.first)
+            continuation = nil
+        }
+        func documentPickerWasCancelled(_: UIDocumentPickerViewController) {
+            continuation?.resume(returning: nil)
+            continuation = nil
+        }
+    }
 #endif

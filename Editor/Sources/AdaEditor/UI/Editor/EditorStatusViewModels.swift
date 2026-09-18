@@ -117,16 +117,24 @@ extension GitRepositoryService {
     /// Reads only HEAD, including an unborn branch; does not load status or file diffs.
     static func currentBranchFooter(projectURL: URL) async -> String? {
         let runner = EditorProcessRunner()
-        let branch = await runner.run(EditorProcessCommand(
-            executablePath: "/usr/bin/git", arguments: ["symbolic-ref", "--quiet", "--short", "HEAD"], workingDirectory: projectURL
-        ))
+        let branch = await runner.run(
+            EditorProcessCommand(
+                executablePath: "/usr/bin/git",
+                arguments: ["symbolic-ref", "--quiet", "--short", "HEAD"],
+                workingDirectory: projectURL
+            )
+        )
         if branch.succeeded {
             let name = branch.standardOutput.trimmingCharacters(in: .whitespacesAndNewlines)
             return name.isEmpty ? nil : "Git: \(name)"
         }
-        let head = await runner.run(EditorProcessCommand(
-            executablePath: "/usr/bin/git", arguments: ["rev-parse", "--verify", "HEAD"], workingDirectory: projectURL
-        ))
+        let head = await runner.run(
+            EditorProcessCommand(
+                executablePath: "/usr/bin/git",
+                arguments: ["rev-parse", "--verify", "HEAD"],
+                workingDirectory: projectURL
+            )
+        )
         return head.succeeded ? "Git: Detached HEAD" : nil
     }
 }

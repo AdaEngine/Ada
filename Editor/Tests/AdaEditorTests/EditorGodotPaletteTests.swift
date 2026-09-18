@@ -1,6 +1,7 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Godot syntax palette")
 struct EditorGodotPaletteTests {

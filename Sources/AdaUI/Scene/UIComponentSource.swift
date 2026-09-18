@@ -15,9 +15,19 @@ public struct UIComponentSource: Codable, Hashable, Sendable {
     /// Input names mapped to exported fields of scripts attached to this UI entity.
     public var scriptBindings: [String: UIScriptFieldBinding]
 
-    public init(kind: Kind = .ui, path: String = "", identifier: String = "", contextName: String = "", inputs: [String: UIValue] = [:],
-                scriptBindings: [String: UIScriptFieldBinding] = [:]) {
-        self.kind = kind; self.path = path; self.identifier = identifier; self.contextName = contextName; self.inputs = inputs
+    public init(
+        kind: Kind = .ui,
+        path: String = "",
+        identifier: String = "",
+        contextName: String = "",
+        inputs: [String: UIValue] = [:],
+        scriptBindings: [String: UIScriptFieldBinding] = [:]
+    ) {
+        self.kind = kind
+        self.path = path
+        self.identifier = identifier
+        self.contextName = contextName
+        self.inputs = inputs
         self.scriptBindings = scriptBindings
     }
 
@@ -64,9 +74,15 @@ public final class UIComponentRuntime {
 
     /// Validates persisted mappings without constructing a view or executing gameplay scripts.
     public func validateScriptBindings(source: UIComponentSource) throws {
-        guard !source.scriptBindings.isEmpty else { return }
-        guard source.kind == .ui else { throw UIDiagnostic("Script field bindings require a .ui source.") }
-        guard source.contextName.isEmpty else { throw UIDiagnostic("Script field bindings use an entity-owned context. Clear Data context.") }
+        guard !source.scriptBindings.isEmpty else {
+            return
+        }
+        guard source.kind == .ui else {
+            throw UIDiagnostic("Script field bindings require a .ui source.")
+        }
+        guard source.contextName.isEmpty else {
+            throw UIDiagnostic("Script field bindings use an entity-owned context. Clear Data context.")
+        }
         let document = try resources.load(resources.resolve(source.path))
         if let name = source.scriptBindings.keys.first(where: { name in !document.inputs.contains { $0.name == name } }) {
             throw UIDiagnostic("UI input '\(name)' is not declared in '\(source.path)'.")
@@ -76,10 +92,15 @@ public final class UIComponentRuntime {
     public func makeView(source: UIComponentSource, context suppliedContext: UIBindingContext? = nil) throws -> AnyView {
         try validateScriptBindings(source: source)
         let context: UIBindingContext
-        if let suppliedContext { context = suppliedContext }
-        else if source.contextName.isEmpty { context = defaultContext ?? UIBindingContext(values: source.inputs) }
-        else if let named = contexts[source.contextName] { context = named }
-        else { throw UIDiagnostic("Unknown UI context '\(source.contextName)'.") }
+        if let suppliedContext {
+            context = suppliedContext
+        } else if source.contextName.isEmpty {
+            context = defaultContext ?? UIBindingContext(values: source.inputs)
+        } else if let named = contexts[source.contextName] {
+            context = named
+        } else {
+            throw UIDiagnostic("Unknown UI context '\(source.contextName)'.")
+        }
         switch source.kind {
         case .ui:
             let url = try resources.resolve(source.path)
@@ -88,7 +109,9 @@ public final class UIComponentRuntime {
             sessions.append(WeakUISession(session))
             return AnyView(UISceneView(session: session))
         case .script:
-            guard let scriptFactory else { throw UIDiagnostic("This host has no AdaScript UI source provider.") }
+            guard let scriptFactory else {
+                throw UIDiagnostic("This host has no AdaScript UI source provider.")
+            }
             return try scriptFactory(source, context, resources)
         case .swiftView:
             let node = UINodeDescription(type: source.identifier, arguments: source.inputs.mapValues { .init(value: $0) })
@@ -98,7 +121,11 @@ public final class UIComponentRuntime {
 
     /// Revalidates mounted scenes after a file watcher reports a resource change.
     public func reload(_ url: URL, document: UISceneDocument? = nil) throws {
-        if let document { try resources.publish(document, at: url) } else { resources.invalidate(url) }
+        if let document {
+            try resources.publish(document, at: url)
+        } else {
+            resources.invalidate(url)
+        }
         sessions.removeAll { $0.value == nil }
         for session in sessions.compactMap(\.value) {
             let candidate = try session.sourceURL.map(resources.load) ?? session.document
@@ -127,21 +154,37 @@ final class UIComponentStorage: Sendable {
     @MainActor var scriptData: UIScriptBindingData?
 
     @MainActor func bindingData() -> UIScriptBindingData? {
-        guard let source, !source.scriptBindings.isEmpty else { return nil }
-        if let scriptData { return scriptData }
+        guard let source, !source.scriptBindings.isEmpty else {
+            return nil
+        }
+        if let scriptData {
+            return scriptData
+        }
         let data = UIScriptBindingData(values: source.inputs)
         scriptData = data
         return data
     }
 
-    init(view: UIView) { suppliedView = view; source = nil }
-    init(source: UIComponentSource) { suppliedView = nil; self.source = source }
+    init(view: UIView) {
+        suppliedView = view
+        source = nil
+    }
+    init(source: UIComponentSource) {
+        suppliedView = nil
+        self.source = source
+    }
 
     @MainActor
     func resolve(runtime: UIComponentRuntime?) throws -> UIView {
-        if let suppliedView { return suppliedView }
-        if let resolvedView { return resolvedView }
-        guard let source else { throw UIDiagnostic("Missing UI source.") }
+        if let suppliedView {
+            return suppliedView
+        }
+        if let resolvedView {
+            return resolvedView
+        }
+        guard let source else {
+            throw UIDiagnostic("Missing UI source.")
+        }
         let runtime = runtime ?? self.runtime ?? UIComponentRuntime(resourceRoot: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
         self.runtime = runtime
         let view = UIContainerView(rootView: try runtime.makeView(source: source, context: bindingData()?.context))

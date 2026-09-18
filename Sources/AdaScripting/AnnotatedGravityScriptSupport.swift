@@ -34,7 +34,7 @@ final class AnnotatedGravityRuntimeDelegate: GravityVirtualMachineDelegate, @unc
     }
 
     func virtualMachineLoadFile(
-        _ virtualMachine: GravityVirtualMachine,
+        _: GravityVirtualMachine,
         file: String,
         fileId: inout UInt32,
         isStatic: inout Bool
@@ -48,9 +48,9 @@ final class AnnotatedGravityRuntimeDelegate: GravityVirtualMachineDelegate, @unc
     }
 
     func virtualMachine(
-        _ virtualMachine: GravityVirtualMachine,
+        _: GravityVirtualMachine,
         didErrorWith message: String,
-        errorType: error_type_t,
+        errorType _: error_type_t,
         errorDescription: error_desc_t
     ) {
         if let path = pathsByFileID[errorDescription.fileid] {
@@ -60,17 +60,17 @@ final class AnnotatedGravityRuntimeDelegate: GravityVirtualMachineDelegate, @unc
         }
     }
 
-    func virtualMachineDidReciveLog(_ virtualMachine: GravityVirtualMachine, message: String) {
+    func virtualMachineDidReciveLog(_: GravityVirtualMachine, message: String) {
         RuntimeLogStore.shared.append(level: "info", label: "AdaScript", message: message)
     }
-    func virtualMachineDidClearLog(_ virtualMachine: GravityVirtualMachine) {}
-    func virtualMachineBridgeEquals(_ virtualMachine: GravityVirtualMachine, lhsValue: GSValue, rhsValue: GSValue) -> Bool { false }
-    func virtualMachine(_ virtualMachine: GravityVirtualMachine, didExecuteIn ctx: GSValue, arguments: [GSValue], argumentsCount: Int16, vIndex: UInt32) -> Bool { false }
-    func virtualMachine(_ virtualMachine: GravityVirtualMachine, didSetValue value: GSValue, in target: GSValue, forKey key: String) -> Bool { false }
-    func virtualMachine(_ virtualMachine: GravityVirtualMachine, didGetValueFrom target: GSValue, forKey key: String) throws -> GSValue? { nil }
+    func virtualMachineDidClearLog(_: GravityVirtualMachine) {}
+    func virtualMachineBridgeEquals(_: GravityVirtualMachine, lhsValue _: GSValue, rhsValue _: GSValue) -> Bool { false }
+    func virtualMachine(_: GravityVirtualMachine, didExecuteIn _: GSValue, arguments _: [GSValue], argumentsCount _: Int16, vIndex _: UInt32) -> Bool { false }
+    func virtualMachine(_: GravityVirtualMachine, didSetValue _: GSValue, in _: GSValue, forKey _: String) -> Bool { false }
+    func virtualMachine(_: GravityVirtualMachine, didGetValueFrom _: GSValue, forKey _: String) throws -> GSValue? { nil }
 
     func virtualMachine(
-        _ virtualMachine: GravityVirtualMachine,
+        _: GravityVirtualMachine,
         didSetUndefValue value: GSValue,
         in target: GSValue,
         forKey key: String
@@ -96,7 +96,7 @@ final class AnnotatedGravityRuntimeDelegate: GravityVirtualMachineDelegate, @unc
         forKey key: String
     ) throws -> GSValue? {
         if let row = target.toObjectOf(AnnotatedGravityQueryRow.self),
-           let component = row.component(named: key) {
+            let component = row.component(named: key) {
             return GSValue(object: component, in: virtualMachine)
         }
         if let component = target.toObjectOf(AnnotatedGravityComponentView.self) {
@@ -114,25 +114,26 @@ final class AnnotatedGravityRuntimeDelegate: GravityVirtualMachineDelegate, @unc
         return nil
     }
 
-    func virtualMachine(_ virtualMachine: GravityVirtualMachine, didRequestStringWith length: UInt32) -> String { "" }
+    func virtualMachine(_: GravityVirtualMachine, didRequestStringWith _: UInt32) -> String { "" }
 }
 
 enum AnnotatedGravityValueBridge {
     static func makeGravityValue(_ value: EditorFieldValue, virtualMachine: GravityVirtualMachine) -> GSValue {
         switch value {
         case .null: GSValue(nullIn: virtualMachine)
-        case .bool(let value): GSValue(boolean: value, in: virtualMachine)
-        case .int(let value): GSValue(integer: value, in: virtualMachine)
-        case .double(let value): GSValue(double: value, in: virtualMachine)
-        case .string(let value): GSValue(string: value, in: virtualMachine)
-        case .array(let values):
+        case let .bool(value): GSValue(boolean: value, in: virtualMachine)
+        case let .int(value): GSValue(integer: value, in: virtualMachine)
+        case let .double(value): GSValue(double: value, in: virtualMachine)
+        case let .string(value): GSValue(string: value, in: virtualMachine)
+        case let .array(values):
             GSValue(newArrayIn: virtualMachine, items: values.map { makeGravityValue($0, virtualMachine: virtualMachine) as Any })
-        case .object(let values):
+        case let .object(values):
             GSValue(
                 newArrayIn: virtualMachine,
-                items: ["red", "green", "blue", "alpha"].compactMap { values[$0] }.map {
-                    makeGravityValue($0, virtualMachine: virtualMachine) as Any
-                }
+                items: ["red", "green", "blue", "alpha"].compactMap { values[$0] }
+                    .map {
+                        makeGravityValue($0, virtualMachine: virtualMachine) as Any
+                    }
             )
         }
     }
@@ -180,9 +181,9 @@ extension GravityAnnotation {
             return []
         }
         switch value {
-        case .identifier(let value):
+        case let .identifier(value):
             return [value]
-        case .list(let values):
+        case let .list(values):
             return values.compactMap(\.identifierValue)
         default:
             return []
@@ -192,14 +193,14 @@ extension GravityAnnotation {
 
 extension GravityAnnotation.Value {
     var identifierValue: String? {
-        guard case .identifier(let value) = self else {
+        guard case let .identifier(value) = self else {
             return nil
         }
         return value
     }
 
     var stringValue: String? {
-        guard case .string(let value) = self else {
+        guard case let .string(value) = self else {
             return nil
         }
         return value

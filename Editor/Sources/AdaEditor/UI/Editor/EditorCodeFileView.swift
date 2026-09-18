@@ -22,7 +22,7 @@ struct EditorCodeFileView: View {
     let onTextSelection: ((EditorTextDocument, EditorSourceRange?, String?) -> Void)?
     let onChatSelection: ((EditorTextDocument, EditorSourceRange, String) -> Void)?
     let sourceContextMenuItems: ((EditorTextDocument, EditorSourceLocation) -> [TextEditorContextMenuItem])?
-    var debugger: EditorDebugger? = nil
+    var debugger: EditorDebugger?
 
     @Environment(\.theme) private var theme
 
@@ -42,8 +42,8 @@ struct EditorCodeFileView: View {
                     .overlay(anchor: .topLeading) {
                         ZStack {
                             if let description = document.sourceHoverDescription,
-                               !description.isEmpty,
-                               document.sourceHoverRange != nil {
+                                !description.isEmpty,
+                                document.sourceHoverRange != nil {
                                 sourceHoverOverlay(description: description)
                             }
                             if !document.completionItems.isEmpty {
@@ -58,8 +58,8 @@ struct EditorCodeFileView: View {
     }
 }
 
-private extension EditorCodeFileView {
-    var codeHeader: some View {
+extension EditorCodeFileView {
+    private var codeHeader: some View {
         HStack(spacing: 8) {
             Text(document.title)
                 .font(.system(size: 12))
@@ -85,7 +85,7 @@ private extension EditorCodeFileView {
         .background(theme.editorColors.surface)
     }
 
-    var codeEditor: some View {
+    private var codeEditor: some View {
         TextEditor(text: text, tokenSpans: tokenSpans, sourceInteraction: sourceInteraction)
             .font(AdaEditorCodeFont.font(family: fontFamily, weight: fontWeight, size: fontSize))
             .foregroundColor(colorPalette.plainText)
@@ -96,7 +96,7 @@ private extension EditorCodeFileView {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    func completionList(width: Float, height: Float) -> some View {
+    private func completionList(width: Float, height: Float) -> some View {
         let rowWidth = Swift.max(Float.zero, width - EditorCompletionPopupLayout.horizontalPadding * 2)
         let listHeight = Swift.max(Float.zero, height - EditorCompletionPopupLayout.verticalPadding * 2)
 
@@ -144,7 +144,7 @@ private extension EditorCodeFileView {
         .accessibilityIdentifier("AdaEditor.CodeCompletion")
     }
 
-    var completionOverlay: some View {
+    private var completionOverlay: some View {
         GeometryReader { geometry in
             let popupFrame = EditorCompletionPopupLayout.frame(
                 viewportSize: geometry.size,
@@ -159,7 +159,7 @@ private extension EditorCodeFileView {
         }
     }
 
-    func sourceHoverOverlay(description: String) -> some View {
+    private func sourceHoverOverlay(description: String) -> some View {
         GeometryReader { geometry in
             let displayText = EditorSourceHoverPresentation.displayText(from: description)
             let popupFrame = EditorSourceHoverPopupLayout.frame(
@@ -178,28 +178,30 @@ private extension EditorCodeFileView {
                     keywordFont: AdaEditorCodeFont.font(family: fontFamily, weight: keywordFontWeight, size: 11)
                 )
             )
-                .lineLimit(EditorSourceHoverPopupLayout.maximumLineCount)
-                .padding(EditorSourceHoverPopupLayout.contentPadding)
-                .frame(width: popupFrame.width, height: popupFrame.height, alignment: .topLeading)
-                .background(RoundedRectangleShape(cornerRadius: 7).fill(theme.editorColors.surface))
-                .overlay {
-                    RoundedRectangleShape(cornerRadius: 7)
-                        .stroke(theme.editorColors.border.opacity(0.85), lineWidth: 1)
-                }
-                .offset(x: popupFrame.minX, y: popupFrame.minY)
-                .allowsHitTesting(false)
-                .accessibilityIdentifier("AdaEditor.SourceHoverDescription")
+            .lineLimit(EditorSourceHoverPopupLayout.maximumLineCount)
+            .padding(EditorSourceHoverPopupLayout.contentPadding)
+            .frame(width: popupFrame.width, height: popupFrame.height, alignment: .topLeading)
+            .background(RoundedRectangleShape(cornerRadius: 7).fill(theme.editorColors.surface))
+            .overlay {
+                RoundedRectangleShape(cornerRadius: 7)
+                    .stroke(theme.editorColors.border.opacity(0.85), lineWidth: 1)
+            }
+            .offset(x: popupFrame.minX, y: popupFrame.minY)
+            .allowsHitTesting(false)
+            .accessibilityIdentifier("AdaEditor.SourceHoverDescription")
         }
     }
 
-    var sourceInteraction: TextEditorSourceInteraction? {
+    private var sourceInteraction: TextEditorSourceInteraction? {
         let supportsLanguageTooling = document.language.supportsLanguageTooling
 
         return TextEditorSourceInteraction(
             lineMarkers: debugLineMarkers,
             executionLine: debugExecutionLine,
             onGutterClick: { line in
-                guard let path = document.absolutePath, document.language == .swift || document.language == .ada else { return }
+                guard let path = document.absolutePath, document.language == .swift || document.language == .ada else {
+                    return
+                }
                 debugger?.toggleBreakpoint(path: path, line: line + 1)
             },
             highlightedRanges: document.symbolHighlights.map(\.textEditorRange),
@@ -212,27 +214,39 @@ private extension EditorCodeFileView {
             hoveredRange: document.sourceHoverRange?.textEditorRange,
             focusedRange: document.focusedRange?.textEditorRange,
             onHover: { position in
-                guard supportsLanguageTooling else { return }
+                guard supportsLanguageTooling else {
+                    return
+                }
                 onSourceHover?(document, position.map { EditorSourceLocation(textEditorPosition: $0) })
             },
             onPrimaryClick: { position in
-                guard supportsLanguageTooling else { return }
+                guard supportsLanguageTooling else {
+                    return
+                }
                 onGoToDefinition?(document, EditorSourceLocation(textEditorPosition: position))
             },
             onCaretChange: { position, currentText in
-                guard supportsLanguageTooling else { return }
+                guard supportsLanguageTooling else {
+                    return
+                }
                 onCompletionPosition?(document, EditorSourceLocation(textEditorPosition: position), currentText)
             },
             onRequestCompletion: { position, currentText in
-                guard supportsLanguageTooling else { return }
+                guard supportsLanguageTooling else {
+                    return
+                }
                 onCompletionRequest?(document, EditorSourceLocation(textEditorPosition: position), currentText)
             },
             onMoveCompletionSelection: { delta in
-                guard supportsLanguageTooling else { return false }
+                guard supportsLanguageTooling else {
+                    return false
+                }
                 return onMoveCompletionSelection?(document, delta) ?? false
             },
             onAcceptCompletion: {
-                guard supportsLanguageTooling else { return false }
+                guard supportsLanguageTooling else {
+                    return false
+                }
                 return onAcceptCompletion?(document) ?? false
             },
             onSelectionChange: { range, text in
@@ -242,7 +256,9 @@ private extension EditorCodeFileView {
                 onChatSelection?(document, EditorSourceRange(textEditorRange: range), text)
             },
             contextMenuItems: { position in
-                guard supportsLanguageTooling else { return [] }
+                guard supportsLanguageTooling else {
+                    return []
+                }
                 return sourceContextMenuItems?(document, EditorSourceLocation(textEditorPosition: position)) ?? []
             },
             selectionHint: TextEditorSelectionHint(
@@ -254,29 +270,37 @@ private extension EditorCodeFileView {
         )
     }
 
-    var debugLineMarkers: [TextEditorLineMarker] {
-        guard let debugger, let path = document.absolutePath else { return [] }
-        let session = document.language == .swift ? debugger.swift : debugger.adaScript
-        return debugger.breakpoints.filter { $0.path == path }.map { breakpoint in
-            TextEditorLineMarker(
-                line: breakpoint.line - 1,
-                color: breakpoint.enabled ? Color.red : theme.editorColors.muted,
-                isFilled: breakpoint.enabled && (!session.state.isActive || session.verifiedBreakpoints[breakpoint.id] == true)
-            )
+    private var debugLineMarkers: [TextEditorLineMarker] {
+        guard let debugger, let path = document.absolutePath else {
+            return []
         }
+        let session = document.language == .swift ? debugger.swift : debugger.adaScript
+        return debugger.breakpoints.filter { $0.path == path }
+            .map { breakpoint in
+                TextEditorLineMarker(
+                    line: breakpoint.line - 1,
+                    color: breakpoint.enabled ? Color.red : theme.editorColors.muted,
+                    isFilled: breakpoint.enabled && (!session.state.isActive || session.verifiedBreakpoints[breakpoint.id] == true)
+                )
+            }
     }
 
-    var debugExecutionLine: Int? {
-        guard let debugger, let path = document.absolutePath, !debugger.modifiedSources.contains(path) else { return nil }
+    private var debugExecutionLine: Int? {
+        guard let debugger, let path = document.absolutePath, !debugger.modifiedSources.contains(path) else {
+            return nil
+        }
         let session = document.language == .swift ? debugger.swift : debugger.adaScript
         guard session.state == .paused,
-              let frame = session.frames.first(where: { $0.id == session.selectedFrameID }),
-              let framePath = frame.path,
-              URL(fileURLWithPath: framePath).resolvingSymlinksInPath() == URL(fileURLWithPath: path).resolvingSymlinksInPath() else { return nil }
+            let frame = session.frames.first(where: { $0.id == session.selectedFrameID }),
+            let framePath = frame.path,
+            URL(fileURLWithPath: framePath).resolvingSymlinksInPath() == URL(fileURLWithPath: path).resolvingSymlinksInPath()
+        else {
+            return nil
+        }
         return frame.line - 1
     }
 
-    var tokenSpans: [TextEditorTokenSpan] {
+    private var tokenSpans: [TextEditorTokenSpan] {
         let keywordFont = AdaEditorCodeFont.font(
             family: fontFamily,
             weight: keywordFontWeight,
@@ -302,7 +326,7 @@ private extension EditorCodeFileView {
         }
     }
 
-    var editorColors: TextEditorColors {
+    private var editorColors: TextEditorColors {
         TextEditorColors(
             background: theme.editorColors.surfaceElevated,
             border: .clear,
@@ -314,7 +338,7 @@ private extension EditorCodeFileView {
         )
     }
 
-    func fileError(message: String) -> some View {
+    private func fileError(message: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Unable to open file")
                 .font(.system(size: 13))
@@ -328,7 +352,7 @@ private extension EditorCodeFileView {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    func color(for token: EditorSemanticToken) -> Color {
+    private func color(for token: EditorSemanticToken) -> Color {
         switch token.type {
         case "macro", "decorator":
             colorPalette.annotationColor
@@ -353,7 +377,7 @@ private extension EditorCodeFileView {
         }
     }
 
-    func diagnosticColor(for severity: EditorDiagnosticSeverity) -> Color {
+    private func diagnosticColor(for severity: EditorDiagnosticSeverity) -> Color {
         switch severity {
         case .error:
             Color(red: 1, green: 0.28, blue: 0.32)
@@ -366,7 +390,7 @@ private extension EditorCodeFileView {
         }
     }
 
-    func completionKindBadge(_ kind: EditorCompletionKind) -> some View {
+    private func completionKindBadge(_ kind: EditorCompletionKind) -> some View {
         Text(kind.badgeTitle)
             .font(.system(size: 10, weight: .bold))
             .foregroundColor(.white)
@@ -392,7 +416,8 @@ struct EditorSourceHoverPopupLayout {
     ) -> Rect {
         let availableWidth = max(0, viewportSize.width - viewportInset * 2)
         let width = min(preferredWidth, availableWidth)
-        let logicalLineCount = description
+        let logicalLineCount =
+            description
             .split(separator: "\n", omittingEmptySubsequences: false)
             .reduce(0) { count, line in
                 count + max(1, Int(ceil(Double(line.count) / Double(estimatedCharactersPerLine))))
@@ -479,18 +504,22 @@ enum EditorCompletionPresentation {
     }
 
     static func detail(for item: EditorCompletionItem) -> String? {
-        guard let detail = item.detail, detail != item.label else { return nil }
+        guard let detail = item.detail, detail != item.label else {
+            return nil
+        }
         return singleLine(detail, maximumLength: 24)
     }
 
     static func singleLine(_ value: String, maximumLength: Int) -> String {
         let normalized = value.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        guard normalized.count > maximumLength else { return normalized }
+        guard normalized.count > maximumLength else {
+            return normalized
+        }
         return String(normalized.prefix(max(1, maximumLength - 1))) + "…"
     }
 }
 
-private extension EditorCompletionKind {
+extension EditorCompletionKind {
     var badgeTitle: String {
         switch self {
         case .annotation: "@"
@@ -577,13 +606,14 @@ struct EditorCompletionPopupLayout {
         let caretTop = Float(18) + Float(max(0, position.line)) * lineHeight
         let desiredYBelow = caretTop + lineHeight
         let desiredYAbove = caretTop - height
-        let desiredY = if desiredYBelow + height <= viewportSize.height - viewportInset {
-            desiredYBelow
-        } else if desiredYAbove >= viewportInset {
-            desiredYAbove
-        } else {
-            desiredYBelow
-        }
+        let desiredY =
+            if desiredYBelow + height <= viewportSize.height - viewportInset {
+                desiredYBelow
+            } else if desiredYAbove >= viewportInset {
+                desiredYAbove
+            } else {
+                desiredYBelow
+            }
         let maxX = max(viewportInset, viewportSize.width - width - viewportInset)
         let maxY = max(viewportInset, viewportSize.height - height - viewportInset)
 
@@ -602,20 +632,21 @@ private struct EditorCompletionButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         let colors = theme.editorColors
-        let backgroundColor = if isKeyboardSelected || configuration.isSelected {
-            colors.blue.opacity(0.28)
-        } else if configuration.isHighlighted {
-            colors.border.opacity(0.72)
-        } else {
-            Color.clear
-        }
+        let backgroundColor =
+            if isKeyboardSelected || configuration.isSelected {
+                colors.blue.opacity(0.28)
+            } else if configuration.isHighlighted {
+                colors.border.opacity(0.72)
+            } else {
+                Color.clear
+            }
 
         return configuration.label
             .background(RoundedRectangleShape(cornerRadius: 3).fill(backgroundColor))
     }
 }
 
-private extension EditorSourceLocation {
+extension EditorSourceLocation {
     init(textEditorPosition: TextEditorSourcePosition) {
         self.init(line: textEditorPosition.line, character: textEditorPosition.column)
     }
@@ -625,7 +656,7 @@ private extension EditorSourceLocation {
     }
 }
 
-private extension EditorSourceRange {
+extension EditorSourceRange {
     init(textEditorRange: TextEditorSourceRange) {
         self.init(
             start: EditorSourceLocation(textEditorPosition: textEditorRange.start),
@@ -658,11 +689,13 @@ enum AdaEditorCodeFont {
     }
 
     private static func loadResource(named name: String) -> FontResource? {
-        guard let fontURL = Foundation.Bundle.editor.url(
-            forResource: name,
-            withExtension: "ttf",
-            subdirectory: "Assets/Fonts"
-        ) else {
+        guard
+            let fontURL = Foundation.Bundle.editor.url(
+                forResource: name,
+                withExtension: "ttf",
+                subdirectory: "Assets/Fonts"
+            )
+        else {
             return nil
         }
 
@@ -742,25 +775,28 @@ private enum EditorTreeSitterSwiftSyntaxHighlighter {
         let bundleRoots: [URL] = Bundle.allBundles.flatMap { bundle -> [URL] in
             var roots = [
                 bundle.bundleURL,
-                bundle.bundleURL.deletingLastPathComponent()
+                bundle.bundleURL.deletingLastPathComponent(),
             ]
             if let resourceURL = bundle.resourceURL {
                 roots.append(resourceURL)
             }
             return roots
         }
-        let roots = bundleRoots + [
-            Bundle.main.resourceURL,
-            Optional(Bundle.main.bundleURL),
-            Bundle.main.executableURL?.deletingLastPathComponent(),
-            Optional(Bundle.main.bundleURL.deletingLastPathComponent())
-        ].compactMap(\.self)
+        let roots =
+            bundleRoots
+            + [
+                Bundle.main.resourceURL,
+                Optional(Bundle.main.bundleURL),
+                Bundle.main.executableURL?.deletingLastPathComponent(),
+                Optional(Bundle.main.bundleURL.deletingLastPathComponent()),
+            ]
+            .compactMap(\.self)
 
         for root in roots {
             let bundleURL = root.appendingPathComponent(bundleName, isDirectory: true)
             let queryURLs = [
                 bundleURL.appendingPathComponent("queries", isDirectory: true),
-                bundleURL.appendingPathComponent("Contents/Resources/queries", isDirectory: true)
+                bundleURL.appendingPathComponent("Contents/Resources/queries", isDirectory: true),
             ]
 
             if let readableURL = queryURLs.first(where: { FileManager.default.isReadableFile(atPath: $0.path) }) {
@@ -775,7 +811,7 @@ private enum EditorTreeSitterSwiftSyntaxHighlighter {
         let currentDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         let buildDirectories = [
             currentDirectory.appendingPathComponent(".build", isDirectory: true),
-            currentDirectory.appendingPathComponent("Editor/.build", isDirectory: true)
+            currentDirectory.appendingPathComponent("Editor/.build", isDirectory: true),
         ]
 
         for buildDirectory in buildDirectories where FileManager.default.fileExists(atPath: buildDirectory.path) {
@@ -786,7 +822,7 @@ private enum EditorTreeSitterSwiftSyntaxHighlighter {
             for case let bundleURL as URL in enumerator where bundleURL.lastPathComponent == bundleName {
                 let queryURLs = [
                     bundleURL.appendingPathComponent("queries", isDirectory: true),
-                    bundleURL.appendingPathComponent("Contents/Resources/queries", isDirectory: true)
+                    bundleURL.appendingPathComponent("Contents/Resources/queries", isDirectory: true),
                 ]
 
                 if let readableURL = queryURLs.first(where: { FileManager.default.isReadableFile(atPath: $0.path) }) {
@@ -817,7 +853,8 @@ private enum EditorTreeSitterSwiftSyntaxHighlighter {
 
         let cursor = query.execute(in: tree)
         let lines = source.components(separatedBy: .newlines)
-        return cursor
+        return
+            cursor
             .resolve(with: .init(string: source))
             .highlights()
             .compactMap { namedRange in
@@ -872,8 +909,12 @@ private enum EditorTreeSitterSwiftSyntaxHighlighter {
             return palette.number
         }
 
-        if name == "attribute" { return palette.annotationColor }
-        if name.hasPrefix("function") { return palette.functionColor }
+        if name == "attribute" {
+            return palette.annotationColor
+        }
+        if name.hasPrefix("function") {
+            return palette.functionColor
+        }
         if name.hasPrefix("keyword") {
             return palette.keyword
         }
@@ -920,12 +961,13 @@ enum EditorSyntaxHighlighter {
 
     static func tokens(for source: String, language: EditorSourceLanguage, palette: EditorCodeColorPalette) -> [EditorCodeToken] {
         let lines = source.components(separatedBy: .newlines)
-        return spans(for: source, language: language, palette: palette).map { span in
-            let line = lines[safe: span.line] ?? ""
-            let startIndex = line.index(line.startIndex, offsetBy: min(span.startColumn, line.count))
-            let endIndex = line.index(startIndex, offsetBy: min(span.length, line.distance(from: startIndex, to: line.endIndex)))
-            return EditorCodeToken(text: String(line[startIndex..<endIndex]), color: span.color)
-        }
+        return spans(for: source, language: language, palette: palette)
+            .map { span in
+                let line = lines[safe: span.line] ?? ""
+                let startIndex = line.index(line.startIndex, offsetBy: min(span.startColumn, line.count))
+                let endIndex = line.index(startIndex, offsetBy: min(span.length, line.distance(from: startIndex, to: line.endIndex)))
+                return EditorCodeToken(text: String(line[startIndex..<endIndex]), color: span.color)
+            }
     }
 
     static func spans(
@@ -939,18 +981,19 @@ enum EditorSyntaxHighlighter {
             return cached
         }
 
-        let spans = makeSpans(for: source, language: language, palette: palette).map { span in
-            guard span.color == palette.keyword else {
-                return span
+        let spans = makeSpans(for: source, language: language, palette: palette)
+            .map { span in
+                guard span.color == palette.keyword else {
+                    return span
+                }
+                return TextEditorTokenSpan(
+                    line: span.line,
+                    startColumn: span.startColumn,
+                    length: span.length,
+                    color: span.color,
+                    font: keywordFont
+                )
             }
-            return TextEditorTokenSpan(
-                line: span.line,
-                startColumn: span.startColumn,
-                length: span.length,
-                color: span.color,
-                font: keywordFont
-            )
-        }
         return cacheSpans(spans, for: key)
     }
 
@@ -968,17 +1011,19 @@ enum EditorSyntaxHighlighter {
         }
 
         if language == .glsl || language == .wgsl {
-            return EditorShaderSyntaxHighlighter.tokens(for: source, language: language == .glsl ? .glsl : .wgsl).map { token in
-                let color: Color = switch token.kind {
-                case .keyword: palette.keyword
-                case .type: palette.type
-                case .string: palette.string
-                case .number: palette.number
-                case .comment: palette.comment
-                case .punctuation: palette.punctuation
+            return EditorShaderSyntaxHighlighter.tokens(for: source, language: language == .glsl ? .glsl : .wgsl)
+                .map { token in
+                    let color: Color =
+                        switch token.kind {
+                        case .keyword: palette.keyword
+                        case .type: palette.type
+                        case .string: palette.string
+                        case .number: palette.number
+                        case .comment: palette.comment
+                        case .punctuation: palette.punctuation
+                        }
+                    return TextEditorTokenSpan(line: token.line, startColumn: token.column, length: token.length, color: color)
                 }
-                return TextEditorTokenSpan(line: token.line, startColumn: token.column, length: token.length, color: color)
-            }
         }
 
         let lines = source.components(separatedBy: .newlines)
@@ -1028,7 +1073,7 @@ enum EditorSyntaxHighlighter {
             state.accessRevision &+= 1
             state.entries[key] = CacheEntry(spans: spans, lastAccess: state.accessRevision)
             if state.entries.count > maximumCacheEntryCount,
-               let staleKey = state.entries.min(by: { $0.value.lastAccess < $1.value.lastAccess })?.key {
+                let staleKey = state.entries.min(by: { $0.value.lastAccess < $1.value.lastAccess })?.key {
                 state.entries.removeValue(forKey: staleKey)
             }
             return spans
@@ -1036,14 +1081,14 @@ enum EditorSyntaxHighlighter {
     }
 
     #if DEBUG
-    static func hasCachedSpans(
-        for source: String,
-        language: EditorSourceLanguage,
-        palette: EditorCodeColorPalette
-    ) -> Bool {
-        let key = CacheKey(source: source, language: language.rawValue, palette: palette, keywordFont: nil)
-        return cache.withLock { $0.entries[key] != nil }
-    }
+        static func hasCachedSpans(
+            for source: String,
+            language: EditorSourceLanguage,
+            palette: EditorCodeColorPalette
+        ) -> Bool {
+            let key = CacheKey(source: source, language: language.rawValue, palette: palette, keywordFont: nil)
+            return cache.withLock { $0.entries[key] != nil }
+        }
     #endif
 
     private static func treeSitterSwiftSpans(
@@ -1052,7 +1097,8 @@ enum EditorSyntaxHighlighter {
         palette: EditorCodeColorPalette
     ) -> [TextEditorTokenSpan]? {
         guard language == .swift || language == .packageManifest,
-              let highlightSpans = EditorTreeSitterSwiftSyntaxHighlighter.spans(for: source, palette: palette) else {
+            let highlightSpans = EditorTreeSitterSwiftSyntaxHighlighter.spans(for: source, palette: palette)
+        else {
             return nil
         }
 
@@ -1479,13 +1525,13 @@ enum EditorSyntaxHighlighter {
         "actor", "as", "async", "await", "break", "case", "catch", "class", "continue", "default", "defer", "do", "else", "enum", "extension",
         "fallthrough", "false", "for", "func", "guard", "if", "import", "in", "init", "inout", "is", "let", "nil", "operator", "private",
         "protocol", "public", "repeat", "return", "self", "some", "static", "struct", "subscript", "super", "switch", "throw", "throws", "true",
-        "try", "typealias", "var", "where", "while"
+        "try", "typealias", "var", "where", "while",
     ]
 
     private static let gravityKeywords: Set<String> = [
         "_args", "_func", "and", "break", "case", "class", "const", "continue", "default", "else", "enum", "event", "extern", "false",
         "file", "for", "func", "if", "import", "in", "internal", "is", "lazy", "module", "not", "null", "or", "private", "public", "repeat",
-        "return", "static", "struct", "super", "switch", "true", "undefined", "var", "while"
+        "return", "static", "struct", "super", "switch", "true", "undefined", "var", "while",
     ]
 
     private static let jsonKeywords: Set<String> = ["false", "null", "true"]
@@ -1496,7 +1542,7 @@ enum EditorSyntaxHighlighter {
     private static let yamlPunctuation = Set("[]{}:,-")
 }
 
-private extension Collection {
+extension Collection {
     subscript(safe index: Index) -> Element? {
         indices.contains(index) ? self[index] : nil
     }

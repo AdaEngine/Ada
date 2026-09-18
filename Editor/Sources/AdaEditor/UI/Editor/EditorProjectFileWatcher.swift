@@ -112,26 +112,26 @@ extension EditorViewModel {
     func startProjectFileWatching() {
         // The engine's filesystem event backend is recursive on macOS.
         #if os(macOS)
-        guard projectFileWatcher == nil, let projectURL else {
-            return
-        }
-        let watcher = EditorProjectFileWatcher(root: projectURL) { [weak self] paths in
-            guard let self else {
+            guard projectFileWatcher == nil, let projectURL else {
                 return
             }
-            self.refreshProjectFiles(logsRefresh: false)
-            self.refreshSourceControl()
-            for path in paths where !path.isEmpty {
-                self.reloadOpenProjectFile(relativePath: path)
+            let watcher = EditorProjectFileWatcher(root: projectURL) { [weak self] paths in
+                guard let self else {
+                    return
+                }
+                self.refreshProjectFiles(logsRefresh: false)
+                self.refreshSourceControl()
+                for path in paths where !path.isEmpty {
+                    self.reloadOpenProjectFile(relativePath: path)
+                }
             }
-        }
-        do {
-            try watcher.start()
-            projectFileWatcher = watcher
-            refreshProjectFiles(logsRefresh: false)
-        } catch {
-            appendOutput("Unable to watch project files: \(error.localizedDescription)")
-        }
+            do {
+                try watcher.start()
+                projectFileWatcher = watcher
+                refreshProjectFiles(logsRefresh: false)
+            } catch {
+                appendOutput("Unable to watch project files: \(error.localizedDescription)")
+            }
         #endif
     }
 

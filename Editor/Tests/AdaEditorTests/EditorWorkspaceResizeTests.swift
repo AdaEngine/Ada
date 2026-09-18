@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 @_spi(Internal) import AdaUI
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Workspace panel resizing", .serialized)
 @MainActor
@@ -112,13 +113,15 @@ struct EditorWorkspaceResizeTests {
         model.showRightPanel = true
         model.showBottomPanel = true
         let counter = ResizeBuildCounter()
-        let container = UIContainerView(rootView: EditorWorkspaceView(
-            viewModel: model,
-            leftPanel: { ResizeBodyProbe(counter: counter).accessibilityIdentifier("probe.left") },
-            mainPanel: { ResizeBodyProbe(counter: counter).accessibilityIdentifier("probe.main") },
-            rightPanel: { ResizeBodyProbe(counter: counter).accessibilityIdentifier("probe.right") },
-            bottomPanel: { ResizeBodyProbe(counter: counter).accessibilityIdentifier("probe.bottom") }
-        ))
+        let container = UIContainerView(
+            rootView: EditorWorkspaceView(
+                viewModel: model,
+                leftPanel: { ResizeBodyProbe(counter: counter).accessibilityIdentifier("probe.left") },
+                mainPanel: { ResizeBodyProbe(counter: counter).accessibilityIdentifier("probe.main") },
+                rightPanel: { ResizeBodyProbe(counter: counter).accessibilityIdentifier("probe.right") },
+                bottomPanel: { ResizeBodyProbe(counter: counter).accessibilityIdentifier("probe.bottom") }
+            )
+        )
         container.frame = Rect(x: 0, y: 0, width: 1200, height: 700)
         container.bounds.size = container.frame.size
         await settle(container)
@@ -135,8 +138,16 @@ struct EditorWorkspaceResizeTests {
             if touch {
                 container.onTouchesEvent([TouchEvent(window: .empty, location: point, phase: eventIndex == 0 ? .began : .moved, time: 0)])
             } else {
-                container.onMouseEvent(MouseEvent(window: RID(), button: .left, mousePosition: point,
-                    phase: eventIndex == 0 ? .began : .changed, modifierKeys: [], time: 0))
+                container.onMouseEvent(
+                    MouseEvent(
+                        window: RID(),
+                        button: .left,
+                        mousePosition: point,
+                        phase: eventIndex == 0 ? .began : .changed,
+                        modifierKeys: [],
+                        time: 0
+                    )
+                )
             }
             await settle(container)
             let handle = try container.uiNode(matching: selector)
@@ -148,8 +159,16 @@ struct EditorWorkspaceResizeTests {
         if touch {
             container.onTouchesEvent([TouchEvent(window: .empty, location: start, phase: .ended, time: 0)])
         } else {
-            container.onMouseEvent(MouseEvent(window: RID(), button: .left, mousePosition: start,
-                phase: .ended, modifierKeys: [], time: 0))
+            container.onMouseEvent(
+                MouseEvent(
+                    window: RID(),
+                    button: .left,
+                    mousePosition: start,
+                    phase: .ended,
+                    modifierKeys: [],
+                    time: 0
+                )
+            )
         }
         await settle(container)
         #expect(counter.builds == beforeBuilds)
@@ -172,13 +191,15 @@ struct EditorWorkspaceResizeTests {
     }
 
     private func makeContainer(_ model: EditorViewModel) -> UIContainerView<some View> {
-        let container = UIContainerView(rootView: EditorWorkspaceView(
-            viewModel: model,
-            leftPanel: { Color.red.accessibilityIdentifier("test.left") },
-            mainPanel: { Color.blue.accessibilityIdentifier("test.main") },
-            rightPanel: { Color.green.accessibilityIdentifier("test.right") },
-            bottomPanel: { Color.gray.accessibilityIdentifier("test.bottom") }
-        ))
+        let container = UIContainerView(
+            rootView: EditorWorkspaceView(
+                viewModel: model,
+                leftPanel: { Color.red.accessibilityIdentifier("test.left") },
+                mainPanel: { Color.blue.accessibilityIdentifier("test.main") },
+                rightPanel: { Color.green.accessibilityIdentifier("test.right") },
+                bottomPanel: { Color.gray.accessibilityIdentifier("test.bottom") }
+            )
+        )
         container.frame = Rect(x: 0, y: 0, width: 1200, height: 700)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()

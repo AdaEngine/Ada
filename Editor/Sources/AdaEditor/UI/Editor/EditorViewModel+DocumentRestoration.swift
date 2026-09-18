@@ -17,8 +17,12 @@ extension EditorViewModel {
             return
         }
         let path = document.relativePath
-        guard path != lastRememberedProjectFile,
-              projectSidebar.items.contains(where: { !$0.isFolder && $0.relativePath == path }) else { return }
+        guard
+            path != lastRememberedProjectFile,
+            projectSidebar.items.contains(where: { !$0.isFolder && $0.relativePath == path })
+        else {
+            return
+        }
         do {
             let data = try JSONEncoder().encode(EditorDocumentSession(relativePath: path))
             try fileManager.createDirectory(at: sessionURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -38,9 +42,12 @@ extension EditorViewModel {
         let metadata = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager)
         let candidates = [saved?.relativePath, metadata?.runtime.entry.scene, metadata?.editor.startupScene, "Assets/Scenes/Main.ascn"]
             .compactMap { $0 }
-        let item = candidates.lazy.compactMap { path in
-            self.projectSidebar.items.first { !$0.isFolder && $0.relativePath == path }
-        }.first ?? projectSidebar.items.first { $0.kind == .scene }
+        let item =
+            candidates.lazy
+            .compactMap { path in
+                self.projectSidebar.items.first { !$0.isFolder && $0.relativePath == path }
+            }
+            .first ?? projectSidebar.items.first { $0.kind == .scene }
         guard let item else {
             return
         }

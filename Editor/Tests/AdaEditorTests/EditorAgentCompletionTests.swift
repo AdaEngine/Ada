@@ -1,14 +1,20 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Agent command and skill completion")
 @MainActor
 struct EditorAgentCompletionTests {
     private var skill: EditorAgentSkill {
         .init(
-            id: "ada-coding", name: "Ada coding", description: "Work on code", localPath: "/tmp/SKILL.md",
-            userInvocable: true, allowedTools: [], instructions: "Use AdaScript"
+            id: "ada-coding",
+            name: "Ada coding",
+            description: "Work on code",
+            localPath: "/tmp/SKILL.md",
+            userInvocable: true,
+            allowedTools: [],
+            instructions: "Use AdaScript"
         )
     }
 

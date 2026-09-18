@@ -5,13 +5,13 @@
 //  Created by v.prusakov on 5/10/22.
 //
 
+import AdaAssets
+import AdaCorePipelines
 import AdaECS
 @_spi(Internal) import AdaRender
 import AdaTransform
-import AdaCorePipelines
-import Math
-import AdaAssets
 import AdaUtils
+import Math
 
 // MARK: - Sprite Batching
 
@@ -75,7 +75,7 @@ public struct SpriteDrawData: Resource, DefaultValue {
     public var indexBuffer: BufferData<UInt32>
 
     public static let defaultValue: SpriteDrawData = {
-        SpriteDrawData(
+        Self(
             vertexBuffer: .init(label: "SpriteRenderSystem_VertexBuffer", elements: []),
             indexBuffer: .init(label: "SpriteRenderSystem_IndexBuffer", elements: [])
         )
@@ -86,7 +86,7 @@ public struct SpriteDrawData: Resource, DefaultValue {
 @System
 @inline(__always)
 public func ExtractSprite(
-    _ world: World,
+    _: World,
     _ sprites: Extract<
         Query<Entity, Sprite, GlobalTransform, Transform, Visibility>
     >,
@@ -126,22 +126,24 @@ func UpdateBoundings(
         Or<Changed<Mesh2D>, Without<NoFrustumCulling>>
     >
 ) async {
-    await sprites.parallel().forEach { entity, sprite, bounds in
-        guard let size = (sprite.size ?? sprite.texture?.asset.size.toSize())?.asVector2 else {
-            return
-        }
-        // Local quad is [-0.5,0.5]×size → centered at origin; AABB must match for frustum culling.
-        bounds.bounds = .aabb(
-            AABB(
-                center: .zero,
-                halfExtents: Vector3(0.5 * size, 0)
+    await sprites.parallel()
+        .forEach { _, sprite, bounds in
+            guard let size = (sprite.size ?? sprite.texture?.asset.size.toSize())?.asVector2 else {
+                return
+            }
+            // Local quad is [-0.5,0.5]×size → centered at origin; AABB must match for frustum culling.
+            bounds.bounds = .aabb(
+                AABB(
+                    center: .zero,
+                    halfExtents: Vector3(0.5 * size, 0)
+                )
             )
-        )
-    }
+        }
 
-    await meshes.parallel().forEach { mesh2d, bounds in
-        bounds.bounds = .aabb(mesh2d.mesh.bounds)
-    }
+    await meshes.parallel()
+        .forEach { mesh2d, bounds in
+            bounds.bounds = .aabb(mesh2d.mesh.bounds)
+        }
 }
 
 @System
@@ -156,7 +158,7 @@ func PrepareSprites(
     _ extractedSprites: Res<ExtractedSprites>,
     _ spriteDrawPass: Res<SpriteDrawPass>
 ) {
-    camera.forEach { camera, entities in
+    camera.forEach { _, entities in
         for sprite in extractedSprites.sprites {
             if !entities.entityIds.contains(sprite.entityId) {
                 continue
@@ -178,7 +180,6 @@ func PrepareSprites(
 
 @PlainSystem
 public struct SpriteRenderSystem {
-
     @ResMut<SortedRenderItems<Transparent2DRenderItem>>
     private var renderItems
 
@@ -201,15 +202,15 @@ public struct SpriteRenderSystem {
     private var spriteData: SpriteDrawData
 
     static let quadPosition: [Vector4] = [
-        [-0.5, -0.5,  0.0, 1.0],
-        [ 0.5, -0.5,  0.0, 1.0],
-        [ 0.5,  0.5,  0.0, 1.0],
-        [-0.5,  0.5,  0.0, 1.0]
+        [-0.5, -0.5, 0.0, 1.0],
+        [0.5, -0.5, 0.0, 1.0],
+        [0.5, 0.5, 0.0, 1.0],
+        [-0.5, 0.5, 0.0, 1.0],
     ]
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         spriteBatches.batches.removeAll(keepingCapacity: true)
         let device = renderDevice.renderDevice
 
@@ -224,9 +225,8 @@ public struct SpriteRenderSystem {
 
         func finishCurrentBatch() {
             if let batchEntity = batchEntityId,
-               let texture = currentTexture,
-               batchStartIndex < instanceCount
-            {
+                let texture = currentTexture,
+                batchStartIndex < instanceCount {
                 spriteBatches.batches[batchEntity] = SpriteBatch(
                     texture: texture,
                     range: batchStartIndex..<instanceCount

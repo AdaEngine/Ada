@@ -24,11 +24,10 @@ import AdaUtils
 
 /// The properties of a search bar.
 public struct SearchBarStyleConfiguration {
-
     /// A view that describes the text input part of the search bar.
     public struct Label: View {
         public typealias Body = Never
-        public var body: Never { fatalError() }
+        public var body: Never { fatalError("Unreachable code") }
 
         enum Storage {
             case makeView((_ViewInputs) -> _ViewOutputs)
@@ -40,10 +39,10 @@ public struct SearchBarStyleConfiguration {
         public static func _makeView(_ view: _ViewGraphNode<Self>, inputs: _ViewInputs) -> _ViewOutputs {
             let storage = view[\.storage].value
             switch storage {
-            case .makeView(let block):
+            case let .makeView(block):
                 return block(inputs)
-            case .makeViewList(let block):
-                let nodes = block(_ViewListInputs(input: inputs)).outputs.map { $0.node }
+            case let .makeViewList(block):
+                let nodes = block(_ViewListInputs(input: inputs)).outputs.map(\.node)
                 let node = LayoutViewContainerNode(
                     layout: AnyLayout(inputs.layout),
                     content: view.value,
@@ -77,19 +76,18 @@ public struct SearchBarStyleConfiguration {
     }
 }
 
-public extension View {
+extension View {
     /// Sets the style for search bars within this view.
     ///
     /// - Parameter style: The search bar style to apply.
     /// - Returns: The view with the search bar style applied.
-    func searchBarStyle<S: SearchBarStyle>(_ style: S) -> some View {
+    public func searchBarStyle<S: SearchBarStyle>(_ style: S) -> some View {
         self.environment(\.searchBarStyle, style)
     }
 }
 
 /// The default search bar style with Ada's glass effect.
 public struct DefaultSearchBarStyle: SearchBarStyle {
-
     /// Initialize a new default search bar style.
     public init() {}
 
@@ -119,7 +117,6 @@ public struct DefaultSearchBarStyle: SearchBarStyle {
 
 /// A plain search bar style with rectangular borders.
 public struct PlainSearchBarStyle: SearchBarStyle {
-
     /// Initialize a new plain search bar style.
     public init() {}
 
@@ -151,8 +148,8 @@ struct SearchBarEnvironmentKey: @preconcurrency EnvironmentKey {
     @MainActor static let defaultValue: any SearchBarStyle = DefaultSearchBarStyle()
 }
 
-public extension EnvironmentValues {
-    var searchBarStyle: any SearchBarStyle {
+extension EnvironmentValues {
+    public var searchBarStyle: any SearchBarStyle {
         get { self[SearchBarEnvironmentKey.self] }
         set { self[SearchBarEnvironmentKey.self] = newValue }
     }
@@ -160,7 +157,6 @@ public extension EnvironmentValues {
 
 /// A type-erased search bar style.
 public struct AnySearchBarStyle: SearchBarStyle {
-
     /// The style of the type-erased search bar style.
     let style: any SearchBarStyle
 

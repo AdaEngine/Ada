@@ -5,10 +5,11 @@
 //  Created by v.prusakov on 5/7/22.
 //
 
+import AdaAssets
 @_spi(Internal) import AdaECS
 import AdaTransform
+import AdaUtils
 import Math
-import AdaAssets
 
 // FIXME: Currently we render on window directly
 // TODO: Move window info to ECS system
@@ -16,17 +17,16 @@ import AdaAssets
 /// System for updating cameras data on scene.
 @PlainSystem
 public struct CameraSystem: Sendable {
-
     @Query<Entity, Ref<Camera>, GlobalTransform>
     private var query
 
     @Res
     private var primaryWindow: PrimaryWindowId?
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
     @MainActor
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         self.query.forEach { entity, camera, globalTransform in
             let viewMatrix = globalTransform.matrix.inverse
             camera.viewMatrix = viewMatrix
@@ -49,15 +49,16 @@ public struct CameraSystem: Sendable {
         var needsUpdateProjection = false
 
         switch camera.renderTarget {
-        case .window(let windowRef):
+        case let .window(windowRef):
             guard let primaryWindow else {
                 return
             }
             camera.renderTarget = .window(windowRef)
 
             let resolvedWindowId = windowRef.getWindowId(from: primaryWindow)
-            guard let renderWindow = unsafe RenderEngine.shared
-                .getRenderWindow(for: resolvedWindowId)
+            guard
+                let renderWindow = unsafe RenderEngine.shared
+                    .getRenderWindow(for: resolvedWindowId)
             else {
                 return
             }
@@ -72,8 +73,8 @@ public struct CameraSystem: Sendable {
                 needsUpdateProjection = true
             }
 
-        case .texture(let textureHandle):
-            let texture = textureHandle.asset!
+        case let .texture(textureHandle):
+            let texture = textureHandle.asset.unwrap(message: "Camera render-target texture is not loaded.")
             let size = Size(width: Float(texture.width), height: Float(texture.height))
 
             if camera.viewport.rect.size != size {

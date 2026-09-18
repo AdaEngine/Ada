@@ -92,14 +92,18 @@ public final class GravityWorkspace {
         if let hover = languageService.hover(text: text, position: position) {
             return hover
         }
-        guard let target = definition(uri: uri, position: position),
-              let analysis = analysis(for: target.uri),
-              let symbol = (analysis.symbols + analysis.symbols.flatMap(\.members)).first(where: {
-                  $0.selectionRange == target.selectionRange
-              }),
-              let token = GravityDocumentAnalyzer.parse(text).tokens.first(where: {
-                  $0.kind == .identifier && $0.range.contains(position)
-              }) else {
+        guard
+            let target = definition(uri: uri, position: position),
+            let analysis = analysis(for: target.uri),
+            let symbol = (analysis.symbols + analysis.symbols.flatMap(\.members))
+                .first(where: {
+                    $0.selectionRange == target.selectionRange
+                }),
+            let token = GravityDocumentAnalyzer.parse(text).tokens
+                .first(where: {
+                    $0.kind == .identifier && $0.range.contains(position)
+                })
+        else {
             return nil
         }
         return GravityHover(contents: "\(symbol.detail) \(symbol.name)", range: token.range)
@@ -118,9 +122,11 @@ public final class GravityWorkspace {
             return nil
         }
         let parsed = GravityDocumentAnalyzer.parse(document.text)
-        guard let tokenIndex = parsed.tokens.firstIndex(where: {
-            $0.kind == .identifier && $0.range.contains(position)
-        }) else {
+        guard
+            let tokenIndex = parsed.tokens.firstIndex(where: {
+                $0.kind == .identifier && $0.range.contains(position)
+            })
+        else {
             return nil
         }
 
@@ -135,22 +141,24 @@ public final class GravityWorkspace {
                 typeName = parsed.inferredTypes[receiver] ?? receiver
             }
             if let typeName,
-               let locatedType = locatedSymbol(named: typeName, localURI: key, localSymbols: parsed.analysis.symbols, workspaceSymbols: workspaceSymbols),
-               let member = locatedType.symbol.members.first(where: { $0.name == token.text }) {
+                let locatedType = locatedSymbol(named: typeName, localURI: key, localSymbols: parsed.analysis.symbols, workspaceSymbols: workspaceSymbols),
+                let member = locatedType.symbol.members.first(where: { $0.name == token.text }) {
                 return Self.definition(uri: locatedType.uri, symbol: member)
             }
         }
 
         if let containingType = GravityDocumentAnalyzer.typeContaining(position, in: parsed.typeRegions),
-           let member = containingType.members.first(where: { $0.name == token.text }) {
+            let member = containingType.members.first(where: { $0.name == token.text }) {
             return Self.definition(uri: key, symbol: member)
         }
-        guard let located = locatedSymbol(
-            named: token.text,
-            localURI: key,
-            localSymbols: parsed.analysis.symbols,
-            workspaceSymbols: workspaceSymbols
-        ) else {
+        guard
+            let located = locatedSymbol(
+                named: token.text,
+                localURI: key,
+                localSymbols: parsed.analysis.symbols,
+                workspaceSymbols: workspaceSymbols
+            )
+        else {
             return nil
         }
         return Self.definition(uri: located.uri, symbol: located.symbol)
@@ -158,10 +166,11 @@ public final class GravityWorkspace {
 
     public func refreshFile(uri: String) {
         let key = Self.documentKey(uri)
-        guard openDocuments[key] == nil,
-              let url = Self.fileURL(from: uri),
-              Self.isGravitySource(url),
-              let text = try? String(contentsOf: url, encoding: .utf8)
+        guard
+            openDocuments[key] == nil,
+            let url = Self.fileURL(from: uri),
+            Self.isGravitySource(url),
+            let text = try? String(contentsOf: url, encoding: .utf8)
         else {
             return
         }
@@ -186,7 +195,9 @@ public final class GravityWorkspace {
         let importedKeys = Set(located.map { "\($0.uri):\($0.symbol.kind.rawValue):\($0.symbol.name)" })
         let documents = diskDocuments.merging(openDocuments) { _, open in open }
         for documentURI in documents.keys.sorted() where documentURI != key {
-            guard let document = documents[documentURI] else { continue }
+            guard let document = documents[documentURI] else {
+                continue
+            }
             located += document.analysis.symbols.compactMap { symbol in
                 let symbolKey = "\(documentURI):\(symbol.kind.rawValue):\(symbol.name)"
                 return importedKeys.contains(symbolKey) ? nil : (uri: documentURI, symbol: symbol)
@@ -202,20 +213,22 @@ public final class GravityWorkspace {
         }
         var symbols: [(uri: String, symbol: GravitySymbol)] = []
         for scriptImport in document.analysis.imports {
-            guard case .source(let importedURI, let importedDocument) = resolve(scriptImport, from: key) else {
+            guard case let .source(importedURI, importedDocument) = resolve(scriptImport, from: key) else {
                 continue
             }
             if let namespace = scriptImport.namespace {
-                symbols.append((
-                    uri: importedURI,
-                    symbol: GravitySymbol(
-                        name: namespace,
-                        kind: .class,
-                        detail: "Imported AdaScript module",
-                        range: scriptImport.range,
-                        members: importedDocument.analysis.symbols
+                symbols.append(
+                    (
+                        uri: importedURI,
+                        symbol: GravitySymbol(
+                            name: namespace,
+                            kind: .class,
+                            detail: "Imported AdaScript module",
+                            range: scriptImport.range,
+                            members: importedDocument.analysis.symbols
+                        )
                     )
-                ))
+                )
             } else {
                 let selectedNames = Set(scriptImport.names)
                 symbols += importedDocument.analysis.symbols
@@ -241,9 +254,10 @@ public final class GravityWorkspace {
     private func importDiagnostics(uri: String, imports: [GravityImport]) -> [GravityDiagnostic] {
         imports.compactMap { scriptImport in
             switch resolve(scriptImport, from: uri) {
-            case .source, .virtual:
+            case .source,
+                .virtual:
                 nil
-            case .invalid(let message):
+            case let .invalid(message):
                 GravityDiagnostic(message: message, range: scriptImport.range)
             }
         }
@@ -285,22 +299,25 @@ public final class GravityWorkspace {
         diskDocuments.removeAll(keepingCapacity: true)
         let resourceKeys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey]
         for rootURL in rootURLs {
-            guard let enumerator = fileManager.enumerator(
-                at: rootURL,
-                includingPropertiesForKeys: resourceKeys,
-                options: []
-            ) else {
+            guard
+                let enumerator = fileManager.enumerator(
+                    at: rootURL,
+                    includingPropertiesForKeys: resourceKeys,
+                    options: []
+                )
+            else {
                 continue
             }
             for case let fileURL as URL in enumerator {
                 if Self.skippedDirectoryNames.contains(fileURL.lastPathComponent),
-                   (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                    (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
                     enumerator.skipDescendants()
                     continue
                 }
-                guard Self.isGravitySource(fileURL),
-                      (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
-                      let text = try? String(contentsOf: fileURL, encoding: .utf8)
+                guard
+                    Self.isGravitySource(fileURL),
+                    (try? fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+                    let text = try? String(contentsOf: fileURL, encoding: .utf8)
                 else {
                     continue
                 }

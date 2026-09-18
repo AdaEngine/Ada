@@ -7,41 +7,44 @@
 
 #if false && canImport(SwiftUI) && swift(>=5.9)
 
-import AdaEngine
-import SwiftUI
+    import AdaEngine
+    import SwiftUI
 
-//@available(iOS 16.0, macOS 14.0, *)
-//public struct ScenePreviewProvider {
-//    public let scene: AdaEngine.Scene
-//    
-//    public init(scene: AdaEngine.Scene) {
-//        self.scene = scene
-//    }
-//}
+    // @available(iOS 16.0, macOS 14.0, *)
+    // public struct ScenePreviewProvider {
+    //    public let scene: AdaEngine.Scene
+    //
+    //    public init(scene: AdaEngine.Scene) {
+    //        self.scene = scene
+    //    }
+    // }
 
-#if canImport(UIKit)
+    #if canImport(UIKit)
 
-extension ScenePreviewProvider: UIViewRepresentable {
-    
-    public func makeUIView(in context: Context) -> AEView {
-        return try! AEView(scene: scene, frame: .zero)
-    }
-    
-    public func updateUIView(_ view: AEView, in context: Context) { }
-}
+        extension ScenePreviewProvider: UIViewRepresentable {
+            public func makeUIView(in _: Context) -> AEView {
+                do {
+                    return try AEView(scene: scene, frame: .zero)
+                } catch {
+                    preconditionFailure("Unable to create scene preview: \(error)")
+                }
+            }
 
-#endif
+            public func updateUIView(_: AEView, in _: Context) {}
+        }
 
-#if canImport(AppKit)
+    #endif
 
-//extension ScenePreviewProvider: NSViewRepresentable {
-//    public func makeNSView(context: Context) -> AEView {
-//        try! AEView(scene: scene, frame: .zero)
-//    }
-//    
-//    public func updateNSView(_ nsView: AEView, context: Context) { }
-//}
+    #if canImport(AppKit)
 
-#endif
+        // extension ScenePreviewProvider: NSViewRepresentable {
+        //    public func makeNSView(context: Context) -> AEView {
+        //        try! AEView(scene: scene, frame: .zero)
+        //    }
+        //
+        //    public func updateNSView(_ nsView: AEView, context: Context) { }
+        // }
+
+    #endif
 
 #endif

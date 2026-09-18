@@ -6,7 +6,6 @@
 //
 
 public struct ConcurrentSequence<S: Sequence> {
-
     public typealias Element = S.Element
 
     private let base: S
@@ -16,17 +15,17 @@ public struct ConcurrentSequence<S: Sequence> {
     }
 }
 
-public extension Sequence {
+extension Sequence {
     /// Create wrapper for sequence to use Swift Modern Concurrency.
-    var concurrent: ConcurrentSequence<Self> {
+    public var concurrent: ConcurrentSequence<Self> {
         ConcurrentSequence(base: self)
     }
 }
 
-public extension ConcurrentSequence {
+extension ConcurrentSequence {
     /// Iterate over all elements in sequence and create task for each.
     @concurrent
-    func forEach(
+    public func forEach(
         _ operation: @escaping @Sendable (Element) async -> Void
     ) async where Element: Sendable {
         // A task group automatically waits for all of its

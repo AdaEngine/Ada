@@ -50,8 +50,8 @@ enum EditorSceneHierarchyModel {
     }
 }
 
-private extension EditorSceneHierarchyModel {
-    static func append(
+extension EditorSceneHierarchyModel {
+    private static func append(
         _ entity: EditorSceneEntity,
         level: Int,
         childrenByParentID: [String?: [EditorSceneEntity]],
@@ -98,7 +98,7 @@ private extension EditorSceneHierarchyModel {
         }
     }
 
-    static func resources(from entity: EditorSceneEntity) -> [EditorSceneHierarchyResource] {
+    private static func resources(from entity: EditorSceneEntity) -> [EditorSceneHierarchyResource] {
         var resources: [EditorSceneHierarchyResource] = []
         var seen: Set<String> = []
 
@@ -132,7 +132,7 @@ private extension EditorSceneHierarchyModel {
         return resources
     }
 
-    static func appendResources(
+    private static func appendResources(
         in payload: EditorComponentPayload,
         componentName: String,
         keyPath: [String],
@@ -150,7 +150,7 @@ private extension EditorSceneHierarchyModel {
         }
     }
 
-    static func appendResources(
+    private static func appendResources(
         in value: EditorSceneValue,
         componentName: String,
         keyPath: [String],
@@ -158,7 +158,7 @@ private extension EditorSceneHierarchyModel {
         resources: inout [EditorSceneHierarchyResource]
     ) {
         switch value {
-        case .string(let string):
+        case let .string(string):
             guard keyPathLooksResourceLike(keyPath) || valueLooksResourceLike(string) else {
                 return
             }
@@ -169,7 +169,7 @@ private extension EditorSceneHierarchyModel {
                 seen: &seen,
                 resources: &resources
             )
-        case .array(let values):
+        case let .array(values):
             for (index, value) in values.enumerated() {
                 appendResources(
                     in: value,
@@ -179,7 +179,7 @@ private extension EditorSceneHierarchyModel {
                     resources: &resources
                 )
             }
-        case .object(let values):
+        case let .object(values):
             for key in values.keys.sorted() {
                 appendResources(
                     in: values[key] ?? .null,
@@ -189,12 +189,16 @@ private extension EditorSceneHierarchyModel {
                     resources: &resources
                 )
             }
-        case .bool, .double, .int, .uint, .null:
+        case .bool,
+            .double,
+            .int,
+            .uint,
+            .null:
             break
         }
     }
 
-    static func appendResource(
+    private static func appendResource(
         componentName: String,
         fieldName: String,
         value: String,
@@ -221,17 +225,17 @@ private extension EditorSceneHierarchyModel {
         )
     }
 
-    static func keyPathLooksResourceLike(_ keyPath: [String]) -> Bool {
+    private static func keyPathLooksResourceLike(_ keyPath: [String]) -> Bool {
         let joinedPath = keyPath.joined(separator: ".").lowercased()
         let resourceTerms = ["asset", "resource", "texture", "material", "mesh", "audio", "path", "file", "url"]
         return resourceTerms.contains { joinedPath.contains($0) }
     }
 
-    static func valueLooksResourceLike(_ value: String) -> Bool {
+    private static func valueLooksResourceLike(_ value: String) -> Bool {
         let lowercasedValue = value.lowercased()
         let resourceExtensions = [
             ".ascn", ".atlas", ".dae", ".fbx", ".glb", ".gltf", ".jpg", ".jpeg", ".json", ".material", ".mp3", ".obj", ".png", ".scene", ".scn",
-            ".shader", ".wav", ".yaml", ".yml"
+            ".shader", ".wav", ".yaml", ".yml",
         ]
         return lowercasedValue.hasPrefix("assets/")
             || lowercasedValue.hasPrefix("res://")

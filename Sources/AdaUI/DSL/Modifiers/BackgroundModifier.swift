@@ -9,10 +9,10 @@ import AdaAnimation
 import AdaUtils
 import Math
 
-public extension View {
+extension View {
     /// Layers the color view that you specify behind this view.
     /// - Parameter color: A ``Color`` that you use to declare the views to draw behind this view.
-    func background(_ color: Color) -> some View {
+    public func background(_ color: Color) -> some View {
         self.modifier(
             BackgroundViewModifier(
                 anchor: .center,
@@ -24,9 +24,9 @@ public extension View {
 
     /// Layers the views that you specify behind this view.
     /// - Parameter anchor: The alignment that the modifier uses to position the implicit ``ZStack`` that groups the background views. The default is center.
-    /// - Parameter content: A ``ViewBuilder`` that you use to declare the views to draw behind this view, 
+    /// - Parameter content: A ``ViewBuilder`` that you use to declare the views to draw behind this view,
     /// stacked in a cascading order from bottom to top. The last view that you list appears at the front of the stack.
-    func background<Content: View>(anchor: AnchorPoint = .center, @ViewBuilder content: () -> Content) -> some View {
+    public func background<Content: View>(anchor: AnchorPoint = .center, @ViewBuilder content: () -> Content) -> some View {
         self.modifier(
             BackgroundViewModifier(
                 anchor: anchor,
@@ -35,12 +35,12 @@ public extension View {
             )
         )
     }
-    
+
     /// Layers the views that you specify behind this view.
     /// - Parameter anchor: The alignment that the modifier uses to position the implicit ``ZStack`` that groups the background views. The default is center.
     /// - Parameter content: A ``ViewBuilder`` that you use to declare the views to draw behind this view,
     /// stacked in a cascading order from bottom to top. The last view that you list appears at the front of the stack.
-    func background<Content: View>(anchor: AnchorPoint = .center, _ content: @autoclosure () -> Content) -> some View {
+    public func background<Content: View>(anchor: AnchorPoint = .center, _ content: @autoclosure () -> Content) -> some View {
         self.modifier(
             BackgroundViewModifier(
                 anchor: anchor,
@@ -75,7 +75,7 @@ private struct BackgroundLayout: Layout {
 
     let anchor: AnchorPoint
 
-    func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> Size {
+    func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) -> Size {
         guard !subviews.isEmpty else {
             return proposal.replacingUnspecifiedDimensions()
         }
@@ -84,7 +84,7 @@ private struct BackgroundLayout: Layout {
         return contentSubview.sizeThatFits(proposal)
     }
 
-    func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+    func placeSubviews(in bounds: Rect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout Void) {
         guard !subviews.isEmpty else {
             return
         }

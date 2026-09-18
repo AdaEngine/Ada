@@ -54,7 +54,9 @@ extension EditorUISceneEditor {
     func layerRow(_ row: Row) -> some View {
         HStack(spacing: 0) {
             if row.hasChildren {
-                Button { model.toggleLayerCollapsed(row.node.id) } label: {
+                Button {
+                    model.toggleLayerCollapsed(row.node.id)
+                } label: {
                     symbol(model.collapsedLayerIDs.contains(row.node.id) ? "\u{E5CC}" : "\u{E5CF}", size: 14)
                 }
                 .buttonStyle(DefaultButtonStyle())
@@ -69,7 +71,10 @@ extension EditorUISceneEditor {
     }
 
     private func layerSelectionButton(_ row: Row) -> some View {
-        Button { model.selectedID = row.node.id; model.insertionModifierID = nil } label: {
+        Button {
+            model.selectedID = row.node.id
+            model.insertionModifierID = nil
+        } label: {
             HStack(spacing: 7) {
                 symbol(EditorUIDesignerSymbols.icon(row.node.type), size: 14)
                 Text(row.node.type).lineLimit(1)
@@ -77,24 +82,28 @@ extension EditorUISceneEditor {
                 if row.depth == 0 {
                     Text("ROOT").font(.system(size: 9, weight: .semibold)).foregroundColor(theme.editorColors.muted)
                 }
-            }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: model.selectedID == row.node.id))
         .accessibilityIdentifier("AdaEditor.UIScene.Node.\(row.node.id)")
-        .gesture(DragGesture(minimumDistance: 8).onEnded { value in
-            let current = rows
-            guard let index = current.firstIndex(where: { $0.node.id == row.node.id }) else {
-                return
-            }
-            let destination = min(max(index + Int((value.translation.height / 32).rounded()), 0), current.count - 1)
-            let target = current[destination]
-            if value.translation.width > 20 {
-                model.move(row.node.id, into: target.node.id)
-            } else if let parent = target.parentID, let parentNode = current.first(where: { $0.node.id == parent })?.node,
-                    let childIndex = parentNode.children.firstIndex(where: { $0.id == target.node.id }) {
-                model.move(row.node.id, into: parent, at: childIndex)
-            }
-        })
+        .gesture(
+            DragGesture(minimumDistance: 8)
+                .onEnded { value in
+                    let current = rows
+                    guard let index = current.firstIndex(where: { $0.node.id == row.node.id }) else {
+                        return
+                    }
+                    let destination = min(max(index + Int((value.translation.height / 32).rounded()), 0), current.count - 1)
+                    let target = current[destination]
+                    if value.translation.width > 20 {
+                        model.move(row.node.id, into: target.node.id)
+                    } else if let parent = target.parentID, let parentNode = current.first(where: { $0.node.id == parent })?.node,
+                        let childIndex = parentNode.children.firstIndex(where: { $0.id == target.node.id }) {
+                        model.move(row.node.id, into: parent, at: childIndex)
+                    }
+                }
+        )
         .contextMenu {
             Button("Move selected here") { model.move(model.selectedID, into: row.node.id) }
             if row.hasChildren {
@@ -102,8 +111,14 @@ extension EditorUISceneEditor {
                     model.toggleLayerCollapsed(row.node.id)
                 }
             }
-            Button("Duplicate") { model.selectedID = row.node.id; model.duplicateSelected() }
-            Button("Delete") { model.selectedID = row.node.id; model.removeSelected() }
+            Button("Duplicate") {
+                model.selectedID = row.node.id
+                model.duplicateSelected()
+            }
+            Button("Delete") {
+                model.selectedID = row.node.id
+                model.removeSelected()
+            }
         }
     }
 }

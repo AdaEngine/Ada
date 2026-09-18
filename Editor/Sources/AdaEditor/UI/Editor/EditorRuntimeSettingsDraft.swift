@@ -33,8 +33,10 @@ struct EditorRuntimeSettingsDraft: Equatable, Sendable {
         guard let height = Int(windowHeight), height > 0 else {
             throw EditorRuntimeSettingsDraftError.invalidWindowHeight
         }
-        guard let gravityX = Double(gravityX), gravityX.isFinite,
-              let gravityY = Double(gravityY), gravityY.isFinite else {
+        guard
+            let gravityX = Double(gravityX), gravityX.isFinite,
+            let gravityY = Double(gravityY), gravityY.isFinite
+        else {
             throw EditorRuntimeSettingsDraftError.invalidPhysicsGravity
         }
 
@@ -72,7 +74,7 @@ enum EditorRuntimeSettingsDraftError: Error, Equatable, LocalizedError, Sendable
     }
 }
 
-private extension String {
+extension String {
     var trimmedNilIfEmpty: String? {
         let value = trimmingCharacters(in: .whitespacesAndNewlines)
         return value.isEmpty ? nil : value

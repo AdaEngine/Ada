@@ -18,7 +18,9 @@ final class EditorDisplayPreviewModel {
     private var projectRoot: URL?
 
     func load(projectRoot: URL) {
-        guard self.projectRoot != projectRoot else { return }
+        guard self.projectRoot != projectRoot else {
+            return
+        }
         self.projectRoot = projectRoot
         do {
             settings = try ProjectSystem.loadProject(at: projectRoot).editor.displayPreview ?? .init()
@@ -37,7 +39,9 @@ final class EditorDisplayPreviewModel {
     }
 
     private func save() {
-        guard let projectRoot else { return }
+        guard let projectRoot else {
+            return
+        }
         do {
             var project = try ProjectSystem.loadProject(at: projectRoot)
             project.editor.displayPreview = settings
@@ -51,10 +55,13 @@ extension EditorSceneViewportView {
     var displayPreviewControls: some View {
         HStack(spacing: 8) {
             Text("Display").font(.system(size: 10))
-            EditorEnumField(cases: ["Standard", "Foldable Preview"], selection: Binding(
-                get: { displayPreview.settings.mode == .standard ? "Standard" : "Foldable Preview" },
-                set: { displayPreview.select(mode: $0 == "Standard" ? .standard : .foldable) }
-            ))
+            EditorEnumField(
+                cases: ["Standard", "Foldable Preview"],
+                selection: Binding(
+                    get: { displayPreview.settings.mode == .standard ? "Standard" : "Foldable Preview" },
+                    set: { displayPreview.select(mode: $0 == "Standard" ? .standard : .foldable) }
+                )
+            )
             .frame(width: 142)
             .accessibilityIdentifier("AdaEditor.Display.Mode")
             if displayPreview.settings.mode == .foldable {

@@ -30,7 +30,9 @@ final class NavigationContext {
     }
 
     func pop() {
-        guard !path.isEmpty else { return }
+        guard !path.isEmpty else {
+            return
+        }
         path.removeLast()
         onPathChanged?()
     }
@@ -40,7 +42,9 @@ final class NavigationContext {
         builder: @escaping (D, _ViewInputs) -> ViewNode
     ) {
         registerDestinationBuilder(for: ObjectIdentifier(type)) { anyValue, inputs in
-            guard let typedValue = anyValue.base as? D else { return nil }
+            guard let typedValue = anyValue.base as? D else {
+                return nil
+            }
             return builder(typedValue, inputs)
         }
     }
@@ -74,17 +78,19 @@ final class NavigationSplitCompactBackAction: @unchecked Sendable {
 @MainActor
 final class NavigationSplitColumnContext: @unchecked Sendable {
     private let navigateHandler: @MainActor (AnyHashable) -> Bool
-    private let destinationHandler: @MainActor (
-        ObjectIdentifier,
-        @escaping (AnyHashable, _ViewInputs) -> ViewNode?
-    ) -> Void
-
-    init(
-        navigate: @MainActor @escaping (AnyHashable) -> Bool,
-        registerDestination: @MainActor @escaping (
+    private let destinationHandler:
+        @MainActor (
             ObjectIdentifier,
             @escaping (AnyHashable, _ViewInputs) -> ViewNode?
         ) -> Void
+
+    init(
+        navigate: @MainActor @escaping (AnyHashable) -> Bool,
+        registerDestination:
+            @MainActor @escaping (
+                ObjectIdentifier,
+                @escaping (AnyHashable, _ViewInputs) -> ViewNode?
+            ) -> Void
     ) {
         self.navigateHandler = navigate
         self.destinationHandler = registerDestination
@@ -99,7 +105,9 @@ final class NavigationSplitColumnContext: @unchecked Sendable {
         builder: @escaping (D, _ViewInputs) -> ViewNode
     ) {
         destinationHandler(ObjectIdentifier(type)) { anyValue, inputs in
-            guard let typedValue = anyValue.base as? D else { return nil }
+            guard let typedValue = anyValue.base as? D else {
+                return nil
+            }
             return builder(typedValue, inputs)
         }
     }
@@ -114,12 +122,12 @@ protocol NavigationSplitDestinationRegistering: AnyObject {
 }
 
 extension EnvironmentValues {
-    @Entry var navigationContext: NavigationContext? = nil
-    @Entry internal var navigationSplitCompactBackAction: NavigationSplitCompactBackAction? = nil
-    @Entry internal var navigationSplitColumnContext: NavigationSplitColumnContext? = nil
+    @Entry var navigationContext: NavigationContext?
+    @Entry internal var navigationSplitCompactBackAction: NavigationSplitCompactBackAction?
+    @Entry internal var navigationSplitColumnContext: NavigationSplitColumnContext?
     @Entry internal var navigationBarConfiguration: NavigationBarConfiguration = NavigationBarConfiguration()
-    @Entry internal var navigationBarLeadingItems: NavigationBarItemContent? = nil
-    @Entry internal var navigationBarTrailingItems: NavigationBarItemContent? = nil
+    @Entry internal var navigationBarLeadingItems: NavigationBarItemContent?
+    @Entry internal var navigationBarTrailingItems: NavigationBarItemContent?
 }
 
 // MARK: - Navigation bar configuration
@@ -141,7 +149,7 @@ struct NavigationBarConfiguration: Hashable, Sendable {
     var titleFont: Font?
     var titlePosition: NavigationTitlePosition = .automatic
     var titleDisplayMode: NavigationBarTitleDisplayMode = .automatic
-    var navigationBarColor: Color? = nil
+    var navigationBarColor: Color?
     var isHidden = false
     var backButtonHidden = false
 }
@@ -160,26 +168,26 @@ final class NavigationBarItemContent: @unchecked Sendable {
     }
 }
 
-public extension View {
-    func navigationTitle(_ title: String) -> some View {
+extension View {
+    public func navigationTitle(_ title: String) -> some View {
         self.transformEnvironment(\.navigationBarConfiguration) { configuration in
             configuration.title = title
         }
     }
 
-    func navigationTitle(_ title: Text) -> some View {
+    public func navigationTitle(_ title: Text) -> some View {
         self.navigationTitle(title.plainText)
     }
 
     /// Sets the navigation title font without changing content or toolbar item fonts.
     /// Pass `nil` to restore the default font for the title position.
-    func navigationTitleFont(_ font: Font?) -> some View {
+    public func navigationTitleFont(_ font: Font?) -> some View {
         self.transformEnvironment(\.navigationBarConfiguration) { configuration in
             configuration.titleFont = font
         }
     }
 
-    func navigationTitlePosition(_ position: NavigationTitlePosition) -> some View {
+    public func navigationTitlePosition(_ position: NavigationTitlePosition) -> some View {
         self.transformEnvironment(\.navigationBarConfiguration) { configuration in
             configuration.titlePosition = position
         }
@@ -187,43 +195,43 @@ public extension View {
 
     /// Sets the base color used by the navigation bar's fading background gradient.
     /// Pass `nil` to restore the default black gradient.
-    func navigationBarColor(_ color: Color?) -> some View {
+    public func navigationBarColor(_ color: Color?) -> some View {
         self.transformEnvironment(\.navigationBarConfiguration) { configuration in
             configuration.navigationBarColor = color
         }
     }
 
-    func navigationBarTitleDisplayMode(_ mode: NavigationBarTitleDisplayMode) -> some View {
+    public func navigationBarTitleDisplayMode(_ mode: NavigationBarTitleDisplayMode) -> some View {
         self.transformEnvironment(\.navigationBarConfiguration) { configuration in
             configuration.titleDisplayMode = mode
         }
     }
 
-    func navigationBarBackButtonHidden(_ hidden: Bool = true) -> some View {
+    public func navigationBarBackButtonHidden(_ hidden: Bool = true) -> some View {
         self.transformEnvironment(\.navigationBarConfiguration) { configuration in
             configuration.backButtonHidden = hidden
         }
     }
 
-    func navigationBarHidden(_ hidden: Bool = true) -> some View {
+    public func navigationBarHidden(_ hidden: Bool = true) -> some View {
         self.transformEnvironment(\.navigationBarConfiguration) { configuration in
             configuration.isHidden = hidden
         }
     }
 
-    func navigationBarLeadingItems<Content: View>(
+    public func navigationBarLeadingItems<Content: View>(
         @ViewBuilder _ content: @MainActor @escaping () -> Content
     ) -> some View {
         self.environment(\.navigationBarLeadingItems, NavigationBarItemContent(content: content))
     }
 
-    func navigationBarTrailingItems<Content: View>(
+    public func navigationBarTrailingItems<Content: View>(
         @ViewBuilder _ content: @MainActor @escaping () -> Content
     ) -> some View {
         self.environment(\.navigationBarTrailingItems, NavigationBarItemContent(content: content))
     }
 
-    func navigationBar<Leading: View, Trailing: View>(
+    public func navigationBar<Leading: View, Trailing: View>(
         @ViewBuilder leadingItems: @MainActor @escaping () -> Leading,
         @ViewBuilder trailingItems: @MainActor @escaping () -> Trailing
     ) -> some View {
@@ -250,7 +258,7 @@ public extension View {
 @MainActor @preconcurrency
 public struct NavigationStack<Content: View>: View, ViewNodeBuilder {
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let pathBinding: Binding<NavigationPath>
     let content: () -> Content
@@ -292,7 +300,6 @@ public struct NavigationStack<Content: View>: View, ViewNodeBuilder {
 // MARK: - NavigationStackNode
 
 final class NavigationStackNode: ViewNode {
-
     private enum Constants {
         static let navigationBarHeight: Float = 92
     }
@@ -366,7 +373,7 @@ final class NavigationStackNode: ViewNode {
 
         let newNode: ViewNode
         if let topValue = navigationContext.path.topElement,
-           let destNode = navigationContext.buildDestination(for: topValue, inputs: childInputs) {
+            let destNode = navigationContext.buildDestination(for: topValue, inputs: childInputs) {
             newNode = destNode
         } else {
             newNode = contentBuilder(childInputs)
@@ -431,7 +438,8 @@ final class NavigationStackNode: ViewNode {
         var state = Self.navigationBarState(in: currentContentNode)
         let configuration = state.configuration
         let showsBackButton = !navigationContext.path.isEmpty && !configuration.backButtonHidden
-        let splitBackAction = configuration.backButtonHidden
+        let splitBackAction =
+            configuration.backButtonHidden
             ? nil
             : viewInputs.environment.navigationSplitCompactBackAction
         let showsNavigationBar = !configuration.isHidden
@@ -506,17 +514,20 @@ final class NavigationStackNode: ViewNode {
             anchor: .center,
             proposal: proposal
         )
-        navigationBarNode?.place(
-            in: .zero,
-            anchor: .topLeading,
-            proposal: ProposedViewSize(width: frame.width, height: totalNavigationBarReservedHeight)
-        )
+        navigationBarNode?
+            .place(
+                in: .zero,
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: frame.width, height: totalNavigationBarReservedHeight)
+            )
     }
 
     override func updateEnvironment(_ environment: EnvironmentValues) {
         let prevVersion = self.environment.version
         super.updateEnvironment(environment)
-        guard self.environment.version != prevVersion else { return }
+        guard self.environment.version != prevVersion else {
+            return
+        }
         viewInputs.environment = self.environment
         syncNavigationBar()
     }
@@ -582,7 +593,9 @@ final class NavigationStackNode: ViewNode {
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
         if let navigationBarNode {
             let barPoint = navigationBarNode.convert(point, from: self)
             if let hit = navigationBarNode.hitTest(barPoint, with: event) {
@@ -727,7 +740,8 @@ final class NavigationBarNode: ViewNode {
         let titlePosition = resolvedTitlePosition()
         let centerY = chromeTopInset + Constants.height * 0.5
         var leadingX = Constants.horizontalPadding
-        let reservedTitleWidth = titlePosition == .center || titlePosition == .automatic
+        let reservedTitleWidth =
+            titlePosition == .center || titlePosition == .automatic
             ? Constants.minimumCenteredTitleWidth
             : 0
         let maxItemWidth = max(
@@ -784,7 +798,8 @@ final class NavigationBarNode: ViewNode {
                     anchor: .leading,
                     proposal: ProposedViewSize(width: availableWidth, height: Constants.controlHeight)
                 )
-            case .automatic, .center:
+            case .automatic,
+                .center:
                 let occupiedSideWidth = max(
                     leadingX,
                     Constants.horizontalPadding + trailingWidth + Constants.itemSpacing
@@ -804,7 +819,9 @@ final class NavigationBarNode: ViewNode {
     override func updateEnvironment(_ environment: EnvironmentValues) {
         let prevVersion = self.environment.version
         super.updateEnvironment(environment)
-        guard self.environment.version != prevVersion else { return }
+        guard self.environment.version != prevVersion else {
+            return
+        }
         inputs.environment = self.environment
         updateChildEnvironments()
     }
@@ -817,7 +834,9 @@ final class NavigationBarNode: ViewNode {
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
         for node in childNodes.reversed() {
             let childPoint = node.convert(point, from: self)
             if let hit = node.hitTest(childPoint, with: event) {
@@ -828,10 +847,11 @@ final class NavigationBarNode: ViewNode {
     }
 
     override func point(inside point: Point, with event: any InputEvent) -> Bool {
-        super.point(inside: point, with: event) || childNodes.contains { node in
-            let childPoint = node.convert(point, from: self)
-            return node.point(inside: childPoint, with: event)
-        }
+        super.point(inside: point, with: event)
+            || childNodes.contains { node in
+                let childPoint = node.convert(point, from: self)
+                return node.point(inside: childPoint, with: event)
+            }
     }
 
     override func draw(with context: UIGraphicsContext) {
@@ -887,7 +907,8 @@ final class NavigationBarNode: ViewNode {
             backButtonNode,
             leadingItemsNode,
             trailingItemsNode,
-        ].compactMap { $0 }
+        ]
+        .compactMap { $0 }
     }
 
     var inspectionChildNodes: [ViewNode] {
@@ -915,7 +936,9 @@ final class NavigationBarNode: ViewNode {
     }
 
     private func makeTitleNode() -> ViewNode? {
-        guard let title = configuration.title, !title.isEmpty else { return nil }
+        guard let title = configuration.title, !title.isEmpty else {
+            return nil
+        }
         let pointSize: Double = resolvedTitlePosition() == .leading ? 22 : 16
         let view = Text(title)
             .font(configuration.titleFont ?? .system(size: pointSize))
@@ -929,12 +952,12 @@ final class NavigationBarNode: ViewNode {
     private func makeSplitBackButtonNode(action: NavigationSplitCompactBackAction) -> ViewNode {
         let view = Button(action: {
             action.perform()
-        }) {
+        }, label: {
             Text("<")
                 .font(.system(size: 24))
                 .foregroundColor(.white)
                 .frame(width: Constants.controlHeight, height: Constants.controlHeight)
-        }
+        })
         let node = Button._makeView(_ViewGraphNode(value: view), inputs: navigationBarItemInputs()).node
         node.accessibilityIdentifier = "AdaUI.NavigationSplitView.backButton"
         return node
@@ -943,12 +966,12 @@ final class NavigationBarNode: ViewNode {
     private func makeBackButtonNode() -> ViewNode {
         let view = Button(action: { [weak navigationContext] in
             navigationContext?.pop()
-        }) {
+        }, label: {
             Text("<")
                 .font(.system(size: 24))
                 .foregroundColor(.white)
                 .frame(width: Constants.controlHeight, height: Constants.controlHeight)
-        }
+        })
         return Button._makeView(_ViewGraphNode(value: view), inputs: navigationBarItemInputs()).node
     }
 
@@ -970,13 +993,15 @@ final class NavigationBarNode: ViewNode {
 
     private func resolvedTitlePosition() -> NavigationTitlePosition {
         switch configuration.titlePosition {
-        case .leading, .center:
+        case .leading,
+            .center:
             return configuration.titlePosition
         case .automatic:
             switch configuration.titleDisplayMode {
             case .large:
                 return .leading
-            case .automatic, .inline:
+            case .automatic,
+                .inline:
                 return .center
             }
         }

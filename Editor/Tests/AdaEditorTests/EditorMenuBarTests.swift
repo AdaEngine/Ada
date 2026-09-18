@@ -1,4 +1,5 @@
 import Testing
+
 @testable import AdaEditor
 
 @MainActor
@@ -29,6 +30,7 @@ struct EditorMenuBarTests {
         #expect(file.items.map(\.title).contains("Save All"))
         #expect(build.items.map(\.title).contains("Build Project"))
         #expect(build.items.map(\.title).contains("Run Tests"))
+        #expect(code.items.map(\.title).contains("Show Preview"))
         #expect(code.items.map(\.title).contains("Rebuild Preview"))
         #expect(system.items.map(\.title) == (EditorDistribution.current == .standalone ? ["Settings...", "Check for Updates…"] : ["Settings..."]))
         #expect(system.items.first?.keyEquivalent == .comma)

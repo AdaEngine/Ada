@@ -11,17 +11,17 @@ import AdaRender
     dependencies: [.after("AdaRender.ConfigurateRenderViewTargetSystem")]
 )
 public struct PrepareEnvironment3DTexturesSystem {
-
     @Query<Entity, Camera, CameraRenderGraph, Ref<RenderViewTarget>>
     private var cameras
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         cameras.forEach { _, camera, renderGraph, target in
-            guard renderGraph.subgraphLabel == .main3D,
-                  camera.isActive,
-                  let mainTexture = target.mainTexture
+            guard
+                renderGraph.subgraphLabel == .main3D,
+                camera.isActive,
+                let mainTexture = target.mainTexture
             else {
                 target.rendering3DUsesEnvironmentTargets = false
                 return

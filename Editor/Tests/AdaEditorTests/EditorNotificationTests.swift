@@ -190,6 +190,6 @@ struct EditorNotificationTests {
 @MainActor
 private final class NotificationTestBackground: EditorBackgroundExecution {
     var completions: [Bool] = []
-    func update(_ activity: EditorOperationActivity) {}
+    func update(_: EditorOperationActivity) {}
     func finish(success: Bool) { completions.append(success) }
 }

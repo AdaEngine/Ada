@@ -21,7 +21,6 @@ public final class GravityLanguageServerSession {
     }
 
     // A protocol method router naturally has one branch per supported LSP method.
-    // swiftlint:disable:next cyclomatic_complexity
     public func handle(_ message: [String: Any]) -> GravityLanguageServerAction {
         guard let method = message["method"] as? String else {
             return GravityLanguageServerAction(outgoingMessages: [errorResponse(id: message["id"], code: -32600, message: "Invalid Request")])
@@ -45,7 +44,8 @@ public final class GravityLanguageServerSession {
         switch method {
         case "initialize":
             return initialize(id: id, params: params)
-        case "initialized", "$/cancelRequest":
+        case "initialized",
+            "$/cancelRequest":
             return GravityLanguageServerAction()
         case "shutdown":
             isShutdown = true
@@ -64,7 +64,9 @@ public final class GravityLanguageServerSession {
             return completion(id: id, params: params)
         case "textDocument/definition":
             return definition(id: id, params: params)
-        case "textDocument/hover", "textDocument/signatureHelp", "textDocument/semanticTokens/full":
+        case "textDocument/hover",
+            "textDocument/signatureHelp",
+            "textDocument/semanticTokens/full":
             return languageFeature(method: method, id: id, params: params)
         case "textDocument/documentSymbol":
             return documentSymbols(id: id, params: params)
@@ -92,7 +94,7 @@ public final class GravityLanguageServerSession {
         let capabilities: [String: Any] = [
             "completionProvider": [
                 "resolveProvider": false,
-                "triggerCharacters": ["."]
+                "triggerCharacters": ["."],
             ],
             "documentSymbolProvider": true,
             "definitionProvider": true,
@@ -102,28 +104,32 @@ public final class GravityLanguageServerSession {
                 "full": true,
                 "legend": [
                     "tokenModifiers": [],
-                    "tokenTypes": GravitySemanticTokenKind.allCases.map(\.rawValue)
-                ]
+                    "tokenTypes": GravitySemanticTokenKind.allCases.map(\.rawValue),
+                ],
             ],
             "signatureHelpProvider": ["triggerCharacters": ["(", ","]],
             "textDocumentSync": [
                 "change": 1,
                 "openClose": true,
-                "save": ["includeText": true]
-            ]
+                "save": ["includeText": true],
+            ],
         ]
         return GravityLanguageServerAction(outgoingMessages: [
-            response(id: id, result: [
-                "capabilities": capabilities,
-                "serverInfo": ["name": "AdaEngine AdaScript Language Server", "version": "0.1.0"]
-            ])
+            response(
+                id: id,
+                result: [
+                    "capabilities": capabilities,
+                    "serverInfo": ["name": "AdaEngine AdaScript Language Server", "version": "0.1.0"],
+                ]
+            )
         ])
     }
 
     private func didOpen(params: [String: Any]) -> GravityLanguageServerAction {
-        guard let document = params["textDocument"] as? [String: Any],
-              let uri = document["uri"] as? String,
-              let text = document["text"] as? String
+        guard
+            let document = params["textDocument"] as? [String: Any],
+            let uri = document["uri"] as? String,
+            let text = document["text"] as? String
         else {
             return GravityLanguageServerAction()
         }
@@ -132,10 +138,11 @@ public final class GravityLanguageServerSession {
     }
 
     private func didChange(params: [String: Any]) -> GravityLanguageServerAction {
-        guard let document = params["textDocument"] as? [String: Any],
-              let uri = document["uri"] as? String,
-              let changes = params["contentChanges"] as? [[String: Any]],
-              let text = changes.last?["text"] as? String
+        guard
+            let document = params["textDocument"] as? [String: Any],
+            let uri = document["uri"] as? String,
+            let changes = params["contentChanges"] as? [[String: Any]],
+            let text = changes.last?["text"] as? String
         else {
             return GravityLanguageServerAction()
         }
@@ -149,10 +156,13 @@ public final class GravityLanguageServerSession {
         }
         workspace.close(uri: uri)
         return GravityLanguageServerAction(outgoingMessages: [
-            notification(method: "textDocument/publishDiagnostics", params: [
-                "diagnostics": [],
-                "uri": uri
-            ])
+            notification(
+                method: "textDocument/publishDiagnostics",
+                params: [
+                    "diagnostics": [],
+                    "uri": uri,
+                ]
+            )
         ])
     }
 
@@ -165,26 +175,31 @@ public final class GravityLanguageServerSession {
     }
 
     private func completion(id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
-        guard let id,
-              let document = params["textDocument"] as? [String: Any],
-              let uri = document["uri"] as? String,
-              let position = Self.position(from: params["position"])
+        guard
+            let id,
+            let document = params["textDocument"] as? [String: Any],
+            let uri = document["uri"] as? String,
+            let position = Self.position(from: params["position"])
         else {
             return GravityLanguageServerAction(outgoingMessages: id.map { [errorResponse(id: $0, code: -32602, message: "Invalid completion parameters")] } ?? [])
         }
         let items = workspace.completions(uri: uri, position: position).map(Self.completionItem(from:))
         return GravityLanguageServerAction(outgoingMessages: [
-            response(id: id, result: [
-                "isIncomplete": false,
-                "items": items
-            ])
+            response(
+                id: id,
+                result: [
+                    "isIncomplete": false,
+                    "items": items,
+                ]
+            )
         ])
     }
 
     private func documentSymbols(id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
-        guard let id,
-              let document = params["textDocument"] as? [String: Any],
-              let uri = document["uri"] as? String
+        guard
+            let id,
+            let document = params["textDocument"] as? [String: Any],
+            let uri = document["uri"] as? String
         else {
             return GravityLanguageServerAction(outgoingMessages: id.map { [errorResponse(id: $0, code: -32602, message: "Invalid document symbol parameters")] } ?? [])
         }
@@ -193,10 +208,11 @@ public final class GravityLanguageServerSession {
     }
 
     private func definition(id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
-        guard let id,
-              let document = params["textDocument"] as? [String: Any],
-              let uri = document["uri"] as? String,
-              let position = Self.position(from: params["position"])
+        guard
+            let id,
+            let document = params["textDocument"] as? [String: Any],
+            let uri = document["uri"] as? String,
+            let position = Self.position(from: params["position"])
         else {
             return GravityLanguageServerAction(outgoingMessages: id.map { [errorResponse(id: $0, code: -32602, message: "Invalid definition parameters")] } ?? [])
         }
@@ -224,10 +240,13 @@ public final class GravityLanguageServerSession {
     private func publishDiagnostics(uri: String) -> GravityLanguageServerAction {
         let diagnostics = workspace.analysis(for: uri)?.diagnostics.map(Self.diagnostic(from:)) ?? []
         return GravityLanguageServerAction(outgoingMessages: [
-            notification(method: "textDocument/publishDiagnostics", params: [
-                "diagnostics": diagnostics,
-                "uri": uri
-            ])
+            notification(
+                method: "textDocument/publishDiagnostics",
+                params: [
+                    "diagnostics": diagnostics,
+                    "uri": uri,
+                ]
+            )
         ])
     }
 
@@ -239,7 +258,7 @@ public final class GravityLanguageServerSession {
         [
             "error": ["code": code, "message": message],
             "id": id ?? NSNull(),
-            "jsonrpc": "2.0"
+            "jsonrpc": "2.0",
         ]
     }
 
@@ -255,11 +274,12 @@ public final class GravityLanguageServerSession {
     }
 
     private static func position(from value: Any?) -> GravitySourcePosition? {
-        guard let value = value as? [String: Any],
-              let line = value["line"] as? Int,
-              let character = value["character"] as? Int,
-              line >= 0,
-              character >= 0
+        guard
+            let value = value as? [String: Any],
+            let line = value["line"] as? Int,
+            let character = value["character"] as? Int,
+            line >= 0,
+            character >= 0
         else {
             return nil
         }
@@ -269,7 +289,7 @@ public final class GravityLanguageServerSession {
     private static func lspRange(from range: GravitySourceRange) -> [String: Any] {
         [
             "end": ["character": range.end.utf16Column, "line": range.end.line],
-            "start": ["character": range.start.utf16Column, "line": range.start.line]
+            "start": ["character": range.start.utf16Column, "line": range.start.line],
         ]
     }
 
@@ -281,8 +301,8 @@ public final class GravityLanguageServerSession {
             "sortText": item.sortText,
             "textEdit": [
                 "newText": item.insertText,
-                "range": lspRange(from: item.replacementRange)
-            ]
+                "range": lspRange(from: item.replacementRange),
+            ],
         ]
     }
 
@@ -291,7 +311,7 @@ public final class GravityLanguageServerSession {
             "message": diagnostic.message,
             "range": lspRange(from: diagnostic.range),
             "severity": diagnostic.severity.rawValue,
-            "source": "gravity-lsp"
+            "source": "gravity-lsp",
         ]
     }
 
@@ -301,7 +321,7 @@ public final class GravityLanguageServerSession {
             "kind": symbol.kind.rawValue,
             "name": symbol.name,
             "range": lspRange(from: symbol.range),
-            "selectionRange": lspRange(from: symbol.selectionRange)
+            "selectionRange": lspRange(from: symbol.selectionRange),
         ]
         if !symbol.members.isEmpty {
             result["children"] = symbol.members.map(documentSymbol(from:))
@@ -313,13 +333,13 @@ public final class GravityLanguageServerSession {
         [
             "targetRange": lspRange(from: definition.range),
             "targetSelectionRange": lspRange(from: definition.selectionRange),
-            "targetUri": definition.uri
+            "targetUri": definition.uri,
         ]
     }
 }
 
-private extension GravityLanguageServerSession {
-    func languageFeature(method: String, id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
+extension GravityLanguageServerSession {
+    private func languageFeature(method: String, id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
         switch method {
         case "textDocument/hover":
             hover(id: id, params: params)
@@ -330,10 +350,12 @@ private extension GravityLanguageServerSession {
         }
     }
 
-    func semanticTokens(id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
-        guard let id,
-              let document = params["textDocument"] as? [String: Any],
-              let uri = document["uri"] as? String else {
+    private func semanticTokens(id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
+        guard
+            let id,
+            let document = params["textDocument"] as? [String: Any],
+            let uri = document["uri"] as? String
+        else {
             return GravityLanguageServerAction(outgoingMessages: id.map { [errorResponse(id: $0, code: -32602, message: "Invalid semantic token parameters")] } ?? [])
         }
         return GravityLanguageServerAction(outgoingMessages: [
@@ -341,42 +363,51 @@ private extension GravityLanguageServerSession {
         ])
     }
 
-    func hover(id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
-        guard let id,
-              let document = params["textDocument"] as? [String: Any],
-              let uri = document["uri"] as? String,
-              let position = Self.position(from: params["position"]) else {
+    private func hover(id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
+        guard
+            let id,
+            let document = params["textDocument"] as? [String: Any],
+            let uri = document["uri"] as? String,
+            let position = Self.position(from: params["position"])
+        else {
             return GravityLanguageServerAction(outgoingMessages: id.map { [errorResponse(id: $0, code: -32602, message: "Invalid hover parameters")] } ?? [])
         }
-        let result: Any = workspace.hover(uri: uri, position: position).map { hover in
-            [
-                "contents": ["kind": "markdown", "value": hover.contents],
-                "range": Self.lspRange(from: hover.range)
-            ]
-        } ?? NSNull()
+        let result: Any =
+            workspace.hover(uri: uri, position: position)
+            .map { hover in
+                [
+                    "contents": ["kind": "markdown", "value": hover.contents],
+                    "range": Self.lspRange(from: hover.range),
+                ]
+            } ?? NSNull()
         return GravityLanguageServerAction(outgoingMessages: [response(id: id, result: result)])
     }
 
-    func signatureHelp(id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
-        guard let id,
-              let document = params["textDocument"] as? [String: Any],
-              let uri = document["uri"] as? String,
-              let position = Self.position(from: params["position"]) else {
+    private func signatureHelp(id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
+        guard
+            let id,
+            let document = params["textDocument"] as? [String: Any],
+            let uri = document["uri"] as? String,
+            let position = Self.position(from: params["position"])
+        else {
             return GravityLanguageServerAction(outgoingMessages: id.map { [errorResponse(id: $0, code: -32602, message: "Invalid signature help parameters")] } ?? [])
         }
-        let result: Any = workspace.signatureHelp(uri: uri, position: position).map { help in
-            [
-                "activeParameter": help.activeParameter,
-                "activeSignature": 0,
-                "signatures": [["label": help.label]]
-            ]
-        } ?? NSNull()
+        let result: Any =
+            workspace.signatureHelp(uri: uri, position: position)
+            .map { help in
+                [
+                    "activeParameter": help.activeParameter,
+                    "activeSignature": 0,
+                    "signatures": [["label": help.label]],
+                ]
+            } ?? NSNull()
         return GravityLanguageServerAction(outgoingMessages: [response(id: id, result: result)])
     }
 
-    static func semanticTokenData(_ tokens: [GravitySemanticToken]) -> [Int] {
+    private static func semanticTokenData(_ tokens: [GravitySemanticToken]) -> [Int] {
         let tokenTypeIndices = Dictionary(uniqueKeysWithValues: GravitySemanticTokenKind.allCases.enumerated().map { ($0.element, $0.offset) })
-        let segments = tokens
+        let segments =
+            tokens
             .flatMap(semanticTokenSegments)
             .sorted { lhs, rhs in lhs.position < rhs.position }
         var previous = GravitySourcePosition(line: 0, utf16Column: 0)
@@ -387,7 +418,8 @@ private extension GravityLanguageServerSession {
                 continue
             }
             let deltaLine = segment.position.line - previous.line
-            let deltaStart = deltaLine == 0
+            let deltaStart =
+                deltaLine == 0
                 ? segment.position.utf16Column - previous.utf16Column
                 : segment.position.utf16Column
             data += [deltaLine, deltaStart, segment.length, typeIndex, 0]
@@ -396,7 +428,7 @@ private extension GravityLanguageServerSession {
         return data
     }
 
-    static func semanticTokenSegments(_ token: GravitySemanticToken) -> [SemanticTokenSegment] {
+    private static func semanticTokenSegments(_ token: GravitySemanticToken) -> [SemanticTokenSegment] {
         if token.range.start.line == token.range.end.line {
             return [
                 SemanticTokenSegment(
@@ -409,7 +441,7 @@ private extension GravityLanguageServerSession {
         return []
     }
 
-    struct SemanticTokenSegment {
+    private struct SemanticTokenSegment {
         var kind: GravitySemanticTokenKind
         var length: Int
         var position: GravitySourcePosition

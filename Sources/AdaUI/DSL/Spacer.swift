@@ -10,9 +10,8 @@ import Math
 /// A flexible space that expands along the major axis of its containing stack layout,
 /// or on both axes if not contained in a stack.
 public struct Spacer: View, ViewNodeBuilder {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     /// The minimum length this spacer can be shrunk to, along the axis or axes of expansion.
     public var minLength: Float?
@@ -21,7 +20,7 @@ public struct Spacer: View, ViewNodeBuilder {
         self.minLength = minLength
     }
 
-    func buildViewNode(in context: BuildContext) -> ViewNode {
+    func buildViewNode(in _: BuildContext) -> ViewNode {
         SpacerViewNode(minLength: minLength, content: self)
     }
 }

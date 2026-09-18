@@ -41,7 +41,7 @@ public struct ZStackLayout: Layout {
             cache.minSize.height = max(cache.minSize.height, minSize.height)
         }
     }
-    
+
     public func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> Size {
         let idealSize = subviews.reduce(Size.zero) { partialResult, subview in
             let subviewSize = subview.sizeThatFits(proposal)

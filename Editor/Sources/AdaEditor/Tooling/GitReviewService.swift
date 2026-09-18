@@ -1,27 +1,29 @@
 import Foundation
 
 extension GitRepositoryServicing {
-    func history(projectURL: URL, head: String?, offset: Int) async -> Result<GitHistoryPage, GitReadError> {
+    func history(projectURL _: URL, head _: String?, offset _: Int) async -> Result<GitHistoryPage, GitReadError> {
         .failure(GitReadError(message: "History is unavailable."))
     }
 
-    func review(projectURL: URL, commit: GitCommit) async -> Result<GitReview, GitReadError> {
+    func review(projectURL _: URL, commit _: GitCommit) async -> Result<GitReview, GitReadError> {
         .failure(GitReadError(message: "Commit details are unavailable."))
     }
 
-    func patch(rootURL: URL, file: GitDiffFile) async -> Result<GitFilePatch, GitReadError> {
+    func patch(rootURL _: URL, file _: GitDiffFile) async -> Result<GitFilePatch, GitReadError> {
         .failure(GitReadError(message: "Diff is unavailable."))
     }
 }
 
 extension GitRepositoryService {
     func readGit(_ arguments: [String], at url: URL) async -> EditorProcessResult {
-        await processRunner.run(EditorProcessCommand(
-            executablePath: "/usr/bin/env",
-            arguments: ["git", "--no-pager", "--literal-pathspecs"] + arguments,
-            workingDirectory: url,
-            environment: ["GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C"]
-        ))
+        await processRunner.run(
+            EditorProcessCommand(
+                executablePath: "/usr/bin/env",
+                arguments: ["git", "--no-pager", "--literal-pathspecs"] + arguments,
+                workingDirectory: url,
+                environment: ["GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C"]
+            )
+        )
     }
 
     func repositoryRoot(at projectURL: URL) async -> Result<URL, GitReadError> {
@@ -54,9 +56,12 @@ extension GitRepositoryService {
                 }
                 revision = result.standardOutput.trimmingCharacters(in: .whitespacesAndNewlines)
             }
-            let result = await readGit([
-                "log", "--max-count=51", "--skip=\(max(0, offset))", "--format=%H%x00%P%x00%an%x00%at%x00%s%x00%B", "-z", revision, "--"
-            ], at: root)
+            let result = await readGit(
+                [
+                    "log", "--max-count=51", "--skip=\(max(0, offset))", "--format=%H%x00%P%x00%an%x00%at%x00%s%x00%B", "-z", revision, "--",
+                ],
+                at: root
+            )
             guard result.succeeded else {
                 return .failure(readError(result))
             }
@@ -72,15 +77,19 @@ extension GitRepositoryService {
         var commits: [GitCommit] = []
         var index = 0
         while index + 5 < fields.count {
-            guard let timestamp = TimeInterval(fields[index + 3]) else { break }
-            commits.append(GitCommit(
-                id: fields[index],
-                parents: fields[index + 1].split(separator: " ").map(String.init),
-                author: fields[index + 2],
-                date: Date(timeIntervalSince1970: timestamp),
-                subject: fields[index + 4],
-                message: fields[index + 5].trimmingCharacters(in: .newlines)
-            ))
+            guard let timestamp = TimeInterval(fields[index + 3]) else {
+                break
+            }
+            commits.append(
+                GitCommit(
+                    id: fields[index],
+                    parents: fields[index + 1].split(separator: " ").map(String.init),
+                    author: fields[index + 2],
+                    date: Date(timeIntervalSince1970: timestamp),
+                    subject: fields[index + 4],
+                    message: fields[index + 5].trimmingCharacters(in: .newlines)
+                )
+            )
             index += 6
         }
         return commits
@@ -111,12 +120,15 @@ extension GitRepositoryService {
     func changeFiles(snapshot: GitRepositorySnapshot, root: URL) async -> Result<[GitDiffFile], GitReadError> {
         var files: [GitDiffFile] = []
         for comparison in [GitComparison.staged, .workingTree, .untracked] {
-            let entries: [GitStatusEntry] = switch comparison {
-            case .staged: snapshot.stagedFiles
-            case .workingTree: snapshot.changedFiles
-            default: snapshot.untrackedFiles
+            let entries: [GitStatusEntry] =
+                switch comparison {
+                case .staged: snapshot.stagedFiles
+                case .workingTree: snapshot.changedFiles
+                default: snapshot.untrackedFiles
+                }
+            guard !entries.isEmpty else {
+                continue
             }
-            guard !entries.isEmpty else { continue }
             var statistics: [String: GitDiffStatistics] = [:]
             if comparison != .untracked {
                 let result = await readGit(diffArguments(for: comparison) + ["--numstat", "-z", "--"], at: root)
@@ -171,9 +183,9 @@ extension GitRepositoryService {
 
     private static var nullDevice: String {
         #if os(Windows)
-        "NUL"
+            "NUL"
         #else
-        "/dev/null"
+            "/dev/null"
         #endif
     }
 
@@ -181,7 +193,9 @@ extension GitRepositoryService {
         let options = ["--no-ext-diff", "--no-textconv", "--no-color", "--find-renames"]
         switch comparison {
         case .staged: return ["diff", "--cached"] + options
-        case .workingTree, .untracked: return ["diff"] + options
+        case .workingTree,
+            .untracked:
+            return ["diff"] + options
         case let .commit(base, head):
             if let base {
                 return ["diff"] + options + [base, head]
@@ -199,9 +213,13 @@ extension GitRepositoryService {
             let original = fields[index + 1]
             index += 2
             let isRename = status == .renamed || status == .copied
-            guard !isRename || index < fields.count else { break }
+            guard !isRename || index < fields.count else {
+                break
+            }
             let path = isRename ? fields[index] : original
-            if isRename { index += 1 }
+            if isRename {
+                index += 1
+            }
             files.append(GitDiffFile(path: path, originalPath: isRename ? original : nil, status: status, comparison: comparison))
         }
         return files
@@ -214,10 +232,14 @@ extension GitRepositoryService {
         while index < fields.count {
             let parts = fields[index].split(separator: "\t", maxSplits: 2, omittingEmptySubsequences: false)
             index += 1
-            guard parts.count == 3 else { continue }
+            guard parts.count == 3 else {
+                continue
+            }
             var path = String(parts[2])
             if path.isEmpty {
-                guard index + 1 < fields.count else { break }
+                guard index + 1 < fields.count else {
+                    break
+                }
                 path = fields[index + 1]
                 index += 2
             }

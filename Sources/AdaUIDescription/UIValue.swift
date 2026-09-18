@@ -6,47 +6,89 @@ public indirect enum UIValue: Codable, Hashable, Sendable {
     case bool(Bool)
     case number(Double)
     case string(String)
-    case array([UIValue])
-    case object([String: UIValue])
+    case array([Self])
+    case object([String: Self])
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
-        if container.decodeNil() { self = .null }
-        else if let value = try? container.decode(Bool.self) { self = .bool(value) }
-        else if let value = try? container.decode(Double.self) { self = .number(value) }
-        else if let value = try? container.decode(String.self) { self = .string(value) }
-        else if let value = try? container.decode([UIValue].self) { self = .array(value) }
-        else { self = .object(try container.decode([String: UIValue].self)) }
+        if container.decodeNil() {
+            self = .null
+        } else if let value = try? container.decode(Bool.self) {
+            self = .bool(value)
+        } else if let value = try? container.decode(Double.self) {
+            self = .number(value)
+        } else if let value = try? container.decode(String.self) {
+            self = .string(value)
+        } else if let value = try? container.decode([Self].self) {
+            self = .array(value)
+        } else {
+            self = .object(try container.decode([String: Self].self))
+        }
     }
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
         case .null: try container.encodeNil()
-        case .bool(let value): try container.encode(value)
-        case .number(let value): try container.encode(value)
-        case .string(let value): try container.encode(value)
-        case .array(let value): try container.encode(value)
-        case .object(let value): try container.encode(value)
+        case let .bool(value): try container.encode(value)
+        case let .number(value): try container.encode(value)
+        case let .string(value): try container.encode(value)
+        case let .array(value): try container.encode(value)
+        case let .object(value): try container.encode(value)
         }
     }
 
-    public var string: String? { if case .string(let value) = self { value } else { nil } }
-    public var number: Double? { if case .number(let value) = self { value } else { nil } }
-    public var bool: Bool? { if case .bool(let value) = self { value } else { nil } }
-    public var array: [UIValue]? { if case .array(let value) = self { value } else { nil } }
+    public var string: String? {
+        if case let .string(value) = self {
+            value
+        } else {
+            nil
+        }
+    }
+    public var number: Double? {
+        if case let .number(value) = self {
+            value
+        } else {
+            nil
+        }
+    }
+    public var bool: Bool? {
+        if case let .bool(value) = self {
+            value
+        } else {
+            nil
+        }
+    }
+    public var array: [Self]? {
+        if case let .array(value) = self {
+            value
+        } else {
+            nil
+        }
+    }
 
-    public func value(at path: ArraySlice<String>) -> UIValue? {
-        guard let key = path.first else { return self }
-        guard case .object(let values) = self else { return nil }
+    public func value(at path: ArraySlice<String>) -> Self? {
+        guard let key = path.first else {
+            return self
+        }
+        guard case let .object(values) = self else {
+            return nil
+        }
         return values[key]?.value(at: path.dropFirst())
     }
-    public func setting(_ value: UIValue, at path: ArraySlice<String>) -> UIValue? {
-        guard let key = path.first else { return value }
-        guard case .object(var values) = self else { return nil }
-        if path.count == 1 { values[key] = value }
-        else {
-            guard let updated = values[key]?.setting(value, at: path.dropFirst()) else { return nil }
+    public func setting(_ value: Self, at path: ArraySlice<String>) -> Self? {
+        guard let key = path.first else {
+            return value
+        }
+        guard case var .object(values) = self else {
+            return nil
+        }
+        if path.count == 1 {
+            values[key] = value
+        } else {
+            guard let updated = values[key]?.setting(value, at: path.dropFirst()) else {
+                return nil
+            }
             values[key] = updated
         }
         return .object(values)
@@ -54,11 +96,14 @@ public indirect enum UIValue: Codable, Hashable, Sendable {
 
     public var type: UIValueType {
         switch self {
-        case .null: .any; case .bool: .bool; case .number: .number
-        case .string: .string; case .array: .array; case .object: .object
+        case .null: .any
+        case .bool: .bool
+        case .number: .number
+        case .string: .string
+        case .array: .array
+        case .object: .object
         }
     }
-
 }
 
 public enum UIValueType: String, Codable, CaseIterable, Sendable {
@@ -66,7 +111,13 @@ public enum UIValueType: String, Codable, CaseIterable, Sendable {
 
     public func accepts(_ value: UIValue) -> Bool {
         switch (self, value) {
-        case (.any, _), (.bool, .bool), (.number, .number), (.string, .string), (.array, .array), (.object, .object): true
+        case (.any, _),
+            (.bool, .bool),
+            (.number, .number),
+            (.string, .string),
+            (.array, .array),
+            (.object, .object):
+            true
         default: false
         }
     }
@@ -117,7 +168,6 @@ public struct UIParameter: Codable, Hashable, Sendable {
         editor = try c.decodeIfPresent(UIParameterEditor.self, forKey: .editor)
         isBinding = try c.decodeIfPresent(Bool.self, forKey: .isBinding) ?? false
     }
-
 }
 
 public struct UIActionSignature: Codable, Hashable, Sendable {
@@ -134,7 +184,6 @@ public struct UIActionSignature: Codable, Hashable, Sendable {
         name = try c.decode(String.self, forKey: .name)
         parameters = try c.decodeIfPresent([UIParameter].self, forKey: .parameters) ?? []
     }
-
 }
 
 public enum UIContentShape: String, Codable, Sendable { case none, single, children }
@@ -150,8 +199,13 @@ public struct UIDescriptorSignature: Codable, Hashable, Sendable, Identifiable {
     public var platforms: [String]
 
     public init(
-        id: String, name: String, version: Int = 1, parameters: [UIParameter] = [],
-        actions: [UIActionSignature] = [], content: UIContentShape = .none, platforms: [String] = []
+        id: String,
+        name: String,
+        version: Int = 1,
+        parameters: [UIParameter] = [],
+        actions: [UIActionSignature] = [],
+        content: UIContentShape = .none,
+        platforms: [String] = []
     ) {
         self.id = id
         self.version = version

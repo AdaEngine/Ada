@@ -12,7 +12,6 @@ import Math
 
 /// This class is used to hold a box3d body reference.
 public final class Body3D: @unchecked Sendable {
-
     weak var world: PhysicsWorld3D?
     weak var entity: Entity?
 
@@ -114,7 +113,6 @@ public final class Body3D: @unchecked Sendable {
 }
 
 final class BoxShape3D {
-
     private let shape: b3ShapeId
 
     init(shape: consuming b3ShapeId) {
@@ -160,7 +158,7 @@ final class BoxShape3D {
         bodyId: b3BodyId
     ) -> b3ShapeId {
         switch shape.fixture {
-        case .box(let shape):
+        case let .box(shape):
             var hull = b3MakeBoxHull(
                 shape.halfExtents.x,
                 shape.halfExtents.y,
@@ -171,7 +169,7 @@ final class BoxShape3D {
                     b3CreateHullShape(bodyId, shapeDefPtr, hullPtr)
                 }
             }
-        case .sphere(let shape):
+        case let .sphere(shape):
             var sphere = b3Sphere(center: shape.center.b3Vec, radius: shape.radius)
             return withUnsafePointer(to: shapeDef) { shapeDefPtr in
                 withUnsafePointer(to: &sphere) { spherePtr in

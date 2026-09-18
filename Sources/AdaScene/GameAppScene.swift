@@ -14,7 +14,6 @@ import Math
 /// GameAppScene will present game scene in the pre-configured window.
 /// You must use this type of scene if your application should launch a game scene.
 public struct GameAppScene: AppScene {
-
     public typealias SceneBlock = @MainActor @Sendable () throws -> Scene
 
     public var body: some AppScene {
@@ -44,7 +43,6 @@ public struct GameAppScene: AppScene {
 }
 
 struct GameScenePlugin: Plugin {
-
     let gameScene: AssetHandle<Scene>
 
     func setup(in app: AppWorlds) {

@@ -10,7 +10,6 @@ import Foundation
 import Math
 
 extension TextEditorViewNode {
-
     func lines() -> [LineInfo] {
         if let lineCache {
             return lineCache

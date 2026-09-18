@@ -15,7 +15,6 @@ import Math
 
 /// Event describing the status of a finger touching the screen.
 public struct TouchEvent: InputEvent {
-
     /// Describe the phase of a finger touch
     public enum Phase: Hashable, Sendable {
         case began
@@ -29,7 +28,7 @@ public struct TouchEvent: InputEvent {
 
     /// Describe the phase of a finger touch
     public let phase: Phase
-    
+
     public let id: RID = RID()
 
     /// Stable identity of a finger from began through ended/cancelled; distinct from the event ID.

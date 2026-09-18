@@ -124,13 +124,13 @@ public struct HotReloadView<Fallback: View>: UIViewRepresentable {
         self.fallback = fallback
     }
 
-    public func makeUIView(in context: Context) -> UIView {
+    public func makeUIView(in _: Context) -> UIView {
         return UIHotReloadHostView(id: id) {
             UIContainerView(rootView: fallback())
         }
     }
 
-    public func updateUIView(_ view: UIView, in context: Context) {
+    public func updateUIView(_ view: UIView, in _: Context) {
         guard let host = view as? UIHotReloadHostView else {
             return
         }
@@ -143,19 +143,19 @@ public struct HotReloadView<Fallback: View>: UIViewRepresentable {
     public func sizeThatFits(
         _ proposal: ProposedViewSize,
         view: UIView,
-        context: Context
+        context _: Context
     ) -> Size {
         return view.sizeThatFits(proposal)
     }
 }
 
-public extension View {
+extension View {
     /// Wraps this view in a hot reload redraw boundary.
     ///
     /// Unlike ``hotReload(id:)``, this modifier does not require a manually coordinated identifier or
     /// an exported C factory symbol. Automatic hot reload runtimes can use the boundary to recreate the
     /// view after injected Swift implementations have been loaded.
-    func hotReloading(
+    public func hotReloading(
         fileID: StaticString = #fileID,
         function: StaticString = #function,
         line: UInt = #line,
@@ -174,7 +174,7 @@ public extension View {
     }
 
     /// Wraps this view in a hot reload host with the supplied identifier.
-    func hotReload(id: String) -> some View {
+    public func hotReload(id: String) -> some View {
         HotReloadView(id: id) {
             self
         }
@@ -183,7 +183,7 @@ public extension View {
 
 @MainActor
 final class UIHotReloadHostView: UIView {
-    fileprivate var id: String
+    var id: String
 
     private var fallback: @MainActor () -> UIView
     private weak var activeView: UIView?

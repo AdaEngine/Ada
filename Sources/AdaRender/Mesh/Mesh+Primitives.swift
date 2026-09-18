@@ -5,9 +5,9 @@
 
 import Math
 
-public extension Mesh {
+extension Mesh {
     /// Generates a cube with separate vertices and outward normals for each face.
-    static func generateCube(size: Vector3 = .one, renderDevice: RenderDevice) -> Mesh {
+    public static func generateCube(size: Vector3 = .one, renderDevice: RenderDevice) -> Mesh {
         precondition(size.x > 0 && size.y > 0 && size.z > 0)
         let faces: [(Vector3, Vector3, Vector3)] = [
             ([1, 0, 0], [0, 0, -1], [0, 1, 0]),
@@ -15,7 +15,7 @@ public extension Mesh {
             ([0, 1, 0], [1, 0, 0], [0, 0, -1]),
             ([0, -1, 0], [1, 0, 0], [0, 0, 1]),
             ([0, 0, 1], [1, 0, 0], [0, 1, 0]),
-            ([0, 0, -1], [-1, 0, 0], [0, 1, 0])
+            ([0, 0, -1], [-1, 0, 0], [0, 1, 0]),
         ]
         let corners: [Vector2] = [[-1, -1], [1, -1], [1, 1], [-1, 1]]
         var positions: [Vector3] = []
@@ -41,7 +41,7 @@ public extension Mesh {
     }
 
     /// Generates a filled circle in the XY plane facing positive Z.
-    static func generateCircle(radius: Float = 0.5, segments: Int = 64, renderDevice: RenderDevice) -> Mesh {
+    public static func generateCircle(radius: Float = 0.5, segments: Int = 64, renderDevice: RenderDevice) -> Mesh {
         precondition(radius > 0 && segments >= 3)
         var positions: [Vector3] = [.zero]
         var uvs: [Vector2] = [[0.5, 0.5]]
@@ -52,7 +52,9 @@ public extension Mesh {
             let y = Math.sin(angle)
             positions.append(Vector3(x * radius, y * radius, 0))
             uvs.append(Vector2((x + 1) / 2, (1 - y) / 2))
-            if index < segments { indices += [0, UInt32(index + 1), UInt32(index + 2)] }
+            if index < segments {
+                indices += [0, UInt32(index + 1), UInt32(index + 2)]
+            }
         }
         var descriptor = MeshDescriptor(name: "Circle")
         descriptor.positions = MeshBuffer(positions)
@@ -63,7 +65,7 @@ public extension Mesh {
     }
 
     /// Generates a horizontal plane facing positive Y.
-    static func generatePlane(size: Vector2 = .one, renderDevice: RenderDevice) -> Mesh {
+    public static func generatePlane(size: Vector2 = .one, renderDevice: RenderDevice) -> Mesh {
         precondition(size.x > 0 && size.y > 0)
         let x = size.x / 2
         let z = size.y / 2
@@ -76,7 +78,7 @@ public extension Mesh {
     }
 
     /// Generates a UV sphere suitable for lit and textured 3D materials.
-    static func generateSphere(
+    public static func generateSphere(
         radius: Float = 0.5,
         segments: Int = 32,
         rings: Int = 20,
@@ -118,7 +120,7 @@ public extension Mesh {
                 let next = UInt32((ring + 1) * stride + segment)
                 indices.append(contentsOf: [
                     current, current + 1, next,
-                    current + 1, next + 1, next
+                    current + 1, next + 1, next,
                 ])
             }
         }
@@ -127,6 +129,6 @@ public extension Mesh {
         descriptor.normals = MeshBuffer(normals)
         descriptor.textureCoordinates = MeshBuffer(textureCoordinates)
         descriptor.indicies = indices
-        return Mesh.generate(from: [descriptor], renderDevice: renderDevice)
+        return Self.generate(from: [descriptor], renderDevice: renderDevice)
     }
 }

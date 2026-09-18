@@ -22,7 +22,6 @@ public struct SparseSet<Key: Hashable, Value> {
     }
 }
 
-
 extension SparseSet {
     public init(_ dictionary: [Key: Value]) {
         var set = SparseSet<Key, Value>()
@@ -33,16 +32,16 @@ extension SparseSet {
     }
 }
 
-public extension SparseSet {
+extension SparseSet {
     @inlinable
-    var values: ContiguousArray<DenseValue> {
+    public var values: ContiguousArray<DenseValue> {
         _read {
             yield self.dense
         }
     }
 
     @inlinable
-    func firstIndex(for key: Key) -> Index? {
+    public func firstIndex(for key: Key) -> Index? {
         guard let index = sparse[key], index < count else {
             return nil
         }
@@ -50,7 +49,7 @@ public extension SparseSet {
     }
 
     @inlinable
-    func firstValue(for key: Key) -> Value? {
+    public func firstValue(for key: Key) -> Value? {
         guard let index = firstIndex(for: key) else {
             return nil
         }
@@ -60,13 +59,13 @@ public extension SparseSet {
     }
 
     @inlinable
-    func contains(_ key: Key) -> Bool {
-        self.firstIndex(for: key) != nil
+    public func contains(_ key: Key) -> Bool {
+        sparse[key].map { $0 < count } ?? false
     }
 
     @discardableResult
     @inlinable
-    mutating func insert(_ value: Value, for key: Key) -> DenseValue {
+    public mutating func insert(_ value: Value, for key: Key) -> DenseValue {
         let newPair = (key, value)
         if let index = firstIndex(for: key) {
             dense[index] = newPair
@@ -81,7 +80,7 @@ public extension SparseSet {
 
     @discardableResult
     @inlinable
-    mutating func remove(for key: Key) -> DenseValue? {
+    public mutating func remove(for key: Key) -> DenseValue? {
         guard let index = firstIndex(for: key) else {
             return nil
         }
@@ -96,13 +95,13 @@ public extension SparseSet {
     }
 
     @inlinable
-    mutating func removeAll(keepingCapacity: Bool = false) {
+    public mutating func removeAll(keepingCapacity: Bool = false) {
         self.dense.removeAll(keepingCapacity: keepingCapacity)
         self.sparse.removeAll(keepingCapacity: keepingCapacity)
     }
 
     @inlinable
-    subscript(_ key: Key) -> Value? {
+    public subscript(_ key: Key) -> Value? {
         get {
             return firstValue(for: key)
         }
@@ -116,7 +115,7 @@ public extension SparseSet {
     }
 
     @inlinable
-    subscript(_ key: Key, default value: Value) -> Value? {
+    public subscript(_ key: Key, default value: Value) -> Value? {
         get {
             return firstValue(for: key) ?? value
         }
@@ -184,7 +183,7 @@ extension SparseSet: Codable where Value: Codable, Key: Codable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let denseValues = try container.decode(Array<CodableDenseValue>.self, forKey: .dense)
+        let denseValues = try container.decode([CodableDenseValue].self, forKey: .dense)
         self.sparse = try container.decode([Key: Index].self, forKey: .sparse)
         self.dense = ContiguousArray(denseValues.map { ($0.key, $0.value) })
     }

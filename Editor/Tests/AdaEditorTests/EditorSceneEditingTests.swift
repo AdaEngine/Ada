@@ -1,9 +1,12 @@
-@testable import AdaCorePipelines
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
+// Different SPI groups expose independent test-only APIs.
+// swiftlint:disable:next duplicate_imports
 @_spi(Internal) import AdaEngine
 import Foundation
 import Testing
+
+@testable import AdaCorePipelines
+@testable import AdaEditor
 
 private enum EditorReflectionMode: String, CaseIterable, EditorEnumReflectable, Codable, Sendable {
     case idle
@@ -123,7 +126,8 @@ struct EditorSceneEditingTests {
             @export var enabled = true;
             @component(required: true) var transform: Transform;
         }
-        """.write(to: sourcesURL.appendingPathComponent("SceneController.ada"), atomically: true, encoding: .utf8)
+        """
+        .write(to: sourcesURL.appendingPathComponent("SceneController.ada"), atomically: true, encoding: .utf8)
         let project = ProjectSystem.defaultProject(projectName: "ScriptableScene", buildSystem: .adaScript)
         let support = try EditorScriptableObjectCatalogLoader.load(project: project, at: projectURL, fileManager: fileManager)
         let descriptor = try #require(support.descriptors.first)
@@ -168,9 +172,11 @@ struct EditorSceneEditingTests {
         #expect(childItem.level == 2)
         #expect(child.parent == parent.id)
         #expect(childItem.componentNames.contains("Sprite"))
-        #expect(childItem.resources == [
-            EditorSceneHierarchyResource(componentName: "Sprite", fieldName: "Texture", value: "Assets/Textures/player.png")
-        ])
+        #expect(
+            childItem.resources == [
+                EditorSceneHierarchyResource(componentName: "Sprite", fieldName: "Texture", value: "Assets/Textures/player.png")
+            ]
+        )
         #expect(EditorSceneHierarchyIcon.symbol(for: childItem) == EditorSceneHierarchyIcon.image)
     }
 
@@ -344,6 +350,38 @@ struct EditorSceneEditingTests {
         #expect(world.getEntityByID(camera.id) === camera)
     }
 
+    @Test("3D viewport raycast follows the rendered vertical camera axis")
+    @MainActor
+    func viewportRaycastFollowsRenderedVerticalCameraAxis() throws {
+        let model = EditorSceneModel.default(projectName: "Projected Raycast")
+        let entityID = try #require(model.editor?.selectedEntity)
+        let content = try model.encodedYAML()
+        let world = World()
+        world.spawn("SceneView_Camera") {
+            Camera()
+            Transform()
+        }
+        let loadResult = EditorSceneFileLoader.load(content: content, into: world, loadsScriptableObjects: false)
+        let viewportModel = EditorSceneViewportModel()
+        let viewportSize = Size(width: 1_280, height: 720)
+        viewportModel.configure(sceneContent: content, onSelectionChanged: { _ in }, onDocumentContentChanged: { _ in })
+        viewportModel.attachSceneWorld(world, loadResult: loadResult)
+        viewportModel.setViewportSize(viewportSize)
+        viewportModel.setDisplayMode(.threeD)
+        viewportModel.setActiveTool(.select)
+        viewportModel.perspectiveBlend = 1
+
+        let projectedOrigin = try #require(viewportModel.project(.zero, size: viewportSize))
+        #expect(projectedOrigin.y > viewportSize.height * 0.5)
+        #expect(viewportModel.pick3D(at: projectedOrigin) == entityID)
+
+        var cursorSelection: String?
+        viewportModel.onSelectEntity = { cursorSelection = $0 }
+        #expect(viewportModel.handleInput(mouseEvent(button: .left, position: projectedOrigin, phase: .began)))
+        #expect(viewportModel.handleInput(mouseEvent(button: .left, position: projectedOrigin, phase: .ended)))
+        #expect(cursorSelection == entityID)
+    }
+
     @Test("scene viewport pill creates entities and starts Play Mode")
     @MainActor
     func sceneViewportPillControls() throws {
@@ -369,17 +407,19 @@ struct EditorSceneEditingTests {
         )
         var updatedDocument: EditorSceneDocument?
         var didRequestPlay = false
-        let container = UIContainerView(rootView: EditorSceneViewportView(
-            document: document,
-            resourceRootURL: nil,
-            inspectorViewModel: EditorInspectorSidebarViewModel(),
-            playModeState: .editing,
-            playRuntime: nil,
-            onEntitySelected: nil,
-            onPlay: { didRequestPlay = true },
-            onStop: nil,
-            onDocumentChanged: { updatedDocument = $0 }
-        ))
+        let container = UIContainerView(
+            rootView: EditorSceneViewportView(
+                document: document,
+                resourceRootURL: nil,
+                inspectorViewModel: EditorInspectorSidebarViewModel(),
+                playModeState: .editing,
+                playRuntime: nil,
+                onEntitySelected: nil,
+                onPlay: { didRequestPlay = true },
+                onStop: nil,
+                onDocumentChanged: { updatedDocument = $0 }
+            )
+        )
         container.frame = Rect(x: 0, y: 0, width: 900, height: 600)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
@@ -392,6 +432,57 @@ struct EditorSceneEditingTests {
         #expect(didRequestPlay)
     }
 
+    @Test("scene editor embeds hierarchy beside the viewport")
+    @MainActor
+    func sceneEditorEmbedsHierarchy() throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            let app = AppWorlds(main: World(name: "EmbeddedSceneHierarchyTests"))
+            RenderWorldPlugin().setup(in: app)
+        }
+        let content = try EditorSceneModel.default(projectName: "EmbeddedHierarchy").encodedYAML()
+        let document = EditorSceneDocument(
+            id: "scene:embedded-hierarchy",
+            title: "EmbeddedHierarchy.ascn",
+            relativePath: "Assets/Scenes/EmbeddedHierarchy.ascn",
+            absolutePath: nil,
+            content: content,
+            lastSavedContent: content,
+            isReadOnly: false,
+            sceneModel: EditorSceneFileLoader.model(from: content),
+            errorMessage: nil,
+            isDirty: false,
+            statusMessage: nil,
+            loadSummary: EditorSceneFileLoader.summary(from: content)
+        )
+        let workbench = EditorWorkbenchViewModel(openDocuments: [.scene(document)], activeDocumentID: document.id)
+        let container = UIContainerView(
+            rootView: EditorSceneDocumentEditor(
+                document: document,
+                workbench: workbench,
+                resourceRootURL: nil,
+                uiCatalog: .standard,
+                inspectorViewModel: EditorInspectorSidebarViewModel(),
+                playModeState: .editing,
+                playRuntime: nil,
+                onEntitySelected: nil,
+                onPlay: nil,
+                onStop: nil
+            )
+        )
+        container.frame = Rect(x: 0, y: 0, width: 1_100, height: 700)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+
+        let hierarchy = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneEditor.HierarchyPanel"))
+        let viewport = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneEditor.ViewportPanel"))
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneHierarchy"))
+        #expect(hierarchy.absoluteFrame.minX == 0)
+        #expect(hierarchy.absoluteFrame.width == EditorSceneDocumentEditor.hierarchyWidth)
+        #expect(viewport.absoluteFrame.minX == EditorSceneDocumentEditor.hierarchyWidth + 1)
+        #expect(viewport.absoluteFrame.width == 1_100 - EditorSceneDocumentEditor.hierarchyWidth - 1)
+    }
+
     @Test("2D viewport grid and default entity marker render as quads")
     @MainActor
     func viewportGridAndMarkerRenderAsQuads() throws {
@@ -402,18 +493,28 @@ struct EditorSceneEditingTests {
         var gridContext = UIGraphicsContext()
         viewportModel.drawGrid(in: &gridContext, size: Size(width: 320, height: 180), theme: .adaEditor)
 
-        #expect(gridContext.getDrawCommands().contains { command in
-            if case .drawQuad = command { return true }
-            return false
-        })
+        #expect(
+            gridContext.getDrawCommands()
+                .contains { command in
+                    if case .drawQuad = command {
+                        return true
+                    }
+                    return false
+                }
+        )
 
         var gizmoContext = UIGraphicsContext()
         viewportModel.drawGizmos(in: &gizmoContext, size: Size(width: 320, height: 180), theme: .adaEditor)
 
-        #expect(gizmoContext.getDrawCommands().contains { command in
-            if case .drawQuad = command { return true }
-            return false
-        })
+        #expect(
+            gizmoContext.getDrawCommands()
+                .contains { command in
+                    if case .drawQuad = command {
+                        return true
+                    }
+                    return false
+                }
+        )
     }
 
     @Test("3D grid projection matches the render camera")
@@ -456,21 +557,24 @@ struct EditorSceneEditingTests {
         let difference = Vector2(gridPoint.x - renderPoint.x, gridPoint.y - renderPoint.y)
         #expect(difference.squaredLength < 0.0001)
 
-        let clippedSegment = try #require(viewportModel.clipSegmentToNearPlane(
-            start: Vector3(0, 0, -68),
-            end: Vector3(0, 0, 48),
-            size: size
-        ))
+        let clippedSegment = try #require(
+            viewportModel.clipSegmentToNearPlane(
+                start: Vector3(0, 0, -68),
+                end: Vector3(0, 0, 48),
+                size: size
+            )
+        )
         #expect(viewportModel.project(clippedSegment.start, size: size) != nil)
         #expect(viewportModel.project(clippedSegment.end, size: size) != nil)
 
         var gridContext = UIGraphicsContext()
         viewportModel.draw3DGrid(in: &gridContext, size: size, theme: .adaEditor)
-        let projectedLineCount = gridContext.getDrawCommands().reduce(into: 0) { count, command in
-            if case .drawLine = command {
-                count += 1
+        let projectedLineCount = gridContext.getDrawCommands()
+            .reduce(into: 0) { count, command in
+                if case .drawLine = command {
+                    count += 1
+                }
             }
-        }
         #expect(projectedLineCount > 10)
     }
 
@@ -481,7 +585,8 @@ struct EditorSceneEditingTests {
         let viewportModel = EditorSceneViewportModel()
         viewportModel.threeDPitch = pitch
         viewportModel.perspectiveBlend = 1
-        let center = pitch < 0
+        let center =
+            pitch < 0
             ? viewportModel.threeDPosition + viewportModel.front3D * (-viewportModel.threeDPosition.y / viewportModel.front3D.y)
             : Vector3(0, 0, 14)
         let start = center - Vector3(1, 0, 0)
@@ -496,7 +601,12 @@ struct EditorSceneEditingTests {
         var context = UIGraphicsContext()
         context.translateBy(x: origin.x, y: -origin.y)
         viewportModel.drawProjectedSegment(
-            from: start, to: end, in: &context, size: size, lineWidth: 1, color: .white
+            from: start,
+            to: end,
+            in: &context,
+            size: size,
+            lineWidth: 1,
+            color: .white
         )
         let command = try #require(context.getDrawCommands().first)
         guard case let .drawLine(lineStart, lineEnd, _, _) = command else {
@@ -506,7 +616,12 @@ struct EditorSceneEditingTests {
         // The line tessellator preserves these positions; the UI camera maps
         // negative world Y to positive screen Y, as it does for UI rectangles.
         let uiProjection = Transform3D.orthographic(
-            left: 0, right: 1600, top: 0, bottom: -1000, zNear: -1, zFar: 1
+            left: 0,
+            right: 1600,
+            top: 0,
+            bottom: -1000,
+            zNear: -1,
+            zFar: 1
         )
         for (vertex, expected) in [(lineStart, expectedStart), (lineEnd, expectedEnd)] {
             let clip = uiProjection * Vector4(vertex, 1)
@@ -564,9 +679,13 @@ struct EditorSceneEditingTests {
         let viewportModel = EditorSceneViewportModel()
 
         viewportModel.attachSceneWorld(world, loadResult: .empty)
-        viewportModel.setViewportSize(Size(width: 640, height: 360))
+        let viewportSize = Size(width: 640, height: 360)
+        viewportModel.setViewportSize(viewportSize)
         await world.runScheduler(.preUpdate)
         #expect(cameraEntity.components[VisibleEntities.self]?.entityIds.contains(visibleEntity.id) == true)
+        #expect(cameraEntity.components[Transform.self]?.position.z == EditorSceneViewportModel.twoDCameraDepth)
+        let projectedOrigin = try #require(viewportModel.project(.zero, size: viewportSize))
+        #expect((projectedOrigin - Vector2(viewportSize.width * 0.5, viewportSize.height * 0.5)).squaredLength < 0.001)
         viewportModel.setDisplayMode(.threeD)
 
         #expect(viewportModel.perspectiveTransitionProgress == 0)
@@ -602,6 +721,7 @@ struct EditorSceneEditingTests {
         #expect(twoDGraph.subgraphLabel.rawValue == "Scene 3D Render Graph")
         #expect(cameraEntity.components[Environment3D.self]?.skybox.isEnabled == false)
         #expect(viewportModel.perspectiveTransitionProgress == 0)
+        #expect(cameraEntity.components[Transform.self]?.position.z == EditorSceneViewportModel.twoDCameraDepth)
         #expect(cameraEntity.components[VisibleEntities.self]?.entityIds.contains(visibleEntity.id) == true)
         #expect(cameraEntity.components[GlobalTransform.self]?.matrix == cameraEntity.components[Transform.self]?.matrix)
     }
@@ -763,10 +883,12 @@ struct EditorSceneEditingTests {
         #expect(twoDRuler.opacity == 1)
         #expect(twoDRuler.labels.contains { $0.axis == .x })
         #expect(twoDRuler.labels.contains { $0.axis == .y })
-        #expect(twoDRuler.labels.allSatisfy { label in
-            label.position.x >= 0 && label.position.x <= size.width
-                && label.position.y >= 0 && label.position.y <= size.height
-        })
+        #expect(
+            twoDRuler.labels.allSatisfy { label in
+                label.position.x >= 0 && label.position.x <= size.width
+                    && label.position.y >= 0 && label.position.y <= size.height
+            }
+        )
 
         viewportModel.setDisplayMode(.threeD)
         _ = viewportModel.update(deltaTime: 0.25)

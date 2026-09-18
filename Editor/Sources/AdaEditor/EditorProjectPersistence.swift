@@ -10,15 +10,21 @@ extension EditorProjectStore {
     @discardableResult
     public func renameProject(_ reference: EditorProjectReference, to name: String) throws -> EditorProjectReference {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { throw EditorProjectStoreError.emptyProjectName }
+        guard !name.isEmpty else {
+            throw EditorProjectStoreError.emptyProjectName
+        }
         var references = try loadProjects()
         guard let index = references.firstIndex(where: { $0.id == reference.id }) else {
             throw CocoaError(.fileNoSuchFile)
         }
         let url = resolveProjectURL(for: references[index])
         #if os(iOS) || os(tvOS) || os(visionOS)
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
         #endif
         let original = try ProjectSystem.loadProject(at: url, fileManager: fileManager)
         var project = original
@@ -40,13 +46,14 @@ extension EditorProjectStore {
             applicationSupport = applicationSupportURL
         } else {
             #if os(macOS)
-            applicationSupport = fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
+                applicationSupport = fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
             #else
-            applicationSupport = fileManager.temporaryDirectory
+                applicationSupport = fileManager.temporaryDirectory
             #endif
         }
 
-        return applicationSupport
+        return
+            applicationSupport
             .appendingPathComponent("AdaEditor", isDirectory: true)
             .appendingPathComponent("projects.json", isDirectory: false)
     }
@@ -90,17 +97,17 @@ extension EditorProjectStore {
         }
 
         #if os(iOS) || os(tvOS) || os(visionOS)
-        if let bookmarkData = project.bookmarkData {
-            var isStale = false
-            if let bookmarkedURL = try? URL(
-                resolvingBookmarkData: bookmarkData,
-                options: [],
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            ) {
-                return bookmarkedURL.standardizedFileURL
+            if let bookmarkData = project.bookmarkData {
+                var isStale = false
+                if let bookmarkedURL = try? URL(
+                    resolvingBookmarkData: bookmarkData,
+                    options: [],
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                ) {
+                    return bookmarkedURL.standardizedFileURL
+                }
             }
-        }
         #endif
 
         return URL(fileURLWithPath: project.path, isDirectory: true).standardizedFileURL
@@ -111,7 +118,8 @@ extension EditorProjectStore {
         let resolvedURL = resolveProjectURL(for: project)
         restoredProject.path = resolvedURL.path
         if restoredProject.documentsRelativePath == nil {
-            restoredProject.documentsRelativePath = documentsRelativePath(for: resolvedURL)
+            restoredProject.documentsRelativePath =
+                documentsRelativePath(for: resolvedURL)
                 ?? Self.legacyDocumentsRelativePath(from: project.path)
         }
         return restoredProject
@@ -130,11 +138,12 @@ extension EditorProjectStore {
     }
 
     static func legacyDocumentsRelativePath(from path: String) -> String? {
-        guard let containerRange = path.range(of: "/Containers/Data/Application/"),
-              let documentsRange = path.range(
+        guard
+            let containerRange = path.range(of: "/Containers/Data/Application/"),
+            let documentsRange = path.range(
                 of: "/Documents/",
                 range: containerRange.upperBound..<path.endIndex
-              )
+            )
         else {
             return nil
         }
@@ -144,13 +153,13 @@ extension EditorProjectStore {
 
     func makeBookmarkData(for projectURL: URL) -> Data? {
         #if os(iOS) || os(tvOS) || os(visionOS)
-        return try? projectURL.bookmarkData(
-            options: [],
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        )
+            return try? projectURL.bookmarkData(
+                options: [],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
         #else
-        return nil
+            return nil
         #endif
     }
 

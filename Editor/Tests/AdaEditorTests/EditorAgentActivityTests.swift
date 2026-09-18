@@ -164,10 +164,10 @@ struct EditorAgentActivityTests {
         var tapped = false
         let container = UIContainerView(
             rootView: Button("Panel control") { tapped = true }
-            .accessibilityIdentifier("GlowTest.PanelControl")
-            .frame(width: size.width, height: size.height)
-            .background(Color.black)
-            .overlay { EditorAgentActivityOverlay(state: .working, settings: appearance) }
+                .accessibilityIdentifier("GlowTest.PanelControl")
+                .frame(width: size.width, height: size.height)
+                .background(Color.black)
+                .overlay { EditorAgentActivityOverlay(state: .working, settings: appearance) }
         )
         container.frame = Rect(origin: .zero, size: size)
         container.bounds.size = size
@@ -176,8 +176,10 @@ struct EditorAgentActivityTests {
         let context = UIGraphicsContext()
         container.draw(with: context)
         let commands = context.getDrawCommands()
-        guard case let .drawShaderEffect(_, material)? = commands.last,
-              let glow = material as? CustomMaterial<EditorAgentGlowMaterial> else {
+        guard
+            case let .drawShaderEffect(_, material)? = commands.last,
+            let glow = material as? CustomMaterial<EditorAgentGlowMaterial>
+        else {
             Issue.record("Expected glow above panel content")
             return
         }

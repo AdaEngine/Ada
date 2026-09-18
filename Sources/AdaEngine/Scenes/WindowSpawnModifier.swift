@@ -9,8 +9,8 @@
 import AdaUtils
 import Math
 
-public extension View {
-    func window<WindowContent: View>(
+extension View {
+    public func window<WindowContent: View>(
         isPresented: Binding<Bool>,
         configuration: UIWindow.Configuration,
         @ViewBuilder content: @escaping () -> WindowContent
@@ -25,7 +25,7 @@ public struct PresentWindowViewModifier<WindowContent: View>: ViewModifier {
     @Binding var isPresented: Bool
     let configuration: UIWindow.Configuration
     let windowContent: () -> WindowContent
-    
+
     public func body(content: Content) -> some View {
         content
             .background(
@@ -42,11 +42,11 @@ private struct PresentWindowHolderView<WindowContent: View>: View {
     @Binding var isPresented: Bool
     let configuration: UIWindow.Configuration
     var content: () -> WindowContent
-    
+
     @State private var window: UIWindow?
     @Environment(\.windowManager) private var windowManager
     @Environment(\.world) private var world
-    
+
     var body: some View {
         EmptyView()
             .onChange(of: isPresented) { _, newValue in
@@ -57,7 +57,7 @@ private struct PresentWindowHolderView<WindowContent: View>: View {
                 }
             }
     }
-    
+
     private func spawnWindow() {
         let window = UIWindow(configuration: configuration)
         let container = UIContainerView(rootView: content())
@@ -71,9 +71,10 @@ private struct PresentWindowHolderView<WindowContent: View>: View {
         if configuration.background.isTransparent {
             camera.backgroundColor = Color(red: 0, green: 0, blue: 0, alpha: 0)
         }
-        let cameraEntity = world?.spawn(
-            bundle: Camera2D(camera: camera)
-        )
+        let cameraEntity = world?
+            .spawn(
+                bundle: Camera2D(camera: camera)
+            )
         window.runtimeCameraEntity = cameraEntity
 
         if configuration.showsImmediately {
@@ -81,7 +82,7 @@ private struct PresentWindowHolderView<WindowContent: View>: View {
         }
         self.window = window
     }
-    
+
     private func dispawnWindow(_ window: UIWindow) {
         window.close()
         self.window = window

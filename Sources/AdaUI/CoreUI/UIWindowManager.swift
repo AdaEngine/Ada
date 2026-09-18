@@ -5,22 +5,22 @@
 //  Created by v.prusakov on 5/29/22.
 //
 
+import AdaECS
 @_spi(Internal) import AdaInput
 import AdaRender
 import AdaUtils
-import Math
-import AdaECS
 import Foundation
+import Math
 
 /// Base protocol describes platform specific window.
 @MainActor
 public protocol SystemWindow {
     /// Window title.
     var title: String { get set }
-    
+
     /// Window size.
     var size: Size { get set }
-    
+
     /// Window position on screen.
     var position: Point { get set }
 }
@@ -29,7 +29,6 @@ public protocol SystemWindow {
 /// Application has only one window manager per instance.
 @MainActor
 open class UIWindowManager {
-
     public private(set) static var shared: UIWindowManager!
 
     /// Returns all windows registred in current process.
@@ -41,9 +40,9 @@ open class UIWindowManager {
     @_spi(Internal)
     public var inputRef: Ref<Input>?
 
-    public init() { }
+    public init() {}
 
-    open func menuBuilder(for window: UIWindow) -> UIMenuBuilder? {
+    open func menuBuilder(for _: UIWindow) -> UIMenuBuilder? {
         return nil
     }
 
@@ -53,37 +52,37 @@ open class UIWindowManager {
         self.windows[window.id] = window
         window.windowDidReady()
     }
-    
+
     /// Show window and make it focused.
-    open func showWindow(_ window: UIWindow, isFocused: Bool) {
+    open func showWindow(_: UIWindow, isFocused _: Bool) {
         fatalErrorMethodNotImplemented()
     }
-    
+
     /// Close window.
-    open func closeWindow(_ window: UIWindow) {
+    open func closeWindow(_: UIWindow) {
         fatalErrorMethodNotImplemented()
     }
-    
+
     /// Set window mode for window.
-    open func setWindowMode(_ window: UIWindow, mode: UIWindow.Mode) {
+    open func setWindowMode(_: UIWindow, mode _: UIWindow.Mode) {
         fatalErrorMethodNotImplemented()
     }
-    
+
     /// Set minimum size for window.
-    open func setMinimumSize(_ size: Size, for window: UIWindow) {
+    open func setMinimumSize(_: Size, for _: UIWindow) {
         fatalErrorMethodNotImplemented()
     }
-    
+
     /// Resize window.
-    open func resizeWindow(_ window: UIWindow, size: Size) {
+    open func resizeWindow(_: UIWindow, size _: Size) {
         fatalErrorMethodNotImplemented()
     }
-    
+
     /// Get screen instance for window.
-    open func getScreen(for window: UIWindow) -> Screen? {
+    open func getScreen(for _: UIWindow) -> Screen? {
         Screen.main
     }
-    
+
     open func setActiveWindow(_ window: UIWindow) {
         guard self.activeWindow !== window else {
             return
@@ -92,7 +91,7 @@ open class UIWindowManager {
         if let activeWindow {
             resignActiveWindow(activeWindow)
         }
-        
+
         self.activeWindow = window
         window.isActive = true
         window.windowDidBecameActive()
@@ -109,42 +108,46 @@ open class UIWindowManager {
         ContextMenuPresentationCenter.dismissForDeactivation?(window)
         window.windowDidResignActive()
     }
-    
-    open func setCursorShape(_ shape: Input.CursorShape) {
+
+    open func setCursorShape(_: Input.CursorShape) {
         fatalErrorMethodNotImplemented()
     }
-    
+
     open func getCursorShape() -> Input.CursorShape {
         fatalErrorMethodNotImplemented()
     }
-    
-    open func setCursorImage(for shape: Input.CursorShape, texture: Texture2D?, hotspot: Vector2) {
+
+    open func setCursorImage(for _: Input.CursorShape, texture _: Texture2D?, hotspot _: Vector2) {
         fatalErrorMethodNotImplemented()
     }
-    
-    open func setMouseMode(_ mode: Input.MouseMode) {
+
+    open func setMouseMode(_: Input.MouseMode) {
         fatalErrorMethodNotImplemented()
     }
-    
+
     open func getMouseMode() -> Input.MouseMode {
         fatalErrorMethodNotImplemented()
     }
-    
+
     open func updateCursor() {
         fatalErrorMethodNotImplemented()
     }
 
-    open func textInputFocusDidChange(_ isFocused: Bool) { }
+    open func textInputFocusDidChange(_: Bool) {}
 
     public final func removeWindow(_ window: UIWindow, setActiveAnotherIfNeeded: Bool = true) {
         guard let window = self.windows[window.id] else {
             assertionFailure("We don't have window in windows stack. That strange problem.")
             return
         }
-        
+
         // Destory window from render window
         do {
-            unsafe try RenderEngine.shared!.destroyWindow(window.id)
+            guard let renderEngine = unsafe RenderEngine.shared else {
+                assertionFailure("RenderEngine is not initialized.")
+                return
+            }
+            try renderEngine.destroyWindow(window.id)
         } catch {
             assertionFailure(error.localizedDescription)
             return
@@ -153,16 +156,18 @@ open class UIWindowManager {
         window.runtimeCameraEntity = nil
         self.windows.remove(for: window.id)
         window.windowDidDisappear()
-        
+
         // Check if we don't have any windows we should shutdown and quit engine process
         guard !self.windows.isEmpty else {
             return
         }
-        
+
         if setActiveAnotherIfNeeded {
             // Set last window as active
             // TODO: (Vlad) I think we should have any order
-            let newUIWindow = self.windows.values.last!.value
+            guard let newUIWindow = self.windows.values.last?.value else {
+                return
+            }
             self.setActiveWindow(newUIWindow)
         }
     }

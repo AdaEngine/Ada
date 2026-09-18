@@ -49,24 +49,25 @@ struct EditorActivityEvent: Equatable, Sendable, Identifiable {
     }
 
     var compactTitle: String {
-        let title: String = switch kind {
-        case .agent:
-            "Agent"
-        case .build:
-            "Build"
-        case .indexing:
-            "Indexing"
-        case .preview:
-            "Preview"
-        case .run:
-            "Running"
-        case .sourceControl:
-            "Git"
-        case .test:
-            "Testing"
-        case .workspace:
-            "Preparing"
-        }
+        let title: String =
+            switch kind {
+            case .agent:
+                "Agent"
+            case .build:
+                "Build"
+            case .indexing:
+                "Indexing"
+            case .preview:
+                "Preview"
+            case .run:
+                "Running"
+            case .sourceControl:
+                "Git"
+            case .test:
+                "Testing"
+            case .workspace:
+                "Preparing"
+            }
 
         guard let fractionCompleted else {
             return title
@@ -86,7 +87,7 @@ enum EditorActivityPresentation {
     ) -> [EditorActivityEvent] {
         var events = workspaceEvent(for: workspaceStatus, buildActivity: buildActivity).map { [$0] } ?? []
 
-        if case .building(let declaration, let message) = previewStatus {
+        if case let .building(declaration, message) = previewStatus {
             events.append(
                 EditorActivityEvent(
                     id: "preview",
@@ -127,17 +128,18 @@ enum EditorActivityPresentation {
                 kind: .indexing,
                 title: "Indexing Swift package"
             )
-        case .preparing(let progress):
+        case let .preparing(progress):
             guard progress.phase != .ready, progress.phase != .failed else {
                 return nil
             }
-            let fractionCompleted: Float? = if let completed = progress.completedFileCount,
-                                               let total = progress.totalFileCount,
-                                               total > 0 {
-                Float(completed) / Float(total)
-            } else {
-                nil
-            }
+            let fractionCompleted: Float? =
+                if let completed = progress.completedFileCount,
+                    let total = progress.totalFileCount,
+                    total > 0 {
+                    Float(completed) / Float(total)
+                } else {
+                    nil
+                }
             return EditorActivityEvent(
                 id: "workspace",
                 kind: progress.phase == .indexingBuild ? .indexing : .workspace,
@@ -145,7 +147,7 @@ enum EditorActivityPresentation {
                 detail: progress.currentTarget ?? progress.currentFile ?? progress.detail,
                 fractionCompleted: fractionCompleted
             )
-        case .running(let title):
+        case let .running(title):
             let step = buildActivity?.currentStep
             return EditorActivityEvent(
                 id: "workspace-command",
@@ -154,7 +156,10 @@ enum EditorActivityPresentation {
                 detail: step.map { $0.detail ?? $0.title },
                 fractionCompleted: step?.fractionCompleted
             )
-        case .cancelled, .failed, .idle, .ready:
+        case .cancelled,
+            .failed,
+            .idle,
+            .ready:
             return nil
         }
     }
@@ -178,10 +183,10 @@ struct EditorFooter: View {
     let viewModel: EditorFooterViewModel
     let activities: [EditorActivityEvent]
     var onOpenActivity: () -> Void = {}
-    
+
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
-    
+
     var body: some View {
         HStack(spacing: 14) {
             ForEach(viewModel.leftItems, id: \.self) {

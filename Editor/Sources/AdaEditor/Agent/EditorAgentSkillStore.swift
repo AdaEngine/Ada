@@ -58,7 +58,9 @@ enum EditorAgentSkillStore {
         let metadata = parseFrontMatter(content)
         let directoryName = skillFileURL.deletingLastPathComponent().lastPathComponent
         let declaredName = metadata["name"]?.nilIfEmpty ?? directoryName
-        let id = metadata["id"]?.nilIfEmpty ?? declaredName
+        let id =
+            metadata["id"]?.nilIfEmpty
+            ?? declaredName
             .lowercased()
             .replacingOccurrences(of: #"[^a-z0-9_.-]+"#, with: "-", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
@@ -85,13 +87,15 @@ enum EditorAgentSkillStore {
         guard declaredName.contains("-") else {
             return declaredName
         }
-        return declaredName.split(separator: "-").map { word in
-            switch word.lowercased() {
-            case "ada": "Ada"
-            case "adaui": "AdaUI"
-            default: word.prefix(1).uppercased() + word.dropFirst()
+        return declaredName.split(separator: "-")
+            .map { word in
+                switch word.lowercased() {
+                case "ada": "Ada"
+                case "adaui": "AdaUI"
+                default: word.prefix(1).uppercased() + word.dropFirst()
+                }
             }
-        }.joined(separator: " ")
+            .joined(separator: " ")
     }
 
     private static func parseFrontMatter(_ content: String) -> [String: String] {
@@ -115,11 +119,5 @@ enum EditorAgentSkillStore {
             result[key] = value
         }
         return result
-    }
-}
-
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
     }
 }

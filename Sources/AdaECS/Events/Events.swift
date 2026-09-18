@@ -9,7 +9,7 @@ import AdaUtils
 
 /// Events Receiver. Allows you to receive events from the world.
 /// Events object returns an array of events from previous frame.
-/// 
+///
 /// Example:
 /// ```swift
 /// @System
@@ -23,7 +23,6 @@ import AdaUtils
 /// ```
 @propertyWrapper
 public final class Events<T: Event>: @unchecked Sendable {
-
     private var storage: Ref<EventsStorage<T>>?
 
     public var wrappedValue: ContiguousArray<T> {
@@ -39,7 +38,7 @@ public final class Events<T: Event>: @unchecked Sendable {
         }
     }
 
-    public init() { }
+    public init() {}
 }
 
 extension Events: SystemParameter {
@@ -49,7 +48,7 @@ extension Events: SystemParameter {
         return access
     }
 
-    public convenience init(from world: World) {
+    public convenience init(from _: World) {
         self.init()
     }
 

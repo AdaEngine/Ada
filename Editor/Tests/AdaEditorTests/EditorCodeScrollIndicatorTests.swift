@@ -1,7 +1,8 @@
 @_spi(AdaEngine) import AdaEngine
-@testable import AdaUI
 import Math
 import Testing
+
+@testable import AdaUI
 
 @Suite("Code scroll indicators", .serialized)
 @MainActor
@@ -45,12 +46,20 @@ struct EditorCodeScrollIndicatorTests {
     }
 
     private func findScroll(_ node: ViewNode) -> ScrollViewNode? {
-        if let scroll = node as? ScrollViewNode { return scroll }
-        if let root = node as? ViewRootNode { return findScroll(root.contentNode) }
-        if let modifier = node as? ViewModifierNode { return findScroll(modifier.contentNode) }
+        if let scroll = node as? ScrollViewNode {
+            return scroll
+        }
+        if let root = node as? ViewRootNode {
+            return findScroll(root.contentNode)
+        }
+        if let modifier = node as? ViewModifierNode {
+            return findScroll(modifier.contentNode)
+        }
         if let container = node as? ViewContainerNode {
             for child in container.nodes {
-                if let scroll = findScroll(child) { return scroll }
+                if let scroll = findScroll(child) {
+                    return scroll
+                }
             }
         }
         return nil

@@ -7,16 +7,16 @@
 
 import Foundation
 
-public extension Bundle {
-    static var engineBundle: Bundle {
-#if SWIFT_PACKAGE
-        return Bundle.module
-#else
-        return Bundle(for: BundleToken.self)
-#endif
+extension Bundle {
+    public static var engineBundle: Bundle {
+        #if SWIFT_PACKAGE
+            return Self.module
+        #else
+            return Bundle(for: BundleToken.self)
+        #endif
     }
 }
 
 #if !SWIFT_PACKAGE
-class BundleToken {}
+    class BundleToken {}
 #endif

@@ -50,7 +50,8 @@ final class EditorToolbarViewModel {
             return item.relativePath.hasPrefix("\(searchScopeRelativePath)/")
         }
 
-        return scopedItems
+        return Array(
+            scopedItems
             .filter { item in
                 item.title.localizedCaseInsensitiveContains(query)
                     || item.relativePath.localizedCaseInsensitiveContains(query)
@@ -64,7 +65,7 @@ final class EditorToolbarViewModel {
                 return lhs.relativePath.localizedStandardCompare(rhs.relativePath) == .orderedAscending
             }
             .prefix(12)
-            .map { $0 }
+        )
     }
 
     func search(in item: EditorProjectSidebarViewModel.Item?) {
@@ -150,7 +151,7 @@ final class EditorProjectSidebarViewModel {
         var isFolder: Bool
         var isSymbolicLink: Bool = false
         var kind: EditorProjectFileKind
-        var assetRoot: String? = nil
+        var assetRoot: String?
     }
 
     var items: [Item]
@@ -169,42 +170,43 @@ final class EditorProjectSidebarViewModel {
         items.first(where: \.isActive)
     }
 
-    init(items: [Item] = [
-        Item(id: "src", disclosure: "", icon: "▱", title: "src", relativePath: "src", level: 0, isActive: false, isFolder: true, kind: .folder),
-        Item(
-            id: "src/EngineLoop.ada",
-            disclosure: "",
-            icon: "▱",
-            title: "EngineLoop.ada",
-            relativePath: "src/EngineLoop.ada",
-            level: 1,
-            isActive: true,
-            isFolder: false,
-            kind: .text(.ada)
-        ),
-        Item(
-            id: "src/Renderer.ada",
-            disclosure: "",
-            icon: "▱",
-            title: "Renderer.ada",
-            relativePath: "src/Renderer.ada",
-            level: 1,
-            isActive: false,
-            isFolder: false,
-            kind: .text(.ada)
-        ),
-        Item(
-            id: "Assets/Scenes/Main.ascn",
-            disclosure: "",
-            icon: "▱",
-            title: "Main.ascn",
-            relativePath: "Assets/Scenes/Main.ascn",
-            level: 1,
-            isActive: false,
-            isFolder: false,
-            kind: .scene
-        )
-    ],
+    init(
+        items: [Item] = [
+            Item(id: "src", disclosure: "", icon: "▱", title: "src", relativePath: "src", level: 0, isActive: false, isFolder: true, kind: .folder),
+            Item(
+                id: "src/EngineLoop.ada",
+                disclosure: "",
+                icon: "▱",
+                title: "EngineLoop.ada",
+                relativePath: "src/EngineLoop.ada",
+                level: 1,
+                isActive: true,
+                isFolder: false,
+                kind: .text(.ada)
+            ),
+            Item(
+                id: "src/Renderer.ada",
+                disclosure: "",
+                icon: "▱",
+                title: "Renderer.ada",
+                relativePath: "src/Renderer.ada",
+                level: 1,
+                isActive: false,
+                isFolder: false,
+                kind: .text(.ada)
+            ),
+            Item(
+                id: "Assets/Scenes/Main.ascn",
+                disclosure: "",
+                icon: "▱",
+                title: "Main.ascn",
+                relativePath: "Assets/Scenes/Main.ascn",
+                level: 1,
+                isActive: false,
+                isFolder: false,
+                kind: .scene
+            ),
+        ],
         collapsedFolderIDs: Set<String> = [],
         displayMode: DisplayMode = .targets,
         isDisplayModeMenuPresented: Bool = false,
@@ -231,8 +233,8 @@ final class EditorProjectSidebarViewModel {
             item.assetRoot == item.relativePath || isSourceTarget(item)
         }
         if let sourceRootTarget,
-           var sourceRoot = items.first(where: { $0.isFolder && $0.relativePath == sourceRootTarget.relativePath }),
-           !targetRoots.contains(where: { $0.id == sourceRoot.id }) {
+            var sourceRoot = items.first(where: { $0.isFolder && $0.relativePath == sourceRootTarget.relativePath }),
+            !targetRoots.contains(where: { $0.id == sourceRoot.id }) {
             sourceRoot.title = sourceRootTarget.title
             targetRoots.append(sourceRoot)
             targetRoots.sort { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }

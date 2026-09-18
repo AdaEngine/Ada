@@ -11,7 +11,6 @@ import Foundation
 import Logging
 
 public struct AssetsPlugin: Plugin {
-
     private let filePath: StaticString
     private let assetBundleResourceURL: URL?
 

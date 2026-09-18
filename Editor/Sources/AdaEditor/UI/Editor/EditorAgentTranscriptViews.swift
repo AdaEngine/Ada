@@ -5,7 +5,7 @@ import Math
 private struct EditorAgentMessageRowLayout: Layout {
     let isUser: Bool
 
-    func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> Size {
+    func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) -> Size {
         guard let card = subviews.first else {
             return .zero
         }
@@ -16,7 +16,7 @@ private struct EditorAgentMessageRowLayout: Layout {
         return Size(width: proposal.width ?? size.width, height: size.height)
     }
 
-    func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+    func placeSubviews(in bounds: Rect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout Void) {
         guard let card = subviews.first else {
             return
         }
@@ -257,9 +257,12 @@ struct EditorAgentEventCard: View {
         switch event.kind {
         case .error:
             theme.editorColors.purple
-        case .toolCall, .toolResult, .permission:
+        case .toolCall,
+            .toolResult,
+            .permission:
             theme.editorColors.blue
-        case .message, .runStatus:
+        case .message,
+            .runStatus:
             theme.editorColors.muted
         }
     }
@@ -270,7 +273,9 @@ struct EditorAgentEventCard: View {
 
     private func toolStatusTitle(_ status: EditorAgentToolStatus?) -> String {
         switch status {
-        case .pending, nil: "Pending"
+        case .pending,
+            nil:
+            "Pending"
         case .inProgress: "Running"
         case .completed: "Done"
         case .failed: "Failed"
@@ -281,7 +286,10 @@ struct EditorAgentEventCard: View {
         switch status {
         case .completed: theme.editorColors.blue
         case .failed: theme.editorColors.purple
-        case .pending, .inProgress, nil: theme.editorColors.muted
+        case .pending,
+            .inProgress,
+            nil:
+            theme.editorColors.muted
         }
     }
 
@@ -340,7 +348,7 @@ struct EditorAgentAttachmentCard: View {
     @ViewBuilder
     private var preview: some View {
         if attachment.mimeType.hasPrefix("image/"),
-           let image = try? Image(contentsOf: URL(fileURLWithPath: attachment.absolutePath, isDirectory: false)) {
+            let image = try? Image(contentsOf: URL(fileURLWithPath: attachment.absolutePath, isDirectory: false)) {
             image
                 .resizable()
                 .aspectRatio(Float(image.width) / Float(max(1, image.height)), contentMode: .fit)

@@ -14,7 +14,7 @@ public enum RuntimePlatform: String, Codable {
     case visionOS
 
     case windows
-    
+
     case linux
     case android
     case web

@@ -8,18 +8,18 @@
 public struct RectInt: Equatable, Codable, Hashable, Sendable {
     public var origin: PointInt
     public var size: SizeInt
-    
+
     public init(origin: PointInt, size: SizeInt) {
         self.origin = origin
         self.size = size
     }
 }
 
-public extension RectInt {
+extension RectInt {
     @inline(__always)
-    static let zero = RectInt(origin: .zero, size: .zero)
-    
-    init(x: Int, y: Int, width: Int, height: Int) {
+    public static let zero = RectInt(origin: .zero, size: .zero)
+
+    public init(x: Int, y: Int, width: Int, height: Int) {
         self.origin = [x, y]
         self.size = SizeInt(width: width, height: height)
     }

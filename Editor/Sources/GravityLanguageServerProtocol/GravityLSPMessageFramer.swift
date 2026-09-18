@@ -22,7 +22,7 @@ public struct GravityLSPMessageFramer: Sendable {
             guard headerData.count <= Self.maximumHeaderLength else {
                 throw GravityLSPFramingError.invalidHeader
             }
-            guard let header = String(data: headerData, encoding: .utf8) else {
+            guard let header = String(bytes: headerData, encoding: .utf8) else {
                 throw GravityLSPFramingError.invalidHeader
             }
             guard let contentLength = Self.contentLength(from: header), contentLength >= 0 else {

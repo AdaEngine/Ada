@@ -1,8 +1,9 @@
-@testable import AdaEditor
 @_spi(AdaEngine) @testable import AdaEngine
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorFoldableTests {
@@ -146,11 +147,13 @@ struct EditorFoldableTests {
     @Test func fittedSurfaceRoutesClicksAndExcludesHinge() {
         var primaryTaps = 0
         var secondaryTaps = 0
-        let content = UIContainerView(rootView: HStack(spacing: 0) {
-            Button("Primary") { primaryTaps += 1 }.frame(width: 400, height: 640)
-            Color.black.frame(width: 20, height: 640).allowsHitTesting(false)
-            Button("Map") { secondaryTaps += 1 }.frame(width: 400, height: 640)
-        })
+        let content = UIContainerView(
+            rootView: HStack(spacing: 0) {
+                Button("Primary") { primaryTaps += 1 }.frame(width: 400, height: 640)
+                Color.black.frame(width: 20, height: 640).allowsHitTesting(false)
+                Button("Map") { secondaryTaps += 1 }.frame(width: 400, height: 640)
+            }
+        )
         let host = AdaptiveSurfaceHost()
         host.frame = Rect(x: 0, y: 0, width: 1000, height: 800)
         host.configure(previewView: content, zoom: 0.5, isInteractive: true, contentSize: Size(width: 820, height: 640))
@@ -173,8 +176,8 @@ struct EditorFoldableTests {
 @PlainSystem(dependencies: [.before(ScriptComponentUpdateSystem.self)])
 struct FoldableTestTime {
     @ResMut<DeltaTime> private var time
-    init(world: World) {}
-    @MainActor func update(context: UpdateContext) {
+    init(world _: World) {}
+    @MainActor func update(context _: UpdateContext) {
         time = DeltaTime(deltaTime: 0.05)
     }
 }

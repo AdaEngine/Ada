@@ -8,7 +8,6 @@
 import Math
 
 public struct Path: Sendable {
-
     private var elements: [Element] = []
 
     public var isEmpty: Bool {
@@ -16,7 +15,7 @@ public struct Path: Sendable {
     }
 
     public var boundingRect: Rect {
-        fatalError()
+        fatalError("Unreachable code")
     }
 
     public enum Element: Sendable, Equatable {
@@ -41,19 +40,18 @@ public struct Path: Sendable {
 
     public init() {}
 
-    public init(_ callback: (inout Path) -> Void) {
-        var path = Path()
+    public init(_ callback: (inout Self) -> Void) {
+        var path = Self()
         callback(&path)
         self = path
     }
 
-    public func forEach(_ body: (Path.Element) -> Void) {
+    public func forEach(_ body: (Self.Element) -> Void) {
         self.elements.forEach(body)
     }
 }
 
 extension Path {
-
     /// Begins a new subpath at the specified point.
     ///
     /// The specified point becomes the start point of a new subpath.
@@ -132,7 +130,7 @@ extension Path {
     }
 
     /// Adds a rectangular subpath to the path.
-    public mutating func addRect(_ rect: Rect, transform: Transform2D = .identity) {
+    public mutating func addRect(_ rect: Rect, transform _: Transform2D = .identity) {
         move(to: Vector2(rect.minX, rect.minY))
         addLine(to: Vector2(rect.maxX, rect.minY))
         addLine(to: Vector2(rect.maxX, rect.maxY))
@@ -175,5 +173,4 @@ extension Path {
         addCurve(to: Point(rect.minX + r, rect.minY), control1: Point(rect.minX, rect.minY + r - k), control2: Point(rect.minX + r - k, rect.minY))
         closeSubpath()
     }
-
 }

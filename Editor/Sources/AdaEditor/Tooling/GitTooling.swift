@@ -95,7 +95,7 @@ struct GitRepositorySnapshot: Equatable, Sendable {
     var branches: [GitBranch]
     var statusMessage: String?
 
-    static let empty = GitRepositorySnapshot(
+    static let empty = Self(
         branchName: nil,
         upstreamName: nil,
         isDetached: false,
@@ -194,30 +194,31 @@ actor GitRepositoryService: GitRepositoryServicing {
     }
 
     nonisolated func makeCommand(_ kind: GitCommandKind, projectURL: URL) -> EditorProcessCommand {
-        let arguments: [String] = switch kind {
-        case .status:
-            ["git", "status", "--porcelain=v1", "-b", "-z", "--untracked-files=all"]
-        case .branches:
-            ["git", "branch", "--format=%(HEAD)%09%(refname:short)%09%(upstream:short)"]
-        case .initializeRepository:
-            ["git", "init"]
-        case .stage(let paths):
-            paths.isEmpty ? ["git", "add", "-A"] : ["git", "add", "--"] + paths
-        case .unstage(let paths):
-            paths.isEmpty ? ["git", "restore", "--staged", "--", "."] : ["git", "restore", "--staged", "--"] + paths
-        case .stash(let message):
-            ["git", "stash", "push", "-u", "-m", message]
-        case .commit(let message):
-            ["git", "commit", "-m", message]
-        case .pull:
-            ["git", "pull"]
-        case .push:
-            ["git", "push"]
-        case .checkout(let branch):
-            ["git", "checkout", branch]
-        case .createBranch(let name):
-            ["git", "checkout", "-b", name]
-        }
+        let arguments: [String] =
+            switch kind {
+            case .status:
+                ["git", "status", "--porcelain=v1", "-b", "-z", "--untracked-files=all"]
+            case .branches:
+                ["git", "branch", "--format=%(HEAD)%09%(refname:short)%09%(upstream:short)"]
+            case .initializeRepository:
+                ["git", "init"]
+            case let .stage(paths):
+                paths.isEmpty ? ["git", "add", "-A"] : ["git", "add", "--"] + paths
+            case let .unstage(paths):
+                paths.isEmpty ? ["git", "restore", "--staged", "--", "."] : ["git", "restore", "--staged", "--"] + paths
+            case let .stash(message):
+                ["git", "stash", "push", "-u", "-m", message]
+            case let .commit(message):
+                ["git", "commit", "-m", message]
+            case .pull:
+                ["git", "pull"]
+            case .push:
+                ["git", "push"]
+            case let .checkout(branch):
+                ["git", "checkout", branch]
+            case let .createBranch(name):
+                ["git", "checkout", "-b", name]
+            }
 
         return EditorProcessCommand(
             executablePath: "/usr/bin/env",
@@ -229,17 +230,25 @@ actor GitRepositoryService: GitRepositoryServicing {
 
     func snapshot(projectURL: URL) async -> GitRepositoryLoadResult {
         let rootResult = await repositoryRoot(at: projectURL)
-        guard case .success(let rootURL) = rootResult else {
+        guard case let .success(rootURL) = rootResult else {
             let message: String
-            if case .failure(let error) = rootResult { message = error.message } else { message = "Repository unavailable." }
+            if case let .failure(error) = rootResult {
+                message = error.message
+            } else {
+                message = "Repository unavailable."
+            }
             var snapshot = GitRepositorySnapshot.empty
             snapshot.statusMessage = message
-            return GitRepositoryLoadResult(snapshot: snapshot, statusResult: EditorProcessResult(
-                command: makeCommand(.status, projectURL: projectURL),
-                exitCode: 1,
-                standardOutput: "",
-                standardError: message
-            ), branchResult: nil)
+            return GitRepositoryLoadResult(
+                snapshot: snapshot,
+                statusResult: EditorProcessResult(
+                    command: makeCommand(.status, projectURL: projectURL),
+                    exitCode: 1,
+                    standardOutput: "",
+                    standardError: message
+                ),
+                branchResult: nil
+            )
         }
         let statusResult = await processRunner.run(makeCommand(.status, projectURL: rootURL))
         guard statusResult.succeeded else {
@@ -270,8 +279,8 @@ actor GitRepositoryService: GitRepositoryServicing {
         }
 
         switch await changeFiles(snapshot: snapshot, root: rootURL) {
-        case .success(let files): snapshot.diffFiles = files
-        case .failure(let error): snapshot.statusMessage = error.message
+        case let .success(files): snapshot.diffFiles = files
+        case let .failure(error): snapshot.statusMessage = error.message
         }
         return GitRepositoryLoadResult(snapshot: snapshot, statusResult: statusResult, branchResult: branchResult)
     }
@@ -280,10 +289,10 @@ actor GitRepositoryService: GitRepositoryServicing {
         if case .initializeRepository = kind {
             return await processRunner.run(makeCommand(.initializeRepository, projectURL: projectURL))
         }
-        guard case .success(let root) = await repositoryRoot(at: projectURL) else {
+        guard case let .success(root) = await repositoryRoot(at: projectURL) else {
             return EditorProcessResult(command: makeCommand(kind, projectURL: projectURL), exitCode: 1, standardOutput: "", standardError: "Repository unavailable.")
         }
-        if case .unstage(let paths) = kind {
+        if case let .unstage(paths) = kind {
             let head = await readGit(["rev-parse", "--verify", "HEAD"], at: root)
             if !head.succeeded {
                 return await readGit(["rm", "--cached", "-r", "--"] + (paths.isEmpty ? ["."] : paths), at: root)
@@ -344,13 +353,17 @@ extension GitRepositorySnapshot {
         while index < fields.count {
             let record = fields[index]
             index += 1
-            guard record.count >= 4 else { continue }
+            guard record.count >= 4 else {
+                continue
+            }
             let markers = Array(record.prefix(2))
             let indexStatus = status(from: markers[0])
             let workingStatus = status(from: markers[1])
             var original: String?
             if indexStatus == .renamed || indexStatus == .copied || workingStatus == .renamed || workingStatus == .copied {
-                guard index < fields.count else { break }
+                guard index < fields.count else {
+                    break
+                }
                 original = fields[index]
                 index += 1
             }
@@ -361,21 +374,22 @@ extension GitRepositorySnapshot {
     }
 
     static func parseBranches(from output: String) -> [GitBranch] {
-        output.components(separatedBy: .newlines).compactMap { line in
-            guard !line.isEmpty else {
-                return nil
-            }
+        output.components(separatedBy: .newlines)
+            .compactMap { line in
+                guard !line.isEmpty else {
+                    return nil
+                }
 
-            let parts = line.components(separatedBy: "\t")
-            guard parts.count >= 2 else {
-                return nil
-            }
+                let parts = line.components(separatedBy: "\t")
+                guard parts.count >= 2 else {
+                    return nil
+                }
 
-            let marker = parts[0]
-            let name = parts[1]
-            let upstream = parts.count > 2 && !parts[2].isEmpty ? parts[2] : nil
-            return GitBranch(name: name, isCurrent: marker == "*", upstream: upstream)
-        }
+                let marker = parts[0]
+                let name = parts[1]
+                let upstream = parts.count > 2 && !parts[2].isEmpty ? parts[2] : nil
+                return GitBranch(name: name, isCurrent: marker == "*", upstream: upstream)
+            }
     }
 
     private static func parseBranchHeader(_ header: String) -> (name: String?, upstream: String?, isDetached: Bool, ahead: Int, behind: Int) {
@@ -463,7 +477,7 @@ extension GitRepositorySnapshot {
     }
 }
 
-private extension Array where Element: Hashable {
+extension Array where Element: Hashable {
     func removingDuplicates() -> [Element] {
         var seen: Set<Element> = []
         return filter { seen.insert($0).inserted }

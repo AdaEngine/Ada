@@ -54,7 +54,7 @@ public struct RenderGraphSnapshot: Codable, Hashable, Sendable {
     public let entryNode: String?
     public let nodes: [RenderGraphNodeSnapshot]
     public let edges: [RenderGraphEdgeSnapshot]
-    public let subgraphs: [RenderGraphSnapshot]
+    public let subgraphs: [Self]
     public let issues: [RenderGraphIssue]
 }
 
@@ -74,7 +74,7 @@ public struct RenderResourceSummary: Codable, Hashable, Sendable {
         self.kind = slotValue.value.resourceKind.rawValue
 
         switch slotValue.value {
-        case .texture(let texture):
+        case let .texture(texture):
             self.typeName = String(reflecting: Swift.type(of: texture))
             self.label = texture.gpuTexture.label
             self.width = texture.gpuTexture.size.width
@@ -82,7 +82,7 @@ public struct RenderResourceSummary: Codable, Hashable, Sendable {
             self.length = nil
             self.entityID = nil
             self.entityName = nil
-        case .buffer(let buffer):
+        case let .buffer(buffer):
             self.typeName = String(reflecting: Swift.type(of: buffer))
             self.label = buffer.label
             self.width = nil
@@ -90,7 +90,7 @@ public struct RenderResourceSummary: Codable, Hashable, Sendable {
             self.length = buffer.length
             self.entityID = nil
             self.entityName = nil
-        case .sampler(let sampler):
+        case let .sampler(sampler):
             self.typeName = String(reflecting: Swift.type(of: sampler))
             self.label = nil
             self.width = nil
@@ -98,7 +98,7 @@ public struct RenderResourceSummary: Codable, Hashable, Sendable {
             self.length = nil
             self.entityID = nil
             self.entityName = nil
-        case .entity(let entity):
+        case let .entity(entity):
             self.typeName = String(reflecting: Swift.type(of: entity))
             self.label = nil
             self.width = nil
@@ -208,13 +208,17 @@ public final class RenderGraphDiagnostics: @unchecked Sendable, Resource {
     }
 
     func append(_ record: RenderGraphFrameRecord) {
-        guard isEnabled else { return }
+        guard isEnabled else {
+            return
+        }
         records.append(record)
         trimToCapacity()
     }
 
     private func trimToCapacity() {
-        guard records.count > capacity else { return }
+        guard records.count > capacity else {
+            return
+        }
         records.removeFirst(records.count - capacity)
     }
 }
@@ -240,11 +244,13 @@ extension RenderGraph {
             }
         }
 
-        let edgeSnapshots = uniqueEdges
+        let edgeSnapshots =
+            uniqueEdges
             .sorted { edgeSortKey($0) < edgeSortKey($1) }
             .map(makeEdgeSnapshot)
 
-        let subgraphSnapshots = includeSubgraphs
+        let subgraphSnapshots =
+            includeSubgraphs
             ? subGraphs
                 .sorted { $0.key.rawValue < $1.key.rawValue }
                 .map { $0.value.makeSnapshot(includeSubgraphs: true) }
@@ -262,7 +268,7 @@ extension RenderGraph {
 
     private func makeEdgeSnapshot(_ edge: Edge) -> RenderGraphEdgeSnapshot {
         switch edge {
-        case .node(let outputNode, let inputNode):
+        case let .node(outputNode, inputNode):
             return RenderGraphEdgeSnapshot(
                 kind: .node,
                 fromNode: outputNode.rawValue,
@@ -272,9 +278,9 @@ extension RenderGraph {
                 inputSlot: nil,
                 inputSlotKind: nil
             )
-        case .slot(let outputNode, let outputSlotIndex, let inputNode, let inputSlotIndex):
-            let outputSlot = nodes[outputNode]?.node.outputResources[safe: outputSlotIndex]
-            let inputSlot = nodes[inputNode]?.node.inputResources[safe: inputSlotIndex]
+        case let .slot(outputNode, outputSlotIndex, inputNode, inputSlotIndex):
+            let outputSlot = nodes[outputNode]?.node.outputResources[validated: outputSlotIndex]
+            let inputSlot = nodes[inputNode]?.node.inputResources[validated: inputSlotIndex]
             return RenderGraphEdgeSnapshot(
                 kind: .slot,
                 fromNode: outputNode.rawValue,
@@ -291,81 +297,95 @@ extension RenderGraph {
         var issues: [RenderGraphIssue] = []
 
         if nodes.isEmpty {
-            issues.append(.init(
-                severity: .warning,
-                code: "empty_graph",
-                message: "Render graph has no nodes.",
-                node: nil
-            ))
+            issues.append(
+                .init(
+                    severity: .warning,
+                    code: "empty_graph",
+                    message: "Render graph has no nodes.",
+                    node: nil
+                )
+            )
         }
 
         if !nodes.isEmpty && nodes.values.allSatisfy({ !$0.inputEdges.isEmpty }) {
-            issues.append(.init(
-                severity: .error,
-                code: "empty_executable_graph",
-                message: "Render graph has no node without input dependencies, so execution cannot start.",
-                node: nil
-            ))
+            issues.append(
+                .init(
+                    severity: .error,
+                    code: "empty_executable_graph",
+                    message: "Render graph has no node without input dependencies, so execution cannot start.",
+                    node: nil
+                )
+            )
         }
 
         for node in nodes.values where node.name != Self.entryNodeName && node.inputEdges.isEmpty && node.outputEdges.isEmpty {
-            issues.append(.init(
-                severity: .warning,
-                code: "disconnected_node",
-                message: "Node has no input or output edges.",
-                node: node.name.rawValue
-            ))
+            issues.append(
+                .init(
+                    severity: .warning,
+                    code: "disconnected_node",
+                    message: "Node has no input or output edges.",
+                    node: node.name.rawValue
+                )
+            )
         }
 
         for edge in edges {
             switch edge {
-            case .node(let outputNode, let inputNode):
+            case let .node(outputNode, inputNode):
                 if nodes[outputNode] == nil {
                     issues.append(missingNodeIssue(outputNode, edge: edge))
                 }
                 if nodes[inputNode] == nil {
                     issues.append(missingNodeIssue(inputNode, edge: edge))
                 }
-            case .slot(let outputNode, let outputSlotIndex, let inputNode, let inputSlotIndex):
+            case let .slot(outputNode, outputSlotIndex, inputNode, inputSlotIndex):
                 guard let output = nodes[outputNode], let input = nodes[inputNode] else {
-                    if nodes[outputNode] == nil { issues.append(missingNodeIssue(outputNode, edge: edge)) }
-                    if nodes[inputNode] == nil { issues.append(missingNodeIssue(inputNode, edge: edge)) }
+                    if nodes[outputNode] == nil {
+                        issues.append(missingNodeIssue(outputNode, edge: edge))
+                    }
+                    if nodes[inputNode] == nil {
+                        issues.append(missingNodeIssue(inputNode, edge: edge))
+                    }
                     continue
                 }
-                guard let outputSlot = output.node.outputResources[safe: outputSlotIndex] else {
+                guard let outputSlot = output.node.outputResources[validated: outputSlotIndex] else {
                     issues.append(invalidSlotIssue(node: outputNode, slotIndex: outputSlotIndex, edge: edge))
                     continue
                 }
-                guard let inputSlot = input.node.inputResources[safe: inputSlotIndex] else {
+                guard let inputSlot = input.node.inputResources[validated: inputSlotIndex] else {
                     issues.append(invalidSlotIssue(node: inputNode, slotIndex: inputSlotIndex, edge: edge))
                     continue
                 }
                 if outputSlot.kind != inputSlot.kind {
-                    issues.append(.init(
-                        severity: .error,
-                        code: "slot_kind_mismatch",
-                        message: "Slot edge connects \(outputSlot.kind.rawValue) output to \(inputSlot.kind.rawValue) input.",
-                        node: inputNode.rawValue
-                    ))
+                    issues.append(
+                        .init(
+                            severity: .error,
+                            code: "slot_kind_mismatch",
+                            message: "Slot edge connects \(outputSlot.kind.rawValue) output to \(inputSlot.kind.rawValue) input.",
+                            node: inputNode.rawValue
+                        )
+                    )
                 }
             }
         }
 
         for node in nodes.values {
             if let runGraphNode = node.node as? RunGraphNode, subGraphs[runGraphNode.graphName] == nil {
-                issues.append(.init(
-                    severity: .error,
-                    code: "missing_subgraph",
-                    message: "RunGraphNode references missing subgraph '\(runGraphNode.graphName.rawValue)'.",
-                    node: node.name.rawValue
-                ))
+                issues.append(
+                    .init(
+                        severity: .error,
+                        code: "missing_subgraph",
+                        message: "RunGraphNode references missing subgraph '\(runGraphNode.graphName.rawValue)'.",
+                        node: node.name.rawValue
+                    )
+                )
             }
         }
 
         return issues
     }
 
-    private func missingNodeIssue(_ node: RenderNodeLabel, edge: Edge) -> RenderGraphIssue {
+    private func missingNodeIssue(_ node: RenderNodeLabel, edge _: Edge) -> RenderGraphIssue {
         RenderGraphIssue(
             severity: .error,
             code: "missing_edge_node",
@@ -374,7 +394,7 @@ extension RenderGraph {
         )
     }
 
-    private func invalidSlotIssue(node: RenderNodeLabel, slotIndex: Int, edge: Edge) -> RenderGraphIssue {
+    private func invalidSlotIssue(node: RenderNodeLabel, slotIndex: Int, edge _: Edge) -> RenderGraphIssue {
         RenderGraphIssue(
             severity: .error,
             code: "invalid_slot_index",
@@ -385,23 +405,23 @@ extension RenderGraph {
 
     private func edgeSortKey(_ edge: Edge) -> String {
         switch edge {
-        case .slot(let outputNode, _, let inputNode, _):
+        case let .slot(outputNode, _, inputNode, _):
             return "\(outputNode.rawValue)->\(inputNode.rawValue)->slot"
-        case .node(let outputNode, let inputNode):
+        case let .node(outputNode, inputNode):
             return "\(outputNode.rawValue)->\(inputNode.rawValue)->node"
         }
     }
 }
 
-private extension RenderGraphSlotSnapshot {
+extension RenderGraphSlotSnapshot {
     init(slot: RenderSlot) {
         self.name = slot.name.rawValue
         self.kind = slot.kind.rawValue
     }
 }
 
-private extension Array {
-    subscript(safe index: Index) -> Element? {
+extension Array {
+    subscript(validated index: Index) -> Element? {
         indices.contains(index) ? self[index] : nil
     }
 }

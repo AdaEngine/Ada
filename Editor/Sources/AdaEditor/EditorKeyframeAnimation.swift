@@ -57,8 +57,12 @@ final class EditorAnimationPanelViewModel {
     }
 
     func displayedPlayhead(now: Date, duration: Double) -> Double {
-        guard isPlaying, let playbackStartedAt else { return min(duration, max(0, playhead)) }
-        guard duration > 0 else { return 0 }
+        guard isPlaying, let playbackStartedAt else {
+            return min(duration, max(0, playhead))
+        }
+        guard duration > 0 else {
+            return 0
+        }
         let elapsed = max(0, now.timeIntervalSince(playbackStartedAt))
         return (playbackStartTime + elapsed).truncatingRemainder(dividingBy: duration)
     }
@@ -164,9 +168,15 @@ struct EditorAnimationTrack: Codable, Equatable, Identifiable, Sendable {
 
     func value(at time: Double) -> Double? {
         let keyframes = keyframes.sorted { $0.time < $1.time }
-        guard let first = keyframes.first else { return nil }
-        guard keyframes.count > 1 else { return first.value }
-        guard time > first.time else { return first.value }
+        guard let first = keyframes.first else {
+            return nil
+        }
+        guard keyframes.count > 1 else {
+            return first.value
+        }
+        guard time > first.time else {
+            return first.value
+        }
         guard let rightIndex = keyframes.firstIndex(where: { $0.time > time }) else {
             return keyframes.last?.value
         }
@@ -174,7 +184,9 @@ struct EditorAnimationTrack: Codable, Equatable, Identifiable, Sendable {
         let left = keyframes[rightIndex - 1]
         let right = keyframes[rightIndex]
         let duration = right.time - left.time
-        guard duration > 0 else { return left.value }
+        guard duration > 0 else {
+            return left.value
+        }
         var progress = min(1, max(0, (time - left.time) / duration))
         switch left.curveToNext {
         case .linear:
@@ -234,7 +246,7 @@ extension EditorSceneModel {
                     property: .positionX,
                     keyframes: [
                         EditorAnimationKeyframe(time: 0, value: initialValue),
-                        EditorAnimationKeyframe(time: 1, value: initialValue)
+                        EditorAnimationKeyframe(time: 1, value: initialValue),
                     ]
                 )
             ]
@@ -251,9 +263,11 @@ extension EditorSceneModel {
     }
 
     mutating func addAnimationTrack(property: EditorAnimationProperty, to clipID: String) -> EditorAnimationTrack? {
-        guard var clips = animations,
-              let clipIndex = clips.firstIndex(where: { $0.id == clipID }),
-              !clips[clipIndex].tracks.contains(where: { $0.property == property }) else {
+        guard
+            var clips = animations,
+            let clipIndex = clips.firstIndex(where: { $0.id == clipID }),
+            !clips[clipIndex].tracks.contains(where: { $0.property == property })
+        else {
             return nil
         }
         let value = animationValue(for: property, entityID: clips[clipIndex].targetEntityID) ?? property.defaultValue
@@ -261,7 +275,7 @@ extension EditorSceneModel {
             property: property,
             keyframes: [
                 EditorAnimationKeyframe(time: 0, value: value),
-                EditorAnimationKeyframe(time: clips[clipIndex].duration, value: value)
+                EditorAnimationKeyframe(time: clips[clipIndex].duration, value: value),
             ]
         )
         clips[clipIndex].tracks.append(track)
@@ -270,19 +284,28 @@ extension EditorSceneModel {
     }
 
     mutating func removeAnimationTrack(id trackID: String, from clipID: String) {
-        guard var clips = animations,
-              let clipIndex = clips.firstIndex(where: { $0.id == clipID }) else { return }
+        guard
+            var clips = animations,
+            let clipIndex = clips.firstIndex(where: { $0.id == clipID })
+        else {
+            return
+        }
         clips[clipIndex].tracks.removeAll { $0.id == trackID }
         animations = clips
     }
 
     @discardableResult
     mutating func addAnimationKeyframe(clipID: String, trackID: String, time: Double) -> EditorAnimationKeyframe? {
-        guard var clips = animations,
-              let clipIndex = clips.firstIndex(where: { $0.id == clipID }),
-              let trackIndex = clips[clipIndex].tracks.firstIndex(where: { $0.id == trackID }) else { return nil }
+        guard
+            var clips = animations,
+            let clipIndex = clips.firstIndex(where: { $0.id == clipID }),
+            let trackIndex = clips[clipIndex].tracks.firstIndex(where: { $0.id == trackID })
+        else {
+            return nil
+        }
         let clampedTime = min(clips[clipIndex].duration, max(0, time))
-        let value = clips[clipIndex].tracks[trackIndex].value(at: clampedTime)
+        let value =
+            clips[clipIndex].tracks[trackIndex].value(at: clampedTime)
             ?? animationValue(for: clips[clipIndex].tracks[trackIndex].property, entityID: clips[clipIndex].targetEntityID)
             ?? clips[clipIndex].tracks[trackIndex].property.defaultValue
         let keyframe = EditorAnimationKeyframe(time: clampedTime, value: value)
@@ -294,9 +317,13 @@ extension EditorSceneModel {
     }
 
     mutating func removeAnimationKeyframe(clipID: String, trackID: String, keyframeID: String) {
-        guard var clips = animations,
-              let clipIndex = clips.firstIndex(where: { $0.id == clipID }),
-              let trackIndex = clips[clipIndex].tracks.firstIndex(where: { $0.id == trackID }) else { return }
+        guard
+            var clips = animations,
+            let clipIndex = clips.firstIndex(where: { $0.id == clipID }),
+            let trackIndex = clips[clipIndex].tracks.firstIndex(where: { $0.id == trackID })
+        else {
+            return
+        }
         clips[clipIndex].tracks[trackIndex].keyframes.removeAll { $0.id == keyframeID }
         animations = clips
     }
@@ -309,10 +336,14 @@ extension EditorSceneModel {
         value: Double? = nil,
         curve: EditorAnimationCurve? = nil
     ) {
-        guard var clips = animations,
-              let clipIndex = clips.firstIndex(where: { $0.id == clipID }),
-              let trackIndex = clips[clipIndex].tracks.firstIndex(where: { $0.id == trackID }),
-              let keyframeIndex = clips[clipIndex].tracks[trackIndex].keyframes.firstIndex(where: { $0.id == keyframeID }) else { return }
+        guard
+            var clips = animations,
+            let clipIndex = clips.firstIndex(where: { $0.id == clipID }),
+            let trackIndex = clips[clipIndex].tracks.firstIndex(where: { $0.id == trackID }),
+            let keyframeIndex = clips[clipIndex].tracks[trackIndex].keyframes.firstIndex(where: { $0.id == keyframeID })
+        else {
+            return
+        }
         if let time {
             clips[clipIndex].tracks[trackIndex].keyframes[keyframeIndex].time = min(clips[clipIndex].duration, max(0, time))
         }
@@ -332,11 +363,17 @@ extension EditorSceneModel {
         duration: Double? = nil,
         repeatMode: EditorAnimationRepeatMode? = nil
     ) {
-        guard var clips = animations,
-              let clipIndex = clips.firstIndex(where: { $0.id == clipID }) else { return }
+        guard
+            var clips = animations,
+            let clipIndex = clips.firstIndex(where: { $0.id == clipID })
+        else {
+            return
+        }
         if let name {
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty { clips[clipIndex].name = trimmed }
+            if !trimmed.isEmpty {
+                clips[clipIndex].name = trimmed
+            }
         }
         if let duration {
             clips[clipIndex].duration = max(0.01, duration)
@@ -349,12 +386,16 @@ extension EditorSceneModel {
                 }
             }
         }
-        if let repeatMode { clips[clipIndex].repeatMode = repeatMode }
+        if let repeatMode {
+            clips[clipIndex].repeatMode = repeatMode
+        }
         animations = clips
     }
 
     func animationValue(for property: EditorAnimationProperty, entityID: String) -> Double? {
-        guard let transform = entities.first(where: { $0.id == entityID })?.components[EditorBuiltInComponentType.transform] else { return nil }
+        guard let transform = entities.first(where: { $0.id == entityID })?.components[EditorBuiltInComponentType.transform] else {
+            return nil
+        }
         switch property {
         case .positionX: return transform.vectorValue(key: "position", index: 0)
         case .positionY: return transform.vectorValue(key: "position", index: 1)
@@ -367,17 +408,25 @@ extension EditorSceneModel {
 }
 
 extension EditorAnimationProperty {
-    fileprivate var defaultValue: Double {
+    var defaultValue: Double {
         switch self {
-        case .positionX, .positionY, .positionZ: 0
-        case .scaleX, .scaleY, .scaleZ: 1
+        case .positionX,
+            .positionY,
+            .positionZ:
+            0
+        case .scaleX,
+            .scaleY,
+            .scaleZ:
+            1
         }
     }
 }
 
-private extension EditorComponentPayload {
+extension EditorComponentPayload {
     func vectorValue(key: String, index: Int) -> Double? {
-        guard case .array(let values)? = self[key], values.indices.contains(index) else { return nil }
+        guard case let .array(values)? = self[key], values.indices.contains(index) else {
+            return nil
+        }
         return values[index].doubleValue
     }
 }
@@ -405,12 +454,14 @@ extension EditorAnimationClip {
     }
 }
 
-private extension EditorAnimationTrack {
+extension EditorAnimationTrack {
     func makeRuntimeTrack() -> AnyKeyframeTrack<EditorTransformAnimationValues>? {
         let frames: [(time: Float, value: Float, curveToNext: KeyframeCurveKind)] = keyframes.map {
             (time: Float($0.time), value: Float($0.value), curveToNext: $0.curveToNext.runtimeValue)
         }
-        guard !frames.isEmpty else { return nil }
+        guard !frames.isEmpty else {
+            return nil
+        }
         let serialized = keyframes.map {
             SerializedKeyframe(time: $0.time, value: [Float($0.value)], curveToNext: $0.curveToNext.runtimeValue)
         }
@@ -418,7 +469,9 @@ private extension EditorAnimationTrack {
             identifier: property.rawValue,
             serializedKeyframes: serialized,
             applyFn: { values, time in
-                guard let value = sampleVectorArithmetic(keyframes: frames, localTime: time) else { return }
+                guard let value = sampleVectorArithmetic(keyframes: frames, localTime: time) else {
+                    return
+                }
                 switch property {
                 case .positionX: values.transform.position.x = value
                 case .positionY: values.transform.position.y = value

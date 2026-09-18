@@ -37,15 +37,15 @@ public struct Alignment: Equatable, Sendable {
         self.vertical = vertical
     }
 
-    public static let center = Alignment(horizontal: .center, vertical: .center)
-    public static let leading = Alignment(horizontal: .leading, vertical: .center)
-    public static let trailing = Alignment(horizontal: .trailing, vertical: .center)
-    public static let top = Alignment(horizontal: .center, vertical: .top)
-    public static let bottom = Alignment(horizontal: .center, vertical: .bottom)
-    public static let topLeading = Alignment(horizontal: .leading, vertical: .top)
-    public static let topTrailing = Alignment(horizontal: .trailing, vertical: .top)
-    public static let bottomLeading = Alignment(horizontal: .leading, vertical: .bottom)
-    public static let bottomTrailing = Alignment(horizontal: .trailing, vertical: .bottom)
+    public static let center = Self(horizontal: .center, vertical: .center)
+    public static let leading = Self(horizontal: .leading, vertical: .center)
+    public static let trailing = Self(horizontal: .trailing, vertical: .center)
+    public static let top = Self(horizontal: .center, vertical: .top)
+    public static let bottom = Self(horizontal: .center, vertical: .bottom)
+    public static let topLeading = Self(horizontal: .leading, vertical: .top)
+    public static let topTrailing = Self(horizontal: .trailing, vertical: .top)
+    public static let bottomLeading = Self(horizontal: .leading, vertical: .bottom)
+    public static let bottomTrailing = Self(horizontal: .trailing, vertical: .bottom)
 
     /// Corresponding anchor for ``ViewNode/place(in:anchor:proposal:)``.
     public var anchorPoint: AnchorPoint {
@@ -76,8 +76,8 @@ public struct Axis: OptionSet, Sendable {
     }
 
     /// The horizontal axis.
-    public static let horizontal = Axis(rawValue: 1 << 0)
+    public static let horizontal = Self(rawValue: 1 << 0)
 
     /// The vertical axis.
-    public static let vertical = Axis(rawValue: 1 << 1)
+    public static let vertical = Self(rawValue: 1 << 1)
 }

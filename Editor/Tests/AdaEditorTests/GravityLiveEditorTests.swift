@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("AdaScript live editor tooling")
 @MainActor
@@ -28,12 +29,14 @@ struct GravityLiveEditorTests {
         )
         model.refreshSemanticTokens(for: .text(document))
         for _ in 0..<200 {
-            if model.problems.contains(where: { $0.source == "adascript-lsp" }) { break }
+            if model.problems.contains(where: { $0.source == "adascript-lsp" }) {
+                break
+            }
             try await Task.sleep(for: .milliseconds(5))
         }
         let diagnostic = try #require(model.problems.first { $0.source == "adascript-lsp" })
         #expect(diagnostic.message == "Duplicate property 'speed' in 'Main'")
-        guard case .text(let highlighted)? = model.workbench.activeDocument else {
+        guard case let .text(highlighted)? = model.workbench.activeDocument else {
             Issue.record("Expected an active code document")
             return
         }
@@ -46,11 +49,13 @@ struct GravityLiveEditorTests {
         model.workbench.updateTextDocument(id: fixed.id) { $0.content = fixed.content }
         model.refreshSemanticTokens(for: .text(fixed))
         for _ in 0..<200 {
-            if !model.problems.contains(where: { $0.source == "adascript-lsp" }) { break }
+            if !model.problems.contains(where: { $0.source == "adascript-lsp" }) {
+                break
+            }
             try await Task.sleep(for: .milliseconds(5))
         }
         #expect(model.problems.isEmpty)
-        guard case .text(let cleared)? = model.workbench.activeDocument else {
+        guard case let .text(cleared)? = model.workbench.activeDocument else {
             Issue.record("Expected an active code document")
             return
         }
@@ -85,22 +90,27 @@ struct GravityLiveEditorTests {
         let position = EditorSourceLocation(line: 0, character: 12)
         model.handleSourceHover(document: document, position: position)
         for _ in 0..<200 {
-            if case .text(let updated)? = model.workbench.activeDocument, updated.sourceHoverRange != nil { break }
+            if case let .text(updated)? = model.workbench.activeDocument, updated.sourceHoverRange != nil {
+                break
+            }
             try await Task.sleep(for: .milliseconds(5))
         }
-        guard case .text(let hovered)? = model.workbench.activeDocument else {
+        guard case let .text(hovered)? = model.workbench.activeDocument else {
             Issue.record("Expected an active code document")
             return
         }
-        #expect(hovered.sourceHoverRange == EditorSourceRange(
-            start: EditorSourceLocation(line: 0, character: 8),
-            end: EditorSourceLocation(line: 0, character: 21)
-        ))
+        #expect(
+            hovered.sourceHoverRange
+                == EditorSourceRange(
+                    start: EditorSourceLocation(line: 0, character: 8),
+                    end: EditorSourceLocation(line: 0, character: 21)
+                )
+        )
         #expect(hovered.sourceHoverDescription?.contains("VladComponent") == true)
         let targets = await service.definition(fileURL: file, language: .ada, text: source, position: position)
         #expect(targets.first?.filePath == component.path)
         model.handleSourceHover(document: hovered, position: nil)
-        guard case .text(let cleared)? = model.workbench.activeDocument else {
+        guard case let .text(cleared)? = model.workbench.activeDocument else {
             return
         }
         #expect(cleared.sourceHoverRange == nil)

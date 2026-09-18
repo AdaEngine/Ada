@@ -10,7 +10,9 @@ struct ProjectOpeningRecentProjectRow: View {
         let isAvailable = availability?.isAvailable == true
 
         return Button {
-            if isAvailable { viewModel.openRecentProject(project) }
+            if isAvailable {
+                viewModel.openRecentProject(project)
+            }
         } label: {
             ZStack(anchor: .leading) {
                 if isActive {

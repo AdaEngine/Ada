@@ -1,8 +1,9 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor project switcher", .serialized)
 @MainActor

@@ -35,15 +35,15 @@ struct GravityLanguageServerTests {
     func semanticCompletion() throws {
         let service = GravityLanguageService()
         let source = """
-        class MovementSystem {
-            var speed = 1;
-            func update(deltaTime, queries) {}
-        }
-        func main() {
-            var system = MovementSystem();
-            system.up
-        }
-        """
+            class MovementSystem {
+                var speed = 1;
+                func update(deltaTime, queries) {}
+            }
+            func main() {
+                var system = MovementSystem();
+                system.up
+            }
+            """
         let methodItems = service.completions(
             text: source,
             position: GravitySourcePosition(line: 6, utf16Column: 13)
@@ -53,14 +53,14 @@ struct GravityLanguageServerTests {
         #expect(update.replacementRange.start == GravitySourcePosition(line: 6, utf16Column: 11))
 
         let querySource = """
-        @query(Transform)
-        var movers;
-        func update(context) {
-            for (var entity in movers) {
-                entity.i
+            @query(Transform)
+            var movers;
+            func update(context) {
+                for (var entity in movers) {
+                    entity.i
+                }
             }
-        }
-        """
+            """
         let queryItems = service.completions(
             text: querySource,
             position: GravitySourcePosition(line: 4, utf16Column: 16)
@@ -74,11 +74,12 @@ struct GravityLanguageServerTests {
             .appendingPathComponent("AdaScriptLSP-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: projectURL) }
         try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
-        try "class SharedSystem { func tick() {} }".write(
-            to: projectURL.appendingPathComponent("Shared.ada"),
-            atomically: true,
-            encoding: .utf8
-        )
+        try "class SharedSystem { func tick() {} }"
+            .write(
+                to: projectURL.appendingPathComponent("Shared.ada"),
+                atomically: true,
+                encoding: .utf8
+            )
 
         let workspace = GravityWorkspace()
         workspace.configure(rootURIs: [projectURL.absoluteString])
@@ -105,11 +106,12 @@ struct GravityLanguageServerTests {
         defer { try? FileManager.default.removeItem(at: projectURL) }
         let generatedURL = projectURL.appendingPathComponent(".ada/generated", isDirectory: true)
         try FileManager.default.createDirectory(at: generatedURL, withIntermediateDirectories: true)
-        try "class GeneratedSystem { func update() {} }".write(
-            to: generatedURL.appendingPathComponent("Generated.gravity"),
-            atomically: true,
-            encoding: .utf8
-        )
+        try "class GeneratedSystem { func update() {} }"
+            .write(
+                to: generatedURL.appendingPathComponent("Generated.gravity"),
+                atomically: true,
+                encoding: .utf8
+            )
 
         let workspace = GravityWorkspace()
         workspace.configure(rootURIs: [projectURL.absoluteString])
@@ -145,15 +147,20 @@ struct GravityLanguageServerTests {
             version: 1
         )
 
-        let target = try #require(workspace.definition(
-            uri: currentURL.absoluteString,
-            position: GravitySourcePosition(line: 1, utf16Column: 15)
-        ))
+        let target = try #require(
+            workspace.definition(
+                uri: currentURL.absoluteString,
+                position: GravitySourcePosition(line: 1, utf16Column: 15)
+            )
+        )
         #expect(target.uri == sharedURL.absoluteString)
-        #expect(target.selectionRange == GravitySourceRange(
-            start: GravitySourcePosition(line: 0, utf16Column: 26),
-            end: GravitySourcePosition(line: 0, utf16Column: 30)
-        ))
+        #expect(
+            target.selectionRange
+                == GravitySourceRange(
+                    start: GravitySourcePosition(line: 0, utf16Column: 26),
+                    end: GravitySourcePosition(line: 0, utf16Column: 30)
+                )
+        )
     }
 
     @Test("Workspace reports unresolved and escaping imports")
@@ -169,9 +176,9 @@ struct GravityLanguageServerTests {
         workspace.open(
             uri: currentURL.absoluteString,
             text: """
-            import { Missing } from "./Missing";
-            import { Secret } from "../Secret";
-            """,
+                import { Missing } from "./Missing";
+                import { Secret } from "../Secret";
+                """,
             version: 1
         )
 
@@ -198,11 +205,11 @@ struct GravityLanguageServerTests {
     func unfinishedTypeCompletion() {
         let service = GravityLanguageService()
         let source = """
-        class MovementSystem {
-            func update() {}
-            func run() {
-                this.up
-        """
+            class MovementSystem {
+                func update() {}
+                func run() {
+                    this.up
+            """
         let analysis = service.analyze(text: source)
         let completions = service.completions(
             text: source,
@@ -227,9 +234,9 @@ struct GravityLanguageServerTests {
                     "languageId": "gravity",
                     "text": "@que",
                     "uri": uri,
-                    "version": 1
+                    "version": 1,
                 ]
-            ]
+            ],
         ])
         let diagnosticsNotification = try #require(opened.outgoingMessages.first)
         #expect(diagnosticsNotification["method"] as? String == "textDocument/publishDiagnostics")
@@ -240,8 +247,8 @@ struct GravityLanguageServerTests {
             "method": "textDocument/completion",
             "params": [
                 "position": ["character": 4, "line": 0],
-                "textDocument": ["uri": uri]
-            ]
+                "textDocument": ["uri": uri],
+            ],
         ])
         let response = try #require(completion.outgoingMessages.first)
         let result = try #require(response["result"] as? [String: Any])
@@ -253,8 +260,8 @@ struct GravityLanguageServerTests {
             "method": "textDocument/didChange",
             "params": [
                 "contentChanges": [["text": "func tick() {}\nfunc update() { tick(); }"]],
-                "textDocument": ["uri": uri, "version": 2]
-            ]
+                "textDocument": ["uri": uri, "version": 2],
+            ],
         ])
         let definition = session.handle([
             "id": 3,
@@ -262,8 +269,8 @@ struct GravityLanguageServerTests {
             "method": "textDocument/definition",
             "params": [
                 "position": ["character": 18, "line": 1],
-                "textDocument": ["uri": uri]
-            ]
+                "textDocument": ["uri": uri],
+            ],
         ])
         try validateDefinition(definition, uri: uri)
 
@@ -298,7 +305,7 @@ struct GravityLanguageServerTests {
             "id": 1,
             "jsonrpc": "2.0",
             "method": "initialize",
-            "params": ["rootUri": NSNull()]
+            "params": ["rootUri": NSNull()],
         ])
         let response = try #require(initialize.outgoingMessages.first)
         let result = try #require(response["result"] as? [String: Any])

@@ -156,7 +156,7 @@ enum NamedTextureAtlasPacker {
             try validate(placement, maximum: descriptor.maxSize, margin: descriptor.margin)
 
             if cursorX > descriptor.margin,
-               cursorX + placement.cellWidth + descriptor.margin > shelfWidth {
+                cursorX + placement.cellWidth + descriptor.margin > shelfWidth {
                 cursorY += rowHeight + descriptor.padding
                 cursorX = descriptor.margin
                 rowHeight = 0
@@ -183,9 +183,11 @@ enum NamedTextureAtlasPacker {
     }
 
     private static func validate(_ placement: Placement, maximum: SizeInt?, margin: Int) throws {
-        guard let maximum,
-              placement.cellWidth + margin * 2 > maximum.width
-                  || placement.cellHeight + margin * 2 > maximum.height else {
+        guard
+            let maximum,
+            placement.cellWidth + margin * 2 > maximum.width
+                || placement.cellHeight + margin * 2 > maximum.height
+        else {
             return
         }
         throw NamedTextureAtlasPackingError.imageTooLarge(
@@ -215,13 +217,13 @@ enum NamedTextureAtlasPacker {
         atlasWidth: Int,
         atlasData: inout Data
     ) {
-        for cellY in 0 ..< placement.cellHeight {
+        for cellY in 0..<placement.cellHeight {
             let sourceY = min(max(cellY - extrude, 0), placement.image.height - 1)
-            for cellX in 0 ..< placement.cellWidth {
+            for cellX in 0..<placement.cellWidth {
                 let sourceX = min(max(cellX - extrude, 0), placement.image.width - 1)
                 let sourceOffset = (sourceY * placement.image.width + sourceX) * 4
                 let destinationOffset = ((placement.y + cellY) * atlasWidth + placement.x + cellX) * 4
-                atlasData[destinationOffset ..< destinationOffset + 4] = placement.image.data[sourceOffset ..< sourceOffset + 4]
+                atlasData[destinationOffset..<destinationOffset + 4] = placement.image.data[sourceOffset..<sourceOffset + 4]
             }
         }
     }

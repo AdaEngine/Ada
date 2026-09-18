@@ -20,8 +20,9 @@ extension EditorViewModel {
         }
         let root = projectURL.resolvingSymlinksInPath().standardizedFileURL.path
         let destinationPath = destination.resolvingSymlinksInPath().standardizedFileURL.path
-        guard destinationPath == root || destinationPath.hasPrefix(root + "/"),
-              (try? destination.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        guard
+            destinationPath == root || destinationPath.hasPrefix(root + "/"),
+            (try? destination.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
         else {
             appendOutput("File import failed: select a directory inside the project.")
             return false
@@ -29,17 +30,23 @@ extension EditorViewModel {
 
         var importedCount = 0
         for sourceURL in sourceURLs {
-            guard sourceURL.isFileURL else { continue }
+            guard sourceURL.isFileURL else {
+                continue
+            }
             #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS)
-            let hasAccess = sourceURL.startAccessingSecurityScopedResource()
-            defer { if hasAccess { sourceURL.stopAccessingSecurityScopedResource() } }
+                let hasAccess = sourceURL.startAccessingSecurityScopedResource()
+                defer {
+                    if hasAccess {
+                        sourceURL.stopAccessingSecurityScopedResource()
+                    }
+                }
             #endif
             do {
                 let source = sourceURL.resolvingSymlinksInPath().standardizedFileURL
                 let values = try source.resourceValues(forKeys: [.isDirectoryKey])
                 // Copying a directory into itself would recurse indefinitely.
                 if values.isDirectory == true,
-                   destinationPath == source.path || destinationPath.hasPrefix(source.path + "/") {
+                    destinationPath == source.path || destinationPath.hasPrefix(source.path + "/") {
                     appendOutput("Skipped \(sourceURL.lastPathComponent): a folder cannot be copied into itself.")
                     continue
                 }

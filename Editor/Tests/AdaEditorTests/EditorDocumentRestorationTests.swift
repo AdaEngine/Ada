@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Project document restoration")
 @MainActor

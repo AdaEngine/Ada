@@ -55,7 +55,6 @@ public protocol ThemeKey {
 /// }
 /// ```
 public struct Theme: Sendable {
-
     private var values: [ObjectIdentifier: any Sendable] = [:]
 
     public init() {}
@@ -67,7 +66,7 @@ public struct Theme: Sendable {
     }
 
     /// Merges another theme into this one. Values from `other` take precedence.
-    public mutating func merge(_ other: Theme) {
+    public mutating func merge(_ other: Self) {
         values.merge(other.values, uniquingKeysWith: { $1 })
     }
 }
@@ -114,7 +113,7 @@ extension Theme: Hashable {
         }
 
         if let lhsObjectID = objectIdentifierIfReference(lhs),
-           let rhsObjectID = objectIdentifierIfReference(rhs) {
+            let rhsObjectID = objectIdentifierIfReference(rhs) {
             return lhsObjectID == rhsObjectID
         }
 

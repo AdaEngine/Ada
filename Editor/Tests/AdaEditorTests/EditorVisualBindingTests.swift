@@ -1,8 +1,9 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorVisualBindingTests {
@@ -146,7 +147,11 @@ struct EditorVisualBindingTests {
         try source.write(to: uiURL, atomically: true, encoding: .utf8)
         let script = EditorScriptableObjectDescriptor(
             fields: [.init(name: "status", defaultValue: .string("Ready"), kind: .string), .init(name: "speed", defaultValue: .double(1), kind: .float)],
-            identifier: "game.hud", name: "HUD", requiredComponentTypeNames: [], sourcePath: "HUD.ada", version: 1
+            identifier: "game.hud",
+            name: "HUD",
+            requiredComponentTypeNames: [],
+            sourcePath: "HUD.ada",
+            version: 1
         )
         var scene = EditorSceneModel.default(projectName: "Bindings")
         let entity = scene.addEntity(name: "HUD", parentID: nil)
@@ -157,13 +162,26 @@ struct EditorVisualBindingTests {
         let sceneURL = root.appendingPathComponent("Main.ascn")
         try content.write(to: sceneURL, atomically: true, encoding: .utf8)
         let sceneDocument = EditorSceneDocument(
-            id: "scene", title: "Main.ascn", relativePath: "Main.ascn", absolutePath: sceneURL.path,
-            content: content, lastSavedContent: content, sceneModel: scene, errorMessage: nil, isDirty: false,
+            id: "scene",
+            title: "Main.ascn",
+            relativePath: "Main.ascn",
+            absolutePath: sceneURL.path,
+            content: content,
+            lastSavedContent: content,
+            sceneModel: scene,
+            errorMessage: nil,
+            isDirty: false,
             loadSummary: EditorSceneFileLoader.summary(from: content)
         )
         let uiDocument = EditorTextDocument(
-            id: "ui", title: "HUD.ui", relativePath: "HUD.ui", absolutePath: uiURL.path,
-            language: .plainText, content: source, lastSavedContent: source, errorMessage: nil
+            id: "ui",
+            title: "HUD.ui",
+            relativePath: "HUD.ui",
+            absolutePath: uiURL.path,
+            language: .plainText,
+            content: source,
+            lastSavedContent: source,
+            errorMessage: nil
         )
         let workbench = EditorWorkbenchViewModel(openDocuments: [.scene(sceneDocument), .ui(uiDocument)], activeDocumentID: "ui")
         let model = workbench.uiSceneModel(for: uiDocument, resourceRoot: root, bindingCatalog: [script])

@@ -60,8 +60,10 @@ public struct AdaScriptLibraryManifest: Codable, Equatable, Sendable {
             throw AdaScriptLibraryError.invalid("Duplicate dependencies in \(id).")
         }
         for dependency in dependencies {
-            guard Self.isIdentifier(dependency.id), !dependency.source.provider.isEmpty,
-                  !dependency.source.location.isEmpty, !dependency.source.revision.isEmpty else {
+            guard
+                Self.isIdentifier(dependency.id), !dependency.source.provider.isEmpty,
+                !dependency.source.location.isEmpty, !dependency.source.revision.isEmpty
+            else {
                 throw AdaScriptLibraryError.invalid("Invalid dependency in \(id).")
             }
         }
@@ -75,9 +77,10 @@ public struct AdaScriptLibraryManifest: Codable, Equatable, Sendable {
         !path.isEmpty && path.count <= 240 && !path.contains("\\") && !path.contains(":")
             && !path.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
             && path.hasSuffix(".ada")
-            && path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy {
-                !$0.isEmpty && !$0.hasPrefix(".") && !$0.hasSuffix(" ")
-            }
+            && path.split(separator: "/", omittingEmptySubsequences: false)
+                .allSatisfy {
+                    !$0.isEmpty && !$0.hasPrefix(".") && !$0.hasSuffix(" ")
+                }
     }
 }
 
@@ -86,7 +89,7 @@ public enum AdaScriptLibraryError: Error, Equatable, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .invalid(let message): message
+        case let .invalid(message): message
         }
     }
 }

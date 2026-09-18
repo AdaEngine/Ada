@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Git review integration")
 struct GitReviewTests {
@@ -187,7 +188,9 @@ struct GitReviewTests {
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Git.Diff.File.\(file.id)"))
         #expect(document.expandedFiles.contains(file.id))
         for _ in 0..<100 {
-            if document.patches[file.id] != nil { break }
+            if document.patches[file.id] != nil {
+                break
+            }
             try await Task.sleep(for: .milliseconds(5))
         }
         #expect(document.patches[file.id] != nil)
@@ -231,7 +234,7 @@ struct GitReviewTests {
         await model.sourceControl.refreshTask?.value
         container.layoutIfNeeded()
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Git.File.Untracked:new.txt"))
-        guard case .git(let review) = model.workbench.activeDocument else {
+        guard case let .git(review) = model.workbench.activeDocument else {
             Issue.record("Click should open a Git document")
             return
         }
@@ -249,7 +252,7 @@ struct GitReviewTests {
         let commit = try #require(model.sourceControl.commits.first)
         container.layoutIfNeeded()
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Git.Commit.\(commit.id)"))
-        guard case .git(let history) = model.workbench.activeDocument else {
+        guard case let .git(history) = model.workbench.activeDocument else {
             Issue.record("Click should open a commit review")
             return
         }
@@ -298,13 +301,18 @@ private struct GitReviewFixture {
     func commit(_ message: String) async throws { try await git(["commit", "--allow-empty", "-m", message]) }
     @discardableResult
     func git(_ arguments: [String]) async throws -> String {
-        let result = await EditorProcessRunner().run(EditorProcessCommand(
-            executablePath: "/usr/bin/env",
-            arguments: ["git", "-c", "user.name=Git Test", "-c", "user.email=git-test@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"] + arguments,
-            workingDirectory: url,
-            environment: ["GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null"]
-        ))
-        guard result.succeeded else { throw GitReadError(message: result.combinedOutput) }
+        let result = await EditorProcessRunner()
+            .run(
+                EditorProcessCommand(
+                    executablePath: "/usr/bin/env",
+                    arguments: ["git", "-c", "user.name=Git Test", "-c", "user.email=git-test@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"] + arguments,
+                    workingDirectory: url,
+                    environment: ["GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null"]
+                )
+            )
+        guard result.succeeded else {
+            throw GitReadError(message: result.combinedOutput)
+        }
         return result.standardOutput
     }
 }
@@ -334,11 +342,13 @@ private actor DelayedGitReviewService: GitRepositoryServicing {
     func execute(_ kind: GitCommandKind, projectURL: URL) async -> EditorProcessResult {
         EditorProcessResult(command: makeCommand(kind, projectURL: projectURL), exitCode: 0, standardOutput: "", standardError: "")
     }
-    func patch(rootURL: URL, file: GitDiffFile) async -> Result<GitFilePatch, GitReadError> {
+    func patch(rootURL _: URL, file _: GitDiffFile) async -> Result<GitFilePatch, GitReadError> {
         hasStarted = true
         started?.resume()
         started = nil
-        if holdResponse { await withCheckedContinuation { response = $0 } }
+        if holdResponse {
+            await withCheckedContinuation { response = $0 }
+        }
         return .success(GitFilePatch.parse("@@ -1 +1 @@\n-old\n+new\n"))
     }
 }

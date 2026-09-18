@@ -1,7 +1,8 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Settings tree", .serialized)
 @MainActor
@@ -94,9 +95,30 @@ struct EditorSettingsTreeTests {
         #expect(card.absoluteFrame.size.height > 90)
         #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Settings.Group.APPEARANCE")).isEmpty)
         model.selectPage("APPEARANCE", in: .general)
-        for _ in 0..<10 { await Task.yield(); container.update(1.0 / 60.0); container.layoutIfNeeded() }
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1.0 / 60.0)
+            container.layoutIfNeeded()
+        }
         #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Cloud.SignIn")).isEmpty)
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.Group.APPEARANCE"))
     }
 
+    @Test("Project context stays pinned to the bottom of the settings sidebar")
+    func projectContextStaysAtSidebarBottom() throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "SettingsSidebarLayout")))
+        }
+        let model = EditorSettingsWindowViewModel(editorViewModel: EditorViewModel(project: nil), selectedSection: .general)
+        let container = UIContainerView(rootView: EditorSettingsWindowView(viewModel: model).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 1000, height: 720)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+
+        let context = try container.uiNode(
+            matching: .accessibilityIdentifier(EditorSettingsWindowView.sidebarContextAccessibilityIdentifier)
+        )
+        #expect(abs(context.absoluteFrame.maxY - container.bounds.height) < 0.5)
+    }
 }

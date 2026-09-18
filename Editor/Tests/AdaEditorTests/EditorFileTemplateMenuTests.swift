@@ -1,4 +1,3 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 @_spi(Internal) @testable import AdaRender
@@ -9,6 +8,8 @@ import AdaUtils
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor
 @Suite(.serialized)
@@ -34,14 +35,16 @@ struct EditorFileTemplateMenuTests {
 
         for kind in EditorNewFileKind.allCases {
             let row = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.ProjectTree.Existing.swift"))
-            container.onMouseEvent(MouseEvent(
-                window: RID(),
-                button: .right,
-                mousePosition: Point(row.absoluteFrame.midX, row.absoluteFrame.midY),
-                phase: .began,
-                modifierKeys: [],
-                time: 0
-            ))
+            container.onMouseEvent(
+                MouseEvent(
+                    window: RID(),
+                    button: .right,
+                    mousePosition: Point(row.absoluteFrame.midX, row.absoluteFrame.midY),
+                    phase: .began,
+                    modifierKeys: [],
+                    time: 0
+                )
+            )
             let menu = try #require(presentation?.items.first)
             #expect(menu.title == "New…")
             let openPicker = try #require(menu.action)
@@ -64,14 +67,16 @@ struct EditorFileTemplateMenuTests {
         }
 
         let background = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.ProjectTree.Background"))
-        container.onMouseEvent(MouseEvent(
-            window: RID(),
-            button: .right,
-            mousePosition: Point(background.absoluteFrame.minX + 5, background.absoluteFrame.maxY - 5),
-            phase: .began,
-            modifierKeys: [],
-            time: 1
-        ))
+        container.onMouseEvent(
+            MouseEvent(
+                window: RID(),
+                button: .right,
+                mousePosition: Point(background.absoluteFrame.minX + 5, background.absoluteFrame.maxY - 5),
+                phase: .began,
+                modifierKeys: [],
+                time: 1
+            )
+        )
         let action = try #require(presentation?.items.first?.action)
         action()
         #expect(model.newFileDestinationRelativePath.isEmpty)
@@ -99,7 +104,10 @@ struct EditorFileTemplateMenuTests {
             _ = try dialog.uiNode(matching: .accessibilityIdentifier("AdaEditor.NewFile.Group.\(group.rawValue)"))
         }
         _ = try dialog.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.ProjectTree.New.script"))
-        for _ in 0..<10 { await Task.yield(); dialog.layoutIfNeeded() }
+        for _ in 0..<10 {
+            await Task.yield()
+            dialog.layoutIfNeeded()
+        }
         #expect(model.newFileKind == .script)
         #expect(model.newFileDestinationRelativePath == "Sources/Game")
         #expect(model.isNewFileKindPreselected)
@@ -137,7 +145,10 @@ struct EditorFileTemplateMenuTests {
         container.layoutIfNeeded()
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.NewFile.Search"))
         container.onTextInputEvent(TextInputEvent(window: .empty, text: "localization", action: .insert, time: 0))
-        for _ in 0..<10 { await Task.yield(); container.layoutIfNeeded() }
+        for _ in 0..<10 {
+            await Task.yield()
+            container.layoutIfNeeded()
+        }
         #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.ProjectTree.New.script")).isEmpty)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.ProjectTree.New.localization"))
         #expect(selected == .localization)
@@ -172,7 +183,7 @@ struct EditorFileTemplateMenuTests {
             let document = try #require(model.workbench.activeDocument)
             let path = try #require(document.absolutePath)
             if kind == .atlas {
-                guard case .asset(let asset) = document else {
+                guard case let .asset(asset) = document else {
                     Issue.record("Atlas should open as an editable asset")
                     continue
                 }
@@ -181,7 +192,7 @@ struct EditorFileTemplateMenuTests {
                 #expect(editor.isEditable)
                 #expect(editor.descriptor.images.isEmpty)
             } else {
-                guard case .asset(let asset) = document else {
+                guard case let .asset(asset) = document else {
                     Issue.record("Tile set should open in its visual editor")
                     continue
                 }
@@ -206,10 +217,13 @@ struct EditorFileTemplateMenuTests {
                 #expect(source.contains("func update(context: AdaSystemContext)"))
             }
         }
-        _ = try AdaScriptPlugin(sources: [
-            .init(path: "System.ada", source: EditorNewFileKind.script.initialContent(fileName: "Template.ada")),
-            .init(path: "Empty.ada", source: EditorNewFileKind.emptyScript.initialContent(fileName: "Empty.ada"))
-        ], name: "TemplateModule")
+        _ = try AdaScriptPlugin(
+            sources: [
+                .init(path: "System.ada", source: EditorNewFileKind.script.initialContent(fileName: "Template.ada")),
+                .init(path: "Empty.ada", source: EditorNewFileKind.emptyScript.initialContent(fileName: "Empty.ada")),
+            ],
+            name: "TemplateModule"
+        )
         let objectSource = AdaScriptSource(path: "TemplateObject.ada", source: EditorNewFileKind.scriptableObject.initialContent(fileName: "TemplateObject.ada"))
         let schema = try #require(AdaScriptSchemaParser.parseScriptables(sources: [objectSource]).first)
         try AdaScriptObjectRegistration.register(
@@ -277,22 +291,24 @@ struct EditorFileTemplateMenuTests {
     }
 
     private func makeSidebar(_ model: EditorViewModel) -> UIContainerView<some View> {
-        let container = UIContainerView(rootView: EditorProjectSidebar(
-            viewModel: model.projectSidebar,
-            projectRootItem: model.projectRootSidebarItem,
-            onOpenItem: { model.openProjectItem($0) },
-            onOpenRawItem: { model.openProjectItemAsRaw($0) },
-            onNewFile: { model.presentNewFileDialog(kind: $0) },
-            onImportAssets: {},
-            onDropFiles: { model.importDroppedFiles(from: $0) },
-            onRevealItem: { _ in },
-            onOpenInDefaultApplication: { _ in },
-            onOpenInTerminal: { _ in },
-            onFindInFolder: { _ in },
-            onFindInProjectRoot: {},
-            onCopyPath: { _, _ in },
-            onDeleteItem: { _ in }
-        ))
+        let container = UIContainerView(
+            rootView: EditorProjectSidebar(
+                viewModel: model.projectSidebar,
+                projectRootItem: model.projectRootSidebarItem,
+                onOpenItem: { model.openProjectItem($0) },
+                onOpenRawItem: { model.openProjectItemAsRaw($0) },
+                onNewFile: { model.presentNewFileDialog(kind: $0) },
+                onImportAssets: {},
+                onDropFiles: { model.importDroppedFiles(from: $0) },
+                onRevealItem: { _ in },
+                onOpenInDefaultApplication: { _ in },
+                onOpenInTerminal: { _ in },
+                onFindInFolder: { _ in },
+                onFindInProjectRoot: {},
+                onCopyPath: { _, _ in },
+                onDeleteItem: { _ in }
+            )
+        )
         container.frame = Rect(x: 0, y: 0, width: 320, height: 600)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()

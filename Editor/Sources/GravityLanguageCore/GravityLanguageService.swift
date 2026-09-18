@@ -19,13 +19,13 @@ public struct GravityLanguageService: Sendable {
         }
         let token = tokens[tokenIndex]
         if tokenIndex > 0,
-           tokens[tokenIndex - 1].text == "@",
-           let annotation = GravityBuiltins.annotationCandidates.first(where: { $0.label == token.text }) {
+            tokens[tokenIndex - 1].text == "@",
+            let annotation = GravityBuiltins.annotationCandidates.first(where: { $0.label == token.text }) {
             return GravityHover(contents: annotation.detail, range: token.range)
         }
         if let receiverPath = Self.receiverPath(beforeMemberAt: tokenIndex, tokens: tokens),
-           let receiverType = resolvedType(receiverPath: receiverPath, position: position, parsed: parsed),
-           let member = GravityAPICatalog.member(named: token.text, in: receiverType) {
+            let receiverType = resolvedType(receiverPath: receiverPath, position: position, parsed: parsed),
+            let member = GravityAPICatalog.member(named: token.text, in: receiverType) {
             return GravityHover(contents: member.detail, range: token.range)
         }
         let symbols = parsed.analysis.symbols + parsed.analysis.symbols.flatMap(\.members)
@@ -46,12 +46,13 @@ public struct GravityLanguageService: Sendable {
                 _ = openParentheses.popLast()
             }
         }
-        guard let openIndex = openParentheses.last,
-              openIndex > 0,
-              tokens[openIndex - 1].kind == .identifier,
-              let receiverPath = Self.receiverPath(beforeMemberAt: openIndex - 1, tokens: tokens),
-              let receiverType = resolvedType(receiverPath: receiverPath, position: position, parsed: parsed),
-              let member = GravityAPICatalog.member(named: tokens[openIndex - 1].text, in: receiverType)
+        guard
+            let openIndex = openParentheses.last,
+            openIndex > 0,
+            tokens[openIndex - 1].kind == .identifier,
+            let receiverPath = Self.receiverPath(beforeMemberAt: openIndex - 1, tokens: tokens),
+            let receiverType = resolvedType(receiverPath: receiverPath, position: position, parsed: parsed),
+            let member = GravityAPICatalog.member(named: tokens[openIndex - 1].text, in: receiverType)
         else {
             return nil
         }
@@ -79,9 +80,11 @@ public struct GravityLanguageService: Sendable {
             return []
         }
         let parsed = GravityDocumentAnalyzer.parse(text)
-        guard !parsed.tokens.contains(where: { token in
-            (token.kind == .comment || token.kind == .string) && token.range.start <= position && position <= token.range.end
-        }) else {
+        guard
+            !parsed.tokens.contains(where: { token in
+                (token.kind == .comment || token.kind == .string) && token.range.start <= position && position <= token.range.end
+            })
+        else {
             return []
         }
 
@@ -95,7 +98,8 @@ public struct GravityLanguageService: Sendable {
             candidates = GravityBuiltins.globalCandidates + symbols.map(GravityCompletionCandidate.init(symbol:))
         }
 
-        return candidates
+        return
+            candidates
             .filter { context.prefix.isEmpty || $0.label.localizedCaseInsensitiveContains(context.prefix) }
             .uniqued(on: \.label)
             .sorted { lhs, rhs in
@@ -244,20 +248,14 @@ private struct GravityCompletionContext {
     }
 }
 
-private extension String {
+extension String {
     func stringIndex(atUTF16Offset offset: Int) -> String.Index? {
-        guard offset >= 0,
-              let utf16Index = utf16.index(utf16.startIndex, offsetBy: offset, limitedBy: utf16.endIndex)
+        guard
+            offset >= 0,
+            let utf16Index = utf16.index(utf16.startIndex, offsetBy: offset, limitedBy: utf16.endIndex)
         else {
             return nil
         }
         return Self.Index(utf16Index, within: self)
-    }
-}
-
-private extension Sequence {
-    func uniqued<Key: Hashable>(on key: (Element) -> Key) -> [Element] {
-        var seen: Set<Key> = []
-        return filter { seen.insert(key($0)).inserted }
     }
 }

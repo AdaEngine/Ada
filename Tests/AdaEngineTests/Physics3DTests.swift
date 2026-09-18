@@ -77,6 +77,22 @@ struct Physics3DTests {
     }
 
     @Test
+    func nativePerformanceProfileReportsStepPhasesAndCounters() throws {
+        let metrics = PhysicsPerformanceMetrics()
+        let physicsWorld = PhysicsWorld3D()
+
+        physicsWorld.updateSimulation(1.0 / 60.0)
+        physicsWorld.recordPerformance(into: metrics)
+
+        let snapshot = try #require(metrics.snapshots.first { $0.dimension == .threeD })
+        #expect(snapshot.stepCount == 1)
+        #expect(snapshot.step != nil)
+        #expect(snapshot.phases.contains { $0.phase == .collide })
+        #expect(snapshot.phases.contains { $0.phase == .solve })
+        #expect(snapshot.counters.bodyCount == 0)
+    }
+
+    @Test
     func fixedSchedulerAdvancesAndWritesBackDynamicBody() async throws {
         let box = world.main.spawn {
             PhysicsBody3DComponent(

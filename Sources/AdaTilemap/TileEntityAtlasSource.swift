@@ -5,12 +5,11 @@
 //  Created by v.prusakov on 5/10/24.
 //
 
-import AdaUtils
 import AdaECS
+import AdaUtils
 import Math
 
 public class TileEntityAtlasSource: TileSource, @unchecked Sendable {
-
     struct EntityTileData {
         var entity: Entity
 
@@ -18,21 +17,21 @@ public class TileEntityAtlasSource: TileSource, @unchecked Sendable {
     }
 
     private(set) var tiles: [PointInt: EntityTileData] = [:]
-    
-    public override init() {
+
+    override public init() {
         super.init()
     }
-    
+
     // MARK: - Codable
-    
-    public required init(from decoder: any Decoder) throws {
+
+    public required init(from _: any Decoder) throws {
         fatalErrorMethodNotImplemented()
     }
-    
-    public override func encode(to encoder: any Encoder) throws {
+
+    override public func encode(to _: any Encoder) throws {
         fatalErrorMethodNotImplemented()
     }
-    
+
     // MARK: - Public
 
     public func createTile(at atlasCoordinates: PointInt, for entity: Entity) {

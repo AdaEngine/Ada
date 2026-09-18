@@ -1,19 +1,22 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Git source control tooling")
 struct GitToolingTests {
     @Test("Git status parser extracts branch tracking and changed files")
     func statusParserExtractsChanges() throws {
-        let snapshot = GitRepositorySnapshot.parseStatus(from: """
-        ## feature/source-control...origin/feature/source-control [ahead 1, behind 2]
-        M  Sources/App.swift
-         M Sources/View.swift
-        MM Sources/Editor.swift
-        R  Sources/Old.swift -> Sources/New.swift
-        ?? Assets/Icon.png
-        """)
+        let snapshot = GitRepositorySnapshot.parseStatus(
+            from: """
+                ## feature/source-control...origin/feature/source-control [ahead 1, behind 2]
+                M  Sources/App.swift
+                 M Sources/View.swift
+                MM Sources/Editor.swift
+                R  Sources/Old.swift -> Sources/New.swift
+                ?? Assets/Icon.png
+                """
+        )
 
         #expect(snapshot.branchName == "feature/source-control")
         #expect(snapshot.footerTitle == "Git: feature/source-control*")
@@ -30,11 +33,13 @@ struct GitToolingTests {
 
     @Test("Git branch parser extracts current branch and upstream")
     func branchParserExtractsCurrentAndUpstream() {
-        let branches = GitRepositorySnapshot.parseBranches(from: """
-        \tmain\torigin/main
-        *\tfeature/source-control\torigin/feature/source-control
-        \trelease\t
-        """)
+        let branches = GitRepositorySnapshot.parseBranches(
+            from: """
+                \tmain\torigin/main
+                *\tfeature/source-control\torigin/feature/source-control
+                \trelease\t
+                """
+        )
 
         #expect(branches.map(\.name) == ["main", "feature/source-control", "release"])
         #expect(branches.first(where: \.isCurrent)?.name == "feature/source-control")
@@ -68,10 +73,12 @@ struct GitToolingTests {
         let project = EditorProjectReference(name: "Game", path: projectURL.path, lastOpenedAt: Date())
         let service = GitFakeRepositoryService(
             loadResult: GitRepositoryLoadResult(
-                snapshot: GitRepositorySnapshot.parseStatus(from: """
-                ## main...origin/main
-                 M Sources/App.swift
-                """),
+                snapshot: GitRepositorySnapshot.parseStatus(
+                    from: """
+                        ## main...origin/main
+                         M Sources/App.swift
+                        """
+                ),
                 statusResult: GitFakeRepositoryService.result(.status, projectURL: projectURL, output: "## main\n"),
                 branchResult: nil
             )
@@ -110,7 +117,7 @@ struct GitToolingTests {
 
         for _ in 0..<100 {
             if await workspaceService.bootstrapCallCount == 1,
-               await sourceControlService.snapshotCallCount == 1 {
+                await sourceControlService.snapshotCallCount == 1 {
                 break
             }
             try await Task.sleep(for: .milliseconds(10))
@@ -152,7 +159,7 @@ private actor GitFakeRepositoryService: GitRepositoryServicing {
         GitRepositoryService().makeCommand(kind, projectURL: projectURL)
     }
 
-    func snapshot(projectURL: URL) async -> GitRepositoryLoadResult {
+    func snapshot(projectURL _: URL) async -> GitRepositoryLoadResult {
         snapshotCallCount += 1
         return loadResult
     }
@@ -194,23 +201,23 @@ private actor EditorStartupFakeWorkspaceService: SwiftPMWorkspaceServicing {
         Self.result(kind, projectURL: projectURL)
     }
 
-    func semanticTokens(fileURL: URL, language: EditorSourceLanguage, text: String) async -> [EditorSemanticToken] {
+    func semanticTokens(fileURL _: URL, language _: EditorSourceLanguage, text _: String) async -> [EditorSemanticToken] {
         []
     }
 
-    func definition(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) async -> [EditorSourceSymbolTarget] {
+    func definition(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) async -> [EditorSourceSymbolTarget] {
         []
     }
 
-    func references(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) async -> [EditorSourceReference] {
+    func references(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) async -> [EditorSourceReference] {
         []
     }
 
-    func hover(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) async -> EditorSymbolHover? {
+    func hover(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) async -> EditorSymbolHover? {
         nil
     }
 
-    func documentHighlights(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) async -> [EditorDocumentHighlight] {
+    func documentHighlights(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) async -> [EditorDocumentHighlight] {
         []
     }
 

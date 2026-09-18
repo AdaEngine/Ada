@@ -6,13 +6,12 @@
 //
 
 import AdaAnimation
-import Math
 import AdaInput
+import Math
 
-public extension View {
-
+extension View {
     /// Scales this view’s rendered output by the given vertical and horizontal size amounts.
-    func scaleEffect(_ scale: Vector2, anchor: AnchorPoint = .center) -> some View {
+    public func scaleEffect(_ scale: Vector2, anchor: AnchorPoint = .center) -> some View {
         modifier(
             TransformViewModifier(
                 value: scale,
@@ -26,7 +25,7 @@ public extension View {
     }
 
     /// Rotates a view’s rendered output in two dimensions around the specified point.
-    func rotationEffect(_ angle: Angle) -> some View {
+    public func rotationEffect(_ angle: Angle) -> some View {
         modifier(
             TransformViewModifier(
                 value: angle.radians,
@@ -71,7 +70,7 @@ final class TransformEffectViewNode<Value: VectorArithmetic>: ViewModifierNode {
         content: Content,
         value: Value,
         mapTransform: @escaping (inout Transform3D, Value) -> Void
-    ) where Content : View {
+    ) where Content: View {
         self.value = value
         self.mapTransform = mapTransform
         super.init(contentNode: contentNode, content: content)
@@ -88,7 +87,7 @@ final class TransformEffectViewNode<Value: VectorArithmetic>: ViewModifierNode {
             return
         }
 
-        if let animationController = animationController {
+        if let animationController {
             animationController.addTweenAnimation(
                 from: TweenValue(animatableData: self.value),
                 to: TweenValue(animatableData: newNode.value),
@@ -138,10 +137,10 @@ final class TransformEffectViewNode<Value: VectorArithmetic>: ViewModifierNode {
 
         context.setTransform(
             context.transform
-            * frameTranslation
-            * anchorTranslation
-            * self.localTransform
-            * inverseAnchorTranslation
+                * frameTranslation
+                * anchorTranslation
+                * self.localTransform
+                * inverseAnchorTranslation
         )
     }
 }

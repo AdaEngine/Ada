@@ -43,14 +43,18 @@ struct EditorSelectionHintTests {
     func colorsAndDrawing() throws {
         prepareRenderer()
         let model = EditorWorkbenchViewModel()
-        model.open(.text(EditorTextDocument(
-            id: "hint",
-            title: "Hint.swift",
-            relativePath: "Hint.swift",
-            language: .swift,
-            content: "let value = 1\nlet other = 2",
-            errorMessage: nil
-        )))
+        model.open(
+            .text(
+                EditorTextDocument(
+                    id: "hint",
+                    title: "Hint.swift",
+                    relativePath: "Hint.swift",
+                    language: .swift,
+                    content: "let value = 1\nlet other = 2",
+                    errorMessage: nil
+                )
+            )
+        )
         let container = UIContainerView(rootView: SelectionHintCodeView(model: model).theme(.adaEditor))
         container.frame = Rect(x: 0, y: 0, width: 700, height: 300)
         container.bounds.size = container.frame.size
@@ -65,12 +69,15 @@ struct EditorSelectionHintTests {
         node.selectionHead = 3
         var context = UIGraphicsContext()
         node.drawSelectionHint(in: &context)
-        #expect(context.getDrawCommands().contains { command in
-            if case .drawPath(_, _, .fill(let color)) = command {
-                return color == hint.background
-            }
-            return false
-        })
+        #expect(
+            context.getDrawCommands()
+                .contains { command in
+                    if case let .drawPath(_, _, .fill(color)) = command {
+                        return color == hint.background
+                    }
+                    return false
+                }
+        )
     }
 
     private func editorNode(in node: ViewNode) -> TextEditorViewNode? {
@@ -92,7 +99,7 @@ private struct SelectionHintCodeView: View {
     let model: EditorWorkbenchViewModel
 
     var body: some View {
-        if case .text(let document)? = model.activeDocument {
+        if case let .text(document)? = model.activeDocument {
             EditorCodeFileView(
                 document: document,
                 text: model.textDocumentBinding(documentID: document.id),

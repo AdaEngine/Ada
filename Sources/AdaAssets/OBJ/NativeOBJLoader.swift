@@ -26,7 +26,7 @@ public struct NativeOBJLoader: OBJLoader {
 
     /// Loads an OBJ document from its UTF-8 representation.
     public func load(data: Data) throws -> OBJImportResult {
-        guard let source = String(data: data, encoding: .utf8) else {
+        guard let source = String(bytes: data, encoding: .utf8) else {
             throw OBJLoadingError.invalidEncoding
         }
         return try parse(source)
@@ -80,11 +80,13 @@ public struct NativeOBJLoader: OBJLoader {
                 guard fields.count >= 4 else {
                     throw OBJLoadingError.invalidFace(line: lineNumber)
                 }
-                let vertices = try fields.dropFirst().map {
-                    try parseFaceVertex($0, state: state, line: lineNumber)
-                }
+                let vertices = try fields.dropFirst()
+                    .map {
+                        try parseFaceVertex($0, state: state, line: lineNumber)
+                    }
                 state.appendFace(vertices)
-            case "o", "g":
+            case "o",
+                "g":
                 let name = fields.dropFirst().map(String.init).joined(separator: " ")
                 state.selectMesh(named: name.isEmpty ? "Unnamed" : name)
             case "usemtl":

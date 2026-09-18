@@ -12,7 +12,6 @@ import AdaUtils
 import Math
 
 final class TextEditorViewNode: ViewNode {
-
     struct Snapshot: Equatable {
         var text: String
         var selectionAnchor: Int
@@ -173,12 +172,15 @@ final class TextEditorViewNode: ViewNode {
 
         self.activateTextCursorIfNeeded()
 
-        let shouldHandleSelectionEvent: Bool = switch event.phase {
-        case .began, .ended, .cancelled:
-            event.button == .left
-        case .changed:
-            event.button == .left || self.isSelectingWithMouse
-        }
+        let shouldHandleSelectionEvent: Bool =
+            switch event.phase {
+            case .began,
+                .ended,
+                .cancelled:
+                event.button == .left
+            case .changed:
+                event.button == .left || self.isSelectingWithMouse
+            }
 
         guard shouldHandleSelectionEvent else {
             return
@@ -203,7 +205,8 @@ final class TextEditorViewNode: ViewNode {
             }
             self.selectionHead = caretOffset
             self.preferredColumn = nil
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             self.isSelectingWithMouse = false
             if !self.isTap(at: localPoint, start: self.mousePressStartPoint) {
                 self.selectionHead = caretOffset
@@ -255,16 +258,17 @@ final class TextEditorViewNode: ViewNode {
         }
 
         if event.modifiers.isEmpty {
-            let completionCommandHandled = switch event.keyCode {
-            case .arrowUp:
-                self.sourceInteraction?.onMoveCompletionSelection?(-1) == true
-            case .arrowDown:
-                self.sourceInteraction?.onMoveCompletionSelection?(1) == true
-            case .enter:
-                self.sourceInteraction?.onAcceptCompletion?() == true
-            default:
-                false
-            }
+            let completionCommandHandled =
+                switch event.keyCode {
+                case .arrowUp:
+                    self.sourceInteraction?.onMoveCompletionSelection?(-1) == true
+                case .arrowDown:
+                    self.sourceInteraction?.onMoveCompletionSelection?(1) == true
+                case .enter:
+                    self.sourceInteraction?.onAcceptCompletion?() == true
+                default:
+                    false
+                }
             if completionCommandHandled {
                 self.resetCaretBlink()
                 return
@@ -283,12 +287,13 @@ final class TextEditorViewNode: ViewNode {
 
         let extendSelection = event.modifiers.contains(.shift)
         #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS)
-        let movesToLineBoundary = event.modifiers.contains(.main)
-        let movesByWordBoundary = event.modifiers.contains(.alt)
+            let movesToLineBoundary = event.modifiers.contains(.main)
+            let movesByWordBoundary = event.modifiers.contains(.alt)
         #else
-        let movesToLineBoundary = false
-        let movesByWordBoundary = event.modifiers.contains(.main)
-            || event.modifiers.contains(.control)
+            let movesToLineBoundary = false
+            let movesByWordBoundary =
+                event.modifiers.contains(.main)
+                || event.modifiers.contains(.control)
         #endif
 
         switch event.keyCode {
@@ -411,7 +416,7 @@ final class TextEditorViewNode: ViewNode {
                     )
                 }
                 if self.showsLineNumbers,
-                   let marker = self.sourceInteraction?.lineMarkers.first(where: { $0.line == lineIndex }) {
+                    let marker = self.sourceInteraction?.lineMarkers.first(where: { $0.line == lineIndex }) {
                     clippedContext.drawEllipse(
                         in: Rect(x: contentRect.minX, y: rowY + (lineHeight - 10) * 0.5, width: 10, height: 10),
                         color: marker.color,

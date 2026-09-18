@@ -1,4 +1,3 @@
-
 //
 //  SystemQuery.swift
 //  AdaEngine
@@ -27,18 +26,20 @@ public protocol SystemParameter: Sendable {
     func finish(_ world: World)
 }
 
-public extension SystemParameter {
-    static var access: SystemAccessSet {
+extension SystemParameter {
+    public static var access: SystemAccessSet {
         SystemAccessSet()
     }
 
-    var access: SystemAccessSet {
+    public var access: SystemAccessSet {
         Self.access
     }
 
-    func update(from world: World) {
-        fatalError("Query should be implemented")
+    // Protocol witness must remain callable; concrete query implementations override it.
+    // swiftlint:disable:next unavailable_function
+    public func update(from _: World) {
+        preconditionFailure("SystemQuery.update(from:) must be implemented by a concrete query.")
     }
 
-    func finish(_ world: World) { }
+    public func finish(_: World) {}
 }

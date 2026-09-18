@@ -6,12 +6,12 @@
 /// Attaches application menus to a view subtree.
 ///
 /// Menu content is collected by ``UIMenuBuilder`` when the platform window builds its menu bar.
-public extension View {
-    func menuBar(_ menus: [UIMenu]) -> some View {
+extension View {
+    public func menuBar(_ menus: [UIMenu]) -> some View {
         modifier(MenuBarModifier(content: self, menus: menus))
     }
 
-    func menuBar(_ menus: UIMenu...) -> some View {
+    public func menuBar(_ menus: UIMenu...) -> some View {
         menuBar(menus)
     }
 }

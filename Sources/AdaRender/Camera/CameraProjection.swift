@@ -20,11 +20,11 @@ public enum Projection: Sendable, Codable {
     @inlinable
     public var cameraProjection: CameraProjection {
         switch self {
-        case .orthographic(let orthographicProjection):
+        case let .orthographic(orthographicProjection):
             return orthographicProjection
-        case .perspective(let perspectiveProjection):
+        case let .perspective(perspectiveProjection):
             return perspectiveProjection
-        case .custom(let cameraProjection):
+        case let .custom(cameraProjection):
             return cameraProjection
         }
     }
@@ -57,10 +57,10 @@ public enum Projection: Sendable, Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
-        case .orthographic(let projection):
+        case let .orthographic(projection):
             try container.encode(ProjectionType.orthographic, forKey: .type)
             try container.encode(projection, forKey: .value)
-        case .perspective(let projection):
+        case let .perspective(projection):
             try container.encode(ProjectionType.perspective, forKey: .type)
             try container.encode(projection, forKey: .value)
         case .custom:
@@ -94,13 +94,13 @@ extension Projection: CameraProjection {
     @inlinable
     public mutating func updateView(width: Float, height: Float) {
         switch self {
-        case .orthographic(var orthographicProjection):
+        case var .orthographic(orthographicProjection):
             orthographicProjection.updateView(width: width, height: height)
             self = .orthographic(orthographicProjection)
-        case .perspective(var perspectiveProjection):
+        case var .perspective(perspectiveProjection):
             perspectiveProjection.updateView(width: width, height: height)
             self = .perspective(perspectiveProjection)
-        case .custom(var cameraProjection):
+        case var .custom(cameraProjection):
             cameraProjection.updateView(width: width, height: height)
             self = .custom(cameraProjection)
         }
@@ -158,7 +158,6 @@ public struct OrthographicProjection: CameraProjection {
 }
 
 public struct PerspectiveProjection: CameraProjection {
-
     public var near: Float
 
     public var far: Float
@@ -172,7 +171,7 @@ public struct PerspectiveProjection: CameraProjection {
         near: Float = 0.1,
         far: Float = 1000,
         fieldOfView: Angle = .degrees(70),
-        aspectRation: Float = 16/9
+        aspectRation: Float = 16 / 9
     ) {
         self.near = near
         self.far = far
@@ -211,9 +210,9 @@ public protocol CameraProjection: Sendable, Codable {
     mutating func updateView(width: Float, height: Float)
 }
 
-public extension CameraProjection {
+extension CameraProjection {
     /// Make frustum from transform.
-    func makeFrustum(from transform: Transform3D) -> Frustum {
+    public func makeFrustum(from transform: Transform3D) -> Frustum {
         Frustum.make(from: self.makeClipView() * transform)
     }
 }

@@ -26,16 +26,17 @@ final class ObservedContentInvalidations {
     }
 
     private func flush() {
-        let batch = pending.values.map { entry in
-            var depth = 0
-            var ancestor = entry.node?.parent
-            while let node = ancestor {
-                depth += 1
-                ancestor = node.parent
+        let batch = pending.values
+            .map { entry in
+                var depth = 0
+                var ancestor = entry.node?.parent
+                while let node = ancestor {
+                    depth += 1
+                    ancestor = node.parent
+                }
+                return (entry: entry, depth: depth)
             }
-            return (entry: entry, depth: depth)
-        }
-        .sorted { $0.depth < $1.depth }
+            .sorted { $0.depth < $1.depth }
         pending.removeAll(keepingCapacity: true)
         isScheduled = false
 

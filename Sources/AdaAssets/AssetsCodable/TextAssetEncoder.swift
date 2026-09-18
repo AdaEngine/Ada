@@ -1,18 +1,18 @@
 //
 //  TextAssetEncoder.swift
-//  
+//
 //
 //  Created by v.prusakov on 5/2/24.
 //
 
 import Foundation
+
 #if !WASM
-import Yams
+    import Yams
 #endif
 
 /// An encoder for assets that are stored in text format.
 public final class TextAssetEncoder: AssetEncoder, @unchecked Sendable {
-
     /// The asset meta info of the encoder.
     public let assetMeta: AssetMeta
     /// The encoder of the encoder.
@@ -36,31 +36,34 @@ public final class TextAssetEncoder: AssetEncoder, @unchecked Sendable {
     /// - Parameters:
     ///   - value: The value to encode.
     /// - Throws: An error if the value cannot be encoded to the encoder.
-    public func encode<T>(_ value: T) throws where T : Encodable {
+    public func encode<T>(_ value: T) throws where T: Encodable {
         if let encoder {
             var container = encoder.singleValueContainer()
             try container.encode(value)
             return
         }
-        
+
         if let data = value as? Data {
             self.encodedData = data
         } else {
             #if WASM
-            let encoder = JSONEncoder()
+                let encoder = JSONEncoder()
             #else
-            let encoder = YAMLEncoder()
-            encoder.options.floatingPointNumberFormatStrategy = .decimal
+                let encoder = YAMLEncoder()
+                encoder.options.floatingPointNumberFormatStrategy = .decimal
             #endif
-            let data = try encoder.encode(value, userInfo: [
-                .assetMetaInfo: self.assetMeta,
-                .assetsEncodingContext: self
-            ])
-            
+            let data = try encoder.encode(
+                value,
+                userInfo: [
+                    .assetMetaInfo: self.assetMeta,
+                    .assetsEncodingContext: self,
+                ]
+            )
+
             self.encodedData = data
         }
     }
-    
+
     /// Encode an asset to the encoder.
     ///
     /// - Parameters:
@@ -78,17 +81,17 @@ protocol AnyEncoder: Sendable {
 }
 
 #if !WASM
-extension YAMLEncoder: @unchecked @retroactive Sendable {}
+    extension YAMLEncoder: @unchecked @retroactive Sendable {}
 
-extension YAMLEncoder: AnyEncoder {
-    func encode<T>(_ value: T, userInfo: [CodingUserInfoKey : any Sendable]) throws -> Data where T : Encodable {
-        return try self.encode(value, userInfo: userInfo).data(using: .utf8)!
+    extension YAMLEncoder: AnyEncoder {
+        func encode<T>(_ value: T, userInfo: [CodingUserInfoKey: any Sendable]) throws -> Data where T: Encodable {
+            return try Data(self.encode(value, userInfo: userInfo).utf8)
+        }
     }
-}
 #endif
 
 extension JSONEncoder: AnyEncoder {
-    func encode<T>(_ value: T, userInfo: [CodingUserInfoKey : any Sendable]) throws -> Data where T : Encodable {
+    func encode<T>(_ value: T, userInfo: [CodingUserInfoKey: any Sendable]) throws -> Data where T: Encodable {
         self.userInfo = userInfo
         return try self.encode(value)
     }

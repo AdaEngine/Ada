@@ -24,12 +24,16 @@ struct EditorTopToolbarRegion: View {
         )
     }
     private var canRun: Bool {
-        if viewModel.selectedRunDestination == .player { return !viewModel.playerSession.isBusy }
+        if viewModel.selectedRunDestination == .player {
+            return !viewModel.playerSession.isBusy
+        }
         return !viewModel.isProjectRunning
     }
 
     private var debugAction: (() -> Void)? {
-        guard viewModel.selectedRunDestination != .player else { return nil }
+        guard viewModel.selectedRunDestination != .player else {
+            return nil
+        }
         return { viewModel.debugSelectedTarget() }
     }
 }

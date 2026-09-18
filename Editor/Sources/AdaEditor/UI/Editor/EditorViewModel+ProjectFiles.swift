@@ -14,7 +14,9 @@ extension EditorViewModel {
         projectSidebar.select(item)
         let document = Self.document(for: item)
         workbench.open(document)
-        if case .ui = document { refreshUIExports() }
+        if case .ui = document {
+            refreshUIExports()
+        }
         refreshSemanticTokens(for: document)
         refreshPreviewForActiveDocument()
 
@@ -40,9 +42,11 @@ extension EditorViewModel {
         let parentPath = URL(fileURLWithPath: item.relativePath, isDirectory: false)
             .deletingLastPathComponent()
             .relativePath
-        toolbar.search(in: projectSidebar.items.first { candidate in
-            candidate.isFolder && candidate.relativePath == parentPath
-        })
+        toolbar.search(
+            in: projectSidebar.items.first { candidate in
+                candidate.isFolder && candidate.relativePath == parentPath
+            }
+        )
     }
 
     func findInProjectRoot() {
@@ -85,9 +89,10 @@ extension EditorViewModel {
     }
 
     func fileURL(for item: EditorProjectSidebarViewModel.Item) -> URL? {
-        Self.absoluteFilePath(from: item.id).map {
-            URL(fileURLWithPath: $0, isDirectory: item.isFolder)
-        }
+        Self.absoluteFilePath(from: item.id)
+            .map {
+                URL(fileURLWithPath: $0, isDirectory: item.isFolder)
+            }
     }
 
     func performPlatformFileAction(
@@ -129,7 +134,9 @@ extension EditorViewModel {
                 appendOutput("Imported asset \(sourceURL.lastPathComponent) -> \(relativeProjectPath(for: destinationURL.path))")
             }
             try ensureAssetResourcesInManifest(projectURL: projectURL)
-            if !sourceURLs.isEmpty { workbench.achievements?.record([.firstImport: 1]) }
+            if !sourceURLs.isEmpty {
+                workbench.achievements?.record([.firstImport: 1])
+            }
             projectSidebar.items = Self.projectTreeItems(for: project, fileManager: fileManager)
             toolbar.searchableItems = projectSidebar.items
             syncInspectorTextureAssets()
@@ -202,7 +209,7 @@ extension EditorViewModel {
         }
     }
 
-    func handleAgentProjectFileChanged(relativePath: String, fileManager: FileManager = .default) {
+    func handleAgentProjectFileChanged(relativePath: String, fileManager _: FileManager = .default) {
         refreshProjectFiles(logsRefresh: false)
         refreshSourceControl()
         reloadOpenProjectFile(relativePath: relativePath)
@@ -215,14 +222,17 @@ extension EditorViewModel {
 
         let changedURL = projectURL.appendingPathComponent(relativePath).standardizedFileURL
         EventManager.default.send(UISceneResourceChanged(url: changedURL))
-        if relativePath == ".ada/ui-exports.json" { refreshUIExports() }
+        if relativePath == ".ada/ui-exports.json" {
+            refreshUIExports()
+        }
         for document in workbench.openDocuments {
             guard document.relativePath == relativePath else {
                 continue
             }
 
             switch document {
-            case .text(let textDocument), .ui(let textDocument):
+            case let .text(textDocument),
+                let .ui(textDocument):
                 guard !textDocument.isDirty else {
                     continue
                 }
@@ -243,7 +253,7 @@ extension EditorViewModel {
                         updatedDocument.statusMessage = "Read-only: unable to read as UTF-8"
                     }
                 }
-            case .scene(var sceneDocument):
+            case var .scene(sceneDocument):
                 guard !sceneDocument.isDirty else {
                     continue
                 }
@@ -260,7 +270,8 @@ extension EditorViewModel {
                     sceneDocument.statusMessage = "Reload failed"
                     workbench.replaceSceneDocument(sceneDocument)
                 }
-            case .asset, .git:
+            case .asset,
+                .git:
                 continue
             }
         }

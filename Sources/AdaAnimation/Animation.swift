@@ -12,7 +12,6 @@ public struct AnimationContext<V: VectorArithmetic>: Sendable {
 
 /// A protocol that defines the behavior of a custom animation.
 public protocol CustomAnimation: Hashable {
-
     /// The finite duration of this animation, if it has one.
     var finiteDuration: TimeInterval? { get }
 
@@ -31,30 +30,29 @@ public protocol CustomAnimation: Hashable {
     ) -> Bool where V: VectorArithmetic
 }
 
-public extension CustomAnimation {
-    var finiteDuration: TimeInterval? {
+extension CustomAnimation {
+    public var finiteDuration: TimeInterval? {
         nil
     }
 
-    func velocity<V>(_ value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? where V: VectorArithmetic {
+    public func velocity<V>(_: V, time _: TimeInterval, context _: inout AnimationContext<V>) -> V? where V: VectorArithmetic {
         return nil
     }
 
-    func shouldMerge<V>(previous: Animation, value: V, time: TimeInterval, context: inout AnimationContext<V>) -> Bool where V: VectorArithmetic {
+    public func shouldMerge<V>(previous _: Animation, value _: V, time _: TimeInterval, context _: inout AnimationContext<V>) -> Bool where V: VectorArithmetic {
         return false
     }
 }
 
 /// A linear animation.
 struct LinearAnimation: CustomAnimation {
-
     let duration: TimeInterval
 
     var finiteDuration: TimeInterval? {
         duration
     }
 
-    func animate<V: VectorArithmetic>(_ value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? {
+    func animate<V: VectorArithmetic>(_ value: V, time: TimeInterval, context _: inout AnimationContext<V>) -> V? {
         guard time < duration else {
             return nil
         }
@@ -62,14 +60,13 @@ struct LinearAnimation: CustomAnimation {
         return value.scaled(by: Double(time / duration))
     }
 
-    func velocity<V>(_ value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? where V: VectorArithmetic {
+    func velocity<V>(_ value: V, time _: TimeInterval, context _: inout AnimationContext<V>) -> V? where V: VectorArithmetic {
         value.scaled(by: Double(1.0 / duration))
     }
 }
 
 /// A type that represents an animation.
 public struct Animation: Equatable, @unchecked Sendable {
-
     /// The base animation.
     public let base: any CustomAnimation
 
@@ -81,26 +78,26 @@ public struct Animation: Equatable, @unchecked Sendable {
     }
 
     /// Check if two animations are equal.
-    public static func == (lhs: Animation, rhs: Animation) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.base.hashValue == rhs.base.hashValue
     }
 }
 
 /// A default animation.
-public extension Animation {
+extension Animation {
     /// The default animation.
-    static let `default`: Animation = .linear
+    public static let `default`: Animation = .linear
 
     /// A linear animation.
-    static let linear: Animation = .linear(duration: 1)
+    public static let linear: Animation = .linear(duration: 1)
 
     /// Create a linear animation.
-    static func linear(duration: TimeInterval) -> Animation {
+    public static func linear(duration: TimeInterval) -> Animation {
         Animation(LinearAnimation(duration: duration))
     }
 
     /// Create a delay animation.
-    func delay(_ duration: TimeInterval) -> Animation {
+    public func delay(_ duration: TimeInterval) -> Animation {
         let delay = Animation(DelayAnimation(duration: duration))
         return Animation(CombineAnimation(left: delay, right: self))
     }
@@ -108,21 +105,20 @@ public extension Animation {
     /// Repeats this animation indefinitely.
     ///
     /// When `autoreverses` is true, every odd cycle plays the finite base animation backward.
-    func repeatForever(autoreverses: Bool = true) -> Animation {
+    public func repeatForever(autoreverses: Bool = true) -> Animation {
         Animation(RepeatForeverAnimation(base: self, autoreverses: autoreverses))
     }
 }
 
 /// A delay animation.
 struct DelayAnimation: CustomAnimation {
-
     let duration: TimeInterval
 
     var finiteDuration: TimeInterval? {
         duration
     }
 
-    func animate<V: VectorArithmetic>(_ value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? {
+    func animate<V: VectorArithmetic>(_ value: V, time: TimeInterval, context _: inout AnimationContext<V>) -> V? {
         guard time < duration else {
             return nil
         }
@@ -133,13 +129,12 @@ struct DelayAnimation: CustomAnimation {
 
 /// A combine animation.
 struct CombineAnimation: CustomAnimation {
-
     let left: Animation
     let right: Animation
 
     var finiteDuration: TimeInterval? {
         switch (left.base.finiteDuration, right.base.finiteDuration) {
-        case (.some(let leftDuration), .some(let rightDuration)):
+        case let (.some(leftDuration), .some(rightDuration)):
             return max(leftDuration, rightDuration)
         default:
             return nil
@@ -162,11 +157,10 @@ struct CombineAnimation: CustomAnimation {
 
 /// An animation that loops a finite base animation forever.
 struct RepeatForeverAnimation: CustomAnimation {
-
     let base: Animation
     let autoreverses: Bool
 
-    static func == (lhs: RepeatForeverAnimation, rhs: RepeatForeverAnimation) -> Bool {
+    static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.base == rhs.base && lhs.autoreverses == rhs.autoreverses
     }
 

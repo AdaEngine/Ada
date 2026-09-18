@@ -10,7 +10,8 @@ extension EditorUISceneEditor {
                         .accessibilityIdentifier("AdaEditor.UIScene.Library.\(tab)")
                 }
                 Spacer()
-            }.frame(height: 32).padding(10)
+            }
+            .frame(height: 32).padding(10)
             panelDivider
             if libraryTab == "Components" {
                 AnyView(componentLibrary).frame(maxHeight: .infinity)
@@ -37,14 +38,17 @@ extension EditorUISceneEditor {
                             VStack(alignment: .leading, spacing: 4) {
                                 sectionTitle(category, detail: String(items.count)).padding(.horizontal, 6)
                                 ForEach(items) { signature in
-                                    Button { model.add(signature.id, selectingNewNode: false) } label: {
+                                    Button {
+                                        model.add(signature.id, selectingNewNode: false)
+                                    } label: {
                                         HStack(spacing: 10) {
                                             symbol(EditorUIDesignerSymbols.icon(signature.id))
                                                 .foregroundColor(theme.editorColors.muted)
                                             Text(signature.name).lineLimit(1)
                                             Spacer()
                                             symbol("\u{E145}", size: 12).foregroundColor(theme.editorColors.muted.opacity(0.6))
-                                        }.frame(maxWidth: .infinity, alignment: .leading)
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                     .disabled(model.isReadOnly)
                                     .accessibilityIdentifier("AdaEditor.UIScene.Add.\(signature.id)")
@@ -52,11 +56,14 @@ extension EditorUISceneEditor {
                             }
                         }
                     }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }.frame(maxHeight: .infinity)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: .infinity)
             Text("Adding to \(model.selectedNode?.type ?? "selected layer")")
                 .font(.system(size: 10)).foregroundColor(theme.editorColors.muted)
-        }.padding(10)
+        }
+        .padding(10)
     }
 
     var layerLibrary: some View {
@@ -67,8 +74,10 @@ extension EditorUISceneEditor {
                     ForEach(rows, id: \.node.id) { row in
                         layerRow(row)
                     }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }.frame(maxHeight: .infinity)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: .infinity)
             panelDivider
             HStack(spacing: 4) {
                 iconButton("\u{E5D8}", title: "Layer.Up") { model.reorder(-1) }
@@ -76,7 +85,8 @@ extension EditorUISceneEditor {
                 Spacer()
                 iconButton("\u{E14D}", title: "Layer.Duplicate", action: model.duplicateSelected)
                 iconButton("\u{E872}", title: "Layer.Delete", action: model.removeSelected)
-            }.disabled(model.isReadOnly || model.selectedID == model.document.root.id)
+            }
+            .disabled(model.isReadOnly || model.selectedID == model.document.root.id)
             Text("Wrap selection in").font(.system(size: 10)).foregroundColor(theme.editorColors.muted)
             ScrollView(.horizontal) {
                 HStack(spacing: 2) {
@@ -84,13 +94,16 @@ extension EditorUISceneEditor {
                         Button(type) { model.wrap(type) }
                             .accessibilityIdentifier("AdaEditor.UIScene.Wrap.\(type)")
                     }
-                }.disabled(model.isReadOnly)
+                }
+                .disabled(model.isReadOnly)
             }
-        }.padding(10)
+        }
+        .padding(10)
     }
 
     var designerInspector: some View {
         VStack(alignment: .leading, spacing: 0) {
+            adaEditorInspectorTitle(theme: theme)
             if let node = model.selectedNode, let signature = model.signature(for: node) {
                 HStack(spacing: 10) {
                     symbol(EditorUIDesignerSymbols.icon(node.type), size: 20)
@@ -102,11 +115,14 @@ extension EditorUISceneEditor {
                             .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
                     }
                     Spacer()
-                }.padding(14).frame(height: 76)
+                }
+                .padding(14).frame(height: 76)
                 panelDivider
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 16) {
-                        if node.type == "UI" { Button("Open UI source") { model.openNestedUI() } }
+                        if node.type == "UI" {
+                            Button("Open UI source") { model.openNestedUI() }
+                        }
                         VStack(alignment: .leading, spacing: 12) {
                             sectionTitle("Properties", detail: String(signature.parameters.count))
                             if signature.parameters.isEmpty {
@@ -122,10 +138,13 @@ extension EditorUISceneEditor {
                             ForEach(signature.actions, id: \.name) { action in
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(action.name).font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
-                                    EditorUIDesignerField(placeholder: "Handler name", text: Binding(
-                                        get: { model.selectedNode?.actions[action.name] ?? "" },
-                                        set: { value in model.updateSelected { $0.actions[action.name] = value.isEmpty ? nil : value } }
-                                    ))
+                                    EditorUIDesignerField(
+                                        placeholder: "Handler name",
+                                        text: Binding(
+                                            get: { model.selectedNode?.actions[action.name] ?? "" },
+                                            set: { value in model.updateSelected { $0.actions[action.name] = value.isEmpty ? nil : value } }
+                                        )
+                                    )
                                 }
                             }
                         }
@@ -134,19 +153,26 @@ extension EditorUISceneEditor {
                         if node.id == model.document.root.id {
                             panelDivider
                             VStack(alignment: .leading, spacing: 8) {
-                                Button { showsInputs.toggle() } label: {
+                                Button {
+                                    showsInputs.toggle()
+                                } label: {
                                     HStack {
                                         symbol(showsInputs ? "\u{E5CF}" : "\u{E5CC}", size: 14)
                                         Text("Inputs & actions").font(.system(size: 12, weight: .semibold))
                                         Spacer()
                                         Text(String(model.document.inputs.count + model.document.actions.count)).foregroundColor(theme.editorColors.muted)
                                     }
-                                }.accessibilityIdentifier("AdaEditor.UIScene.Inputs.Toggle")
-                                if showsInputs { inputDeclarations }
+                                }
+                                .accessibilityIdentifier("AdaEditor.UIScene.Inputs.Toggle")
+                                if showsInputs {
+                                    inputDeclarations
+                                }
                             }
                         }
-                    }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                }.frame(maxHeight: .infinity)
+                    }
+                    .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: .infinity)
                 .disabled(model.isReadOnly)
             } else {
                 Text("Select a layer to inspect").foregroundColor(theme.editorColors.muted).padding(16)
@@ -154,7 +180,8 @@ extension EditorUISceneEditor {
             }
         }
         .textFieldStyle(EditorUIDesignerInspectorFieldStyle(colors: theme.editorColors))
-        .background(theme.editorColors.surface)
+        .background(theme.editorColors.surfaceElevated)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityIdentifier("AdaEditor.UIScene.Inspector")
     }
 
@@ -181,7 +208,6 @@ extension EditorUISceneEditor {
             }
             .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, bordered: true))
             .accessibilityIdentifier("AdaEditor.UIScene.Modifiers.Toggle")
-
         }
     }
 }

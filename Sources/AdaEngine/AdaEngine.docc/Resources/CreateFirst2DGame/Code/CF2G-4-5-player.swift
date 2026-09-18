@@ -1,7 +1,7 @@
 import AdaEngine
 
 struct FirstScene: Plugin {
-    func setup(in app: AppWorlds) {
+    func setup(in _: AppWorlds) {
         /** Collapsed code */
     }
 }
@@ -11,8 +11,8 @@ struct PlayerComponent {}
 
 @System
 func PlayerMovement(
-    _ playerTransform: FIlterQuery<Ref<Transform>, With<PlayerComponent>>,
-    _ speed: Local<Float> = 3.0
+    _: FIlterQuery<Ref<Transform>, With<PlayerComponent>>,
+    _: Local<Float> = 3.0
 ) {
-    
+
 }

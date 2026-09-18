@@ -63,9 +63,10 @@ final class EditorDocumentationViewModel {
             return articles
         }
         return articles.filter { article in
-            query.split(whereSeparator: \.isWhitespace).allSatisfy { term in
-                (article.section + " " + article.plainText).localizedStandardContains(String(term))
-            }
+            query.split(whereSeparator: \.isWhitespace)
+                .allSatisfy { term in
+                    (article.section + " " + article.plainText).localizedStandardContains(String(term))
+                }
         }
     }
 
@@ -85,7 +86,9 @@ final class EditorDocumentationViewModel {
         guard id != selectedID, articles.contains(where: { $0.id == id }) else {
             return
         }
-        if let selectedID { backHistory.append(selectedID) }
+        if let selectedID {
+            backHistory.append(selectedID)
+        }
         selectedID = id
         forwardHistory = []
     }
@@ -94,7 +97,9 @@ final class EditorDocumentationViewModel {
         guard let id = backHistory.popLast() else {
             return
         }
-        if let selectedID { forwardHistory.append(selectedID) }
+        if let selectedID {
+            forwardHistory.append(selectedID)
+        }
         selectedID = id
     }
 
@@ -102,7 +107,9 @@ final class EditorDocumentationViewModel {
         guard let id = forwardHistory.popLast() else {
             return
         }
-        if let selectedID { backHistory.append(selectedID) }
+        if let selectedID {
+            backHistory.append(selectedID)
+        }
         selectedID = id
     }
 }

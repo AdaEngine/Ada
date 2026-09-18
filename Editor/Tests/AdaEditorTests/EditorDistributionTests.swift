@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor distribution channels")
 struct EditorDistributionTests {

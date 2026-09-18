@@ -16,12 +16,19 @@ extension EditorViewModel {
     static func document(for item: EditorProjectSidebarViewModel.Item) -> EditorWorkbenchDocument {
         if URL(fileURLWithPath: item.title).pathExtension.lowercased() == "ui" {
             let content = textFileContent(for: item)
-            return .ui(EditorTextDocument(
-                id: "ui:\(item.relativePath)", title: item.title, relativePath: item.relativePath,
-                absolutePath: absoluteFilePath(from: item.id), language: .plainText,
-                content: content.value, lastSavedContent: content.errorMessage == nil ? content.value : nil,
-                isReadOnly: item.isSymbolicLink || content.errorMessage != nil, errorMessage: content.errorMessage
-            ))
+            return .ui(
+                EditorTextDocument(
+                    id: "ui:\(item.relativePath)",
+                    title: item.title,
+                    relativePath: item.relativePath,
+                    absolutePath: absoluteFilePath(from: item.id),
+                    language: .plainText,
+                    content: content.value,
+                    lastSavedContent: content.errorMessage == nil ? content.value : nil,
+                    isReadOnly: item.isSymbolicLink || content.errorMessage != nil,
+                    errorMessage: content.errorMessage
+                )
+            )
         }
         switch item.kind {
         case .scene:
@@ -43,7 +50,7 @@ extension EditorViewModel {
                     loadSummary: EditorSceneFileLoader.summary(from: content.value)
                 )
             )
-        case .text(let language):
+        case let .text(language):
             let content = textFileContent(for: item)
             return .text(
                 EditorTextDocument(
@@ -59,9 +66,12 @@ extension EditorViewModel {
                     statusMessage: item.isSymbolicLink ? "Read-only: symbolic link" : content.errorMessage == nil ? nil : "Read-only: unable to read as UTF-8"
                 )
             )
-        case .image, .audio, .genericAsset:
+        case .image,
+            .audio,
+            .genericAsset:
             return .asset(assetDocument(for: item))
-        case .folder, .unsupported:
+        case .folder,
+            .unsupported:
             return .text(
                 EditorTextDocument(
                     id: "unsupported:\(item.relativePath)",
@@ -109,11 +119,12 @@ extension EditorViewModel {
         let resourceRoots = Array(Set((projectMetadata?.paths.resourceRoots ?? []) + [assetsRoot]))
             .sorted { $0.count > $1.count }
         var items: [EditorProjectSidebarViewModel.Item] = []
-        let rootEntries = (try? fileManager.contentsOfDirectory(
-            at: projectURL,
-            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-            options: []
-        )) ?? []
+        let rootEntries =
+            (try? fileManager.contentsOfDirectory(
+                at: projectURL,
+                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+                options: []
+            )) ?? []
 
         for url in rootEntries.sorted(by: projectTreeSort) where !shouldSkipProjectTreeURL(url) {
             appendProjectTreeItems(
@@ -126,7 +137,7 @@ extension EditorViewModel {
             )
         }
 
-        if !items.contains(where: { $0.isActive }), let firstSelectableIndex = items.firstIndex(where: { !$0.isFolder }) {
+        if !items.contains(where: \.isActive), let firstSelectableIndex = items.firstIndex(where: { !$0.isFolder }) {
             items[firstSelectableIndex].isActive = true
         }
 
@@ -175,11 +186,12 @@ extension EditorViewModel {
             return
         }
 
-        let childURLs = (try? fileManager.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-            options: []
-        )) ?? []
+        let childURLs =
+            (try? fileManager.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+                options: []
+            )) ?? []
 
         for childURL in childURLs.sorted(by: projectTreeSort) where !shouldSkipProjectTreeURL(childURL) {
             appendProjectTreeItems(
@@ -273,10 +285,11 @@ extension EditorViewModel {
 
     static func textureAssets(from items: [EditorProjectSidebarViewModel.Item]) -> [EditorInspectorSidebarViewModel.TextureAsset] {
         items.compactMap { item in
-            guard item.kind == .image,
-                  let assetsRoot = item.assetRoot,
-                  let reference = assetReference(for: item.relativePath, assetsRoot: assetsRoot),
-                  let absolutePath = absoluteFilePath(from: item.id)
+            guard
+                item.kind == .image,
+                let assetsRoot = item.assetRoot,
+                let reference = assetReference(for: item.relativePath, assetsRoot: assetsRoot),
+                let absolutePath = absoluteFilePath(from: item.id)
             else {
                 return nil
             }
@@ -290,10 +303,11 @@ extension EditorViewModel {
 
     static func sceneAssets(from items: [EditorProjectSidebarViewModel.Item]) -> [EditorInspectorSidebarViewModel.SceneAsset] {
         items.compactMap { item in
-            guard item.kind == .scene,
-                  let assetsRoot = item.assetRoot,
-                  let reference = assetReference(for: item.relativePath, assetsRoot: assetsRoot),
-                  let absolutePath = absoluteFilePath(from: item.id)
+            guard
+                item.kind == .scene,
+                let assetsRoot = item.assetRoot,
+                let reference = assetReference(for: item.relativePath, assetsRoot: assetsRoot),
+                let absolutePath = absoluteFilePath(from: item.id)
             else {
                 return nil
             }
@@ -308,16 +322,23 @@ extension EditorViewModel {
     static func uiSourcePaths(from items: [EditorProjectSidebarViewModel.Item]) -> [String] {
         items.compactMap { item in
             let ext = URL(fileURLWithPath: item.title).pathExtension.lowercased()
-            guard ["ui", "ada"].contains(ext) else { return nil }
-            if ext == "ui", let root = item.assetRoot { return assetReference(for: item.relativePath, assetsRoot: root) }
+            guard ["ui", "ada"].contains(ext) else {
+                return nil
+            }
+            if ext == "ui", let root = item.assetRoot {
+                return assetReference(for: item.relativePath, assetsRoot: root)
+            }
             return item.relativePath
-        }.sorted()
+        }
+        .sorted()
     }
 
     static func uiSceneFiles(from items: [EditorProjectSidebarViewModel.Item]) -> [String: String] {
         var files: [String: String] = [:]
         for item in items where URL(fileURLWithPath: item.title).pathExtension.lowercased() == "ui" {
-            guard let absolutePath = absoluteFilePath(from: item.id) else { continue }
+            guard let absolutePath = absoluteFilePath(from: item.id) else {
+                continue
+            }
             let reference = item.assetRoot.flatMap { assetReference(for: item.relativePath, assetsRoot: $0) } ?? item.relativePath
             files[reference] = absolutePath
         }
@@ -347,7 +368,7 @@ extension EditorViewModel {
     static func isTextFile(_ url: URL) -> Bool {
         let textExtensions: Set<String> = [
             "ada", "c", "cc", "comp", "cpp", "cxx", "frag", "geom", "glsl", "gravity", "h", "hpp", "hxx", "json", "md", "markdown",
-            "ui", "ascn", "tileset", "metal", "plist", "scn", "scene", "shader", "strings", "swift", "tesc", "tese", "toml", "txt", "vert", "wgsl", "xml", "yaml", "yml"
+            "ui", "ascn", "tileset", "metal", "plist", "scn", "scene", "shader", "strings", "swift", "tesc", "tese", "toml", "txt", "vert", "wgsl", "xml", "yaml", "yml",
         ]
         let lowercasedName = url.lastPathComponent.lowercased()
 
@@ -393,7 +414,9 @@ extension EditorRunDestination {
     var adaProjectDestination: AdaProjectRunDestination {
         switch self {
         case .macOS: .macOS
-        case .iPadOS, .player: .iPadOS
+        case .iPadOS,
+            .player:
+            .iPadOS
         case .web: .web
         }
     }

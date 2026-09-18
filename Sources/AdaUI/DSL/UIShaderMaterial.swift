@@ -12,46 +12,46 @@ import AdaRender
 /// Use this with ``CustomMaterial`` and ``View/shaderEffect(_:placement:)``.
 public protocol UIShaderMaterial: ReflectedMaterial {}
 
-public extension UIShaderMaterial {
-    static func vertexShader() throws -> AssetHandle<ShaderSource> {
+extension UIShaderMaterial {
+    public static func vertexShader() throws -> AssetHandle<ShaderSource> {
         let source = """
-        #version 450 core
-        #pragma stage : vert
+            #version 450 core
+            #pragma stage : vert
 
-        #include <AdaEngine/View.glsl>
+            #include <AdaEngine/View.glsl>
 
-        layout (location = 0) in vec4 a_Position;
-        layout (location = 1) in vec4 a_Color;
-        layout (location = 2) in vec2 a_TexCoordinate;
+            layout (location = 0) in vec4 a_Position;
+            layout (location = 1) in vec4 a_Color;
+            layout (location = 2) in vec2 a_TexCoordinate;
 
-        struct VertexOut
-        {
-            vec4 Color;
-            vec2 UV;
-        };
+            struct VertexOut
+            {
+                vec4 Color;
+                vec2 UV;
+            };
 
-        layout (location = 0) out VertexOut Output;
+            layout (location = 0) out VertexOut Output;
 
-        [[main]]
-        void ui_shader_material_vertex()
-        {
-            Output.Color = a_Color;
-            Output.UV = a_TexCoordinate;
-            gl_Position = u_ViewProjection * a_Position;
-        }
-        """
+            [[main]]
+            void ui_shader_material_vertex()
+            {
+                Output.Color = a_Color;
+                Output.UV = a_TexCoordinate;
+                gl_Position = u_ViewProjection * a_Position;
+            }
+            """
         return AssetHandle(try ShaderSource(source: source))
     }
 
-    static func configureShaderDefines(
-        keys: Set<String>,
-        vertexDescriptor: VertexDescriptor
+    public static func configureShaderDefines(
+        keys _: Set<String>,
+        vertexDescriptor _: VertexDescriptor
     ) -> [ShaderDefine] {
         []
     }
 
-    static func configurePipeline(
-        keys: Set<String>,
+    public static func configurePipeline(
+        keys _: Set<String>,
         vertex: Shader,
         fragment: Shader,
         vertexDescriptor: VertexDescriptor
@@ -70,4 +70,3 @@ public extension UIShaderMaterial {
         return descriptor
     }
 }
-

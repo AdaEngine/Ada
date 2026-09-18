@@ -1,7 +1,8 @@
-@testable import AdaEditor
 import AdaPlayerConnect
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("AdaPlayer project packaging")
 struct EditorPlayerProjectTests {
@@ -11,9 +12,12 @@ struct EditorPlayerProjectTests {
         let project = root.appendingPathComponent("Game")
         try FileManager.default.createDirectory(at: project.appendingPathComponent("Sources"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: project.appendingPathComponent("Assets"), withIntermediateDirectories: true)
-        try "@view class HUD { func body() { Text(\"Device preview\"); } }".write(
-            to: project.appendingPathComponent("Sources/HUD.ada"), atomically: true, encoding: .utf8
-        )
+        try "@view class HUD { func body() { Text(\"Device preview\"); } }"
+            .write(
+                to: project.appendingPathComponent("Sources/HUD.ada"),
+                atomically: true,
+                encoding: .utf8
+            )
         try Data([1, 2, 3]).write(to: project.appendingPathComponent("Assets/example.bin"))
         var settings = ProjectSystem.defaultProject(projectName: "Game", buildSystem: .adaScript)
         settings.runtime.entry = AdaProjectRuntimeEntry(view: "HUD")

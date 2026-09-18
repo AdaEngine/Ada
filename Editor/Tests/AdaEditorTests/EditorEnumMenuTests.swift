@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 @_spi(Internal) import AdaUI
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorEnumMenuTests {
@@ -20,10 +21,12 @@ struct EditorEnumMenuTests {
         let previousPresenter = ContextMenuPresentationCenter.present
         ContextMenuPresentationCenter.present = { menu = $0 }
         defer { ContextMenuPresentationCenter.present = previousPresenter }
-        let container = UIContainerView(rootView: EditorEnumField(
-            cases: ["one", "two"],
-            selection: Binding(get: { selected }, set: { selected = $0 })
-        ))
+        let container = UIContainerView(
+            rootView: EditorEnumField(
+                cases: ["one", "two"],
+                selection: Binding(get: { selected }, set: { selected = $0 })
+            )
+        )
         container.frame = Rect(x: 0, y: 0, width: 220, height: 100)
         container.layoutSubviews()
         let selector = UINodeSelector.accessibilityIdentifier("AdaEditor.Enum.Toggle")

@@ -28,9 +28,11 @@ final class EditorWorkbenchViewModel {
     var codeFontFamily: EditorCodeFontFamily
     var codeFontWeight: EditorCodeFontWeight
     var keywordFontWeight: EditorCodeFontWeight
+    var isPreviewEnabled: Bool
     var previewStatus: EditorPreviewStatus
     var uiCatalog: UICatalog = .standard
     var uiCatalogError: String?
+    var entityPickerRequest: EditorEntityPickerRequest?
     var modifierPickerRequest: EditorModifierPickerRequest?
     @ObservationIgnored var uiExportLoader = EditorUIExportLoader()
     @ObservationIgnored var uiExportTask: Task<Void, Never>?
@@ -56,13 +58,14 @@ final class EditorWorkbenchViewModel {
         hoveredChip: String? = nil,
         activeEditorTab: String = "Main.ascn",
         activeOutputTab: String = "Problems",
-        openDocuments: [EditorWorkbenchDocument] = AdaEngineStyleContent.defaultEditorDocuments,
+        openDocuments: [EditorWorkbenchDocument] = [],
         activeDocumentID: String = "scene:Assets/Scenes/Main.ascn",
         codeColorPalette: EditorCodeColorPalette = .godot,
         codeFontSize: Double = 14,
         codeFontFamily: EditorCodeFontFamily = .firaCode,
         codeFontWeight: EditorCodeFontWeight = .medium,
         keywordFontWeight: EditorCodeFontWeight = .bold,
+        isPreviewEnabled: Bool = true,
         previewStatus: EditorPreviewStatus = .hidden,
         selectedPreviewID: String? = nil,
         loadedPreview: EditorLoadedPreview? = nil
@@ -78,6 +81,7 @@ final class EditorWorkbenchViewModel {
         self.codeFontFamily = codeFontFamily
         self.codeFontWeight = codeFontWeight
         self.keywordFontWeight = keywordFontWeight
+        self.isPreviewEnabled = isPreviewEnabled
         self.previewStatus = previewStatus
         self.selectedPreviewID = selectedPreviewID
         self.loadedPreview = loadedPreview
@@ -113,7 +117,7 @@ final class EditorWorkbenchViewModel {
     }
 
     var activeSceneDocument: EditorSceneDocument? {
-        guard case .scene(let document)? = activeDocument else {
+        guard case let .scene(document)? = activeDocument else {
             return nil
         }
 
@@ -194,7 +198,9 @@ final class EditorWorkbenchViewModel {
         }
 
         let closingDocument = openDocuments[closingIndex]
-        if case .git(let document) = closingDocument { document.close() }
+        if case let .git(document) = closingDocument {
+            document.close()
+        }
         if closingDocument.isDirty, !saveDocument(closingDocument) {
             return
         }

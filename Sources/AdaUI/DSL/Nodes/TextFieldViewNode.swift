@@ -13,7 +13,6 @@ import Foundation
 import Math
 
 final class TextFieldViewNode: ViewNode {
-
     private struct Snapshot: Equatable {
         let text: String
         let selectionAnchor: Int
@@ -151,7 +150,7 @@ final class TextFieldViewNode: ViewNode {
             self.touchPressStartPoint = nil
             self.clearTapCandidate()
             #if canImport(UIKit)
-            self.hideEditMenu()
+                self.hideEditMenu()
             #endif
         }
         self.caretVisible = isFocused
@@ -163,12 +162,15 @@ final class TextFieldViewNode: ViewNode {
     override func onMouseEvent(_ event: MouseEvent) {
         self.owner?.window?.windowManager.setCursorShape(.iBeam)
 
-        let shouldHandleSelectionEvent: Bool = switch event.phase {
-        case .began, .ended, .cancelled:
-            event.button == .left
-        case .changed:
-            event.button == .left || self.isSelectingWithMouse
-        }
+        let shouldHandleSelectionEvent: Bool =
+            switch event.phase {
+            case .began,
+                .ended,
+                .cancelled:
+                event.button == .left
+            case .changed:
+                event.button == .left || self.isSelectingWithMouse
+            }
 
         guard shouldHandleSelectionEvent else {
             return
@@ -202,7 +204,8 @@ final class TextFieldViewNode: ViewNode {
             self.clampSelectionToBounds()
             self.ensureCaretVisibleIfNeeded()
             self.requestDisplay()
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             self.isSelectingWithMouse = false
             self.selectionHead = caretOffset
             self.clampSelectionToBounds()
@@ -248,7 +251,8 @@ final class TextFieldViewNode: ViewNode {
             self.clampSelectionToBounds()
             self.ensureCaretVisibleIfNeeded()
             self.requestDisplay()
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             self.isSelectingWithTouch = false
             self.selectionHead = caretOffset
             self.clampSelectionToBounds()
@@ -312,7 +316,8 @@ final class TextFieldViewNode: ViewNode {
             } else {
                 self.moveCaret(delta: 1, extendSelection: extendSelection)
             }
-        case .home, .pageUp:
+        case .home,
+            .pageUp:
             self.moveCaretToStart(extendSelection: extendSelection)
         case .pageDown:
             self.moveCaretToEnd(extendSelection: extendSelection)
@@ -366,7 +371,7 @@ final class TextFieldViewNode: ViewNode {
         let borderColor = self.isFocused ? Constants.focusedBorderColor : Constants.borderColor
 
         context.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
-        
+
         if self.environment._textFieldDrawsBackground {
             context.drawRect(bounds, color: Constants.backgroundColor)
             self.drawBorder(in: &context, rect: bounds, color: borderColor)
@@ -437,7 +442,6 @@ final class TextFieldViewNode: ViewNode {
 }
 
 extension TextFieldViewNode {
-
     var hasSelection: Bool {
         self.selectionAnchor != self.selectionHead
     }
@@ -517,11 +521,12 @@ extension TextFieldViewNode {
             return
         }
 
-        let targetOffset = if direction < 0 {
-            self.wordBoundaryBefore(offset: self.caretOffset)
-        } else {
-            self.wordBoundaryAfter(offset: self.caretOffset)
-        }
+        let targetOffset =
+            if direction < 0 {
+                self.wordBoundaryBefore(offset: self.caretOffset)
+            } else {
+                self.wordBoundaryAfter(offset: self.caretOffset)
+            }
 
         if extendSelection {
             self.selectionHead = targetOffset
@@ -1127,24 +1132,26 @@ extension TextFieldViewNode {
 }
 
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 
-extension TextFieldViewNode {
-    func showEditMenu(at position: Point) {
-        guard let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
-              let window = windowScene.windows.first(where: { $0.isKeyWindow }),
-              let view = window.rootViewController?.view else {
-            return
+    extension TextFieldViewNode {
+        func showEditMenu(at position: Point) {
+            guard
+                let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+                let window = windowScene.windows.first(where: { $0.isKeyWindow }),
+                let view = window.rootViewController?.view
+            else {
+                return
+            }
+
+            let rootPoint = self.convertPointToRoot(position)
+            let cgRect = CGRect(x: CGFloat(rootPoint.x), y: CGFloat(rootPoint.y), width: 1, height: 1)
+            UIMenuController.shared.showMenu(from: view, rect: cgRect)
         }
 
-        let rootPoint = self.convertPointToRoot(position)
-        let cgRect = CGRect(x: CGFloat(rootPoint.x), y: CGFloat(rootPoint.y), width: 1, height: 1)
-        UIMenuController.shared.showMenu(from: view, rect: cgRect)
+        func hideEditMenu() {
+            UIMenuController.shared.hideMenu()
+            UIMenuController.shared.setMenuVisible(false, animated: true)
+        }
     }
-
-    func hideEditMenu() {
-        UIMenuController.shared.hideMenu()
-        UIMenuController.shared.setMenuVisible(false, animated: true)
-    }
-}
 #endif

@@ -8,12 +8,18 @@ struct WindowDisplayLayoutSystem {
     @Res private var embedded: EmbeddedDisplayLayout?
     @Res private var primaryWindow: PrimaryWindowId?
 
-    init(world: World) {}
+    init(world _: World) {}
 
-    @MainActor func update(context: UpdateContext) {
-        guard embedded == nil, let primaryWindow,
-              let window = unsafe RenderEngine.shared.getRenderWindow(for: primaryWindow.windowId) else { return }
+    @MainActor func update(context _: UpdateContext) {
+        guard
+            embedded == nil, let primaryWindow,
+            let window = unsafe RenderEngine.shared.getRenderWindow(for: primaryWindow.windowId)
+        else {
+            return
+        }
         let next = DisplayLayout.standard(size: window.logicalSize.toSize())
-        if layout != next { layout = next }
+        if layout != next {
+            layout = next
+        }
     }
 }

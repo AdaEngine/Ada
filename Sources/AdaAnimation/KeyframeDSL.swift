@@ -183,8 +183,7 @@ public func KeyframeTrack<Value: Sendable>(
 
 // MARK: - KeyframeClip DSL init
 
-public extension KeyframeClip {
-
+extension KeyframeClip {
     /// Create a keyframe clip using result-builder syntax.
     ///
     /// ```swift
@@ -195,7 +194,7 @@ public extension KeyframeClip {
     ///     }
     /// }
     /// ```
-    init(
+    public init(
         name: String,
         initialValues: Value,
         duration: TimeInterval,
@@ -217,10 +216,20 @@ public extension KeyframeClip {
 /// Extracts float components from a `VectorArithmetic` value for JSON storage.
 /// Specialised for known types; falls back to a single zero component for unknown types.
 private func floatComponents<T: VectorArithmetic>(of value: T) -> [Float] {
-    if let v = value as? Vector3 { return [v.x, v.y, v.z] }
-    if let v = value as? Vector2 { return [v.x, v.y] }
-    if let v = value as? Vector4 { return [v.x, v.y, v.z, v.w] }
-    if let v = value as? Float { return [v] }
-    if let v = value as? Double { return [Float(v)] }
+    if let v = value as? Vector3 {
+        return [v.x, v.y, v.z]
+    }
+    if let v = value as? Vector2 {
+        return [v.x, v.y]
+    }
+    if let v = value as? Vector4 {
+        return [v.x, v.y, v.z, v.w]
+    }
+    if let v = value as? Float {
+        return [v]
+    }
+    if let v = value as? Double {
+        return [Float(v)]
+    }
     return [Float(value.magnitudeSquared)]
 }

@@ -139,7 +139,7 @@ struct UISceneTests {
         #expect(flatten(container.uiTreeRoots()).contains { $0.sceneNodeID == "node" })
     }
 
-    @Test func repeatedViewsRetainIndependentStateWhenReordered() async throws {
+    @Test func repeatedViewsRetainIndependentStateWhenReordered() throws {
         var counts: [String: Int] = [:]
         let catalog = try UICatalog.standard.adding(views: [.init(signature: .init(id: "Counter", name: "Counter", parameters: [.init("name", type: .string)])) { inputs in
             let name = inputs.string("name")
@@ -161,14 +161,8 @@ struct UISceneTests {
         container.layoutSubviews()
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("counter.B"))
         context.set("items", to: .array([itemB, itemA]))
-        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
-        while ContinuousClock.now < deadline {
-            container.layoutSubviews()
-            let a = try container.uiNode(matching: .accessibilityIdentifier("counter.A"))
-            let b = try container.uiNode(matching: .accessibilityIdentifier("counter.B"))
-            if b.absoluteFrame.minY < a.absoluteFrame.minY { break }
-            try await Task.sleep(for: .milliseconds(10))
-        }
+        container.viewTree.rootNode.invalidateContent()
+        container.layoutSubviews()
         let a = try container.uiNode(matching: .accessibilityIdentifier("counter.A"))
         let b = try container.uiNode(matching: .accessibilityIdentifier("counter.B"))
         #expect(b.absoluteFrame.minY < a.absoluteFrame.minY)

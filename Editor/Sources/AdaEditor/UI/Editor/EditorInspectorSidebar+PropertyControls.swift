@@ -19,7 +19,8 @@ extension EditorInspectorSidebar {
     }
 
     func colorPreview(from value: String) -> Color {
-        let components = value
+        let components =
+            value
             .split { $0 == "," || $0 == " " || $0 == "\t" }
             .map { Float($0.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0 }
         return Color(
@@ -37,24 +38,24 @@ extension EditorInspectorSidebar {
         text: Binding<String>
     ) -> some View {
         #if (canImport(AppKit) && os(macOS)) || (canImport(UIKit) && os(iOS))
-        Button(action: {
-            EditorPlatformColorPicker.present(value: value) { updatedValue in
-                colorTextDrafts[fieldID] = nil
-                text.wrappedValue = updatedValue.rgbaString
+            Button(action: {
+                EditorPlatformColorPicker.present(value: value) { updatedValue in
+                    colorTextDrafts[fieldID] = nil
+                    text.wrappedValue = updatedValue.rgbaString
+                }
+            }) {
+                RectangleShape()
+                    .fill(colorPreview(from: value.rgbaString))
+                    .frame(width: 30, height: 28)
+                    .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
             }
-        }) {
+            .buttonStyle(DefaultButtonStyle())
+            .accessibilityIdentifier("AdaEditor.Inspector.ColorPicker.\(fieldID)")
+        #else
             RectangleShape()
                 .fill(colorPreview(from: value.rgbaString))
                 .frame(width: 30, height: 28)
                 .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
-        }
-        .buttonStyle(DefaultButtonStyle())
-        .accessibilityIdentifier("AdaEditor.Inspector.ColorPicker.\(fieldID)")
-        #else
-        RectangleShape()
-            .fill(colorPreview(from: value.rgbaString))
-            .frame(width: 30, height: 28)
-            .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
         #endif
     }
 
@@ -73,7 +74,8 @@ extension EditorInspectorSidebar {
             },
             set: { updatedText in
                 colorTextDrafts[fieldID] = updatedText
-                let updatedValue = mode == .rgba
+                let updatedValue =
+                    mode == .rgba
                     ? EditorInspectorColorValue(rgbaText: updatedText)
                     : EditorInspectorColorValue(hexText: updatedText)
                 guard let updatedValue else {
@@ -131,19 +133,19 @@ extension EditorInspectorSidebar {
             .accessibilityIdentifier("AdaEditor.Inspector.AssetReference.\(fieldID)")
             .overlay {
                 #if canImport(AppKit) && os(macOS)
-                EditorInspectorTextureDropTarget(
-                    onClick: {
-                        activeAssetFieldID = activeAssetFieldID == fieldID ? nil : fieldID
-                        assetSearchText = ""
-                    },
-                    onDrop: { url in
-                        guard let asset = viewModel.textureAsset(droppedFileURL: url) else {
-                            return
+                    EditorInspectorTextureDropTarget(
+                        onClick: {
+                            activeAssetFieldID = activeAssetFieldID == fieldID ? nil : fieldID
+                            assetSearchText = ""
+                        },
+                        onDrop: { url in
+                            guard let asset = viewModel.textureAsset(droppedFileURL: url) else {
+                                return
+                            }
+                            text.wrappedValue = asset.reference
+                            activeAssetFieldID = nil
                         }
-                        text.wrappedValue = asset.reference
-                        activeAssetFieldID = nil
-                    }
-                )
+                    )
                 #endif
             }
 
@@ -181,16 +183,15 @@ extension EditorInspectorSidebar {
             }
             .buttonStyle(DefaultButtonStyle())
             .accessibilityIdentifier("AdaEditor.Inspector.SceneReference.\(fieldID)")
-
         }
     }
 
     @ViewBuilder
     var scenePickerPanel: some View {
         if let activeSceneFieldID,
-           let field = viewModel.selectedEntity?.components
-            .flatMap(\.fields)
-            .first(where: { "\($0.typeName).\($0.field.key)" == activeSceneFieldID }) {
+            let field = viewModel.selectedEntity?.components
+                .flatMap(\.fields)
+                .first(where: { activeSceneFieldID == "\($0.typeName).\($0.field.key)" }) {
             scenePicker(text: viewModel.componentFieldBinding(typeName: field.typeName, field: field.field))
         }
     }

@@ -45,7 +45,7 @@ struct ProjectOpeningDiagnostic: Equatable, Identifiable, Sendable {
 final class ProjectOpeningViewModel {
     var projectAvailability: [String: ProjectOpeningAvailability] = [:]
     var recentProjects: [EditorProjectReference] = []
-    var projectName: String = "AdaGame"
+    var projectName: String = "My_Game"
     var projectLocation: String = ""
     var isCreatingNewProject = false
     var existingProjectPath: String = ""
@@ -99,8 +99,12 @@ final class ProjectOpeningViewModel {
             try store.removeRecentProject(project)
             reloadRecentProjects()
             projectAvailability.removeValue(forKey: project.path)
-            if existingProjectPath == project.path { existingProjectPath = "" }
-            if projectBeingRenamed?.id == project.id { projectBeingRenamed = nil }
+            if existingProjectPath == project.path {
+                existingProjectPath = ""
+            }
+            if projectBeingRenamed?.id == project.id {
+                projectBeingRenamed = nil
+            }
             recentProjectError = nil
         } catch {
             recentProjectError = "Could not remove project: \(error.localizedDescription)"
@@ -188,7 +192,9 @@ final class ProjectOpeningViewModel {
     }
 
     var availableTemplates: [EditorProjectTemplate] { store.distribution.projectTemplates }
-    var supportsSwiftProjects: Bool { store.distribution.supportsSwiftProjects }
+    var supportsSwiftProjects: Bool {
+        store.distribution.supportsSwiftProjects
+    }
 
     private let store: EditorProjectStore
 
@@ -202,7 +208,7 @@ final class ProjectOpeningViewModel {
         do {
             recentProjects = try store.loadProjects()
             if let selectedProject,
-               recentProjects.contains(where: { $0.path == selectedProject.path }) {
+                recentProjects.contains(where: { $0.path == selectedProject.path }) {
                 self.selectedProject = recentProjects.first(where: { $0.path == selectedProject.path })
             } else {
                 selectedProject = nil
@@ -215,11 +221,16 @@ final class ProjectOpeningViewModel {
     func refreshProjectAvailability() async {
         let locations = recentProjects.map { ($0.path, retainedProjectURL(for: $0)) }
         // File enumeration can block on external or cloud volumes; only immutable URLs cross actors.
-        let snapshot = await Task.detached(priority: .utility) {
-            Dictionary(locations.map { path, url in
-                (path, ProjectOpeningAvailability.inspect(at: url))
-            }, uniquingKeysWith: { _, latest in latest })
-        }.value
+        let snapshot =
+            await Task.detached(priority: .utility) {
+                Dictionary(
+                    locations.map { path, url in
+                        (path, ProjectOpeningAvailability.inspect(at: url))
+                    },
+                    uniquingKeysWith: { _, latest in latest }
+                )
+            }
+            .value
         guard !Task.isCancelled, projectAvailability != snapshot else {
             return
         }
@@ -251,29 +262,31 @@ final class ProjectOpeningViewModel {
 
         // Foundation does not provide asynchronous file reads here. Keep the blocking project validation
         // and manifest update off the UI actor so unavailable or cloud-backed paths cannot freeze the window.
-        let result = await Task.detached(priority: .userInitiated) {
-            let backgroundStore = EditorProjectStore(
-                storageURL: storageURL,
-                fileManager: FileManager(),
-                adaEnginePackageURL: adaEnginePackageURL,
-                documentsDirectoryURL: documentsDirectoryURL,
-                distribution: distribution
-            )
-            guard backgroundStore.fileManager.fileExists(atPath: lastProjectURL.path) else {
-                return BackgroundProjectOpenResult.unavailable
-            }
-
-            do {
-                let openedProject = try backgroundStore.openProject(
-                    at: lastProjectURL
+        let result =
+            await Task.detached(priority: .userInitiated) {
+                let backgroundStore = EditorProjectStore(
+                    storageURL: storageURL,
+                    fileManager: FileManager(),
+                    adaEnginePackageURL: adaEnginePackageURL,
+                    documentsDirectoryURL: documentsDirectoryURL,
+                    distribution: distribution
                 )
-                return .opened(openedProject)
-            } catch let error as ProjectSystemError {
-                return .projectFailure(error)
-            } catch {
-                return .failure(error.localizedDescription)
+                guard backgroundStore.fileManager.fileExists(atPath: lastProjectURL.path) else {
+                    return BackgroundProjectOpenResult.unavailable
+                }
+
+                do {
+                    let openedProject = try backgroundStore.openProject(
+                        at: lastProjectURL
+                    )
+                    return .opened(openedProject)
+                } catch let error as ProjectSystemError {
+                    return .projectFailure(error)
+                } catch {
+                    return .failure(error.localizedDescription)
+                }
             }
-        }.value
+            .value
 
         guard selectedProject?.path == selectedPathBeforeOpening, projectToOpenInEditor == nil else {
             return false
@@ -426,8 +439,9 @@ final class ProjectOpeningViewModel {
             return "Ada SwiftPM"
         }
         let metadataURL = ProjectSystem.metadataURL(forProjectAt: URL(fileURLWithPath: project.path, isDirectory: true))
-        guard let data = try? Data(contentsOf: metadataURL),
-              let adaProject = try? ProjectSystem.loadProject(from: data)
+        guard
+            let data = try? Data(contentsOf: metadataURL),
+            let adaProject = try? ProjectSystem.loadProject(from: data)
         else {
             return "Ada SwiftPM"
         }
@@ -473,57 +487,57 @@ final class ProjectOpeningViewModel {
 
     private func initializeGitRepositoryIfNeeded(at path: String) -> String? {
         #if os(macOS) || os(Linux) || os(Windows)
-        let command: [String]
-        #if os(Windows)
-        command = ["git", "init"]
+            let command: [String]
+            #if os(Windows)
+                command = ["git", "init"]
+            #else
+                command = ["/usr/bin/env", "git", "init"]
+            #endif
+
+            let process = Process()
+            let output = Pipe()
+            let error = Pipe()
+            process.executableURL = URL(fileURLWithPath: command[0])
+            process.arguments = Array(command.dropFirst())
+            process.currentDirectoryURL = URL(fileURLWithPath: path, isDirectory: true)
+            process.standardOutput = output
+            process.standardError = error
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+            } catch {
+                return "Git initialization failed: \(error.localizedDescription)"
+            }
+
+            guard process.terminationStatus == 0 else {
+                let outputText = output.readableString
+                let errorText = error.readableString
+                let reason = outputText.isEmpty ? (errorText.isEmpty ? "exit code \(process.terminationStatus)" : errorText) : outputText
+                return "Git initialization failed: \(reason)"
+            }
+            return nil
         #else
-        command = ["/usr/bin/env", "git", "init"]
-        #endif
-
-        let process = Process()
-        let output = Pipe()
-        let error = Pipe()
-        process.executableURL = URL(fileURLWithPath: command[0])
-        process.arguments = Array(command.dropFirst())
-        process.currentDirectoryURL = URL(fileURLWithPath: path, isDirectory: true)
-        process.standardOutput = output
-        process.standardError = error
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            return "Git initialization failed: \(error.localizedDescription)"
-        }
-
-        guard process.terminationStatus == 0 else {
-            let outputText = output.readableString
-            let errorText = error.readableString
-            let reason = outputText.isEmpty ? (errorText.isEmpty ? "exit code \(process.terminationStatus)" : errorText) : outputText
-            return "Git initialization failed: \(reason)"
-        }
-        return nil
-        #else
-        return "Git initialization requires a desktop platform. The project was created without a Git repository."
+            return "Git initialization requires a desktop platform. The project was created without a Git repository."
         #endif
     }
 }
 
-private extension Pipe {
+extension Pipe {
     var readableString: String {
-        String(data: fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        String(bytes: fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 }
 
-private extension ProjectOpeningViewModel {
-    func openProject(atPath path: String, openInEditor: Bool = false) {
+extension ProjectOpeningViewModel {
+    private func openProject(atPath path: String, openInEditor: Bool = false) {
         openProject(
             at: URL(fileURLWithPath: path, isDirectory: true),
             openInEditor: openInEditor
         )
     }
 
-    func openProject(at url: URL, openInEditor: Bool = false) {
+    private func openProject(at url: URL, openInEditor: Bool = false) {
         do {
             isCreatingNewProject = false
             selectedProject = try store.openProject(at: url)
@@ -540,12 +554,12 @@ private extension ProjectOpeningViewModel {
         }
     }
 
-    func retainedProjectURL(for project: EditorProjectReference) -> URL {
+    private func retainedProjectURL(for project: EditorProjectReference) -> URL {
         let projectURL = store.resolveProjectURL(for: project)
         #if canImport(UIKit)
-        return ProjectOpenPicker.retainSecurityScopedAccess(to: projectURL)
+            return ProjectOpenPicker.retainSecurityScopedAccess(to: projectURL)
         #else
-        return projectURL
+            return projectURL
         #endif
     }
 }
@@ -553,11 +567,11 @@ private extension ProjectOpeningViewModel {
 extension ProjectOpeningViewModel {
     func applyProjectLocationPickerResult(_ result: ProjectLocationPickerResult) {
         switch result {
-        case .selected(let url):
+        case let .selected(url):
             setProjectLocation(url)
         case .cancelled:
             statusMessage = "Project location selection cancelled."
-        case .unavailable(let message):
+        case let .unavailable(message):
             statusMessage = "Could not choose a project location: \(message)"
         }
     }
@@ -577,14 +591,16 @@ struct ProjectOpeningAvailability: Equatable, Sendable {
     static func inspect(at url: URL) -> Self {
         let fileManager = FileManager()
         var isDirectory: ObjCBool = false
-        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue,
-              fileManager.isReadableFile(atPath: url.path),
-              let project = try? ProjectSystem.loadProject(at: url, fileManager: fileManager)
+        guard
+            fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue,
+            fileManager.isReadableFile(atPath: url.path),
+            let project = try? ProjectSystem.loadProject(at: url, fileManager: fileManager)
         else {
             return Self(isAvailable: false, containsSwiftCode: false)
         }
-        guard project.build.system == .swiftpm,
-              fileManager.isReadableFile(atPath: url.appendingPathComponent("Package.swift").path)
+        guard
+            project.build.system == .swiftpm,
+            fileManager.isReadableFile(atPath: url.appendingPathComponent("Package.swift").path)
         else {
             return Self(isAvailable: true, containsSwiftCode: false)
         }
@@ -594,11 +610,15 @@ struct ProjectOpeningAvailability: Equatable, Sendable {
             if isSwiftSource(sourceURL) {
                 return true
             }
-            guard let files = fileManager.enumerator(
-                at: sourceURL,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles, .skipsPackageDescendants]
-            ) else { return false }
+            guard
+                let files = fileManager.enumerator(
+                    at: sourceURL,
+                    includingPropertiesForKeys: [.isRegularFileKey],
+                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                )
+            else {
+                return false
+            }
             for case let file as URL in files where isSwiftSource(file) {
                 return true
             }

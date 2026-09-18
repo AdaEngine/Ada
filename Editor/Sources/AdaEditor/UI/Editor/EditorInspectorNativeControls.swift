@@ -1,55 +1,58 @@
 #if canImport(AppKit) && os(macOS)
-@_spi(AdaEngine) import AdaEngine
-import AppKit
+    @_spi(AdaEngine) import AdaEngine
+    import AppKit
 
-struct EditorInspectorTextureDropTarget: AppKitViewRepresentable {
-    let onClick: () -> Void
-    let onDrop: (URL) -> Void
+    struct EditorInspectorTextureDropTarget: AppKitViewRepresentable {
+        let onClick: () -> Void
+        let onDrop: (URL) -> Void
 
-    func makeNSView(context: Context) -> TextureDropView {
-        TextureDropView(onClick: onClick, onDrop: onDrop)
-    }
-
-    func updateNSView(_ view: TextureDropView, context: Context) {
-        view.onClick = onClick
-        view.onDrop = onDrop
-    }
-
-    final class TextureDropView: NSView {
-        var onClick: () -> Void
-        var onDrop: (URL) -> Void
-
-        init(onClick: @escaping () -> Void, onDrop: @escaping (URL) -> Void) {
-            self.onClick = onClick
-            self.onDrop = onDrop
-            super.init(frame: .zero)
-            registerForDraggedTypes([.fileURL])
+        func makeNSView(context _: Context) -> TextureDropView {
+            TextureDropView(onClick: onClick, onDrop: onDrop)
         }
 
-        @available(*, unavailable)
-        required init?(coder: NSCoder) {
-            nil
+        func updateNSView(_ view: TextureDropView, context _: Context) {
+            view.onClick = onClick
+            view.onDrop = onDrop
         }
 
-        override func mouseDown(with event: NSEvent) {
-            onClick()
-        }
+        final class TextureDropView: NSView {
+            var onClick: () -> Void
+            var onDrop: (URL) -> Void
 
-        override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-            droppedFileURL(from: sender) == nil ? [] : .copy
-        }
-
-        override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
-            guard let url = droppedFileURL(from: sender) else {
-                return false
+            init(onClick: @escaping () -> Void, onDrop: @escaping (URL) -> Void) {
+                self.onClick = onClick
+                self.onDrop = onDrop
+                super.init(frame: .zero)
+                registerForDraggedTypes([.fileURL])
             }
-            onDrop(url)
-            return true
-        }
 
-        private func droppedFileURL(from draggingInfo: any NSDraggingInfo) -> URL? {
-            draggingInfo.draggingPasteboard.readObjects(forClasses: [NSURL.self])?.first as? URL
+            @available(*, unavailable)
+            required init?(coder _: NSCoder) {
+                nil
+            }
+
+            override func mouseDown(with _: NSEvent) {
+                onClick()
+            }
+
+            override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+                droppedFileURL(from: sender) == nil ? [] : .copy
+            }
+
+            override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+                guard let url = droppedFileURL(from: sender) else {
+                    return false
+                }
+                onDrop(url)
+                return true
+            }
+
+            private func droppedFileURL(from draggingInfo: any NSDraggingInfo) -> URL? {
+                guard let fileURLClass = NSClassFromString("NSURL") else {
+                    return nil
+                }
+                return draggingInfo.draggingPasteboard.readObjects(forClasses: [fileURLClass])?.first as? URL
+            }
         }
     }
-}
 #endif

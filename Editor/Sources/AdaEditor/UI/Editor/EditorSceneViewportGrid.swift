@@ -188,7 +188,8 @@ extension EditorSceneViewportModel {
         while x <= maxX {
             let isAxis = abs(x) < 0.0001
             let isMajor = index.isMultiple(of: majorEvery)
-            let color = isAxis
+            let color =
+                isAxis
                 ? theme.editorColors.purple.opacity(0.65 * opacity)
                 : theme.editorColors.border.opacity((isMajor ? 0.40 : 0.22) * opacity)
             let width: Float = isAxis ? 2 : 1
@@ -209,7 +210,8 @@ extension EditorSceneViewportModel {
         while z <= maxZ {
             let isAxis = abs(z) < 0.0001
             let isMajor = index.isMultiple(of: majorEvery)
-            let color = isAxis
+            let color =
+                isAxis
                 ? theme.editorColors.blue.opacity(0.70 * opacity)
                 : theme.editorColors.border.opacity((isMajor ? 0.40 : 0.22) * opacity)
             let width: Float = isAxis ? 2 : 1
@@ -234,9 +236,11 @@ extension EditorSceneViewportModel {
         lineWidth: Float,
         color: Color
     ) {
-        guard let segment = clipSegmentToNearPlane(start: start, end: end, size: size),
-              let projectedStart = project(segment.start, size: size),
-              let projectedEnd = project(segment.end, size: size) else {
+        guard
+            let segment = clipSegmentToNearPlane(start: start, end: end, size: size),
+            let projectedStart = project(segment.start, size: size),
+            let projectedEnd = project(segment.end, size: size)
+        else {
             return
         }
 
@@ -258,8 +262,10 @@ extension EditorSceneViewportModel {
             return nil
         }
         let ndc = clipPoint.xyz / clipPoint.w
-        guard ndc.x.isFinite, ndc.y.isFinite, ndc.z.isFinite,
-              ndc.z >= 0, ndc.z <= 1 else {
+        guard
+            ndc.x.isFinite, ndc.y.isFinite, ndc.z.isFinite,
+            ndc.z >= 0, ndc.z <= 1
+        else {
             return nil
         }
 
@@ -319,12 +325,14 @@ extension EditorSceneViewportModel {
         while x <= maxX {
             let screenX = worldToScreen(Vector2(x, 0), size: size).x
             if screenX >= 44 && screenX <= size.width - 4 {
-                labels.append(EditorSceneViewportCoordinateRuler.Label(
-                    axis: .x,
-                    value: x,
-                    position: Point(x: screenX, y: 0),
-                    text: formatted(x)
-                ))
+                labels.append(
+                    EditorSceneViewportCoordinateRuler.Label(
+                        axis: .x,
+                        value: x,
+                        position: Point(x: screenX, y: 0),
+                        text: formatted(x)
+                    )
+                )
             }
             x += step
         }
@@ -333,12 +341,14 @@ extension EditorSceneViewportModel {
         while y <= maxY {
             let screenY = worldToScreen(Vector2(0, y), size: size).y
             if screenY >= 24 && screenY <= size.height - 4 {
-                labels.append(EditorSceneViewportCoordinateRuler.Label(
-                    axis: .y,
-                    value: y,
-                    position: Point(x: 0, y: screenY),
-                    text: formatted(y)
-                ))
+                labels.append(
+                    EditorSceneViewportCoordinateRuler.Label(
+                        axis: .y,
+                        value: y,
+                        position: Point(x: 0, y: screenY),
+                        text: formatted(y)
+                    )
+                )
             }
             y += step
         }

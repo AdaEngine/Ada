@@ -46,31 +46,31 @@ enum EditorAgentSceneToolError: Error, Equatable, LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
-        case .invalidScenePath(let path):
+        case let .invalidScenePath(path):
             "Invalid project scene path: \(path)"
-        case .sceneNotFound(let path):
+        case let .sceneNotFound(path):
             "Scene was not found: \(path)"
-        case .revisionConflict(let expected, let actual):
+        case let .revisionConflict(expected, actual):
             "Scene revision conflict. Expected \(expected), found \(actual)."
-        case .entityNotFound(let id):
+        case let .entityNotFound(id):
             "Scene entity was not found: \(id)"
-        case .duplicateEntityID(let id):
+        case let .duplicateEntityID(id):
             "Scene entity id already exists: \(id)"
         case .invalidEntityName:
             "Scene entity name must not be empty."
-        case .invalidParent(let entityID, let parentID):
+        case let .invalidParent(entityID, parentID):
             "Entity \(entityID) cannot use missing parent \(parentID)."
-        case .hierarchyCycle(let entityID):
+        case let .hierarchyCycle(entityID):
             "Scene hierarchy contains a cycle at entity \(entityID)."
-        case .componentNotFound(let entityID, let typeName):
+        case let .componentNotFound(entityID, typeName):
             "Component \(typeName) was not found on entity \(entityID)."
-        case .componentUnavailable(let typeName):
+        case let .componentUnavailable(typeName):
             "Component is not available for structured editing: \(typeName)"
-        case .invalidComponent(let typeName, let message):
+        case let .invalidComponent(typeName, message):
             "Invalid \(typeName) component payload: \(message)"
-        case .changeNotFound(let id):
+        case let .changeNotFound(id):
             "Scene change was not found: \(id)"
-        case .undoConflict(let expected, let actual):
+        case let .undoConflict(expected, actual):
             "Scene changed after this operation. Undo expected \(expected), found \(actual)."
         }
     }
@@ -95,21 +95,27 @@ final class EditorAgentSceneToolService {
     }
 
     func listScenes() -> [String] {
-        guard let enumerator = fileManager.enumerator(
-            at: projectURL,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
+        guard
+            let enumerator = fileManager.enumerator(
+                at: projectURL,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
+        else {
             return []
         }
 
-        return enumerator.compactMap { item -> String? in
-            guard let url = item as? URL,
-                  Self.sceneExtensions.contains(url.pathExtension.lowercased()) else {
-                return nil
+        return
+            enumerator.compactMap { item -> String? in
+                guard
+                    let url = item as? URL,
+                    Self.sceneExtensions.contains(url.pathExtension.lowercased())
+                else {
+                    return nil
+                }
+                return projectRelativePath(for: url)
             }
-            return projectRelativePath(for: url)
-        }.sorted()
+            .sorted()
     }
 
     func snapshot(relativePath: String) throws -> EditorAgentSceneSnapshot {
@@ -197,7 +203,7 @@ final class EditorAgentSceneToolService {
 
     private func apply(_ operation: EditorAgentSceneOperation, to model: inout EditorSceneModel) throws {
         switch operation {
-        case .createEntity(let requestedID, let rawName, let parentID, let components):
+        case let .createEntity(requestedID, rawName, parentID, components):
             let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty else {
                 throw EditorAgentSceneToolError.invalidEntityName
@@ -219,7 +225,7 @@ final class EditorAgentSceneToolService {
             model.entities.append(EditorSceneEntity(id: id, name: name, enabled: true, parent: parentID, components: resolvedComponents))
             model.selectEntity(id)
 
-        case .renameEntity(let id, let rawName):
+        case let .renameEntity(id, rawName):
             let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty else {
                 throw EditorAgentSceneToolError.invalidEntityName
@@ -227,18 +233,18 @@ final class EditorAgentSceneToolService {
             let index = try entityIndex(id, in: model)
             model.entities[index].name = name
 
-        case .setEntityEnabled(let id, let enabled):
+        case let .setEntityEnabled(id, enabled):
             let index = try entityIndex(id, in: model)
             model.entities[index].enabled = enabled
 
-        case .reparentEntity(let id, let parentID):
+        case let .reparentEntity(id, parentID):
             let index = try entityIndex(id, in: model)
             if let parentID, !model.entities.contains(where: { $0.id == parentID }) {
                 throw EditorAgentSceneToolError.invalidParent(entityID: id, parentID: parentID)
             }
             model.entities[index].parent = parentID
 
-        case .deleteEntity(let id, let children):
+        case let .deleteEntity(id, children):
             let index = try entityIndex(id, in: model)
             let parentID = model.entities[index].parent
             if children == .cascade {
@@ -259,7 +265,7 @@ final class EditorAgentSceneToolService {
                 }
             }
 
-        case .setComponent(let entityID, let typeName, let payload):
+        case let .setComponent(entityID, typeName, payload):
             let index = try entityIndex(entityID, in: model)
             try validateComponent(typeName: typeName, payload: payload)
             if model.entities[index].components[typeName] == nil {
@@ -270,7 +276,7 @@ final class EditorAgentSceneToolService {
             }
             model.entities[index].components[typeName] = payload
 
-        case .removeComponent(let entityID, let typeName):
+        case let .removeComponent(entityID, typeName):
             let index = try entityIndex(entityID, in: model)
             guard model.entities[index].components[typeName] != nil else {
                 throw EditorAgentSceneToolError.componentNotFound(entityID: entityID, typeName: typeName)
@@ -335,8 +341,10 @@ final class EditorAgentSceneToolService {
     }
 
     private func resolvedSceneURL(_ relativePath: String) throws -> URL {
-        guard !relativePath.hasPrefix("/"),
-              Self.sceneExtensions.contains(URL(fileURLWithPath: relativePath).pathExtension.lowercased()) else {
+        guard
+            !relativePath.hasPrefix("/"),
+            Self.sceneExtensions.contains(URL(fileURLWithPath: relativePath).pathExtension.lowercased())
+        else {
             throw EditorAgentSceneToolError.invalidScenePath(relativePath)
         }
         let candidate = projectURL.appendingPathComponent(relativePath).standardizedFileURL
@@ -357,10 +365,11 @@ final class EditorAgentSceneToolService {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(record).write(
-            to: changesDirectoryURL.appendingPathComponent("\(record.id).json"),
-            options: [.atomic]
-        )
+        try encoder.encode(record)
+            .write(
+                to: changesDirectoryURL.appendingPathComponent("\(record.id).json"),
+                options: [.atomic]
+            )
     }
 
     private var changesDirectoryURL: URL {
@@ -381,7 +390,7 @@ final class EditorAgentSceneToolService {
     }
 }
 
-private extension String {
+extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self
     }

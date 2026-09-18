@@ -2,7 +2,9 @@
 import Foundation
 
 enum EditorAchievementFilter: String, CaseIterable {
-    case all = "All", earned = "Earned", locked = "Not earned"
+    case all = "All"
+    case earned = "Earned"
+    case locked = "Not earned"
 }
 
 struct EditorAchievementSettings: View {
@@ -21,18 +23,24 @@ struct EditorAchievementSettings: View {
                 .font(.system(size: 12))
                 .accessibilityIdentifier("AdaEditor.Achievements.Connection")
             if !center.isConnected {
-                Text(center.snapshot.guestOwner == nil
-                     ? "Your local achievements will be added to the first Game Center account you connect."
-                     : "Offline progress stays with its local profile. Achievements from different accounts are kept separate.")
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.editorColors.muted)
+                Text(
+                    center.snapshot.guestOwner == nil
+                        ? "Your local achievements will be added to the first Game Center account you connect."
+                        : "Offline progress stays with its local profile. Achievements from different accounts are kept separate."
+                )
+                .font(.system(size: 11))
+                .foregroundColor(theme.editorColors.muted)
             }
             if let error = center.storageError {
                 Text(error).font(.system(size: 12))
             }
             HStack(spacing: 12) {
                 Button(center.isConnected ? "Sync Game Center" : "Connect Game Center") {
-                    if center.isConnected { center.synchronize() } else { center.connect() }
+                    if center.isConnected {
+                        center.synchronize()
+                    } else {
+                        center.connect()
+                    }
                 }
                 .font(.system(size: 12))
                 .padding(.horizontal, 12)
@@ -57,9 +65,12 @@ struct EditorAchievementSettings: View {
                         .font(.system(size: 12))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(RoundedRectangleShape(cornerRadius: 5).fill(
-                            filter == item ? theme.editorColors.blue.opacity(0.18) : theme.editorColors.surface
-                        ))
+                        .background(
+                            RoundedRectangleShape(cornerRadius: 5)
+                                .fill(
+                                    filter == item ? theme.editorColors.blue.opacity(0.18) : theme.editorColors.surface
+                                )
+                        )
                         .foregroundColor(filter == item ? theme.editorColors.blue : theme.editorColors.text)
                         .accessibilityIdentifier("AdaEditor.Achievements.Filter.\(item.rawValue)")
                 }
@@ -102,7 +113,9 @@ struct EditorAchievementSettings: View {
                 }
             }
             Spacer()
-            if !hidden { Text("\(achievement.points) pt").font(.system(size: 11)) }
+            if !hidden {
+                Text("\(achievement.points) pt").font(.system(size: 11))
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)

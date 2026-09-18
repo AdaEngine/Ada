@@ -8,9 +8,8 @@
 /// A view that overlays its subviews, aligning them in both axes.
 /// The ZStack assigns each successive subview a higher z-axis value than the one before it, meaning later subviews appear “on top” of earlier ones.
 public struct ZStack<Content: View>: View {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let anchor: AnchorPoint
     let content: () -> Content

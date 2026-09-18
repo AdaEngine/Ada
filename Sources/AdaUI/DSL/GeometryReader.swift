@@ -79,7 +79,7 @@ public struct NamedViewCoordinateSpace: Equatable, ViewCoordinateSpaceProtocol {
     ///   - lhs: The left-hand side of the equality check.
     ///   - rhs: The right-hand side of the equality check.
     /// - Returns: A Boolean value indicating whether the two named view coordinate spaces are equal.
-    public static func == (lhs: NamedViewCoordinateSpace, rhs: NamedViewCoordinateSpace) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.name == rhs.name
     }
 
@@ -87,8 +87,8 @@ public struct NamedViewCoordinateSpace: Equatable, ViewCoordinateSpaceProtocol {
     ///
     /// - Parameter name: The name of the named view coordinate space.
     /// - Returns: A new named view coordinate space.
-    public static func named<H: Hashable>(_ name: H) -> NamedViewCoordinateSpace {
-        NamedViewCoordinateSpace(name)
+    public static func named<H: Hashable>(_ name: H) -> Self {
+        Self(name)
     }
 }
 
@@ -97,7 +97,6 @@ public struct NamedViewCoordinateSpace: Equatable, ViewCoordinateSpaceProtocol {
 /// A geometry proxy.
 @MainActor
 public struct GeometryProxy {
-
     /// The named coordinate space container.
     let namedCoordinateSpaceContainer: NamedViewCoordinateSpaceContainer
 
@@ -132,7 +131,7 @@ public struct GeometryProxy {
             return self.resolvedGlobalFrame
         case .scrollView:
             return frame(relativeTo: ViewCoordinateSpace.scrollViewId)
-        case .named(let value):
+        case let .named(value):
             return frame(relativeTo: value)
         }
     }
@@ -159,9 +158,8 @@ public struct GeometryProxy {
 
 /// A geometry reader.
 public struct GeometryReader<Content: View>: View, ViewNodeBuilder {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let content: (GeometryProxy) -> Content
 
@@ -176,14 +174,13 @@ public struct GeometryReader<Content: View>: View, ViewNodeBuilder {
     ///
     /// - Parameter context: The build context.
     /// - Returns: The view node.
-    func buildViewNode(in context: BuildContext) -> ViewNode {
+    func buildViewNode(in _: BuildContext) -> ViewNode {
         GeometryReaderViewNode(contentProxy: content, content: self)
     }
 }
 
 /// A geometry reader view node.
 final class GeometryReaderViewNode<Content: View>: ViewContainerNode {
-
     /// The content proxy.
     private var contentProxy: (GeometryProxy) -> Content
     private var lastContentSignature: ContentSignature?
@@ -223,8 +220,8 @@ final class GeometryReaderViewNode<Content: View>: ViewContainerNode {
 
         var resolvedEnvironment = geometryReaderNode.environment
         if !resolvedEnvironment.animationsDisabled,
-           resolvedEnvironment.animationController == nil,
-           let animationController = self.environment.animationController {
+            resolvedEnvironment.animationController == nil,
+            let animationController = self.environment.animationController {
             resolvedEnvironment.animationController = animationController
         }
         self.applyResolvedEnvironmentSilently(resolvedEnvironment)
@@ -312,7 +309,7 @@ final class GeometryReaderViewNode<Content: View>: ViewContainerNode {
                 self?.scheduleObservedContentInvalidation(revision: observationRevision)
             }
         }
-        let nodes = outputs.map { $0.node }
+        let nodes = outputs.map(\.node)
 
         self.reconcileChildNodes(from: nodes)
         self.lastContentSignature = signature
@@ -359,12 +356,12 @@ extension EnvironmentValues {
     @Entry var coordinateSpaces: NamedViewCoordinateSpaceContainer = NamedViewCoordinateSpaceContainer()
 }
 
-public extension View {
+extension View {
     /// The coordinate space of the view.
     ///
     /// - Parameter named: The named view coordinate space.
     /// - Returns: The coordinate space of the view.
-    func coordinateSpace(_ named: NamedViewCoordinateSpace) -> some View {
+    public func coordinateSpace(_ named: NamedViewCoordinateSpace) -> some View {
         self.modifier(CoordinateSpaceViewModifier(named: named, content: self))
     }
 }

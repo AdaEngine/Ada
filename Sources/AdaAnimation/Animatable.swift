@@ -15,35 +15,32 @@ public protocol Animatable {
     var animatableData: AnimatableData { get set }
 }
 
-public extension Animatable where Self: VectorArithmetic {
-
+extension Animatable where Self: VectorArithmetic {
     /// The data to animate.
-    var animatableData: Self {
+    public var animatableData: Self {
         get { self }
         set { self = newValue }
     }
 }
 
-public extension Animatable where Self.AnimatableData == EmptyAnimatableData {
-
+extension Animatable where Self.AnimatableData == EmptyAnimatableData {
     /// The data to animate.
-    var animatableData: EmptyAnimatableData {
+    public var animatableData: EmptyAnimatableData {
         get { EmptyAnimatableData() }
         // swiftlint:disable:next unused_setter_value
-        set { }
+        set {}
     }
 }
 
 /// An empty type for animatable data.
 public struct EmptyAnimatableData: VectorArithmetic, Sendable {
-
     /// Subtract two empty animatable data.
     ///
     /// - Parameters:
     ///   - lhs: The left-hand side of the subtraction.
     ///   - rhs: The right-hand side of the subtraction.
-    public static func - (lhs: EmptyAnimatableData, rhs: EmptyAnimatableData) -> EmptyAnimatableData {
-        EmptyAnimatableData(value: lhs.value - rhs.value)
+    public static func - (lhs: Self, rhs: Self) -> Self {
+        Self(value: lhs.value - rhs.value)
     }
 
     /// Add two empty animatable data.
@@ -51,12 +48,12 @@ public struct EmptyAnimatableData: VectorArithmetic, Sendable {
     /// - Parameters:
     ///   - lhs: The left-hand side of the addition.
     ///   - rhs: The right-hand side of the addition.
-    public static func + (lhs: EmptyAnimatableData, rhs: EmptyAnimatableData) -> EmptyAnimatableData {
-        EmptyAnimatableData(value: lhs.value + rhs.value)
+    public static func + (lhs: Self, rhs: Self) -> Self {
+        Self(value: lhs.value + rhs.value)
     }
 
     /// The zero value of the empty animatable data.
-    public static let zero: EmptyAnimatableData = EmptyAnimatableData(value: 0)
+    public static let zero: EmptyAnimatableData = Self(value: 0)
 
     /// The value of the empty animatable data.
     var value: Double
@@ -83,7 +80,6 @@ public struct EmptyAnimatableData: VectorArithmetic, Sendable {
 
 /// A pair of animatable values, which is itself animatable.
 public struct AnimatablePair<First: VectorArithmetic, Second: VectorArithmetic>: VectorArithmetic {
-
     /// The first value of the animatable pair.
     public var first: First
 
@@ -115,7 +111,7 @@ public struct AnimatablePair<First: VectorArithmetic, Second: VectorArithmetic>:
     ///   - lhs: The left-hand side of the subtraction.
     ///   - rhs: The right-hand side of the subtraction.
     public static func - (lhs: Self, rhs: Self) -> Self {
-        AnimatablePair(lhs.first - rhs.first, lhs.second - rhs.second)
+        Self(lhs.first - rhs.first, lhs.second - rhs.second)
     }
 
     /// Add two animatable pairs.
@@ -124,9 +120,9 @@ public struct AnimatablePair<First: VectorArithmetic, Second: VectorArithmetic>:
     ///   - lhs: The left-hand side of the addition.
     ///   - rhs: The right-hand side of the addition.
     public static func + (lhs: Self, rhs: Self) -> Self {
-        AnimatablePair(lhs.first + rhs.first, lhs.second + rhs.second)
+        Self(lhs.first + rhs.first, lhs.second + rhs.second)
     }
 
     /// The zero value of the animatable pair.
-    public static var zero: AnimatablePair<First, Second> { return AnimatablePair(First.zero, Second.zero) }
+    public static var zero: AnimatablePair<First, Second> { return Self(First.zero, Second.zero) }
 }

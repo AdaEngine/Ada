@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor
 @Suite("Transform gizmo interaction", .serialized)
@@ -160,7 +161,10 @@ struct EditorTransformGizmoTests {
         fixture.viewport.configure(
             sceneContent: fixture.content,
             onSelectionChanged: { fixture.selection = $0 },
-            onDocumentContentChanged: { fixture.content = $0; fixture.documentEdits += 1 }
+            onDocumentContentChanged: {
+                fixture.content = $0
+                fixture.documentEdits += 1
+            }
         )
         #expect(fixture.viewport.handleInput(mouse(origin + Vector2(40, 0), .changed)))
         #expect(fixture.viewport.handleInput(mouse(origin + Vector2(40, 0), .ended)))
@@ -246,8 +250,14 @@ struct EditorTransformGizmoTests {
             let replacement = try EditorSceneModel.default(projectName: "Replacement").encodedYAML()
             fixture.viewport.configure(
                 sceneContent: replacement,
-                onSelectionChanged: { fixture.selection = $0; fixture.selectionUpdates += 1 },
-                onDocumentContentChanged: { fixture.content = $0; fixture.documentEdits += 1 }
+                onSelectionChanged: {
+                    fixture.selection = $0
+                    fixture.selectionUpdates += 1
+                },
+                onDocumentContentChanged: {
+                    fixture.content = $0
+                    fixture.documentEdits += 1
+                }
             )
         }
         let selection = fixture.selection
@@ -295,8 +305,20 @@ private final class Fixture {
         model.selectEntity("selected")
         content = try model.encodedYAML()
         content = try EditorSceneYAMLDocument.upsertTransform(transform, entityID: "selected", in: content)
-        if let parent { content = try EditorSceneYAMLDocument.upsertTransform(parent, entityID: root, in: content) }
-        viewport.configure(sceneContent: content, onSelectionChanged: { [weak self] in self?.selection = $0; self?.selectionUpdates += 1 }, onDocumentContentChanged: { [weak self] in self?.content = $0; self?.documentEdits += 1 })
+        if let parent {
+            content = try EditorSceneYAMLDocument.upsertTransform(parent, entityID: root, in: content)
+        }
+        viewport.configure(
+            sceneContent: content,
+            onSelectionChanged: { [weak self] in
+                self?.selection = $0
+                self?.selectionUpdates += 1
+            },
+            onDocumentContentChanged: { [weak self] in
+                self?.content = $0
+                self?.documentEdits += 1
+            }
+        )
         let result = EditorSceneFileLoader.load(content: content, into: world)
         runtimeID = result.entitiesByEditorID["selected"]
         viewport.attachSceneWorld(world, loadResult: result)

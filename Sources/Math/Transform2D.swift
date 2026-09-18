@@ -12,7 +12,7 @@ public struct Transform2D: Hashable, Sendable {
     public var x: Vector3
     public var y: Vector3
     public var z: Vector3
-    
+
     @inline(__always)
     public init() {
         self.x = Vector3(1, 0, 0)
@@ -21,51 +21,51 @@ public struct Transform2D: Hashable, Sendable {
     }
 }
 
-public extension Transform2D {
+extension Transform2D {
     @inline(__always)
-    init(translation: borrowing Vector2) {
+    public init(translation: borrowing Vector2) {
         self.x = Vector3(1, 0, 0)
         self.y = Vector3(0, 1, 0)
         self.z = Vector3(translation.x, translation.y, 1)
     }
-    
+
     @inline(__always)
-    init(scale: borrowing Vector2) {
-        var matrix = Transform2D.identity
+    public init(scale: borrowing Vector2) {
+        var matrix = Self.identity
         matrix[0, 0] = scale.x
         matrix[1, 1] = scale.y
         self = matrix
     }
-    
+
     @inline(__always)
-    init(rotation: borrowing Angle) {
-        var matrix = Transform2D.identity
+    public init(rotation: borrowing Angle) {
+        var matrix = Self.identity
         matrix[0, 0] = cos(rotation.radians)
         matrix[0, 1] = sin(rotation.radians)
         matrix[1, 0] = -sin(rotation.radians)
         matrix[1, 1] = cos(rotation.radians)
         self = matrix
     }
-    
+
     @inline(__always)
-    init(columns: borrowing [Vector3]) {
+    public init(columns: borrowing [Vector3]) {
         precondition(columns.count == 3, "Inconsist columns count")
         self.x = columns[0]
         self.y = columns[1]
         self.z = columns[2]
     }
-    
+
     @inline(__always)
-    init(diagonal: Float) {
-        var matrix = Transform2D.identity
+    public init(diagonal: Float) {
+        var matrix = Self.identity
         matrix[0, 0] = diagonal
         matrix[1, 1] = diagonal
         matrix[2, 2] = diagonal
         self = matrix
     }
-    
+
     @inline(__always)
-    init(_ x: consuming Vector3, _ y: consuming Vector3, _ z: consuming Vector3) {
+    public init(_ x: consuming Vector3, _ y: consuming Vector3, _ z: consuming Vector3) {
         self.x = x
         self.y = y
         self.z = z
@@ -76,29 +76,31 @@ extension Transform2D: Codable {}
 
 extension Transform2D: CustomDebugStringConvertible {
     public var debugDescription: String {
-        return String(describing: type(of: self)) + "(" + [x, y, z].map { (v: Vector3) -> String in
-            "[" + [v.x, v.y, v.z].map { String(describing: $0) }.joined(separator: ", ") + "]"
-        }.joined(separator: ", ") + ")"
+        return String(describing: type(of: self)) + "("
+            + [x, y, z]
+            .map { (v: Vector3) -> String in
+                "[" + [v.x, v.y, v.z].map { String(describing: $0) }.joined(separator: ", ") + "]"
+            }
+            .joined(separator: ", ") + ")"
     }
 }
 
-public extension Transform2D {
-    
+extension Transform2D {
     @inline(__always)
-    subscript (_ column: Int, _ row: Int) -> Float {
+    public subscript(_ column: Int, _ row: Int) -> Float {
         get {
             self[column][row]
         }
-        
+
         set {
             self[column][row] = newValue
         }
     }
-    
+
     @inline(__always)
-    subscript (column: Int) -> Vector3 {
+    public subscript(column: Int) -> Vector3 {
         get {
-            switch(column) {
+            switch column {
             case 0: return x
             case 1: return y
             case 2: return z
@@ -106,7 +108,7 @@ public extension Transform2D {
             }
         }
         set {
-            switch(column) {
+            switch column {
             case 0: x = newValue
             case 1: y = newValue
             case 2: z = newValue
@@ -114,19 +116,18 @@ public extension Transform2D {
             }
         }
     }
-    
+
     @inline(__always)
-    static let identity: Transform2D = Transform2D()
+    public static let identity: Transform2D = Transform2D()
 }
 
-public extension Transform2D {
-    
+extension Transform2D {
     /// Rotation in radians
-    var rotation: Float {
+    public var rotation: Float {
         get {
             return atan2(self[0].y, self[0].x)
         }
-        
+
         set {
             let scale = self.scale
             let cosRotation = cos(newValue)
@@ -138,65 +139,65 @@ public extension Transform2D {
             self.scale = scale
         }
     }
-    
-    var position: Vector2 {
+
+    public var position: Vector2 {
         get {
             Vector2(self[2, 0], self[2, 1])
         }
-        
+
         set {
             self[2, 0] = newValue.x
             self[2, 1] = newValue.y
         }
     }
-    
-    var scale: Vector2 {
+
+    public var scale: Vector2 {
         get {
             Vector2(self.x.length, self.y.length)
         }
-        
+
         set {
             self.x = self.x.normalized
             self.y = self.y.normalized
-            
+
             self.x *= newValue.x
             self.y *= newValue.y
         }
     }
 }
 
-public extension Transform2D {
-    func rotated(by angle: Angle) -> Transform2D {
+extension Transform2D {
+    public func rotated(by angle: Angle) -> Transform2D {
         var mat = self
         mat.rotation = angle.radians
         return mat
     }
-    
-    func translatedBy(x: Float, y: Float) -> Transform2D {
+
+    public func translatedBy(x: Float, y: Float) -> Transform2D {
         var mat = self
         mat.position = [x, y]
         return mat
     }
-    
-    func scaledBy(x: Float, y: Float) -> Transform2D {
+
+    public func scaledBy(x: Float, y: Float) -> Transform2D {
         var mat = self
         mat.scale = [x, y]
         return mat
     }
 }
 
-extension Transform2D: Equatable { }
+extension Transform2D: Equatable {}
 
-public extension Transform2D {
-    static func * (lhs: borrowing Transform2D, rhs: Float) -> Transform2D {
+extension Transform2D {
+    public static func * (lhs: borrowing Transform2D, rhs: Float) -> Transform2D {
         Transform2D(columns: [
             [lhs[0, 0] * rhs, lhs[0, 1] * rhs, lhs[0, 2] * rhs],
             [lhs[1, 0] * rhs, lhs[1, 1] * rhs, lhs[1, 2] * rhs],
             [lhs[2, 0] * rhs, lhs[2, 1] * rhs, lhs[2, 2] * rhs],
         ])
     }
-    
-    static func * (lhs: borrowing Transform2D, rhs: borrowing Transform2D) -> Transform2D {
+
+    public static func * (lhs: borrowing Transform2D, rhs: borrowing Transform2D) -> Transform2D {
         var x: Vector3 = lhs.x * rhs[0].x
         x = x + lhs.y * rhs[0].y
         x = x + lhs.z * rhs[0].z
@@ -208,8 +209,8 @@ public extension Transform2D {
         z = z + lhs.z * rhs[2].z
         return Transform2D(x, y, z)
     }
-    
-    static prefix func - (matrix: borrowing Transform2D) -> Transform2D {
+
+    public static prefix func - (matrix: borrowing Transform2D) -> Transform2D {
         Transform2D(columns: [
             [-matrix[0, 0], -matrix[0, 1], -matrix[0, 2]],
             [-matrix[1, 0], -matrix[1, 1], -matrix[1, 2]],
@@ -218,8 +219,8 @@ public extension Transform2D {
     }
 }
 
-public extension Transform2D {
-    var inverse: Transform2D {
+extension Transform2D {
+    public var inverse: Transform2D {
         var mm = Transform2D()
         mm.x.x = self.y.y * self.z.z
         mm.x.x = mm.x.x - self.y.z * self.z.y
@@ -241,16 +242,16 @@ public extension Transform2D {
         mm.z.z = mm.z.z - self.x.y * self.y.x
         return mm * (1 / self.determinant)
     }
-    
-    var transpose: Transform2D {
+
+    public var transpose: Transform2D {
         return Transform2D(columns: [
             [self.x.x, self.y.x, self.z.x],
             [self.x.y, self.y.y, self.z.y],
-            [self.x.z, self.y.z, self.z.z]
+            [self.x.z, self.y.z, self.z.z],
         ])
     }
-    
-    var determinant: Float {
+
+    public var determinant: Float {
         var d1 = self.y.y * self.z.z
         d1 = d1 - self.z.y * self.y.z
         var d2 = self.x.y * self.z.z
@@ -263,19 +264,18 @@ public extension Transform2D {
         return det
     }
 
-    var isAffineMatrix: Bool {
+    public var isAffineMatrix: Bool {
         return self[0, 2] == 0 && self[1, 2] == 0 && self[2, 2] == 1
     }
-
 }
 
-public extension Transform2D {
-    init(affineTransformFrom t: borrowing Transform3D) {
+extension Transform2D {
+    public init(affineTransformFrom t: borrowing Transform3D) {
         let pos = t.origin
         self = Transform2D(
             [t[0, 0], t[1, 0], 0],
             [t[0, 1], t[1, 1], 0],
-            [pos.x,   pos.y,   1]
+            [pos.x, pos.y, 1]
         )
     }
 }

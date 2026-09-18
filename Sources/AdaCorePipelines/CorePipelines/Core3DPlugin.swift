@@ -14,14 +14,13 @@ import Math
 
 /// Plugin for RenderWorld added 3D render capatibilites.
 public struct Core3DPlugin: Plugin {
-
     private let includes2D: Bool
 
     /// Enables depth-tested 2D content in the 3D graph. Requires `Core2DPlugin`.
     public init(includes2D: Bool = false) {
         self.includes2D = includes2D
     }
-    
+
     /// Input slots of render graph.
     public enum InputNode {
         public static let view: RenderSlot.Label = "view"
@@ -31,7 +30,7 @@ public struct Core3DPlugin: Plugin {
         GLTFLoaderResolver.shared.setLoader(NativeGLTFLoader())
         OBJLoaderResolver.shared.setLoader(NativeOBJLoader())
         Environment3D.registerComponent()
-        
+
         guard let app = app.getSubworldBuilder(by: .renderWorld) else {
             return
         }
@@ -89,18 +88,18 @@ public struct Core3DPlugin: Plugin {
     }
 }
 
-public extension RenderGraph.Label {
+extension RenderGraph.Label {
     /// Render graph name.
-    static let main3D: RenderGraph.Label = "Scene 3D Render Graph"
+    public static let main3D: RenderGraph.Label = "Scene 3D Render Graph"
 }
 
-public extension RenderNodeLabel {
-    enum Main3D {
+extension RenderNodeLabel {
+    public enum Main3D {
         public static let beginPass: RenderNodeLabel = "Main3D.BeginPass"
         public static let endPass: RenderNodeLabel = "Main3D.EndPass"
     }
 }
 
-public extension RenderNodeLabel {
-    static let screenSpaceReflection: RenderNodeLabel = "Main3D.ScreenSpaceReflection"
+extension RenderNodeLabel {
+    public static let screenSpaceReflection: RenderNodeLabel = "Main3D.ScreenSpaceReflection"
 }

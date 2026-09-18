@@ -20,7 +20,7 @@ public struct GLTFImportResult: Sendable {
         public let transform: Transform3D
         public let children: [Int]
         public let meshIndex: Int?
-        
+
         public init(name: String?, transform: Transform3D, children: [Int], meshIndex: Int?) {
             self.name = name
             self.transform = transform
@@ -32,7 +32,7 @@ public struct GLTFImportResult: Sendable {
     public struct Mesh: Sendable {
         public let name: String?
         public let primitives: [Primitive]
-        
+
         public init(name: String?, primitives: [Primitive]) {
             self.name = name
             self.primitives = primitives
@@ -44,7 +44,7 @@ public struct GLTFImportResult: Sendable {
         public let indices: [UInt32]?
         public let materialIndex: Int?
         public let mode: PrimitiveMode
-        
+
         public init(attributes: [Attribute: Accessor], indices: [UInt32]?, materialIndex: Int?, mode: PrimitiveMode) {
             self.attributes = attributes
             self.indices = indices
@@ -71,27 +71,30 @@ public struct GLTFImportResult: Sendable {
             guard componentCount == 2, values.count.isMultiple(of: 2) else {
                 return []
             }
-            return stride(from: 0, to: values.count, by: 2).map {
-                Vector2(x: values[$0], y: values[$0 + 1])
-            }
+            return stride(from: 0, to: values.count, by: 2)
+                .map {
+                    Vector2(x: values[$0], y: values[$0 + 1])
+                }
         }
 
         public func vector3Values() -> [Vector3] {
             guard componentCount == 3, values.count.isMultiple(of: 3) else {
                 return []
             }
-            return stride(from: 0, to: values.count, by: 3).map {
-                Vector3(x: values[$0], y: values[$0 + 1], z: values[$0 + 2])
-            }
+            return stride(from: 0, to: values.count, by: 3)
+                .map {
+                    Vector3(x: values[$0], y: values[$0 + 1], z: values[$0 + 2])
+                }
         }
 
         public func vector4Values() -> [Vector4] {
             guard componentCount == 4, values.count.isMultiple(of: 4) else {
                 return []
             }
-            return stride(from: 0, to: values.count, by: 4).map {
-                Vector4(x: values[$0], y: values[$0 + 1], z: values[$0 + 2], w: values[$0 + 3])
-            }
+            return stride(from: 0, to: values.count, by: 4)
+                .map {
+                    Vector4(x: values[$0], y: values[$0 + 1], z: values[$0 + 2], w: values[$0 + 3])
+                }
         }
     }
 
@@ -124,8 +127,16 @@ public struct GLTFImportResult: Sendable {
         public let roughnessFactor: Float
         public let metallicRoughnessTextureIndex: Int?
         public let normalTextureIndex: Int?
-        
-        public init(name: String?, baseColorFactor: Vector4, baseColorTextureIndex: Int?, metallicFactor: Float, roughnessFactor: Float, metallicRoughnessTextureIndex: Int?, normalTextureIndex: Int?) {
+
+        public init(
+            name: String?,
+            baseColorFactor: Vector4,
+            baseColorTextureIndex: Int?,
+            metallicFactor: Float,
+            roughnessFactor: Float,
+            metallicRoughnessTextureIndex: Int?,
+            normalTextureIndex: Int?
+        ) {
             self.name = name
             self.baseColorFactor = baseColorFactor
             self.baseColorTextureIndex = baseColorTextureIndex
@@ -139,7 +150,7 @@ public struct GLTFImportResult: Sendable {
     public struct Texture: Sendable {
         public let source: Int
         public let sampler: Int?
-        
+
         public init(source: Int, sampler: Int?) {
             self.source = source
             self.sampler = sampler
@@ -150,7 +161,7 @@ public struct GLTFImportResult: Sendable {
         public let uri: URL?
         public let data: Data?
         public let mimeType: String?
-        
+
         public init(uri: URL?, data: Data?, mimeType: String?) {
             self.uri = uri
             self.data = data
@@ -165,7 +176,7 @@ public struct GLTFImportResult: Sendable {
     public let images: [Image]
     public let scenes: [[Int]]
     public let defaultScene: Int?
-    
+
     public init(nodes: [Node], meshes: [Mesh], materials: [Material], textures: [Texture], images: [Image], scenes: [[Int]], defaultScene: Int?) {
         self.nodes = nodes
         self.meshes = meshes
@@ -180,13 +191,13 @@ public struct GLTFImportResult: Sendable {
 /// A resolver for the GLTFLoader.
 public final class GLTFLoaderResolver: @unchecked Sendable {
     public static let shared = GLTFLoaderResolver()
-    
+
     private var loader: (any GLTFLoader)?
-    
+
     public func setLoader(_ loader: any GLTFLoader) {
         self.loader = loader
     }
-    
+
     public func getLoader() -> any GLTFLoader {
         guard let loader = self.loader else {
             fatalError("GLTFLoader is not set. Please set a loader using GLTFLoaderResolver.shared.setLoader(_:)")

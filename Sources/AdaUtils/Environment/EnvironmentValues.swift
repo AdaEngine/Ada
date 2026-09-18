@@ -92,7 +92,6 @@ public protocol EnvironmentKey {
 /// }
 /// ```
 public struct EnvironmentValues: Sendable {
-
     private var values: [ObjectIdentifier: any Sendable] = [:]
     private var valueFingerprints: [ObjectIdentifier: Int] = [:]
 
@@ -110,7 +109,7 @@ public struct EnvironmentValues: Sendable {
     public private(set) var changedKeys: Set<ObjectIdentifier> = []
 
     /// Creates an environment values instance.
-    public init() { }
+    public init() {}
 
     /// When non-nil, every subscript READ reports the accessed key's ObjectIdentifier here.
     /// Used once during `@Environment` initialisation to discover which keys it subscribes to.
@@ -121,7 +120,7 @@ public struct EnvironmentValues: Sendable {
     /// Accesses the environment value associated with a custom key.
     public subscript<K: EnvironmentKey>(_ type: K.Type) -> K.Value {
         get {
-            EnvironmentValues._recordKeyAccess?(ObjectIdentifier(type))
+            unsafe Self._recordKeyAccess?(ObjectIdentifier(type))
             return (self.values[ObjectIdentifier(type)] as? K.Value) ?? K.defaultValue
         }
         set {
@@ -140,7 +139,7 @@ public struct EnvironmentValues: Sendable {
     }
 
     @_spi(Internal)
-    public mutating func merge(_ newValue: EnvironmentValues) {
+    public mutating func merge(_ newValue: Self) {
         for (key, value) in newValue.values {
             let existing = self.values[key]
             let actuallyChanged = !Self.areEquivalent(existing, value)
@@ -160,7 +159,7 @@ public struct EnvironmentValues: Sendable {
     /// Returns true if any key in `ids` has a different stored value between `self` and `other`.
     /// Used by subscription filtering in `ViewNode.updateEnvironment` to skip rebuilds
     /// when none of the keys a storage subscribes to actually changed.
-    package func hasChangedValues(forKeyIDs ids: Set<ObjectIdentifier>, comparedTo old: EnvironmentValues) -> Bool {
+    package func hasChangedValues(forKeyIDs ids: Set<ObjectIdentifier>, comparedTo old: Self) -> Bool {
         for id in ids {
             let newVal = values[id]
             let oldVal = old.values[id]
@@ -171,7 +170,7 @@ public struct EnvironmentValues: Sendable {
         return false
     }
 
-    package func hasSameSnapshot(as other: EnvironmentValues) -> Bool {
+    package func hasSameSnapshot(as other: Self) -> Bool {
         version == other.version && environmentHash == other.environmentHash
     }
 
@@ -191,8 +190,8 @@ public struct EnvironmentValues: Sendable {
     }
 }
 
-private extension EnvironmentValues {
-    static func makeFingerprint(for id: ObjectIdentifier, value: some Sendable) -> Int {
+extension EnvironmentValues {
+    private static func makeFingerprint(for id: ObjectIdentifier, value: some Sendable) -> Int {
         var hasher = Hasher()
         hasher.combine(id)
 
@@ -213,7 +212,7 @@ private extension EnvironmentValues {
         return hasher.finalize()
     }
 
-    static func combineStructuralFingerprint(_ value: Any, into hasher: inout Hasher, depth: Int = 0) {
+    private static func combineStructuralFingerprint(_ value: Any, into hasher: inout Hasher, depth: Int = 0) {
         hasher.combine(ObjectIdentifier(type(of: value)))
 
         guard depth < 4 else {
@@ -240,11 +239,12 @@ private extension EnvironmentValues {
         }
     }
 
-    static func areEquivalent(_ lhs: (any Sendable)?, _ rhs: (any Sendable)?) -> Bool {
+    private static func areEquivalent(_ lhs: (any Sendable)?, _ rhs: (any Sendable)?) -> Bool {
         switch (lhs, rhs) {
         case (nil, nil):
             return true
-        case (nil, _), (_, nil):
+        case (nil, _),
+            (_, nil):
             return false
         case let (lhs?, rhs?):
             if let lhsHash = lhs as? AnyHashable, let rhsHash = rhs as? AnyHashable {
@@ -252,7 +252,7 @@ private extension EnvironmentValues {
             }
 
             if let lhsObjectID = objectIdentifierIfReference(lhs),
-               let rhsObjectID = objectIdentifierIfReference(rhs) {
+                let rhsObjectID = objectIdentifierIfReference(rhs) {
                 return lhsObjectID == rhsObjectID
             }
 
@@ -260,11 +260,11 @@ private extension EnvironmentValues {
         }
     }
 
-    static func objectIdentifierIfReference(_ value: some Sendable) -> ObjectIdentifier? {
+    private static func objectIdentifierIfReference(_ value: some Sendable) -> ObjectIdentifier? {
         objectIdentifierIfReference(value as Any)
     }
 
-    static func objectIdentifierIfReference(_ value: Any) -> ObjectIdentifier? {
+    private static func objectIdentifierIfReference(_ value: Any) -> ObjectIdentifier? {
         let mirror = Mirror(reflecting: value)
         if mirror.displayStyle == .optional {
             guard let wrapped = mirror.children.first?.value else {
@@ -281,8 +281,8 @@ private extension EnvironmentValues {
     }
 }
 
-package extension EnvironmentValues {
-    @TaskLocal static var current = EnvironmentValues()
+extension EnvironmentValues {
+    @TaskLocal package static var current = EnvironmentValues()
 }
 
 /// Updates the current environment for the duration of an asynchronous operation.
@@ -297,8 +297,8 @@ public func withEnvironmentValues<T>(
     }
 }
 
-public extension EnvironmentValues {
-    @Entry var context: EnvironmentContext = .runtime
+extension EnvironmentValues {
+    @Entry public var context: EnvironmentContext = .runtime
 }
 
 public enum EnvironmentContext: Sendable {

@@ -20,7 +20,6 @@ public struct StackLayoutCache {
 }
 
 public struct HStackLayout: Layout {
-
     public typealias AnimatableData = EmptyAnimatableData
 
     let alignment: VerticalAlignment
@@ -70,31 +69,35 @@ public struct HStackLayout: Layout {
         }
 
         let proposedHeight = finiteDimension(proposal.height)
-        let idealSizes = subviews.enumerated().map { index, subview in
-            let measured = subview.sizeThatFits(ProposedViewSize(height: proposedHeight))
-            return sanitized(size: measured, fallback: cache.minSizes[index])
-        }
+        let idealSizes = subviews.enumerated()
+            .map { index, subview in
+                let measured = subview.sizeThatFits(ProposedViewSize(height: proposedHeight))
+                return sanitized(size: measured, fallback: cache.minSizes[index])
+            }
         let idealSize = idealSizes.reduce(Size.zero) { partialResult, subviewSize in
             Size(
                 width: partialResult.width + subviewSize.width,
                 height: max(partialResult.height, subviewSize.height)
             )
         }
-        let hasFlexibleSubviews = (0..<subviews.count).contains { index in
-            isFlexibleSubview(index: index, cache: cache)
-        }
+        let hasFlexibleSubviews = (0..<subviews.count)
+            .contains { index in
+                isFlexibleSubview(index: index, cache: cache)
+            }
 
         guard let proposedWidth = finiteDimension(proposal.width), hasFlexibleSubviews else {
             return Size(width: idealSize.width + cache.totalSubviewSpacing, height: idealSize.height)
         }
 
-        let minimumContentWidth = subviews.enumerated().reduce(Float.zero) { partialResult, element in
-            let (index, subview) = element
-            return partialResult + min(
-                compressionMinWidth(index: index, subview: subview, cache: cache),
-                idealSizes[index].width
-            )
-        }
+        let minimumContentWidth = subviews.enumerated()
+            .reduce(Float.zero) { partialResult, element in
+                let (index, subview) = element
+                return partialResult
+                    + min(
+                        compressionMinWidth(index: index, subview: subview, cache: cache),
+                        idealSizes[index].width
+                    )
+            }
         let proposedContentWidth = max(proposedWidth - cache.totalSubviewSpacing, 0)
         let width = min(max(proposedContentWidth, minimumContentWidth), cache.maxSize.width)
 
@@ -108,7 +111,7 @@ public struct HStackLayout: Layout {
         var origin: Point = bounds.origin
         var anchor: AnchorPoint = .leading
         let isRightToLeft = subviews.layoutDirection == .rightToLeft
-        
+
         switch self.alignment {
         case .top:
             anchor = isRightToLeft ? .topTrailing : .topLeading
@@ -122,15 +125,17 @@ public struct HStackLayout: Layout {
         }
         var idealWidth: Float = 0
         let proposedHeight = finiteDimension(proposal.height)
-        let idealSizes: [Size] = subviews.enumerated().map { index, subview in
-            let size = subview.sizeThatFits(ProposedViewSize(height: proposedHeight))
-            let sanitizedSize = sanitized(size: size, fallback: cache.minSizes[index])
-            idealWidth += sanitizedSize.width
-            return sanitizedSize
-        }
-        let hasFlexibleSubviews = (0..<subviews.count).contains { index in
-            isFlexibleSubview(index: index, cache: cache)
-        }
+        let idealSizes: [Size] = subviews.enumerated()
+            .map { index, subview in
+                let size = subview.sizeThatFits(ProposedViewSize(height: proposedHeight))
+                let sanitizedSize = sanitized(size: size, fallback: cache.minSizes[index])
+                idealWidth += sanitizedSize.width
+                return sanitizedSize
+            }
+        let hasFlexibleSubviews = (0..<subviews.count)
+            .contains { index in
+                isFlexibleSubview(index: index, cache: cache)
+            }
 
         let layoutWidth: Float
         if hasFlexibleSubviews {
@@ -140,9 +145,10 @@ public struct HStackLayout: Layout {
         }
         origin.x = isRightToLeft ? bounds.maxX : bounds.minX
 
-        let fallbackFlexibleIndices = (0..<subviews.count).filter { index in
-            isFlexibleSubview(index: index, cache: cache)
-        }
+        let fallbackFlexibleIndices = (0..<subviews.count)
+            .filter { index in
+                isFlexibleSubview(index: index, cache: cache)
+            }
         let spacerFlexibleIndices = fallbackFlexibleIndices.filter { index in
             isSpacerSubview(subviews[index])
         }
@@ -165,7 +171,8 @@ public struct HStackLayout: Layout {
                 distributedFlexibleIndices = fallbackFlexibleIndices
             }
         } else {
-            distributedFlexibleIndices = nonSpacerFlexibleIndices.isEmpty
+            distributedFlexibleIndices =
+                nonSpacerFlexibleIndices.isEmpty
                 ? fallbackFlexibleIndices
                 : nonSpacerFlexibleIndices
         }
@@ -174,12 +181,13 @@ public struct HStackLayout: Layout {
         if distributedPriorityCount > 1 || availableSpace < 0 {
             let assignedWidths = stackAssignedMainAxisSizes(
                 idealSizes: idealSizes.map(\.width),
-                minSizes: subviews.enumerated().map { index, subview in
-                    min(
-                        compressionMinWidth(index: index, subview: subview, cache: cache),
-                        idealSizes[index].width
-                    )
-                },
+                minSizes: subviews.enumerated()
+                    .map { index, subview in
+                        min(
+                            compressionMinWidth(index: index, subview: subview, cache: cache),
+                            idealSizes[index].width
+                        )
+                    },
                 maxSizes: cache.maxSizes.map(\.width),
                 layoutPriorities: layoutPriorities,
                 flexibleIndices: distributedFlexibleIndices,
@@ -272,10 +280,12 @@ public struct HStackLayout: Layout {
         subview: LayoutSubview,
         cache: Cache
     ) -> Float {
-        guard let frameNode = subview.node as? FrameViewNode,
-              case .constraints(let minWidth, _, let maxWidth, _, _, _, _) = frameNode.frameRule,
-              let maxWidth,
-              !maxWidth.isFinite else {
+        guard
+            let frameNode = subview.node as? FrameViewNode,
+            case let .constraints(minWidth, _, maxWidth, _, _, _, _) = frameNode.frameRule,
+            let maxWidth,
+            !maxWidth.isFinite
+        else {
             return cache.minSizes[index].width
         }
 
@@ -288,8 +298,8 @@ public struct HStackLayout: Layout {
 
     private func isExplicitlyFlexibleWidthNode(_ node: ViewNode) -> Bool {
         if let frameNode = node as? FrameViewNode,
-              case .constraints(_, _, let maxWidth, _, _, _, _) = frameNode.frameRule,
-              let maxWidth {
+            case let .constraints(_, _, maxWidth, _, _, _, _) = frameNode.frameRule,
+            let maxWidth {
             return !maxWidth.isFinite
         }
 
@@ -299,5 +309,4 @@ public struct HStackLayout: Layout {
 
         return false
     }
-
 }

@@ -22,11 +22,12 @@ public final class Texture2DProxy: Texture2D, @unchecked Sendable {
     public init(source: Texture2D) {
         let source = Self.flattenedSource(source)
         self.source = Mutex(source)
-        super.init(
-            gpuTexture: source.gpuTexture,
-            sampler: source.sampler,
-            size: source.size
-        )
+        super
+            .init(
+                gpuTexture: source.gpuTexture,
+                sampler: source.sampler,
+                size: source.size
+            )
     }
 
     public func replaceSource(with source: Texture2D) {
@@ -77,10 +78,11 @@ public final class Texture2DProxy: Texture2D, @unchecked Sendable {
     public required init(from assetDecoder: any AssetDecoder) async throws {
         let source = try await Texture2D(from: assetDecoder)
         self.source = Mutex(source)
-        super.init(
-            gpuTexture: source.gpuTexture,
-            sampler: source.sampler,
-            size: source.size
-        )
+        super
+            .init(
+                gpuTexture: source.gpuTexture,
+                sampler: source.sampler,
+                size: source.size
+            )
     }
 }

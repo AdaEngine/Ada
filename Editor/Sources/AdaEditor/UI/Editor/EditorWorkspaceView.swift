@@ -13,7 +13,6 @@ struct EditorWorkspaceView<
     RightPanel: View,
     BottomPanel: View
 >: View {
-
     let viewModel: EditorViewModel
     @ViewBuilder let leftPanel: () -> LeftPanel
     @ViewBuilder let mainPanel: () -> MainPanel
@@ -25,6 +24,7 @@ struct EditorWorkspaceView<
     var body: some View {
         GeometryReader { geometry in
             // Width changes are observed by the layout, not the panel builders.
+            // swiftlint:disable:next redundant_discardable_let
             let _ = resizeState.topologyRevision
             let layout = resizeState.layout(in: geometry.size, viewModel: viewModel)
             // Keep seven slots, including empty placeholders for collapsed panels.
@@ -111,7 +111,8 @@ struct EditorWorkspaceLayout: Equatable {
         let horizontalHandleWidth = Float((leftPanelWidth > 0 ? 1 : 0) + (rightPanelWidth > 0 ? 1 : 0)) * Self.resizeHandleSize
         mainPanelWidth = max(0, size.width - horizontalHandleWidth - leftPanelWidth - rightPanelWidth)
 
-        bottomPanelHeight = showsBottomPanel
+        bottomPanelHeight =
+            showsBottomPanel
             ? Self.clampedBottomPanelHeight(requestedBottomPanelHeight, in: size)
             : 0
         let verticalHandleHeight = bottomPanelHeight > 0 ? Self.resizeHandleSize : 0
@@ -127,8 +128,8 @@ struct EditorWorkspaceLayout: Equatable {
     }
 }
 
-private extension EditorWorkspaceLayout {
-    static func panelWidths(
+extension EditorWorkspaceLayout {
+    private static func panelWidths(
         availableWidth: Float,
         showsLeftPanel: Bool,
         showsRightPanel: Bool,
@@ -139,8 +140,12 @@ private extension EditorWorkspaceLayout {
     ) -> (left: Float, right: Float) {
         var left = showsLeftPanel ? resolvedPanelWidth(requestedLeftPanelWidth, fallback: fallbackLeftPanelWidth) : 0
         var right = showsRightPanel ? resolvedPanelWidth(requestedRightPanelWidth, fallback: fallbackRightPanelWidth) : 0
-        if left < minimumLeftPanelWidth { left = 0 }
-        if right < minimumRightPanelWidth { right = 0 }
+        if left < minimumLeftPanelWidth {
+            left = 0
+        }
+        if right < minimumRightPanelWidth {
+            right = 0
+        }
 
         // Reclaim both the content and divider of a collapsed panel before sizing its siblings.
         while left > 0 || right > 0 {
@@ -160,7 +165,7 @@ private extension EditorWorkspaceLayout {
         return (0, 0)
     }
 
-    static func resolvedPanelWidth(_ width: Float, fallback: Float) -> Float {
+    private static func resolvedPanelWidth(_ width: Float, fallback: Float) -> Float {
         let resolvedWidth = width.isFinite ? width : fallback
         return max(0, resolvedWidth)
     }

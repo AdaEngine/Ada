@@ -9,7 +9,6 @@ import Math
 
 /// A 3D physics shape description.
 public final class Shape3DResource: Codable, Sendable {
-
     struct BoxShape: Codable, Hashable, Equatable, Sendable {
         let halfExtents: Vector3
     }
@@ -38,7 +37,7 @@ public final class Shape3DResource: Codable, Sendable {
                     halfExtents: [
                         width / 2,
                         height / 2,
-                        depth / 2
+                        depth / 2,
                     ]
                 )
             )
@@ -55,7 +54,7 @@ public final class Shape3DResource: Codable, Sendable {
         switch self.fixture {
         case .box:
             return self
-        case .sphere(var shape):
+        case var .sphere(shape):
             shape.center = [x, y, z]
             return Shape3DResource(fixture: .sphere(shape))
         }

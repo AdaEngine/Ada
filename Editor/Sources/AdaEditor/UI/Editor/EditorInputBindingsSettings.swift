@@ -37,12 +37,18 @@ final class EditorInputBindingsDraft {
     }
 
     func edit(_ id: UUID, _ change: (inout Action) -> Void) {
-        guard let index = actions.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = actions.firstIndex(where: { $0.id == id }) else {
+            return
+        }
         change(&actions[index])
     }
 
     func addBinding(_ binding: InputBinding, to id: UUID) {
-        edit(id) { if !$0.bindings.contains(binding) { $0.bindings.append(binding) } }
+        edit(id) {
+            if !$0.bindings.contains(binding) {
+                $0.bindings.append(binding)
+            }
+        }
     }
 }
 
@@ -50,28 +56,45 @@ private struct EditorInputBindingOption: Sendable {
     let title: String
     let binding: InputBinding
 
-    static let groups: [(String, [EditorInputBindingOption])] = [
-        ("Keyboard", KeyCode.allCases.filter { $0 != .none }.map {
-            EditorInputBindingOption(title: label(String(describing: $0)), binding: .key($0))
-        }),
-        ("Mouse", [
-            EditorInputBindingOption(title: "Left Button", binding: .mouseButton(.left)),
-            EditorInputBindingOption(title: "Right Button", binding: .mouseButton(.right)),
-            EditorInputBindingOption(title: "Middle Button", binding: .mouseButton(.middle)),
-            EditorInputBindingOption(title: "Wheel Positive", binding: .mouseScroll(.positive)),
-            EditorInputBindingOption(title: "Wheel Negative", binding: .mouseScroll(.negative)),
-            EditorInputBindingOption(title: "Movement", binding: .mouseMotion)
-        ]),
-        ("Gamepad", GamepadButton.allCases.filter { $0 != .unknown }.map {
-            EditorInputBindingOption(title: label($0.rawValue), binding: .gamepadButton($0))
-        } + GamepadAxis.allCases.filter { $0 != .unknown }.flatMap { axis in
-            InputAxisDirection.allCases.map {
-                EditorInputBindingOption(title: "\(label(axis.rawValue)) \($0 == .positive ? "+" : "−")", binding: .gamepadAxis(axis, $0))
-            }
-        }),
-        ("Touch", [EditorInputBindingOption(title: "Any Finger Held", binding: .touch)] + InputTouchPhase.allCases.map {
-            EditorInputBindingOption(title: label($0.rawValue), binding: .touchEvent($0))
-        })
+    static let groups: [(String, [Self])] = [
+        (
+            "Keyboard",
+            KeyCode.allCases.filter { $0 != .none }
+                .map {
+                    Self(title: label(String(describing: $0)), binding: .key($0))
+                }
+        ),
+        (
+            "Mouse",
+            [
+                Self(title: "Left Button", binding: .mouseButton(.left)),
+                Self(title: "Right Button", binding: .mouseButton(.right)),
+                Self(title: "Middle Button", binding: .mouseButton(.middle)),
+                Self(title: "Wheel Positive", binding: .mouseScroll(.positive)),
+                Self(title: "Wheel Negative", binding: .mouseScroll(.negative)),
+                Self(title: "Movement", binding: .mouseMotion),
+            ]
+        ),
+        (
+            "Gamepad",
+            GamepadButton.allCases.filter { $0 != .unknown }
+                .map {
+                    Self(title: label($0.rawValue), binding: .gamepadButton($0))
+                }
+                + GamepadAxis.allCases.filter { $0 != .unknown }
+                .flatMap { axis in
+                    InputAxisDirection.allCases.map {
+                        Self(title: "\(label(axis.rawValue)) \($0 == .positive ? "+" : "−")", binding: .gamepadAxis(axis, $0))
+                    }
+                }
+        ),
+        (
+            "Touch",
+            [Self(title: "Any Finger Held", binding: .touch)]
+                + InputTouchPhase.allCases.map {
+                    Self(title: label($0.rawValue), binding: .touchEvent($0))
+                }
+        ),
     ]
 
     private static func label(_ value: String) -> String {
@@ -82,7 +105,7 @@ private struct EditorInputBindingOption: Sendable {
         groups.first { $0.1.contains { $0.binding == binding } }?.0 ?? "Keyboard"
     }
 
-    static func options(_ group: String) -> [EditorInputBindingOption] {
+    static func options(_ group: String) -> [Self] {
         groups.first { $0.0 == group }?.1 ?? []
     }
 }
@@ -115,10 +138,13 @@ struct EditorInputBindingsSettings: View {
     private func actionCard(_ action: EditorInputBindingsDraft.Action) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                TextField("Action name", text: Binding(
-                    get: { draft.actions.first { $0.id == action.id }?.name ?? "" },
-                    set: { value in draft.edit(action.id) { $0.name = value } }
-                ))
+                TextField(
+                    "Action name",
+                    text: Binding(
+                        get: { draft.actions.first { $0.id == action.id }?.name ?? "" },
+                        set: { value in draft.edit(action.id) { $0.name = value } }
+                    )
+                )
                 .textFieldStyle(PlainTextFieldStyle())
                 .font(.system(size: 13)).padding(.horizontal, 8).frame(height: 32)
                 .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.surfaceElevated))
@@ -139,13 +165,25 @@ struct EditorInputBindingsSettings: View {
                     }
                 }
             }
-            if action.bindings.contains(where: { if case .gamepadAxis = $0 { return true }; return false }) {
+            if action.bindings.contains(where: {
+                if case .gamepadAxis = $0 {
+                    return true
+                }
+                return false
+            }) {
                 HStack(spacing: 8) {
                     Text("Gamepad Dead Zone").font(.system(size: 11))
-                    EditorEnumField(cases: ["0.0", "0.1", "0.2", "0.3", "0.4", "0.5"], selection: Binding(
-                        get: { String(action.deadZone) },
-                        set: { value in if let number = Float(value) { draft.edit(action.id) { $0.deadZone = number } } }
-                    ))
+                    EditorEnumField(
+                        cases: ["0.0", "0.1", "0.2", "0.3", "0.4", "0.5"],
+                        selection: Binding(
+                            get: { String(action.deadZone) },
+                            set: { value in
+                                if let number = Float(value) {
+                                    draft.edit(action.id) { $0.deadZone = number }
+                                }
+                            }
+                        )
+                    )
                     .frame(width: 90)
                 }
             }
@@ -162,19 +200,29 @@ struct EditorInputBindingsSettings: View {
         let options = EditorInputBindingOption.options(group)
         return HStack(spacing: 8) {
             Text(group).font(.system(size: 11)).frame(width: 75, alignment: .leading)
-            EditorEnumField(cases: options.map(\.title), selection: Binding(
-                get: { options.first { $0.binding == binding }?.title ?? "" },
-                set: { title in
-                    guard let selected = options.first(where: { $0.title == title }) else { return }
-                    draft.edit(action.id) {
-                        guard $0.bindings.indices.contains(index) else { return }
-                        $0.bindings[index] = selected.binding
+            EditorEnumField(
+                cases: options.map(\.title),
+                selection: Binding(
+                    get: { options.first { $0.binding == binding }?.title ?? "" },
+                    set: { title in
+                        guard let selected = options.first(where: { $0.title == title }) else {
+                            return
+                        }
+                        draft.edit(action.id) {
+                            guard $0.bindings.indices.contains(index) else {
+                                return
+                            }
+                            $0.bindings[index] = selected.binding
+                        }
                     }
-                }
-            ), accessibilityID: "AdaEditor.Settings.InputBindings.Binding.\(action.name).\(index)")
+                ),
+                accessibilityID: "AdaEditor.Settings.InputBindings.Binding.\(action.name).\(index)"
+            )
             button("−", id: "RemoveBinding.\(action.name).\(index)") {
                 draft.edit(action.id) {
-                    if $0.bindings.indices.contains(index) { $0.bindings.remove(at: index) }
+                    if $0.bindings.indices.contains(index) {
+                        $0.bindings.remove(at: index)
+                    }
                 }
             }
         }

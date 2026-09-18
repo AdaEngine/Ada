@@ -8,12 +8,12 @@ public enum EditorDistribution: String, Sendable {
 
     public static let current: Self = {
         #if os(iOS) || os(tvOS) || os(visionOS)
-        return .appStore
+            return .appStore
         #else
-        return resolve(
-            channel: Bundle.main.object(forInfoDictionaryKey: "AdaEditorDistribution") as? String,
-            isAppBundle: Bundle.main.bundleURL.pathExtension == "app"
-        )
+            return resolve(
+                channel: Bundle.main.object(forInfoDictionaryKey: "AdaEditorDistribution") as? String,
+                isAppBundle: Bundle.main.bundleURL.pathExtension == "app"
+            )
         #endif
     }()
 

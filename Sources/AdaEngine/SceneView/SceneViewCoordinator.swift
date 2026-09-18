@@ -17,7 +17,6 @@ import AdaUI
 import AdaUtils
 import Math
 
-// swiftlint:disable type_body_length
 @MainActor
 final class SceneViewCoordinator: OffscreenViewportDelegate {
     private(set) var appWorlds: AppWorlds?
@@ -81,11 +80,15 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     // MARK: - OffscreenViewportDelegate
 
     func bootstrapIfNeeded() {
-        guard appWorlds == nil && !isBootstrapping && !isShutdown else { return }
+        guard appWorlds == nil && !isBootstrapping && !isShutdown else {
+            return
+        }
         isBootstrapping = true
 
         Task { @MainActor [weak self] in
-            guard let self, !self.isShutdown else { return }
+            guard let self, !self.isShutdown else {
+                return
+            }
             let app = self.buildAppWorlds()
             guard !self.isShutdown else {
                 self.isBootstrapping = false
@@ -139,11 +142,15 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     func updateSize(_ size: SizeInt, scaleFactor: Float) {
-        guard size.width > 0 && size.height > 0 else { return }
-        guard size.width <= maximumRenderTextureDimension,
-              size.height <= maximumRenderTextureDimension,
-              scaleFactor.isFinite,
-              scaleFactor > 0 else {
+        guard size.width > 0 && size.height > 0 else {
+            return
+        }
+        guard
+            size.width <= maximumRenderTextureDimension,
+            size.height <= maximumRenderTextureDimension,
+            scaleFactor.isFinite,
+            scaleFactor > 0
+        else {
             return
         }
         guard size != currentSize || scaleFactor != self.scaleFactor else {
@@ -184,16 +191,24 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     func receiveInputEvent(_ event: any InputEvent) {
-        guard let app = appWorlds else { return }
-        guard app.main.getResource(Input.self) != nil else { return }
+        guard let app = appWorlds else {
+            return
+        }
+        guard app.main.getResource(Input.self) != nil else {
+            return
+        }
         let input = app.main.getRefResource(Input.self)
         input.wrappedValue.receiveEvent(event)
         input.wrappedValue.flushPendingEvents()
     }
 
     func updateMousePosition(_ position: Point) {
-        guard let app = appWorlds else { return }
-        guard app.main.getResource(Input.self) != nil else { return }
+        guard let app = appWorlds else {
+            return
+        }
+        guard app.main.getResource(Input.self) != nil else {
+            return
+        }
         let input = app.main.getRefResource(Input.self)
         input.wrappedValue.mousePosition = position
     }
@@ -201,11 +216,15 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     // MARK: - Private
 
     private func standaloneTick(_ deltaTime: AdaUtils.TimeInterval) {
-        guard !standaloneTickInFlight else { return }
+        guard !standaloneTickInFlight else {
+            return
+        }
         standaloneTickInFlight = true
         Task { @MainActor [weak self] in
             defer { self?.standaloneTickInFlight = false }
-            guard let self, let app = self.appWorlds else { return }
+            guard let self, let app = self.appWorlds else {
+                return
+            }
             app.main.insertResource(DeltaTime(deltaTime: deltaTime))
             try? await app.update()
         }
@@ -223,9 +242,13 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     private func finalizeSetupIfReady() {
-        guard let app = appWorlds,
-              currentSize.width > 0 && currentSize.height > 0,
-              !hasCalledSetup else { return }
+        guard
+            let app = appWorlds,
+            currentSize.width > 0 && currentSize.height > 0,
+            !hasCalledSetup
+        else {
+            return
+        }
 
         if targetRenderTexture == nil {
             rebuildRenderTexturePool(size: currentSize, scaleFactor: scaleFactor)
@@ -297,7 +320,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         }
     }
 
-    private func updateCameraTarget(app: AppWorlds, entity: Entity, texture: RenderTexture) {
+    private func updateCameraTarget(app _: AppWorlds, entity: Entity, texture: RenderTexture) {
         let logicalSize = Size(
             width: Float(currentSize.width) / scaleFactor,
             height: Float(currentSize.height) / scaleFactor
@@ -324,20 +347,21 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
 
     private func rebuildRenderTexturePool(size: SizeInt, scaleFactor: Float) {
         let poolSize = max(3, unsafe RenderEngine.configurations.maxFramesInFlight + 2)
-        renderTexturePool = (0..<poolSize).map { index in
-            let texture = RenderTexture(
-                size: size,
-                scaleFactor: scaleFactor,
-                format: .bgra8,
-                debugLabel: "SceneView_RenderTarget_\(index)"
-            )
-            texture.renderCompletedHandler = { [weak self] texture in
-                Task { @MainActor in
-                    self?.completeRenderTexture(texture)
+        renderTexturePool = (0..<poolSize)
+            .map { index in
+                let texture = RenderTexture(
+                    size: size,
+                    scaleFactor: scaleFactor,
+                    format: .bgra8,
+                    debugLabel: "SceneView_RenderTarget_\(index)"
+                )
+                texture.renderCompletedHandler = { [weak self] texture in
+                    Task { @MainActor in
+                        self?.completeRenderTexture(texture)
+                    }
                 }
+                return texture
             }
-            return texture
-        }
         pendingDisplayTargets.removeAll()
         retiredDisplayTargets.removeAll()
         nextRenderTextureIndex = 0
@@ -362,11 +386,11 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
 
         var didPublish = false
         while let firstTarget = pendingDisplayTargets.first,
-              firstTarget.isCompleted {
+            firstTarget.isCompleted {
             let completedTarget = pendingDisplayTargets.removeFirst()
             let previousFrontTexture = frontRenderTexture
             if let currentFront = frontRenderTexture,
-               currentFront !== completedTarget.texture {
+                currentFront !== completedTarget.texture {
                 retiredDisplayTargets.append(
                     RetiredDisplayTarget(
                         texture: currentFront,
@@ -381,7 +405,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         }
         if didPublish {
             if let renderTexture = renderTexture as? Texture2DProxy,
-               let frontRenderTexture {
+                let frontRenderTexture {
                 renderTexture.replaceSource(with: frontRenderTexture)
             } else if let frontRenderTexture {
                 renderTexture = Texture2DProxy(source: frontRenderTexture)
@@ -402,7 +426,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
 
     private func prepareNextRenderTarget() {
         if let targetRenderTexture,
-           !isDisplayUnavailable(targetRenderTexture) {
+            !isDisplayUnavailable(targetRenderTexture) {
             makeCameraRenderTargetReady(targetRenderTexture)
             scheduleForDisplay(targetRenderTexture)
             return
@@ -440,9 +464,11 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             return nil
         }
 
-        let unavailable = Set((pendingDisplayTargets.map { ObjectIdentifier($0.texture) })
-            + retiredDisplayTargets.map { ObjectIdentifier($0.texture) }
-            + [frontRenderTexture].compactMap { $0 }.map(ObjectIdentifier.init))
+        let unavailable = Set(
+            (pendingDisplayTargets.map { ObjectIdentifier($0.texture) })
+                + retiredDisplayTargets.map { ObjectIdentifier($0.texture) }
+                + [frontRenderTexture].compactMap { $0 }.map(ObjectIdentifier.init)
+        )
 
         for offset in 0..<renderTexturePool.count {
             let index = (nextRenderTextureIndex + offset) % renderTexturePool.count

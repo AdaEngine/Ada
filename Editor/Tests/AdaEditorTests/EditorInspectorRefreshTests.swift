@@ -1,8 +1,9 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
-@testable import AdaUI
 import Math
 import Testing
+
+@testable import AdaEditor
+@testable import AdaUI
 
 @MainActor
 @Suite(.serialized)
@@ -14,13 +15,16 @@ struct EditorInspectorRefreshTests {
         }
     }
 
-    @Test("field edits preserve component nodes, focus, and scroll position", arguments: [
-        (EditorBuiltInComponentType.transform, "position", "10, 20, 30"),
-        (EditorBuiltInComponentType.sprite, "tintColor", "0.5, 0.4, 0.8, 1"),
-        (EditorBuiltInComponentType.sprite, "flipX", "true"),
-        (EditorBuiltInComponentType.sprite, "size", "64, 48"),
-        (EditorBuiltInComponentType.visibility, "value", "hidden")
-    ])
+    @Test(
+        "field edits preserve component nodes, focus, and scroll position",
+        arguments: [
+            (EditorBuiltInComponentType.transform, "position", "10, 20, 30"),
+            (EditorBuiltInComponentType.sprite, "tintColor", "0.5, 0.4, 0.8, 1"),
+            (EditorBuiltInComponentType.sprite, "flipX", "true"),
+            (EditorBuiltInComponentType.sprite, "size", "64, 48"),
+            (EditorBuiltInComponentType.visibility, "value", "hidden"),
+        ]
+    )
     func editingPreservesComponentNodes(typeName: String, fieldKey: String, value: String) async throws {
         var scene = EditorSceneModel.default(projectName: "Inspector")
         let entity = scene.addEntity(preset: .sprite)
@@ -38,12 +42,18 @@ struct EditorInspectorRefreshTests {
         let selector = UINodeSelector.accessibilityIdentifier("AdaEditor.Inspector.ToggleComponent.\(EditorBuiltInComponentType.transform)")
         _ = try container.uiScrollToNode(matching: selector)
         let initialNodes = componentHeaders(in: container.uiTreeRoots())
-        let textField = try #require(flatten(container.uiTreeRoots()).first {
-            $0.nodeType.contains("TextFieldViewNode") && $0.canBecomeFocused
-        })
+        let textField = try #require(
+            flatten(container.uiTreeRoots())
+                .first {
+                    $0.nodeType.contains("TextFieldViewNode") && $0.canBecomeFocused
+                }
+        )
         _ = try container.uiFocusNode(matching: .runtimeID(textField.runtimeId))
-        let field = try #require(inspector.selectedEntity?.components
-            .first { $0.typeName == typeName }?.fields.first { $0.field.key == fieldKey })
+        let field = try #require(
+            inspector.selectedEntity?.components
+                .first { $0.typeName == typeName }?
+                .fields.first { $0.field.key == fieldKey }
+        )
         inspector.updateComponentField = { typeName, field, value in
             scene.updateField(typeName: typeName, field: field, value: value, in: entity.id)
             do {
@@ -83,7 +93,10 @@ struct EditorInspectorRefreshTests {
         var selectionUpdates = 0
         viewport.configure(
             sceneContent: try scene.encodedYAML(),
-            onSelectionChanged: { inspector.selectEntity($0); selectionUpdates += 1 },
+            onSelectionChanged: {
+                inspector.selectEntity($0)
+                selectionUpdates += 1
+            },
             onDocumentContentChanged: { _ in },
             onTransformChanged: { inspector.updateLiveTransform(editorID: $0, payload: $1) }
         )
@@ -94,9 +107,12 @@ struct EditorInspectorRefreshTests {
         container.layoutIfNeeded()
         _ = try container.uiScrollToNode(matching: .accessibilityIdentifier("AdaEditor.Inspector.ToggleComponent.\(EditorBuiltInComponentType.transform)"))
         let initialNodes = componentHeaders(in: container.uiTreeRoots())
-        let textField = try #require(flatten(container.uiTreeRoots()).first {
-            $0.nodeType.contains("TextFieldViewNode") && $0.canBecomeFocused
-        })
+        let textField = try #require(
+            flatten(container.uiTreeRoots())
+                .first {
+                    $0.nodeType.contains("TextFieldViewNode") && $0.canBecomeFocused
+                }
+        )
         _ = try container.uiFocusNode(matching: .runtimeID(textField.runtimeId))
         let initialFields = inspector.transformFields
         let fieldNodes = textFields(in: container.viewTree.rootNode)
@@ -193,13 +209,16 @@ struct EditorInspectorRefreshTests {
     }
 
     private func componentHeaders(in nodes: [UINodeSnapshot]) -> [UINodeSnapshot] {
-        flatten(nodes).filter {
-            $0.accessibilityIdentifier?.hasPrefix("AdaEditor.Inspector.ToggleComponent.") == true
-        }
+        flatten(nodes)
+            .filter {
+                $0.accessibilityIdentifier?.hasPrefix("AdaEditor.Inspector.ToggleComponent.") == true
+            }
     }
 
     private func textFields(in node: ViewNode) -> [TextFieldViewNode] {
-        if let field = node as? TextFieldViewNode { return [field] }
+        if let field = node as? TextFieldViewNode {
+            return [field]
+        }
         return node.transientEnvironmentChildren.flatMap { textFields(in: $0) }
     }
 

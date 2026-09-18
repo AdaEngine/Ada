@@ -8,7 +8,7 @@
 import Foundation
 
 #if os(macOS) || os(iOS) || os(visionOS)
-import AVFoundation
+    import AVFoundation
 #endif
 
 public enum AudioCaptureSampleFormat: Sendable {
@@ -39,7 +39,7 @@ public struct AudioCaptureFormat: Sendable, Equatable {
 }
 
 public struct AudioCaptureConfiguration: Sendable, Equatable {
-    public static let `default` = AudioCaptureConfiguration()
+    public static let `default` = Self()
 
     public var format: AudioCaptureFormat
     public var bufferDuration: TimeInterval
@@ -72,8 +72,8 @@ public struct AudioCaptureChunk: Sendable, Equatable {
             return []
         }
 
-        return self.data.withUnsafeBytes { rawBuffer in
-            Array(rawBuffer.bindMemory(to: Float.self))
+        return unsafe self.data.withUnsafeBytes { rawBuffer in
+            unsafe Array(rawBuffer.bindMemory(to: Float.self))
         }
     }
 }
@@ -88,13 +88,13 @@ public enum AudioCaptureError: LocalizedError, Sendable, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .initializationFailed(let code):
+        case let .initializationFailed(code):
             "Failed to initialize microphone capture device. Code: \(code)"
-        case .startFailed(let code):
+        case let .startFailed(code):
             "Failed to start microphone capture device. Code: \(code)"
-        case .stopFailed(let code):
+        case let .stopFailed(code):
             "Failed to stop microphone capture device. Code: \(code)"
-        case .invalidConfiguration(let message):
+        case let .invalidConfiguration(message):
             "Invalid microphone capture configuration: \(message)"
         case .permissionDenied:
             "Microphone capture permission was denied."
@@ -163,41 +163,40 @@ public enum AudioCapturePermission {
     @MainActor
     public static func authorizationStatus() -> AudioCaptureAuthorization {
         #if os(macOS) || os(iOS) || os(visionOS)
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized:
-            return .authorized
-        case .denied:
-            return .denied
-        case .notDetermined:
-            return .notDetermined
-        case .restricted:
-            return .restricted
-        @unknown default:
-            return .unsupported
-        }
+            switch AVCaptureDevice.authorizationStatus(for: .audio) {
+            case .authorized:
+                return .authorized
+            case .denied:
+                return .denied
+            case .notDetermined:
+                return .notDetermined
+            case .restricted:
+                return .restricted
+            @unknown default:
+                return .unsupported
+            }
         #else
-        return .unsupported
+            return .unsupported
         #endif
     }
 
     @MainActor
     public static func requestAccess() async -> AudioCaptureAuthorization {
         #if os(macOS) || os(iOS) || os(visionOS)
-        let status = Self.authorizationStatus()
-        guard status == .notDetermined else {
-            return status
-        }
-
-        let granted = await withCheckedContinuation { continuation in
-            AVCaptureDevice.requestAccess(for: .audio) { granted in
-                continuation.resume(returning: granted)
+            let status = Self.authorizationStatus()
+            guard status == .notDetermined else {
+                return status
             }
-        }
 
-        return granted ? .authorized : .denied
+            let granted = await withCheckedContinuation { continuation in
+                AVCaptureDevice.requestAccess(for: .audio) { granted in
+                    continuation.resume(returning: granted)
+                }
+            }
+
+            return granted ? .authorized : .denied
         #else
-        return .unsupported
+            return .unsupported
         #endif
     }
 }
-

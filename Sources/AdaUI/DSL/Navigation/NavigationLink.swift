@@ -23,7 +23,7 @@ import Math
 @MainActor @preconcurrency
 public struct NavigationLink<Label: View>: View, ViewNodeBuilder {
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let value: AnyHashable
     let label: () -> Label
@@ -44,7 +44,6 @@ public struct NavigationLink<Label: View>: View, ViewNodeBuilder {
 // MARK: - NavigationLinkNode
 
 final class NavigationLinkNode: ViewModifierNode {
-
     private let value: AnyHashable
     private var isHighlighted: Bool = false
 
@@ -54,15 +53,20 @@ final class NavigationLinkNode: ViewModifierNode {
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
         return self
     }
 
     override func onMouseEvent(_ event: MouseEvent) {
-        guard environment.isEnabled else { return }
+        guard environment.isEnabled else {
+            return
+        }
 
         switch event.phase {
-        case .began, .changed:
+        case .began,
+            .changed:
             if event.button == .left {
                 isHighlighted = true
             }
@@ -85,8 +89,12 @@ final class NavigationLinkNode: ViewModifierNode {
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
-        guard environment.isEnabled else { return }
-        guard let touch = touches.first else { return }
+        guard environment.isEnabled else {
+            return
+        }
+        guard let touch = touches.first else {
+            return
+        }
 
         switch touch.phase {
         case .began:

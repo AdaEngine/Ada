@@ -32,13 +32,13 @@ extension UIContainerView: UITextEditingCommandHandling {
     }
 }
 
-public extension UIWindow {
+extension UIWindow {
     /// Applies an editing command to the focused text control in this window.
     @discardableResult
-    func uiPerformTextEditingCommand(_ command: UITextEditingCommand) -> Bool {
+    public func uiPerformTextEditingCommand(_ command: UITextEditingCommand) -> Bool {
         func perform(in view: UIView) -> Bool {
             if let handler = view as? any UITextEditingCommandHandling,
-               handler.uiPerformTextEditingCommand(command) {
+                handler.uiPerformTextEditingCommand(command) {
                 return true
             }
 
@@ -52,7 +52,7 @@ public extension UIWindow {
     }
 }
 
-private extension TextEditorViewNode {
+extension TextEditorViewNode {
     func perform(_ command: UITextEditingCommand) {
         switch command {
         case .undo: undo()
@@ -65,7 +65,7 @@ private extension TextEditorViewNode {
     }
 }
 
-private extension TextFieldViewNode {
+extension TextFieldViewNode {
     func perform(_ command: UITextEditingCommand) {
         switch command {
         case .undo: undo()

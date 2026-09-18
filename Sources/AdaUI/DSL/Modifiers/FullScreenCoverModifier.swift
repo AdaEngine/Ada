@@ -9,7 +9,7 @@ import AdaInput
 import AdaUtils
 import Math
 
-public extension View {
+extension View {
     /// Presents a modal view that covers as much of the screen as possible.
     ///
     /// The presented view can be dismissed via the ``DismissAction`` from the environment.
@@ -26,7 +26,7 @@ public extension View {
     ///     }
     /// }
     /// ```
-    func fullScreenCover<Overlay: View>(
+    public func fullScreenCover<Overlay: View>(
         isPresented: Binding<Bool>,
         @ViewBuilder content: @escaping () -> Overlay
     ) -> some View {
@@ -38,7 +38,7 @@ public extension View {
     /// The presented view receives the unwrapped item and can be dismissed via
     /// the ``DismissAction`` from the environment. Dismissing the view sets the
     /// item binding back to `nil`.
-    func fullScreenCover<Item: Hashable, Content: View>(
+    public func fullScreenCover<Item: Hashable, Content: View>(
         item: Binding<Item?>,
         @ViewBuilder content: @escaping (Item) -> Content
     ) -> some View {
@@ -85,7 +85,6 @@ struct FullScreenCoverModifier<WrappedContent: View, Overlay: View>: ViewModifie
 // MARK: - FullScreenCoverNode
 
 final class FullScreenCoverNode: ViewModifierNode {
-
     private var isPresented: Binding<Bool>
     private let overlayBuilder: (_ViewInputs) -> ViewNode
     private var overlayNode: ViewNode?
@@ -155,7 +154,9 @@ final class FullScreenCoverNode: ViewModifierNode {
     override func updateEnvironment(_ environment: EnvironmentValues) {
         let prevVersion = self.environment.version
         super.updateEnvironment(environment)
-        guard self.environment.version != prevVersion else { return }
+        guard self.environment.version != prevVersion else {
+            return
+        }
         viewInputs.environment = self.environment
 
         if let overlayNode {
@@ -179,7 +180,9 @@ final class FullScreenCoverNode: ViewModifierNode {
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
 
         if let overlayNode {
             let overlayPoint = overlayNode.convert(point, from: self)
@@ -196,7 +199,9 @@ final class FullScreenCoverNode: ViewModifierNode {
         let wasPresented = isPresented.wrappedValue
 
         super.update(from: newNode)
-        guard let other = newNode as? FullScreenCoverNode else { return }
+        guard let other = newNode as? FullScreenCoverNode else {
+            return
+        }
         self.isPresented = other.isPresented
 
         let isPresented = isPresented.wrappedValue

@@ -48,7 +48,7 @@ extension World {
 
         @inlinable
         mutating func getOrRegisterComponent<T: Component>(
-            _ component: T.Type
+            _: T.Type
         ) -> ComponentId {
             let id = ObjectIdentifier(T.self)
             if let componentId = self.componentsIds[id] {
@@ -61,17 +61,17 @@ extension World {
 
         @inline(__always)
         @inlinable
-        func getComponentId<T: Component>(_ component: T.Type) -> ComponentId? {
+        func getComponentId<T: Component>(_: T.Type) -> ComponentId? {
             self.componentsIds[ObjectIdentifier(T.self)]
         }
 
         @inlinable
-        func getRequiredComponents<T: Component>(for component: T) -> [RequiredComponentInfo] {
+        func getRequiredComponents<T: Component>(for _: T) -> [RequiredComponentInfo] {
             getComponentId(T.self).flatMap { self.requiredComponents[$0] } ?? []
         }
 
         @inlinable
-        func getRequiredComponents<T: Component>(for component: T.Type) -> [RequiredComponentInfo] {
+        func getRequiredComponents<T: Component>(for _: T.Type) -> [RequiredComponentInfo] {
             getComponentId(T.self).flatMap { self.requiredComponents[$0] } ?? []
         }
     }
@@ -91,7 +91,7 @@ extension World {
             }
 
             func getWithTick<T: Resource>(
-                _ type: T.Type
+                _: T.Type
             ) -> (
                 pointer: UnsafeMutablePointer<T>,
                 addedTick: UnsafeBox<Tick>,
@@ -109,31 +109,35 @@ extension World {
         private var resourceIds: [ObjectIdentifier: ComponentId] = [:]
         private var resourceData: SparseSet<ComponentId, ResourceData> = [:]
 
-        func getResource<T: Resource>(_ resourceType: T.Type) -> T? {
-            guard let componentId = self.resourceIds[T.identifier],
-                  let resource = self.resourceData[componentId] else {
+        func getResource<T: Resource>(_: T.Type) -> T? {
+            guard
+                let componentId = self.resourceIds[T.identifier],
+                let resource = self.resourceData[componentId]
+            else {
                 return nil
             }
             return resource.pointer.get(at: 0, as: T.self)
         }
 
         func getResource(_ resourceType: any Resource.Type) -> (any Resource)? {
-            guard let componentId = self.resourceIds[ObjectIdentifier(resourceType)],
-                  let resource = self.resourceData[componentId] else {
+            guard
+                let componentId = self.resourceIds[ObjectIdentifier(resourceType)],
+                let resource = self.resourceData[componentId]
+            else {
                 return nil
             }
             return resource.erasedResource
         }
 
-        func contains<T: Resource>(_ type: T.Type) -> Bool {
+        func contains<T: Resource>(_: T.Type) -> Bool {
             if let componentId = self.resourceIds[T.identifier] {
                 return self.resourceData.contains(componentId)
             }
             return false
         }
 
-        func getResources() -> Array<any Resource> {
-            self.resourceData.map { $0.erasedResource }
+        func getResources() -> [any Resource] {
+            self.resourceData.map(\.erasedResource)
         }
 
         mutating func getOrRegisterResource(
@@ -181,7 +185,7 @@ extension World {
         }
 
         mutating func registerResource<T: Resource>(
-            _ resource: T.Type,
+            _: T.Type,
             id: ObjectIdentifier
         ) -> ComponentId {
             Task { @MainActor in
@@ -192,7 +196,7 @@ extension World {
             return componentId
         }
 
-        mutating func removeResource<T: Resource>(_ resource: T.Type) {
+        mutating func removeResource<T: Resource>(_: T.Type) {
             let id = ObjectIdentifier(T.self)
             guard let componentId = self.resourceIds[id] else {
                 return
@@ -201,9 +205,11 @@ extension World {
             self.resourceIds[id] = nil
         }
 
-        func getResourceData<T: Resource>(_ resource: T.Type) -> ResourceData? {
-            guard let componentId = self.resourceIds[T.identifier],
-                  let resource = self.resourceData[componentId] else {
+        func getResourceData<T: Resource>(_: T.Type) -> ResourceData? {
+            guard
+                let componentId = self.resourceIds[T.identifier],
+                let resource = self.resourceData[componentId]
+            else {
                 return nil
             }
             return resource

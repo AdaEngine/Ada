@@ -1,13 +1,13 @@
 @_spi(Internal) @testable import AdaApp
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
-@testable import AdaPhysics
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
 
 @testable import AdaEditor
+@testable import AdaPhysics
 
 @MainActor
 @Suite(.serialized)
@@ -24,7 +24,7 @@ struct EditorPhysicsInspectorTests {
         #expect(body.shapes.count == 1)
         #expect(body.filter.collisionBitMask == .all)
         #expect(!descriptor.fields.contains { $0.key == "runtimeBody" })
-        #expect(descriptor.fields.allSatisfy { $0.isEditable })
+        #expect(descriptor.fields.allSatisfy(\.isEditable))
         #expect(descriptor.fields.first { $0.key == "mode" }?.displayValue(in: payload) == "dynamic")
 
         let legacy = payload.filter { !["fixedRotation", "gravityScale", "linearVelocity", "angularVelocity", "debugColor"].contains($0.key) }
@@ -48,7 +48,7 @@ struct EditorPhysicsInspectorTests {
             ("material.friction", "0.3"), ("material.restitution", "0.4"), ("material.density", "2"),
             ("massProperties.mass", "5"), ("massProperties.inertia.z", "3"),
             ("filter.categoryBitMask", "9223372036854775808"), ("filter.collisionBitMask", "18446744073709551615"),
-            ("debugColor", "0.2, 0.4, 0.6, 1")
+            ("debugColor", "0.2, 0.4, 0.6, 1"),
         ] {
             let field = try #require(descriptor.fields.first { $0.key == key })
             scene.updateField(typeName: typeName, field: field, value: value, in: entity.id)
@@ -86,7 +86,10 @@ struct EditorPhysicsInspectorTests {
         body.massProperties.inertia.z = 3
         let saved = try JSONEncoder().encode(body)
         let restored = try JSONDecoder().decode(PhysicsBody2DComponent.self, from: saved)
-        let entity = app.main.spawn { restored; Transform() }
+        let entity = app.main.spawn {
+            restored
+            Transform()
+        }
         await app.main.runScheduler(.physicsSync)
         let live = try #require(entity.components[PhysicsBody2DComponent.self])
         #expect(live.runtimeBody != nil)
@@ -137,11 +140,19 @@ struct EditorPhysicsInspectorTests {
         _ = try container.uiTapNode(matching: add)
         let addCircle = try #require(menu?.items.first { $0.title == "Circle" }?.action)
         addCircle()
-        for _ in 0..<10 { await Task.yield(); container.update(1.0 / 60.0); container.layoutIfNeeded() }
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1.0 / 60.0)
+            container.layoutIfNeeded()
+        }
         let remove = UINodeSelector.accessibilityIdentifier("AdaEditor.Physics.Shapes.Remove.0")
         _ = try container.uiScrollToNode(matching: remove)
         _ = try container.uiTapNode(matching: remove)
-        for _ in 0..<10 { await Task.yield(); container.update(1.0 / 60.0); container.layoutIfNeeded() }
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1.0 / 60.0)
+            container.layoutIfNeeded()
+        }
         try enterOffset(in: container)
         let payload = try #require(scene.entities.first { $0.id == entity.id }?.components[typeName])
         let body = try #require(EditorComponentRegistry.decode(typeName: typeName, payload: payload) as? PhysicsBody2DComponent)

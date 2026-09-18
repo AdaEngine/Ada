@@ -12,7 +12,7 @@ struct EditorHotReloadState: Equatable, Sendable {
     var lastReloadedPath: String?
     var errorMessage: String?
 
-    static let unavailable = EditorHotReloadState(
+    static let unavailable = Self(
         isEnabled: false,
         watchedPathCount: 0,
         lastReloadedPath: nil,
@@ -125,10 +125,10 @@ final class EditorHotReloadController {
     }
 
     private func reload(changedPaths: [AbsolutePath]) {
-        let changedPath = changedPaths
+        let changedPath =
+            changedPaths
             .map(\.pathString)
-            .sorted()
-            .first
+            .min()
             .map { URL(fileURLWithPath: $0).lastPathComponent }
 
         state = EditorHotReloadState(
@@ -160,7 +160,8 @@ enum EditorHotReloadConfiguration {
             forProjectAt: projectURL,
             metadata: metadata,
             fileManager: fileManager
-        ).compactMap { url in
+        )
+        .compactMap { url in
             try? AbsolutePath(validating: url.path)
         }
     }
@@ -169,7 +170,7 @@ enum EditorHotReloadConfiguration {
         let relativePaths = [
             metadata?.paths.sources ?? fallbackSourcePath,
             metadata?.paths.assets ?? fallbackAssetsPath,
-            ProjectSystem.metadataDirectoryName
+            ProjectSystem.metadataDirectoryName,
         ]
 
         var seenPaths = Set<String>()
@@ -178,7 +179,8 @@ enum EditorHotReloadConfiguration {
                 return nil
             }
 
-            let url = projectURL
+            let url =
+                projectURL
                 .appendingPathComponent(relativePath, isDirectory: true)
                 .standardizedFileURL
                 .resolvingSymlinksInPath()

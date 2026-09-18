@@ -75,7 +75,7 @@ extension Parser {
     }
 }
 
-private extension Parser {
+extension Parser {
     private mutating func parseView(
         name: String,
         annotation: Annotation,
@@ -85,7 +85,7 @@ private extension Parser {
         let environment = try parseViewBody(name: name)
         let id: String
         let isIDExplicit: Bool
-        if case .string(let explicitID) = annotation.arguments["id"] {
+        if case let .string(explicitID) = annotation.arguments["id"] {
             id = explicitID
             isIDExplicit = true
         } else {
@@ -98,7 +98,7 @@ private extension Parser {
         if let previewTitle = try previewAnnotation?.previewTitle(viewName: name, path: path) {
             title = previewTitle
             isTitleExplicit = true
-        } else if case .string(let explicitTitle) = annotation.arguments["title"] {
+        } else if case let .string(explicitTitle) = annotation.arguments["title"] {
             title = explicitTitle
             isTitleExplicit = true
         } else {
@@ -151,7 +151,7 @@ private extension Parser {
         guard let environment = annotations.first(where: { $0.name == "environment" }) else {
             return nil
         }
-        guard case .identifier(let key)? = environment.positionalArguments.first else {
+        guard case let .identifier(key)? = environment.positionalArguments.first else {
             throw error("@environment in \(viewName) requires a symbolic key")
         }
         guard match("var"), let propertyName = consumeIdentifier() else {
@@ -214,23 +214,23 @@ private extension Parser {
     }
 
     private func scriptableID(name: String, annotation: Annotation) throws -> String {
-        guard case .string(let id) = annotation.arguments["id"] else {
+        guard case let .string(id) = annotation.arguments["id"] else {
             throw error("@scriptable on \(name) requires id: \"...\"")
         }
         return id
     }
 
     private func scriptableVersion(_ annotation: Annotation) -> Int {
-        if case .number(let value) = annotation.arguments["version"], let parsed = Int(value), parsed > 0 {
+        if case let .number(value) = annotation.arguments["version"], let parsed = Int(value), parsed > 0 {
             return parsed
         }
         return 1
     }
 
     private func scriptableAliases(_ annotation: Annotation) throws -> [String] {
-        if case .list(let values) = annotation.arguments["aliases"] {
+        if case let .list(values) = annotation.arguments["aliases"] {
             return try values.map { value in
-                guard case .string(let alias) = value else {
+                guard case let .string(alias) = value else {
                     throw error("@scriptable aliases must contain strings")
                 }
                 return alias
@@ -243,13 +243,15 @@ private extension Parser {
         annotation: Annotation,
         declarationName: String
     ) throws -> AdaScriptableBinding {
-        guard match("var"), let propertyName = consumeIdentifier(), match(":"),
-              let typeName = consumeIdentifier(), match(";") else {
+        guard
+            match("var"), let propertyName = consumeIdentifier(), match(":"),
+            let typeName = consumeIdentifier(), match(";")
+        else {
             throw error("@\(annotation.name) in \(declarationName) must annotate 'var name: Type;'")
         }
         if annotation.name == "component" {
             let required: Bool
-            if case .bool(let value) = annotation.arguments["required"] {
+            if case let .bool(value) = annotation.arguments["required"] {
                 required = value
             } else {
                 required = false
@@ -261,7 +263,7 @@ private extension Parser {
             )
         }
         let optional: Bool
-        if case .bool(let value) = annotation.arguments["optional"] {
+        if case let .bool(value) = annotation.arguments["optional"] {
             optional = value
         } else {
             optional = false
@@ -302,7 +304,8 @@ private extension Parser {
         var depth = 1
         var usesDeferredCommands = false
         while !isAtEnd, depth > 0 {
-            usesDeferredCommands = usesDeferredCommands
+            usesDeferredCommands =
+                usesDeferredCommands
                 || checkSequence(["context", ".", "world", ".", "commands"])
             if depth == 1, let binding = try parseResourceBinding(systemName: systemName) {
                 bindings.append(binding)
@@ -327,12 +330,14 @@ private extension Parser {
         guard let resourceAnnotation = annotations.first(where: { $0.name == "res" }) else {
             return nil
         }
-        guard match("var"), let propertyName = consumeIdentifier(), match(":"),
-              let resourceName = consumeIdentifier(), match(";") else {
+        guard
+            match("var"), let propertyName = consumeIdentifier(), match(":"),
+            let resourceName = consumeIdentifier(), match(";")
+        else {
             throw error("@res in \(systemName) must annotate 'var name: ResourceType;'")
         }
         let isOptional: Bool
-        if case .bool(let value) = resourceAnnotation.arguments["optional"] {
+        if case let .bool(value) = resourceAnnotation.arguments["optional"] {
             isOptional = value
         } else {
             isOptional = false
@@ -411,7 +416,7 @@ private extension Parser {
     }
 
     private func schemaID(name: String, annotation: Annotation) throws -> String {
-        if case .string(let explicitID) = annotation.arguments["id"] {
+        if case let .string(explicitID) = annotation.arguments["id"] {
             return explicitID
         }
         throw error("@\(annotation.name) on \(name) requires id: \"...\"")
@@ -421,7 +426,7 @@ private extension Parser {
         if annotation.name == "component" {
             return .component
         }
-        if case .bool(let value) = annotation.arguments["autoInsert"] {
+        if case let .bool(value) = annotation.arguments["autoInsert"] {
             return .resource(autoInsert: value)
         }
         return .resource(autoInsert: false)
@@ -561,9 +566,10 @@ private extension Parser {
         guard index + values.count <= tokens.count else {
             return false
         }
-        return zip(tokens[index..<(index + values.count)], values).allSatisfy { token, value in
-            token.text == value
-        }
+        return zip(tokens[index..<(index + values.count)], values)
+            .allSatisfy { token, value in
+                token.text == value
+            }
     }
 
     @discardableResult

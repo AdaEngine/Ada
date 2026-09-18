@@ -52,7 +52,7 @@ public struct BlobArray: Sendable {
 
     public init<T: ~Copyable>(
         count: Int,
-        of type: T.Type,
+        of _: T.Type,
         deinitializer: ((UnsafeMutableRawBufferPointer, Int) -> Void)? = nil
     ) {
         self.count = count
@@ -69,8 +69,8 @@ public struct BlobArray: Sendable {
     }
 }
 
-public extension BlobArray {
-    mutating func realloc(_ count: Int) {
+extension BlobArray {
+    public mutating func realloc(_ count: Int) {
         let newBuffer = unsafe _Buffer(
             count: count,
             pointer: .allocate(
@@ -84,61 +84,57 @@ public extension BlobArray {
         self.count = count
     }
 
-    func clear(_ count: Int) {
+    public func clear(_ count: Int) {
         unsafe self.buffer.clear(count)
     }
 
-    func insert<T: ~Copyable>(_ element: consuming T, at index: Int) {
+    public func insert<T: ~Copyable>(_ element: consuming T, at index: Int) {
         #if DEBUG
-        precondition(
-            MemoryLayout<T>.stride == self.layout.size &&
-            MemoryLayout<T>.alignment == self.layout.alignment,
-            "Element has different layout"
-        )
+            precondition(
+                MemoryLayout<T>.stride == self.layout.size && MemoryLayout<T>.alignment == self.layout.alignment,
+                "Element has different layout"
+            )
         #endif
-        unsafe self.buffer.pointer
-            .baseAddress!
+        unsafe self.baseAddress()
             .advanced(by: index * self.layout.size)
             .assumingMemoryBound(to: T.self)
             .initialize(to: element)
     }
 
-    func getMutablePointer<T: ~Copyable>(at index: Int, as type: T.Type) -> UnsafeMutablePointer<T> {
-    #if DEBUG
-        precondition(
-            MemoryLayout<T>.stride == self.layout.size &&
-            MemoryLayout<T>.alignment == self.layout.alignment,
-            "Element has different layout"
-        )
-    #endif
+    public func getMutablePointer<T: ~Copyable>(at index: Int, as type: T.Type) -> UnsafeMutablePointer<T> {
+        #if DEBUG
+            precondition(
+                MemoryLayout<T>.stride == self.layout.size && MemoryLayout<T>.alignment == self.layout.alignment,
+                "Element has different layout"
+            )
+        #endif
 
-        return unsafe self.buffer.pointer.baseAddress!
+        return unsafe self.baseAddress()
             .advanced(by: index * self.layout.size)
             .bindMemory(to: type, capacity: self.layout.size)
     }
 
-    func get<T>(at index: Int, as type: T.Type) -> T {
-    #if DEBUG
-        precondition(
-            MemoryLayout<T>.stride == self.layout.size &&
-            MemoryLayout<T>.alignment == self.layout.alignment,
-            "Element has different layout"
-        )
-    #endif
-        return unsafe self.buffer.pointer.baseAddress!
+    public func get<T>(at index: Int, as type: T.Type) -> T {
+        #if DEBUG
+            precondition(
+                MemoryLayout<T>.stride == self.layout.size && MemoryLayout<T>.alignment == self.layout.alignment,
+                "Element has different layout"
+            )
+        #endif
+        return unsafe self.baseAddress()
             .advanced(by: index * self.layout.size)
             .bindMemory(to: type, capacity: self.layout.size)
             .pointee
     }
 
-    func swapAndDrop(
+    public func swapAndDrop(
         from fromIndex: Int,
         to toIndex: Int
     ) {
         swapAndDrop(from: fromIndex, to: toIndex, shouldDeinitialize: true)
     }
 
-    func swapAndDrop(
+    public func swapAndDrop(
         from fromIndex: Int,
         to toIndex: Int,
         shouldDeinitialize: Bool
@@ -149,7 +145,7 @@ public extension BlobArray {
         if fromIndex == toIndex || layout.size == 0 {
             return
         }
-        let base = unsafe buffer.pointer.baseAddress!
+        let base = unsafe baseAddress()
         let fromPointer = unsafe base.advanced(by: fromIndex * layout.size)
         let toPointer = unsafe base.advanced(by: toIndex * layout.size)
 
@@ -157,16 +153,19 @@ public extension BlobArray {
             unsafe self.buffer.deinitializer?(UnsafeMutableRawBufferPointer(start: toPointer, count: layout.size), 1)
         }
         unsafe withUnsafeTemporaryAllocation(of: UInt8.self, capacity: layout.size) { tmp in
-            let tempPointer = UnsafeMutableRawPointer(tmp.baseAddress!)
+            guard let temporaryAddress = tmp.baseAddress else {
+                preconditionFailure("Temporary BlobArray storage was not allocated.")
+            }
+            let tempPointer = UnsafeMutableRawPointer(temporaryAddress)
             unsafe tempPointer.copyMemory(from: fromPointer, byteCount: layout.size)
             unsafe fromPointer.copyMemory(from: toPointer, byteCount: layout.size)
             unsafe toPointer.copyMemory(from: tempPointer, byteCount: layout.size)
         }
     }
 
-    func remove(at index: Int) {
+    public func remove(at index: Int) {
         // Create a buffer pointer starting at the element to remove
-        let basePointer = unsafe self.buffer.pointer.baseAddress!
+        let basePointer = unsafe self.baseAddress()
         let elementPointer = unsafe basePointer.advanced(by: index * self.layout.size)
         let elementBuffer = unsafe UnsafeMutableRawBufferPointer(
             start: elementPointer,
@@ -176,20 +175,27 @@ public extension BlobArray {
         unsafe self.buffer.deinitializer?(elementBuffer, 1)
     }
 
-    func copyElement(
+    public func copyElement(
         to blobArray: inout BlobArray,
         from fromIndex: Int,
         to toIndex: Int
     ) {
         #if DEBUG
-        precondition(
-            self.layout.size == blobArray.layout.size &&
-            self.layout.alignment == blobArray.layout.alignment,
-            "BlobArray has different layout"
-        )
+            precondition(
+                self.layout.size == blobArray.layout.size && self.layout.alignment == blobArray.layout.alignment,
+                "BlobArray has different layout"
+            )
         #endif
-        let sourcePointer = unsafe self.buffer.pointer.baseAddress!.advanced(by: fromIndex * self.layout.size)
-        let destinationPointer = unsafe blobArray.buffer.pointer.baseAddress!.advanced(by: toIndex * self.layout.size)
+        let sourcePointer = unsafe self.baseAddress().advanced(by: fromIndex * self.layout.size)
+        let destinationPointer = unsafe blobArray.baseAddress().advanced(by: toIndex * self.layout.size)
         unsafe destinationPointer.copyMemory(from: sourcePointer, byteCount: self.layout.size)
+    }
+
+    @inline(__always)
+    private func baseAddress() -> UnsafeMutableRawPointer {
+        guard let address = unsafe buffer.pointer.baseAddress else {
+            preconditionFailure("BlobArray storage is empty.")
+        }
+        return unsafe address
     }
 }

@@ -26,20 +26,28 @@ public func keyframeNormalizedLocalTime(
     duration: TimeInterval,
     mode: KeyframeRepeatMode
 ) -> TimeInterval {
-    guard duration > 0 else { return 0 }
+    guard duration > 0 else {
+        return 0
+    }
     switch mode {
     case .once:
         return min(max(playhead, 0), duration)
-    case .loop(let reversed):
+    case let .loop(reversed):
         let t = playhead.truncatingRemainder(dividingBy: duration)
         let forward = t < 0 ? t + duration : t
         return reversed ? duration - forward : forward
     case .pingPong:
         let span = duration * 2
-        guard span > 0 else { return 0 }
+        guard span > 0 else {
+            return 0
+        }
         var t = playhead.truncatingRemainder(dividingBy: span)
-        if t < 0 { t += span }
-        if t > duration { return span - t }
+        if t < 0 {
+            t += span
+        }
+        if t > duration {
+            return span - t
+        }
         return t
     case .repeatCount:
         let t = playhead.truncatingRemainder(dividingBy: duration)
@@ -60,16 +68,21 @@ public func keyframePlaybackState(
     case .once:
         let clamped = min(max(playhead, 0), duration)
         return KeyframePlaybackState(localTime: clamped, isFinished: playhead >= duration)
-    case .loop, .pingPong:
+    case .loop,
+        .pingPong:
         return KeyframePlaybackState(
             localTime: keyframeNormalizedLocalTime(playhead: playhead, duration: duration, mode: mode),
             isFinished: false
         )
-    case .repeatCount(let count):
+    case let .repeatCount(count):
         let safe = max(0, count)
-        if safe == 0 { return KeyframePlaybackState(localTime: 0, isFinished: true) }
+        if safe == 0 {
+            return KeyframePlaybackState(localTime: 0, isFinished: true)
+        }
         let maxPlayhead = TimeInterval(safe) * duration
-        if playhead >= maxPlayhead { return KeyframePlaybackState(localTime: duration, isFinished: true) }
+        if playhead >= maxPlayhead {
+            return KeyframePlaybackState(localTime: duration, isFinished: true)
+        }
         let local = keyframeNormalizedLocalTime(playhead: playhead, duration: duration, mode: .loop())
         return KeyframePlaybackState(localTime: local, isFinished: false)
     }
@@ -82,18 +95,28 @@ public func sampleVectorArithmetic<T: VectorArithmetic>(
     keyframes: [(time: TimeInterval, value: T, curveToNext: KeyframeCurveKind)],
     localTime: TimeInterval
 ) -> T? {
-    guard !keyframes.isEmpty else { return nil }
+    guard !keyframes.isEmpty else {
+        return nil
+    }
     let sorted = keyframes.sorted { $0.time < $1.time }
-    if sorted.count == 1 { return sorted[0].value }
-    if localTime <= sorted[0].time { return sorted[0].value }
-    if localTime >= sorted[sorted.count - 1].time { return sorted[sorted.count - 1].value }
+    if sorted.count == 1 {
+        return sorted[0].value
+    }
+    if localTime <= sorted[0].time {
+        return sorted[0].value
+    }
+    if localTime >= sorted[sorted.count - 1].time {
+        return sorted[sorted.count - 1].value
+    }
     guard let ri = sorted.firstIndex(where: { $0.time > localTime }), ri > 0 else {
         return sorted.last?.value
     }
     let left = sorted[ri - 1]
     let right = sorted[ri]
     let span = right.time - left.time
-    guard span > 0 else { return left.value }
+    guard span > 0 else {
+        return left.value
+    }
     var u = Double((localTime - left.time) / span)
     u = clamp01(u)
     u = applyCurveEasing(left.curveToNext, u: u)
@@ -108,7 +131,7 @@ public func sampleVector3Keyframes(_ keyframes: [Vector3Keyframe], localTime: Ti
 }
 
 extension Vector3 {
-    fileprivate func interpolated(towards other: Vector3, amount: Double) -> Vector3 {
+    private func interpolated(towards other: Vector3, amount: Double) -> Vector3 {
         let a = Float(amount)
         return Vector3(x: x + (other.x - x) * a, y: y + (other.y - y) * a, z: z + (other.z - z) * a)
     }
@@ -117,16 +140,28 @@ extension Vector3 {
 // MARK: - Quaternion sampler (slerp)
 
 public func sampleQuaternionKeyframes(_ keyframes: [QuaternionKeyframe], localTime: TimeInterval) -> Quat? {
-    guard !keyframes.isEmpty else { return nil }
+    guard !keyframes.isEmpty else {
+        return nil
+    }
     let sorted = keyframes.sorted { $0.time < $1.time }
-    if sorted.count == 1 { return sorted[0].value }
-    if localTime <= sorted[0].time { return sorted[0].value }
-    if localTime >= sorted[sorted.count - 1].time { return sorted[sorted.count - 1].value }
-    guard let ri = sorted.firstIndex(where: { $0.time > localTime }), ri > 0 else { return sorted.last?.value }
+    if sorted.count == 1 {
+        return sorted[0].value
+    }
+    if localTime <= sorted[0].time {
+        return sorted[0].value
+    }
+    if localTime >= sorted[sorted.count - 1].time {
+        return sorted[sorted.count - 1].value
+    }
+    guard let ri = sorted.firstIndex(where: { $0.time > localTime }), ri > 0 else {
+        return sorted.last?.value
+    }
     let left = sorted[ri - 1]
     let right = sorted[ri]
     let span = right.time - left.time
-    guard span > 0 else { return left.value }
+    guard span > 0 else {
+        return left.value
+    }
     var u = Double((localTime - left.time) / span)
     u = clamp01(u)
     u = applyCurveEasing(left.curveToNext, u: u)
@@ -160,7 +195,10 @@ func slerpQuat(_ a: Quat, _ b: Quat, t: Float) -> Quat {
     var cosHalfTheta = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w
     var b2 = b
     if cosHalfTheta < 0 {
-        b2.x = -b.x; b2.y = -b.y; b2.z = -b.z; b2.w = -b.w
+        b2.x = -b.x
+        b2.y = -b.y
+        b2.z = -b.z
+        b2.w = -b.w
         cosHalfTheta = -cosHalfTheta
     }
     if cosHalfTheta >= 1 - Float.ulpOfOne {

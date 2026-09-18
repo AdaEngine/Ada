@@ -26,12 +26,11 @@ import Math
 
 /// The properties of a button.
 public struct ButtonStyleConfiguration {
-
     /// The label of the button style.
     public struct Label: View {
         /// The body of the label.
         public typealias Body = Never
-        public var body: Never { fatalError() }
+        public var body: Never { fatalError("Unreachable code") }
 
         /// The storage of the label.
         enum Storage {
@@ -45,10 +44,10 @@ public struct ButtonStyleConfiguration {
         public static func _makeView(_ view: _ViewGraphNode<Self>, inputs: _ViewInputs) -> _ViewOutputs {
             let storage = view[\.storage].value
             switch storage {
-            case .makeView(let block):
+            case let .makeView(block):
                 return block(inputs)
-            case .makeViewList(let block):
-                let nodes = block(_ViewListInputs(input: inputs)).outputs.map { $0.node }
+            case let .makeViewList(block):
+                let nodes = block(_ViewListInputs(input: inputs)).outputs.map(\.node)
                 let node = LayoutViewContainerNode(
                     layout: AnyLayout(inputs.layout),
                     content: view.value,
@@ -70,7 +69,7 @@ public struct ButtonStyleConfiguration {
     public var isSelected: Bool {
         state.contains(.selected)
     }
-    
+
     /// A Boolean value indicating whether the control is in the selected state.
     /// Alias to isSelected property
     public var isPressed: Bool { self.isSelected }
@@ -81,20 +80,18 @@ public struct ButtonStyleConfiguration {
     }
 }
 
-public extension View {
-
+extension View {
     /// Sets the style for buttons within this view to a button style with a custom appearance and standard interaction behavior.
     ///
     /// - Parameter style: The button style to apply.
     /// - Returns: The view with the button style applied.
-    func buttonStyle<S: ButtonStyle>(_ style: S) -> some View {
+    public func buttonStyle<S: ButtonStyle>(_ style: S) -> some View {
         self.environment(\.buttonStyle, style)
     }
 }
 
 /// The default button style, based on the button’s context.
 public struct DefaultButtonStyle: ButtonStyle {
-
     /// Initialize a new default button style.
     public init() {}
 
@@ -260,9 +257,9 @@ public struct GlassButtonStyle<S: Shape>: ButtonStyle, @unchecked Sendable {
     }
 }
 
-public extension GlassButtonStyle where S == CapsuleShape {
+extension GlassButtonStyle where S == CapsuleShape {
     /// Initialize a new capsule-shaped glass button style.
-    init(
+    public init(
         glass: Glass = AdaColorPalette.landingButtonGlass,
         highlightedGlass: Glass? = nil,
         pressedGlass: Glass = .interaction,
@@ -296,9 +293,9 @@ public extension GlassButtonStyle where S == CapsuleShape {
     }
 }
 
-public extension ButtonStyle where Self == GlassButtonStyle<CapsuleShape> {
+extension ButtonStyle where Self == GlassButtonStyle<CapsuleShape> {
     /// The default capsule-shaped liquid glass button style.
-    static var glass: GlassButtonStyle<CapsuleShape> {
+    public static var glass: GlassButtonStyle<CapsuleShape> {
         GlassButtonStyle()
     }
 }
@@ -316,7 +313,6 @@ extension EnvironmentValues {
 
 /// A type-erased button style.
 public struct AnyButtonStyle: ButtonStyle {
-
     /// The style of the type-erased button style.
     let style: any ButtonStyle
 

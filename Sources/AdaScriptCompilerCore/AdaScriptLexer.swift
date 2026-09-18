@@ -55,7 +55,9 @@ struct Lexer {
             if source[index] == "\\" {
                 advance()
             }
-            guard index < source.endIndex else { break }
+            guard index < source.endIndex else {
+                break
+            }
             result.append(source[index])
             advance()
         }

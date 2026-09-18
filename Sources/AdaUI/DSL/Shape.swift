@@ -5,8 +5,8 @@
 //  Created by vladislav.prusakov on 31.07.2024.
 //
 
-import AdaUtils
 import AdaAnimation
+import AdaUtils
 import Math
 
 /// A type that resolves into a concrete fill or stroke color for shapes.
@@ -15,7 +15,7 @@ public protocol ShapeStyle {
 }
 
 extension Color: ShapeStyle {
-    public func resolve(in environment: EnvironmentValues) -> Color {
+    public func resolve(in _: EnvironmentValues) -> Color {
         self
     }
 }
@@ -57,17 +57,15 @@ enum ShapeRenderMode: Sendable, Equatable {
 }
 
 struct _ShapeView<S: Shape>: View, ViewNodeBuilder {
-
     let shape: S
-    var body: Never { fatalError() }
+    var body: Never { fatalError("Unreachable code") }
 
-    func buildViewNode(in context: BuildContext) -> ViewNode {
+    func buildViewNode(in _: BuildContext) -> ViewNode {
         ShapeViewNode(shape: shape, renderMode: .legacy, content: self)
     }
 }
 
 struct _ShapeStyledView<S: Shape, Style: ShapeStyle>: View, ViewNodeBuilder {
-
     enum Kind: Sendable, Equatable {
         case fill
         case stroke(StrokeStyle)
@@ -76,7 +74,7 @@ struct _ShapeStyledView<S: Shape, Style: ShapeStyle>: View, ViewNodeBuilder {
     let shape: S
     let style: Style
     let kind: Kind
-    var body: Never { fatalError() }
+    var body: Never { fatalError("Unreachable code") }
 
     func buildViewNode(in context: BuildContext) -> ViewNode {
         let color = style.resolve(in: context.environment)
@@ -165,7 +163,6 @@ public struct RoundedRectangle: Shape {
 /// A shape view node.
 @MainActor
 class ShapeViewNode<S: Shape>: ViewNode {
-
     private var shape: S
     private var renderMode: ShapeRenderMode
     private var path: Path = Path()
@@ -216,7 +213,8 @@ class ShapeViewNode<S: Shape>: ViewNode {
 
         let startData = self.shape.animatableData
         let endData = otherNode.shape.animatableData
-        let animationController = self.environment.animationController
+        let animationController =
+            self.environment.animationController
             ?? otherNode.environment.animationController
             ?? nearestAnimationController()
 
@@ -235,7 +233,9 @@ class ShapeViewNode<S: Shape>: ViewNode {
                 label: "shape-\(self.id)",
                 environment: self.environment,
                 updateBlock: { [weak self] value in
-                    guard let self else { return }
+                    guard let self else {
+                        return
+                    }
                     self.shape.animatableData = value.animatableData
                     self.updatePath()
                     self.invalidateNearestLayer()
@@ -262,16 +262,16 @@ class ShapeViewNode<S: Shape>: ViewNode {
     }
 }
 
-public extension Shape {
-    func fill<S: ShapeStyle>(_ style: S) -> some View {
+extension Shape {
+    public func fill<S: ShapeStyle>(_ style: S) -> some View {
         _ShapeStyledView(shape: self, style: style, kind: .fill)
     }
 
-    func stroke<S: ShapeStyle>(_ style: S, style strokeStyle: StrokeStyle = .init()) -> some View {
+    public func stroke<S: ShapeStyle>(_ style: S, style strokeStyle: StrokeStyle = .init()) -> some View {
         _ShapeStyledView(shape: self, style: style, kind: .stroke(strokeStyle))
     }
 
-    func stroke<S: ShapeStyle>(_ style: S, lineWidth: Float = 1) -> some View {
+    public func stroke<S: ShapeStyle>(_ style: S, lineWidth: Float = 1) -> some View {
         self.stroke(style, style: StrokeStyle(lineWidth: lineWidth))
     }
 
@@ -279,7 +279,7 @@ public extension Shape {
     ///
     /// - Parameter proposal: The proposed size.
     /// - Returns: The size that fits the shape.
-    func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
+    public func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
         return proposal.replacingUnspecifiedDimensions()
     }
 }

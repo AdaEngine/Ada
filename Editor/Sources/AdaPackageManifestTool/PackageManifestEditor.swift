@@ -20,9 +20,9 @@ public enum PackageManifestEditError: Error, Equatable, Sendable {
         switch self {
         case .invalidSwiftSyntax:
             #"{"error":"invalidSwiftSyntax","reason":"Package.swift could not be parsed as Swift."}"#
-        case .unsupportedManifestShape(let reason, let suggestedPatch):
+        case let .unsupportedManifestShape(reason, suggestedPatch):
             #"{"error":"unsupportedManifestShape","reason":"\#(Self.escape(reason))","suggestedPatch":"\#(Self.escape(suggestedPatch))"}"#
-        case .invalidArgument(let message):
+        case let .invalidArgument(message):
             #"{"error":"invalidArgument","reason":"\#(Self.escape(message))"}"#
         }
     }
@@ -54,27 +54,27 @@ public enum PackageManifestEditor {
 
         let result: PackageManifestEditResult
         switch command {
-        case .addTarget(let name, let dependencies):
+        case let .addTarget(name, dependencies):
             result = try insertTarget(manifest, entry: targetEntry(kind: "target", name: name, dependencies: dependencies))
-        case .addExecutableTarget(let name, let dependencies):
+        case let .addExecutableTarget(name, dependencies):
             let withProduct = try insertProduct(manifest, entry: productEntry(kind: "executable", name: name))
             result = try insertTarget(withProduct.manifest, entry: targetEntry(kind: "executableTarget", name: name, dependencies: dependencies))
-        case .addTestTarget(let name, let dependencies):
+        case let .addTestTarget(name, dependencies):
             result = try insertTarget(manifest, entry: targetEntry(kind: "testTarget", name: name, dependencies: dependencies))
-        case .addDependency(let url, let requirement):
+        case let .addDependency(url, requirement):
             result = try insertDependency(manifest, entry: dependencyEntry(url: url, requirement: try validatedRequirement(requirement)))
-        case .addLocalDependency(let name, let path):
+        case let .addLocalDependency(name, path):
             result = try addLocalDependency(manifest, name: name, path: path)
-        case .removeDependency(let identity):
+        case let .removeDependency(identity):
             result = try removeDependency(manifest, identity: identity)
-        case .ensureAdaEngineDependency(let path, let targetName):
+        case let .ensureAdaEngineDependency(path, targetName):
             result = try ensureAdaEngineDependency(manifest, path: path, targetName: targetName)
-        case .configureTarget(let name, let sources, let exclude, let resources):
+        case let .configureTarget(name, sources, exclude, resources):
             result = try configureTarget(manifest, name: name, sources: sources, exclude: exclude, resources: resources)
-        case .addPlugin(let name, let capability):
+        case let .addPlugin(name, capability):
             let withProduct = try insertProduct(manifest, entry: pluginProductEntry(name: name))
             result = try insertTarget(withProduct.manifest, entry: pluginTargetEntry(name: name, capability: capability))
-        case .ensureAssetResources(let targetName, let assetsPath):
+        case let .ensureAssetResources(targetName, assetsPath):
             result = try ensureAssetResources(manifest, targetName: targetName, assetsPath: assetsPath)
         }
 
@@ -99,11 +99,13 @@ public enum PackageManifestEditor {
 
         let matched = String(trimmed[match])
         if matched.hasPrefix("from") || matched.hasPrefix("exact") {
-            guard let version = matched.split(separator: "\"").dropFirst().first,
-                  String(version).range(
-                    of: #"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"#,
-                    options: .regularExpression
-                  ) != nil
+            guard
+                let version = matched.split(separator: "\"").dropFirst().first,
+                String(version)
+                    .range(
+                        of: #"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"#,
+                        options: .regularExpression
+                    ) != nil
             else {
                 throw PackageManifestEditError.invalidArgument("Version requirements must contain a semantic version such as 1.0.0.")
             }
@@ -254,8 +256,9 @@ public enum PackageManifestEditor {
         var searchRange = manifest.startIndex..<manifest.endIndex
 
         while let start = manifest.range(of: ".executableTarget(", range: searchRange)?.lowerBound {
-            guard let openParen = manifest[start...].firstIndex(of: "("),
-                  let closeParen = closingDelimiterIndex(open: "(", close: ")", start: openParen, in: manifest)
+            guard
+                let openParen = manifest[start...].firstIndex(of: "("),
+                let closeParen = closingDelimiterIndex(open: "(", close: ")", start: openParen, in: manifest)
             else {
                 break
             }
@@ -276,9 +279,10 @@ public enum PackageManifestEditor {
         }
 
         let match = body[range]
-        guard let firstQuote = match.firstIndex(of: "\""),
-              let lastQuote = match.lastIndex(of: "\""),
-              firstQuote != lastQuote
+        guard
+            let firstQuote = match.firstIndex(of: "\""),
+            let lastQuote = match.lastIndex(of: "\""),
+            firstQuote != lastQuote
         else {
             return nil
         }
@@ -350,7 +354,7 @@ public enum PackageManifestEditor {
             throw PackageManifestEditError.invalidArgument("\(label.capitalized) paths must be project-relative POSIX paths.")
         }
         let components = trimmed.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-        guard !components.contains(".."), !components.contains(where: { $0.isEmpty }) else {
+        guard !components.contains(".."), !components.contains(where: \.isEmpty) else {
             throw PackageManifestEditError.invalidArgument("\(label.capitalized) paths must not escape the project or contain empty segments.")
         }
         let normalizedComponents = components.filter { $0 != "." }
@@ -380,8 +384,8 @@ public enum PackageManifestEditor {
         }
 
         if let resourcesLabel = editedBody.range(of: "resources:"),
-           let openBracket = editedBody[resourcesLabel.upperBound...].firstIndex(of: "["),
-           let closeBracket = closingDelimiterIndex(open: "[", close: "]", start: openBracket, in: editedBody) {
+            let openBracket = editedBody[resourcesLabel.upperBound...].firstIndex(of: "["),
+            let closeBracket = closingDelimiterIndex(open: "[", close: "]", start: openBracket, in: editedBody) {
             let prefix = editedBody[..<closeBracket]
             let suffix = editedBody[closeBracket...]
             let needsComma = prefix.last(where: { !$0.isWhitespace }).map { $0 != "[" && $0 != "," } ?? false
@@ -478,9 +482,10 @@ public enum PackageManifestEditor {
     }
 
     private static func arrayContentsRange(named name: String, in manifest: String) -> Range<String.Index>? {
-        guard let labelRange = manifest.range(of: "\\b\(NSRegularExpression.escapedPattern(for: name))\\s*:", options: .regularExpression),
-              let openBracket = manifest[labelRange.upperBound...].firstIndex(of: "["),
-              let closeBracket = closingDelimiterIndex(open: "[", close: "]", start: openBracket, in: manifest)
+        guard
+            let labelRange = manifest.range(of: "\\b\(NSRegularExpression.escapedPattern(for: name))\\s*:", options: .regularExpression),
+            let openBracket = manifest[labelRange.upperBound...].firstIndex(of: "["),
+            let closeBracket = closingDelimiterIndex(open: "[", close: "]", start: openBracket, in: manifest)
         else {
             return nil
         }
@@ -511,9 +516,10 @@ public enum PackageManifestEditor {
             return nil
         }
         let matched = body[match]
-        guard let firstQuote = matched.firstIndex(of: "\""),
-              let lastQuote = matched.lastIndex(of: "\""),
-              firstQuote != lastQuote
+        guard
+            let firstQuote = matched.firstIndex(of: "\""),
+            let lastQuote = matched.lastIndex(of: "\""),
+            firstQuote != lastQuote
         else {
             return nil
         }
@@ -597,12 +603,13 @@ public enum PackageManifestEditor {
 
     private static func targetBodyByAppendingOrderedArgument(_ argument: String, label: String, to body: String) throws -> String {
         let trailingLabels = ["publicHeadersPath", "packageAccess", "cSettings", "cxxSettings", "swiftSettings", "linkerSettings", "plugins"]
-        let laterLabels: [String] = switch label {
-        case "path": ["exclude", "sources", "resources"] + trailingLabels
-        case "exclude": ["sources", "resources"] + trailingLabels
-        case "sources": ["resources"] + trailingLabels
-        default: trailingLabels
-        }
+        let laterLabels: [String] =
+            switch label {
+            case "path": ["exclude", "sources", "resources"] + trailingLabels
+            case "exclude": ["sources", "resources"] + trailingLabels
+            case "sources": ["resources"] + trailingLabels
+            default: trailingLabels
+            }
         let laterRanges = laterLabels.compactMap { label in
             body.range(of: #"\b\#(NSRegularExpression.escapedPattern(for: label))\s*:"#, options: .regularExpression)
         }
@@ -620,9 +627,10 @@ public enum PackageManifestEditor {
 
     private static func arrayArgumentRange(label: String, in body: String) -> Range<String.Index>? {
         let pattern = #"\b\#(NSRegularExpression.escapedPattern(for: label))\s*:"#
-        guard let labelRange = body.range(of: pattern, options: .regularExpression),
-              let openBracket = body[labelRange.upperBound...].firstIndex(of: "["),
-              let closeBracket = closingDelimiterIndex(open: "[", close: "]", start: openBracket, in: body)
+        guard
+            let labelRange = body.range(of: pattern, options: .regularExpression),
+            let openBracket = body[labelRange.upperBound...].firstIndex(of: "["),
+            let closeBracket = closingDelimiterIndex(open: "[", close: "]", start: openBracket, in: body)
         else {
             return nil
         }
@@ -630,8 +638,9 @@ public enum PackageManifestEditor {
     }
 
     private static func arrayArgumentContentsRange(label: String, in body: String) -> Range<String.Index>? {
-        guard let argumentRange = arrayArgumentRange(label: label, in: body),
-              let openBracket = body[argumentRange].firstIndex(of: "[")
+        guard
+            let argumentRange = arrayArgumentRange(label: label, in: body),
+            let openBracket = body[argumentRange].firstIndex(of: "[")
         else {
             return nil
         }
@@ -677,8 +686,9 @@ public enum PackageManifestEditor {
     }
 
     private static func closingBracketIndex(forArrayNamed name: String, in manifest: String) -> String.Index? {
-        guard let labelRange = manifest.range(of: "\n    \(name):"),
-              let openBracket = manifest[labelRange.upperBound...].firstIndex(of: "[")
+        guard
+            let labelRange = manifest.range(of: "\n    \(name):"),
+            let openBracket = manifest[labelRange.upperBound...].firstIndex(of: "[")
         else {
             return nil
         }

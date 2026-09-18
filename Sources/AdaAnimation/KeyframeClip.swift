@@ -9,7 +9,6 @@ import AdaUtils
 
 /// Type-erased keyframe track for a single property of `Value`.
 public struct AnyKeyframeTrack<Value>: @unchecked Sendable {
-
     /// String identifier used for JSON serialization (e.g. `"transform.position"`).
     public let identifier: String
 
@@ -47,7 +46,6 @@ public struct AnyKeyframeTrack<Value>: @unchecked Sendable {
 /// }
 /// ```
 public struct KeyframeClip<Value: Sendable>: Sendable {
-
     public var name: String
     public var duration: TimeInterval
     public var repeatMode: KeyframeRepeatMode

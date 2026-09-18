@@ -22,7 +22,7 @@ public protocol UIKeyframeAnimatable: Sendable {
 public struct KeyframeAnimatorNodeProxy {
     private weak var node: (any KeyframeAnimatorNodeProxyTarget)?
 
-    fileprivate init(node: any KeyframeAnimatorNodeProxyTarget) {
+    init(node: any KeyframeAnimatorNodeProxyTarget) {
         self.node = node
     }
 
@@ -65,10 +65,10 @@ public struct KeyframeAnimatorNodeProxy {
     }
 }
 
-public extension View {
+extension View {
     /// Attaches a keyframe animation to this view node.
     @MainActor
-    func keyframeAnimator<Value: UIKeyframeAnimatable>(
+    public func keyframeAnimator<Value: UIKeyframeAnimatable>(
         _ clip: KeyframeClip<Value>,
         speed: Double = 1,
         isPlaying: Bool = true
@@ -84,7 +84,7 @@ public extension View {
 
     /// Attaches keyframe animation clips to this view node.
     @MainActor
-    func keyframeAnimator<Value: UIKeyframeAnimatable>(
+    public func keyframeAnimator<Value: UIKeyframeAnimatable>(
         initialClipName: String? = nil,
         speed: Double = 1,
         isPlaying: Bool = true,
@@ -113,7 +113,7 @@ public enum KeyframeNodeAnimatorBuilder<Value: UIKeyframeAnimatable> {
     }
 }
 
-private protocol KeyframeAnimatorNodeProxyTarget: AnyObject {
+protocol KeyframeAnimatorNodeProxyTarget: AnyObject {
     @MainActor var animatedTransform: Transform3D { get set }
     @MainActor var animatedOpacity: Float { get set }
     @MainActor var frame: Rect { get }

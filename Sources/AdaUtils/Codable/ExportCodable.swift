@@ -20,20 +20,20 @@ public protocol _ExportEncodable {
 
 public struct CodingName: CodingKey {
     public var stringValue: String
-    
+
     public init(stringValue: String) {
         self.stringValue = stringValue
     }
-    
+
     public var intValue: Int?
-    
+
     public init?(intValue: Int) {
         self.intValue = intValue
         self.stringValue = String(intValue)
     }
 }
 
-public extension CodingName {
-    static let editor = CodingName(stringValue: "_editor")
-    static let value = CodingName(stringValue: "_value")
+extension CodingName {
+    public static let editor = CodingName(stringValue: "_editor")
+    public static let value = CodingName(stringValue: "_value")
 }

@@ -63,9 +63,9 @@ final class EditorProjectSwitcherViewModel {
         }
         let resolvedURL = store.resolveProjectURL(for: project)
         #if canImport(UIKit)
-        return projectForOpening(at: ProjectOpenPicker.retainSecurityScopedAccess(to: resolvedURL))
+            return projectForOpening(at: ProjectOpenPicker.retainSecurityScopedAccess(to: resolvedURL))
         #else
-        return projectForOpening(at: resolvedURL)
+            return projectForOpening(at: resolvedURL)
         #endif
     }
 

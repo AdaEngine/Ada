@@ -21,7 +21,9 @@ enum KeyframeAnimatorWaitOnce {
         let box = OnceBox()
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             let cancellable = EventManager.default.subscribe(to: KeyframeAnimatorRunDidFinish.self) { event in
-                guard event.entityID == entityID, event.runToken == runToken else { return }
+                guard event.entityID == entityID, event.runToken == runToken else {
+                    return
+                }
                 if box.fire() {
                     cont.resume()
                 }
@@ -59,7 +61,9 @@ final class OnceBox: @unchecked Sendable {
     func fire() -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        if didFire { return false }
+        if didFire {
+            return false
+        }
         didFire = true
         if let cancellable {
             cancellable.cancel()

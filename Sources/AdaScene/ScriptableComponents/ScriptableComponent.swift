@@ -58,31 +58,31 @@ open class ScriptableObject: Codable, @unchecked Sendable {
     /// Returns detached exported state for UI binding. Override alongside `writeExportedField` in native scripts.
     /// AdaScript provides these accessors automatically for `@export` properties.
     @MainActor
-    open func readExportedField(_ name: String) -> EditorFieldValue? { nil }
+    open func readExportedField(_: String) -> EditorFieldValue? { nil }
 
     /// Applies a queued UI edit outside view construction. Return false for unknown or incompatible values.
     @MainActor
-    open func writeExportedField(_ name: String, value: EditorFieldValue) -> Bool { false }
+    open func writeExportedField(_: String, value _: EditorFieldValue) -> Bool { false }
 
     /// Called exactly once after successful attachment.
     @MainActor
-    open func ready(context: ScriptableObjectContext) {}
+    open func ready(context _: ScriptableObjectContext) {}
 
     /// Called on the update scheduler.
     @MainActor
-    open func update(context: ScriptableObjectContext) {}
+    open func update(context _: ScriptableObjectContext) {}
 
     /// Called for fixed-timestep work.
     @MainActor
-    open func fixedUpdate(context: ScriptableObjectContext) {}
+    open func fixedUpdate(context _: ScriptableObjectContext) {}
 
     /// Called when input events are available.
     @MainActor
-    open func event(_ events: [any InputEvent], context: ScriptableObjectContext) {}
+    open func event(_: [any InputEvent], context _: ScriptableObjectContext) {}
 
     /// Called exactly once when the object is detached or its entity disappears.
     @MainActor
-    open func destroy(context: ScriptableObjectContext) {}
+    open func destroy(context _: ScriptableObjectContext) {}
 
     // MARK: - Codable
 
@@ -91,9 +91,13 @@ open class ScriptableObject: Codable, @unchecked Sendable {
         let container = try decoder.container(keyedBy: CodingName.self)
 
         repeat {
-            guard let children = mirror?.children else { break }
+            guard let children = mirror?.children else {
+                break
+            }
             for child in children {
-                guard let decodableKey = child.value as? _ExportDecodable else { continue }
+                guard let decodableKey = child.value as? _ExportDecodable else {
+                    continue
+                }
                 let propertyName = String((child.label ?? "").dropFirst())
                 try decodableKey.decode(
                     from: container,
@@ -110,9 +114,13 @@ open class ScriptableObject: Codable, @unchecked Sendable {
         var mirror: Mirror? = Mirror(reflecting: self)
 
         repeat {
-            guard let children = mirror?.children else { break }
+            guard let children = mirror?.children else {
+                break
+            }
             for child in children {
-                guard let encodableKey = child.value as? _ExportEncodable else { continue }
+                guard let encodableKey = child.value as? _ExportEncodable else {
+                    continue
+                }
                 let propertyName = String((child.label ?? "").dropFirst())
                 try encodableKey.encode(
                     to: &container,
@@ -131,7 +139,8 @@ open class ScriptableObject: Codable, @unchecked Sendable {
             attachedEntity = entity
             lifecycleState = .attached
             return true
-        case .attached, .ready:
+        case .attached,
+            .ready:
             return attachedEntity === entity
         case .destroyed:
             return false

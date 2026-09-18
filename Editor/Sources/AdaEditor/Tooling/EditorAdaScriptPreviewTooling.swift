@@ -31,10 +31,12 @@ actor EditorAdaScriptPreviewBuilder {
             guard let target = packageModel.target(containing: request.document, projectURL: request.projectURL) else {
                 throw EditorPreviewBuildFailure(message: "Could not resolve the SwiftPM target for \(request.document.relativePath).")
             }
-            sourceRoot = URL(
-                fileURLWithPath: target.path ?? "Sources/\(target.name)",
-                relativeTo: request.projectURL
-            ).standardizedFileURL
+            sourceRoot =
+                URL(
+                    fileURLWithPath: target.path ?? "Sources/\(target.name)",
+                    relativeTo: request.projectURL
+                )
+                .standardizedFileURL
             sourceGroupName = target.name
         } else {
             let project = try ProjectSystem.loadProject(at: request.projectURL, fileManager: fileManager)
@@ -45,11 +47,13 @@ actor EditorAdaScriptPreviewBuilder {
             sourceRoot = request.projectURL.appendingPathComponent(sourcePath, isDirectory: true).standardizedFileURL
             sourceGroupName = project.runtime.moduleName
         }
-        guard let enumerator = fileManager.enumerator(
-            at: sourceRoot,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
+        guard
+            let enumerator = fileManager.enumerator(
+                at: sourceRoot,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
+        else {
             throw EditorPreviewBuildFailure(message: "Could not enumerate AdaScript sources in \(sourceGroupName).")
         }
 

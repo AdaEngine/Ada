@@ -11,7 +11,6 @@ import Math
 /// Component that responsible to display ``TileMap`` instance on screen.
 @Component
 public struct TileMapComponent {
-
     /// Contains ``TileMap`` instance that will display on screen.
     public var tileMap: TileMap
 

@@ -13,7 +13,6 @@ import Math
 
 /// The Input plugin handle system input events and ``Input`` resource to the world.
 public struct InputPlugin: Plugin {
-
     @Local private var controllerEngine: GameControllerEngine?
 
     private let actions: [InputAction]?
@@ -25,10 +24,10 @@ public struct InputPlugin: Plugin {
 
     public func setup(in app: AppWorlds) {
         #if canImport(Darwin)
-        let appleGameControllerManager = AppleGameControllerManager()
-        controllerEngine = appleGameControllerManager
+            let appleGameControllerManager = AppleGameControllerManager()
+            controllerEngine = appleGameControllerManager
         #else
-        controllerEngine = nil
+            controllerEngine = nil
         #endif
 
         var input = Input(gameControllerEngine: controllerEngine)
@@ -53,24 +52,23 @@ public struct InputPlugin: Plugin {
             .addSystem(InputEventParseSystem.self, on: .preUpdate)
             .addSystem(InputEventsCleanupSystem.self, on: .postUpdate)
     }
-    
-    public func destroy(for app: borrowing AppWorlds) {
+
+    public func destroy(for _: borrowing AppWorlds) {
         controllerEngine?.stopMonitoring()
     }
 }
 
 @PlainSystem
 public struct InputEventParseSystem {
-
     @ResMut<Input>
     private var input
 
     private let logger = Logger(label: "org.adaengine.AdaInput")
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
     @MainActor
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         input.beginActionFrame()
         input.flushPendingEvents()
         for event in input.eventsPool {
@@ -98,8 +96,12 @@ public struct InputEventParseSystem {
                     $0.contactID != touchEvent.contactID || $0.window != touchEvent.window
                 }
                 switch touchEvent.phase {
-                case .began, .moved: input.touches.insert(touchEvent)
-                case .ended, .cancelled: break
+                case .began,
+                    .moved:
+                    input.touches.insert(touchEvent)
+                case .ended,
+                    .cancelled:
+                    break
                 }
                 switch touchEvent.phase {
                 case .began: input.actionTouchPhases.insert(.began)

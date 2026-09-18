@@ -21,7 +21,7 @@ public final class RuntimeWGSLMaterial: Material, @unchecked Sendable {
         super.init(shaderSource: source)
     }
 
-    public required convenience init(from assetDecoder: AssetDecoder) throws {
+    public required convenience init(from _: AssetDecoder) throws {
         throw RuntimeMaterialError.explicitSourcesRequired
     }
 
@@ -30,16 +30,20 @@ public final class RuntimeWGSLMaterial: Material, @unchecked Sendable {
         update()
     }
 
-    public override func update() {
+    override public func update() {
         setValue(lock.withLock { value }, for: "parameters")
         setTexture(MaterialTexture(texture: texture, samplerName: "imageSampler"), for: "image")
     }
 
-    public override func collectDefines(for vertexDescriptor: VertexDescriptor, keys: Set<String>) -> [ShaderDefine] { [] }
+    override public func collectDefines(for _: VertexDescriptor, keys _: Set<String>) -> [ShaderDefine] { [] }
 
-    public override func makeShaderModule(defines: [ShaderDefine]) throws -> ShaderModule {
-        if let module { return module }
-        guard unsafe RenderEngine.shared.type == .webgpu else { throw RuntimeMaterialError.webGPURequired }
+    override public func makeShaderModule(defines _: [ShaderDefine]) throws -> ShaderModule {
+        if let module {
+            return module
+        }
+        guard unsafe RenderEngine.shared.type == .webgpu else {
+            throw RuntimeMaterialError.webGPURequired
+        }
         var vertexReflection = ShaderReflectionData()
         let view = ShaderResource.ShaderBuffer(name: "view", size: 192, shaderStage: .vertex, binding: 2, resourceAccess: .read, members: [:])
         vertexReflection.shaderBuffers[view.name] = view
@@ -67,8 +71,10 @@ public final class RuntimeWGSLMaterial: Material, @unchecked Sendable {
         return module
     }
 
-    public override func configureRenderPipeline(for vertexDescriptor: VertexDescriptor, keys: Set<String>, shaderModule: ShaderModule) -> RenderPipelineDescriptor? {
-        guard let vertex = shaderModule.getShader(for: .vertex), let fragment = shaderModule.getShader(for: .fragment) else { return nil }
+    override public func configureRenderPipeline(for vertexDescriptor: VertexDescriptor, keys _: Set<String>, shaderModule: ShaderModule) -> RenderPipelineDescriptor? {
+        guard let vertex = shaderModule.getShader(for: .vertex), let fragment = shaderModule.getShader(for: .fragment) else {
+            return nil
+        }
         var descriptor = RenderPipelineDescriptor(vertex: vertex)
         descriptor.debugName = "Runtime WGSL UI material"
         descriptor.fragment = fragment
@@ -79,16 +85,16 @@ public final class RuntimeWGSLMaterial: Material, @unchecked Sendable {
     }
 
     private static let vertexSource = """
-    struct View { projection: mat4x4<f32>, viewProjection: mat4x4<f32>, viewMatrix: mat4x4<f32> }
-    @group(0) @binding(2) var<uniform> view: View;
-    struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32> }
-    @vertex fn player_vertex(@location(0) position: vec4<f32>, @location(1) color: vec4<f32>, @location(2) uv: vec2<f32>) -> Output {
-        var result: Output;
-        result.position = view.viewProjection * position;
-        result.uv = uv;
-        return result;
-    }
-    """
+        struct View { projection: mat4x4<f32>, viewProjection: mat4x4<f32>, viewMatrix: mat4x4<f32> }
+        @group(0) @binding(2) var<uniform> view: View;
+        struct Output { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32> }
+        @vertex fn player_vertex(@location(0) position: vec4<f32>, @location(1) color: vec4<f32>, @location(2) uv: vec2<f32>) -> Output {
+            var result: Output;
+            result.position = view.viewProjection * position;
+            result.uv = uv;
+            return result;
+        }
+        """
 
     private enum RuntimeMaterialError: Error { case explicitSourcesRequired, webGPURequired }
 }

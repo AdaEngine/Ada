@@ -68,11 +68,13 @@ final class EditorTileSourceEditorModel {
                 throw EditorTileSourceError.message("Symbolic-link tile sources are read-only.")
             }
             let data = try Data(contentsOf: url)
-            guard let yaml = String(data: data, encoding: .utf8),
-                  let parsed = try Yams.load(yaml: yaml) as? [String: Any],
-                  let loadedSources = parsed["sources"] as? [[String: Any]],
-                  let size = parsed["tileSize"] as? [String: Int],
-                  let x = size["x"], let y = size["y"], x > 0, y > 0 else {
+            guard
+                let yaml = String(bytes: data, encoding: .utf8),
+                let parsed = try Yams.load(yaml: yaml) as? [String: Any],
+                let loadedSources = parsed["sources"] as? [[String: Any]],
+                let size = parsed["tileSize"] as? [String: Int],
+                let x = size["x"], let y = size["y"], x > 0, y > 0
+            else {
                 throw EditorTileSourceError.message("Expected tileSize and sources in the .tileset file.")
             }
             root = parsed
@@ -82,7 +84,9 @@ final class EditorTileSourceEditorModel {
             displayHeight = String(y)
             isEditable = true
             selectSource(min(selectedSource, max(0, sources.count - 1)))
-            if sources.isEmpty { status = "Add a PNG image to create a tile source." }
+            if sources.isEmpty {
+                status = "Add a PNG image to create a tile source."
+            }
         } catch {
             isEditable = false
             status = error.localizedDescription
@@ -95,10 +99,14 @@ final class EditorTileSourceEditorModel {
         image = nil
         layout = nil
         name = sourceNameSafely(index)
-        guard sources.indices.contains(index),
-              sources[index]["type"] as? String == String(reflecting: TextureAtlasTileSource.self),
-              let raw = sourceData["image"], let url else {
-            if !sources.isEmpty { status = "This source uses a legacy atlas or a custom type. Its data is preserved." }
+        guard
+            sources.indices.contains(index),
+            sources[index]["type"] as? String == String(reflecting: TextureAtlasTileSource.self),
+            let raw = sourceData["image"], let url
+        else {
+            if !sources.isEmpty {
+                status = "This source uses a legacy atlas or a custom type. Its data is preserved."
+            }
             return
         }
         do {
@@ -130,8 +138,8 @@ final class EditorTileSourceEditorModel {
         }
         ProjectOpenPicker.presentAtlasImagePicker { [weak self] result in
             switch result {
-            case .selected(let urls): self?.addImages(urls)
-            case .unavailable(let message): self?.status = message
+            case let .selected(urls): self?.addImages(urls)
+            case let .unavailable(message): self?.status = message
             case .cancelled: break
             }
         }
@@ -172,8 +180,8 @@ final class EditorTileSourceEditorModel {
                         "id": try nextSourceID(in: updated),
                         "name": source.deletingPathExtension().lastPathComponent,
                         "image": try imageObject(settings),
-                        "tiles": []
-                    ] as [String: Any]
+                        "tiles": [],
+                    ] as [String: Any],
                 ])
             }
             guard updated.count != sources.count else {
@@ -245,7 +253,9 @@ final class EditorTileSourceEditorModel {
         var updated = tiles
         if let index = updated.firstIndex(where: { ($0["xy"] as? [Int]) == [selectedTile.x, selectedTile.y] }) {
             updated.remove(at: index)
-        } else { updated.append(newTile(selectedTile)) }
+        } else {
+            updated.append(newTile(selectedTile))
+        }
         saveTiles(updated)
     }
 
@@ -267,11 +277,17 @@ final class EditorTileSourceEditorModel {
     }
 
     func applyAnimation() {
-        guard canEditSource, let selectedTile,
-              let index = tiles.firstIndex(where: { ($0["xy"] as? [Int]) == [selectedTile.x, selectedTile.y] }) else { return }
-        guard let count = Int(frames), count > 0, count <= 65_536,
-              let seconds = Double(duration), seconds.isFinite, seconds > 0,
-              count <= (verticalAnimation ? gridSize.height - selectedTile.y : gridSize.width - selectedTile.x) else {
+        guard
+            canEditSource, let selectedTile,
+            let index = tiles.firstIndex(where: { ($0["xy"] as? [Int]) == [selectedTile.x, selectedTile.y] })
+        else {
+            return
+        }
+        guard
+            let count = Int(frames), count > 0, count <= 65_536,
+            let seconds = Double(duration), seconds.isFinite, seconds > 0,
+            count <= (verticalAnimation ? gridSize.height - selectedTile.y : gridSize.width - selectedTile.x)
+        else {
             status = "Animation needs a positive duration and frames within the grid."
             return
         }
@@ -297,8 +313,8 @@ final class EditorTileSourceEditorModel {
     }
 }
 
-private extension EditorTileSourceEditorModel {
-    func nextSourceID(in sources: [[String: Any]]) throws -> Int {
+extension EditorTileSourceEditorModel {
+    private func nextSourceID(in sources: [[String: Any]]) throws -> Int {
         let ids = sources.compactMap { ($0["data"] as? [String: Any])?["id"] as? Int }
         guard (ids.max() ?? -1) < Int.max else {
             throw EditorTileSourceError.message("No source IDs available.")
@@ -306,12 +322,15 @@ private extension EditorTileSourceEditorModel {
         return (ids.max() ?? -1) + 1
     }
 
-    func saveTiles(_ tiles: [[String: Any]]) {
+    private func saveTiles(_ tiles: [[String: Any]]) {
         var updated = sources
         var data = sourceData
         data["tiles"] = tiles
         updated[selectedSource]["data"] = data
-        do { try save(updated); status = "Saved \(tiles.count) tiles" } catch { status = error.localizedDescription }
+        do {
+            try save(updated)
+            status = "Saved \(tiles.count) tiles"
+        } catch { status = error.localizedDescription }
     }
 
     private func save(_ updated: [[String: Any]], tileSize: [String: Int]? = nil) throws {
@@ -324,7 +343,9 @@ private extension EditorTileSourceEditorModel {
         }
         var candidate = root
         candidate["sources"] = updated
-        if let tileSize { candidate["tileSize"] = tileSize }
+        if let tileSize {
+            candidate["tileSize"] = tileSize
+        }
         let data = Data(try Yams.dump(object: candidate).utf8)
         try data.write(to: url, options: .atomic)
         root = candidate
@@ -346,9 +367,9 @@ private extension EditorTileSourceEditorModel {
                 "td": [
                     "mColor": ["red": 1.0, "green": 1.0, "blue": 1.0, "alpha": 1.0],
                     "f_h": false,
-                    "f_v": false
-                ]
-            ] as [String: Any]
+                    "f_v": false,
+                ],
+            ] as [String: Any],
         ]
     }
 
@@ -370,7 +391,7 @@ enum EditorTileSourceError: LocalizedError {
     case message(String)
     var errorDescription: String? {
         switch self {
-        case .message(let text): text
+        case let .message(text): text
         }
     }
 }

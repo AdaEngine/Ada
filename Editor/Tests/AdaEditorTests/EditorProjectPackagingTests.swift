@@ -1,8 +1,9 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Project packaging", .serialized)
 struct EditorProjectPackagingTests {
@@ -34,9 +35,9 @@ struct EditorProjectPackagingTests {
         let store = EditorProjectStore(storageURL: root.appendingPathComponent("recent.json"), distribution: .standalone)
         let model = ProjectOpeningViewModel(store: store)
         #if os(iOS)
-        #expect(EditorProjectStore.defaultUsesProjectPackage)
+            #expect(EditorProjectStore.defaultUsesProjectPackage)
         #else
-        #expect(!EditorProjectStore.defaultUsesProjectPackage)
+            #expect(!EditorProjectStore.defaultUsesProjectPackage)
         #endif
         model.beginCreateNewProject(template: .adaScript, suggestedName: "Toggled")
         #expect(model.shouldCreateProjectPackage == EditorProjectStore.defaultUsesProjectPackage)
@@ -57,11 +58,14 @@ struct EditorProjectPackagingTests {
         #expect(model.shouldCreateProjectPackage == EditorProjectStore.defaultUsesProjectPackage)
     }
 
-    @Test("all application variants own the same project document type", arguments: [
-        "Sources/AdaEditor/Platforms/macOS/Info.plist",
-        "Platforms/StandaloneUpdater/App-Info.plist",
-        "Sources/AdaEditor/Platforms/iOS/Info.plist"
-    ])
+    @Test(
+        "all application variants own the same project document type",
+        arguments: [
+            "Sources/AdaEditor/Platforms/macOS/Info.plist",
+            "Platforms/StandaloneUpdater/App-Info.plist",
+            "Sources/AdaEditor/Platforms/iOS/Info.plist",
+        ]
+    )
     func documentRegistration(path: String) throws {
         let root = URL(fileURLWithPath: #filePath)
             .resolvingSymlinksInPath()

@@ -17,9 +17,11 @@ struct EditorNewFileMenu: View {
         } else {
             groups = [EditorNewFileGroup.allCases]
         }
-        return groups.map { column in
-            column.filter { group in group.templates.contains { $0.matches(search) } }
-        }.filter { !$0.isEmpty }
+        return
+            groups.map { column in
+                column.filter { group in group.templates.contains { $0.matches(search) } }
+            }
+            .filter { !$0.isEmpty }
     }
 
     var body: some View {
@@ -78,7 +80,9 @@ struct EditorNewFileMenu: View {
             .frame(height: 22)
             .accessibilityIdentifier("AdaEditor.NewFile.Group.\(group.rawValue)")
             ForEach(group.templates.filter { $0.matches(search) }, id: \.self) { kind in
-                Button { onSelect(kind) } label: {
+                Button {
+                    onSelect(kind)
+                } label: {
                     HStack(spacing: 10) {
                         Text(kind.icon)
                             .font(AdaEditorMaterialSymbolFont.font(size: 22))
@@ -112,8 +116,11 @@ private struct EditorTemplateButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(RoundedRectangleShape(cornerRadius: 6).fill(
-                configuration.state.isHighlighted || configuration.state.isSelected ? theme.editorColors.blue.opacity(0.18) : Color.clear
-            ))
+            .background(
+                RoundedRectangleShape(cornerRadius: 6)
+                    .fill(
+                        configuration.state.isHighlighted || configuration.state.isSelected ? theme.editorColors.blue.opacity(0.18) : Color.clear
+                    )
+            )
     }
 }

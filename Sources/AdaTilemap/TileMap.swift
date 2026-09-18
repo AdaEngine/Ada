@@ -6,13 +6,12 @@
 //
 
 import AdaAssets
-import Math
 @_spi(Runtime) import AdaUtils
+import Math
 import OrderedCollections
 
 /// A tile map.
 public class TileMap: @unsafe Asset, @unchecked Sendable {
-
     /// The tile set of the tile map.
     public var tileSet: TileSet = TileSet() {
         didSet {
@@ -24,7 +23,7 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
     public internal(set) var layers: [TileMapLayer] = [TileMapLayer()]
 
     /// The asset meta info of the tile map.
-    public nonisolated(unsafe) var assetMetaInfo: AssetMetaInfo?
+    nonisolated(unsafe) public var assetMetaInfo: AssetMetaInfo?
 
     /// A Boolean value indicating whether the tile map needs to be updated.
     internal private(set) var needsUpdate: Bool = false
@@ -36,7 +35,7 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
     public init() {
         self.tileSetDidChange()
     }
-    
+
     /// Initialize a new tile map from a decoder.
     ///
     /// - Parameter decoder: The decoder to initialize the tile map from.
@@ -44,11 +43,11 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
     public required init(from decoder: AssetDecoder) async throws {
         let fileContent = try decoder.decode(FileContent.self)
         self.tileSet = fileContent.tileSet
-        
+
         for layer in fileContent.layers {
             let newLayer = self.createLayer()
             newLayer.name = layer.name
-            
+
             for tile in layer.tiles {
                 newLayer.setCell(
                     at: tile.position,
@@ -58,32 +57,32 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
             }
         }
     }
-    
+
     /// Encode the tile map to an encoder.
     ///
     /// - Parameter encoder: The encoder to encode the tile map to.
     /// - Throws: An error if the tile map cannot be encoded to the encoder.
     public func encodeContents(with encoder: AssetEncoder) async throws {
         var layers = [FileContent.Layer]()
-        
+
         for layer in self.layers {
-            let tiles = layer.tileCells.elements.map { (position, data) in
+            let tiles = layer.tileCells.elements.map { position, data in
                 FileContent.Tile(
                     position: position,
                     atlasPosition: data.atlasCoordinates,
                     sourceId: data.sourceId
                 )
             }
-            
+
             layers.append(
                 FileContent.Layer(name: layer.name, id: layer.id, tiles: tiles)
             )
         }
-        
+
         let content = FileContent(layers: layers, tileSet: self.tileSet)
         try encoder.encode(content)
     }
-    
+
     /// The extensions of the tile map.
     public static func extensions() -> [String] {
         ["tilemap"]
@@ -98,7 +97,7 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
         layer.tileSet = self.tileSet
         layer.tileMap = self
         self.layers.append(layer)
-        
+
         return layer
     }
 
@@ -189,32 +188,31 @@ extension TileMap {
             let id: Int
             let tiles: [Tile]
         }
-        
+
         struct Tile: Codable {
-            
             enum CodingKeys: String, CodingKey {
                 case position = "p"
                 case atlasPosition = "ap"
                 case sourceId = "sid"
             }
-            
+
             let position: PointInt
             let atlasPosition: PointInt
             let sourceId: TileSource.ID
-            
+
             init(position: PointInt, atlasPosition: PointInt, sourceId: TileSource.ID) {
                 self.position = position
                 self.atlasPosition = atlasPosition
                 self.sourceId = sourceId
             }
-            
+
             init(from decoder: any Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
-                self.position = try PointInt(container.decode([Int].self, forKey: Tile.CodingKeys.position))
-                self.atlasPosition = try PointInt(container.decode([Int].self, forKey: Tile.CodingKeys.atlasPosition))
-                self.sourceId = try container.decode(TileSource.ID.self, forKey: Tile.CodingKeys.sourceId)
+                self.position = try PointInt(container.decode([Int].self, forKey: Self.CodingKeys.position))
+                self.atlasPosition = try PointInt(container.decode([Int].self, forKey: Self.CodingKeys.atlasPosition))
+                self.sourceId = try container.decode(TileSource.ID.self, forKey: Self.CodingKeys.sourceId)
             }
-            
+
             func encode(to encoder: any Encoder) throws {
                 var container = encoder.container(keyedBy: CodingKeys.self)
                 try container.encode(self.sourceId, forKey: .sourceId)
@@ -222,7 +220,7 @@ extension TileMap {
                 try container.encode([atlasPosition.x, atlasPosition.y], forKey: .atlasPosition)
             }
         }
-        
+
         let layers: [Layer]
         let tileSet: TileSet
     }

@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor text search")
 struct EditorTextSearchTests {
@@ -60,10 +61,14 @@ struct EditorTextSearchTests {
         let editor = EditorViewModel(project: EditorProjectReference(name: "Search", path: root.path))
         let item = try #require(editor.projectSidebar.items.first { $0.relativePath == "code.swift" })
         editor.openProjectItem(item)
-        guard case .text(let document)? = editor.workbench.activeDocument else {
-            Issue.record("Expected text document"); return
+        guard case let .text(document)? = editor.workbench.activeDocument else {
+            Issue.record("Expected text document")
+            return
         }
-        editor.workbench.updateTextDocument(id: document.id) { $0.content = "let unsaved = 1"; $0.isDirty = true }
+        editor.workbench.updateTextDocument(id: document.id) {
+            $0.content = "let unsaved = 1"
+            $0.isDirty = true
+        }
         editor.textSearch.query = "unsaved"
         #expect(editor.handleMenuCommand(.findInProject))
         #expect(editor.textSearch.isPresented)
@@ -71,8 +76,9 @@ struct EditorTextSearchTests {
         let match = try #require(editor.textSearch.results.matches.first)
         editor.openTextSearchMatch(match)
         #expect(!editor.textSearch.isPresented)
-        guard case .text(let opened)? = editor.workbench.activeDocument else {
-            Issue.record("Expected search target"); return
+        guard case let .text(opened)? = editor.workbench.activeDocument else {
+            Issue.record("Expected search target")
+            return
         }
         #expect(opened.content == "let unsaved = 1")
         #expect(opened.isDirty)
@@ -100,9 +106,16 @@ struct EditorTextSearchTests {
 
     @Test @MainActor func searchInputFocusUsesRealNodes() throws {
         var query = ""
-        let container = UIContainerView(rootView: TextField("Search", text: Binding(
-            get: { query }, set: { query = $0 }
-        )).accessibilityIdentifier(EditorTextSearchDialog.fieldIdentifier))
+        let container = UIContainerView(
+            rootView: TextField(
+                "Search",
+                text: Binding(
+                    get: { query },
+                    set: { query = $0 }
+                )
+            )
+            .accessibilityIdentifier(EditorTextSearchDialog.fieldIdentifier)
+        )
         container.frame = Rect(x: 0, y: 0, width: 400, height: 80)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
@@ -174,7 +187,10 @@ struct EditorTextSearchDialogTests {
         )
         let palette = EditorCodeColorPalette.dark
         let text = EditorTextSearchPresentationText.attributedText(
-            match, palette: palette, font: .system(size: 12), keywordFont: .system(size: 12, weight: .bold)
+            match,
+            palette: palette,
+            font: .system(size: 12),
+            keywordFont: .system(size: 12, weight: .bold)
         )
         #expect(text.attributes(at: text.startIndex).foregroundColor == palette.keyword)
         let selected = try #require(text.text.range(of: "move"))
@@ -196,7 +212,10 @@ struct EditorTextSearchDialogTests {
             )
         )
         let text = EditorTextSearchPresentationText.attributedText(
-            match, palette: .dark, font: .system(size: 12), keywordFont: .system(size: 12)
+            match,
+            palette: .dark,
+            font: .system(size: 12),
+            keywordFont: .system(size: 12)
         )
         #expect(text.text.count < 250)
         #expect(text.text.hasPrefix("… "))
@@ -209,8 +228,10 @@ struct EditorTextSearchDialogTests {
         defer { try? FileManager.default.removeItem(at: root) }
         try "first needle\nsecond needle".write(to: root.appendingPathComponent("example.swift"), atomically: true, encoding: .utf8)
         let editor = EditorViewModel(project: EditorProjectReference(name: "Search", path: root.path))
-        let container = UIContainerView(rootView: Color.clear
-            .modifier(EditorTextSearchPresentation(viewModel: editor)).theme(.adaEditor))
+        let container = UIContainerView(
+            rootView: Color.clear
+                .modifier(EditorTextSearchPresentation(viewModel: editor)).theme(.adaEditor)
+        )
         container.frame = Rect(x: 0, y: 0, width: 1200, height: 800)
         container.bounds.size = container.frame.size
         container.layoutSubviews()
@@ -232,8 +253,9 @@ struct EditorTextSearchDialogTests {
         container.onKeyEvent(KeyEvent(window: RID(), keyCode: .enter, modifiers: [], status: .down, time: 2, isRepeated: false))
         await refresh(container)
         #expect(!editor.textSearch.isPresented)
-        guard case .text(let document)? = editor.workbench.activeDocument else {
-            Issue.record("Search must open the selected file"); return
+        guard case let .text(document)? = editor.workbench.activeDocument else {
+            Issue.record("Search must open the selected file")
+            return
         }
         #expect(document.focusedRange?.start.line == 1)
         container.onKeyEvent(KeyEvent(window: RID(), keyCode: .f, modifiers: [.main, .shift], status: .down, time: 3, isRepeated: false))

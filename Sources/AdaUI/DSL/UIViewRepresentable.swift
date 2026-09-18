@@ -10,7 +10,6 @@ import Math
 
 /// A context for a UIViewRepresentable.
 public struct UIViewRepresentableContext<View: UIViewRepresentable> {
-
     /// The environment for the UIViewRepresentable.
     public internal(set) var environment: EnvironmentValues
 
@@ -19,11 +18,11 @@ public struct UIViewRepresentableContext<View: UIViewRepresentable> {
 }
 
 /// A wrapper for a UIView that you use to integrate that view into your DSL view hierarchy.
-/// 
-/// - Warning: DSL views fully controls the layout of the UIView's center, bounds, frame, and transform properties. Don’t directly set these layout-related properties on the view managed by a UIViewRepresentable instance from your own code because that conflicts with AdaUI and results in undefined behavior.
+///
+/// - Warning: DSL views fully control the UIView's center, bounds, frame, and transform. Don't set
+///   those properties directly on a managed view because that conflicts with AdaUI layout.
 @MainActor
 public protocol UIViewRepresentable: View {
-
     /// The type of the view.
     associatedtype ViewType: UIView
 
@@ -61,35 +60,32 @@ public protocol UIViewRepresentable: View {
     func makeCoordinator() -> Coordinator
 }
 
-public extension UIViewRepresentable where Coordinator == Void {
-
+extension UIViewRepresentable where Coordinator == Void {
     /// Make a coordinator.
     ///
     /// - Returns: The coordinator.
-    func makeCoordinator() {
+    public func makeCoordinator() {
         return
     }
 }
 
-public extension UIViewRepresentable {
-
+extension UIViewRepresentable {
     /// The size that fits the UIViewRepresentable.
     ///
     /// - Parameter proposal: The proposed size.
     /// - Parameter view: The view.
     /// - Parameter context: The context.
     /// - Returns: The size that fits the UIViewRepresentable.
-    func sizeThatFits(
+    public func sizeThatFits(
         _ proposal: ProposedViewSize,
         view: ViewType,
-        context: Context
+        context _: Context
     ) -> Size {
         return view.sizeThatFits(proposal)
     }
 }
 
 extension UIViewRepresentable {
-
     /// The body of the UIViewRepresentable.
     ///
     /// - Returns: The body of the UIViewRepresentable.

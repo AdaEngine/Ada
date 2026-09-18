@@ -26,14 +26,14 @@ public enum SystemDependency: Sendable {
     case after(String)
 }
 
-public extension SystemDependency { 
-        /// Run the system before the specified system.
-    static func before<T: System>(_ system: T.Type) -> SystemDependency {
+extension SystemDependency {
+    /// Run the system before the specified system.
+    public static func before<T: System>(_ system: T.Type) -> SystemDependency {
         return .before(system.swiftName)
     }
 
     /// Run the system after the specified system.
-    static func after<T: System>(_ system: T.Type) -> SystemDependency {
+    public static func after<T: System>(_ system: T.Type) -> SystemDependency {
         return .after(system.swiftName)
     }
 }
@@ -45,18 +45,18 @@ extension SystemDependency: Equatable {
     /// - Returns: True if the two system dependencies are equal, otherwise false.
     public static func == (lhs: SystemDependency, rhs: SystemDependency) -> Bool {
         switch lhs {
-        case .before(let system):
+        case let .before(system):
             switch rhs {
-            case .before(let rhsSystem):
+            case let .before(rhsSystem):
                 return system == rhsSystem
             case .after:
                 return false
             }
-        case .after(let system):
+        case let .after(system):
             switch rhs {
             case .before:
                 return false
-            case .after(let rhsSystem):
+            case let .after(rhsSystem):
                 return system == rhsSystem
             }
         }

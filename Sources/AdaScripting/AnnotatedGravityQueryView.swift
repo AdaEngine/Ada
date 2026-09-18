@@ -51,7 +51,7 @@ final class AnnotatedGravityQueryBridge: @unchecked Sendable {
         return GSValue(integer: iterationIndex, in: virtualMachine)
     }
 
-    func next(_ index: Int) -> AnnotatedGravityQueryRow {
+    func next(_: Int) -> AnnotatedGravityQueryRow {
         row
     }
 }
@@ -89,17 +89,19 @@ final class AnnotatedGravityQueryRow: @unchecked Sendable {
         self.cursor = cursor
         self.reportDiagnostic = reportDiagnostic
         self.virtualMachine = virtualMachine
-        self.componentViews = Dictionary(uniqueKeysWithValues: componentAccesses.map { access in
-            (
-                access.alias,
-                AnnotatedGravityComponentView.make(
-                    cursor: cursor,
-                    access: access,
-                    reportDiagnostic: reportDiagnostic,
-                    virtualMachine: virtualMachine
+        self.componentViews = Dictionary(
+            uniqueKeysWithValues: componentAccesses.map { access in
+                (
+                    access.alias,
+                    AnnotatedGravityComponentView.make(
+                        cursor: cursor,
+                        access: access,
+                        reportDiagnostic: reportDiagnostic,
+                        virtualMachine: virtualMachine
+                    )
                 )
-            )
-        })
+            }
+        )
     }
 
     func get(_ component: String, _ field: String) -> GSValue {
@@ -159,8 +161,10 @@ final class AnnotatedGravityComponentView: @unchecked Sendable {
     }
 
     func get(_ fieldName: String) -> GSValue {
-        guard let field = access.fields[fieldName],
-              let value = cursor.read(componentAt: access.componentIndex, field: field) else {
+        guard
+            let field = access.fields[fieldName],
+            let value = cursor.read(componentAt: access.componentIndex, field: field)
+        else {
             reportDiagnostic("Unknown or unreadable field '\(access.alias).\(fieldName)'")
             return GSValue(nullIn: virtualMachine)
         }
@@ -176,8 +180,10 @@ final class AnnotatedGravityComponentView: @unchecked Sendable {
             reportDiagnostic("Unknown field '\(access.alias).\(fieldName)'")
             return false
         }
-        guard let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
-              cursor.write(componentAt: access.componentIndex, field: field, value: fieldValue) else {
+        guard
+            let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
+            cursor.write(componentAt: access.componentIndex, field: field, value: fieldValue)
+        else {
             reportDiagnostic("Invalid value for '\(access.alias).\(fieldName)'")
             return false
         }

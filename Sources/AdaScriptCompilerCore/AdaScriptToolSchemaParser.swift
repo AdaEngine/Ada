@@ -5,11 +5,13 @@ extension Parser {
         line: Int
     ) throws -> AdaScriptToolSchema {
         let supportedArguments: Set<String> = ["api", "id", "name", "permissions", "platforms", "version"]
-        guard annotation.positionalArguments.isEmpty,
-              annotation.arguments.keys.allSatisfy(supportedArguments.contains) else {
+        guard
+            annotation.positionalArguments.isEmpty,
+            annotation.arguments.keys.allSatisfy(supportedArguments.contains)
+        else {
             throw toolError("@tool on \(name) contains unsupported arguments")
         }
-        guard case .string(let id)? = annotation.arguments["id"], !id.isEmpty else {
+        guard case let .string(id)? = annotation.arguments["id"], !id.isEmpty else {
             throw toolError("@tool on \(name) requires id: \"...\"")
         }
         let displayName = try toolStringArgument(
@@ -55,7 +57,7 @@ extension Parser {
     }
 
     private func toolAPIVersion(in annotation: Annotation, declarationName: String) throws -> Int {
-        if case .number(let value)? = annotation.arguments["api"], let parsed = Int(value), parsed > 0 {
+        if case let .number(value)? = annotation.arguments["api"], let parsed = Int(value), parsed > 0 {
             return parsed
         }
         guard annotation.arguments["api"] != nil else {
@@ -73,7 +75,7 @@ extension Parser {
         guard let value = annotation.arguments[key] else {
             return defaultValue
         }
-        guard case .string(let string) = value, !string.isEmpty else {
+        guard case let .string(string) = value, !string.isEmpty else {
             throw toolError("@tool \(key) on \(declarationName) must be a non-empty string")
         }
         return string
@@ -88,11 +90,11 @@ extension Parser {
         guard let value = annotation.arguments[key] else {
             return defaultValue
         }
-        guard case .list(let values) = value else {
+        guard case let .list(values) = value else {
             throw toolError("@tool \(key) on \(declarationName) must be a string list")
         }
         return try values.map { value in
-            guard case .string(let string) = value, !string.isEmpty else {
+            guard case let .string(string) = value, !string.isEmpty else {
                 throw toolError("@tool \(key) on \(declarationName) must contain non-empty strings")
             }
             return string
@@ -123,8 +125,9 @@ extension Parser {
 
     private static func isToolSemanticVersion(_ value: String) -> Bool {
         let components = value.split(separator: ".", omittingEmptySubsequences: false)
-        return components.count == 3 && components.allSatisfy { component in
-            !component.isEmpty && component.allSatisfy(\.isNumber)
-        }
+        return components.count == 3
+            && components.allSatisfy { component in
+                !component.isEmpty && component.allSatisfy(\.isNumber)
+            }
     }
 }

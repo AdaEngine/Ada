@@ -6,11 +6,11 @@
 //
 
 import AdaAssets
+import AdaCorePipelines
 import AdaECS
 import AdaRender
-import AdaCorePipelines
-import AdaTransform
 import AdaText
+import AdaTransform
 import AdaUtils
 import Math
 
@@ -65,13 +65,13 @@ public struct TextDrawData: Resource, WorldInitable {
     public var indexBuffer: BufferData<UInt32>
     /// Font atlas textures used during rendering (max 16).
     public var fontAtlas: Texture2D
-    
+
     /// Background quad vertices (using QuadVertexData).
     public var bgVertexBuffer: BufferData<QuadVertexData>
     /// Background quad indices.
     public var bgIndexBuffer: BufferData<UInt32>
 
-    public init(from world: World) {
+    public init(from _: World) {
         self.vertexBuffer = BufferData(label: "Text2D_VertexBuffer", elements: [])
         self.indexBuffer = BufferData(label: "Text2D_IndexBuffer", elements: [])
         self.fontAtlas = Texture2D.whiteTexture
@@ -105,16 +105,18 @@ public func ExtractText(
         if visible == .hidden {
             return
         }
-        
+
         // Get backgroundColor from the first character's attributes (if any)
         let backgroundColor: Color? = {
-            guard let firstIndex = textComponent.text.text.indices.first else { return nil }
+            guard let firstIndex = textComponent.text.text.indices.first else {
+                return nil
+            }
             let attrs = textComponent.text.attributes(at: firstIndex)
             let bgColor = attrs.backgroundColor
             // Only set if not clear (default)
             return bgColor.alpha > 0 ? bgColor : nil
         }()
-        
+
         extractedTexts.texts[entity.id] = ExtractedText(
             entityId: entity.id,
             textLayout: textLayoutComponent.textLayout,
@@ -137,7 +139,7 @@ func PrepareTexts(
     _ extractedTexts: Res<ExtractedTexts>,
     _ textDrawPass: Res<TextDrawPass>
 ) {
-    camera.forEach { camera, entities in
+    camera.forEach { _, _ in
         for text in extractedTexts.texts {
             let pipeline = textRenderPipeline.wrappedValue.pipeline(device: renderDevice.renderDevice)
             renderItems.items.append(
@@ -158,15 +160,14 @@ func PrepareTexts(
 /// Quad positions for background rendering.
 private let quadPositions: [Vector4] = [
     [-0.5, -0.5, 0.0, 1.0],
-    [ 0.5, -0.5, 0.0, 1.0],
-    [ 0.5,  0.5, 0.0, 1.0],
-    [-0.5,  0.5, 0.0, 1.0]
+    [0.5, -0.5, 0.0, 1.0],
+    [0.5, 0.5, 0.0, 1.0],
+    [-0.5, 0.5, 0.0, 1.0],
 ]
 
 /// System that prepares text vertex and index buffers for rendering.
 @PlainSystem
 public struct Text2DRenderSystem {
-
     @ResMut<SortedRenderItems<Transparent2DRenderItem>>
     private var renderItems
 
@@ -182,15 +183,15 @@ public struct Text2DRenderSystem {
     @Res<RenderDeviceHandler>
     private var renderDevice
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         textBatches.batches.removeAll(keepingCapacity: true)
         let device = renderDevice.renderDevice
 
         // Clear previous frame data
         textDrawData.clear()
-        
+
         var currentFontAtlas: Texture2D?
         var instanceCount: Int32 = 0
         var bgQuadCount: Int32 = 0
@@ -213,32 +214,32 @@ public struct Text2DRenderSystem {
             if glyphData.verticies.isEmpty {
                 continue
             }
-            
+
             // Get font atlas from glyph data (use first non-nil texture)
             let fontAtlas = glyphData.textures.compactMap({ $0 }).first(where: { $0 !== Texture2D.whiteTexture }) ?? .whiteTexture
-            
+
             // Update font atlas if it changed (for proper texture binding)
-            let needsAtlasUpdate = currentFontAtlas == nil || !isSameFontAtlas(currentFontAtlas!, fontAtlas)
-            
+            let needsAtlasUpdate = currentFontAtlas.map { !isSameFontAtlas($0, fontAtlas) } ?? true
+
             if needsAtlasUpdate {
                 currentFontAtlas = fontAtlas
                 textDrawData.fontAtlas = fontAtlas
             }
-            
+
             // Check if we need to render a background quad
             var hasBackground = false
             var currentBgQuadIndex: Int32 = 0
-            
+
             if let bgColor = text.backgroundColor {
                 hasBackground = true
                 currentBgQuadIndex = bgQuadCount
-                
+
                 // Calculate bounding box for the text
                 let boundingSize = text.textLayout.boundingSize()
-                
+
                 // Create background quad vertices
                 let bgVertexOffset = UInt32(textDrawData.bgVertexBuffer.count)
-                
+
                 // Generate 4 vertices for the background quad
                 for quadPos in quadPositions {
                     // Scale quad by bounding size and apply world transform
@@ -249,7 +250,7 @@ public struct Text2DRenderSystem {
                         quadPos.w
                     )
                     let worldPos = worldTransform * scaledPos
-                    
+
                     textDrawData.bgVertexBuffer.append(
                         QuadVertexData(
                             position: worldPos,
@@ -259,7 +260,7 @@ public struct Text2DRenderSystem {
                         )
                     )
                 }
-                
+
                 // Generate indices for background quad
                 // Triangle 1: 0, 1, 2
                 textDrawData.bgIndexBuffer.append(bgVertexOffset + 0)
@@ -269,7 +270,7 @@ public struct Text2DRenderSystem {
                 textDrawData.bgIndexBuffer.append(bgVertexOffset + 2)
                 textDrawData.bgIndexBuffer.append(bgVertexOffset + 3)
                 textDrawData.bgIndexBuffer.append(bgVertexOffset + 0)
-                
+
                 bgQuadCount += 1
             }
 
@@ -311,15 +312,15 @@ public struct Text2DRenderSystem {
         // Write buffers to GPU
         textDrawData.vertexBuffer.write(to: device)
         textDrawData.indexBuffer.write(to: device)
-        
+
         if !textDrawData.bgVertexBuffer.isEmpty {
             textDrawData.bgVertexBuffer.write(to: device)
             textDrawData.bgIndexBuffer.write(to: device)
         }
     }
-    
+
     // MARK: - Private
-    
+
     @inlinable
     func isSameFontAtlas(_ lhs: Texture2D, _ rhs: Texture2D) -> Bool {
         return lhs.assetMetaInfo?.assetId != .empty && lhs.assetMetaInfo?.assetId == rhs.assetMetaInfo?.assetId
@@ -331,7 +332,7 @@ public struct Text2DRenderSystem {
 /// Draw pass for rendering 2D text with optional background.
 public struct TextDrawPass: DrawPass {
     public typealias Item = Transparent2DRenderItem
-    
+
     /// Pipeline for rendering background quads.
     private var quadPipeline: RenderPipeline?
 
@@ -340,7 +341,7 @@ public struct TextDrawPass: DrawPass {
     public func render(
         with renderEncoder: RenderCommandEncoder,
         world: World,
-        view: Entity,
+        view _: Entity,
         item: Transparent2DRenderItem
     ) throws {
         guard
@@ -358,15 +359,15 @@ public struct TextDrawPass: DrawPass {
         defer {
             renderEncoder.popDebugName()
         }
-        
+
         // Render background quad first (if exists)
         if batch.hasBackground,
-           let renderDevice = world.getResource(RenderDeviceHandler.self) {
+            let renderDevice = world.getResource(RenderDeviceHandler.self) {
             let quadPipelines = world.getRefResource(RenderPipelines<QuadPipeline>.self)
             let quadPipeline = quadPipelines.wrappedValue.pipeline(device: renderDevice.renderDevice)
-            
+
             renderEncoder.pushDebugName("Text Background")
-            
+
             // Bind white texture for solid color rendering
             let backgroundResourceSet = RenderResourceSet(
                 bindings: [
@@ -379,23 +380,23 @@ public struct TextDrawPass: DrawPass {
                         binding: 1,
                         shaderStages: .fragment,
                         resource: .sampler(Texture2D.whiteTexture.sampler)
-                    )
+                    ),
                 ]
             )
             renderEncoder.setResourceSet(backgroundResourceSet, index: 0)
-            
+
             renderEncoder.setVertexBuffer(textDrawData.bgVertexBuffer, offset: 0, slot: 0)
             renderEncoder.setIndexBuffer(textDrawData.bgIndexBuffer, indexFormat: .uInt32)
             renderEncoder.setRenderPipelineState(quadPipeline)
-            
+
             let bgIndexOffset = Int(batch.backgroundQuadIndex) * 6 * MemoryLayout<UInt32>.stride
-            
+
             renderEncoder.drawIndexed(
                 indexCount: 6,
                 indexBufferOffset: bgIndexOffset,
                 instanceCount: 1
             )
-            
+
             renderEncoder.popDebugName()
         }
 
@@ -417,7 +418,7 @@ public struct TextDrawPass: DrawPass {
                     binding: 1,
                     shaderStages: .fragment,
                     resource: .sampler(textDrawData.fontAtlas.sampler)
-                )
+                ),
             ]
         )
         renderEncoder.setResourceSet(textResourceSet, index: 0)

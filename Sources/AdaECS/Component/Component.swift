@@ -37,15 +37,15 @@ public struct RequiredComponents {
     }
 }
 
-public extension Component {
-    static var componentsInfo: ComponentsInfo {
+extension Component {
+    public static var componentsInfo: ComponentsInfo {
         ComponentsInfo(
             componentId: Self.identifier,
             isPlainOldData: _isPOD(Self.self)
         )
     }
 
-    static var requiredComponents: RequiredComponents {
+    public static var requiredComponents: RequiredComponents {
         RequiredComponents(components: [])
     }
 }
@@ -60,7 +60,6 @@ public struct ComponentsInfo {
 
 /// Provides the events related to components.
 public enum ComponentEvents {
-
     /// Event raised after a component has been added to an entity,
     public struct DidAdd: Event {
         /// The component type.

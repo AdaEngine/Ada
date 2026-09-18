@@ -1,7 +1,8 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor keyframe animation")
 struct EditorKeyframeAnimationTests {
@@ -11,7 +12,7 @@ struct EditorKeyframeAnimationTests {
             property: .positionX,
             keyframes: [
                 EditorAnimationKeyframe(time: 0, value: 0, curveToNext: .linear),
-                EditorAnimationKeyframe(time: 1, value: 10)
+                EditorAnimationKeyframe(time: 1, value: 10),
             ]
         )
         var hold = linear
@@ -42,14 +43,16 @@ struct EditorKeyframeAnimationTests {
         #expect(decodedKeyframe.value == 12)
         #expect(decodedKeyframe.curveToNext == .cubicInOut)
 
-        let legacy = try EditorSceneModel.decode(from: """
-        format: ada.scene
-        schemaVersion: 1
-        scene:
-          id: legacy
-          name: Legacy
-        entities: []
-        """)
+        let legacy = try EditorSceneModel.decode(
+            from: """
+                format: ada.scene
+                schemaVersion: 1
+                scene:
+                  id: legacy
+                  name: Legacy
+                entities: []
+                """
+        )
         #expect(legacy.animations == nil)
     }
 

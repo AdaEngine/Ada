@@ -9,7 +9,7 @@ import AdaInput
 import AdaRender
 import AdaUtils
 
-/// A protocol that represents a menu builder. 
+/// A protocol that represents a menu builder.
 @MainActor
 public protocol UIMenuBuilder: AnyObject {
     /// Insert a new menu.
@@ -30,19 +30,18 @@ public protocol UIMenuBuilder: AnyObject {
 }
 
 /// A custom item in the editing menu managed by the menu controller.
-/// 
-/// Custom menu items appear in the menu after any validated system items. 
+///
+/// Custom menu items appear in the menu after any validated system items.
 /// A ``MenuItem`` object has two properties: a title and an action block identifying the method to invoke in the handling responder object.
 /// To have custom menu items appear in the menu, you must add them to the ``UIMenuBuilder/insert(_:)`` method.
 @MainActor
 public final class MenuItem: Identifiable {
-
     /// A separator item title.
     private static let separatorTitle = "_SEPARATOR_"
 
     /// A separator item.
     public static let separator: MenuItem = MenuItem()
-    
+
     /// The menu item’s title.
     public let title: String
     /// The menu item’s image.
@@ -50,18 +49,18 @@ public final class MenuItem: Identifiable {
 
     /// The menu item’s action.
     public var action: UIEventAction?
-    
+
     /// The menu item’s key equivalent.
     public var keyEquivalent: KeyCode?
     /// The menu item’s key equivalent modifier mask.
     public var keyEquivalentModifierMask: KeyModifier?
-    
+
     /// A Boolean value indicating whether the menu item is enabled.
     public var isEnabled: Bool = true
-    
+
     /// The menu that owns the menu item.
     public private(set) weak var menu: UIMenu?
-    
+
     /// A Boolean value indicating whether the menu item is a separator.
     public var isSeparator: Bool {
         self.title == Self.separatorTitle
@@ -71,7 +70,7 @@ public final class MenuItem: Identifiable {
         self.title = Self.separatorTitle
         self.isEnabled = false
     }
-    
+
     /// Initialize a new menu item.
     ///
     /// - Parameters:
@@ -92,11 +91,11 @@ public final class MenuItem: Identifiable {
         self.keyEquivalent = keyEquivalent
         self.keyEquivalentModifierMask = keyEquivalentModifierMask
     }
-    
+
     func setMenuOwner(_ owner: UIMenu) {
         self.menu = owner
     }
-    
+
     /// The parent menu item.
     public private(set) weak var parent: MenuItem?
 
@@ -125,7 +124,6 @@ public final class MenuItem: Identifiable {
 /// A menu that contains menu items.
 @MainActor
 public class UIMenu: Identifiable {
-
     /// The native menu surface where the menu is presented.
     public enum Placement: Equatable, Sendable {
         /// Present the menu as a regular top-level menu.
@@ -185,6 +183,5 @@ public class UIMenu: Identifiable {
 
     /// Update the menu.
     func update() {
-        
     }
 }

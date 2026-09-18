@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor real workspace")
 struct EditorRealWorkspaceTests {
@@ -10,16 +11,18 @@ struct EditorRealWorkspaceTests {
         let projectURL = try makeRealWorkspaceDirectory(named: "RealTree")
         defer { removeRealWorkspaceDirectory(projectURL) }
 
-        try "// swift-tools-version: 6.2\n".write(
-            to: projectURL.appendingPathComponent("Package.swift"),
-            atomically: true,
-            encoding: .utf8
-        )
-        try "# Real project\n".write(
-            to: projectURL.appendingPathComponent("README.md"),
-            atomically: true,
-            encoding: .utf8
-        )
+        try "// swift-tools-version: 6.2\n"
+            .write(
+                to: projectURL.appendingPathComponent("Package.swift"),
+                atomically: true,
+                encoding: .utf8
+            )
+        try "# Real project\n"
+            .write(
+                to: projectURL.appendingPathComponent("README.md"),
+                atomically: true,
+                encoding: .utf8
+            )
         let sourceDirectory = projectURL.appendingPathComponent("src", isDirectory: true)
         try FileManager.default.createDirectory(at: sourceDirectory, withIntermediateDirectories: true)
         let realContent = "let sourceOfTruth = \"disk\"\n"
@@ -30,11 +33,12 @@ struct EditorRealWorkspaceTests {
         )
         let ignoredBuildDirectory = projectURL.appendingPathComponent(".build", isDirectory: true)
         try FileManager.default.createDirectory(at: ignoredBuildDirectory, withIntermediateDirectories: true)
-        try "mock".write(
-            to: ignoredBuildDirectory.appendingPathComponent("Generated.swift"),
-            atomically: true,
-            encoding: .utf8
-        )
+        try "mock"
+            .write(
+                to: ignoredBuildDirectory.appendingPathComponent("Generated.swift"),
+                atomically: true,
+                encoding: .utf8
+            )
 
         var metadata = ProjectSystem.defaultProject(projectName: "RealTree")
         metadata.paths.sources = "src"
@@ -51,7 +55,7 @@ struct EditorRealWorkspaceTests {
 
         let sourceItem = try #require(viewModel.projectSidebar.items.first { $0.relativePath == "src/EngineLoop.ada" })
         viewModel.openProjectItem(sourceItem)
-        guard case .text(let document) = viewModel.workbench.activeDocument else {
+        guard case let .text(document) = viewModel.workbench.activeDocument else {
             Issue.record("Expected a real text document")
             return
         }
@@ -107,7 +111,7 @@ struct EditorRealWorkspaceTests {
             document.isDirty = true
         }
         let didReportConflict = await waitForRealWorkspaceCondition {
-            guard case .text(let document)? = viewModel.workbench.activeDocument else {
+            guard case let .text(document)? = viewModel.workbench.activeDocument else {
                 return false
             }
             return document.statusMessage == "Save blocked: file changed on disk"
@@ -115,7 +119,7 @@ struct EditorRealWorkspaceTests {
 
         #expect(didReportConflict)
         #expect(try String(contentsOf: sourceURL, encoding: .utf8) == "let value = 3 // external\n")
-        guard case .text(let conflictedDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(conflictedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected the conflicted text document")
             return
         }
@@ -144,8 +148,9 @@ struct EditorRealWorkspaceTests {
 
         viewModel.workbench.addEntity(to: documentID)
         let didAutosaveScene = await waitForRealWorkspaceCondition {
-            guard let content = try? String(contentsOf: sceneURL, encoding: .utf8),
-                  let model = try? EditorSceneModel.decode(from: content)
+            guard
+                let content = try? String(contentsOf: sceneURL, encoding: .utf8),
+                let model = try? EditorSceneModel.decode(from: content)
             else {
                 return false
             }
@@ -157,14 +162,14 @@ struct EditorRealWorkspaceTests {
         #expect(try EditorSceneModel.decode(from: savedContent).entities.count == 2)
         #expect(viewModel.workbench.activeDocument?.isDirty == false)
 
-        guard case .scene(let savedDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .scene(savedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected a scene document")
             return
         }
         let firstLine = try #require(viewModel.workbench.sceneLines(for: savedDocument).first)
         viewModel.workbench.updateSceneLine(documentID: documentID, lineIndex: 0, value: "[")
         let didRejectInvalidScene = await waitForRealWorkspaceCondition {
-            guard case .scene(let document)? = viewModel.workbench.activeDocument else {
+            guard case let .scene(document)? = viewModel.workbench.activeDocument else {
                 return false
             }
             return document.statusMessage == "Save blocked" && document.errorMessage != nil
@@ -172,7 +177,7 @@ struct EditorRealWorkspaceTests {
 
         #expect(didRejectInvalidScene)
         #expect(try String(contentsOf: sceneURL, encoding: .utf8) == savedContent)
-        guard case .scene(let invalidDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .scene(invalidDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected an invalid scene document")
             return
         }
@@ -182,8 +187,9 @@ struct EditorRealWorkspaceTests {
 
         viewModel.workbench.updateSceneLine(documentID: documentID, lineIndex: 0, value: firstLine)
         let didRecoverSceneAutosave = await waitForRealWorkspaceCondition {
-            guard let content = try? String(contentsOf: sceneURL, encoding: .utf8),
-                  let model = try? EditorSceneModel.decode(from: content)
+            guard
+                let content = try? String(contentsOf: sceneURL, encoding: .utf8),
+                let model = try? EditorSceneModel.decode(from: content)
             else {
                 return false
             }
@@ -215,7 +221,7 @@ struct EditorRealWorkspaceTests {
         #expect(assetItem.kind == .image)
         viewModel.openProjectItem(assetItem)
 
-        guard case .asset(let document) = viewModel.workbench.activeDocument else {
+        guard case let .asset(document) = viewModel.workbench.activeDocument else {
             Issue.record("Expected an asset document")
             return
         }
@@ -234,17 +240,18 @@ struct EditorRealWorkspaceTests {
         let sceneDirectory = projectURL.appendingPathComponent("Assets/Scenes", isDirectory: true)
         try FileManager.default.createDirectory(at: sceneDirectory, withIntermediateDirectories: true)
         let sceneURL = sceneDirectory.appendingPathComponent("Main.ascn")
-        try SceneDocumentFormat.defaultSceneYAML(projectName: "ReplaceSceneAutosave").write(
-            to: sceneURL,
-            atomically: true,
-            encoding: .utf8
-        )
+        try SceneDocumentFormat.defaultSceneYAML(projectName: "ReplaceSceneAutosave")
+            .write(
+                to: sceneURL,
+                atomically: true,
+                encoding: .utf8
+            )
 
         let project = EditorProjectReference(name: "ReplaceSceneAutosave", path: projectURL.path)
         let viewModel = EditorViewModel(project: project, autosaveDelay: .milliseconds(10))
         let sceneItem = try #require(viewModel.projectSidebar.items.first { $0.relativePath == "Assets/Scenes/Main.ascn" })
         viewModel.openProjectItem(sceneItem)
-        guard case .scene(var updatedDocument)? = viewModel.workbench.activeDocument else {
+        guard case var .scene(updatedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected a scene document")
             return
         }
@@ -256,8 +263,9 @@ struct EditorRealWorkspaceTests {
 
         viewModel.workbench.replaceSceneDocument(updatedDocument)
         let didAutosaveReplacement = await waitForRealWorkspaceCondition {
-            guard let content = try? String(contentsOf: sceneURL, encoding: .utf8),
-                  let model = try? EditorSceneModel.decode(from: content)
+            guard
+                let content = try? String(contentsOf: sceneURL, encoding: .utf8),
+                let model = try? EditorSceneModel.decode(from: content)
             else {
                 return false
             }
@@ -301,7 +309,7 @@ struct EditorRealWorkspaceTests {
         #expect(textItem.isSymbolicLink)
         viewModel.openProjectItem(textItem)
         let textDocumentID = try #require(viewModel.workbench.activeDocument?.id)
-        guard case .text(let linkedTextDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(linkedTextDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected a linked text document")
             return
         }
@@ -321,8 +329,9 @@ struct EditorRealWorkspaceTests {
         #expect(sceneItem.isSymbolicLink)
         viewModel.openProjectItem(sceneItem)
         let sceneDocumentID = try #require(viewModel.workbench.activeDocument?.id)
-        guard let sceneIndex = viewModel.workbench.openDocuments.firstIndex(where: { $0.id == sceneDocumentID }),
-              case .scene(var linkedSceneDocument) = viewModel.workbench.openDocuments[sceneIndex]
+        guard
+            let sceneIndex = viewModel.workbench.openDocuments.firstIndex(where: { $0.id == sceneDocumentID }),
+            case var .scene(linkedSceneDocument) = viewModel.workbench.openDocuments[sceneIndex]
         else {
             Issue.record("Expected a linked scene document")
             return
@@ -363,11 +372,12 @@ struct EditorRealWorkspaceTests {
         let sceneDirectory = projectURL.appendingPathComponent("Assets/Scenes", isDirectory: true)
         try FileManager.default.createDirectory(at: sceneDirectory, withIntermediateDirectories: true)
         let sceneURL = sceneDirectory.appendingPathComponent("Main.ascn")
-        try SceneDocumentFormat.defaultSceneYAML(projectName: "BlockedClose").write(
-            to: sceneURL,
-            atomically: true,
-            encoding: .utf8
-        )
+        try SceneDocumentFormat.defaultSceneYAML(projectName: "BlockedClose")
+            .write(
+                to: sceneURL,
+                atomically: true,
+                encoding: .utf8
+            )
 
         let project = EditorProjectReference(name: "BlockedClose", path: projectURL.path)
         let viewModel = EditorViewModel(project: project, autosaveDelay: .seconds(5))
@@ -383,7 +393,7 @@ struct EditorRealWorkspaceTests {
         viewModel.workbench.closeDocument(id: sourceDocumentID)
 
         #expect(viewModel.workbench.openDocuments.contains { $0.id == sourceDocumentID })
-        guard case .text(let conflictedDocument)? = viewModel.workbench.openDocuments.first(where: { $0.id == sourceDocumentID }) else {
+        guard case let .text(conflictedDocument)? = viewModel.workbench.openDocuments.first(where: { $0.id == sourceDocumentID }) else {
             Issue.record("Expected the conflicted document to stay open")
             return
         }
@@ -399,7 +409,7 @@ struct EditorRealWorkspaceTests {
         viewModel.workbench.closeDocument(id: sceneDocumentID)
 
         #expect(viewModel.workbench.openDocuments.contains { $0.id == sceneDocumentID })
-        guard case .scene(let invalidDocument)? = viewModel.workbench.openDocuments.first(where: { $0.id == sceneDocumentID }) else {
+        guard case let .scene(invalidDocument)? = viewModel.workbench.openDocuments.first(where: { $0.id == sceneDocumentID }) else {
             Issue.record("Expected the invalid scene to stay open")
             return
         }
@@ -423,7 +433,7 @@ struct EditorRealWorkspaceTests {
         viewModel.openProjectItem(sourceItem)
         let documentID = try #require(viewModel.workbench.activeDocument?.id)
 
-        guard case .text(let unreadableDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(unreadableDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected an unreadable text document")
             return
         }
@@ -445,7 +455,7 @@ struct EditorRealWorkspaceTests {
 
         #expect(viewModel.workbench.openDocuments.contains { $0.id == documentID })
         #expect(try Data(contentsOf: sourceURL) == originalBytes)
-        guard case .text(let blockedDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(blockedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected the read-only document to remain active")
             return
         }
@@ -456,11 +466,12 @@ struct EditorRealWorkspaceTests {
 
 private func makeRealWorkspaceProject(named name: String) throws -> URL {
     let projectURL = try makeRealWorkspaceDirectory(named: name)
-    try "// swift-tools-version: 6.2\n".write(
-        to: projectURL.appendingPathComponent("Package.swift"),
-        atomically: true,
-        encoding: .utf8
-    )
+    try "// swift-tools-version: 6.2\n"
+        .write(
+            to: projectURL.appendingPathComponent("Package.swift"),
+            atomically: true,
+            encoding: .utf8
+        )
     try FileManager.default.createDirectory(
         at: projectURL.appendingPathComponent("Sources", isDirectory: true),
         withIntermediateDirectories: true

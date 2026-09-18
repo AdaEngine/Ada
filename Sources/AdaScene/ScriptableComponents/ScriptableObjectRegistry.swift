@@ -11,15 +11,15 @@ public enum ScriptableObjectCodingError: Error, Equatable, Sendable, CustomStrin
 
     public var description: String {
         switch self {
-        case .duplicateAlias(let alias):
+        case let .duplicateAlias(alias):
             "Duplicate scriptable object alias '\(alias)'"
-        case .duplicateIdentifier(let identifier):
+        case let .duplicateIdentifier(identifier):
             "Duplicate scriptable object identifier '\(identifier)'"
         case let .invalidVersion(version, type):
             "Invalid scriptable object version \(version) for '\(type)'"
-        case .unknownType(let identifier):
+        case let .unknownType(identifier):
             "Unknown scriptable object type '\(identifier)'"
-        case .unregisteredRuntimeType(let type):
+        case let .unregisteredRuntimeType(type):
             "Unregistered scriptable object runtime type '\(type)'"
         case let .unsupportedVersion(encoded, current, type):
             "Scriptable object '\(type)' uses version \(encoded), but this runtime supports \(current)"
@@ -126,7 +126,7 @@ public enum ScriptableObjectRegistry {
     public static func descriptor(for object: ScriptableObject) -> ScriptableObjectDescriptor? {
         lock.withLock {
             if let explicitIdentifier = object.explicitTypeIdentifier,
-               let descriptor = unsafe descriptorsByName[explicitIdentifier] {
+                let descriptor = unsafe descriptorsByName[explicitIdentifier] {
                 return descriptor
             }
             guard let identifier = unsafe identifiersByType[ObjectIdentifier(type(of: object))] else {

@@ -77,13 +77,14 @@ extension EditorWorkbenchViewModel {
 
     var activeDocumentSaveFailureDescription: String? {
         switch activeDocument {
-        case .scene(let document)?:
+        case let .scene(document):
             document.statusMessage ?? document.errorMessage
-        case .text(let document)?, .ui(let document)?:
+        case let .text(document),
+            let .ui(document):
             document.statusMessage ?? document.errorMessage
-        case .git?:
+        case .git:
             nil
-        case .asset?:
+        case .asset:
             "assets cannot be saved from the code editor"
         case nil:
             nil
@@ -93,9 +94,9 @@ extension EditorWorkbenchViewModel {
     @discardableResult
     func saveDocument(_ document: EditorWorkbenchDocument) -> Bool {
         switch document {
-        case .scene(let document):
+        case let .scene(document):
             return saveSceneDocument(id: document.id)
-        case .ui(let document):
+        case let .ui(document):
             for sceneID in uiSceneModels[document.id]?.bindingSceneDocumentIDs ?? [] {
                 if let scene = sceneDocument(id: sceneID), scene.isDirty, !saveSceneDocument(id: sceneID) {
                     updateTextDocument(id: document.id) { $0.statusMessage = "Unable to save the scene containing this UI's script bindings." }
@@ -103,9 +104,10 @@ extension EditorWorkbenchViewModel {
                 }
             }
             return saveTextDocument(id: document.id)
-        case .text(let document):
+        case let .text(document):
             return saveTextDocument(id: document.id)
-        case .asset, .git:
+        case .asset,
+            .git:
             return false
         }
     }
@@ -217,7 +219,7 @@ extension EditorWorkbenchViewModel {
             return
         }
 
-        guard case .scene(var previousDocument) = openDocuments[index] else {
+        guard case var .scene(previousDocument) = openDocuments[index] else {
             return
         }
         guard !previousDocument.isReadOnly else {
@@ -235,7 +237,7 @@ extension EditorWorkbenchViewModel {
         openDocuments[index] = .scene(document)
         notifyActiveDocumentChangedIfNeeded(documentID: document.id)
         if document.isDirty,
-           document.content != previousDocument.content || document.sceneModel != previousDocument.sceneModel || !previousDocument.isDirty {
+            document.content != previousDocument.content || document.sceneModel != previousDocument.sceneModel || !previousDocument.isDirty {
             onDocumentEdited?(document.id)
         }
     }
@@ -264,10 +266,22 @@ extension EditorWorkbenchViewModel {
         }
     }
 
-    func addScenePrefab(documentID: String, parentID: String?) {
-        updateSceneModelDocument(id: documentID, status: "Scene prefab added") { model in
-            _ = model.addSceneInstance(parentID: parentID)
+    func presentEntityPicker(documentID: String, parentID: String?) {
+        guard sceneDocument(id: documentID)?.isReadOnly == false else {
+            return
         }
+        entityPickerRequest = EditorEntityPickerRequest(documentID: documentID, parentID: parentID)
+    }
+
+    func addSceneEntity(
+        documentID: String,
+        parentID: String?,
+        template: EditorSceneEntityTemplate
+    ) {
+        updateSceneModelDocument(id: documentID, status: "\(template.title) added") { model in
+            _ = model.addEntity(template: template, parentID: parentID)
+        }
+        entityPickerRequest = nil
     }
 
     func renameSceneEntity(documentID: String, entityID: String, name: String) {
@@ -296,8 +310,10 @@ extension EditorWorkbenchViewModel {
 
     @discardableResult
     func copySceneEntity(documentID: String, entityID: String) -> Bool {
-        guard let model = sceneDocument(id: documentID)?.sceneModel,
-              let payload = model.clipboardPayload(for: entityID) else {
+        guard
+            let model = sceneDocument(id: documentID)?.sceneModel,
+            let payload = model.clipboardPayload(for: entityID)
+        else {
             return false
         }
         UIClipboard.setString(payload)
@@ -306,8 +322,10 @@ extension EditorWorkbenchViewModel {
 
     @discardableResult
     func pasteSceneEntity(documentID: String, parentID: String?) -> Bool {
-        guard let payload = UIClipboard.getString(),
-              EditorSceneModel.canPasteEntityPayload(payload) else {
+        guard
+            let payload = UIClipboard.getString(),
+            EditorSceneModel.canPasteEntityPayload(payload)
+        else {
             return false
         }
         var didPaste = false
@@ -356,7 +374,7 @@ extension EditorWorkbenchViewModel {
     }
 
     func sceneDocument(id documentID: String) -> EditorSceneDocument? {
-        guard case .scene(let document)? = openDocuments.first(where: { $0.id == documentID }) else {
+        guard case let .scene(document)? = openDocuments.first(where: { $0.id == documentID }) else {
             return nil
         }
 
@@ -365,7 +383,9 @@ extension EditorWorkbenchViewModel {
 
     func textDocument(id documentID: String) -> EditorTextDocument? {
         switch openDocuments.first(where: { $0.id == documentID }) {
-        case .text(let document), .ui(let document): return document
+        case let .text(document),
+            let .ui(document):
+            return document
         default: return nil
         }
     }
@@ -423,7 +443,7 @@ extension EditorWorkbenchViewModel {
             return
         }
 
-        guard case .scene(var document) = openDocuments[index] else {
+        guard case var .scene(document) = openDocuments[index] else {
             return
         }
 
@@ -444,9 +464,15 @@ extension EditorWorkbenchViewModel {
             return
         }
 
-        guard var document = textDocument(id: documentID) else { return }
+        guard var document = textDocument(id: documentID) else {
+            return
+        }
         let isUI: Bool
-        if case .ui = openDocuments[index] { isUI = true } else { isUI = false }
+        if case .ui = openDocuments[index] {
+            isUI = true
+        } else {
+            isUI = false
+        }
 
         let previousContent = document.content
         let wasDirty = document.isDirty
@@ -463,7 +489,9 @@ extension EditorWorkbenchViewModel {
 
     /// Only accept token coordinates for the exact text used by the language service.
     func applySemanticTokens(_ tokens: [EditorSemanticToken], documentID: String, source: String) {
-        guard textDocument(id: documentID)?.content == source else { return }
+        guard textDocument(id: documentID)?.content == source else {
+            return
+        }
         updateTextDocument(id: documentID) { $0.semanticTokens = tokens }
     }
 

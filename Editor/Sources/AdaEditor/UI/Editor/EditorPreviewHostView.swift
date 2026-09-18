@@ -8,15 +8,15 @@ struct EditorPreviewSurface: UIViewRepresentable {
     let zoom: Float
     let isInteractive: Bool
 
-    func makeUIView(in context: Context) -> EditorPreviewHostView {
+    func makeUIView(in _: Context) -> EditorPreviewHostView {
         EditorPreviewHostView()
     }
 
-    func updateUIView(_ view: EditorPreviewHostView, in context: Context) {
+    func updateUIView(_ view: EditorPreviewHostView, in _: Context) {
         view.configure(previewView: previewView, zoom: zoom, isInteractive: isInteractive)
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, view: EditorPreviewHostView, context: Context) -> Size {
+    func sizeThatFits(_ proposal: ProposedViewSize, view _: EditorPreviewHostView, context _: Context) -> Size {
         proposal.replacingUnspecifiedDimensions()
     }
 }
@@ -34,21 +34,29 @@ final class EditorPreviewHostView: UIView {
     func configure(previewView: UIView, zoom: Float, isInteractive: Bool, contentSize: Size? = nil) {
         let minimumZoom: Float = contentSize == nil ? 0.25 : 0.02
         let resolvedZoom = zoom.isFinite ? min(max(zoom, minimumZoom), 3) : 1
-        guard self.previewView !== previewView || self.zoom != resolvedZoom || self.isInteractive != isInteractive || self.contentSize != contentSize else { return }
+        guard self.previewView !== previewView || self.zoom != resolvedZoom || self.isInteractive != isInteractive || self.contentSize != contentSize else {
+            return
+        }
         if self.isInteractive && (!isInteractive || self.previewView !== previewView), let activeMouseEvent {
-            onMouseEvent(MouseEvent(
-                window: activeMouseEvent.window,
-                button: activeMouseEvent.button,
-                mousePosition: activeMouseEvent.mousePosition,
-                phase: .cancelled,
-                modifierKeys: activeMouseEvent.modifierKeys,
-                time: activeMouseEvent.time
-            ))
+            onMouseEvent(
+                MouseEvent(
+                    window: activeMouseEvent.window,
+                    button: activeMouseEvent.button,
+                    mousePosition: activeMouseEvent.mousePosition,
+                    phase: .cancelled,
+                    modifierKeys: activeMouseEvent.modifierKeys,
+                    time: activeMouseEvent.time
+                )
+            )
         }
         if self.isInteractive && (!isInteractive || self.previewView !== previewView), !activeTouches.isEmpty {
-            onTouchesEvent(Set(activeTouches.map { touch in
-                TouchEvent(window: touch.window, location: touch.location, phase: .cancelled, time: touch.time, contactID: touch.contactID)
-            }))
+            onTouchesEvent(
+                Set(
+                    activeTouches.map { touch in
+                        TouchEvent(window: touch.window, location: touch.location, phase: .cancelled, time: touch.time, contactID: touch.contactID)
+                    }
+                )
+            )
         }
         if self.previewView !== previewView {
             self.previewView?.removeFromParentView()
@@ -78,61 +86,90 @@ final class EditorPreviewHostView: UIView {
         Point(x: (point.x - contentOrigin.x) / zoom, y: (point.y - contentOrigin.y) / zoom)
     }
 
-    override func hitTest(_ point: Point, with event: any InputEvent) -> UIView? {
-        guard isInteractive, !isHidden, bounds.contains(point: point),
-              let previewView, previewView.bounds.contains(point: previewPoint(from: point)) else { return nil }
+    override func hitTest(_ point: Point, with _: any InputEvent) -> UIView? {
+        guard
+            isInteractive, !isHidden, bounds.contains(point: point),
+            let previewView, previewView.bounds.contains(point: previewPoint(from: point))
+        else {
+            return nil
+        }
         return self
     }
 
     override func draw(with context: UIGraphicsContext) {
-        guard !isHidden, let previewView else { return }
+        guard !isHidden, let previewView else {
+            return
+        }
         var recorded = UIGraphicsContext()
         recorded.environment = context.environment
         recorded.opacity = context.opacity
         recorded.windowId = context.windowId
         previewView.draw(with: recorded)
         let origin = contentOrigin
-        let transform = context.transform
+        let transform =
+            context.transform
             * Transform3D(translation: [frame.minX + origin.x, -frame.minY - origin.y, 0])
             * Transform3D(scale: [zoom, zoom, 1])
         context.drawContents(of: recorded, transform: transform)
     }
 
     override func onMouseEvent(_ event: MouseEvent) {
-        guard isInteractive else { return }
-        if event.phase == .began { activeMouseEvent = event }
-        if event.phase == .ended || event.phase == .cancelled { activeMouseEvent = nil }
-        previewView?.onMouseEvent(MouseEvent(
-            window: event.window,
-            button: event.button,
-            scrollDelta: event.scrollDelta,
-            mousePosition: previewPoint(from: event.mousePosition),
-            phase: event.phase,
-            modifierKeys: event.modifierKeys,
-            time: event.time
-        ))
+        guard isInteractive else {
+            return
+        }
+        if event.phase == .began {
+            activeMouseEvent = event
+        }
+        if event.phase == .ended || event.phase == .cancelled {
+            activeMouseEvent = nil
+        }
+        previewView?
+            .onMouseEvent(
+                MouseEvent(
+                    window: event.window,
+                    button: event.button,
+                    scrollDelta: event.scrollDelta,
+                    mousePosition: previewPoint(from: event.mousePosition),
+                    phase: event.phase,
+                    modifierKeys: event.modifierKeys,
+                    time: event.time
+                )
+            )
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
-        guard isInteractive else { return }
+        guard isInteractive else {
+            return
+        }
         activeTouches = Set(touches.filter { $0.phase == .began || $0.phase == .moved })
-        previewView?.onTouchesEvent(Set(touches.map { touch in
-            TouchEvent(window: touch.window, location: previewPoint(from: touch.location), phase: touch.phase, time: touch.time, contactID: touch.contactID)
-        }))
+        previewView?
+            .onTouchesEvent(
+                Set(
+                    touches.map { touch in
+                        TouchEvent(window: touch.window, location: previewPoint(from: touch.location), phase: touch.phase, time: touch.time, contactID: touch.contactID)
+                    }
+                )
+            )
     }
 
     override func onKeyEvent(_ event: KeyEvent) {
-        guard isInteractive else { return }
+        guard isInteractive else {
+            return
+        }
         previewView?.onKeyEvent(event)
     }
 
     override func onTextInputEvent(_ event: TextInputEvent) {
-        guard isInteractive else { return }
+        guard isInteractive else {
+            return
+        }
         previewView?.onTextInputEvent(event)
     }
 
     override func onReceiveEvent(_ event: any InputEvent) {
-        guard isInteractive else { return }
+        guard isInteractive else {
+            return
+        }
         previewView?.onReceiveEvent(event)
     }
 }

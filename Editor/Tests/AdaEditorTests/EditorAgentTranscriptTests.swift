@@ -15,23 +15,40 @@ struct EditorAgentTranscriptTests {
     }
 
     func tool(_ id: String) -> EditorAgentEvent {
-        EditorAgentEvent(id: id, kind: .toolCall, title: "Read \(id)", toolCall: .init(
-            id: id, title: "Read \(id)", kind: "read", status: .completed, content: [], locations: []
-        ))
+        EditorAgentEvent(
+            id: id,
+            kind: .toolCall,
+            title: "Read \(id)",
+            toolCall: .init(
+                id: id,
+                title: "Read \(id)",
+                kind: "read",
+                status: .completed,
+                content: [],
+                locations: []
+            )
+        )
     }
 
     @Test("Interleaved actions group per turn without hiding replies or pending approvals")
     func grouping() {
-        let approval = EditorAgentEvent(id: "approval", kind: .permission, permission: .init(
-            id: "permission", summary: "Allow edit?", options: [], state: .pending
-        ))
+        let approval = EditorAgentEvent(
+            id: "approval",
+            kind: .permission,
+            permission: .init(
+                id: "permission",
+                summary: "Allow edit?",
+                options: [],
+                state: .pending
+            )
+        )
         let events = [
             message("u1", role: .user), tool("a"), message("progress"), tool("b"), approval,
-            EditorAgentEvent(id: "error", kind: .error, title: "Failed"), message("u2", role: .user), tool("c")
+            EditorAgentEvent(id: "error", kind: .error, title: "Failed"), message("u2", role: .user), tool("c"),
         ]
         let rows = EditorAgentTranscriptEntry.grouped(events)
         #expect(rows.map(\.id) == ["u1", "actions:u1", "progress", "approval", "error", "u2", "actions:u2"])
-        guard case .actions(_, let actions) = rows[1] else {
+        guard case let .actions(_, actions) = rows[1] else {
             Issue.record("Expected action group")
             return
         }
@@ -78,15 +95,17 @@ struct EditorAgentTranscriptTests {
         let container = makeContainer(model)
         await settle(container)
         for phase in [MouseEvent.Phase.began, .ended] {
-            container.onMouseEvent(MouseEvent(
-                window: .empty,
-                button: .scrollWheel,
-                scrollDelta: phase == .began ? Point(0, 3) : .zero,
-                mousePosition: Point(150, 130),
-                phase: phase,
-                modifierKeys: [],
-                time: 0
-            ))
+            container.onMouseEvent(
+                MouseEvent(
+                    window: .empty,
+                    button: .scrollWheel,
+                    scrollDelta: phase == .began ? Point(0, 3) : .zero,
+                    mousePosition: Point(150, 130),
+                    phase: phase,
+                    modifierKeys: [],
+                    time: 0
+                )
+            )
         }
         await settle(container)
         let before = try container.uiNode(matching: .accessibilityIdentifier(EditorAgentTranscript.bottomID)).absoluteFrame

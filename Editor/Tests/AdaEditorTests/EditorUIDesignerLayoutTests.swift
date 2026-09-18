@@ -1,8 +1,9 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) @testable import AdaUI
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @Suite("UI Designer workspace", .serialized)
 @MainActor
@@ -15,7 +16,7 @@ struct EditorUIDesignerLayoutTests {
         }
     }
 
-    @Test func compactWorkspaceKeepsCanvasAndSwitchesPanels() throws {
+    @Test func compactWorkspaceKeepsCanvasAndSwitchesLibraryPanel() throws {
         let model = EditorUISceneModel(content: try UISceneDocument().encodedYAML(), sourceURL: nil, resourceRoot: nil)
         let container = makeContainer(model, size: Size(width: 768, height: 700))
         let artboard = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Artboard"))
@@ -32,9 +33,49 @@ struct EditorUIDesignerLayoutTests {
         container.layoutIfNeeded()
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Node.\(textID)"))
         #expect(model.selectedID == textID)
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Pane.Inspector"))
+        #expect(throws: (any Error).self) {
+            try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Pane.Inspector"))
+        }
+    }
+
+    @Test func inspectorPresentationShowsSelectedLayerProperties() throws {
+        let document = UISceneDocument(root: .init(type: "Text", arguments: ["text": .init(value: .string("Hello"))]))
+        let model = EditorUISceneModel(content: try document.encodedYAML(), sourceURL: nil, resourceRoot: nil)
+        let container = UIContainerView(rootView: EditorUISceneEditor(model: model, presentation: .inspector))
+        container.frame = Rect(x: 0, y: 0, width: 320, height: 700)
+        container.bounds.size = container.frame.size
         container.layoutIfNeeded()
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Inspector"))
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Parameter.text"))
+    }
+
+    @Test func contextualInspectorFillsTheRightPanelProposal() throws {
+        let source = try UISceneDocument().encodedYAML()
+        let document = EditorTextDocument(
+            id: "ui:test",
+            title: "test.ui",
+            relativePath: "Assets/Scenes/test.ui",
+            language: .yaml,
+            content: source
+        )
+        let workbench = EditorWorkbenchViewModel(openDocuments: [.ui(document)], activeDocumentID: document.id)
+        let inspector = EditorInspectorSidebarViewModel()
+        let container = UIContainerView(
+            rootView: EditorContextualInspector(
+                document: .ui(document),
+                workbench: workbench,
+                sceneInspectorViewModel: inspector,
+                resourceRootURL: nil
+            )
+        )
+        container.frame = Rect(x: 0, y: 0, width: 360, height: 800)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        let contextualInspector = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.ContextualInspector"))
+        let uiInspector = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Inspector"))
+        #expect(contextualInspector.absoluteFrame.width == 360)
+        #expect(uiInspector.absoluteFrame.width == 360)
+        #expect(uiInspector.absoluteFrame.minX == 0)
     }
 
     @Test func modifierLibraryIsExplicitAndAddsRealModifier() async throws {
@@ -115,7 +156,9 @@ struct EditorUIDesignerLayoutTests {
     }
 
     private func sourceNode(in node: ViewNode) -> TextEditorViewNode? {
-        if let editor = node as? TextEditorViewNode { return editor }
+        if let editor = node as? TextEditorViewNode {
+            return editor
+        }
         return node.transientEnvironmentChildren.lazy.compactMap { sourceNode(in: $0) }.first
     }
 

@@ -7,9 +7,9 @@
 
 enum EditorWindowSafeAreaPolicy {
     #if os(iOS)
-    static let reservesSystemSafeArea = true
+        static let reservesSystemSafeArea = true
     #else
-    static let reservesSystemSafeArea = false
+        static let reservesSystemSafeArea = false
     #endif
 }
 
@@ -37,7 +37,7 @@ enum ProjectEditorLauncher {
             showsImmediately: false,
             makeKey: true
         )
-        
+
         let editorWindow = UIWindowManager.shared.spawnWindow(configuration: configuration) {
             EditorView(project: project)
         }

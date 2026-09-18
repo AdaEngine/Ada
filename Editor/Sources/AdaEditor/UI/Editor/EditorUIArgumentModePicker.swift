@@ -18,7 +18,9 @@ struct EditorUIArgumentModePicker: View {
     }
 
     private func modeButton(_ title: String, binding: Bool) -> some View {
-        Button { onSelect(binding) } label: {
+        Button {
+            onSelect(binding)
+        } label: {
             Text(title)
                 .font(.system(size: 10, weight: isBinding == binding ? .semibold : .regular))
                 .frame(maxWidth: .infinity)
@@ -37,9 +39,12 @@ private struct EditorUIArgumentModeStyle: ButtonStyle {
         return configuration.label
             .foregroundColor(selected ? colors.text : colors.muted)
             .frame(height: 26)
-            .background(RoundedRectangleShape(cornerRadius: 5).fill(
-                selected ? colors.blue.opacity(0.30) : (highlighted ? colors.surfaceElevated : .clear)
-            ))
+            .background(
+                RoundedRectangleShape(cornerRadius: 5)
+                    .fill(
+                        selected ? colors.blue.opacity(0.30) : (highlighted ? colors.surfaceElevated : .clear)
+                    )
+            )
             .overlay {
                 RoundedRectangleShape(cornerRadius: 5)
                     .stroke(selected || highlighted ? colors.blue.opacity(0.75) : .clear, lineWidth: 1)

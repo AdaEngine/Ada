@@ -13,29 +13,49 @@ public final class UIBindingContext {
     public private(set) var revision: UInt64 = 0
 
     @ObservationIgnored private let parent: UIBindingContext?
-    public init(values: [String: UIValue] = [:], parent: UIBindingContext? = nil) { self.values = values; self.parent = parent }
+    public init(values: [String: UIValue] = [:], parent: UIBindingContext? = nil) {
+        self.values = values
+        self.parent = parent
+    }
 
     public func value(_ path: String) -> UIValue? {
         _ = revision
-        if let binding = bindings[path] { return binding.wrappedValue }
-        if let value = values[path] { return value }
+        if let binding = bindings[path] {
+            return binding.wrappedValue
+        }
+        if let value = values[path] {
+            return value
+        }
         let parts = path.split(separator: ".").map(String.init)
-        guard let first = parts.first else { return nil }
+        guard let first = parts.first else {
+            return nil
+        }
         return (bindings[first]?.wrappedValue ?? values[first])?.value(at: parts.dropFirst()) ?? parent?.value(path)
     }
 
     public func set(_ path: String, to value: UIValue) {
-        guard self.value(path) != value else { return }
-        if let binding = bindings[path] { binding.wrappedValue = value }
-        else if values[path] != nil { values[path] = value }
-        else {
+        guard self.value(path) != value else {
+            return
+        }
+        if let binding = bindings[path] {
+            binding.wrappedValue = value
+        } else if values[path] != nil {
+            values[path] = value
+        } else {
             let parts = path.split(separator: ".").map(String.init)
             if let first = parts.first, parts.count > 1,
-               let original = bindings[first]?.wrappedValue ?? values[first],
-               let updated = original.setting(value, at: parts.dropFirst()) {
-                if let binding = bindings[first] { binding.wrappedValue = updated } else { values[first] = updated }
-            } else if let parent, parent.value(path) != nil { parent.set(path, to: value) }
-            else { values[path] = value }
+                let original = bindings[first]?.wrappedValue ?? values[first],
+                let updated = original.setting(value, at: parts.dropFirst()) {
+                if let binding = bindings[first] {
+                    binding.wrappedValue = updated
+                } else {
+                    values[first] = updated
+                }
+            } else if let parent, parent.value(path) != nil {
+                parent.set(path, to: value)
+            } else {
+                values[path] = value
+            }
         }
         revision &+= 1
     }
@@ -43,7 +63,9 @@ public final class UIBindingContext {
     public func bind(_ name: String, to binding: Binding<UIValue>) {
         let existed = bindings[name] != nil
         bindings[name] = binding
-        if !existed { revision &+= 1 }
+        if !existed {
+            revision &+= 1
+        }
     }
 
     public func unbind(_ name: String) { bindings.removeValue(forKey: name) }
@@ -59,7 +81,10 @@ public final class UIBindingContext {
     public func perform(_ name: String, arguments: [String: UIValue] = [:]) {
         do {
             guard let action = handlers[name] else {
-                if let parent { parent.perform(name, arguments: arguments); return }
+                if let parent {
+                    parent.perform(name, arguments: arguments)
+                    return
+                }
                 throw UIDiagnostic("Missing action '\(name)'.")
             }
             try action(arguments)
@@ -70,7 +95,9 @@ public final class UIBindingContext {
     }
 
     public func report(_ diagnostic: UIDiagnostic) {
-        if diagnostics.last != diagnostic { diagnostics.append(diagnostic) }
+        if diagnostics.last != diagnostic {
+            diagnostics.append(diagnostic)
+        }
     }
 
     struct Snapshot {
@@ -89,7 +116,9 @@ public final class UIBindingContext {
 
     public func applyDefaults(_ inputs: [UIParameter]) {
         for input in inputs where value(input.name) == nil {
-            if let value = input.defaultValue { set(input.name, to: value) }
+            if let value = input.defaultValue {
+                set(input.name, to: value)
+            }
         }
     }
 }

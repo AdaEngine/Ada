@@ -36,9 +36,9 @@ public final class AppWorlds {
     public var profilingTargetID: String?
 
     #if ENABLE_RUN_IN_CONCURRENCY
-    public typealias ApplicationRunnerBlock = () async -> Void
+        public typealias ApplicationRunnerBlock = () async -> Void
     #else
-    public typealias ApplicationRunnerBlock = () -> Void
+        public typealias ApplicationRunnerBlock = () -> Void
     #endif
 
     /// The main world.
@@ -80,7 +80,7 @@ public final class AppWorlds {
     ///   - subWorlds: The subworlds.
     public init(
         main: World,
-        subWorlds: [String : AppWorlds] = [:]
+        subWorlds: [String: AppWorlds] = [:]
     ) {
         self.main = main
         self.subWorlds = subWorlds
@@ -88,24 +88,23 @@ public final class AppWorlds {
     }
 }
 
-public extension AppWorlds {
-
+extension AppWorlds {
     /// Set the world extractor.
     /// - Parameter exctractor: The world extractor.
-    func setExctractor(_ exctractor: any WorldExctractor) {
+    public func setExctractor(_ exctractor: any WorldExctractor) {
         unsafe self.worldExctractor = exctractor
     }
 
     /// Set the runner.
     /// - Parameter block: The runner.
-    func setRunner(_ block: @escaping ApplicationRunnerBlock) {
+    public func setRunner(_ block: @escaping ApplicationRunnerBlock) {
         self.runner = block
     }
 
     /// Executes a synchronous tooling operation between frame updates.
     /// Call on the root AppWorlds so subworld schedulers and extraction are also covered.
     /// Do not call from a running system: it would wait for its own frame to finish.
-    func withWorldAccess<T>(_ operation: @MainActor () throws -> T) async throws -> T {
+    public func withWorldAccess<T>(_ operation: @MainActor () throws -> T) async throws -> T {
         while activeUpdates > 0 {
             await withCheckedContinuation { updateWaiters.append($0) }
         }
@@ -114,7 +113,7 @@ public extension AppWorlds {
     }
 
     /// Updates this world and its subworlds, serializing concurrent frame requests.
-    func update() async throws {
+    public func update() async throws {
         while activeUpdates > 0 {
             await withCheckedContinuation { updateWaiters.append($0) }
         }
@@ -191,19 +190,20 @@ public extension AppWorlds {
     /// Get the subworld builder by name.
     /// - Parameter name: The name of the subworld.
     /// - Returns: The subworld builder.
-    func getSubworldBuilder(by name: AppWorldName) -> AppWorlds? {
+    public func getSubworldBuilder(by name: AppWorldName) -> AppWorlds? {
         self.subWorlds[name.rawValue]
     }
 
-    func getWorldBuilder(by name: AppWorldName) -> AppWorlds? {
+    public func getWorldBuilder(by name: AppWorldName) -> AppWorlds? {
         if name == .main {
             return self
         }
         return self.getSubworldBuilder(by: name)
     }
 
-    func allWorldNames() -> [AppWorldName] {
-        [.main] + self.subWorlds.keys
+    public func allWorldNames() -> [AppWorldName] {
+        [.main]
+            + self.subWorlds.keys
             .sorted()
             .map(AppWorldName.init(rawValue:))
     }
@@ -211,13 +211,13 @@ public extension AppWorlds {
     /// Add a new subworld.
     /// - Parameter subworld: The subworld.
     /// - Parameter name: The name of the subworld.
-    func addSubworld(_ subworld: consuming AppWorlds, by name: AppWorldName) {
+    public func addSubworld(_ subworld: consuming AppWorlds, by name: AppWorldName) {
         self.subWorlds[name.rawValue] = subworld
     }
 
     /// Removes a subworld registered with ``addSubworld(_:by:)``.
     @discardableResult
-    func removeSubworld(by name: AppWorldName) -> AppWorlds? {
+    public func removeSubworld(by name: AppWorldName) -> AppWorlds? {
         subWorlds.removeValue(forKey: name.rawValue)
     }
 
@@ -226,7 +226,7 @@ public extension AppWorlds {
     /// - Returns: The app builder.
     @inlinable
     @discardableResult
-    func addPlugin<T: Plugin>(_ plugin: T) -> Self {
+    public func addPlugin<T: Plugin>(_ plugin: T) -> Self {
         if let pluginName = self.installedPlugins[plugin.pluginIdentifier] {
             assertionFailure("Plugin \(pluginName) already installed")
             return self
@@ -239,7 +239,7 @@ public extension AppWorlds {
     /// Insert plugin to specific index.
     @inlinable
     @discardableResult
-    func insertPlugin<T: Plugin, C: Plugin>(_ plugin: T, after pluginType: C.Type) -> Self {
+    public func insertPlugin<T: Plugin, C: Plugin>(_ plugin: T, after pluginType: C.Type) -> Self {
         if let pluginName = self.installedPlugins[plugin.pluginIdentifier] {
             assertionFailure("Plugin \(pluginName) already installed")
             return self
@@ -254,7 +254,7 @@ public extension AppWorlds {
     }
 
     /// Setup plugins.
-    func build() async throws {
+    public func build() async throws {
         try await withExecutionContext {
             await self.setupPlugins(self.plugins[...])
             assert(self.pluginDepth == 0, "Plugins installed recursevly")
@@ -275,7 +275,7 @@ public extension AppWorlds {
 
     /// Executes synchronous work in this world's task-local runtime context.
     @_spi(Internal)
-    func withExecutionContext<Result>(_ operation: () throws -> Result) rethrows -> Result {
+    public func withExecutionContext<Result>(_ operation: () throws -> Result) rethrows -> Result {
         try RuntimeLogStore.$currentSource.withValue(runtimeLogSource) {
             try AppWorldsExecutionContext.$currentID.withValue(executionID) {
                 try AdaTrace.$profileTargetID.withValue(profilingTargetID ?? AdaTrace.profileTargetID) {
@@ -287,7 +287,7 @@ public extension AppWorlds {
 
     /// Executes asynchronous work in this world's task-local runtime context.
     @_spi(Internal)
-    func withExecutionContext<Result>(_ operation: () async throws -> Result) async rethrows -> Result {
+    public func withExecutionContext<Result>(_ operation: () async throws -> Result) async rethrows -> Result {
         try await RuntimeLogStore.$currentSource.withValue(runtimeLogSource) {
             try await AppWorldsExecutionContext.$currentID.withValue(executionID) {
                 try await AdaTrace.$profileTargetID.withValue(profilingTargetID ?? AdaTrace.profileTargetID) {
@@ -298,7 +298,7 @@ public extension AppWorlds {
     }
 }
 
-private extension AppWorlds {
+extension AppWorlds {
     private func setupPlugins(_ plugins: ContiguousArray<any Plugin>.SubSequence) async {
         var index = plugins.endIndex
         for plugin in plugins {
@@ -331,7 +331,7 @@ private extension AppWorlds {
 
 // MARK: - World Proxy
 
-public extension AppWorlds {
+extension AppWorlds {
     /// Add a system to the main world.
     /// - Parameters:
     ///   - system: The system to add.
@@ -339,7 +339,7 @@ public extension AppWorlds {
     /// - Returns: The app builder.
     @inlinable
     @discardableResult
-    func addSystem<T: System>(
+    public func addSystem<T: System>(
         _ system: T.Type,
         on scheduler: AdaECS.SchedulerName = .update
     ) -> Self {
@@ -354,7 +354,7 @@ public extension AppWorlds {
     /// - Returns: The app builder.
     @inlinable
     @discardableResult
-    func removeSystem<T: System>(
+    public func removeSystem<T: System>(
         _ system: T.Type,
         on scheduler: AdaECS.SchedulerName = .update
     ) -> Self {
@@ -364,7 +364,7 @@ public extension AppWorlds {
 
     @inlinable
     @discardableResult
-    func spawn(
+    public func spawn(
         _ name: String = "",
         @ComponentsBuilder components: () -> ComponentsBundle
     ) -> Entity {
@@ -373,7 +373,7 @@ public extension AppWorlds {
 
     @inlinable
     @discardableResult
-    func spawn<T: ComponentsBundle>(
+    public func spawn<T: ComponentsBundle>(
         _ name: String = "",
         bundle: consuming T
     ) -> Entity {
@@ -382,7 +382,7 @@ public extension AppWorlds {
 
     @inlinable
     @discardableResult
-    func spawn(_ name: String = "") -> Entity {
+    public func spawn(_ name: String = "") -> Entity {
         return main.spawn(name)
     }
 
@@ -391,7 +391,7 @@ public extension AppWorlds {
     /// - Returns: The app builder.
     @inlinable
     @discardableResult
-    func insertResource<T: Resource>(_ resource: consuming T) -> Self {
+    public func insertResource<T: Resource>(_ resource: consuming T) -> Self {
         self.main.insertResource(resource)
         return self
     }
@@ -401,7 +401,7 @@ public extension AppWorlds {
     /// - Returns: A resource instance.
     @inlinable
     @discardableResult
-    func createResource<T: Resource & WorldInitable>(_ type: T.Type) -> T {
+    public func createResource<T: Resource & WorldInitable>(_ type: T.Type) -> T {
         return self.main.createResource(of: type)
     }
 
@@ -410,7 +410,7 @@ public extension AppWorlds {
     /// - Returns: A resource instance.
     @inlinable
     @discardableResult
-    func initResource<T: Resource & WorldInitable>(_ type: T.Type) -> Self {
+    public func initResource<T: Resource & WorldInitable>(_ type: T.Type) -> Self {
         _ = self.main.createResource(of: type)
         return self
     }
@@ -420,7 +420,7 @@ public extension AppWorlds {
     /// - Returns: A resource instance.
     @inlinable
     @discardableResult
-    func initResource<T: Resource & DefaultValue>(_ type: T.Type) -> Self {
+    public func initResource<T: Resource & DefaultValue>(_: T.Type) -> Self {
         _ = self.main.insertResource(T.defaultValue)
         return self
     }
@@ -429,7 +429,7 @@ public extension AppWorlds {
     /// - Parameter resource: The resource to insert.
     /// - Returns: The app builder.
     @inlinable
-    func getResource<T: Resource>(_ resource: T.Type) -> T? {
+    public func getResource<T: Resource>(_ resource: T.Type) -> T? {
         return self.main.getResource(resource)
     }
 
@@ -437,7 +437,7 @@ public extension AppWorlds {
     /// - Parameter resource: The resource to insert.
     /// - Returns: The app builder.
     @inlinable
-    func getRefResource<T: Resource>(_ resource: T.Type) -> Ref<T> {
+    public func getRefResource<T: Resource>(_ resource: T.Type) -> Ref<T> {
         self.main.getRefResource(resource)
     }
 }
@@ -464,18 +464,18 @@ public protocol Plugin: Sendable {
     func destroy(for app: borrowing AppWorlds)
 }
 
-public extension Plugin {
-    var pluginIdentifier: String {
+extension Plugin {
+    public var pluginIdentifier: String {
         String(reflecting: Self.self)
     }
 
-    func isLoaded(in app: borrowing AppWorlds) -> Bool {
+    public func isLoaded(in _: borrowing AppWorlds) -> Bool {
         return true
     }
 
-    func finish(for app: borrowing AppWorlds) { }
+    public func finish(for _: borrowing AppWorlds) {}
 
-    func destroy(for app: borrowing AppWorlds) { }
+    public func destroy(for _: borrowing AppWorlds) {}
 }
 
 public struct AppWorldName: Hashable, Equatable, RawRepresentable, CustomStringConvertible, Sendable {
@@ -486,5 +486,5 @@ public struct AppWorldName: Hashable, Equatable, RawRepresentable, CustomStringC
         self.rawValue = rawValue
     }
 
-    public static let main = AppWorldName(rawValue: "Main")
+    public static let main = Self(rawValue: "Main")
 }

@@ -7,17 +7,20 @@ public enum AdaWebPlayerBundle {
         let fileManager = FileManager.default
         let project = try AdaWebPlayerProject.load(at: directory)
         let sources = try project.loadSources(at: directory)
-        guard try AdaScriptSchemaParser.parse(sources: sources).isEmpty,
-              try AdaScriptSchemaParser.parseSystemCapabilities(sources: sources).isEmpty else {
+        guard
+            try AdaScriptSchemaParser.parse(sources: sources).isEmpty,
+            try AdaScriptSchemaParser.parseSystemCapabilities(sources: sources).isEmpty
+        else {
             throw AdaWebPlayerProjectError.invalid("This Web Player profile supports views without ECS systems or custom native data.")
         }
         guard try AdaScriptSchemaParser.parseViews(sources: sources).contains(where: { $0.id == project.entryView }) else {
             throw AdaWebPlayerProjectError.invalid("Entry view '\(project.entryView)' was not found.")
         }
-        let descriptor = try JSONDecoder().decode(
-            PlayerDescriptor.self,
-            from: Data(contentsOf: template.appendingPathComponent("ada-web-player.json"))
-        )
+        let descriptor = try JSONDecoder()
+            .decode(
+                PlayerDescriptor.self,
+                from: Data(contentsOf: template.appendingPathComponent("ada-web-player.json"))
+            )
         guard descriptor.runtimeAPI >= project.runtimeAPI, descriptor.profile == "views" else {
             throw AdaWebPlayerProjectError.invalid("The player template is incompatible with this project's runtime API or profile.")
         }
@@ -26,21 +29,26 @@ public enum AdaWebPlayerBundle {
                 throw AdaWebPlayerProjectError.invalid("Incomplete Web Player template: missing \(path).")
             }
         }
-        var resources = try JSONDecoder().decode(
-            [ResourceEntry].self,
-            from: Data(contentsOf: template.appendingPathComponent("ada-resource-manifest.json"))
-        )
+        var resources = try JSONDecoder()
+            .decode(
+                [ResourceEntry].self,
+                from: Data(contentsOf: template.appendingPathComponent("ada-resource-manifest.json"))
+            )
         let templateRoot = template.resolvingSymlinksInPath().standardizedFileURL
         for resource in resources {
             let relativePath = resource.url.removingPercentEncoding ?? resource.url
             let file = templateRoot.appendingPathComponent(relativePath).resolvingSymlinksInPath().standardizedFileURL
-            guard file.path.hasPrefix(templateRoot.path + "/"),
-                  (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
+            guard
+                file.path.hasPrefix(templateRoot.path + "/"),
+                (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            else {
                 throw AdaWebPlayerProjectError.invalid("Missing or invalid player resource: \(resource.url).")
             }
         }
-        guard !resources.contains(where: { $0.path == "game" || $0.path.hasPrefix("game/") || $0.path.hasPrefix("/game/") }),
-              !fileManager.fileExists(atPath: template.appendingPathComponent("game").path) else {
+        guard
+            !resources.contains(where: { $0.path == "game" || $0.path.hasPrefix("game/") || $0.path.hasPrefix("/game/") }),
+            !fileManager.fileExists(atPath: template.appendingPathComponent("game").path)
+        else {
             throw AdaWebPlayerProjectError.invalid("Expected a player template without embedded game content.")
         }
         guard !fileManager.fileExists(atPath: output.path) else {
@@ -50,7 +58,9 @@ public enum AdaWebPlayerBundle {
         try fileManager.copyItem(at: template, to: output)
         var complete = false
         defer {
-            if !complete { try? fileManager.removeItem(at: output) }
+            if !complete {
+                try? fileManager.removeItem(at: output)
+            }
         }
         let game = output.appendingPathComponent("game", isDirectory: true)
         try fileManager.createDirectory(at: game, withIntermediateDirectories: true)
@@ -64,9 +74,11 @@ public enum AdaWebPlayerBundle {
             try source.source.write(to: destination, atomically: true, encoding: .utf8)
             // Encode URL-sensitive characters while keeping the WASI path exactly equal to the source path.
             let path = "game/\(source.path)"
-            let url = path.split(separator: "/").map {
-                String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "?#%"))) ?? String($0)
-            }.joined(separator: "/")
+            let url = path.split(separator: "/")
+                .map {
+                    String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "?#%"))) ?? String($0)
+                }
+                .joined(separator: "/")
             resources.append(ResourceEntry(path: path, url: url))
         }
         for asset in project.assets ?? [] {

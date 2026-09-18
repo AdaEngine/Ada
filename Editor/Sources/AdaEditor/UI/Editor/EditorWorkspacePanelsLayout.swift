@@ -4,7 +4,11 @@ import Observation
 @Observable
 @MainActor
 final class EditorWorkspaceResizeState {
-    enum Panel: String { case left = "Left", right = "Right", bottom = "Bottom" }
+    enum Panel: String {
+        case left = "Left"
+        case right = "Right"
+        case bottom = "Bottom"
+    }
 
     // Only the layout subscribes to per-movement updates. Content subscribes to topology.
     private(set) var layoutRevision: UInt64 = 0
@@ -87,11 +91,11 @@ struct EditorWorkspacePanelsLayout: Layout {
     let state: EditorWorkspaceResizeState
     let viewModel: EditorViewModel
 
-    func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> Size {
+    func sizeThatFits(_ proposal: ProposedViewSize, subviews _: Subviews, cache _: inout ()) -> Size {
         proposal.replacingUnspecifiedDimensions()
     }
 
-    func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    func placeSubviews(in bounds: Rect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
         _ = state.layoutRevision
         let layout = state.layout(in: bounds.size, viewModel: viewModel)
         var index = 0
@@ -103,11 +107,12 @@ struct EditorWorkspacePanelsLayout: Layout {
             var childProposal = ProposedViewSize.zero
             childProposal.width = width
             childProposal.height = height
-            subviews[index].place(
-                at: Point(bounds.minX + x, bounds.minY + y),
-                anchor: .topLeading,
-                proposal: childProposal
-            )
+            subviews[index]
+                .place(
+                    at: Point(bounds.minX + x, bounds.minY + y),
+                    anchor: .topLeading,
+                    proposal: childProposal
+                )
             index += 1
         }
         let horizontalHandle = EditorWorkspaceLayout.resizeHandleSize

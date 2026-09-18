@@ -11,7 +11,6 @@ import Math
 
 /// This node is responsible for presenting the result to the screen.
 public struct UpscaleNode: RenderNode {
-
     public enum InputNode {
         public static let view: RenderSlot.Label = "view"
     }
@@ -35,8 +34,8 @@ public struct UpscaleNode: RenderNode {
         }
 
         if let mainTexture = target.mainTexture,
-           let outputTexture = target.outputTexture,
-           mainTexture !== outputTexture {
+            let outputTexture = target.outputTexture,
+            mainTexture !== outputTexture {
             let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
             commandBuffer.label = "Upscale Pass"
 
@@ -80,7 +79,7 @@ public struct UpscaleNode: RenderNode {
                         binding: 1,
                         shaderStages: .fragment,
                         resource: .sampler(upscalePipeline.sampler)
-                    )
+                    ),
                 ]
             )
             renderPass.setResourceSet(resourceSet, index: 0)

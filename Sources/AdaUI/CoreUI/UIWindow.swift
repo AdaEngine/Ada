@@ -17,16 +17,15 @@ import Math
 /// - Tag: AdaEngine.Window
 @MainActor
 open class UIWindow: UIView {
-
     public typealias ID = RID
-    
+
     // TODO: (Vlad) Maybe, we should use unique ID without RID
     /// Identifier using to register window in the render engine.
     /// We use this id to start drawing.
     nonisolated public let id: ID = RID()
 
     public var configuration: Configuration
-    
+
     public var title: String {
         get { self.systemWindow?.title ?? "" }
         set { self.systemWindow?.title = newValue }
@@ -35,7 +34,7 @@ open class UIWindow: UIView {
     public var windowManager: UIWindowManager {
         UIWindowManager.shared
     }
-    
+
     @_spi(Internal) public var systemWindow: SystemWindow?
     @_spi(Internal) public var runtimeCameraEntity: Entity?
     internal let eventManager = EventManager()
@@ -57,27 +56,27 @@ open class UIWindow: UIView {
             self._minSize = newValue
         }
     }
-    
+
     public var isFullscreen: Bool = false
 
     public var screen: Screen? {
         return windowManager.getScreen(for: self)
     }
-    
+
     /// Flag indicates that window is active.
     public internal(set) var isActive: Bool = false
 
     /// Called after the native window or scene has been removed.
     public var onDidDisappear: (@MainActor () -> Void)?
 
-    public convenience override init() {
+    override public convenience init() {
         self.init(frame: .zero)
     }
 
     public convenience init(configuration: Configuration) {
         self.init(frame: configuration.frame, configuration: configuration)
     }
-    
+
     public required init(frame: Rect) {
         self.configuration = Configuration(frame: frame)
         super.init(frame: frame)
@@ -105,32 +104,28 @@ open class UIWindow: UIView {
     open func setWindowMode(_ mode: UIWindow.Mode) {
         self.windowManager.setWindowMode(self, mode: mode)
     }
-    
+
     // MARK: - Lifecycle
-    
+
     /// Called one when window ready to use.
     open func windowDidReady() {
-        
     }
-    
+
     /// Called each time when window did appear on screen.
     open func windowDidAppear() {
-        
     }
-    
+
     /// Called once when window did disapper from screen.
     open func windowDidDisappear() {
         onDidDisappear?()
     }
-    
+
     open func windowDidBecameActive() {
-        
     }
-    
+
     open func windowDidResignActive() {
-        
     }
-    
+
     /// Called when user did press `Close` button
     open func windowShouldClose() -> Bool {
         return true
@@ -164,7 +159,7 @@ open class UIWindow: UIView {
         }
         let responder = self.findFirstResponder(for: event) ?? self.defaultResponder(for: event) ?? self
         if let mouse = event as? MouseEvent, mouse.phase == .began,
-           mouse.button != .none, mouse.button != .scrollWheel {
+            mouse.button != .none, mouse.button != .scrollWheel {
             capturedMouseResponders[mouse.button] = WeakBox(responder)
         } else if let touch = event as? TouchEvent, touch.phase == .began {
             capturedTouchResponders[touch.contactID] = WeakBox(responder)
@@ -178,14 +173,26 @@ open class UIWindow: UIView {
             let captured = capturedMouseResponders
             capturedMouseResponders.removeAll(keepingCapacity: true)
             for (button, reference) in captured {
-                guard let responder = reference.value, ownsResponder(responder) else { continue }
-                responder.onEvent(MouseEvent(window: id, button: button, mousePosition: event.mousePosition,
-                    phase: .ended, modifierKeys: event.modifierKeys, time: event.time))
+                guard let responder = reference.value, ownsResponder(responder) else {
+                    continue
+                }
+                responder.onEvent(
+                    MouseEvent(
+                        window: id,
+                        button: button,
+                        mousePosition: event.mousePosition,
+                        phase: .ended,
+                        modifierKeys: event.modifierKeys,
+                        time: event.time
+                    )
+                )
             }
             return false
         }
-        guard event.phase != .began, event.button != .scrollWheel,
-              let reference = capturedMouseResponders[event.button] else {
+        guard
+            event.phase != .began, event.button != .scrollWheel,
+            let reference = capturedMouseResponders[event.button]
+        else {
             return false
         }
         guard let responder = reference.value, ownsResponder(responder), responder.canRespondToAction(event) else {
@@ -220,7 +227,9 @@ open class UIWindow: UIView {
 
     private func defaultResponder(for event: any InputEvent) -> UIView? {
         switch event {
-        case is KeyEvent, is TextInputEvent, is KeyboardEvent:
+        case is KeyEvent,
+            is TextInputEvent,
+            is KeyboardEvent:
             if let focusedResponder = self.findFocusedInputResponderInSubviews(for: event) {
                 return focusedResponder
             }
@@ -247,18 +256,18 @@ open class UIWindow: UIView {
     }
 
     // MARK: - Overriding
-    
-    open override func frameDidChange() {
+
+    override open func frameDidChange() {
         self.windowManager.resizeWindow(self, size: self.frame.size)
         super.frameDidChange()
     }
-    
-    public override func addSubview(_ view: UIView) {
+
+    override public func addSubview(_ view: UIView) {
         guard !(view is UIWindow) else {
             assertionFailure("You cannot add window as subview to another window")
             return
         }
-        
+
         if let anotherWindow = view.window {
             if anotherWindow === self {
                 assertionFailure("View already added on this window.")
@@ -270,18 +279,18 @@ open class UIWindow: UIView {
 
         super.addSubview(view)
     }
-    
-    public override func removeSubview(_ view: UIView) {
+
+    override public func removeSubview(_ view: UIView) {
         if let window = view.window, window !== self {
             assertionFailure("You cant remove view from another window instance.")
             return
         }
-        
+
         super.removeSubview(view)
     }
 }
 
-private extension UIView {
+extension UIView {
     func findFocusedInputResponder(for event: any InputEvent) -> UIView? {
         for subview in self.zSortedChildren.reversed() {
             if let focusedResponder = subview.findFocusedInputResponder(for: event) {
@@ -301,8 +310,8 @@ private extension UIView {
     }
 }
 
-public extension UIWindow {
-    struct Configuration: Sendable {
+extension UIWindow {
+    public struct Configuration: Sendable {
         public var title: String?
         public var frame: Rect
         public var minimumSize: Size
@@ -361,7 +370,7 @@ public extension UIWindow {
     }
 
     /// Describes which native scene should host a platform window.
-    enum ScenePresentation: Sendable, Equatable {
+    public enum ScenePresentation: Sendable, Equatable {
         /// Present the window in the scene that is currently active.
         case current
 
@@ -370,20 +379,20 @@ public extension UIWindow {
         case new
     }
 
-    enum Chrome: Sendable, Equatable {
+    public enum Chrome: Sendable, Equatable {
         case standard
         case borderless
     }
 
-    struct TitleBar: Sendable, Equatable {
+    public struct TitleBar: Sendable, Equatable {
         public var background: TitleBarBackground
         public var reservesSafeArea: Bool
         public var dragRegionHeight: Float?
         public var trafficLightOffset: Point?
 
-        public static let standard = TitleBar(background: .system, reservesSafeArea: true, dragRegionHeight: nil, trafficLightOffset: nil)
-        public static let transparent = TitleBar(background: .transparent, reservesSafeArea: true, dragRegionHeight: nil, trafficLightOffset: nil)
-        public static let overlay = TitleBar(background: .transparent, reservesSafeArea: false, dragRegionHeight: 52, trafficLightOffset: nil)
+        public static let standard = Self(background: .system, reservesSafeArea: true, dragRegionHeight: nil, trafficLightOffset: nil)
+        public static let transparent = Self(background: .transparent, reservesSafeArea: true, dragRegionHeight: nil, trafficLightOffset: nil)
+        public static let overlay = Self(background: .transparent, reservesSafeArea: false, dragRegionHeight: 52, trafficLightOffset: nil)
 
         public init(
             background: TitleBarBackground,
@@ -398,12 +407,12 @@ public extension UIWindow {
         }
     }
 
-    enum TitleBarBackground: Sendable, Equatable {
+    public enum TitleBarBackground: Sendable, Equatable {
         case system
         case transparent
     }
 
-    enum Background: Sendable, Equatable {
+    public enum Background: Sendable, Equatable {
         case opaque(Color)
         case transparent
 
@@ -415,7 +424,7 @@ public extension UIWindow {
         }
     }
 
-    enum BackgroundEffect: Sendable, Equatable {
+    public enum BackgroundEffect: Sendable, Equatable {
         case none
         case blur(BlurMaterial)
 
@@ -426,34 +435,34 @@ public extension UIWindow {
             case popover
             case contentBackground
             case underWindowBackground
-            
+
             #if os(macOS)
-            case glass
+                case glass
             #endif
         }
     }
 
-    enum Level: Sendable {
+    public enum Level: Sendable {
         case normal
         case floating
         case statusBar
     }
 
-    enum CollectionBehavior: Sendable {
+    public enum CollectionBehavior: Sendable {
         case standard
         case allSpacesStationary
     }
 
-    enum Mode: UInt64, Sendable {
+    public enum Mode: UInt64, Sendable {
         case windowed
         case fullscreen
         case fullScreenWindowed
     }
-    
-    nonisolated static let defaultMinimumSize = Size(width: 800, height: 600)
+
+    nonisolated public static let defaultMinimumSize = Size(width: 800, height: 600)
 }
 
-public extension Notification.Name {
-    static let adaEngineWindowDidMiniaturize = Notification.Name("AdaEngine.WindowDidMiniaturize")
-    static let adaEngineWindowDidDeminiaturize = Notification.Name("AdaEngine.WindowDidDeminiaturize")
+extension Notification.Name {
+    public static let adaEngineWindowDidMiniaturize = Notification.Name("AdaEngine.WindowDidMiniaturize")
+    public static let adaEngineWindowDidDeminiaturize = Notification.Name("AdaEngine.WindowDidDeminiaturize")
 }

@@ -14,8 +14,7 @@ import OrderedCollections
 /// Describe an entity and its characteristics.
 /// Entity in ECS based architecture is the main object that holds components.
 open class Entity: Identifiable, @unchecked Sendable {
-
-    static let notAllocatedId = -25102018
+    static let notAllocatedId = -25_102_018
 
     /// Contains entity name.
     public let name: String
@@ -71,7 +70,7 @@ open class Entity: Identifiable, @unchecked Sendable {
     }
 
     // MARK: - Codable
-    
+
     /// Create entity from decoder.
     public required convenience init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -81,7 +80,7 @@ open class Entity: Identifiable, @unchecked Sendable {
         self.components = try container.decode(ComponentSet.self, forKey: .components)
         self.components.entity = id
     }
-    
+
     /// Encode the entity to an encoder.
     /// - Parameter encoder: The encoder to encode the entity to.
     public func encode(to encoder: Encoder) throws {
@@ -90,9 +89,9 @@ open class Entity: Identifiable, @unchecked Sendable {
         try container.encode(self.id, forKey: .id)
         try container.encode(self.components, forKey: .components)
     }
-    
+
     // MARK: - Public
-    
+
     /// Remove entity from world.
     /// - Note: Entity will removed on next update tick.
     public func removeFromWorld(recursively: Bool = false) {
@@ -120,7 +119,7 @@ extension Entity: Hashable {
     public static func == (lhs: Entity, rhs: Entity) -> Bool {
         return lhs.id == rhs.id && lhs.name == rhs.name
     }
-    
+
     /// Hash the entity.
     /// - Parameter hasher: The hasher to hash the entity.
     public func hash(into hasher: inout Hasher) {
@@ -149,11 +148,11 @@ extension Entity: CustomStringConvertible {
     }
 }
 
-public extension Cancellable {
+extension Cancellable {
     /// Stores this type-erasing cancellable instance in the entity.
     /// - Note: This cancellable will be canceled when the entity is removed.
     /// - Parameter entity: The entity to store the cancellable in.
-    func store(in entity: Entity) {
+    public func store(in entity: Entity) {
         if let anyCancellable = self as? AnyCancellable {
             entity.disposeBag.insert(anyCancellable)
         } else {

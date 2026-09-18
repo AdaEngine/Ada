@@ -12,9 +12,8 @@ import Math
 /// A scrollable view.
 @MainActor @preconcurrency
 public struct ScrollView<Content: View>: View, ViewNodeBuilder {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let axis: Axis
     let showsIndicators: Bool
@@ -51,7 +50,9 @@ final class ScrollViewNode: LayoutViewContainerNode {
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
-        guard let scroll = newNode as? ScrollViewNode else { return }
+        guard let scroll = newNode as? ScrollViewNode else {
+            return
+        }
         axis = scroll.axis
         showsIndicators = scroll.showsIndicators
     }
@@ -105,16 +106,17 @@ final class ScrollViewNode: LayoutViewContainerNode {
             height: max(0, contentSize.height - insetHeight)
         )
 
-        super.performLayout(
-            in: Rect(
-                origin: Point(
-                    x: contentOrigin.x + contentInsets.leading,
-                    y: contentOrigin.y + contentInsets.top
+        super
+            .performLayout(
+                in: Rect(
+                    origin: Point(
+                        x: contentOrigin.x + contentInsets.leading,
+                        y: contentOrigin.y + contentInsets.top
+                    ),
+                    size: insetContentSize
                 ),
-                size: insetContentSize
-            ),
-            proposal: ProposedViewSize(insetContentSize)
-        )
+                proposal: ProposedViewSize(insetContentSize)
+            )
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
@@ -208,13 +210,16 @@ final class ScrollViewNode: LayoutViewContainerNode {
             }
             recordWheelEvent(at: event.time)
             applyWheelDelta(event.scrollDelta)
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             finishWheelInteraction()
         }
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
-        guard let touch = touches.first else { return }
+        guard let touch = touches.first else {
+            return
+        }
 
         switch touch.phase {
         case .began:
@@ -225,7 +230,9 @@ final class ScrollViewNode: LayoutViewContainerNode {
             velocityTracker = []
             state = .dragging(initialOffset: self.contentOffset)
         case .moved:
-            guard case .dragging(let initialOffset) = state else { return }
+            guard case let .dragging(initialOffset) = state else {
+                return
+            }
             accumulativePoint.x += touch.location.x - (lastTouchLocation?.x ?? touch.location.x)
             accumulativePoint.y += touch.location.y - (lastTouchLocation?.y ?? touch.location.y)
             let rawOffset = Point(
@@ -238,7 +245,8 @@ final class ScrollViewNode: LayoutViewContainerNode {
             if velocityTracker.count > 5 {
                 velocityTracker.removeFirst()
             }
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             let releaseVelocity = calculateReleaseVelocity()
             let overscroll = calculateOverscroll(contentOffset)
 
@@ -273,7 +281,9 @@ final class ScrollViewNode: LayoutViewContainerNode {
             }
         }
 
-        guard case .animating = state, deltaTime > 0 else { return }
+        guard case .animating = state, deltaTime > 0 else {
+            return
+        }
 
         var newOffset = contentOffset
         var finished = true
@@ -318,7 +328,7 @@ final class ScrollViewNode: LayoutViewContainerNode {
         velocity: inout Float,
         minBound: Float,
         maxBound: Float,
-        dimension: Float,
+        dimension _: Float,
         dt: Float
     ) -> Bool {
         let overscroll: Float
@@ -402,7 +412,7 @@ final class ScrollViewNode: LayoutViewContainerNode {
     }
 
     private func applyWheelDelta(_ delta: Point) {
-        guard case .dragging(let initialOffset) = state else {
+        guard case let .dragging(initialOffset) = state else {
             return
         }
 
@@ -459,7 +469,9 @@ final class ScrollViewNode: LayoutViewContainerNode {
 
     @inline(__always)
     private func rubberBandDistance(_ distance: Float, dimension: Float) -> Float {
-        guard dimension > 0 else { return 0 }
+        guard dimension > 0 else {
+            return 0
+        }
         let c = Self.rubberBandCoefficient
         return (1 - 1 / (distance * c / dimension + 1)) * dimension
     }
@@ -467,13 +479,17 @@ final class ScrollViewNode: LayoutViewContainerNode {
     // MARK: - Velocity Tracking
 
     private func calculateReleaseVelocity() -> Point {
-        guard velocityTracker.count >= 2,
-              let first = velocityTracker.first,
-              let last = velocityTracker.last else {
+        guard
+            velocityTracker.count >= 2,
+            let first = velocityTracker.first,
+            let last = velocityTracker.last
+        else {
             return .zero
         }
         let dt = last.time - first.time
-        guard dt > 0.001 else { return .zero }
+        guard dt > 0.001 else {
+            return .zero
+        }
         return Point(
             x: axis.contains(.horizontal) ? -(last.position.x - first.position.x) / dt : 0,
             y: axis.contains(.vertical) ? -(last.position.y - first.position.y) / dt : 0
@@ -552,7 +568,9 @@ final class ScrollViewNode: LayoutViewContainerNode {
 
     /// Indicator bounds remain in viewport coordinates, independent of content translation.
     var scrollIndicatorRects: [Rect] {
-        guard showsIndicators, frame.width >= 10, frame.height >= 10 else { return [] }
+        guard showsIndicators, frame.width >= 10, frame.height >= 10 else {
+            return []
+        }
         let inset: Float = 3
         let thickness: Float = 4
         let vertical = axis.contains(.vertical) && contentSize.height > frame.height + 0.5
@@ -605,12 +623,13 @@ final class ScrollViewNode: LayoutViewContainerNode {
         contentContext.pushClipRect(self.absoluteFrame())
         contentContext.translateBy(x: -contentOffset.x, y: contentOffset.y)
         contentContext.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
-        super.drawInspectionChildSelectionBounds(
-            with: contentContext,
-            mode: mode,
-            focusedNode: focusedNode,
-            hitTestNode: hitTestNode
-        )
+        super
+            .drawInspectionChildSelectionBounds(
+                with: contentContext,
+                mode: mode,
+                focusedNode: focusedNode,
+                hitTestNode: hitTestNode
+            )
         contentContext.popClipRect()
     }
 
@@ -629,10 +648,11 @@ final class ScrollViewNode: LayoutViewContainerNode {
         contentContext.pushClipRect(self.absoluteFrame())
         contentContext.translateBy(x: -contentOffset.x, y: contentOffset.y)
         contentContext.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
-        super.drawInspectionChildRedrawFlashes(
-            with: contentContext,
-            baselineRevision: baselineRevision
-        )
+        super
+            .drawInspectionChildRedrawFlashes(
+                with: contentContext,
+                baselineRevision: baselineRevision
+            )
         contentContext.popClipRect()
     }
 
@@ -791,7 +811,7 @@ final class ScrollViewNode: LayoutViewContainerNode {
 
     private func lazyScrollTargetFrame(in node: ViewNode, for id: AnyHashable) -> Rect? {
         if let resolver = node as? LazyScrollTargetResolving,
-           let frame = resolver.estimatedFrameForScrollTarget(id: id) {
+            let frame = resolver.estimatedFrameForScrollTarget(id: id) {
             var origin = frame.origin
             var current: ViewNode? = node
             while let currentNode = current, currentNode !== self {

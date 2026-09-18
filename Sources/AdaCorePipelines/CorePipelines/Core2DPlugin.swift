@@ -7,16 +7,15 @@
 
 import AdaApp
 import AdaECS
-import AdaUtils
 import AdaRender
 import AdaTransform
+import AdaUtils
 import Math
 
 /// Plugin for RenderWorld added 2D render capatibilites.
 public struct Core2DPlugin: Plugin {
-
     public init() {}
-    
+
     /// Input slots of render graph.
     public enum InputNode {
         public static let view: RenderSlot.Label = "view"
@@ -31,7 +30,7 @@ public struct Core2DPlugin: Plugin {
         app
             .insertResource(RenderItems<Transparent2DRenderItem>())
             .insertResource(SortedRenderItems<Transparent2DRenderItem>())
-            .addSystem(BatchAndSortTransparent2DRenderItemsSystem.self, on: .batching)
+            .addSystem(Transparent2DBatchingSystem.self, on: .batching)
             .addSystem(ClearTransparent2dRenderItemsSystem.self, on: .preUpdate)
             .insertResource(RenderPipelines(configurator: QuadPipeline()))
             .insertResource(RenderPipelines(configurator: CirclePipeline()))
@@ -65,13 +64,13 @@ public struct Core2DPlugin: Plugin {
     }
 }
 
-public extension RenderGraph.Label {
+extension RenderGraph.Label {
     /// Render graph name.
-    static let main2D: RenderGraph.Label = "Scene 2D Render Graph"
+    public static let main2D: RenderGraph.Label = "Scene 2D Render Graph"
 }
 
-public extension RenderNodeLabel {
-    enum Main2D {
+extension RenderNodeLabel {
+    public enum Main2D {
         public static let beginPass: RenderNodeLabel = "Main2D.BeginPass"
         public static let endPass: RenderNodeLabel = "Main2D.EndPass"
     }
@@ -86,17 +85,16 @@ func ClearTransparent2dRenderItems(
 
 // - FIXME: Remove when fix generic version of BatchAndSortTransparent<T>
 @PlainSystem
-public struct BatchAndSortTransparent2DRenderItemsSystem {
-
+public struct Transparent2DBatchingSystem {
     @ResMut<RenderItems<Transparent2DRenderItem>>
     private var renderItems
 
     @ResMut<SortedRenderItems<Transparent2DRenderItem>>
     private var sortedRenderItems
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) async {
+    public func update(context _: UpdateContext) async {
         sortedRenderItems.items.items.removeAll(keepingCapacity: true)
         let items = renderItems.sorted().items
         var batchedItems: [Transparent2DRenderItem] = []
@@ -128,9 +126,9 @@ public struct BatchAndSortTransparent2DRenderItemsSystem {
         }
 
         if batch.upperBound == otherBatch.lowerBound {
-            currentItem.batchRange = batch.lowerBound ..< otherBatch.upperBound
+            currentItem.batchRange = batch.lowerBound..<otherBatch.upperBound
         } else if batch.lowerBound == otherBatch.upperBound {
-            currentItem.batchRange = otherBatch.lowerBound ..< batch.upperBound
+            currentItem.batchRange = otherBatch.lowerBound..<batch.upperBound
         } else {
             return false
         }

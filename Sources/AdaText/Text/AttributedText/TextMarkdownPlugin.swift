@@ -127,11 +127,11 @@ private struct MarkdownAttributedTextRenderer: MarkupVisitor {
         self.popAttributes()
     }
 
-    mutating func visitLineBreak(_ lineBreak: LineBreak) {
+    mutating func visitLineBreak(_: LineBreak) {
         self.append(self.options.hardBreak)
     }
 
-    mutating func visitSoftBreak(_ softBreak: SoftBreak) {
+    mutating func visitSoftBreak(_: SoftBreak) {
         self.append(self.options.softBreak)
     }
 

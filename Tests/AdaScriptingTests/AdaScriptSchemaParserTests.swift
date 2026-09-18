@@ -346,6 +346,16 @@ extension AdaScriptSchemaParserTests {
         }
     }
 
+    @Test("Rejects view modifiers with missing arguments before preview evaluation")
+    func rejectsViewModifierWithMissingArgument() {
+        #expect(throws: AdaScriptViewBuilderError(path: "Main.ada", line: 1, message: "background requires 1 argument")) {
+            try AdaScriptViewBuilderLowerer.lower(
+                source: "@view class MainView { func body() { Text(\"Hello\").background(); } }",
+                path: "Main.ada"
+            )
+        }
+    }
+
     @Test("Lowers button actions into view instance methods")
     func lowersButtonActions() throws {
         let lowered = try AdaScriptViewBuilderLowerer.lower(

@@ -1,7 +1,7 @@
 @_spi(AdaEngine) import AdaEngine
 
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
 struct EditorDoubleShiftDetector {
@@ -41,30 +41,30 @@ final class EditorSearchShortcutMonitor {
     private var subscriberCount = 0
     private var detector = EditorDoubleShiftDetector()
 
-#if canImport(AppKit)
-    private var eventMonitor: Any?
-    private var pressedShiftKeyCodes: Set<UInt16> = []
-#endif
+    #if canImport(AppKit)
+        private var eventMonitor: Any?
+        private var pressedShiftKeyCodes: Set<UInt16> = []
+    #endif
 
     private init() {}
 
     func start() {
         subscriberCount += 1
 
-#if canImport(AppKit)
-        guard eventMonitor == nil else {
-            return
-        }
-
-        eventMonitor = NSEvent.addLocalMonitorForEvents(
-            matching: [.flagsChanged, .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
-        ) { [weak self] event in
-            MainActor.assumeIsolated {
-                self?.handle(event)
+        #if canImport(AppKit)
+            guard eventMonitor == nil else {
+                return
             }
-            return event
-        }
-#endif
+
+            eventMonitor = NSEvent.addLocalMonitorForEvents(
+                matching: [.flagsChanged, .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
+            ) { [weak self] event in
+                MainActor.assumeIsolated {
+                    self?.handle(event)
+                }
+                return event
+            }
+        #endif
     }
 
     func stop() {
@@ -75,33 +75,37 @@ final class EditorSearchShortcutMonitor {
 
         detector.cancel()
 
-#if canImport(AppKit)
-        pressedShiftKeyCodes.removeAll(keepingCapacity: true)
-        if let eventMonitor {
-            NSEvent.removeMonitor(eventMonitor)
-            self.eventMonitor = nil
-        }
-#endif
+        #if canImport(AppKit)
+            pressedShiftKeyCodes.removeAll(keepingCapacity: true)
+            if let eventMonitor {
+                NSEvent.removeMonitor(eventMonitor)
+                self.eventMonitor = nil
+            }
+        #endif
     }
 
-#if canImport(AppKit)
-    private func handle(_ event: NSEvent) {
-        switch event.type {
-        case .flagsChanged where event.keyCode == 0x38 || event.keyCode == 0x3C:
-            if pressedShiftKeyCodes.remove(event.keyCode) == nil {
-                let startsNewPress = pressedShiftKeyCodes.isEmpty
-                pressedShiftKeyCodes.insert(event.keyCode)
-                if startsNewPress, detector.registerPress(at: Float(event.timestamp)) {
-                    focusSearchField()
+    #if canImport(AppKit)
+        private func handle(_ event: NSEvent) {
+            switch event.type {
+            case .flagsChanged where event.keyCode == 0x38 || event.keyCode == 0x3C:
+                if pressedShiftKeyCodes.remove(event.keyCode) == nil {
+                    let startsNewPress = pressedShiftKeyCodes.isEmpty
+                    pressedShiftKeyCodes.insert(event.keyCode)
+                    if startsNewPress, detector.registerPress(at: Float(event.timestamp)) {
+                        focusSearchField()
+                    }
                 }
+            case .flagsChanged,
+                .keyDown,
+                .leftMouseDown,
+                .rightMouseDown,
+                .otherMouseDown:
+                detector.cancel()
+            default:
+                break
             }
-        case .flagsChanged, .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown:
-            detector.cancel()
-        default:
-            break
         }
-    }
-#endif
+    #endif
 
     @discardableResult
     func focusSearchField(identifier: String = EditorTopToolbar.searchAccessibilityIdentifier) -> Bool {
@@ -118,8 +122,10 @@ final class EditorSearchShortcutMonitor {
     ) -> Bool {
         let selector = UINodeSelector.accessibilityIdentifier(identifier)
         for container in containers {
-            guard let searchNode = try? container.uiNode(matching: selector),
-                  let focusableNode = searchNode.firstFocusableDescendant else {
+            guard
+                let searchNode = try? container.uiNode(matching: selector),
+                let focusableNode = searchNode.firstFocusableDescendant
+            else {
                 continue
             }
 
@@ -135,7 +141,7 @@ final class EditorSearchShortcutMonitor {
     }
 }
 
-private extension UINodeSnapshot {
+extension UINodeSnapshot {
     var firstFocusableDescendant: UINodeSnapshot? {
         if canBecomeFocused {
             return self

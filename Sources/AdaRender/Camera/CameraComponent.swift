@@ -18,12 +18,12 @@ public enum WindowRef: Codable, Sendable, Hashable {
     case windowId(WindowID)
 }
 
-public extension WindowRef {
-    func getWindowId(from primary: PrimaryWindowId) -> WindowID {
+extension WindowRef {
+    public func getWindowId(from primary: PrimaryWindowId) -> WindowID {
         switch self {
         case .primary:
             primary.windowId
-        case .windowId(let windowID):
+        case let .windowId(windowID):
             windowID
         }
     }
@@ -57,10 +57,10 @@ public struct CameraClearFlags: OptionSet, Codable, Sendable {
     }
 
     /// The solid flag.
-    public static let solid = CameraClearFlags(rawValue: 1 << 0)
+    public static let solid = Self(rawValue: 1 << 0)
 
     /// The depth buffer flag.
-    public static let depthBuffer = CameraClearFlags(rawValue: 1 << 1)
+    public static let depthBuffer = Self(rawValue: 1 << 1)
 
     /// The nothing flag.
     public static let nothing: CameraClearFlags = []
@@ -71,10 +71,8 @@ public struct CameraClearFlags: OptionSet, Codable, Sendable {
 /// Each camera has frustum, projection data.
 @Component
 public struct Camera: Sendable {
-
     /// Render target where camera will render.
     public enum RenderTarget: Codable, Sendable {
-
         /// Render camera to window.
         case window(WindowRef)
 
@@ -140,10 +138,10 @@ public struct Camera: Sendable {
     }
 }
 
-public extension Camera {
-    func targetWindowId(from primary: PrimaryWindowId) -> WindowID? {
+extension Camera {
+    public func targetWindowId(from primary: PrimaryWindowId) -> WindowID? {
         switch renderTarget {
-        case .window(let windowRef):
+        case let .window(windowRef):
             return windowRef.getWindowId(from: primary)
         case .texture:
             return nil
@@ -151,19 +149,19 @@ public extension Camera {
     }
 
     /// Normalized Device Coordinate to world point
-    func ndcToWorld(cameraGlobalTransform: Transform3D, ndc: Vector3) -> Vector3 {
+    public func ndcToWorld(cameraGlobalTransform: Transform3D, ndc: Vector3) -> Vector3 {
         let matrix = cameraGlobalTransform * self.computedData.projectionMatrix.inverse
         return (matrix * Vector4(ndc, 1)).xyz
     }
 
     /// Return point from world to Normalized Device Coordinate.
-    func worldToNdc(cameraGlobalTransform: Transform3D, worldPosition: Vector3) -> Vector3 {
+    public func worldToNdc(cameraGlobalTransform: Transform3D, worldPosition: Vector3) -> Vector3 {
         let matrix = self.computedData.projectionMatrix * cameraGlobalTransform.inverse
         return (matrix * Vector4(worldPosition, 1)).xyz
     }
 
     /// Return point from viewport to 2D world.
-    func viewportToWorld2D(cameraGlobalTransform: Transform3D, viewportPosition: Vector2) -> Vector2? {
+    public func viewportToWorld2D(cameraGlobalTransform: Transform3D, viewportPosition: Vector2) -> Vector2? {
         let ndc = viewportPosition * 2 / logicalViewport.rect.size.asVector2 - Vector2.one
         let worldPlane = self.ndcToWorld(cameraGlobalTransform: cameraGlobalTransform, ndc: Vector3(ndc, 1))
 
@@ -171,7 +169,7 @@ public extension Camera {
     }
 
     /// Return ray from viewport to world. More prefer for 3D space.
-    func viewportToWorld(cameraGlobalTransform: Transform3D, point: Vector2) -> Ray? {
+    public func viewportToWorld(cameraGlobalTransform: Transform3D, point: Vector2) -> Ray? {
         let ndc = point * 2 / logicalViewport.rect.size.asVector2 - Vector2.one
         let ndcToWorld = cameraGlobalTransform * self.computedData.projectionMatrix.inverse
 
@@ -202,7 +200,7 @@ public extension Camera {
     }
 
     /// Return point from world to viewport.
-    func worldToViewport(cameraGlobalTransform: Transform3D, worldPosition: Vector3) -> Vector2? {
+    public func worldToViewport(cameraGlobalTransform: Transform3D, worldPosition: Vector3) -> Vector2? {
         let size = logicalViewport.rect.size.asVector2
         let ndcSpace = self.worldToNdc(cameraGlobalTransform: cameraGlobalTransform, worldPosition: worldPosition)
 
@@ -212,7 +210,6 @@ public extension Camera {
 
         return ndcSpace.xy + Vector2.one / 2.0 * size
     }
-
 }
 
 extension Camera {

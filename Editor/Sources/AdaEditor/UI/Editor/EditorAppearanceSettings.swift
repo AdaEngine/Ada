@@ -88,7 +88,9 @@ struct EditorAgentGlowSettings: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Accent color").font(.system(size: 13))
                 EditorUIColorField(value: accentHex, supportsAlpha: false) { value in
-                    if let color = EditorUIColorField.color(value) { settings.setAccentColor(color) }
+                    if let color = EditorUIColorField.color(value) {
+                        settings.setAccentColor(color)
+                    }
                 }
                 .accessibilityIdentifier("AdaEditor.Settings.AgentGlow.Accent")
                 Button("Use theme color") { settings.useThemeAccent() }
@@ -119,9 +121,17 @@ struct EditorAgentGlowSettings: View {
             Button("−") { onChange(value - step) }
                 .frame(width: 28, height: 28)
                 .accessibilityIdentifier("AdaEditor.Settings.AgentGlow.\(id).Decrease")
-            TextField("0", text: Binding(get: { String(format: "%.0f", value) }, set: { text in
-                if let number = Double(text.replacingOccurrences(of: ",", with: ".")), number.isFinite { onChange(number) }
-            }))
+            TextField(
+                "0",
+                text: Binding(
+                    get: { String(format: "%.0f", value) },
+                    set: { text in
+                        if let number = Double(text.replacingOccurrences(of: ",", with: ".")), number.isFinite {
+                            onChange(number)
+                        }
+                    }
+                )
+            )
             .textFieldStyle(PlainTextFieldStyle())
             .font(.system(size: 12))
             .foregroundColor(theme.editorColors.text)

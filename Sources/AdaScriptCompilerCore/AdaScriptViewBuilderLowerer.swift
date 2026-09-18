@@ -29,8 +29,8 @@ public struct AdaScriptViewBuilderError: Error, Equatable, Sendable, CustomStrin
     }
 }
 
-private extension AdaScriptViewBuilderLowerer {
-    static func replacements(
+extension AdaScriptViewBuilderLowerer {
+    private static func replacements(
         tokens: [Token],
         characters: [Character],
         path: String
@@ -49,18 +49,20 @@ private extension AdaScriptViewBuilderLowerer {
                 index += 2
                 continue
             }
-            guard let classOpen = tokens[declarationIndex...].firstIndex(where: { $0.text == "{" }),
-                  let classClose = matchingIndex(openingIndex: classOpen, opening: "{", closing: "}", tokens: tokens) else {
+            guard
+                let classOpen = tokens[declarationIndex...].firstIndex(where: { $0.text == "{" }),
+                let classClose = matchingIndex(openingIndex: classOpen, opening: "{", closing: "}", tokens: tokens)
+            else {
                 throw AdaScriptViewBuilderError(path: path, line: tokens[declarationIndex].line, message: "unterminated @view class")
             }
 
             if let bodyRange = try bodyRange(in: classOpen..<classClose, tokens: tokens, path: path),
-               let loweredBody = try lowerBody(
-                   range: bodyRange,
-                   tokens: tokens,
-                   characters: characters,
-                   path: path
-               ) {
+                let loweredBody = try lowerBody(
+                    range: bodyRange,
+                    tokens: tokens,
+                    characters: characters,
+                    path: path
+                ) {
                 replacements.append(loweredBody.replacement)
                 if !loweredBody.generatedMembers.isEmpty {
                     replacements.append(
@@ -77,7 +79,7 @@ private extension AdaScriptViewBuilderLowerer {
         return replacements
     }
 
-    static func declarationIndex(afterViewAt viewIndex: Int, tokens: [Token], path: String) throws -> Int {
+    private static func declarationIndex(afterViewAt viewIndex: Int, tokens: [Token], path: String) throws -> Int {
         var declarationIndex = viewIndex + 2
         if tokens.indices.contains(declarationIndex), tokens[declarationIndex].text == "(" {
             declarationIndex = try indexAfterGroup(
@@ -110,18 +112,18 @@ private extension AdaScriptViewBuilderLowerer {
         return declarationIndex
     }
 
-    struct Replacement {
+    private struct Replacement {
         let endOffset: Int
         let source: String
         let startOffset: Int
     }
 
-    struct LoweredViewBody {
+    private struct LoweredViewBody {
         let generatedMembers: [String]
         let replacement: Replacement
     }
 
-    static func bodyRange(
+    private static func bodyRange(
         in classRange: Range<Int>,
         tokens: [Token],
         path: String
@@ -134,18 +136,20 @@ private extension AdaScriptViewBuilderLowerer {
             } else if tokens[index].text == "}" {
                 depth -= 1
             } else if depth == 1,
-                      tokens[index].text == "func",
-                      tokens.indices.contains(index + 1),
-                      tokens[index + 1].text == "body" {
-                guard let parametersOpen = tokens[(index + 2)..<classRange.upperBound].firstIndex(where: { $0.text == "(" }),
-                      let parametersClose = matchingIndex(
-                          openingIndex: parametersOpen,
-                          opening: "(",
-                          closing: ")",
-                          tokens: tokens
-                      ),
-                      let bodyOpen = tokens[(parametersClose + 1)..<classRange.upperBound].firstIndex(where: { $0.text == "{" }),
-                      let bodyClose = matchingIndex(openingIndex: bodyOpen, opening: "{", closing: "}", tokens: tokens) else {
+                tokens[index].text == "func",
+                tokens.indices.contains(index + 1),
+                tokens[index + 1].text == "body" {
+                guard
+                    let parametersOpen = tokens[(index + 2)..<classRange.upperBound].firstIndex(where: { $0.text == "(" }),
+                    let parametersClose = matchingIndex(
+                        openingIndex: parametersOpen,
+                        opening: "(",
+                        closing: ")",
+                        tokens: tokens
+                    ),
+                    let bodyOpen = tokens[(parametersClose + 1)..<classRange.upperBound].firstIndex(where: { $0.text == "{" }),
+                    let bodyClose = matchingIndex(openingIndex: bodyOpen, opening: "{", closing: "}", tokens: tokens)
+                else {
                     throw AdaScriptViewBuilderError(path: path, line: tokens[index].line, message: "unterminated body()")
                 }
                 return bodyOpen..<bodyClose
@@ -155,7 +159,7 @@ private extension AdaScriptViewBuilderLowerer {
         return nil
     }
 
-    static func lowerBody(
+    private static func lowerBody(
         range: Range<Int>,
         tokens: [Token],
         characters: [Character],
@@ -191,19 +195,21 @@ private extension AdaScriptViewBuilderLowerer {
         )
     }
 
-    static func indexAfterGroup(
+    private static func indexAfterGroup(
         openingIndex: Int,
         opening: String,
         closing: String,
         tokens: [Token],
         path: String
     ) throws -> Int {
-        guard let closingIndex = matchingIndex(
-            openingIndex: openingIndex,
-            opening: opening,
-            closing: closing,
-            tokens: tokens
-        ) else {
+        guard
+            let closingIndex = matchingIndex(
+                openingIndex: openingIndex,
+                opening: opening,
+                closing: closing,
+                tokens: tokens
+            )
+        else {
             throw AdaScriptViewBuilderError(path: path, line: tokens[openingIndex].line, message: "unterminated '\(opening)'")
         }
         return closingIndex + 1
@@ -277,7 +283,9 @@ private struct ViewExpressionParser {
         case "EmptyView":
             try requireNoArguments(arguments, name: name, line: line)
             return "adaUIBuilder.empty()"
-        case "HStack", "VStack", "ZStack":
+        case "HStack",
+            "VStack",
+            "ZStack":
             return try stackExpression(name: name, arguments: arguments, line: line)
         case "Spacer":
             return try spacerExpression(arguments: arguments, line: line)
@@ -289,7 +297,9 @@ private struct ViewExpressionParser {
             }
             var expression = "adaUIBuilder.nativeView(\(identifier.source))"
             for argument in arguments.dropFirst() {
-                guard let label = argument.label else { throw error("NativeView arguments must be named") }
+                guard let label = argument.label else {
+                    throw error("NativeView arguments must be named")
+                }
                 expression += ".argument(\"\(label)\", \(argument.source))"
             }
             if index < endIndex, tokens[index].text == "{" {
@@ -309,23 +319,54 @@ private struct ViewExpressionParser {
             guard index < endIndex, tokens[index].kind == .identifier else {
                 throw error("expected modifier name after '.'")
             }
+            let modifierName = tokens[index].text
+            let modifierLine = tokens[index].line
             index += 1
             guard index < endIndex, tokens[index].text == "(" else {
                 throw error("view modifiers must be called with parentheses")
             }
-            guard let modifierEndIndex = AdaScriptViewBuilderLowerer.matchingIndex(
-                openingIndex: index,
-                opening: "(",
-                closing: ")",
-                tokens: tokens
-            ) else {
+            guard
+                let modifierEndIndex = AdaScriptViewBuilderLowerer.matchingIndex(
+                    openingIndex: index,
+                    opening: "(",
+                    closing: ")",
+                    tokens: tokens
+                )
+            else {
                 throw error("unterminated view modifier")
             }
+            let arguments = try parseArguments()
+            try validateModifier(modifierName, arguments: arguments, line: modifierLine)
             let modifierEnd = tokens[modifierEndIndex].endOffset
             expression += String(characters[modifierStart..<modifierEnd])
-            index = modifierEndIndex + 1
         }
         return expression
+    }
+
+    private func validateModifier(_ name: String, arguments: [Argument], line: Int) throws {
+        let expectedCount: Int?
+        switch name {
+        case "accessibilityIdentifier",
+            "background",
+            "fontSize",
+            "foregroundColor",
+            "opacity",
+            "padding":
+            expectedCount = 1
+        case "frame":
+            expectedCount = 2
+        default:
+            expectedCount = nil
+        }
+        guard let expectedCount, arguments.count != expectedCount else {
+            return
+        }
+        let noun = expectedCount == 1 ? "argument" : "arguments"
+        throw AdaScriptViewBuilderError(
+            path: path,
+            line: line,
+            message: "\(name) requires \(expectedCount) \(noun)"
+        )
     }
 
     private mutating func buttonExpression(arguments: [Argument], line: Int) throws -> String {
@@ -377,12 +418,14 @@ private struct ViewExpressionParser {
             return []
         }
         let openingIndex = index
-        guard let closingIndex = AdaScriptViewBuilderLowerer.matchingIndex(
-            openingIndex: openingIndex,
-            opening: "(",
-            closing: ")",
-            tokens: tokens
-        ), closingIndex <= endIndex else {
+        guard
+            let closingIndex = AdaScriptViewBuilderLowerer.matchingIndex(
+                openingIndex: openingIndex,
+                opening: "(",
+                closing: ")",
+                tokens: tokens
+            ), closingIndex <= endIndex
+        else {
             throw error("unterminated argument list")
         }
         index += 1
@@ -430,12 +473,14 @@ private struct ViewExpressionParser {
             throw AdaScriptViewBuilderError(path: path, line: line, message: "Button requires an action block")
         }
         let openingIndex = index
-        guard let closingIndex = AdaScriptViewBuilderLowerer.matchingIndex(
-            openingIndex: openingIndex,
-            opening: "{",
-            closing: "}",
-            tokens: tokens
-        ), closingIndex < endIndex else {
+        guard
+            let closingIndex = AdaScriptViewBuilderLowerer.matchingIndex(
+                openingIndex: openingIndex,
+                opening: "{",
+                closing: "}",
+                tokens: tokens
+            ), closingIndex < endIndex
+        else {
             throw AdaScriptViewBuilderError(path: path, line: line, message: "unterminated Button action")
         }
         let actionName = "__ada_view_action_\(generatedMembers.count)"

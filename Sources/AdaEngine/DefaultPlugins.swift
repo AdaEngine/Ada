@@ -74,7 +74,7 @@ public struct DefaultPlugins: Plugin {
     /// Disable a plugin.
     /// - Parameter plugin: The plugin to disable.
     /// - Returns: A new instance of `DefaultPlugins` with the plugin disabled.
-    public func disable<T: Plugin>(_ plugin: T.Type) -> Self {
+    public func disable<T: Plugin>(_: T.Type) -> Self {
         var newValue = self
         newValue.plugins[String(reflecting: T.self)] = nil
         return newValue

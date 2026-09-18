@@ -6,12 +6,43 @@ struct EditorModifierCatalogEntry: Identifiable {
 
     var category: String {
         switch id {
-        case "padding", "frame", "flexibleFrame", "offset", "fixedSize", "layoutPriority", "aspectRatio", "ignoresSafeArea": "Layout"
-        case "background", "foregroundColor", "border", "opacity", "mask", "overlay", "glassEffect", "drawingGroup", "zIndex", "colorScheme": "Appearance"
-        case "fontSize", "lineLimit", "multilineTextAlignment": "Text"
-        case "disabled", "allowsHitTesting", "buttonStyle", "textFieldStyle": "Controls"
-        case "onAppear", "onDisappear", "onTap", "onChange": "Events"
-        case "navigationTitle", "navigationDestination": "Navigation"
+        case "padding",
+            "frame",
+            "flexibleFrame",
+            "offset",
+            "fixedSize",
+            "layoutPriority",
+            "aspectRatio",
+            "ignoresSafeArea":
+            "Layout"
+        case "background",
+            "foregroundColor",
+            "border",
+            "opacity",
+            "mask",
+            "overlay",
+            "glassEffect",
+            "drawingGroup",
+            "zIndex",
+            "colorScheme":
+            "Appearance"
+        case "fontSize",
+            "lineLimit",
+            "multilineTextAlignment":
+            "Text"
+        case "disabled",
+            "allowsHitTesting",
+            "buttonStyle",
+            "textFieldStyle":
+            "Controls"
+        case "onAppear",
+            "onDisappear",
+            "onTap",
+            "onChange":
+            "Events"
+        case "navigationTitle",
+            "navigationDestination":
+            "Navigation"
         case "accessibilityIdentifier": "Accessibility"
         default: "Custom"
         }

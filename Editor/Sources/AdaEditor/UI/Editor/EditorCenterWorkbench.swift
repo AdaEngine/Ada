@@ -25,14 +25,15 @@ struct EditorCenterWorkbench: View {
     let onCopyDocumentPath: ((EditorWorkbenchDocument, Bool) -> Void)?
     let onSelectPreview: ((EditorPreviewDeclaration) -> Void)?
     let onRebuildPreview: (() -> Void)?
+    let onHidePreview: (() -> Void)?
     let onShowPreviewBuildOutput: (() -> Void)?
-    var debugger: EditorDebugger? = nil
-    
+    var debugger: EditorDebugger?
+
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
 
     @State private var previewResizeState = EditorPreviewResizeState()
-    
+
     var body: some View {
         VStack(spacing: 0) {
             editorTabs
@@ -69,7 +70,7 @@ extension EditorCenterWorkbench {
         }
         .background(theme.editorColors.surfaceElevated)
     }
-    
+
     private func editorTab(_ document: EditorWorkbenchDocument, active: Bool) -> some View {
         HStack(spacing: 0) {
             Button(action: { onSelectDocument?(document.id) ?? viewModel.selectDocument(id: document.id) }) {
@@ -165,11 +166,12 @@ extension EditorCenterWorkbench {
             return "UI"
         case .scene:
             return "#"
-        case .text(let document):
+        case let .text(document):
             return document.language == .swift ? "<>" : "{}"
-        case .asset(let document):
+        case let .asset(document):
             switch document.kind {
-            case .atlas, .tileSource:
+            case .atlas,
+                .tileSource:
                 return "▦"
             case .image:
                 return "□"
@@ -195,9 +197,10 @@ extension EditorCenterWorkbench {
             return theme.editorColors.purple
         case .text:
             return theme.editorColors.blue
-        case .asset(let document):
+        case let .asset(document):
             switch document.kind {
-            case .atlas, .tileSource:
+            case .atlas,
+                .tileSource:
                 return theme.editorColors.blue
             case .image:
                 return theme.editorColors.blue
@@ -210,20 +213,20 @@ extension EditorCenterWorkbench {
     }
 
     @ViewBuilder
-    private func activeDocumentView(metrics: AdaEngineStyleLayoutMetrics) -> some View {
+    private func activeDocumentView(metrics _: AdaEngineStyleLayoutMetrics) -> some View {
         switch viewModel.activeDocument {
-        case .git(let document):
+        case let .git(document):
             EditorGitDiffView(document: document, workbench: viewModel)
-        case .scene(let document):
+        case let .scene(document):
             sceneDocumentEditor(document: document)
-        case .ui(let document):
+        case let .ui(document):
             EditorUISceneEditor(
                 model: viewModel.uiSceneModel(for: document, resourceRoot: sceneResourceRootURL, bindingCatalog: inspectorViewModel.scriptableObjectCatalog),
                 colorPalette: viewModel.codeColorPalette
             )
-        case .text(let document):
+        case let .text(document):
             textDocumentEditor(document: document)
-        case .asset(let document):
+        case let .asset(document):
             assetPreview(document: document)
         case nil:
             emptyWorkbench
@@ -240,7 +243,8 @@ extension EditorCenterWorkbench {
             EditorTextureAtlasAssetEditor(document: document)
         case .image:
             EditorImageAssetPreview(document: document)
-        case .audio, .generic:
+        case .audio,
+            .generic:
             assetMetadataPreview(document: document)
         }
     }
@@ -327,6 +331,9 @@ extension EditorCenterWorkbench {
                         onRebuild: {
                             onRebuildPreview?()
                         },
+                        onHide: {
+                            onHidePreview?()
+                        },
                         onShowBuildOutput: {
                             onShowPreviewBuildOutput?()
                         }
@@ -396,8 +403,9 @@ extension EditorCenterWorkbench {
     }
 
     private func sceneDocumentEditor(document: EditorSceneDocument) -> some View {
-        EditorSceneViewportView(
+        EditorSceneDocumentEditor(
             document: document,
+            workbench: viewModel,
             resourceRootURL: sceneResourceRootURL,
             uiCatalog: viewModel.uiCatalog,
             inspectorViewModel: inspectorViewModel,
@@ -405,10 +413,7 @@ extension EditorCenterWorkbench {
             playRuntime: scenePlayRuntime,
             onEntitySelected: onSceneEntitySelected,
             onPlay: onPlayScene,
-            onStop: onStopScene,
-            onDocumentChanged: { updatedDocument in
-                viewModel.replaceSceneDocument(updatedDocument)
-            }
+            onStop: onStopScene
         )
         .accessibilityIdentifier("AdaEditor.SceneDocument.\(document.title)")
     }
@@ -562,7 +567,7 @@ extension EditorCenterWorkbench {
             Spacer()
         }
     }
-    
+
     private func aiFlightBox(metrics: AdaEngineStyleLayoutMetrics) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if metrics.showsAIHeader {
@@ -584,7 +589,7 @@ extension EditorCenterWorkbench {
                 .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.background))
                 .textFieldStyle(PlainTextFieldStyle())
                 .accessibilityIdentifier("AdaEditor.AIFlightBox.Input")
-            
+
             if metrics.showsAIChips {
                 HStack(spacing: 8) {
                     ForEach(metrics.visibleAIChips, id: \.self) { chip in
@@ -605,7 +610,7 @@ extension EditorCenterWorkbench {
         .frame(maxWidth: 350)
         .accessibilityIdentifier("AdaEditor.AIFlightBox")
     }
-    
+
     private func aiChip(_ title: String) -> some View {
         Text(title)
             .font(.system(size: 10))
@@ -625,6 +630,7 @@ private struct EditorPreviewPanel: View {
     let retainedPreviewView: UIView?
     let onSelectPreview: (EditorPreviewDeclaration) -> Void
     let onRebuild: () -> Void
+    let onHide: () -> Void
     let onShowBuildOutput: () -> Void
 
     @Environment(\.theme) private var theme
@@ -656,6 +662,15 @@ private struct EditorPreviewPanel: View {
                     .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surfaceElevated))
             }
             .buttonStyle(DefaultButtonStyle())
+            Button(action: onHide) {
+                Text("×")
+                    .font(.system(size: 14))
+                    .foregroundColor(theme.editorColors.muted)
+                    .frame(width: 22, height: 22)
+                    .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surfaceElevated))
+            }
+            .buttonStyle(DefaultButtonStyle())
+            .accessibilityIdentifier("AdaEditor.PreviewPanel.Close")
         }
         .padding(.horizontal, 12)
         .background(theme.editorColors.surface)
@@ -689,12 +704,12 @@ private struct EditorPreviewPanel: View {
         switch status {
         case .hidden:
             EmptyView()
-        case .unavailable(let message):
+        case let .unavailable(message):
             messageView(title: "Preview unavailable", message: message)
-        case .available(let declarations):
+        case let .available(declarations):
             let selected = declarations.first { $0.id == selectedPreviewID } ?? declarations.first
             messageView(title: selected?.title ?? "Preview", message: "Build the preview to render it.")
-        case .building(let declaration, let message):
+        case let .building(declaration, message):
             if let retainedPreviewView {
                 retainedPreviewContent(retainedPreviewView) {
                     statusBanner(title: declaration.title, message: message, showsBuildOutputButton: false)
@@ -702,10 +717,10 @@ private struct EditorPreviewPanel: View {
             } else {
                 progressView(title: declaration.title, message: message)
             }
-        case .loaded(_, let view):
+        case let .loaded(_, view):
             EditorPreviewViewport(previewView: view, settings: previewControls)
                 .padding(12)
-        case .failed(let declaration, let message, let hasBuildOutput):
+        case let .failed(declaration, message, hasBuildOutput):
             if let retainedPreviewView {
                 retainedPreviewContent(retainedPreviewView) {
                     statusBanner(
@@ -722,13 +737,15 @@ private struct EditorPreviewPanel: View {
 
     private var declarations: [EditorPreviewDeclaration] {
         switch status {
-        case .available(let declarations):
+        case let .available(declarations):
             return declarations
-        case .building(let declaration, _), .loaded(let declaration, _):
+        case let .building(declaration, _),
+            let .loaded(declaration, _):
             return [declaration]
-        case .failed(let declaration, _, _):
+        case let .failed(declaration, _, _):
             return declaration.map { [$0] } ?? []
-        case .hidden, .unavailable:
+        case .hidden,
+            .unavailable:
             return []
         }
     }

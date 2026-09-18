@@ -15,9 +15,9 @@ enum EditorSceneYAMLDocument {
                 return "Scene YAML root is not a mapping"
             case .missingEntities:
                 return "Scene YAML does not contain an entities array"
-            case .missingEntity(let entityID):
+            case let .missingEntity(entityID):
                 return "Scene YAML does not contain entity \(entityID)"
-            case .invalidComponents(let entityID):
+            case let .invalidComponents(entityID):
                 return "Scene entity \(entityID) has invalid components"
             }
         }
@@ -101,7 +101,7 @@ enum EditorSceneYAMLDocument {
         [
             "position": [transform.position.x, transform.position.y, transform.position.z],
             "rotation": [transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w],
-            "scale": [transform.scale.x, transform.scale.y, transform.scale.z]
+            "scale": [transform.scale.x, transform.scale.y, transform.scale.z],
         ]
     }
 
@@ -110,14 +110,14 @@ enum EditorSceneYAMLDocument {
             "name": gizmo.name,
             "kind": gizmo.kind.rawValue,
             "isEnabled": gizmo.isEnabled,
-            "size": gizmo.size
+            "size": gizmo.size,
         ]
         if let color = gizmo.color {
             payload["color"] = [
                 "red": color.red,
                 "green": color.green,
                 "blue": color.blue,
-                "alpha": color.alpha
+                "alpha": color.alpha,
             ]
         }
         return payload

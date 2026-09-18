@@ -28,7 +28,11 @@ struct EditorAddModifierDialog: View {
 
     private var targetName: String {
         var name = "selected layer"
-        model.document.root.visit { if $0.id == nodeID { name = $0.type } }
+        model.document.root.visit {
+            if $0.id == nodeID {
+                name = $0.type
+            }
+        }
         return name
     }
 
@@ -74,7 +78,9 @@ struct EditorAddModifierDialog: View {
                     .lineLimit(2)
             }
             Spacer()
-            Button { dismiss() } label: {
+            Button {
+                dismiss()
+            } label: {
                 symbol("\u{E5CD}", size: 20)
                     .foregroundColor(theme.editorColors.muted)
                     .frame(width: 34, height: 34)
@@ -96,7 +102,9 @@ struct EditorAddModifierDialog: View {
                 .textFieldStyle(PlainTextFieldStyle())
                 .accessibilityIdentifier("AdaEditor.AddModifier.Search")
             if !search.isEmpty {
-                Button { search = "" } label: {
+                Button {
+                    search = ""
+                } label: {
                     symbol("\u{E5CD}", size: 16)
                         .foregroundColor(theme.editorColors.muted)
                         .frame(width: 26, height: 26)

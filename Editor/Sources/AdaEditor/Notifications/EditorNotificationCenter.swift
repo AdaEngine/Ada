@@ -136,7 +136,9 @@ final class EditorNotificationCenter {
             if paused.contains(item.id) || !panelOwners.isEmpty {
                 deadlines[item.id] = now.addingTimeInterval(Self.toastLifetime)
             } else if let deadline = deadlines[item.id] {
-                if deadline <= now { hideToast(item.id) }
+                if deadline <= now {
+                    hideToast(item.id)
+                }
             } else {
                 deadlines[item.id] = now.addingTimeInterval(Self.toastLifetime)
             }
@@ -144,11 +146,19 @@ final class EditorNotificationCenter {
     }
 
     func setHovered(_ id: String, _ value: Bool) {
-        if value { paused.insert(id) } else { paused.remove(id) }
+        if value {
+            paused.insert(id)
+        } else {
+            paused.remove(id)
+        }
     }
 
     func setPanelVisible(_ visible: Bool, owner: UUID) {
-        if visible { panelOwners.insert(owner) } else { panelOwners.remove(owner) }
+        if visible {
+            panelOwners.insert(owner)
+        } else {
+            panelOwners.remove(owner)
+        }
     }
 
     func hideToast(_ id: String) {
@@ -163,8 +173,12 @@ final class EditorNotificationCenter {
     }
 
     func markRead(_ id: String) {
-        if !loaded { pendingReadIDs.insert(id) }
-        if let index = notifications.firstIndex(where: { $0.id == id }) { notifications[index].isRead = true }
+        if !loaded {
+            pendingReadIDs.insert(id)
+        }
+        if let index = notifications.firstIndex(where: { $0.id == id }) {
+            notifications[index].isRead = true
+        }
         removeDelivered?([id])
         persist()
     }
@@ -176,7 +190,9 @@ final class EditorNotificationCenter {
     }
 
     func clear() {
-        if !loaded { clearedBeforeLoad = true }
+        if !loaded {
+            clearedBeforeLoad = true
+        }
         removeDelivered?(notifications.map(\.id))
         notifications.removeAll()
         toastIDs.removeAll()
@@ -186,7 +202,9 @@ final class EditorNotificationCenter {
     }
 
     func perform(_ action: EditorNotificationAction, notificationID: String? = nil) {
-        if let notificationID { dismiss(notificationID) }
+        if let notificationID {
+            dismiss(notificationID)
+        }
         onAction?(action)
     }
 

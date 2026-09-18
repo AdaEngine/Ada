@@ -7,7 +7,6 @@
 
 @MainActor
 final class UIFocusManager {
-
     private weak var rootNode: ViewNode?
     private(set) var focusedNode: ViewNode?
 

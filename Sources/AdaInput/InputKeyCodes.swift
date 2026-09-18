@@ -55,7 +55,7 @@ public enum KeyCode: String, Codable, Hashable, CaseIterable, Sendable {
     case num7 = "7"
     case num8 = "8"
     case num9 = "9"
-    
+
     case colon = ":"
     case semicolon = ";"
     case less = "<"
@@ -63,7 +63,7 @@ public enum KeyCode: String, Codable, Hashable, CaseIterable, Sendable {
     case greater = ">"
     case question = "?"
     case at = "@"
-    
+
     case a = "a"
     case b = "b"
     case c = "c"
@@ -142,14 +142,14 @@ extension KeyCode {
 public struct KeyModifier: OptionSet, Hashable, Sendable {
     /// The raw value of the modifier.
     public let rawValue: UInt8
-    
+
     /// Initialize a new modifier key.
     ///
     /// - Parameter rawValue: The raw value of the modifier.
     public init(rawValue: UInt8) {
         self.rawValue = rawValue
     }
-    
+
     /// The caps lock modifier.
     public static let capsLock = KeyModifier(rawValue: 1 << 0)
     /// The shift modifier.
@@ -164,73 +164,73 @@ public struct KeyModifier: OptionSet, Hashable, Sendable {
 
 #if os(macOS)
 
-import AppKit
+    import AppKit
 
-public extension KeyModifier {
-    /// Initialize a new modifier key.
-    ///
-    /// - Parameter modifiers: The modifier flags.
-    init(modifiers: NSEvent.ModifierFlags) {
-        var flags: KeyModifier = []
+    extension KeyModifier {
+        /// Initialize a new modifier key.
+        ///
+        /// - Parameter modifiers: The modifier flags.
+        public init(modifiers: NSEvent.ModifierFlags) {
+            var flags: KeyModifier = []
 
-        if modifiers.contains(.capsLock) {
-            flags.insert(.capsLock)
+            if modifiers.contains(.capsLock) {
+                flags.insert(.capsLock)
+            }
+
+            if modifiers.contains(.command) {
+                flags.insert(.main)
+            }
+
+            if modifiers.contains(.control) {
+                flags.insert(.control)
+            }
+
+            if modifiers.contains(.option) {
+                flags.insert(.alt)
+            }
+
+            if modifiers.contains(.shift) {
+                flags.insert(.shift)
+            }
+
+            self.init(rawValue: flags.rawValue)
         }
-
-        if modifiers.contains(.command) {
-            flags.insert(.main)
-        }
-
-        if modifiers.contains(.control) {
-            flags.insert(.control)
-        }
-
-        if modifiers.contains(.option) {
-            flags.insert(.alt)
-        }
-
-        if modifiers.contains(.shift) {
-            flags.insert(.shift)
-        }
-
-        self.init(rawValue: flags.rawValue)
     }
-}
 
 #elseif os(iOS) || os(tvOS)
 
-import UIKit
+    import UIKit
 
-public extension KeyModifier {
-    /// Initialize a new modifier key from iOS modifier flags.
-    ///
-    /// - Parameter modifiers: The UIKeyModifierFlags from UIKey.
-    init(modifiers: UIKeyModifierFlags) {
-        var flags: KeyModifier = []
+    extension KeyModifier {
+        /// Initialize a new modifier key from iOS modifier flags.
+        ///
+        /// - Parameter modifiers: The UIKeyModifierFlags from UIKey.
+        public init(modifiers: UIKeyModifierFlags) {
+            var flags: KeyModifier = []
 
-        if modifiers.contains(.alphaShift) {
-            flags.insert(.capsLock)
+            if modifiers.contains(.alphaShift) {
+                flags.insert(.capsLock)
+            }
+
+            if modifiers.contains(.command) {
+                flags.insert(.main)
+            }
+
+            if modifiers.contains(.control) {
+                flags.insert(.control)
+            }
+
+            if modifiers.contains(.alternate) {
+                flags.insert(.alt)
+            }
+
+            if modifiers.contains(.shift) {
+                flags.insert(.shift)
+            }
+
+            self.init(rawValue: flags.rawValue)
         }
-
-        if modifiers.contains(.command) {
-            flags.insert(.main)
-        }
-
-        if modifiers.contains(.control) {
-            flags.insert(.control)
-        }
-
-        if modifiers.contains(.alternate) {
-            flags.insert(.alt)
-        }
-
-        if modifiers.contains(.shift) {
-            flags.insert(.shift)
-        }
-
-        self.init(rawValue: flags.rawValue)
     }
-}
 
 #endif
 
@@ -438,7 +438,7 @@ public enum MouseButton: UInt8, Codable, CaseIterable, Hashable, Sendable {
     case left
     case right
     case middle
-    
+
     case scrollWheel
 }
 

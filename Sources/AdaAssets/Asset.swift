@@ -34,7 +34,6 @@ import Foundation
 /// Also, your asset can support ``Codable`` behaviour and for this scenario, you should implement only ``init(from decoder: Decoder)`` and ``func encode(to encoder: Encoder)`` methods.
 /// Meta and other information will be available from userInfo. Use `Decoder.assetsDecodingContext`, `Decoder.assetMeta` and `Encoder.assetMeta` properties to get this info.
 public protocol Asset: Sendable {
-    
     /// When asset load from the disk, this method will be called.
     ///
     /// - Parameter data: Asset's data.
@@ -53,21 +52,21 @@ public protocol Asset: Sendable {
     var assetMetaInfo: AssetMetaInfo? { get set }
 }
 
-public extension Asset {
+extension Asset {
     /// If resource was initiated from resource, than property will return path to that file relative source dir.
     /// - Warning: Do not override stored value.
-    var assetPath: String {
+    public var assetPath: String {
         self.assetMetaInfo?.assetPath ?? ""
     }
 
     /// If asset was initiated from AssetsManager, than property will return name of that file.
     /// - Warning: Do not override stored value.
-    var assetName: String {
+    public var assetName: String {
         self.assetMetaInfo?.assetName ?? ""
     }
-    
+
     /// Return full path to Asset.
-    var assetAbsolutePath: String {
+    public var assetAbsolutePath: String {
         self.assetMetaInfo?.assetAbsolutePath.path() ?? ""
     }
 }
@@ -94,19 +93,19 @@ public struct AssetMetaInfo: Codable, Sendable {
     public var assetAbsolutePath: URL {
         return AssetsManager.getFilePath(from: self).url
     }
-    
+
     enum CodingKeys: String, CodingKey {
         case assetPath = "assetPath"
         case bundlePath = "bundle"
     }
-    
+
     init(assetId: AssetID, assetPath: String, assetName: String, bundlePath: String?) {
         self.assetId = assetId
         self.assetPath = assetPath
         self.assetName = assetName
         self.bundlePath = bundlePath
     }
-    
+
     /// Initialize a new asset meta info from a decoder.
     ///
     /// - Parameter decoder: The decoder to initialize the asset meta info from.
@@ -118,7 +117,7 @@ public struct AssetMetaInfo: Codable, Sendable {
         self.bundlePath = try container.decodeIfPresent(String.self, forKey: .bundlePath)
         self.assetName = URL(string: assetPath)?.lastPathComponent ?? ""
     }
-    
+
     /// Encode the asset meta info to an encoder.
     ///
     /// - Parameter encoder: The encoder to encode the asset meta info to.
@@ -157,7 +156,7 @@ public final class AssetHandle<T: Asset>: Codable, @unchecked Sendable {
         self.assetMeta = asset.assetMetaInfo
         self.storedAssetPath = asset.assetPath
     }
-    
+
     enum CodingKeys: CodingKey {
         case type
         case assetPath
@@ -180,18 +179,19 @@ public final class AssetHandle<T: Asset>: Codable, @unchecked Sendable {
     }
 
     public func load() async throws {
-        let asset = if let assetMeta, let path = assetMeta.bundlePath, let bundle = Bundle(path: path) {
-            try await AssetsManager.load(
-                T.self,
-                at: storedAssetPath,
-                from: bundle
-            )
-        } else {
-            try await AssetsManager.load(
-                T.self,
-                at: storedAssetPath
-            )
-        }
+        let asset =
+            if let assetMeta, let path = assetMeta.bundlePath, let bundle = Bundle(path: path) {
+                try await AssetsManager.load(
+                    T.self,
+                    at: storedAssetPath,
+                    from: bundle
+                )
+            } else {
+                try await AssetsManager.load(
+                    T.self,
+                    at: storedAssetPath
+                )
+            }
         self.asset = asset.asset
     }
 

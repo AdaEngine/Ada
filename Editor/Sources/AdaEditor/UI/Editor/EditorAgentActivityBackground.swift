@@ -4,9 +4,9 @@ import Foundation
 import Math
 
 #if os(macOS)
-import AppKit
+    import AppKit
 #elseif canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 
 struct EditorAgentActivityBackground: UIViewRepresentable {
@@ -18,14 +18,14 @@ struct EditorAgentActivityBackground: UIViewRepresentable {
     var effectRadius: Float = 24
     var effectOpacity: Float = 0.45
 
-    func makeUIView(in context: Context) -> EditorAgentActivityBackgroundView {
+    func makeUIView(in _: Context) -> EditorAgentActivityBackgroundView {
         let view = EditorAgentActivityBackgroundView()
         view.backgroundColor = .clear
         view.isInteractionEnabled = false
         return view
     }
 
-    func updateUIView(_ view: EditorAgentActivityBackgroundView, in context: Context) {
+    func updateUIView(_ view: EditorAgentActivityBackgroundView, in _: Context) {
         view.configure(
             state: state,
             accent: accent,
@@ -37,7 +37,7 @@ struct EditorAgentActivityBackground: UIViewRepresentable {
         )
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, view: EditorAgentActivityBackgroundView, context: Context) -> Size {
+    func sizeThatFits(_ proposal: ProposedViewSize, view _: EditorAgentActivityBackgroundView, context _: Context) -> Size {
         proposal.replacingUnspecifiedDimensions()
     }
 }
@@ -90,7 +90,10 @@ final class EditorAgentActivityBackgroundView: AdaUI.UIView {
             setNeedsDisplay()
         }
         let radius = effectRadius.isFinite ? min(max(effectRadius, 4), 100) : 24
-        if self.effectRadius != radius { self.effectRadius = radius; setNeedsDisplay() }
+        if self.effectRadius != radius {
+            self.effectRadius = radius
+            setNeedsDisplay()
+        }
         if animation.state != state || animation.activityID != activityID {
             lastUpdateUptime = ProcessInfo.processInfo.systemUptime
         }
@@ -107,15 +110,21 @@ final class EditorAgentActivityBackgroundView: AdaUI.UIView {
         lastUpdateUptime = now
         let canDraw = !isHidden && renderWindow?.canDraw != false
         let changed = animation.advance(elapsed, reduceMotion: Self.reduceMotion, wavesEnabled: canDraw && renderWindow?.isActive != false)
-        if changed && canDraw { setNeedsDisplay() }
+        if changed && canDraw {
+            setNeedsDisplay()
+        }
     }
 
     override func draw(in rect: Rect, with context: UIGraphicsContext) {
-        if let id = context.windowId { renderWindow = UIWindowManager.shared.windows[id] }
+        if let id = context.windowId {
+            renderWindow = UIWindowManager.shared.windows[id]
+        }
         guard animation.isVisible, rect.width > 2, rect.height > 2 else {
             return
         }
-        if material == nil { material = CustomMaterial(EditorAgentGlowMaterial()) }
+        if material == nil {
+            material = CustomMaterial(EditorAgentGlowMaterial())
+        }
         guard let material else {
             return
         }
@@ -129,11 +138,11 @@ final class EditorAgentActivityBackgroundView: AdaUI.UIView {
 
     private static var reduceMotion: Bool {
         #if os(macOS)
-        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         #elseif canImport(UIKit)
-        UIAccessibility.isReduceMotionEnabled
+            UIAccessibility.isReduceMotionEnabled
         #else
-        false
+            false
         #endif
     }
 }
@@ -163,7 +172,9 @@ struct EditorAgentGlowAnimation {
         guard newActivity || self.accent != accent || self.enabled != enabled || targetOpacity != opacity else {
             return false
         }
-        if newActivity { completionAge = 0 }
+        if newActivity {
+            completionAge = 0
+        }
         // Start a fade from the intended hue, rather than from transparent black.
         if visibility == 0 {
             color = state.color(accent: accent)
@@ -183,14 +194,19 @@ struct EditorAgentGlowAnimation {
     mutating func advance(_ deltaTime: Float, reduceMotion: Bool, wavesEnabled: Bool = true) -> Bool {
         let elapsed = deltaTime.isFinite ? max(deltaTime, 0) : 0
         let previousAge = completionAge
-        if state == .completed { completionAge = min(Self.successDuration, completionAge + elapsed) }
+        if state == .completed {
+            completionAge = min(Self.successDuration, completionAge + elapsed)
+        }
         let expired = state == .completed && completionAge >= Self.successDuration
         let shouldShow = enabled && state != .idle && !expired && targetOpacity > 0
         // When one long update crosses the deadline, fade only for the time AFTER the three-second hold.
-        let fadeElapsed = expired && previousAge < Self.successDuration
+        let fadeElapsed =
+            expired && previousAge < Self.successDuration
             ? max(0, elapsed - (Self.successDuration - previousAge)) : elapsed
         let previousVisibility = visibility
-        visibility = reduceMotion ? (shouldShow ? 1 : 0)
+        visibility =
+            reduceMotion
+            ? (shouldShow ? 1 : 0)
             : min(max(visibility + (shouldShow ? 1 : -1) * fadeElapsed / Self.fadeDuration, 0), 1)
         var changed = previousVisibility != visibility
         if visibility == 0 && !shouldShow {
@@ -247,7 +263,10 @@ struct EditorAgentGlowMaterial: UIShaderMaterial {
     }
 
     static func configurePipeline(
-        keys: Set<String>, vertex: Shader, fragment: Shader, vertexDescriptor: VertexDescriptor
+        keys _: Set<String>,
+        vertex: Shader,
+        fragment: Shader,
+        vertexDescriptor: VertexDescriptor
     ) throws -> RenderPipelineDescriptor {
         var descriptor = RenderPipelineDescriptor(vertex: vertex)
         descriptor.debugName = "Editor Agent Background"

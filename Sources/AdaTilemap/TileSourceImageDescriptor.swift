@@ -20,8 +20,10 @@ public struct TileSourceImageDescriptor: Codable, Equatable, Sendable {
 
     public func validate() throws {
         let dimensions = [tileSize.width, tileSize.height, margin.width, margin.height, spacing.width, spacing.height]
-        guard !path.isEmpty, tileSize.width > 0, tileSize.height > 0,
-              dimensions.allSatisfy({ (0...1_048_576).contains($0) }) else {
+        guard
+            !path.isEmpty, tileSize.width > 0, tileSize.height > 0,
+            dimensions.allSatisfy({ (0...1_048_576).contains($0) })
+        else {
             throw AssetDecodingError.decodingProblem("Tile source needs an image, positive tile dimensions and nonnegative margin/spacing.")
         }
     }

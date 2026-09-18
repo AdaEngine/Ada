@@ -1,8 +1,9 @@
-#if os(macOS)
-import CryptoKit
-#endif
 import Foundation
 import Yams
+
+#if os(macOS)
+    import CryptoKit
+#endif
 
 enum EditorAgentRole: String, Codable, Equatable, Sendable {
     case user
@@ -71,9 +72,11 @@ struct EditorAgentSceneContext: Codable, Equatable, Sendable {
     }
 
     init?(document: EditorSceneDocument) {
-        guard let model = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content),
-              let selectedEntityID = model.editor?.selectedEntity,
-              let entity = model.entities.first(where: { $0.id == selectedEntityID }) else {
+        guard
+            let model = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content),
+            let selectedEntityID = model.editor?.selectedEntity,
+            let entity = model.entities.first(where: { $0.id == selectedEntityID })
+        else {
             return nil
         }
 
@@ -95,10 +98,10 @@ struct EditorAgentSceneContext: Codable, Equatable, Sendable {
         }
 
         return """
-        entity:
-          id: \(entity.id)
-          name: \(entity.name)
-        """
+            entity:
+              id: \(entity.id)
+              name: \(entity.name)
+            """
     }
 
     private static func shortComponentName(_ componentName: String) -> String {
@@ -193,14 +196,14 @@ enum EditorAgentToolContentKind: String, Codable, Equatable, Sendable {
 
 struct EditorAgentToolContent: Codable, Equatable, Sendable {
     var kind: EditorAgentToolContentKind
-    var text: String? = nil
-    var path: String? = nil
-    var oldText: String? = nil
-    var newText: String? = nil
-    var terminalID: String? = nil
-    var imageData: String? = nil
-    var mimeType: String? = nil
-    var uri: String? = nil
+    var text: String?
+    var path: String?
+    var oldText: String?
+    var newText: String?
+    var terminalID: String?
+    var imageData: String?
+    var mimeType: String?
+    var uri: String?
 }
 
 struct EditorAgentToolLocation: Codable, Equatable, Sendable {
@@ -314,14 +317,14 @@ extension AdaProjectAgentTarget {
     /// Persist a fingerprint so session history never copies connection environment secrets.
     var sessionIdentity: String? {
         #if os(macOS)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        guard let data = try? encoder.encode(self) else {
-            return nil
-        }
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .sortedKeys
+            guard let data = try? encoder.encode(self) else {
+                return nil
+            }
+            return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         #else
-        return nil
+            return nil
         #endif
     }
 }
@@ -418,7 +421,7 @@ struct EditorAgentSessionConfiguration: Codable, Equatable, Sendable {
         commands = try values.decodeIfPresent([EditorAgentCommand].self, forKey: .commands) ?? []
     }
 
-    static let empty = EditorAgentSessionConfiguration(agentName: nil, selectors: [])
+    static let empty = Self(agentName: nil, selectors: [])
 
     func selector(category: EditorAgentConfigurationCategory) -> EditorAgentConfigurationSelector? {
         selectors.first { $0.category == category }
@@ -438,11 +441,11 @@ enum EditorAgentConnectionState: Equatable, Sendable {
             "Disconnected"
         case .connecting:
             "Connecting"
-        case .ready(let agentName):
+        case let .ready(agentName):
             agentName.map { "Ready · \($0)" } ?? "Ready"
         case .running:
             "Running"
-        case .failed(let message):
+        case let .failed(message):
             "Failed: \(message)"
         }
     }

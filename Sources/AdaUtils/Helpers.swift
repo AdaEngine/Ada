@@ -19,9 +19,9 @@ public func require<T>(
     return value
 }
 
-public extension Optional {
+extension Optional {
     @inlinable
-    func unwrap(
+    public func unwrap(
         message: @autoclosure () -> String = String()
     ) -> Wrapped {
         require(self, message: message())
@@ -39,15 +39,15 @@ public func fatalErrorMethodNotImplemented(
 
 /// Call fatal error, if TODO is called in DEBUG build
 public func TODO(
-    _ message: @autoclosure () -> String = "Not implemented", 
+    _ message: @autoclosure () -> String = "Not implemented",
     functionName: String = #function,
     line: Int = #line,
     file: StaticString = #file
 ) -> Never {
     #if DEBUG
-    fatalError("TODO: [\(file):\(functionName):\(line)] \(message()).")
+        fatalError("TODO: [\(file):\(functionName):\(line)] \(message()).")
     #else
-    fatalError("TODO: [\(file):\(functionName):\(line)] \(message()).")
+        fatalError("TODO: [\(file):\(functionName):\(line)] \(message()).")
     #endif
 }
 
@@ -79,9 +79,9 @@ public func TODO(
 ///     fails. The default is the line number where `assert(_:_:file:line:)`
 ///     is called.
 @inlinable public func assert(
-    _ condition: @autoclosure () -> Bool, 
-    _ message: @autoclosure () -> String = "", 
-    file: StaticString = #file, 
+    _ condition: @autoclosure () -> Bool,
+    _ message: @autoclosure () -> String = "",
+    file: StaticString = #file,
     line: UInt = #line
 ) {
     Swift.assert(condition(), message(), file: file, line: line)
@@ -109,8 +109,8 @@ public func TODO(
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `assertionFailure(_:file:line:)` is called.
 @inlinable public func assertionFailure(
-    _ message: @autoclosure () -> String = "", 
-    file: StaticString = #file, 
+    _ message: @autoclosure () -> String = "",
+    file: StaticString = #file,
     line: UInt = #line
 ) {
     Swift.assertionFailure(message(), file: file, line: line)
@@ -130,13 +130,13 @@ public func TODO(
 ///   never called. Failure to satisfy that assumption is a serious
 ///   programming error.
 @inlinable public func preconditionMainThreadOnly(
-    _ message: @autoclosure () -> String = "", 
-    file: StaticString = #file, 
+    _ message: @autoclosure () -> String = "",
+    file: StaticString = #file,
     line: UInt = #line
 ) {
-#if os(WASI)
-    return
-#else
-    assert(Thread.isMainThread, message(), file: file, line: line)
-#endif
+    #if os(WASI)
+        return
+    #else
+        assert(Thread.isMainThread, message(), file: file, line: line)
+    #endif
 }

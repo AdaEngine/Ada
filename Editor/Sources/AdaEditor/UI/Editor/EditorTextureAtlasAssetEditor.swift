@@ -44,11 +44,11 @@ final class EditorTextureAtlasEditorModel {
                 return
             }
             switch result {
-            case .selected(let urls):
+            case let .selected(urls):
                 self.addImages(from: urls)
             case .cancelled:
                 break
-            case .unavailable(let message):
+            case let .unavailable(message):
                 self.statusMessage = message
             }
         }
@@ -132,7 +132,7 @@ final class EditorTextureAtlasEditorModel {
         source.key ?? URL(fileURLWithPath: source.path).deletingPathExtension().lastPathComponent
     }
 
-    private var fileURL: URL? {
+    var fileURL: URL? {
         document.absolutePath.map { URL(fileURLWithPath: $0, isDirectory: false) }
     }
 
@@ -156,10 +156,11 @@ final class EditorTextureAtlasEditorModel {
             if data.isEmpty {
                 descriptor = NamedTextureAtlas.Descriptor(images: [])
             } else {
-                descriptor = try YAMLDecoder(encoding: .utf8).decode(
-                    NamedTextureAtlas.Descriptor.self,
-                    from: data
-                )
+                descriptor = try YAMLDecoder(encoding: .utf8)
+                    .decode(
+                        NamedTextureAtlas.Descriptor.self,
+                        from: data
+                    )
             }
             statusMessage = descriptor.images.isEmpty ? "Add PNG images to build the atlas." : "Loaded \(descriptor.images.count) images"
         } catch {
@@ -231,14 +232,15 @@ final class EditorTextureAtlasEditorModel {
             return sourceURL
         }
 
-        let importDirectory = atlasURL.deletingLastPathComponent().appendingPathComponent(
-            "\(atlasURL.deletingPathExtension().lastPathComponent).images",
-            isDirectory: true
-        )
+        let importDirectory = atlasURL.deletingLastPathComponent()
+            .appendingPathComponent(
+                "\(atlasURL.deletingPathExtension().lastPathComponent).images",
+                isDirectory: true
+            )
         try FileManager.default.createDirectory(at: importDirectory, withIntermediateDirectories: true)
         let existingDestinationURL = importDirectory.appendingPathComponent(sourceURL.lastPathComponent)
         if FileManager.default.fileExists(atPath: existingDestinationURL.path),
-           try Data(contentsOf: existingDestinationURL) == Data(contentsOf: sourceURL) {
+            try Data(contentsOf: existingDestinationURL) == Data(contentsOf: sourceURL) {
             return existingDestinationURL
         }
         let destinationURL = uniqueDestination(for: sourceURL, in: importDirectory)
@@ -296,7 +298,7 @@ final class EditorTextureAtlasEditorModel {
         let targetComponents = targetURL.standardizedFileURL.pathComponents
         var commonCount = 0
         while commonCount < min(baseComponents.count, targetComponents.count),
-              baseComponents[commonCount] == targetComponents[commonCount] {
+            baseComponents[commonCount] == targetComponents[commonCount] {
             commonCount += 1
         }
 
@@ -451,14 +453,17 @@ struct EditorTextureAtlasAssetEditor: View {
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(theme.editorColors.text)
             Spacer()
-            Button(action: addImages, label: {
-                Text("+ Add")
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.editorColors.blue)
-                    .padding(.horizontal, 8)
-                    .frame(height: 24)
-                    .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.blue.opacity(0.12)))
-            })
+            Button(
+                action: addImages,
+                label: {
+                    Text("+ Add")
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.editorColors.blue)
+                        .padding(.horizontal, 8)
+                        .frame(height: 24)
+                        .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.blue.opacity(0.12)))
+                }
+            )
             .buttonStyle(DefaultButtonStyle())
             .disabled(!model.canAddImages)
             .accessibilityIdentifier("AdaEditor.AtlasEditor.AddImages")
@@ -496,12 +501,15 @@ struct EditorTextureAtlasAssetEditor: View {
                     .lineLimit(1)
             }
             Spacer()
-            Button(action: { model.removeImage(at: index) }, label: {
-                Text("×")
-                    .font(.system(size: 13))
-                    .foregroundColor(theme.editorColors.muted)
-                    .frame(width: 22, height: 22)
-            })
+            Button(
+                action: { model.removeImage(at: index) },
+                label: {
+                    Text("×")
+                        .font(.system(size: 13))
+                        .foregroundColor(theme.editorColors.muted)
+                        .frame(width: 22, height: 22)
+                }
+            )
             .buttonStyle(DefaultButtonStyle())
             .accessibilityIdentifier("AdaEditor.AtlasEditor.Remove.\(index)")
         }
@@ -530,8 +538,8 @@ struct EditorTextureAtlasAssetEditor: View {
         Canvas { context, size in
             let tileSize: Float = 24
             context.drawRect(Rect(origin: .zero, size: size), color: theme.editorColors.surface)
-            for row in 0 ..< max(1, Int(ceil(size.height / tileSize))) {
-                for column in 0 ..< max(1, Int(ceil(size.width / tileSize))) where (row + column).isMultiple(of: 2) {
+            for row in 0..<max(1, Int(ceil(size.height / tileSize))) {
+                for column in 0..<max(1, Int(ceil(size.width / tileSize))) where (row + column).isMultiple(of: 2) {
                     context.drawRect(
                         Rect(
                             x: Float(column) * tileSize,

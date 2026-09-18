@@ -5,17 +5,16 @@
 //  Created by vladislav.prusakov on 19.08.2024.
 //
 
-import Foundation
 import AdaECS
-import AdaUtils
 import AdaRender
+import AdaUtils
+import Foundation
 
 /// - Warning: Work in progress component
 @Component
 public struct UIComponent: Sendable, Codable {
     /// Behaviour how to draw view on screen
     public enum Behaviour: String, Codable, Sendable {
-
         /// Always render on top of scene.
         case overlay
 
@@ -33,13 +32,14 @@ public struct UIComponent: Sendable, Codable {
         read: (UIScriptFieldBinding) throws -> UIScriptFieldSnapshot,
         write: (UIScriptFieldBinding, UIValue) throws -> Void
     ) {
-        guard let source else { return }
+        guard let source else {
+            return
+        }
         storage.bindingData()?.synchronize(mappings: source.scriptBindings, read: read, write: write)
     }
 
     @MainActor public var view: UIView {
-        do { return try storage.resolve(runtime: nil) }
-        catch { return UIContainerView(rootView: Text(error.localizedDescription).foregroundColor(.red)) }
+        do { return try storage.resolve(runtime: nil) } catch { return UIContainerView(rootView: Text(error.localizedDescription).foregroundColor(.red)) }
     }
 
     /// Resolves a serialized source using the current world's UI services.
@@ -73,7 +73,6 @@ public struct UIComponent: Sendable, Codable {
     }
 }
 
-
 extension UIComponent {
     public init(source: UIComponentSource, behaviour: Behaviour = .overlay, windowRef: WindowRef = .primary) {
         storage = UIComponentStorage(source: source)
@@ -85,9 +84,11 @@ extension UIComponent {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(source: try container.decode(UIComponentSource.self, forKey: .source),
-                  behaviour: try container.decodeIfPresent(Behaviour.self, forKey: .behaviour) ?? .overlay,
-                  windowRef: try container.decodeIfPresent(WindowRef.self, forKey: .windowRef) ?? .primary)
+        self.init(
+            source: try container.decode(UIComponentSource.self, forKey: .source),
+            behaviour: try container.decodeIfPresent(Behaviour.self, forKey: .behaviour) ?? .overlay,
+            windowRef: try container.decodeIfPresent(WindowRef.self, forKey: .windowRef) ?? .primary
+        )
     }
 
     public func encode(to encoder: any Encoder) throws {

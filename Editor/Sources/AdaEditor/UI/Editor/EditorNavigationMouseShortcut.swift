@@ -1,5 +1,5 @@
 #if canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
 
 @MainActor
@@ -14,9 +14,9 @@ final class EditorNavigationMouseShortcutMonitor {
     private var backAction: (() -> Void)?
     private var forwardAction: (() -> Void)?
 
-#if canImport(AppKit)
-    private var eventMonitor: Any?
-#endif
+    #if canImport(AppKit)
+        private var eventMonitor: Any?
+    #endif
 
     private init() {}
 
@@ -24,31 +24,31 @@ final class EditorNavigationMouseShortcutMonitor {
         backAction = back
         forwardAction = forward
 
-#if canImport(AppKit)
-        guard eventMonitor == nil else {
-            return
-        }
-
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { [weak self] event in
-            let buttonNumber = event.buttonNumber
-            let wasHandled = MainActor.assumeIsolated {
-                self?.handle(buttonNumber: buttonNumber) ?? false
+        #if canImport(AppKit)
+            guard eventMonitor == nil else {
+                return
             }
-            return wasHandled ? nil : event
-        }
-#endif
+
+            eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .otherMouseDown) { [weak self] event in
+                let buttonNumber = event.buttonNumber
+                let wasHandled = MainActor.assumeIsolated {
+                    self?.handle(buttonNumber: buttonNumber) ?? false
+                }
+                return wasHandled ? nil : event
+            }
+        #endif
     }
 
     func stop() {
         backAction = nil
         forwardAction = nil
 
-#if canImport(AppKit)
-        if let eventMonitor {
-            NSEvent.removeMonitor(eventMonitor)
-            self.eventMonitor = nil
-        }
-#endif
+        #if canImport(AppKit)
+            if let eventMonitor {
+                NSEvent.removeMonitor(eventMonitor)
+                self.eventMonitor = nil
+            }
+        #endif
     }
 
     static func direction(forButtonNumber buttonNumber: Int) -> Direction? {

@@ -1,10 +1,11 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorUISceneTests {
@@ -22,8 +23,16 @@ struct EditorUISceneTests {
         let url = root.appendingPathComponent("Inventory.ui")
         let content = EditorNewFileKind.uiScene.initialContent(fileName: "Inventory.ui")
         try content.write(to: url, atomically: true, encoding: .utf8)
-        let document = EditorTextDocument(id: "ui:Inventory.ui", title: "Inventory.ui", relativePath: "Inventory.ui", absolutePath: url.path,
-                                         language: .plainText, content: content, lastSavedContent: content, errorMessage: nil)
+        let document = EditorTextDocument(
+            id: "ui:Inventory.ui",
+            title: "Inventory.ui",
+            relativePath: "Inventory.ui",
+            absolutePath: url.path,
+            language: .plainText,
+            content: content,
+            lastSavedContent: content,
+            errorMessage: nil
+        )
         let workbench = EditorWorkbenchViewModel(openDocuments: [.ui(document)], activeDocumentID: document.id)
         let model = workbench.uiSceneModel(for: document, resourceRoot: root)
         model.add("Grid")
@@ -50,8 +59,10 @@ struct EditorUISceneTests {
         #expect(container.bounds.contains(point: Point(target.absoluteFrame.midX, target.absoluteFrame.midY)))
         let hit = container.uiHitTest(at: Point(target.absoluteFrame.midX, target.absoluteFrame.midY))
         let layoutPath = try container.uiLayoutDiagnostics(matching: .accessibilityIdentifier("AdaEditor.UIScene.Add.Text"), subtreeDepth: 0).parentPath
-        #expect(hit?.path.contains { $0.accessibilityIdentifier == "AdaEditor.UIScene.Add.Text" } == true,
-                "Palette target \(target.absoluteFrame), ancestors \(layoutPath.map { "\($0.nodeType.split(separator: "<").first ?? "") \($0.absoluteFrame)" })")
+        #expect(
+            hit?.path.contains { $0.accessibilityIdentifier == "AdaEditor.UIScene.Add.Text" } == true,
+            "Palette target \(target.absoluteFrame), ancestors \(layoutPath.map { "\($0.nodeType.split(separator: "<").first ?? "") \($0.absoluteFrame)" })"
+        )
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Add.Text"))
         #expect(model.document.root.children.first?.type == "Text")
         #expect(model.preview != nil)

@@ -15,9 +15,8 @@ import Math
 
 /// Plugin for extracting 3D models from scene to RenderWorld.
 public struct Model3DPlugin: Plugin {
-
     public init() {}
-    
+
     public func setup(in app: AppWorlds) {
         Mesh3DComponent.registerComponent()
         DirectionalLightComponent.registerComponent()
@@ -26,11 +25,11 @@ public struct Model3DPlugin: Plugin {
         BillboardComponent.registerComponent()
 
         app.addSystem(BillboardSystem.self, on: .update)
-        
+
         guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else {
             return
         }
-        
+
         renderWorld
             .insertResource(ExtractedLighting3D())
             .insertResource(RenderItems<Opaque3DRenderItem>())
@@ -166,11 +165,11 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
     )
 
     public init() {}
-    
+
     public func render(
         with renderEncoder: RenderCommandEncoder,
         world: World,
-        view: Entity,
+        view _: Entity,
         item: Opaque3DRenderItem
     ) throws {
         let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
@@ -207,7 +206,7 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
                     .init(binding: 8, shaderStages: .fragment, resource: .sampler(metallicRoughnessTexture.sampler)),
                     .init(binding: 9, shaderStages: .fragment, resource: .sampler(normalTexture.sampler)),
                     .init(binding: 12, shaderStages: .fragment, resource: .texture(emissiveTexture)),
-                    .init(binding: 13, shaderStages: .fragment, resource: .sampler(emissiveTexture.sampler))
+                    .init(binding: 13, shaderStages: .fragment, resource: .sampler(emissiveTexture.sampler)),
                 ]
             ),
             index: 0

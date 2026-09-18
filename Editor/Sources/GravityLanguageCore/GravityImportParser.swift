@@ -13,7 +13,7 @@ struct GravityImportParser {
             case let .success(scriptImport, nextIndex):
                 imports.append(scriptImport)
                 index = nextIndex
-            case .failure(let diagnostic):
+            case let .failure(diagnostic):
                 diagnostics.append(diagnostic)
                 index += 1
             }
@@ -39,9 +39,11 @@ struct GravityImportParser {
             return .failure(diagnostic("Expected '}' in import declaration", token: startToken))
         }
         cursor = closingBraceIndex + 1
-        guard tokens.indices.contains(cursor), tokens[cursor].text == "from",
-              tokens.indices.contains(cursor + 1), tokens[cursor + 1].kind == .string,
-              let path = stringLiteralValue(tokens[cursor + 1].text) else {
+        guard
+            tokens.indices.contains(cursor), tokens[cursor].text == "from",
+            tokens.indices.contains(cursor + 1), tokens[cursor + 1].kind == .string,
+            let path = stringLiteralValue(tokens[cursor + 1].text)
+        else {
             return .failure(diagnostic("Expected quoted module path after 'from'", token: startToken))
         }
 
@@ -75,8 +77,10 @@ struct GravityImportParser {
             }
             cursor += 1
         }
-        guard !names.isEmpty, !expectsIdentifier,
-              tokens.indices.contains(cursor), tokens[cursor].text == "}" else {
+        guard
+            !names.isEmpty, !expectsIdentifier,
+            tokens.indices.contains(cursor), tokens[cursor].text == "}"
+        else {
             return .failure
         }
         return .success(names, cursor)

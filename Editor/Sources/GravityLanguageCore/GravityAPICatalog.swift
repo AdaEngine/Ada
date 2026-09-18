@@ -65,14 +65,14 @@ enum GravityAPICatalog {
                 insertText: "spawn(componentNames)",
                 kind: .method,
                 returnType: "Int"
-            )
+            ),
         ],
         "$AdaEntity": [
             GravityAPIMember("id", detail: "Entity identifier", kind: .property, returnType: "Int")
         ],
         "$AdaSystemContext": [
             GravityAPIMember("deltaTime", detail: "Frame delta time in seconds", kind: .property, returnType: "Double"),
-            GravityAPIMember("world", detail: "Scoped AdaECS world access", kind: .property, returnType: "$AdaWorldContext")
+            GravityAPIMember("world", detail: "Scoped AdaECS world access", kind: .property, returnType: "$AdaWorldContext"),
         ],
         "$AdaWorldContext": [
             GravityAPIMember("commands", detail: "Scoped deferred world commands", kind: .property, returnType: "$AdaCommands")
@@ -119,7 +119,7 @@ enum GravityAPICatalog {
                 detail: "subscribe(event, action) — subscribe to a supported editor event",
                 insertText: "subscribe(event: \"\", action: \"\")",
                 kind: .method
-            )
+            ),
         ],
         "View": [
             viewMember("accessibilityIdentifier", detail: "Set an AdaUI accessibility identifier"),
@@ -137,8 +137,8 @@ enum GravityAPICatalog {
             viewMember("spacing", detail: "Set stack spacing"),
             viewMember("text", detail: "Create an AdaUI text view"),
             viewMember("vStack", detail: "Create a vertical AdaUI stack"),
-            viewMember("zStack", detail: "Create an overlaying AdaUI stack")
-        ]
+            viewMember("zStack", detail: "Create an overlaying AdaUI stack"),
+        ],
     ]
 
     static func member(named name: String, in type: String) -> GravityAPIMember? {

@@ -6,7 +6,7 @@
 import Foundation
 import Math
 
-public extension NamedTextureAtlas {
+extension NamedTextureAtlas {
     /// A source image included in a named texture atlas.
     ///
     /// In an `.atlas` file a source can be written as a path string or as an object with
@@ -18,7 +18,7 @@ public extension NamedTextureAtlas {
     ///   - path: images/enemy.png
     ///     key: enemyIdle
     /// ```
-    struct Source: Codable, Equatable, Sendable {
+    public struct Source: Codable, Equatable, Sendable {
         public var path: String
         public var key: String?
 
@@ -59,7 +59,7 @@ public extension NamedTextureAtlas {
     }
 
     /// Texture filtering used by the generated atlas texture.
-    enum Filter: String, Codable, Sendable {
+    public enum Filter: String, Codable, Sendable {
         case linear
         case nearest
 
@@ -74,7 +74,7 @@ public extension NamedTextureAtlas {
     }
 
     /// Declarative contents and packing settings stored in an `.atlas` resource.
-    struct Descriptor: Codable, Equatable, Sendable {
+    public struct Descriptor: Codable, Equatable, Sendable {
         public var images: [Source]
         public var margin: Int
         public var padding: Int

@@ -8,39 +8,16 @@
  See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 #if os(Windows)
-import Foundation
-import WinSDK
+    import WinSDK
 #endif
+import Foundation
 
 #if os(Windows)
-private typealias PathImpl = WindowsPath
+    typealias PathImpl = WindowsPath
 #else
-private typealias PathImpl = UNIXPath
+    typealias PathImpl = UNIXPath
 #endif
 
-import protocol Foundation.CustomNSError
-import var Foundation.NSLocalizedDescriptionKey
-
-/// Represents an absolute file system path, independently of what (or whether
-/// anything at all) exists at that path in the file system at any given time.
-/// An absolute path always starts with a `/` character, and holds a normalized
-/// string representation.  This normalization is strictly syntactic, and does
-/// not access the file system in any way.
-///
-/// The absolute path string is normalized by:
-/// - Collapsing `..` path components
-/// - Removing `.` path components
-/// - Removing any trailing path separator
-/// - Removing any redundant path separators
-///
-/// This string manipulation may change the meaning of a path if any of the
-/// path components are symbolic links on disk.  However, the file system is
-/// never accessed in any way when initializing an AbsolutePath.
-///
-/// Note that `~` (home directory resolution) is *not* done as part of path
-/// normalization, because it is normally the responsibility of the shell and
-/// not the program being invoked (e.g. when invoking `cd ~`, it is the shell
-/// that evaluates the tilde; the `cd` command receives an absolute path).
 public struct AbsolutePath: Hashable, Sendable {
     /// Check if the given name is a valid individual path component.
     ///
@@ -62,47 +39,49 @@ public struct AbsolutePath: Hashable, Sendable {
     /// Initializes an AbsolutePath from a string that may be either absolute
     /// or relative; if relative, `basePath` is used as the anchor; if absolute,
     /// it is used as is, and in this case `basePath` is ignored.
-    public init(validating str: String, relativeTo basePath: AbsolutePath) throws {
+    public init(validating str: String, relativeTo basePath: Self) throws {
         if PathImpl(string: str).isAbsolute {
             try self.init(validating: str)
         } else {
-#if os(Windows)
-            assert(!basePath.pathString.isEmpty)
-            guard !str.isEmpty else {
-                self.init(basePath._impl)
-                return
-            }
-
-            let base: UnsafePointer<Int8> =
-                unsafe basePath.pathString.fileSystemRepresentation
-            defer { unsafe base.deallocate() }
-
-            let path: UnsafePointer<Int8> = unsafe str.fileSystemRepresentation
-            defer { unsafe path.deallocate() }
-
-            var pwszResult: PWSTR!
-            _ = unsafe String(cString: base).withCString(encodedAs: UTF16.self) { pwszBase in
-                unsafe String(cString: path).withCString(encodedAs: UTF16.self) { pwszPath in
-                    unsafe PathAllocCombine(pwszBase, pwszPath, ULONG(PATHCCH_ALLOW_LONG_PATHS.rawValue), &pwszResult)
+            #if os(Windows)
+                assert(!basePath.pathString.isEmpty)
+                guard !str.isEmpty else {
+                    self.init(basePath._impl)
+                    return
                 }
-            }
-            defer { unsafe LocalFree(pwszResult) }
 
-            unsafe self.init(String(decodingCString: pwszResult, as: UTF16.self))
-#else
-            try self.init(basePath, RelativePath(validating: str))
-#endif
+                let base: UnsafePointer<Int8> =
+                    unsafe basePath.pathString.fileSystemRepresentation
+                defer { unsafe base.deallocate() }
+
+                let path: UnsafePointer<Int8> = unsafe str.fileSystemRepresentation
+                defer { unsafe path.deallocate() }
+
+                var pwszResult: PWSTR!
+                _ = unsafe String(cString: base)
+                    .withCString(encodedAs: UTF16.self) { pwszBase in
+                        unsafe String(cString: path)
+                            .withCString(encodedAs: UTF16.self) { pwszPath in
+                                unsafe PathAllocCombine(pwszBase, pwszPath, ULONG(PATHCCH_ALLOW_LONG_PATHS.rawValue), &pwszResult)
+                            }
+                    }
+                defer { unsafe LocalFree(pwszResult) }
+
+                unsafe self.init(String(decodingCString: pwszResult, as: UTF16.self))
+            #else
+                try self.init(basePath, RelativePath(validating: str))
+            #endif
         }
     }
 
     /// Initializes the AbsolutePath by concatenating a relative path to an
     /// existing absolute path, and renormalizing if necessary.
-    public init(_ absPath: AbsolutePath, _ relPath: RelativePath) {
+    public init(_ absPath: Self, _ relPath: RelativePath) {
         self.init(absPath._impl.appending(relativePath: relPath._impl))
     }
 
     /// Convenience initializer that appends a string to a relative path.
-    public init(_ absPath: AbsolutePath, validating relStr: String) throws {
+    public init(_ absPath: Self, validating relStr: String) throws {
         try self.init(absPath, RelativePath(validating: relStr))
     }
 
@@ -150,8 +129,8 @@ public struct AbsolutePath: Hashable, Sendable {
     /// Absolute path of parent directory.  This always returns a path, because
     /// every directory has a parent (the parent directory of the root directory
     /// is considered to be the root directory itself).
-    public var parentDirectory: AbsolutePath {
-        return AbsolutePath(_impl.parentDirectory)
+    public var parentDirectory: Self {
+        return Self(_impl.parentDirectory)
     }
 
     /// True if the path is the root directory.
@@ -160,15 +139,15 @@ public struct AbsolutePath: Hashable, Sendable {
     }
 
     /// Returns the absolute path with the relative path applied.
-    public func appending(_ subpath: RelativePath) -> AbsolutePath {
-        return AbsolutePath(self, subpath)
+    public func appending(_ subpath: RelativePath) -> Self {
+        return Self(self, subpath)
     }
 
     /// Returns the absolute path with an additional literal component appended.
     ///
     /// This method accepts pseudo-path like '.' or '..', but should not contain "/".
-    public func appending(component: String) -> AbsolutePath {
-        return AbsolutePath(_impl.appending(component: component))
+    public func appending(component: String) -> Self {
+        return Self(_impl.appending(component: component))
     }
 
     /// Returns the absolute path with additional literal components appended.
@@ -176,14 +155,17 @@ public struct AbsolutePath: Hashable, Sendable {
     /// This method should only be used in cases where the input is guaranteed
     /// to be a valid path component (i.e., it cannot be empty, contain a path
     /// separator, or be a pseudo-path like '.' or '..').
-    public func appending(components names: [String]) -> AbsolutePath {
+    public func appending(components names: [String]) -> Self {
         // FIXME: This doesn't seem a particularly efficient way to do this.
-        return names.reduce(self, { path, name in
-            path.appending(component: name)
-        })
+        return names.reduce(
+            self,
+            { path, name in
+                path.appending(component: name)
+            }
+        )
     }
 
-    public func appending(components names: String...) -> AbsolutePath {
+    public func appending(components names: String...) -> Self {
         appending(components: names)
     }
 
@@ -199,7 +181,7 @@ public struct AbsolutePath: Hashable, Sendable {
     ///       path.
 
     /// Root directory (whose string representation is just a path separator).
-    public static let root = AbsolutePath(PathImpl.root)
+    public static let root = Self(PathImpl.root)
 
     /// Normalized string representation (the normalization rules are described
     /// in the documentation of the initializer).  This string is never empty.
@@ -233,7 +215,7 @@ public struct AbsolutePath: Hashable, Sendable {
 /// never accessed in any way when initializing a RelativePath.
 public struct RelativePath: Hashable, Sendable {
     /// Private implementation details, shared with the AbsolutePath struct.
-    fileprivate let _impl: PathImpl
+    let _impl: PathImpl
 
     /// Private initializer when the backing storage is known.
     private init(_ impl: PathImpl) {
@@ -293,15 +275,15 @@ public struct RelativePath: Hashable, Sendable {
     }
 
     /// Returns the relative path with the given relative path applied.
-    public func appending(_ subpath: RelativePath) -> RelativePath {
-        return RelativePath(_impl.appending(relativePath: subpath._impl))
+    public func appending(_ subpath: Self) -> Self {
+        return Self(_impl.appending(relativePath: subpath._impl))
     }
 
     /// Returns the relative path with an additional literal component appended.
     ///
     /// This method accepts pseudo-path like '.' or '..', but should not contain "/".
-    public func appending(component: String) -> RelativePath {
-        return RelativePath(_impl.appending(component: component))
+    public func appending(component: String) -> Self {
+        return Self(_impl.appending(component: component))
     }
 
     /// Returns the relative path with additional literal components appended.
@@ -309,14 +291,17 @@ public struct RelativePath: Hashable, Sendable {
     /// This method should only be used in cases where the input is guaranteed
     /// to be a valid path component (i.e., it cannot be empty, contain a path
     /// separator, or be a pseudo-path like '.' or '..').
-    public func appending(components names: [String]) -> RelativePath {
+    public func appending(components names: [String]) -> Self {
         // FIXME: This doesn't seem a particularly efficient way to do this.
-        return names.reduce(self, { path, name in
-            path.appending(component: name)
-        })
+        return names.reduce(
+            self,
+            { path, name in
+                path.appending(component: name)
+            }
+        )
     }
 
-    public func appending(components names: String...) -> RelativePath {
+    public func appending(components names: String...) -> Self {
         appending(components: names)
     }
 }
@@ -378,7 +363,6 @@ extension RelativePath: CustomStringConvertible {
 
 /// Private implementation shared between AbsolutePath and RelativePath.
 protocol Path: Hashable {
-
     /// Root directory.
     static var root: Self { get }
 
@@ -439,450 +423,464 @@ extension Path {
 }
 
 #if os(Windows)
-private struct WindowsPath: Path, Sendable {
-    let string: String
+    struct WindowsPath: Path, Sendable {
+        let string: String
 
-    // NOTE: this is *NOT* a root path.  It is a drive-relative path that needs
-    // to be specified due to assumptions in the APIs.  Use the platform
-    // specific path separator as we should be normalizing the path normally.
-    // This is required to make the `InMemoryFileSystem` correctly iterate
-    // paths.
-    static let root = Self(string: "\\")
+        // NOTE: this is *NOT* a root path.  It is a drive-relative path that needs
+        // to be specified due to assumptions in the APIs.  Use the platform
+        // specific path separator as we should be normalizing the path normally.
+        // This is required to make the `InMemoryFileSystem` correctly iterate
+        // paths.
+        static let root = Self(string: "\\")
 
-    static func isValidComponent(_ name: String) -> Bool {
-        return name != "" && name != "." && name != ".." && !name.contains("/")
-    }
-
-    static func isAbsolutePath(_ path: String) -> Bool {
-        return unsafe !path.withCString(encodedAs: UTF16.self, PathIsRelativeW)
-    }
-
-    var dirname: String {
-        let fsr: UnsafePointer<Int8> = unsafe self.string.fileSystemRepresentation
-        defer { unsafe fsr.deallocate() }
-
-        var path: String = unsafe String(cString: fsr)
-        // PathCchRemoveFileSpec removes trailing '\' for a
-        // path like 'c:\root\path\', which doesn't give us the parent
-        // directory name. Thus, drop the trailing '\' before calling
-        // PathCchRemoveFileSpec.
-        var substring = path[path.startIndex..<path.endIndex]
-        while !substring.isEmpty && substring.utf8.last == UInt8(ascii: "\\") {
-            substring = substring.dropLast()
-        }
-        if !substring.isEmpty && substring.last != ":" {
-            // Drop the trailing '\', unless the string path only
-            // has '\', and unless the slashes are right after the drive letter.
-            path = String(substring)
+        static func isValidComponent(_ name: String) -> Bool {
+            return !name.isEmpty && name != "." && name != ".." && !name.contains("/")
         }
 
-        return unsafe path.withCString(encodedAs: UTF16.self) {
-            let data = unsafe UnsafeMutablePointer(mutating: $0)
-            unsafe PathCchRemoveFileSpec(data, path.count)
-            return unsafe String(decodingCString: data, as: UTF16.self)
+        static func isAbsolutePath(_ path: String) -> Bool {
+            return unsafe !path.withCString(encodedAs: UTF16.self, PathIsRelativeW)
         }
-    }
 
-    var isAbsolute: Bool {
-        return Self.isAbsolutePath(self.string)
-    }
+        var dirname: String {
+            let fsr: UnsafePointer<Int8> = unsafe self.string.fileSystemRepresentation
+            defer { unsafe fsr.deallocate() }
 
-    public var isRoot: Bool {
-        return unsafe self.string.withCString(encodedAs: UTF16.self, PathCchIsRoot)
-    }
+            var path: String = unsafe String(cString: fsr)
+            // PathCchRemoveFileSpec removes trailing '\' for a
+            // path like 'c:\root\path\', which doesn't give us the parent
+            // directory name. Thus, drop the trailing '\' before calling
+            // PathCchRemoveFileSpec.
+            var substring = path[path.startIndex..<path.endIndex]
+            while !substring.isEmpty && substring.utf8.last == UInt8(ascii: "\\") {
+                substring = substring.dropLast()
+            }
+            if !substring.isEmpty && substring.last != ":" {
+                // Drop the trailing '\', unless the string path only
+                // has '\', and unless the slashes are right after the drive letter.
+                path = String(substring)
+            }
 
-    var basename: String {
-        let path: String = self.string
-        return unsafe path.withCString(encodedAs: UTF16.self) {
-            unsafe PathStripPathW(UnsafeMutablePointer(mutating: $0))
-            return unsafe String(decodingCString: $0, as: UTF16.self)
+            return unsafe path.withCString(encodedAs: UTF16.self) {
+                let data = unsafe UnsafeMutablePointer(mutating: $0)
+                unsafe PathCchRemoveFileSpec(data, path.count)
+                return unsafe String(decodingCString: data, as: UTF16.self)
+            }
         }
-    }
 
-    // FIXME: We should investigate if it would be more efficient to instead
-    // return a path component iterator that does all its work lazily, moving
-    // from one path separator to the next on-demand.
-    //
-    var components: [String] {
-        let normalized: UnsafePointer<Int8> = unsafe string.fileSystemRepresentation
-        defer { unsafe normalized.deallocate() }
-
-        return unsafe String(cString: normalized).components(separatedBy: "\\").filter { !$0.isEmpty }
-    }
-
-    var parentDirectory: Self {
-        return self == .root ? self : Self(string: dirname)
-    }
-
-    init(string: String) {
-        if string.first?.isASCII ?? false, string.first?.isLetter ?? false, string.first?.isLowercase ?? false,
-           string.count > 1, string[string.index(string.startIndex, offsetBy: 1)] == ":"
-        {
-            self.string = "\(string.first!.uppercased())\(string.dropFirst(1))"
-        } else {
-            self.string = string
+        var isAbsolute: Bool {
+            return Self.isAbsolutePath(self.string)
         }
-    }
 
-    private static func repr(_ path: String) -> String {
-        guard !path.isEmpty else { return "" }
-        let representation: UnsafePointer<Int8> = unsafe path.fileSystemRepresentation
-        defer { unsafe representation.deallocate() }
-        return unsafe String(cString: representation)
-    }
-
-    init(validatingAbsolutePath path: String) throws {
-        let realpath = Self.repr(path)
-        if !Self.isAbsolutePath(realpath) {
-            throw PathValidationError.invalidAbsolutePath(path)
+        public var isRoot: Bool {
+            return unsafe self.string.withCString(encodedAs: UTF16.self, PathCchIsRoot)
         }
-        self.init(string: realpath)
-    }
 
-    init(validatingRelativePath path: String) throws {
-        if path.isEmpty || path == "." {
-            self.init(string: ".")
-        } else {
-            let realpath: String = Self.repr(path)
-            // Treat a relative path as an invalid relative path...
-            if Self.isAbsolutePath(realpath) || realpath.first == "\\" {
-                throw PathValidationError.invalidRelativePath(path)
+        var basename: String {
+            let path: String = self.string
+            return unsafe path.withCString(encodedAs: UTF16.self) {
+                unsafe PathStripPathW(UnsafeMutablePointer(mutating: $0))
+                return unsafe String(decodingCString: $0, as: UTF16.self)
+            }
+        }
+
+        // FIXME: We should investigate if it would be more efficient to instead
+        // return a path component iterator that does all its work lazily, moving
+        // from one path separator to the next on-demand.
+        //
+        var components: [String] {
+            let normalized: UnsafePointer<Int8> = unsafe string.fileSystemRepresentation
+            defer { unsafe normalized.deallocate() }
+
+            return unsafe String(cString: normalized).components(separatedBy: "\\").filter { !$0.isEmpty }
+        }
+
+        var parentDirectory: Self {
+            return self == .root ? self : Self(string: dirname)
+        }
+
+        init(string: String) {
+            if let first = string.first, first.isASCII, first.isLetter, first.isLowercase,
+                string.count > 1, string[string.index(string.startIndex, offsetBy: 1)] == ":" {
+                self.string = "\(first.uppercased())\(string.dropFirst(1))"
+            } else {
+                self.string = string
+            }
+        }
+
+        private static func repr(_ path: String) -> String {
+            guard !path.isEmpty else {
+                return ""
+            }
+            let representation: UnsafePointer<Int8> = unsafe path.fileSystemRepresentation
+            defer { unsafe representation.deallocate() }
+            return unsafe String(cString: representation)
+        }
+
+        init(validatingAbsolutePath path: String) throws {
+            let realpath = Self.repr(path)
+            if !Self.isAbsolutePath(realpath) {
+                throw PathValidationError.invalidAbsolutePath(path)
             }
             self.init(string: realpath)
         }
-    }
 
-    func suffix(withDot: Bool) -> String? {
-        return unsafe self.string.withCString(encodedAs: UTF16.self) {
-          if let pointer = unsafe PathFindExtensionW($0) {
-            let substring = unsafe String(decodingCString: pointer, as: UTF16.self)
-            guard substring.length > 0 else { return nil }
-            return withDot ? substring : String(substring.dropFirst(1))
-          }
-          return nil
-        }
-    }
-
-    func appending(component name: String) -> Self {
-        var result: PWSTR?
-        _ = unsafe string.withCString(encodedAs: UTF16.self) { root in
-            unsafe name.withCString(encodedAs: UTF16.self) { path in
-                unsafe PathAllocCombine(root, path, ULONG(PATHCCH_ALLOW_LONG_PATHS.rawValue), &result)
-            }
-        }
-        defer { unsafe LocalFree(result) }
-        return unsafe Self(string: String(decodingCString: result!, as: UTF16.self))
-    }
-
-    func appending(relativePath: Self) -> Self {
-        var result: PWSTR?
-        _ = unsafe string.withCString(encodedAs: UTF16.self) { root in
-            unsafe relativePath.string.withCString(encodedAs: UTF16.self) { path in
-                unsafe PathAllocCombine(root, path, ULONG(PATHCCH_ALLOW_LONG_PATHS.rawValue), &result)
-            }
-        }
-        defer { unsafe LocalFree(result) }
-        return unsafe Self(string: String(decodingCString: result!, as: UTF16.self))
-    }
-}
-#else
-private struct UNIXPath: Path, Sendable {
-    let string: String
-
-    static let root = Self(string: "/")
-
-    static func isValidComponent(_ name: String) -> Bool {
-        return name != "" && name != "." && name != ".." && !name.contains("/")
-    }
-
-    var dirname: String {
-        // FIXME: This method seems too complicated; it should be simplified,
-        //        if possible, and certainly optimized (using UTF8View).
-        // Find the last path separator.
-        guard let idx = string.lastIndex(of: "/") else {
-            // No path separators, so the directory name is `.`.
-            return "."
-        }
-        // Check if it's the only one in the string.
-        if idx == string.startIndex {
-            // Just one path separator, so the directory name is `/`.
-            return "/"
-        }
-        // Otherwise, it's the string up to (but not including) the last path
-        // separator.
-        return String(string.prefix(upTo: idx))
-    }
-
-    var isAbsolute: Bool {
-        return string.hasPrefix("/")
-    }
-
-    var isRoot: Bool {
-        return self == Self.root
-    }
-
-    var basename: String {
-        // FIXME: This method seems too complicated; it should be simplified,
-        //        if possible, and certainly optimized (using UTF8View).
-        // Check for a special case of the root directory.
-        if string.spm_only == "/" {
-            // Root directory, so the basename is a single path separator (the
-            // root directory is special in this regard).
-            return "/"
-        }
-        // Find the last path separator.
-        guard let idx = string.lastIndex(of: "/") else {
-            // No path separators, so the basename is the whole string.
-            return string
-        }
-        // Otherwise, it's the string from (but not including) the last path
-        // separator.
-        return String(string.suffix(from: string.index(after: idx)))
-    }
-
-    // FIXME: We should investigate if it would be more efficient to instead
-    // return a path component iterator that does all its work lazily, moving
-    // from one path separator to the next on-demand.
-    //
-    var components: [String] {
-        // FIXME: This isn't particularly efficient; needs optimization, and
-        // in fact, it might well be best to return a custom iterator so we
-        // don't have to allocate everything up-front.  It would be backed by
-        // the path string and just return a slice at a time.
-        let components = string.components(separatedBy: "/").filter({ !$0.isEmpty })
-
-        if string.hasPrefix("/") {
-            return ["/"] + components
-        } else {
-            return components
-        }
-    }
-
-    var parentDirectory: Self {
-        return self == .root ? self : Self(string: dirname)
-    }
-
-    init(string: String) {
-        self.string = string
-    }
-
-    init(normalizingAbsolutePath path: String) {
-        precondition(path.first == "/", "Failure normalizing \(path), absolute paths should start with '/'")
-
-        // At this point we expect to have a path separator as first character.
-        assert(path.first == "/")
-        // Fast path.
-        if !mayNeedNormalization(absolute: path) {
-            self.init(string: path)
-        }
-
-        // Split the character array into parts, folding components as we go.
-        // As we do so, we count the number of characters we'll end up with in
-        // the normalized string representation.
-        var parts: [String] = []
-        var capacity = 0
-        for part in path.split(separator: "/") {
-            switch part.count {
-              case 0:
-                // Ignore empty path components.
-                continue
-              case 1 where part.first == ".":
-                // Ignore `.` path components.
-                continue
-              case 2 where part.first == "." && part.last == ".":
-                // If there's a previous part, drop it; otherwise, do nothing.
-                if let prev = parts.last {
-                    parts.removeLast()
-                    capacity -= prev.count
-                }
-              default:
-                // Any other component gets appended.
-                parts.append(String(part))
-                capacity += part.count
-            }
-        }
-        capacity += max(parts.count, 1)
-
-        // Create an output buffer using the capacity we've calculated.
-        // FIXME: Determine the most efficient way to reassemble a string.
-        var result = ""
-        result.reserveCapacity(capacity)
-
-        // Put the normalized parts back together again.
-        var iter = parts.makeIterator()
-        result.append("/")
-        if let first = iter.next() {
-            result.append(contentsOf: first)
-            while let next = iter.next() {
-                result.append("/")
-                result.append(contentsOf: next)
-            }
-        }
-
-        // Sanity-check the result (including the capacity we reserved).
-        assert(!result.isEmpty, "unexpected empty string")
-        assert(result.count == capacity, "count: " +
-            "\(result.count), cap: \(capacity)")
-
-        // Use the result as our stored string.
-        self.init(string: result)
-    }
-
-    init(normalizingRelativePath path: String) {
-        precondition(path.first != "/")
-
-        // FIXME: Here we should also keep track of whether anything actually has
-        // to be changed in the string, and if not, just return the existing one.
-
-        // Split the character array into parts, folding components as we go.
-        // As we do so, we count the number of characters we'll end up with in
-        // the normalized string representation.
-        var parts: [String] = []
-        var capacity = 0
-        for part in path.split(separator: "/") {
-            switch part.count {
-            case 0:
-                // Ignore empty path components.
-                continue
-            case 1 where part.first == ".":
-                // Ignore `.` path components.
-                continue
-            case 2 where part.first == "." && part.last == ".":
-                // If at beginning, fall through to treat the `..` literally.
-                guard let prev = parts.last else {
-                    fallthrough
-                }
-                // If previous component is anything other than `..`, drop it.
-                if !(prev.count == 2 && prev.first == "." && prev.last == ".") {
-                    parts.removeLast()
-                    capacity -= prev.count
-                    continue
-                }
-                // Otherwise, fall through to treat the `..` literally.
-                fallthrough
-            default:
-                // Any other component gets appended.
-                parts.append(String(part))
-                capacity += part.count
-            }
-        }
-        capacity += max(parts.count - 1, 0)
-
-        // Create an output buffer using the capacity we've calculated.
-        // FIXME: Determine the most efficient way to reassemble a string.
-        var result = ""
-        result.reserveCapacity(capacity)
-
-        // Put the normalized parts back together again.
-        var iter = parts.makeIterator()
-        if let first = iter.next() {
-            result.append(contentsOf: first)
-            while let next = iter.next() {
-                result.append("/")
-                result.append(contentsOf: next)
-            }
-        }
-
-        // Sanity-check the result (including the capacity we reserved).
-        assert(result.count == capacity, "count: " +
-            "\(result.count), cap: \(capacity)")
-
-        // If the result is empty, return `.`, otherwise we return it as a string.
-        self.init(string: result.isEmpty ? "." : result)
-    }
-
-    init(validatingAbsolutePath path: String) throws {
-        switch path.first {
-        case "/":
-            self.init(normalizingAbsolutePath: path)
-        case "~":
-            throw PathValidationError.startsWithTilde(path)
-        default:
-            throw PathValidationError.invalidAbsolutePath(path)
-        }
-    }
-
-    init(validatingRelativePath path: String) throws {
-        switch path.first {
-        case "/":
-            throw PathValidationError.invalidRelativePath(path)
-        default:
-            self.init(normalizingRelativePath: path)
-        }
-    }
-
-    func suffix(withDot: Bool) -> String? {
-        // FIXME: This method seems too complicated; it should be simplified,
-        //        if possible, and certainly optimized (using UTF8View).
-        // Find the last path separator, if any.
-        let sIdx = string.lastIndex(of: "/")
-        // Find the start of the basename.
-        let bIdx = (sIdx != nil) ? string.index(after: sIdx!) : string.startIndex
-        // Find the last `.` (if any), starting from the second character of
-        // the basename (a leading `.` does not make the whole path component
-        // a suffix).
-        let fIdx = string.index(bIdx, offsetBy: 1, limitedBy: string.endIndex) ?? string.startIndex
-        if let idx = string[fIdx...].lastIndex(of: ".") {
-            // Unless it's just a `.` at the end, we have found a suffix.
-            if string.distance(from: idx, to: string.endIndex) > 1 {
-                let fromIndex = withDot ? idx : string.index(idx, offsetBy: 1)
-                return String(string.suffix(from: fromIndex))
+        init(validatingRelativePath path: String) throws {
+            if path.isEmpty || path == "." {
+                self.init(string: ".")
             } else {
+                let realpath: String = Self.repr(path)
+                // Treat a relative path as an invalid relative path...
+                if Self.isAbsolutePath(realpath) || realpath.first == "\\" {
+                    throw PathValidationError.invalidRelativePath(path)
+                }
+                self.init(string: realpath)
+            }
+        }
+
+        func suffix(withDot: Bool) -> String? {
+            return unsafe self.string.withCString(encodedAs: UTF16.self) {
+                if let pointer = unsafe PathFindExtensionW($0) {
+                    let substring = unsafe String(decodingCString: pointer, as: UTF16.self)
+                    guard substring.length > 0 else {
+                        return nil
+                    }
+                    return withDot ? substring : String(substring.dropFirst(1))
+                }
                 return nil
             }
         }
-        // If we get this far, there is no suffix.
-        return nil
-    }
 
-    func appending(component name: String) -> Self {
-        assert(!name.contains("/"), "\(name) is invalid path component")
-
-        // Handle pseudo paths.
-        switch name {
-        case "", ".":
-            return self
-        case "..":
-            return self.parentDirectory
-        default:
-            break
-        }
-
-        if self == Self.root {
-            return Self(string: "/" + name)
-        } else {
-            return Self(string: string + "/" + name)
-        }
-    }
-
-    func appending(relativePath: Self) -> Self {
-        // Both paths are already normalized.  The only case in which we have
-        // to renormalize their concatenation is if the relative path starts
-        // with a `..` path component.
-        var newPathString = string
-        if self != .root {
-            newPathString.append("/")
-        }
-
-        let relativePathString = relativePath.string
-        newPathString.append(relativePathString)
-
-        // If the relative string starts with `.` or `..`, we need to normalize
-        // the resulting string.
-        // FIXME: We can actually optimize that case, since we know that the
-        // normalization of a relative path can leave `..` path components at
-        // the beginning of the path only.
-        if relativePathString.hasPrefix(".") {
-            if newPathString.hasPrefix("/") {
-                return Self(normalizingAbsolutePath: newPathString)
-            } else {
-                return Self(normalizingRelativePath: newPathString)
+        func appending(component name: String) -> Self {
+            var result: PWSTR?
+            _ = unsafe string.withCString(encodedAs: UTF16.self) { root in
+                unsafe name.withCString(encodedAs: UTF16.self) { path in
+                    unsafe PathAllocCombine(root, path, ULONG(PATHCCH_ALLOW_LONG_PATHS.rawValue), &result)
+                }
             }
-        } else {
-            return Self(string: newPathString)
+            defer { unsafe LocalFree(result) }
+            guard let result else {
+                preconditionFailure("Unable to append Windows path component \(name).")
+            }
+            return unsafe Self(string: String(decodingCString: result, as: UTF16.self))
+        }
+
+        func appending(relativePath: Self) -> Self {
+            var result: PWSTR?
+            _ = unsafe string.withCString(encodedAs: UTF16.self) { root in
+                unsafe relativePath.string.withCString(encodedAs: UTF16.self) { path in
+                    unsafe PathAllocCombine(root, path, ULONG(PATHCCH_ALLOW_LONG_PATHS.rawValue), &result)
+                }
+            }
+            defer { unsafe LocalFree(result) }
+            guard let result else {
+                preconditionFailure("Unable to append Windows relative path \(relativePath.string).")
+            }
+            return unsafe Self(string: String(decodingCString: result, as: UTF16.self))
         }
     }
-}
+#else
+    struct UNIXPath: Path, Sendable {
+        let string: String
+
+        static let root = Self(string: "/")
+
+        static func isValidComponent(_ name: String) -> Bool {
+            return !name.isEmpty && name != "." && name != ".." && !name.contains("/")
+        }
+
+        var dirname: String {
+            // FIXME: This method seems too complicated; it should be simplified,
+            //        if possible, and certainly optimized (using UTF8View).
+            // Find the last path separator.
+            guard let idx = string.lastIndex(of: "/") else {
+                // No path separators, so the directory name is `.`.
+                return "."
+            }
+            // Check if it's the only one in the string.
+            if idx == string.startIndex {
+                // Just one path separator, so the directory name is `/`.
+                return "/"
+            }
+            // Otherwise, it's the string up to (but not including) the last path
+            // separator.
+            return String(string.prefix(upTo: idx))
+        }
+
+        var isAbsolute: Bool {
+            return string.hasPrefix("/")
+        }
+
+        var isRoot: Bool {
+            return self == Self.root
+        }
+
+        var basename: String {
+            // FIXME: This method seems too complicated; it should be simplified,
+            //        if possible, and certainly optimized (using UTF8View).
+            // Check for a special case of the root directory.
+            if string.spm_only == "/" {
+                // Root directory, so the basename is a single path separator (the
+                // root directory is special in this regard).
+                return "/"
+            }
+            // Find the last path separator.
+            guard let idx = string.lastIndex(of: "/") else {
+                // No path separators, so the basename is the whole string.
+                return string
+            }
+            // Otherwise, it's the string from (but not including) the last path
+            // separator.
+            return String(string.suffix(from: string.index(after: idx)))
+        }
+
+        // FIXME: We should investigate if it would be more efficient to instead
+        // return a path component iterator that does all its work lazily, moving
+        // from one path separator to the next on-demand.
+        //
+        var components: [String] {
+            // FIXME: This isn't particularly efficient; needs optimization, and
+            // in fact, it might well be best to return a custom iterator so we
+            // don't have to allocate everything up-front.  It would be backed by
+            // the path string and just return a slice at a time.
+            let components = string.components(separatedBy: "/").filter({ !$0.isEmpty })
+
+            if string.hasPrefix("/") {
+                return ["/"] + components
+            } else {
+                return components
+            }
+        }
+
+        var parentDirectory: Self {
+            return self == .root ? self : Self(string: dirname)
+        }
+
+        init(string: String) {
+            self.string = string
+        }
+
+        init(normalizingAbsolutePath path: String) {
+            precondition(path.first == "/", "Failure normalizing \(path), absolute paths should start with '/'")
+
+            // At this point we expect to have a path separator as first character.
+            assert(path.first == "/")
+            // Fast path.
+            if !mayNeedNormalization(absolute: path) {
+                self.init(string: path)
+            }
+
+            // Split the character array into parts, folding components as we go.
+            // As we do so, we count the number of characters we'll end up with in
+            // the normalized string representation.
+            var parts: [String] = []
+            var capacity = 0
+            for part in path.split(separator: "/") {
+                switch part.count {
+                case 0:
+                    // Ignore empty path components.
+                    continue
+                case 1 where part.first == ".":
+                    // Ignore `.` path components.
+                    continue
+                case 2 where part.first == "." && part.last == ".":
+                    // If there's a previous part, drop it; otherwise, do nothing.
+                    if let prev = parts.last {
+                        parts.removeLast()
+                        capacity -= prev.count
+                    }
+                default:
+                    // Any other component gets appended.
+                    parts.append(String(part))
+                    capacity += part.count
+                }
+            }
+            capacity += max(parts.count, 1)
+
+            // Create an output buffer using the capacity we've calculated.
+            // FIXME: Determine the most efficient way to reassemble a string.
+            var result = ""
+            result.reserveCapacity(capacity)
+
+            // Put the normalized parts back together again.
+            var iter = parts.makeIterator()
+            result.append("/")
+            if let first = iter.next() {
+                result.append(contentsOf: first)
+                while let next = iter.next() {
+                    result.append("/")
+                    result.append(contentsOf: next)
+                }
+            }
+
+            // Sanity-check the result (including the capacity we reserved).
+            assert(!result.isEmpty, "unexpected empty string")
+            assert(
+                result.count == capacity,
+                "count: " + "\(result.count), cap: \(capacity)"
+            )
+
+            // Use the result as our stored string.
+            self.init(string: result)
+        }
+
+        init(normalizingRelativePath path: String) {
+            precondition(path.first != "/")
+
+            // FIXME: Here we should also keep track of whether anything actually has
+            // to be changed in the string, and if not, just return the existing one.
+
+            // Split the character array into parts, folding components as we go.
+            // As we do so, we count the number of characters we'll end up with in
+            // the normalized string representation.
+            var parts: [String] = []
+            var capacity = 0
+            for part in path.split(separator: "/") {
+                switch part.count {
+                case 0:
+                    // Ignore empty path components.
+                    continue
+                case 1 where part.first == ".":
+                    // Ignore `.` path components.
+                    continue
+                case 2 where part.first == "." && part.last == ".":
+                    // If at beginning, fall through to treat the `..` literally.
+                    guard let prev = parts.last else {
+                        fallthrough
+                    }
+                    // If previous component is anything other than `..`, drop it.
+                    if !(prev.count == 2 && prev.first == "." && prev.last == ".") {
+                        parts.removeLast()
+                        capacity -= prev.count
+                        continue
+                    }
+                    // Otherwise, fall through to treat the `..` literally.
+                    fallthrough
+                default:
+                    // Any other component gets appended.
+                    parts.append(String(part))
+                    capacity += part.count
+                }
+            }
+            capacity += max(parts.count - 1, 0)
+
+            // Create an output buffer using the capacity we've calculated.
+            // FIXME: Determine the most efficient way to reassemble a string.
+            var result = ""
+            result.reserveCapacity(capacity)
+
+            // Put the normalized parts back together again.
+            var iter = parts.makeIterator()
+            if let first = iter.next() {
+                result.append(contentsOf: first)
+                while let next = iter.next() {
+                    result.append("/")
+                    result.append(contentsOf: next)
+                }
+            }
+
+            // Sanity-check the result (including the capacity we reserved).
+            assert(
+                result.count == capacity,
+                "count: " + "\(result.count), cap: \(capacity)"
+            )
+
+            // If the result is empty, return `.`, otherwise we return it as a string.
+            self.init(string: result.isEmpty ? "." : result)
+        }
+
+        init(validatingAbsolutePath path: String) throws {
+            switch path.first {
+            case "/":
+                self.init(normalizingAbsolutePath: path)
+            case "~":
+                throw PathValidationError.startsWithTilde(path)
+            default:
+                throw PathValidationError.invalidAbsolutePath(path)
+            }
+        }
+
+        init(validatingRelativePath path: String) throws {
+            switch path.first {
+            case "/":
+                throw PathValidationError.invalidRelativePath(path)
+            default:
+                self.init(normalizingRelativePath: path)
+            }
+        }
+
+        func suffix(withDot: Bool) -> String? {
+            // FIXME: This method seems too complicated; it should be simplified,
+            //        if possible, and certainly optimized (using UTF8View).
+            // Find the last path separator, if any.
+            let sIdx = string.lastIndex(of: "/")
+            // Find the start of the basename.
+            let bIdx = sIdx.map { string.index(after: $0) } ?? string.startIndex
+            // Find the last `.` (if any), starting from the second character of
+            // the basename (a leading `.` does not make the whole path component
+            // a suffix).
+            let fIdx = string.index(bIdx, offsetBy: 1, limitedBy: string.endIndex) ?? string.startIndex
+            if let idx = string[fIdx...].lastIndex(of: ".") {
+                // Unless it's just a `.` at the end, we have found a suffix.
+                if string.distance(from: idx, to: string.endIndex) > 1 {
+                    let fromIndex = withDot ? idx : string.index(idx, offsetBy: 1)
+                    return String(string.suffix(from: fromIndex))
+                } else {
+                    return nil
+                }
+            }
+            // If we get this far, there is no suffix.
+            return nil
+        }
+
+        func appending(component name: String) -> Self {
+            assert(!name.contains("/"), "\(name) is invalid path component")
+
+            // Handle pseudo paths.
+            switch name {
+            case "",
+                ".":
+                return self
+            case "..":
+                return self.parentDirectory
+            default:
+                break
+            }
+
+            if self == Self.root {
+                return Self(string: "/" + name)
+            } else {
+                return Self(string: string + "/" + name)
+            }
+        }
+
+        func appending(relativePath: Self) -> Self {
+            // Both paths are already normalized.  The only case in which we have
+            // to renormalize their concatenation is if the relative path starts
+            // with a `..` path component.
+            var newPathString = string
+            if self != .root {
+                newPathString.append("/")
+            }
+
+            let relativePathString = relativePath.string
+            newPathString.append(relativePathString)
+
+            // If the relative string starts with `.` or `..`, we need to normalize
+            // the resulting string.
+            // FIXME: We can actually optimize that case, since we know that the
+            // normalization of a relative path can leave `..` path components at
+            // the beginning of the path only.
+            if relativePathString.hasPrefix(".") {
+                if newPathString.hasPrefix("/") {
+                    return Self(normalizingAbsolutePath: newPathString)
+                } else {
+                    return Self(normalizingRelativePath: newPathString)
+                }
+            } else {
+                return Self(string: newPathString)
+            }
+        }
+    }
 #endif
 
 /// Describes the way in which a path is invalid.
@@ -895,11 +893,11 @@ public enum PathValidationError: Error {
 extension PathValidationError: CustomStringConvertible {
     public var description: String {
         switch self {
-        case .startsWithTilde(let path):
+        case let .startsWithTilde(path):
             return "invalid absolute path '\(path)'; absolute path must begin with '/'"
-        case .invalidAbsolutePath(let path):
+        case let .invalidAbsolutePath(path):
             return "invalid absolute path '\(path)'"
-        case .invalidRelativePath(let path):
+        case let .invalidRelativePath(path):
             return "invalid relative path '\(path)'; relative path should not begin with '\(AbsolutePath.root.pathString)'"
         }
     }
@@ -929,17 +927,16 @@ extension AbsolutePath {
             // Special case, which is a plain path without `..` components.  It
             // might be an empty path (when self and the base are equal).
             let relComps = pathComps.dropFirst(baseComps.count)
-#if os(Windows)
-            let pathString = relComps.joined(separator: "\\")
-#else
-            let pathString = relComps.joined(separator: "/")
-#endif
+            #if os(Windows)
+                let pathString = relComps.joined(separator: "\\")
+            #else
+                let pathString = relComps.joined(separator: "/")
+            #endif
             do {
                 result = try RelativePath(validating: pathString)
             } catch {
                 preconditionFailure("invalid relative path computed from \(pathString)")
             }
-
         } else {
             // General case, in which we might well need `..` components to go
             // "up" before we can go "down" the directory tree.
@@ -954,11 +951,11 @@ extension AbsolutePath {
             // `newBaseComps` followed by what remains in `newPathComps`.
             var relComps = Array(repeating: "..", count: newBaseComps.count)
             relComps.append(contentsOf: newPathComps)
-#if os(Windows)
-            let pathString = relComps.joined(separator: "\\")
-#else
-            let pathString = relComps.joined(separator: "/")
-#endif
+            #if os(Windows)
+                let pathString = relComps.joined(separator: "\\")
+            #else
+                let pathString = relComps.joined(separator: "/")
+            #endif
             do {
                 result = try RelativePath(validating: pathString)
             } catch {
@@ -1013,7 +1010,7 @@ extension AbsolutePath {
 }
 
 extension PathValidationError: CustomNSError {
-    public var errorUserInfo: [String : Any] {
+    public var errorUserInfo: [String: Any] {
         return [NSLocalizedDescriptionKey: self.description]
     }
 }
@@ -1053,19 +1050,31 @@ extension AbsolutePath {
     @_disfavoredOverload
     @available(*, deprecated, message: "use throwing `init(validating:)` variant instead")
     public init(_ absStr: String) {
-        try! self.init(validating: absStr)
+        do {
+            try self.init(validating: absStr)
+        } catch {
+            preconditionFailure("Invalid absolute path '\(absStr)': \(error)")
+        }
     }
 
     @_disfavoredOverload
     @available(*, deprecated, message: "use throwing `init(validating:relativeTo:)` variant instead")
     public init(_ str: String, relativeTo basePath: AbsolutePath) {
-        try! self.init(validating: str, relativeTo: basePath)
+        do {
+            try self.init(validating: str, relativeTo: basePath)
+        } catch {
+            preconditionFailure("Invalid path '\(str)' relative to '\(basePath)': \(error)")
+        }
     }
 
     @_disfavoredOverload
     @available(*, deprecated, message: "use throwing variant instead")
     public init(_ absPath: AbsolutePath, _ relStr: String) {
-        try! self.init(absPath, validating: relStr)
+        do {
+            try self.init(absPath, validating: relStr)
+        } catch {
+            preconditionFailure("Invalid path '\(relStr)' relative to '\(absPath)': \(error)")
+        }
     }
 }
 
@@ -1075,10 +1084,13 @@ extension RelativePath {
     @_disfavoredOverload
     @available(*, deprecated, message: "use throwing variant instead")
     public init(_ string: String) {
-        try! self.init(validating: string)
+        do {
+            try self.init(validating: string)
+        } catch {
+            preconditionFailure("Invalid relative path '\(string)': \(error)")
+        }
     }
 }
-
 
 extension Collection {
     /// Returns the only element of the collection or nil.

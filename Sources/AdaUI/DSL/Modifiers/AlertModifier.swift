@@ -7,9 +7,9 @@
 
 import AdaText
 
-public extension View {
+extension View {
     /// Presents an alert when a given condition is true.
-    func alert<S, Actions, Message>(
+    public func alert<S, Actions, Message>(
         _ title: S,
         isPresented: Binding<Bool>,
         @ViewBuilder actions: @escaping () -> Actions,
@@ -28,7 +28,7 @@ public extension View {
     }
 
     /// Presents an alert when a given condition is true.
-    func alert<S, Actions>(
+    public func alert<S, Actions>(
         _ title: S,
         isPresented: Binding<Bool>,
         @ViewBuilder actions: @escaping () -> Actions
@@ -37,7 +37,7 @@ public extension View {
     }
 
     /// Presents an alert with a default OK action when a given condition is true.
-    func alert<S>(
+    public func alert<S>(
         _ title: S,
         isPresented: Binding<Bool>
     ) -> some View where S: StringProtocol {
@@ -45,7 +45,7 @@ public extension View {
     }
 
     /// Presents an alert using the given data to produce the alert's content.
-    func alert<S, Data, Actions, Message>(
+    public func alert<S, Data, Actions, Message>(
         _ title: S,
         isPresented: Binding<Bool>,
         presenting data: Data?,
@@ -65,7 +65,7 @@ public extension View {
     }
 
     /// Presents an alert using the given data to produce the alert's actions.
-    func alert<S, Data, Actions>(
+    public func alert<S, Data, Actions>(
         _ title: S,
         isPresented: Binding<Bool>,
         presenting data: Data?,
@@ -164,7 +164,9 @@ private final class AlertModifierNode<Data, Actions: View, Message: View>: ViewM
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
-        guard let other = newNode as? AlertModifierNode<Data, Actions, Message> else { return }
+        guard let other = newNode as? AlertModifierNode<Data, Actions, Message> else {
+            return
+        }
 
         self.title = other.title
         self.isPresented = other.isPresented
@@ -187,16 +189,17 @@ private final class AlertModifierNode<Data, Actions: View, Message: View>: ViewM
         hasPresented = true
 
         let actionButtons = actions(data).alertButtons
-        let buttons = (actionButtons.isEmpty ? [.init(title: "OK", role: .cancel, action: nil)] : actionButtons).map { button in
-            AlertPresentation.Button(
-                title: button.title,
-                role: button.role,
-                action: { [isPresented] in
-                    isPresented.wrappedValue = false
-                    button.action?()
-                }
-            )
-        }
+        let buttons = (actionButtons.isEmpty ? [.init(title: "OK", role: .cancel, action: nil)] : actionButtons)
+            .map { button in
+                AlertPresentation.Button(
+                    title: button.title,
+                    role: button.role,
+                    action: { [isPresented] in
+                        isPresented.wrappedValue = false
+                        button.action?()
+                    }
+                )
+            }
 
         let presentation = AlertPresentation(
             title: title,
@@ -211,23 +214,23 @@ private final class AlertModifierNode<Data, Actions: View, Message: View>: ViewM
     }
 }
 
-private struct AlertButtonDescription {
+struct AlertButtonDescription {
     let title: String
     let role: AlertPresentation.Button.Role?
     let action: (() -> Void)?
 }
 
 @MainActor
-private protocol AlertActionsConvertible {
+protocol AlertActionsConvertible {
     var alertButtons: [AlertButtonDescription] { get }
 }
 
 @MainActor
-private protocol AlertMessageConvertible {
+protocol AlertMessageConvertible {
     var alertMessage: String? { get }
 }
 
-private extension View {
+extension View {
     var alertButtons: [AlertButtonDescription] {
         (self as? AlertActionsConvertible)?.alertButtons ?? []
     }
@@ -239,7 +242,7 @@ private extension View {
 
 @MainActor
 extension Button: AlertActionsConvertible {
-    fileprivate var alertButtons: [AlertButtonDescription] {
+    var alertButtons: [AlertButtonDescription] {
         guard let title = alertTitle else {
             return []
         }
@@ -255,7 +258,7 @@ extension Button: AlertActionsConvertible {
 }
 
 extension ButtonRole {
-    fileprivate var alertRole: AlertPresentation.Button.Role {
+    var alertRole: AlertPresentation.Button.Role {
         switch storage {
         case .cancel:
             return .cancel
@@ -267,20 +270,20 @@ extension ButtonRole {
 
 @MainActor
 extension EmptyView: AlertActionsConvertible, AlertMessageConvertible {
-    fileprivate var alertButtons: [AlertButtonDescription] {
+    var alertButtons: [AlertButtonDescription] {
         []
     }
 
-    fileprivate var alertMessage: String? {
+    var alertMessage: String? {
         nil
     }
 }
 
 @MainActor
 extension Optional: AlertActionsConvertible where Wrapped: View {
-    fileprivate var alertButtons: [AlertButtonDescription] {
+    var alertButtons: [AlertButtonDescription] {
         switch self {
-        case .some(let wrapped):
+        case let .some(wrapped):
             return wrapped.alertButtons
         case .none:
             return []
@@ -290,9 +293,9 @@ extension Optional: AlertActionsConvertible where Wrapped: View {
 
 @MainActor
 extension Optional: AlertMessageConvertible where Wrapped: View {
-    fileprivate var alertMessage: String? {
+    var alertMessage: String? {
         switch self {
-        case .some(let wrapped):
+        case let .some(wrapped):
             return wrapped.alertMessage
         case .none:
             return nil
@@ -302,29 +305,32 @@ extension Optional: AlertMessageConvertible where Wrapped: View {
 
 @MainActor
 extension ViewTuple: AlertActionsConvertible {
-    fileprivate var alertButtons: [AlertButtonDescription] {
-        Mirror(reflecting: value).children.flatMap { child in
-            (child.value as? AlertActionsConvertible)?.alertButtons ?? []
-        }
+    var alertButtons: [AlertButtonDescription] {
+        Mirror(reflecting: value).children
+            .flatMap { child in
+                (child.value as? AlertActionsConvertible)?.alertButtons ?? []
+            }
     }
 }
 
 @MainActor
 extension ViewTuple: AlertMessageConvertible {
-    fileprivate var alertMessage: String? {
-        Mirror(reflecting: value).children.compactMap { child in
-            (child.value as? AlertMessageConvertible)?.alertMessage
-        }.joined(separator: "\n")
+    var alertMessage: String? {
+        Mirror(reflecting: value).children
+            .compactMap { child in
+                (child.value as? AlertMessageConvertible)?.alertMessage
+            }
+            .joined(separator: "\n")
     }
 }
 
 @MainActor
 extension _ConditionalContent: AlertActionsConvertible where TrueContent: View, FalseContent: View {
-    fileprivate var alertButtons: [AlertButtonDescription] {
+    var alertButtons: [AlertButtonDescription] {
         switch storage {
-        case .trueContent(let content):
+        case let .trueContent(content):
             return content.alertButtons
-        case .falseContent(let content):
+        case let .falseContent(content):
             return content.alertButtons
         }
     }
@@ -332,11 +338,11 @@ extension _ConditionalContent: AlertActionsConvertible where TrueContent: View, 
 
 @MainActor
 extension _ConditionalContent: AlertMessageConvertible where TrueContent: View, FalseContent: View {
-    fileprivate var alertMessage: String? {
+    var alertMessage: String? {
         switch storage {
-        case .trueContent(let content):
+        case let .trueContent(content):
             return content.alertMessage
-        case .falseContent(let content):
+        case let .falseContent(content):
             return content.alertMessage
         }
     }
@@ -344,21 +350,21 @@ extension _ConditionalContent: AlertMessageConvertible where TrueContent: View, 
 
 @MainActor
 extension AnyView: AlertActionsConvertible {
-    fileprivate var alertButtons: [AlertButtonDescription] {
+    var alertButtons: [AlertButtonDescription] {
         content.alertButtons
     }
 }
 
 @MainActor
 extension AnyView: AlertMessageConvertible {
-    fileprivate var alertMessage: String? {
+    var alertMessage: String? {
         content.alertMessage
     }
 }
 
 @MainActor
 extension Text: AlertMessageConvertible {
-    fileprivate var alertMessage: String? {
+    var alertMessage: String? {
         plainText
     }
 }

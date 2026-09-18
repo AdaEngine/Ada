@@ -13,7 +13,6 @@ import Math
 
 /// A view that displays one or more lines of read-only text.
 public struct Text {
-
     let storage: Storage
 
     /// Creates a text view that displays localized text.
@@ -64,68 +63,67 @@ public struct Text {
 }
 
 extension Text: View, ViewNodeBuilder {
-    
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     func buildViewNode(in context: BuildContext) -> ViewNode {
         TextViewNode(inputs: context, content: self)
     }
 }
 
-public extension Text {
+extension Text {
     /// Sets the default font for text in this view.
-    func font(_ font: Font?) -> Text {
-        if let font = font {
+    public func font(_ font: Font?) -> Text {
+        if let font {
             self.storage.text.setFont(font, preservingSemanticTraits: true)
         }
         return self
     }
 
     /// Sets the color of the text displayed by this view.
-    func foregroundColor(_ color: Color) -> Text {
+    public func foregroundColor(_ color: Color) -> Text {
         self.storage.foregroundColor = color
         return self
     }
 
     /// Sets to a closed range the number of lines that text can occupy in this view.
-    func lineLimit(_ number: Int?) -> Text {
+    public func lineLimit(_ number: Int?) -> Text {
         self.storage.lineLimit = number
         return self
     }
 
     /// Sets the line break mode for text in this view.
-    func lineBreakMode(_ mode: LineBreakMode) -> Text {
+    public func lineBreakMode(_ mode: LineBreakMode) -> Text {
         self.storage.lineBreakMode = mode
         return self
     }
 
     /// Sets the alignment of text lines in this view.
-    func multilineTextAlignment(_ alignment: TextAlignment) -> Text {
+    public func multilineTextAlignment(_ alignment: TextAlignment) -> Text {
         self.storage.multilineTextAlignment = alignment
         return self
     }
 
     /// Sets the alignment of text lines in this view.
-    func multilineTextAligment(_ alignment: TextAlignment) -> Text {
+    public func multilineTextAligment(_ alignment: TextAlignment) -> Text {
         self.multilineTextAlignment(alignment)
     }
 
     /// Concatenates the text in two text views in a new text view.
-    static func + (lhs: Text, rhs: Text) -> Text {
+    public static func + (lhs: Text, rhs: Text) -> Text {
         let newStorage = lhs.storage.concatinating(other: rhs.storage)
         return Text(newStorage)
     }
 }
 
-public extension View {
+extension View {
     /// Sets the default font for text in this view.
-    func font(_ font: Font?) -> some View {
+    public func font(_ font: Font?) -> some View {
         return self.environment(\.font, font)
     }
-    
+
     /// Sets the default font size for text in this view.
-    func fontSize(_ pointSize: Double) -> some View {
+    public func fontSize(_ pointSize: Double) -> some View {
         return self.transformEnvironment(\.font) { font in
             var newFont = font ?? Font.system(size: 17)
             newFont.pointSize = pointSize
@@ -133,33 +131,33 @@ public extension View {
         }
     }
 
-    func foregroundColor(_ color: Color) -> some View {
+    public func foregroundColor(_ color: Color) -> some View {
         return self.environment(\.foregroundColor, color)
     }
 
-    func lineLimit(_ number: Int?) -> some View {
+    public func lineLimit(_ number: Int?) -> some View {
         return self.environment(\.lineLimit, number)
     }
 
     /// Sets the line break mode for text in this view.
-    func lineBreakMode(_ mode: LineBreakMode) -> some View {
+    public func lineBreakMode(_ mode: LineBreakMode) -> some View {
         return self.environment(\.lineBreakMode, mode)
     }
 
     /// Sets the alignment of text lines in this view.
-    func multilineTextAlignment(_ alignment: TextAlignment) -> some View {
+    public func multilineTextAlignment(_ alignment: TextAlignment) -> some View {
         return self.environment(\.multilineTextAlignment, alignment)
     }
 
     /// Sets the alignment of text lines in this view.
-    func multilineTextAligment(_ alignment: TextAlignment) -> some View {
+    public func multilineTextAligment(_ alignment: TextAlignment) -> some View {
         self.multilineTextAlignment(alignment)
     }
 }
 
 extension Text {
     final class Storage {
-        fileprivate(set) var text: AttributedText
+        var text: AttributedText
         private let preservesExplicitAttributes: Bool
         var foregroundColor: Color?
         var lineLimit: Int?
@@ -258,7 +256,6 @@ extension Text {
 }
 
 extension Text {
-
     public struct Proxy {
         let layoutManager: TextLayoutManager
 
@@ -275,7 +272,6 @@ extension Text {
 
 /// A value that can replace the default text view rendering behavior.
 public protocol TextRenderer: Animatable, Sendable {
-
     /// Draws layout into context.
     @MainActor
     func draw(layout: Text.Layout, in context: inout UIGraphicsContext)
@@ -285,24 +281,23 @@ public protocol TextRenderer: Animatable, Sendable {
     func sizeThatFits(proposal: ProposedViewSize, text: Text.Proxy) -> Size
 }
 
-public extension TextRenderer {
+extension TextRenderer {
+    public var animatableData: EmptyAnimatableData {
+        get { EmptyAnimatableData() }
+        // swiftlint:disable:next unused_setter_value
+        set {}
+    }
 
-  var animatableData: EmptyAnimatableData {
-      get { EmptyAnimatableData() }
-      // swiftlint:disable:next unused_setter_value
-      set { }
-  }
-
-    func sizeThatFits(proposal: ProposedViewSize, text: Text.Proxy) -> Size {
+    public func sizeThatFits(proposal: ProposedViewSize, text: Text.Proxy) -> Size {
         text.sizeThatFits(proposal)
     }
 }
 
-public extension View {
+extension View {
     /// Returns a new view such that any text views within it will use renderer to draw themselves.
     /// - Parameter renderer: The renderer value.
     /// - Returns: A new view that will use renderer to draw its text views.
-    func textRendered<T: TextRenderer>(_ renderer: T) -> some View {
+    public func textRendered<T: TextRenderer>(_ renderer: T) -> some View {
         self.environment(\.textRenderer, renderer)
     }
 }

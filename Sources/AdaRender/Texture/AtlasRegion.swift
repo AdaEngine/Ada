@@ -9,7 +9,6 @@ import Math
 
 /// Describes one named sub-rectangle inside a ``NamedTextureAtlas``.
 public struct AtlasRegion: Codable, Sendable, Hashable {
-
     public var key: String
 
     /// Top-left of the packed allocation in atlas pixels (includes extrude padding).

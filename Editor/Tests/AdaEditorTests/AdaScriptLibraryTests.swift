@@ -1,10 +1,11 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaScriptCompilerCore
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @Suite("AdaScript libraries", .serialized)
 struct AdaScriptLibraryTests {
@@ -21,10 +22,13 @@ struct AdaScriptLibraryTests {
             }
             if path.hasSuffix("/git/trees/\(Self.sha)") {
                 #expect(url.query == "recursive=1")
-                return try JSONSerialization.data(withJSONObject: ["truncated": false, "tree": [
-                    ["path": "ada-library.json", "mode": "100644", "type": "blob", "sha": Self.manifestSHA, "size": manifest.count],
-                    ["path": "Sources/Logic.ada", "mode": "100644", "type": "blob", "sha": Self.codeSHA, "size": code.count]
-                ]])
+                return try JSONSerialization.data(withJSONObject: [
+                    "truncated": false,
+                    "tree": [
+                        ["path": "ada-library.json", "mode": "100644", "type": "blob", "sha": Self.manifestSHA, "size": manifest.count],
+                        ["path": "Sources/Logic.ada", "mode": "100644", "type": "blob", "sha": Self.codeSHA, "size": code.count],
+                    ],
+                ])
             }
             let data = path.hasSuffix(Self.manifestSHA) ? manifest : code
             #expect(path.hasSuffix(Self.manifestSHA) || path.hasSuffix(Self.codeSHA))
@@ -45,7 +49,7 @@ struct AdaScriptLibraryTests {
                 }
                 return try JSONSerialization.data(withJSONObject: [
                     "truncated": truncated,
-                    "tree": [["path": "ada-library.json", "mode": "120000", "type": "blob", "sha": Self.manifestSHA, "size": 10]]
+                    "tree": [["path": "ada-library.json", "mode": "120000", "type": "blob", "sha": Self.manifestSHA, "size": 10]],
                 ])
             }
             await #expect(throws: (any Error).self) {
@@ -75,9 +79,13 @@ struct AdaScriptLibraryTests {
         let root = try Self.makeProject()
         defer { try? FileManager.default.removeItem(at: root) }
         let helper = Self.package("example.helper", source: "func sharedValue() { return 3; }")
-        let library = Self.package("example.game", source: "func gameValue() { return 4; }", dependencies: [
-            .init(id: helper.manifest.id, source: helper.source)
-        ])
+        let library = Self.package(
+            "example.game",
+            source: "func gameValue() { return 4; }",
+            dependencies: [
+                .init(id: helper.manifest.id, source: helper.source)
+            ]
+        )
         let manager = EditorAdaScriptLibraryManager(provider: FixtureProvider(packages: [helper, library]))
         let installed = try await manager.install(library.source, at: root)
         #expect(try installed.orderedLibraries().map(\.manifest.id) == ["example.helper", "example.game"])
@@ -115,9 +123,13 @@ struct AdaScriptLibraryTests {
         let first = Self.package("example.shared", source: "func value() { return 1; }")
         var second = first
         second.source.revision = String(repeating: "b", count: 40)
-        let consumer = Self.package("example.consumer", source: "func consumer() {}", dependencies: [
-            .init(id: first.manifest.id, source: second.source)
-        ])
+        let consumer = Self.package(
+            "example.consumer",
+            source: "func consumer() {}",
+            dependencies: [
+                .init(id: first.manifest.id, source: second.source)
+            ]
+        )
         let manager = EditorAdaScriptLibraryManager(provider: FixtureProvider(packages: [first, second, consumer]))
         let installed = try await manager.install(first.source, at: root)
         await #expect(throws: (any Error).self) { try await manager.install(consumer.source, at: root) }
@@ -156,28 +168,31 @@ struct AdaScriptLibraryTests {
     func runtimeAndPreview() async throws {
         let root = try Self.makeProject()
         defer { try? FileManager.default.removeItem(at: root) }
-        let package = Self.package("example.steps", source: """
-        func libraryStep() { return 3; }
-        @system(id: "example.library-system") class InstalledLibrarySystem {
-            @query(LibraryPosition) var entities;
-            func update(context) {
-                for (var entity in entities) { entity.libraryPosition.value += 1; }
-            }
-        }
-        @scriptable(id: "example.library-object") class InstalledLibraryObject {}
-        """)
+        let package = Self.package(
+            "example.steps",
+            source: """
+                func libraryStep() { return 3; }
+                @system(id: "example.library-system") class InstalledLibrarySystem {
+                    @query(LibraryPosition) var entities;
+                    func update(context) {
+                        for (var entity in entities) { entity.libraryPosition.value += 1; }
+                    }
+                }
+                @scriptable(id: "example.library-object") class InstalledLibraryObject {}
+                """
+        )
         let manager = EditorAdaScriptLibraryManager(provider: FixtureProvider(packages: [package]))
         _ = try await manager.install(package.source, at: root)
         let source = """
-        import { libraryStep } from "@example.steps/Sources/Logic";
-        @system(id: "game.library")
-        class LibrarySystem {
-            @query(LibraryPosition) var entities;
-            func update(context) {
-                for (var entity in entities) { entity.libraryPosition.value += libraryStep(); }
+            import { libraryStep } from "@example.steps/Sources/Logic";
+            @system(id: "game.library")
+            class LibrarySystem {
+                @query(LibraryPosition) var entities;
+                func update(context) {
+                    for (var entity in entities) { entity.libraryPosition.value += libraryStep(); }
+                }
             }
-        }
-        """
+            """
         try source.write(to: root.appendingPathComponent("Sources/Main.ada"), atomically: true, encoding: .utf8)
         var project = try ProjectSystem.loadProject(at: root)
         project.runtime.entry = AdaProjectRuntimeEntry()
@@ -196,18 +211,28 @@ struct AdaScriptLibraryTests {
         #expect(plugin.diagnostics.isEmpty)
 
         let previewSource = """
-        import { libraryStep } from "@example.steps/Sources/Logic";
-        @previewable @view class LibraryHUD { func body() { Text("Library").fontSize(libraryStep()); } }
-        """
+            import { libraryStep } from "@example.steps/Sources/Logic";
+            @previewable @view class LibraryHUD { func body() { Text("Library").fontSize(libraryStep()); } }
+            """
         let declaration = try #require(EditorPreviewScanner.declarations(in: previewSource, language: .ada).first)
         let document = EditorTextDocument(
-            id: "main", title: "Main.ada", relativePath: "Sources/Main.ada",
+            id: "main",
+            title: "Main.ada",
+            relativePath: "Sources/Main.ada",
             absolutePath: root.appendingPathComponent("Sources/Main.ada").path,
-            language: .ada, content: previewSource, lastSavedContent: source
+            language: .ada,
+            content: previewSource,
+            lastSavedContent: source
         )
-        let preview = try await EditorAdaScriptPreviewBuilder().build(.init(
-            projectURL: root, document: document, packageModel: nil, declaration: declaration
-        ) as EditorAdaScriptPreviewBuildRequest)
+        let preview = try await EditorAdaScriptPreviewBuilder()
+            .build(
+                .init(
+                    projectURL: root,
+                    document: document,
+                    packageModel: nil,
+                    declaration: declaration
+                ) as EditorAdaScriptPreviewBuildRequest
+            )
         try AdaScriptView.validate(sources: preview.sources, identifier: "LibraryHUD")
         #expect(preview.sources.contains { $0.source == previewSource })
     }
@@ -244,7 +269,9 @@ struct AdaScriptLibraryTests {
     private static let codeSHA = String(repeating: "d", count: 40)
 
     private static func package(
-        _ id: String, source: String, dependencies: [AdaScriptLibraryDependency] = []
+        _ id: String,
+        source: String,
+        dependencies: [AdaScriptLibraryDependency] = []
     ) -> AdaScriptLibraryDownload {
         .init(
             manifest: .init(id: id, version: "1.0.0", sources: ["Sources/Logic.ada"], dependencies: dependencies),

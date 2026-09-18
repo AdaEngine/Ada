@@ -46,7 +46,11 @@ struct EditorGizmoRemovalTests {
         let remove = UINodeSelector.accessibilityIdentifier("AdaEditor.Inspector.RemoveGizmo")
         _ = try container.uiScrollToNode(matching: remove)
         _ = try container.uiTapNode(matching: remove)
-        for _ in 0..<10 { await Task.yield(); container.update(1.0 / 60.0); container.layoutIfNeeded() }
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1.0 / 60.0)
+            container.layoutIfNeeded()
+        }
         #expect(inspector.selectedEntity?.editorID == selected.id)
         #expect(inspector.selectedEntity?.hasExplicitGizmo == false)
         #expect(inspector.selectedEntity?.gizmo == nil)

@@ -33,7 +33,9 @@ final class HeadlessRenderBackend: RenderBackend, @unchecked Sendable {
 
     @MainActor
     func resizeWindow(_ windowId: WindowID, newSize: SizeInt) throws {
-        guard var window = windows.firstValue(for: windowId) else { return }
+        guard var window = windows.firstValue(for: windowId) else {
+            return
+        }
         window.width = newSize.width
         window.height = newSize.height
         windows.insert(window, for: windowId)
@@ -56,11 +58,11 @@ final class HeadlessRenderBackend: RenderBackend, @unchecked Sendable {
 }
 
 private final class HeadlessRenderDevice: RenderDevice, @unchecked Sendable {
-    func createBuffer(label: String?, length: Int, options: ResourceOptions) -> Buffer {
+    func createBuffer(label: String?, length: Int, options _: ResourceOptions) -> Buffer {
         HeadlessBuffer(label: label, length: length)
     }
 
-    func createBuffer(label: String?, bytes: UnsafeRawPointer, length: Int, options: ResourceOptions) -> Buffer {
+    func createBuffer(label: String?, bytes: UnsafeRawPointer, length: Int, options _: ResourceOptions) -> Buffer {
         let buffer = HeadlessBuffer(label: label, length: length)
         buffer.setData(UnsafeMutableRawPointer(mutating: bytes), byteCount: length, offset: 0)
         return buffer
@@ -76,7 +78,7 @@ private final class HeadlessRenderDevice: RenderDevice, @unchecked Sendable {
         HeadlessVertexBuffer(label: label, length: length, binding: binding)
     }
 
-    func compileShader(from shader: Shader) throws -> any CompiledShader {
+    func compileShader(from _: Shader) throws -> any CompiledShader {
         HeadlessCompiledShader()
     }
 
@@ -105,12 +107,12 @@ private final class HeadlessRenderDevice: RenderDevice, @unchecked Sendable {
     }
 
     @MainActor
-    func createSwapchain(from window: WindowID) -> (any Swapchain)? {
+    func createSwapchain(from _: WindowID) -> (any Swapchain)? {
         HeadlessSwapchain()
     }
 }
 
-private class HeadlessBuffer: Buffer, @unchecked Sendable {
+@unsafe private class HeadlessBuffer: Buffer, @unchecked Sendable {
     var label: String?
     let length: Int
     private let pointer: UnsafeMutableRawPointer
@@ -127,7 +129,9 @@ private class HeadlessBuffer: Buffer, @unchecked Sendable {
     }
 
     func setData(_ bytes: UnsafeMutableRawPointer, byteCount: Int, offset: Int) {
-        guard byteCount > 0, offset < length else { return }
+        guard byteCount > 0, offset < length else {
+            return
+        }
         pointer.advanced(by: offset).copyMemory(from: bytes, byteCount: min(byteCount, length - offset))
     }
 
@@ -176,7 +180,7 @@ private final class HeadlessGPUTexture: GPUTexture, @unchecked Sendable {
         self.image = descriptor.image
     }
 
-    func replaceRegion(_ region: RectInt, mipmapLevel: Int, withBytes bytes: UnsafeRawPointer, bytesPerRow: Int) {}
+    func replaceRegion(_: RectInt, mipmapLevel _: Int, withBytes _: UnsafeRawPointer, bytesPerRow _: Int) {}
 
     func getImage() -> Image? {
         self.image
@@ -211,11 +215,11 @@ private final class HeadlessCommandBuffer: CommandBuffer {
     var label: String?
     private var completedHandlers: [@Sendable () -> Void] = []
 
-    func beginRenderPass(_ desc: RenderPassDescriptor) -> RenderCommandEncoder {
+    func beginRenderPass(_: RenderPassDescriptor) -> RenderCommandEncoder {
         HeadlessRenderCommandEncoder()
     }
 
-    func beginBlitPass(_ desc: BlitPassDescriptor) -> BlitCommandEncoder {
+    func beginBlitPass(_: BlitPassDescriptor) -> BlitCommandEncoder {
         HeadlessBlitCommandEncoder()
     }
 
@@ -230,77 +234,77 @@ private final class HeadlessCommandBuffer: CommandBuffer {
 }
 
 private class HeadlessCommonCommandEncoder: CommonCommandEncoder {
-    func pushDebugName(_ string: String) {}
+    func pushDebugName(_: String) {}
     func popDebugName() {}
 }
 
 private final class HeadlessBlitCommandEncoder: HeadlessCommonCommandEncoder, BlitCommandEncoder {
     func copyTextureToTexture(
-        source: Texture,
-        sourceOrigin: Origin3D,
-        sourceSize: Size3D,
-        sourceMipLevel: Int,
-        sourceSlice: Int,
-        destination: Texture,
-        destinationOrigin: Origin3D,
-        destinationMipLevel: Int,
-        destinationSlice: Int
+        source _: Texture,
+        sourceOrigin _: Origin3D,
+        sourceSize _: Size3D,
+        sourceMipLevel _: Int,
+        sourceSlice _: Int,
+        destination _: Texture,
+        destinationOrigin _: Origin3D,
+        destinationMipLevel _: Int,
+        destinationSlice _: Int
     ) {}
 
-    func copyBufferToBuffer(source: Buffer, sourceOffset: Int, destination: Buffer, destinationOffset: Int, size: Int) {}
+    func copyBufferToBuffer(source _: Buffer, sourceOffset _: Int, destination _: Buffer, destinationOffset _: Int, size _: Int) {}
 
     func copyBufferToTexture(
-        source: Buffer,
-        sourceOffset: Int,
-        sourceBytesPerRow: Int,
-        sourceBytesPerImage: Int,
-        sourceSize: Size3D,
-        destination: Texture,
-        destinationOrigin: Origin3D,
-        destinationMipLevel: Int,
-        destinationSlice: Int
+        source _: Buffer,
+        sourceOffset _: Int,
+        sourceBytesPerRow _: Int,
+        sourceBytesPerImage _: Int,
+        sourceSize _: Size3D,
+        destination _: Texture,
+        destinationOrigin _: Origin3D,
+        destinationMipLevel _: Int,
+        destinationSlice _: Int
     ) {}
 
     func copyTextureToBuffer(
-        source: Texture,
-        sourceOrigin: Origin3D,
-        sourceMipLevel: Int,
-        sourceSlice: Int,
-        sourceSize: Size3D,
-        destination: Buffer,
-        destinationOffset: Int,
-        destinationBytesPerRow: Int,
-        destinationBytesPerImage: Int
+        source _: Texture,
+        sourceOrigin _: Origin3D,
+        sourceMipLevel _: Int,
+        sourceSlice _: Int,
+        sourceSize _: Size3D,
+        destination _: Buffer,
+        destinationOffset _: Int,
+        destinationBytesPerRow _: Int,
+        destinationBytesPerImage _: Int
     ) {}
 
     func endBlitPass() {}
 }
 
 private final class HeadlessRenderCommandEncoder: HeadlessCommonCommandEncoder, RenderCommandEncoder {
-    func setRenderPipelineState(_ pipeline: RenderPipeline) {}
-    func setVertexBuffer(_ buffer: UniformBuffer, offset: Int, slot: Int) {}
-    func setVertexBuffer(_ buffer: VertexBuffer, offset: Int, slot: Int) {}
-    func setFragmentBuffer(_ buffer: UniformBuffer, offset: Int, slot: Int) {}
-    func setVertexBuffer<T>(_ bufferData: BufferData<T>, offset: Int, slot: Int) {}
-    func setFragmentBuffer<T>(_ bufferData: BufferData<T>, offset: Int, slot: Int) {}
-    func setIndexBuffer<T>(_ bufferData: BufferData<T>, indexFormat: IndexBufferFormat) {}
-    func setVertexBytes(_ bytes: UnsafeRawPointer, length: Int, slot: Int) {}
-    func setFragmentTexture(_ texture: Texture, slot: Int) {}
-    func setFragmentSamplerState(_ sampler: Sampler, slot: Int) {}
-    func setResourceSet(_ resourceSet: RenderResourceSet, index: Int) {}
-    func setViewport(_ viewport: Rect) {}
-    func setScissorRect(_ rect: Rect) {}
-    func setTriangleFillMode(_ fillMode: TriangleFillMode) {}
-    func setIndexBuffer(_ buffer: IndexBuffer, offset: Int) {}
-    func drawIndexed(indexCount: Int, indexBufferOffset: Int, instanceCount: Int) {}
-    func draw(type: IndexPrimitive, vertexStart: Int, vertexCount: Int, instanceCount: Int) {}
+    func setRenderPipelineState(_: RenderPipeline) {}
+    func setVertexBuffer(_: UniformBuffer, offset _: Int, slot _: Int) {}
+    func setVertexBuffer(_: VertexBuffer, offset _: Int, slot _: Int) {}
+    func setFragmentBuffer(_: UniformBuffer, offset _: Int, slot _: Int) {}
+    func setVertexBuffer<T>(_: BufferData<T>, offset _: Int, slot _: Int) {}
+    func setFragmentBuffer<T>(_: BufferData<T>, offset _: Int, slot _: Int) {}
+    func setIndexBuffer<T>(_: BufferData<T>, indexFormat _: IndexBufferFormat) {}
+    func setVertexBytes(_: UnsafeRawPointer, length _: Int, slot _: Int) {}
+    func setFragmentTexture(_: Texture, slot _: Int) {}
+    func setFragmentSamplerState(_: Sampler, slot _: Int) {}
+    func setResourceSet(_: RenderResourceSet, index _: Int) {}
+    func setViewport(_: Rect) {}
+    func setScissorRect(_: Rect) {}
+    func setTriangleFillMode(_: TriangleFillMode) {}
+    func setIndexBuffer(_: IndexBuffer, offset _: Int) {}
+    func drawIndexed(indexCount _: Int, indexBufferOffset _: Int, instanceCount _: Int) {}
+    func draw(type _: IndexPrimitive, vertexStart _: Int, vertexCount _: Int, instanceCount _: Int) {}
     func endRenderPass() {}
 }
 
 private final class HeadlessSwapchain: Swapchain {
     let drawablePixelFormat: PixelFormat = .bgra8
 
-    func getNextDrawable(_ renderDevice: RenderDevice) -> (any Drawable)? {
+    func getNextDrawable(_: RenderDevice) -> (any Drawable)? {
         nil
     }
 }

@@ -20,10 +20,25 @@ enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
 
     var group: EditorNewFileGroup {
         switch self {
-        case .uiScript, .scriptableObject, .script, .emptyScript: .adaScript
-        case .scene, .uiScene: .scenes
-        case .vertexShader, .fragmentShader, .computeShader: .shaders
-        case .atlas, .tileSource, .plainText, .localization, .json, .yaml: .resources
+        case .uiScript,
+            .scriptableObject,
+            .script,
+            .emptyScript:
+            .adaScript
+        case .scene,
+            .uiScene:
+            .scenes
+        case .vertexShader,
+            .fragmentShader,
+            .computeShader:
+            .shaders
+        case .atlas,
+            .tileSource,
+            .plainText,
+            .localization,
+            .json,
+            .yaml:
+            .resources
         case .swift: .swift
         }
     }
@@ -72,10 +87,17 @@ enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
 
     var fileExtension: String {
         switch self {
-        case .uiScript, .scriptableObject, .script, .emptyScript: "ada"
+        case .uiScript,
+            .scriptableObject,
+            .script,
+            .emptyScript:
+            "ada"
         case .scene: SceneDocumentFormat.canonicalExtension
         case .uiScene: "ui"
-        case .vertexShader, .fragmentShader, .computeShader: "glsl"
+        case .vertexShader,
+            .fragmentShader,
+            .computeShader:
+            "glsl"
         case .atlas: "atlas"
         case .tileSource: "tileset"
         case .plainText: "txt"
@@ -88,10 +110,14 @@ enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
 
     var icon: String {
         switch self {
-        case .uiScript, .uiScene: "\u{E871}"
+        case .uiScript,
+            .uiScene:
+            "\u{E871}"
         case .scriptableObject: "\u{E87B}"
         case .script: "\u{E8B8}"
-        case .emptyScript, .swift: "\u{E86F}"
+        case .emptyScript,
+            .swift:
+            "\u{E86F}"
         case .scene: "\u{F720}"
         case .vertexShader: "\u{E3E7}"
         case .fragmentShader: "\u{E3B7}"
@@ -100,7 +126,9 @@ enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
         case .tileSource: "\u{E8F1}"
         case .plainText: "\u{E873}"
         case .localization: "\u{E8E2}"
-        case .json, .yaml: "\u{EF42}"
+        case .json,
+            .yaml:
+            "\u{EF42}"
         }
     }
 
@@ -128,45 +156,47 @@ enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
             return SceneDocumentFormat.defaultSceneYAML(projectName: URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent)
         case .uiScript:
             return """
-            // \(fileName)
+                // \(fileName)
 
-            @view
-            @previewable
-            class \(name.hasSuffix("View") ? name : name + "View") {
-                func body() {
-                    VStack(spacing: 8) {
-                        Text("Hello, AdaUI");
-                    }.padding(16);
+                @view
+                @previewable
+                class \(name.hasSuffix("View") ? name : name + "View") {
+                    func body() {
+                        VStack(spacing: 8) {
+                            Text("Hello, AdaUI");
+                        }.padding(16);
+                    }
                 }
-            }
-            """
+                """
         case .scriptableObject:
             return """
-            // \(fileName)
+                // \(fileName)
 
-            @scriptable(id: "game.\(name.lowercased())", version: 1)
-            class \(name.hasSuffix("Script") ? name : name + "Script") {
-                func ready(context) {
-                }
+                @scriptable(id: "game.\(name.lowercased())", version: 1)
+                class \(name.hasSuffix("Script") ? name : name + "Script") {
+                    func ready(context) {
+                    }
 
-                func update(context: AdaScriptableContext) {
-                }
+                    func update(context: AdaScriptableContext) {
+                    }
 
-                func destroy(context) {
+                    func destroy(context) {
+                    }
                 }
-            }
-            """
+                """
         case .script:
             return """
-            // \(fileName)
+                // \(fileName)
 
-            @system(scheduler: "update")
-            class \(name.hasSuffix("System") ? name : name + "System") {
-                func update(context: AdaSystemContext) {
+                @system(scheduler: "update")
+                class \(name.hasSuffix("System") ? name : name + "System") {
+                    func update(context: AdaSystemContext) {
+                    }
                 }
-            }
-            """
-        case .emptyScript, .plainText: return ""
+                """
+        case .emptyScript,
+            .plainText:
+            return ""
         case .swift: return "import AdaEngine\n\n"
         case .atlas: return "images: []\nmargin: 0\npadding: 2\nextrude: 1\nsampler: linear\n"
         case .tileSource: return "tileSize:\n  x: 16\n  y: 16\nsources: []\n"
@@ -176,50 +206,50 @@ enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
             return "/* Add this table to a language folder, such as en.lproj. */\n\"hello\" = \"Hello\";\n"
         case .vertexShader:
             return """
-            #version 450 core
-            #pragma stage : vert
+                #version 450 core
+                #pragma stage : vert
 
-            layout(location = 0) in vec3 a_Position;
-            layout(location = 2) in vec2 a_UV;
-            layout(location = 0) out vec2 v_UV;
+                layout(location = 0) in vec3 a_Position;
+                layout(location = 2) in vec2 a_UV;
+                layout(location = 0) out vec2 v_UV;
 
-            [[main]]
-            void vertex_main() {
-                v_UV = a_UV;
-                gl_Position = vec4(a_Position, 1.0);
-            }
-            """
+                [[main]]
+                void vertex_main() {
+                    v_UV = a_UV;
+                    gl_Position = vec4(a_Position, 1.0);
+                }
+                """
         case .fragmentShader:
             return """
-            #version 450 core
-            #pragma stage : frag
+                #version 450 core
+                #pragma stage : frag
 
-            layout(location = 0) in vec2 v_UV;
-            layout(location = 0) out vec4 COLOR;
+                layout(location = 0) in vec2 v_UV;
+                layout(location = 0) out vec4 COLOR;
 
-            [[main]]
-            void fragment_main() {
-                COLOR = vec4(v_UV, 0.5, 1.0);
-            }
-            """
+                [[main]]
+                void fragment_main() {
+                    COLOR = vec4(v_UV, 0.5, 1.0);
+                }
+                """
         case .computeShader:
             return """
-            #version 450 core
-            #pragma stage : comp
+                #version 450 core
+                #pragma stage : comp
 
-            layout(local_size_x = 64) in;
-            layout(set = 0, binding = 0, std430) buffer Values {
-                float values[];
-            } data;
+                layout(local_size_x = 64) in;
+                layout(set = 0, binding = 0, std430) buffer Values {
+                    float values[];
+                } data;
 
-            [[main]]
-            void compute_main() {
-                uint index = gl_GlobalInvocationID.x;
-                if (index < data.values.length()) {
-                    data.values[index] = 0.0;
+                [[main]]
+                void compute_main() {
+                    uint index = gl_GlobalInvocationID.x;
+                    if (index < data.values.length()) {
+                        data.values[index] = 0.0;
+                    }
                 }
-            }
-            """
+                """
         }
     }
 

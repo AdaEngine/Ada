@@ -116,9 +116,10 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         pluginIdentifier: String,
         world: World
     ) throws -> PreparedAnnotatedSystem {
-        let queries = try plan.queries.enumerated().map { queryIndex, query in
-            try prepareQuery(query, systemIdentifier: plan.identifier, queryIndex: queryIndex)
-        }
+        let queries = try plan.queries.enumerated()
+            .map { queryIndex, query in
+                try prepareQuery(query, systemIdentifier: plan.identifier, queryIndex: queryIndex)
+            }
         let resources = try plan.resources.map { resource in
             try prepareResource(resource, systemIdentifier: plan.identifier)
         }
@@ -127,9 +128,9 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             commands: plan.usesDeferredCommands ? Commands(entities: world.entities, commandsQueue: world.commandQueue) : nil,
             dependencies: plan.dependencies.map { dependency in
                 switch dependency {
-                case .before(let identifier):
+                case let .before(identifier):
                     .before(AnnotatedGravityScriptSystem.makeIdentifier(plugin: pluginIdentifier, system: identifier))
-                case .after(let identifier):
+                case let .after(identifier):
                     .after(AnnotatedGravityScriptSystem.makeIdentifier(plugin: pluginIdentifier, system: identifier))
                 }
             },
@@ -190,21 +191,22 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         }
 
         var access = SystemAccessSet()
-        let componentAccesses = plan.components.enumerated().compactMap { index, name -> AnnotatedComponentAccess? in
-            guard let component = resolved[name] else {
-                return nil
+        let componentAccesses = plan.components.enumerated()
+            .compactMap { index, name -> AnnotatedComponentAccess? in
+                guard let component = resolved[name] else {
+                    return nil
+                }
+                // The first vertical slice conservatively grants write access to
+                // fetched components. Static access inference will narrow this set.
+                access.addComponentWrite(component.identifier)
+                let typeName = String(reflecting: component)
+                let descriptor = EditorComponentReflectionRegistry.descriptor(named: typeName)
+                return AnnotatedComponentAccess(
+                    alias: defaultAlias(for: name),
+                    componentIndex: index,
+                    fields: Dictionary(uniqueKeysWithValues: descriptor?.fields.map { ($0.key, $0) } ?? [])
+                )
             }
-            // The first vertical slice conservatively grants write access to
-            // fetched components. Static access inference will narrow this set.
-            access.addComponentWrite(component.identifier)
-            let typeName = String(reflecting: component)
-            let descriptor = EditorComponentReflectionRegistry.descriptor(named: typeName)
-            return AnnotatedComponentAccess(
-                alias: defaultAlias(for: name),
-                componentIndex: index,
-                fields: Dictionary(uniqueKeysWithValues: descriptor?.fields.map { ($0.key, $0) } ?? [])
-            )
-        }
 
         let componentIDs = plan.components.compactMap { resolved[$0]?.identifier }
         return PreparedAnnotatedQuery(
@@ -218,9 +220,10 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         if let exact = RuntimeTypeRegistry.componentType(named: name) {
             return exact
         }
-        let matches = RuntimeTypeRegistry.registeredComponentTypes().filter { registeredName, _ in
-            registeredName == name || registeredName.hasSuffix(".\(name)")
-        }
+        let matches = RuntimeTypeRegistry.registeredComponentTypes()
+            .filter { registeredName, _ in
+                registeredName == name || registeredName.hasSuffix(".\(name)")
+            }
         guard matches.count == 1 else {
             return nil
         }
@@ -280,14 +283,16 @@ private enum PreparedAnnotatedResource: Sendable {
 
     var parameter: any SystemParameter {
         switch self {
-        case .reflected(_, let parameter, _, _): parameter
-        case .input(_, let parameter, _): parameter
+        case let .reflected(_, parameter, _, _): parameter
+        case let .input(_, parameter, _): parameter
         }
     }
 
     var propertyName: String {
         switch self {
-        case .reflected(_, _, let name, _), .input(let name, _, _): name
+        case let .reflected(_, _, name, _),
+            let .input(name, _, _):
+            name
         }
     }
 }
@@ -298,13 +303,15 @@ private enum AnnotatedResourceBridge {
 
     var object: AnyObject {
         switch self {
-        case .reflected(let bridge): bridge
-        case .input(let bridge): bridge
+        case let .reflected(bridge): bridge
+        case let .input(bridge): bridge
         }
     }
 
     func invalidate() {
-        if case .input(let bridge) = self { bridge.invalidate() }
+        if case let .input(bridge) = self {
+            bridge.invalidate()
+        }
     }
 }
 
@@ -347,7 +354,7 @@ private struct AnnotatedGravityScriptSystem: System {
         return SystemQueries(queries: parameters)
     }
 
-    init(world: World) {
+    init(world _: World) {
         self.pluginIdentifier = "Unconfigured"
         self.preparedSystem = nil
         self.runtime = nil
@@ -367,7 +374,7 @@ private struct AnnotatedGravityScriptSystem: System {
         "AdaScripting.System.\(plugin.utf8.count):\(plugin)\(system.utf8.count):\(system)"
     }
 
-    func update(context: UpdateContext) async {
+    func update(context _: UpdateContext) async {
         guard let preparedSystem, let runtime else {
             return
         }
@@ -514,12 +521,14 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
             if !parameter.isAvailable && !parameter.isOptional {
                 appendDiagnostic("Required resource '\(resourceName)' is not available")
             }
-            return .reflected(AnnotatedGravityResourceView.make(
-                parameter: parameter,
-                fields: fields,
-                reportDiagnostic: appendDiagnostic,
-                virtualMachine: virtualMachine
-            ))
+            return .reflected(
+                AnnotatedGravityResourceView.make(
+                    parameter: parameter,
+                    fields: fields,
+                    reportDiagnostic: appendDiagnostic,
+                    virtualMachine: virtualMachine
+                )
+            )
         }
     }
 

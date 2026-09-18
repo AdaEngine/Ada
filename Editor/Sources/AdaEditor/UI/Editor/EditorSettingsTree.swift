@@ -7,19 +7,26 @@ extension EditorSettingsWindowViewModel {
         case .general:
             return editorViewModel == nil ? ["CLOUD ACCOUNT", "APPEARANCE"] : ["CLOUD ACCOUNT", "APPEARANCE", "EDITOR FONT", "SYNTAX APPEARANCE"]
         case .project:
-            guard editorViewModel != nil else { return [] }
+            guard editorViewModel != nil else {
+                return []
+            }
             var pages = ["PROJECT"]
             if isAdaScriptProject {
                 pages += ["RUNTIME ENTRY", "RUNTIME PROFILE", "FEATURE PLUGINS"]
-                if isRuntimePluginEnabled(.physics2D) { pages.append("PHYSICS 2D") }
+                if isRuntimePluginEnabled(.physics2D) {
+                    pages.append("PHYSICS 2D")
+                }
                 pages.append("DISPLAY")
             }
             pages += ["INPUT BINDINGS", "RESOURCE ROOTS", "BUILD FILE SELECTION", "RUN DESTINATION"]
-            if !isAdaScriptProject { pages.append("LAUNCH") }
+            if !isAdaScriptProject {
+                pages.append("LAUNCH")
+            }
             return pages
         case .agent:
             return ["AGENTS", "ACP CONNECTION", "PERMISSIONS", "CONTEXT"]
-        case .achievements, .notifications:
+        case .achievements,
+            .notifications:
             return []
         }
     }
@@ -30,7 +37,9 @@ extension EditorSettingsWindowViewModel {
 
     func visiblePages(in section: EditorSettingsSection) -> [String] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.isEmpty || section.title.localizedCaseInsensitiveContains(query) { return pages(in: section) }
+        if query.isEmpty || section.title.localizedCaseInsensitiveContains(query) {
+            return pages(in: section)
+        }
         return pages(in: section).filter { $0.localizedCaseInsensitiveContains(query) }
     }
 
@@ -90,7 +99,9 @@ struct EditorSettingsTree: View {
             .accessibilityIdentifier("AdaEditor.Settings.Section.\(section.title)")
             if hasChildren && expanded {
                 ForEach(viewModel.visiblePages(in: section), id: \.self) { page in
-                    Button { viewModel.selectPage(page, in: section) } label: {
+                    Button {
+                        viewModel.selectPage(page, in: section)
+                    } label: {
                         HStack(spacing: 8) {
                             theme.editorColors.border.frame(width: 1, height: 28)
                             Text(page.localizedCapitalized).font(.system(size: 12))

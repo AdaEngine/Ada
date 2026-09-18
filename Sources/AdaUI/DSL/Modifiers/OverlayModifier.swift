@@ -8,12 +8,12 @@
 import AdaAnimation
 import Math
 
-public extension View {
+extension View {
     /// Layers the views that you specify in front of this view.
     /// - Parameter anchor: The anchor that the modifier uses to position the implicit ``ZStack`` that groups the foreground views. The default is center.
     /// - Parameter content: A ``ViewBuilder`` that you use to declare the views to draw in front of this view,
     /// stacked in the order that you list them. The last view that you list appears at the front of the stack.
-    func overlay<Content: View>(
+    public func overlay<Content: View>(
         anchor: AnchorPoint = .center,
         @ViewBuilder content: () -> Content
     ) -> some View {
@@ -51,7 +51,7 @@ private struct OverlayLayout: Layout {
 
     let anchor: AnchorPoint
 
-    func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> Size {
+    func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) -> Size {
         guard !subviews.isEmpty else {
             return proposal.replacingUnspecifiedDimensions()
         }
@@ -60,7 +60,7 @@ private struct OverlayLayout: Layout {
         return contentSubview.sizeThatFits(proposal)
     }
 
-    func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+    func placeSubviews(in bounds: Rect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout Void) {
         guard !subviews.isEmpty else {
             return
         }

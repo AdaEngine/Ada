@@ -9,9 +9,8 @@ import Observation
 
 /// A view that arranges its subviews in a horizontal line.
 public struct HStack<Content: View>: View {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let alignment: VerticalAlignment
     let spacing: Float?

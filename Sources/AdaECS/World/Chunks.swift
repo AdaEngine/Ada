@@ -7,8 +7,8 @@
 
 import AdaUtils
 import Foundation
-import OrderedCollections
 import Logging
+import OrderedCollections
 
 // TODO: A lot of unsafe code. What we can do? Use Span?
 
@@ -25,7 +25,6 @@ public struct MoveEntityResult: Sendable {
 /// A chunk-based storage system for ECS components
 /// Provides memory-efficient, cache-friendly storage for entities and their components
 public struct Chunks: Sendable {
-
     /// Array of chunks for different archetypes
     public internal(set) var chunks: ContiguousArray<Chunk> = []
 
@@ -33,7 +32,7 @@ public struct Chunks: Sendable {
     public let entitiesPerChunk: Int
 
     private var friedLocation: [ChunkLocation] = []
-    
+
     /// Location entity in chunk
     public private(set) var entities: SparseSet<Entity.ID, ChunkLocation> = [:]
 
@@ -50,8 +49,8 @@ public struct Chunks: Sendable {
     }
 }
 
-public extension Chunks {
-    mutating func getFreeChunkIndex() -> Int {
+extension Chunks {
+    public mutating func getFreeChunkIndex() -> Int {
         if let firstLocation = friedLocation.popLast() {
             return firstLocation.chunkIndex
         } else if let possibleIndex = chunks.firstIndex(where: { !$0.isFull }) {
@@ -63,7 +62,7 @@ public extension Chunks {
         }
     }
 
-    func insert<T: Component>(
+    public func insert<T: Component>(
         _ component: T,
         for entity: Entity.ID,
         lastTick: Tick
@@ -80,13 +79,13 @@ public extension Chunks {
             )
     }
 
-    subscript(_ index: Int) -> Chunk {
+    public subscript(_ index: Int) -> Chunk {
         _read { yield chunks[index] }
         _modify { yield &chunks[index] }
     }
 
     @discardableResult
-    mutating func insertEntity(
+    public mutating func insertEntity(
         _ entity: Entity.ID,
         components: [any Component],
         tick: Tick
@@ -107,7 +106,7 @@ public extension Chunks {
     }
 
     @discardableResult
-    mutating func removeEntity(_ entity: Entity.ID) -> MoveEntityResult? {
+    public mutating func removeEntity(_ entity: Entity.ID) -> MoveEntityResult? {
         guard let location = self.entities[entity] else {
             return nil
         }
@@ -118,7 +117,7 @@ public extension Chunks {
         return MoveEntityResult(newLocation: location, swappedEntity: swappedEntity)
     }
 
-    mutating func moveEntity(_ entity: Entity.ID, to chunks: inout Chunks) -> MoveEntityResult {
+    public mutating func moveEntity(_ entity: Entity.ID, to chunks: inout Chunks) -> MoveEntityResult {
         guard let location = self.entities[entity] else {
             fatalError("Entity \(entity) not found in chunks")
         }
@@ -176,7 +175,7 @@ public extension Chunks {
         let swappedEntityId = chunk.swapRemoveEntity(at: entity, deinitialize: deinitialize)
         self.entities.remove(for: entity)
 
-        if let swappedEntityId = swappedEntityId {
+        if let swappedEntityId {
             self.entities[swappedEntityId] = location
         }
         self.chunks[location.chunkIndex] = chunk
@@ -184,7 +183,7 @@ public extension Chunks {
         return swappedEntityId
     }
 
-    mutating func clear() {
+    public mutating func clear() {
         for index in 0..<chunks.count {
             self.chunks[index].clear()
         }
@@ -192,7 +191,7 @@ public extension Chunks {
         self.friedLocation.removeAll()
     }
 
-    func getComponentSlices<T: Component>(for type: T.Type) -> [UnsafeBufferPointer<T>] {
+    public func getComponentSlices<T: Component>(for type: T.Type) -> [UnsafeBufferPointer<T>] {
         var slices: [UnsafeBufferPointer<T>] = unsafe []
         for index in 0..<self.chunks.count {
             if let slice = unsafe self.chunks[index].getComponentSlice(for: type) {
@@ -202,7 +201,7 @@ public extension Chunks {
         return unsafe slices
     }
 
-    func getComponentTicksSlices<T: Component>(
+    public func getComponentTicksSlices<T: Component>(
         for type: T.Type
     ) -> [ChangeTickSlices] {
         var slices: [ChangeTickSlices] = []
@@ -229,7 +228,9 @@ public struct Chunk: Sendable {
         init<T: Component>(capacity: Int, component: T.Type) {
             self.data = unsafe BlobArray(count: capacity, of: T.self) { pointer, count in
                 // Deinitialize components that contain reference types to ensure proper cleanup
-                guard !T.componentsInfo.isPlainOldData else { return }
+                guard !T.componentsInfo.isPlainOldData else {
+                    return
+                }
                 unsafe pointer.baseAddress?
                     .assumingMemoryBound(to: T.self)
                     .deinitialize(count: count)
@@ -241,13 +242,13 @@ public struct Chunk: Sendable {
 
         public var description: String {
             return """
-            ComponentsData(
-                data: \(data.count),
-                addedTicks: \(addedTicks.count),
-                changeTicks: \(changeTicks.count),
-                componentType: \(componentType)
-            )
-            """
+                ComponentsData(
+                    data: \(data.count),
+                    addedTicks: \(addedTicks.count),
+                    changeTicks: \(changeTicks.count),
+                    componentType: \(componentType)
+                )
+                """
         }
     }
 
@@ -278,6 +279,7 @@ public struct Chunk: Sendable {
     }
 
     public var isEmpty: Bool {
+        // swiftlint:disable:next empty_count
         self.count == 0
     }
 
@@ -413,7 +415,7 @@ public struct Chunk: Sendable {
     }
 
     public func isComponentChanged<T: Component>(
-        _ type: T.Type,
+        _: T.Type,
         for entity: Entity.ID,
         lastTick: Tick
     ) -> Bool {
@@ -432,7 +434,7 @@ public struct Chunk: Sendable {
     }
 
     @inline(__always)
-    public func get<T: Component>(_ type: T.Type, for entity: Entity.ID) -> T? {
+    public func get<T: Component>(_: T.Type, for entity: Entity.ID) -> T? {
         guard let index = self.entityIndices[entity] else {
             return nil
         }
@@ -443,7 +445,7 @@ public struct Chunk: Sendable {
 
     @inline(__always)
     public func getMutablePointer<T: Component>(
-        _ type: T.Type,
+        _: T.Type,
         for entity: Entity.ID
     ) -> UnsafeMutablePointer<T>? {
         guard let index = self.entityIndices[entity] else {
@@ -455,7 +457,7 @@ public struct Chunk: Sendable {
     }
 
     public func getMutableTick<T: Component>(
-        _ type: T.Type,
+        _: T.Type,
         for entity: Entity.ID
     ) -> UnsafeMutablePointer<Tick>? {
         guard let index = self.entityIndices[entity] else {
@@ -489,28 +491,28 @@ public struct Chunk: Sendable {
         guard let index = self.entityIndices[entity] else {
             return []
         }
-        return componentsData.values.map { (key, data) in
+        return componentsData.values.map { key, data in
             (key, data.data.get(at: index, as: data.componentType))
         }
     }
 
-    public func getComponentSlice<T: Component>(for type: T.Type) -> UnsafeBufferPointer<T>? {
-        guard let componentData = self.componentsData[T.identifier], self.count > 0 else {
+    public func getComponentSlice<T: Component>(for _: T.Type) -> UnsafeBufferPointer<T>? {
+        guard let componentData = self.componentsData[T.identifier], !self.isEmpty else {
             return nil
         }
         let startPointer = unsafe componentData.data.getMutablePointer(at: 0, as: T.self)
         return unsafe UnsafeBufferPointer(start: startPointer, count: self.count)
     }
 
-    public func getMutableComponentSlice<T: Component>(for type: T.Type) -> UnsafeMutablePointer<T>? {
-        guard let componentData = self.componentsData[T.identifier], self.count > 0 else {
+    public func getMutableComponentSlice<T: Component>(for _: T.Type) -> UnsafeMutablePointer<T>? {
+        guard let componentData = self.componentsData[T.identifier], !self.isEmpty else {
             return nil
         }
         return unsafe componentData.data.getMutablePointer(at: 0, as: T.self)
     }
 
-    public func getComponentTicksSlice<T: Component>(for type: T.Type) -> ChangeTickSlices? {
-        guard let componentData = self.componentsData[T.identifier], self.count > 0 else {
+    public func getComponentTicksSlice<T: Component>(for _: T.Type) -> ChangeTickSlices? {
+        guard let componentData = self.componentsData[T.identifier], !self.isEmpty else {
             return nil
         }
         return unsafe ChangeTickSlices(
@@ -519,8 +521,8 @@ public struct Chunk: Sendable {
         )
     }
 
-    public func getMutableComponentTicksSlice<T: Component>(for type: T.Type) -> ChangeMutableTickSlices? {
-        guard let componentData = self.componentsData[T.identifier], self.count > 0 else {
+    public func getMutableComponentTicksSlice<T: Component>(for _: T.Type) -> ChangeMutableTickSlices? {
+        guard let componentData = self.componentsData[T.identifier], !self.isEmpty else {
             return nil
         }
         return unsafe ChangeMutableTickSlices(
@@ -545,14 +547,14 @@ public struct ChangeMutableTickSlices {
 extension Chunk: CustomStringConvertible {
     public var description: String {
         return """
-        Chunk(
-            entitiesPerChunk: \(entitiesPerChunk),
-            count: \(count),
-            entities: \(entities.map(\.description)),
-            entityIndices: \(entityIndices),
-            componentsData:
-                \(componentsData.map { $0.description }.joined(separator: "\n"))
-        )
-        """
+            Chunk(
+                entitiesPerChunk: \(entitiesPerChunk),
+                count: \(count),
+                entities: \(entities.map(\.description)),
+                entityIndices: \(entityIndices),
+                componentsData:
+                    \(componentsData.map(\.description).joined(separator: "\n"))
+            )
+            """
     }
 }

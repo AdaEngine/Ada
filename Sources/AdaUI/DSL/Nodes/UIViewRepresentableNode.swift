@@ -5,12 +5,11 @@
 //  Created by Vladislav Prusakov on 07.06.2024.
 //
 
-import AdaUtils
 import AdaInput
+import AdaUtils
 import Math
 
 final class UIViewRepresentableNode<Representable: UIViewRepresentable>: ViewNode {
-
     private(set) var view: Representable.ViewType?
     private var coordinator: Representable.Coordinator
     private(set) var representable: Representable
@@ -23,7 +22,7 @@ final class UIViewRepresentableNode<Representable: UIViewRepresentable>: ViewNod
         self.coordinator = representable.makeCoordinator()
         super.init(content: content)
     }
-    
+
     override func performLayout() {
         let context = Representable.Context(environment: self.environment, coordinator: coordinator)
 
@@ -44,8 +43,12 @@ final class UIViewRepresentableNode<Representable: UIViewRepresentable>: ViewNod
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard let view, view.isInteractionEnabled, !view.isHidden,
-              view.hitTest(point, with: event) != nil else { return nil }
+        guard
+            let view, view.isInteractionEnabled, !view.isHidden,
+            view.hitTest(point, with: event) != nil
+        else {
+            return nil
+        }
         return self
     }
 
@@ -59,7 +62,9 @@ final class UIViewRepresentableNode<Representable: UIViewRepresentable>: ViewNod
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
-        guard let newNode = newNode as? UIViewRepresentableNode<Representable> else { return }
+        guard let newNode = newNode as? UIViewRepresentableNode<Representable> else {
+            return
+        }
         representable = newNode.representable
         markNeedsLayout()
         owner?.containerView?.setNeedsLayout()
@@ -88,40 +93,56 @@ final class UIViewRepresentableNode<Representable: UIViewRepresentable>: ViewNod
     }
 
     override func onReceiveEvent(_ event: any InputEvent) {
-        guard view?.isInteractionEnabled == true else { return }
+        guard view?.isInteractionEnabled == true else {
+            return
+        }
         view?.onEvent(event)
     }
 
     override func onKeyEvent(_ event: KeyEvent) {
-        guard view?.isInteractionEnabled == true else { return }
+        guard view?.isInteractionEnabled == true else {
+            return
+        }
         view?.onKeyEvent(event)
     }
 
     override func onTextInputEvent(_ event: TextInputEvent) {
-        guard view?.isInteractionEnabled == true else { return }
+        guard view?.isInteractionEnabled == true else {
+            return
+        }
         view?.onTextInputEvent(event)
     }
 
     override func onMouseEvent(_ event: MouseEvent) {
-        guard let view, view.isInteractionEnabled else { return }
+        guard let view, view.isInteractionEnabled else {
+            return
+        }
         let origin = absoluteFrame().origin
-        view.onMouseEvent(MouseEvent(
-            window: event.window,
-            button: event.button,
-            scrollDelta: event.scrollDelta,
-            mousePosition: event.mousePosition - origin,
-            phase: event.phase,
-            modifierKeys: event.modifierKeys,
-            time: event.time
-        ))
+        view.onMouseEvent(
+            MouseEvent(
+                window: event.window,
+                button: event.button,
+                scrollDelta: event.scrollDelta,
+                mousePosition: event.mousePosition - origin,
+                phase: event.phase,
+                modifierKeys: event.modifierKeys,
+                time: event.time
+            )
+        )
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
-        guard let view, view.isInteractionEnabled else { return }
+        guard let view, view.isInteractionEnabled else {
+            return
+        }
         let origin = absoluteFrame().origin
-        view.onTouchesEvent(Set(touches.map { touch in
-            TouchEvent(window: touch.window, location: touch.location - origin, phase: touch.phase, time: touch.time, contactID: touch.contactID)
-        }))
+        view.onTouchesEvent(
+            Set(
+                touches.map { touch in
+                    TouchEvent(window: touch.window, location: touch.location - origin, phase: touch.phase, time: touch.time, contactID: touch.contactID)
+                }
+            )
+        )
     }
 
     override func update(_ deltaTime: TimeInterval) {

@@ -3,7 +3,6 @@
 //  AdaEngine
 //
 
-// swiftlint:disable type_body_length
 @_spi(AdaEngine) import AdaEngine
 
 private typealias LauncherColor = AdaColorPalette
@@ -16,6 +15,7 @@ enum ProjectOpeningLayout {
     static let explorerWidth: Float = 320
     static let detailWidth: Float = windowWidth - sidebarWidth - explorerWidth
     static let detailPadding: Float = 32
+    static let detailBottomPadding: Float = 16
     static let detailContentWidth: Float = detailWidth - detailPadding * 2
     static let previewHeight: Float = 200
     static let detailRowHeight: Float = 44
@@ -76,10 +76,6 @@ enum ProjectOpeningLandingSpec {
 struct ProjectOpeningView: View {
     @Environment(\.userInterfaceIdiom) private var userInterfaceIdiom
 
-    private var usesCreationNavigation: Bool {
-        userInterfaceIdiom == .pad || userInterfaceIdiom == .phone
-    }
-
     let autoOpenLastProject: Bool
     let initiallyCreatingProject: Bool
     @State private var viewModel: ProjectOpeningViewModel
@@ -112,33 +108,32 @@ struct ProjectOpeningView: View {
                 .foregroundColor(.white)
                 .accessibilityIdentifier(ProjectOpeningAccessibility.detail)
         }
-        .frame(
-            minWidth: usesCreationNavigation ? 0 : ProjectOpeningLayout.windowWidth,
-            maxWidth: .infinity,
-            minHeight: ProjectOpeningLayout.windowHeight,
-            maxHeight: .infinity,
-            alignment: .topLeading
-        )
         .background {
             LauncherColor.window.ignoresSafeArea()
         }
-        .fullScreenCover(isPresented: Binding(
-            get: { viewModel.projectBeingRenamed != nil },
-            set: { if !$0 { viewModel.cancelRenamingProject() } }
-        )) {
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { viewModel.projectBeingRenamed != nil },
+                set: {
+                    if !$0 {
+                        viewModel.cancelRenamingProject()
+                    }
+                }
+            )
+        ) {
             ProjectOpeningRenameDialog(viewModel: viewModel)
         }
         #if os(iOS)
-        .fullScreenCover(item: $presentedSettingsSection) { section in
-            EditorSettingsWindowView(
-                viewModel: EditorSettingsWindowViewModel(
-                    editorViewModel: viewModel.selectedProject.map { EditorViewModel(project: $0) },
-                    selectedSection: section
-                ),
-                showsCloseButton: true
-            )
-            .theme(.adaEditor)
-        }
+            .fullScreenCover(item: $presentedSettingsSection) { section in
+                EditorSettingsWindowView(
+                    viewModel: EditorSettingsWindowViewModel(
+                        editorViewModel: viewModel.selectedProject.map { EditorViewModel(project: $0) },
+                        selectedSection: section
+                    ),
+                    showsCloseButton: true
+                )
+                .theme(.adaEditor)
+            }
         #endif
         .menuBar(EditorMenuBar.makeMenus())
         .onChange(of: viewModel.projectToOpenInEditorToken) { _, _ in
@@ -150,7 +145,9 @@ struct ProjectOpeningView: View {
         .onAppear {
             let didRouteIncomingProject = EditorProjectOpenURLRouter.shared.attach(viewModel)
             EditorMenuCommandRouter.shared.install(owner: viewModel) { [weak viewModel] command in
-                guard let viewModel else { return false }
+                guard let viewModel else {
+                    return false
+                }
                 switch command {
                 case .showSettings:
                     presentSettings(.general)
@@ -158,7 +155,9 @@ struct ProjectOpeningView: View {
                     viewModel.beginCreateNewProject()
                 case .openProject:
                     ProjectOpenPicker.presentProjectPicker { url in
-                        guard let url else { return }
+                        guard let url else {
+                            return
+                        }
                         viewModel.openProject(at: url)
                     }
                 case .showProjectSettings:
@@ -227,6 +226,7 @@ struct ProjectOpeningView: View {
             launcherSectionButton(.samples)
 
             Spacer()
+
             LauncherSidebarTooltipButton("Settings") {
                 presentSettings(.general)
             } label: {
@@ -237,6 +237,7 @@ struct ProjectOpeningView: View {
             }
             .buttonStyle(LauncherIconButtonStyle())
             .frame(width: 54, height: 36)
+            .padding(.bottom, 16)
         }
         .frame(width: ProjectOpeningLayout.sidebarWidth)
         .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
@@ -246,9 +247,9 @@ struct ProjectOpeningView: View {
 
     private func presentSettings(_ section: EditorSettingsSection) {
         #if os(iOS)
-        presentedSettingsSection = section
+            presentedSettingsSection = section
         #else
-        EditorSettingsWindowController.open(project: viewModel.selectedProject, selectedSection: section)
+            EditorSettingsWindowController.open(project: viewModel.selectedProject, selectedSection: section)
         #endif
     }
 
@@ -440,86 +441,76 @@ struct ProjectOpeningView: View {
             return AnyView(emptyProjectLanding)
         }
 
-        return AnyView(VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("ACTIVE PROJECT")
-                    .font(.system(size: 10))
-                    .foregroundColor(LauncherColor.accentViolet)
-                Text(project?.name ?? "Create or Open")
-                    .font(.system(size: 36))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
+        return AnyView(
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("ACTIVE PROJECT")
+                        .font(.system(size: 10))
+                        .foregroundColor(LauncherColor.accentViolet)
+                    Text(project?.name ?? "Create or Open")
+                        .font(.system(size: 36))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+                .frame(width: ProjectOpeningLayout.detailContentWidth, height: 59, alignment: .topLeading)
+
+                Spacer().frame(height: 32)
+
+                ZStack {
+                    RoundedRectangleShape(cornerRadius: 12).fill(LauncherColor.preview)
+                    Text("NO RENDER PREVIEW AVAILABLE")
+                        .font(.system(size: 11))
+                        .foregroundColor(LauncherColor.muted.opacity(0.4))
+                }
+                .frame(height: ProjectOpeningLayout.previewHeight)
+                .frame(maxWidth: .infinity)
+                .overlay {
+                    RoundedRectangleShape(cornerRadius: 12).stroke(LauncherColor.glassBorder, lineWidth: 1)
+                }
+
+                Spacer().frame(height: 32)
+
+                detailsList(project)
+
+                Spacer().frame(height: 28)
+
+                statusAndDiagnostics
+
+                Spacer()
             }
-            .frame(width: ProjectOpeningLayout.detailContentWidth, height: 59, alignment: .topLeading)
-
-            Spacer().frame(height: 32)
-
-            ZStack {
-                RoundedRectangleShape(cornerRadius: 12).fill(LauncherColor.preview)
-                Text("NO RENDER PREVIEW AVAILABLE")
-                    .font(.system(size: 11))
-                    .foregroundColor(LauncherColor.muted.opacity(0.4))
-            }
-            .frame(height: ProjectOpeningLayout.previewHeight)
-            .frame(maxWidth: .infinity)
-            .overlay {
-                RoundedRectangleShape(cornerRadius: 12).stroke(LauncherColor.glassBorder, lineWidth: 1)
-            }
-
-            Spacer().frame(height: 32)
-
-            detailsList(project)
-
-            Spacer().frame(height: 28)
-
-            statusAndDiagnostics
-
-            Spacer()
-        }
-        .padding(ProjectOpeningLayout.detailPadding)
-        .frame(
-            minWidth: 0,
-            maxWidth: .infinity,
-            minHeight: 0,
-            maxHeight: .infinity,
-            alignment: .topLeading
+            .padding(ProjectOpeningLayout.detailPadding)
+            .frame(
+                minWidth: 0,
+                maxWidth: .infinity,
+                minHeight: 0,
+                maxHeight: .infinity,
+                alignment: .topLeading
+            )
+            .background(LauncherColor.window)
         )
-        .background(LauncherColor.window))
     }
 
-    @ViewBuilder
     private var createProjectForm: some View {
-        if usesCreationNavigation {
-            NavigationStack {
-                createProjectFormBody
-                    .navigationTitle("New Project")
-                    .navigationTitleFont(AdaEditorTitleFont.font(size: 22))
-                    .navigationTitlePosition(.leading)
-                    .navigationBarColor(LauncherColor.window)
-            }
-        } else {
+        NavigationStack {
             createProjectFormBody
+                .navigationTitle("New Project")
+                .navigationTitleFont(AdaEditorTitleFont.font(size: 22))
+                .navigationTitlePosition(.leading)
+                .navigationBarColor(LauncherColor.window)
         }
     }
 
     private var createProjectFormBody: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if usesCreationNavigation {
-                ScrollView(.vertical) {
-                    createProjectFormFields
-                        .padding(.horizontal, ProjectOpeningLayout.detailPadding)
-                        .padding(.bottom, 24)
-                }
-            } else {
+            ScrollView(.vertical) {
                 createProjectFormFields
                     .padding(.horizontal, ProjectOpeningLayout.detailPadding)
-                    .padding(.top, ProjectOpeningLayout.detailPadding)
-                Spacer()
+                    .padding(.bottom, 24)
             }
 
             createProjectFormFooter
                 .padding(.horizontal, ProjectOpeningLayout.detailPadding)
-                .padding(.bottom, ProjectOpeningLayout.detailPadding)
+                .padding(.bottom, ProjectOpeningLayout.detailBottomPadding)
         }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
         .background(LauncherColor.window)
@@ -527,22 +518,6 @@ struct ProjectOpeningView: View {
 
     private var createProjectFormFields: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if !usesCreationNavigation {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("CREATE NEW PROJECT")
-                        .font(.system(size: 10))
-                        .foregroundColor(LauncherColor.accentViolet)
-
-                    Text("New Project")
-                        .font(.system(size: 36))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .frame(width: ProjectOpeningLayout.detailContentWidth, alignment: .leading)
-                }
-                .frame(width: ProjectOpeningLayout.detailContentWidth, height: 59, alignment: .topLeading)
-                .accessibilityIdentifier(ProjectOpeningAccessibility.createHeader)
-            }
-
             Text("Choose a project name and a destination folder. AdaEditor will create a new folder with the project files inside it.")
                 .font(.system(size: 13))
                 .foregroundColor(LauncherColor.muted)
@@ -553,7 +528,7 @@ struct ProjectOpeningView: View {
 
             VStack(alignment: .leading, spacing: 18) {
                 createFormField(title: "Project Name") {
-                    TextField("AdaGame", text: viewModel.projectNameBinding)
+                    TextField("My_Game", text: viewModel.projectNameBinding)
                         .font(.system(size: 14))
                         .foregroundColor(.white)
                         .padding(.leading, 14)
@@ -590,9 +565,9 @@ struct ProjectOpeningView: View {
                     .frame(height: 44)
                     .frame(maxWidth: .infinity)
                     .background(RoundedRectangleShape(cornerRadius: 10).fill(LauncherColor.input))
-                        .overlay {
-                            RoundedRectangleShape(cornerRadius: 10).stroke(LauncherColor.inputBorder, lineWidth: 1)
-                        }
+                    .overlay {
+                        RoundedRectangleShape(cornerRadius: 10).stroke(LauncherColor.inputBorder, lineWidth: 1)
+                    }
                 }
                 .accessibilityIdentifier(ProjectOpeningAccessibility.location)
 
@@ -670,7 +645,6 @@ struct ProjectOpeningView: View {
                     .foregroundColor(.white)
             }
         }
-        .buttonStyle(LauncherInlineButtonStyle())
         .accessibilityIdentifier(ProjectOpeningAccessibility.packageToggle)
     }
 

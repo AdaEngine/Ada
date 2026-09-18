@@ -72,7 +72,7 @@ public struct UIRenderNode: RenderNode {
             return []
         }
 
-        try query.forEach { entity, camera, target, cameraUniform in
+        try query.forEach { entity, camera, target, _ in
             if entity != view {
                 return
             }
@@ -194,12 +194,13 @@ public struct UIRenderNode: RenderNode {
                     // Reset scissor for each item so clip state from previous draws
                     // never leaks into non-clipped UI primitives.
                     activePass.setScissorRect(renderTargetScissor)
-                    try AnyDrawPass(item.drawPass).render(
-                        with: activePass,
-                        world: context.world,
-                        view: view,
-                        item: item
-                    )
+                    try AnyDrawPass(item.drawPass)
+                        .render(
+                            with: activePass,
+                            world: context.world,
+                            view: view,
+                            item: item
+                        )
                 }
             }
 
@@ -226,7 +227,7 @@ public struct UIRenderNode: RenderNode {
     }
 }
 
-public extension Transform3D {
+extension Transform3D {
     /// Creates an orthographic projection matrix for UI rendering.
     /// Origin is at top-left corner, Y increases downward.
     /// - Parameters:
@@ -234,7 +235,7 @@ public extension Transform3D {
     ///   - height: Viewport height in points.
     ///   - scaleFactor: Scale factor for HiDPI displays.
     /// - Returns: Orthographic projection matrix.
-    static func createUIProjection(
+    public static func createUIProjection(
         width: Float,
         height: Float,
         scaleFactor: Float = 1.0
@@ -242,7 +243,7 @@ public extension Transform3D {
         // UI orthographic projection with origin at top-left
         // X: 0 to width (left to right)
         // Y: 0 to -height (top to bottom, negated in Rect.toTransform3D)
-        return Transform3D.orthographic(
+        return Self.orthographic(
             left: 0,
             right: width / scaleFactor,
             top: 0,

@@ -18,26 +18,25 @@ public enum SoundState {
 
 /// Interface describe sound object.
 protocol Sound: AnyObject {
-    
     var state: SoundState { get }
-    
+
     var volume: Float { get set }
-    
+
     var pitch: Float { get set }
-    
+
     var position: Vector3 { get set }
-    
+
     var isLooping: Bool { get set }
-    
+
     func start()
-    
+
     func stop()
-    
+
     func pause()
-    
+
     func copy() throws -> Sound
-    
+
     func update(_ deltaTime: AdaUtils.TimeInterval)
-    
-    func onCompleteHandler(_ block: @escaping () -> Void) 
+
+    func onCompleteHandler(_ block: @escaping () -> Void)
 }

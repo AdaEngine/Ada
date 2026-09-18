@@ -13,10 +13,10 @@ import AdaScene
 import AdaUtils
 import Math
 
-public extension UIWindowManager {
+extension UIWindowManager {
     @MainActor
     @discardableResult
-    func spawnWindow<Content: View>(
+    public func spawnWindow<Content: View>(
         configuration: UIWindow.Configuration,
         @ViewBuilder content: () -> Content
     ) -> UIWindow {
@@ -32,9 +32,10 @@ public extension UIWindowManager {
         if configuration.background.isTransparent {
             camera.backgroundColor = Color(red: 0, green: 0, blue: 0, alpha: 0)
         }
-        let cameraEntity = AppWorldsSession.current?.spawn(
-            bundle: Camera2D(camera: camera)
-        )
+        let cameraEntity = AppWorldsSession.current?
+            .spawn(
+                bundle: Camera2D(camera: camera)
+            )
         window.runtimeCameraEntity = cameraEntity
 
         if configuration.showsImmediately {

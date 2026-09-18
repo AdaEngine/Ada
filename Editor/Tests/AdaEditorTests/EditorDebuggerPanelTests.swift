@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 @_spi(Internal) import AdaUI
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor debugger panel", .serialized)
 @MainActor
@@ -89,7 +90,10 @@ struct EditorDebuggerPanelTests {
         let frame = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Debug.pause")).absoluteFrame
         container.onMouseEvent(MouseEvent(window: RID(), button: .none, mousePosition: Point(frame.midX, frame.midY), phase: .changed, modifierKeys: [], time: 0))
         try await Task.sleep(for: .milliseconds(600))
-        for _ in 0..<10 { await Task.yield(); container.layoutIfNeeded() }
+        for _ in 0..<10 {
+            await Task.yield()
+            container.layoutIfNeeded()
+        }
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Debug.Tooltip"))
     }
 
@@ -104,5 +108,4 @@ struct EditorDebuggerPanelTests {
         container.layoutIfNeeded()
         return container
     }
-
 }

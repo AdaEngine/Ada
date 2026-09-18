@@ -11,22 +11,21 @@ import Foundation
 
 /// A shader module that stores shaders.
 public final class ShaderModule: Asset, @unchecked Sendable {
-    
     /// The shaders in the shader module.
     private var shaders: [ShaderStage: Shader] = [:]
 
     /// The reflection data of the shader module.
     var reflectionData: ShaderReflectionData
-    
+
     /// Initialize a new shader module.
     ///
     /// - Parameters:
     ///   - shaders: The shaders in the shader module.
-    init(shaders: [ShaderStage : Shader] = [:], reflectionData: ShaderReflectionData) {
+    init(shaders: [ShaderStage: Shader] = [:], reflectionData: ShaderReflectionData) {
         self.shaders = shaders
         self.reflectionData = reflectionData
     }
-    
+
     /// Add a shader to the shader module.
     ///
     /// - Parameters:
@@ -35,7 +34,7 @@ public final class ShaderModule: Asset, @unchecked Sendable {
     public func addShader(_ shader: Shader, for stage: ShaderStage) {
         self.shaders[stage] = shader
     }
-    
+
     /// Get a shader from the shader module.
     ///
     /// - Parameter stage: The stage of the shader.
@@ -43,12 +42,12 @@ public final class ShaderModule: Asset, @unchecked Sendable {
     public func getShader(for stage: ShaderStage) -> Shader? {
         return self.shaders[stage]
     }
-    
+
     /// The stages of the shader module.
     public var stages: [ShaderStage] {
         return Array(self.shaders.keys)
     }
-    
+
     /// Set a macro for a shader stage.
     ///
     /// - Parameters:
@@ -58,10 +57,10 @@ public final class ShaderModule: Asset, @unchecked Sendable {
     public func setMacro(_ name: String, value: String, for shaderStage: ShaderStage) {
         self.shaders[shaderStage]?.setMacro(name, value: value)
     }
-    
+
     /// The asset meta info of the shader module.
     public var assetMetaInfo: AssetMetaInfo?
-    
+
     /// Initialize a new shader module from a decoder.
     ///
     /// - Parameter decoder: The decoder to initialize the shader module from.
@@ -72,27 +71,27 @@ public final class ShaderModule: Asset, @unchecked Sendable {
         self.shaders = module.shaders
         self.reflectionData = module.reflectionData
     }
-    
+
     /// Encode the shader module to an encoder.
     ///
     /// - Parameter encoder: The encoder to encode the shader module to.
     /// - Throws: An error if the shader module cannot be encoded to the encoder.
-    public func encodeContents(with encoder: AssetEncoder) throws {
-        fatalError("TODO")
+    public func encodeContents(with _: AssetEncoder) throws {
+        throw AssetError.message("ShaderModule encoding is unsupported.")
     }
-    
+
     /// The extensions of the shader module.
     public static func extensions() -> [String] {
         ["mat"]
     }
 }
 
-public extension ShaderModule {
+extension ShaderModule {
     /// Create a new shader module from a file url.
     ///
     /// - Parameter fileUrl: The file url to create the shader module from.
     /// - Returns: The shader module.
-    static func create(from fileUrl: URL) throws -> ShaderModule {
+    public static func create(from fileUrl: URL) throws -> ShaderModule {
         try ShaderCompiler(from: fileUrl).compileShaderModule()
     }
 
@@ -100,7 +99,7 @@ public extension ShaderModule {
     ///
     /// Browser startup still constructs render pipelines synchronously, so shader
     /// resources need a sync path that does not block on `UnsafeTask`.
-    static func loadBundled(at path: String, from bundle: Bundle) throws -> AssetHandle<ShaderModule> {
+    public static func loadBundled(at path: String, from bundle: Bundle) throws -> AssetHandle<ShaderModule> {
         guard let resourceURL = bundle.resourceURL else {
             throw ShaderModuleError.notFound(path)
         }
@@ -111,9 +110,9 @@ public extension ShaderModule {
         }
 
         #if WASM && canImport(WebGPU)
-        if path.hasSuffix(".glsl"), let wgslModule = try createWGSLModuleIfAvailable(for: url) {
-            return AssetHandle(wgslModule)
-        }
+            if path.hasSuffix(".glsl"), let wgslModule = try createWGSLModuleIfAvailable(for: url) {
+                return AssetHandle(wgslModule)
+            }
         #endif
 
         return AssetHandle(try create(from: url))
@@ -125,160 +124,164 @@ private enum ShaderModuleError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notFound(let path):
+        case let .notFound(path):
             "Shader module not found at \(path)."
         }
     }
 }
 
 #if WASM && canImport(WebGPU)
-private extension ShaderModule {
-    static func createWGSLModuleIfAvailable(for glslURL: URL) throws -> ShaderModule? {
-        let baseURL = glslURL.deletingPathExtension()
-        let vertexURL = baseURL.appendingPathExtension("vert.wgsl")
-        let fragmentURL = baseURL.appendingPathExtension("frag.wgsl")
+    extension ShaderModule {
+        private static func createWGSLModuleIfAvailable(for glslURL: URL) throws -> ShaderModule? {
+            let baseURL = glslURL.deletingPathExtension()
+            let vertexURL = baseURL.appendingPathExtension("vert.wgsl")
+            let fragmentURL = baseURL.appendingPathExtension("frag.wgsl")
 
-        guard FileSystem.current.itemExists(at: vertexURL),
-              FileSystem.current.itemExists(at: fragmentURL),
-              let vertexData = FileSystem.current.readFile(at: vertexURL),
-              let fragmentData = FileSystem.current.readFile(at: fragmentURL),
-              let vertexSource = String(data: vertexData, encoding: .utf8),
-              let fragmentSource = String(data: fragmentData, encoding: .utf8) else {
-            return nil
+            guard
+                FileSystem.current.itemExists(at: vertexURL),
+                FileSystem.current.itemExists(at: fragmentURL),
+                let vertexData = FileSystem.current.readFile(at: vertexURL),
+                let fragmentData = FileSystem.current.readFile(at: fragmentURL),
+                let vertexSource = String(bytes: vertexData, encoding: .utf8),
+                let fragmentSource = String(bytes: fragmentData, encoding: .utf8)
+            else {
+                return nil
+            }
+
+            let vertexReflection = makeWGSLReflection(from: vertexSource, stage: .vertex)
+            let fragmentReflection = makeWGSLReflection(from: fragmentSource, stage: .fragment)
+            let vertexShader = try makeWGSLShader(
+                source: vertexSource,
+                stage: .vertex,
+                entryPoint: entryPoint(in: vertexSource, attribute: "vertex"),
+                reflectionData: vertexReflection
+            )
+            let fragmentShader = try makeWGSLShader(
+                source: fragmentSource,
+                stage: .fragment,
+                entryPoint: entryPoint(in: fragmentSource, attribute: "fragment"),
+                reflectionData: fragmentReflection
+            )
+
+            var reflection = ShaderReflectionData()
+            reflection.merge(vertexReflection)
+            reflection.merge(fragmentReflection)
+
+            return ShaderModule(
+                shaders: [
+                    .vertex: vertexShader,
+                    .fragment: fragmentShader,
+                ],
+                reflectionData: reflection
+            )
         }
 
-        let vertexReflection = makeWGSLReflection(from: vertexSource, stage: .vertex)
-        let fragmentReflection = makeWGSLReflection(from: fragmentSource, stage: .fragment)
-        let vertexShader = try makeWGSLShader(
-            source: vertexSource,
-            stage: .vertex,
-            entryPoint: entryPoint(in: vertexSource, attribute: "vertex"),
-            reflectionData: vertexReflection
-        )
-        let fragmentShader = try makeWGSLShader(
-            source: fragmentSource,
-            stage: .fragment,
-            entryPoint: entryPoint(in: fragmentSource, attribute: "fragment"),
-            reflectionData: fragmentReflection
-        )
-
-        var reflection = ShaderReflectionData()
-        reflection.merge(vertexReflection)
-        reflection.merge(fragmentReflection)
-
-        return ShaderModule(
-            shaders: [
-                .vertex: vertexShader,
-                .fragment: fragmentShader
-            ],
-            reflectionData: reflection
-        )
-    }
-
-    static func makeWGSLShader(
-        source: String,
-        stage: ShaderStage,
-        entryPoint: String,
-        reflectionData: ShaderReflectionData
-    ) throws -> Shader {
-        let shader = Shader(
-            source: source,
-            entryPoint: entryPoint,
-            stage: stage,
-            reflectionData: reflectionData
-        )
-        try shader.compile()
-        return shader
-    }
-
-    static func entryPoint(in source: String, attribute: String) -> String {
-        let pattern = "@" + attribute + "\\s+fn\\s+([A-Za-z_][A-Za-z0-9_]*)"
-        guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)),
-              let range = Range(match.range(at: 1), in: source) else {
-            return "main"
+        private static func makeWGSLShader(
+            source: String,
+            stage: ShaderStage,
+            entryPoint: String,
+            reflectionData: ShaderReflectionData
+        ) throws -> Shader {
+            let shader = Shader(
+                source: source,
+                entryPoint: entryPoint,
+                stage: stage,
+                reflectionData: reflectionData
+            )
+            try shader.compile()
+            return shader
         }
 
-        return String(source[range])
-    }
+        private static func entryPoint(in source: String, attribute: String) -> String {
+            let pattern = "@" + attribute + "\\s+fn\\s+([A-Za-z_][A-Za-z0-9_]*)"
+            guard
+                let regex = try? NSRegularExpression(pattern: pattern),
+                let match = regex.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)),
+                let range = Range(match.range(at: 1), in: source)
+            else {
+                return "main"
+            }
 
-    static func makeWGSLReflection(from source: String, stage: ShaderStage) -> ShaderReflectionData {
-        var reflection = ShaderReflectionData()
-        let stageFlag = ShaderStageFlags(shaderStage: stage)
-        let pattern = #"@group\((\d+)\)\s*@binding\((\d+)\)\s*var(?:<([^>]+)>)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^;]+);"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return String(source[range])
+        }
+
+        private static func makeWGSLReflection(from source: String, stage: ShaderStage) -> ShaderReflectionData {
+            var reflection = ShaderReflectionData()
+            let stageFlag = ShaderStageFlags(shaderStage: stage)
+            let pattern = #"@group\((\d+)\)\s*@binding\((\d+)\)\s*var(?:<([^>]+)>)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^;]+);"#
+            guard let regex = try? NSRegularExpression(pattern: pattern) else {
+                return reflection
+            }
+
+            let matches = regex.matches(in: source, range: NSRange(source.startIndex..., in: source))
+            for match in matches {
+                guard
+                    let groupRange = Range(match.range(at: 1), in: source),
+                    let bindingRange = Range(match.range(at: 2), in: source),
+                    let nameRange = Range(match.range(at: 4), in: source),
+                    let typeRange = Range(match.range(at: 5), in: source),
+                    let group = Int(source[groupRange]),
+                    let binding = Int(source[bindingRange])
+                else {
+                    continue
+                }
+
+                let addressSpace: String
+                if let addressRange = Range(match.range(at: 3), in: source) {
+                    addressSpace = String(source[addressRange])
+                } else {
+                    addressSpace = ""
+                }
+                let name = String(source[nameRange])
+                let type = String(source[typeRange])
+
+                reflection.ensureDescriptorSet(at: group)
+
+                if addressSpace == "uniform" {
+                    let buffer = ShaderResource.ShaderBuffer(
+                        name: name,
+                        size: 0,
+                        shaderStage: stageFlag,
+                        binding: binding,
+                        resourceAccess: .read,
+                        members: [:]
+                    )
+                    reflection.shaderBuffers[name] = buffer
+                    reflection.descriptorSets[group].uniformsBuffers[binding] = buffer
+                } else if type.hasPrefix("texture") {
+                    let resource = ShaderResource.ImageSampler(
+                        name: name,
+                        binding: binding,
+                        textureType: .texture2D,
+                        descriptorSet: group,
+                        arraySize: 1,
+                        shaderStage: stageFlag,
+                        resourceAccess: .read
+                    )
+                    reflection.resources[name] = resource
+                    reflection.descriptorSets[group].sampledImages[binding] = resource
+                } else if type.hasPrefix("sampler") {
+                    let sampler = ShaderResource.Sampler(
+                        name: name,
+                        binding: binding,
+                        shaderStage: stageFlag
+                    )
+                    reflection.samplers[name] = sampler
+                    reflection.descriptorSets[group].samplers[binding] = sampler
+                }
+            }
+
             return reflection
         }
-
-        let matches = regex.matches(in: source, range: NSRange(source.startIndex..., in: source))
-        for match in matches {
-            guard
-                let groupRange = Range(match.range(at: 1), in: source),
-                let bindingRange = Range(match.range(at: 2), in: source),
-                let nameRange = Range(match.range(at: 4), in: source),
-                let typeRange = Range(match.range(at: 5), in: source),
-                let group = Int(source[groupRange]),
-                let binding = Int(source[bindingRange])
-            else {
-                continue
-            }
-
-            let addressSpace: String
-            if let addressRange = Range(match.range(at: 3), in: source) {
-                addressSpace = String(source[addressRange])
-            } else {
-                addressSpace = ""
-            }
-            let name = String(source[nameRange])
-            let type = String(source[typeRange])
-
-            reflection.ensureDescriptorSet(at: group)
-
-            if addressSpace == "uniform" {
-                let buffer = ShaderResource.ShaderBuffer(
-                    name: name,
-                    size: 0,
-                    shaderStage: stageFlag,
-                    binding: binding,
-                    resourceAccess: .read,
-                    members: [:]
-                )
-                reflection.shaderBuffers[name] = buffer
-                reflection.descriptorSets[group].uniformsBuffers[binding] = buffer
-            } else if type.hasPrefix("texture") {
-                let resource = ShaderResource.ImageSampler(
-                    name: name,
-                    binding: binding,
-                    textureType: .texture2D,
-                    descriptorSet: group,
-                    arraySize: 1,
-                    shaderStage: stageFlag,
-                    resourceAccess: .read
-                )
-                reflection.resources[name] = resource
-                reflection.descriptorSets[group].sampledImages[binding] = resource
-            } else if type.hasPrefix("sampler") {
-                let sampler = ShaderResource.Sampler(
-                    name: name,
-                    binding: binding,
-                    shaderStage: stageFlag
-                )
-                reflection.samplers[name] = sampler
-                reflection.descriptorSets[group].samplers[binding] = sampler
-            }
-        }
-
-        return reflection
     }
-}
 
-private extension ShaderReflectionData {
-    mutating func ensureDescriptorSet(at index: Int) {
-        guard index >= descriptorSets.count else {
-            return
+    extension ShaderReflectionData {
+        private mutating func ensureDescriptorSet(at index: Int) {
+            guard index >= descriptorSets.count else {
+                return
+            }
+
+            descriptorSets.append(contentsOf: Array(repeating: ShaderResource.DescriptorSet(), count: index - descriptorSets.count + 1))
         }
-
-        descriptorSets.append(contentsOf: Array(repeating: ShaderResource.DescriptorSet(), count: index - descriptorSets.count + 1))
     }
-}
 #endif

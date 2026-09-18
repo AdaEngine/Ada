@@ -36,13 +36,12 @@ public struct RenderGraphContext: ~Copyable, Sendable {
         self.inputResources = inputResources
         self.viewEntity = viewEntity
     }
-    
+
     internal var pendingSubgraphs: [PendingSubGraph] = []
 }
 
-public extension RenderGraphContext {
-
-    mutating func runSubgraph(
+extension RenderGraphContext {
+    public mutating func runSubgraph(
         _ name: RenderGraph.Label,
         inputs: [RenderSlotValue],
         viewEntity: Entity? = nil
@@ -52,29 +51,28 @@ public extension RenderGraphContext {
         }
 
         if let inputResources = graph.entryNode?.node.inputResources {
-            for (index, inputResource) in inputResources.enumerated() {
-                if inputs[index].value.resourceKind != inputResource.kind {
-                    return
-                }
+            for (index, inputResource) in inputResources.enumerated()
+                where inputs[index].value.resourceKind != inputResource.kind {
+                return
             }
         }
-        
+
         self.pendingSubgraphs.append(PendingSubGraph(graph: graph, inputs: inputs, viewEntity: viewEntity))
     }
 
-    func entityResource(by name: RenderSlot.Label) -> Entity? {
+    public func entityResource(by name: RenderSlot.Label) -> Entity? {
         self.inputResources.first(where: { $0.name == name })?.value.entity
     }
 
-    func textureResource(by name: RenderSlot.Label) -> Texture? {
+    public func textureResource(by name: RenderSlot.Label) -> Texture? {
         self.inputResources.first(where: { $0.name == name })?.value.texture
     }
 
-    func bufferResource(by name: RenderSlot.Label) -> Buffer? {
+    public func bufferResource(by name: RenderSlot.Label) -> Buffer? {
         self.inputResources.first(where: { $0.name == name })?.value.buffer
     }
 
-    func samplerResource(by name: RenderSlot.Label) -> Sampler? {
+    public func samplerResource(by name: RenderSlot.Label) -> Sampler? {
         self.inputResources.first(where: { $0.name == name })?.value.sampler
     }
 }

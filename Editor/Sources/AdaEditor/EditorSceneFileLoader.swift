@@ -5,7 +5,7 @@ struct EditorSceneLoadSummary: Equatable, Sendable {
     var entityCount: Int
     var warnings: [String]
 
-    static let empty = EditorSceneLoadSummary(entityCount: 0, warnings: [])
+    static let empty = Self(entityCount: 0, warnings: [])
 }
 
 struct EditorSceneRuntimeLoadResult: Equatable, Sendable {
@@ -14,7 +14,7 @@ struct EditorSceneRuntimeLoadResult: Equatable, Sendable {
     var entitiesByEditorID: [String: Entity.ID]
     var editorIDsByEntityID: [Entity.ID: String]
 
-    static let empty = EditorSceneRuntimeLoadResult(entityCount: 0, warnings: [], entitiesByEditorID: [:], editorIDsByEntityID: [:])
+    static let empty = Self(entityCount: 0, warnings: [], entitiesByEditorID: [:], editorIDsByEntityID: [:])
 }
 
 enum EditorSceneFileLoader {
@@ -125,8 +125,10 @@ enum EditorSceneFileLoader {
                 if componentName == EditorBuiltInComponentType.scriptableComponents, !loadsScriptableObjects {
                     continue
                 }
-                guard RuntimeTypeRegistry.componentType(named: componentName) != nil
-                    || EditorComponentRegistry.descriptor(named: componentName) != nil else {
+                guard
+                    RuntimeTypeRegistry.componentType(named: componentName) != nil
+                        || EditorComponentRegistry.descriptor(named: componentName) != nil
+                else {
                     warnings.append("Unknown component: \(componentName)")
                     continue
                 }
@@ -135,10 +137,14 @@ enum EditorSceneFileLoader {
                     if let component = try EditorComponentRegistry.decode(typeName: componentName, payload: componentPayload) {
                         if let ui = (component as? UIComponent) ?? (component as? CompanionPanel)?.ui {
                             let runtime = world.getResource(UIComponentRuntimeResource.self)?.runtime
-                            if let source = ui.source { try runtime?.validateScriptBindings(source: source) }
+                            if let source = ui.source {
+                                try runtime?.validateScriptBindings(source: source)
+                            }
                             // Script values arrive after ready/update. Keep the component until then,
                             // including when an input intentionally has no preview default.
-                            if ui.source?.scriptBindings.isEmpty != false { _ = try ui.resolveView(runtime: runtime) }
+                            if ui.source?.scriptBindings.isEmpty != false {
+                                _ = try ui.resolveView(runtime: runtime)
+                            }
                         }
                         insertComponent(component, into: entity, in: world)
                     } else {
@@ -148,6 +154,7 @@ enum EditorSceneFileLoader {
                     warnings.append("Failed to decode \(componentName): \(error.localizedDescription)")
                 }
             }
+            completeRuntimeBundle(for: entity, in: world)
         }
 
         for sceneEntity in sceneModel.entities {
@@ -185,7 +192,9 @@ enum EditorSceneFileLoader {
                 continue
             }
             let runtimeClips = clips.map { $0.makeRuntimeClip(initialTransform: transform) }
-            guard !runtimeClips.isEmpty else { continue }
+            guard !runtimeClips.isEmpty else {
+                continue
+            }
             world.insert(
                 KeyframeAnimator(clips: runtimeClips, initialClipName: runtimeClips.first?.name, isPlaying: true),
                 for: entity.id
@@ -221,6 +230,40 @@ enum EditorSceneFileLoader {
     }
 
     @MainActor
+    private static func completeRuntimeBundle(for entity: Entity, in world: World) {
+        guard let camera = world.get(Camera.self, from: entity.id) else {
+            return
+        }
+        if world.get(Visibility.self, from: entity.id) == nil {
+            world.insert(Visibility.visible, for: entity.id)
+        }
+        if world.get(VisibleEntities.self, from: entity.id) == nil {
+            world.insert(VisibleEntities(), for: entity.id)
+        }
+        if world.get(GlobalViewUniform.self, from: entity.id) == nil {
+            world.insert(GlobalViewUniform(), for: entity.id)
+        }
+        if world.get(AudioReceiver.self, from: entity.id) == nil {
+            world.insert(AudioReceiver(), for: entity.id)
+        }
+        if world.get(CameraRenderGraph.self, from: entity.id) == nil {
+            let renderGraph: CameraRenderGraph
+            switch camera.projection {
+            case .perspective:
+                renderGraph = CameraRenderGraph(subgraphLabel: .main3D, inputSlot: Core3DPlugin.InputNode.view)
+            case .orthographic,
+                .custom:
+                renderGraph = CameraRenderGraph(subgraphLabel: .main2D, inputSlot: Main2DRenderNode.InputNode.view)
+            }
+            world.insert(renderGraph, for: entity.id)
+        }
+        if case .perspective = camera.projection,
+            world.get(Environment3D.self, from: entity.id) == nil {
+            world.insert(Environment3D(), for: entity.id)
+        }
+    }
+
+    @MainActor
     private static func instantiateNestedScenes(
         in sceneModel: EditorSceneModel,
         entitiesByEditorID: [String: Entity],
@@ -233,10 +276,12 @@ enum EditorSceneFileLoader {
     ) -> NestedSceneResult {
         var result = NestedSceneResult()
         for sceneEntity in sceneModel.entities {
-            guard let instancePayload = sceneEntity.components[EditorBuiltInComponentType.sceneInstance],
-                  let reference = instancePayload["scene"]?.stringValue,
-                  !reference.isEmpty,
-                  let instanceEntity = entitiesByEditorID[sceneEntity.id] else {
+            guard
+                let instancePayload = sceneEntity.components[EditorBuiltInComponentType.sceneInstance],
+                let reference = instancePayload["scene"]?.stringValue,
+                !reference.isEmpty,
+                let instanceEntity = entitiesByEditorID[sceneEntity.id]
+            else {
                 continue
             }
             guard let nestedURL = resolveSceneReference(reference, relativeTo: sourceURL, resourceRootURL: resourceRootURL) else {
@@ -318,7 +363,7 @@ private struct NestedSceneResult {
     var editorIDsByEntityID: [Entity.ID: String] = [:]
 }
 
-private extension EditorSceneRuntimeLoadResult {
+extension EditorSceneRuntimeLoadResult {
     static func emptyWithWarnings(_ warnings: [String]) -> EditorSceneRuntimeLoadResult {
         EditorSceneRuntimeLoadResult(entityCount: 0, warnings: warnings, entitiesByEditorID: [:], editorIDsByEntityID: [:])
     }

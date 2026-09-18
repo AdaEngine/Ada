@@ -24,7 +24,7 @@ public protocol EditorInspectableComponent: Component {
 /// struct Transform {
 ///     var position: Vector3
 /// }
-/// 
+///
 /// let transform = Transform()
 ///                     .setPosition(Vector3(0, 0, 0))
 /// ```
@@ -33,7 +33,6 @@ public protocol EditorInspectableComponent: Component {
 public macro Component(
     required: [any (Component & DefaultValue).Type] = []
 ) = #externalMacro(module: "AdaEngineMacros", type: "ComponentMacro")
-
 
 /// A macro for creating a bundle.
 /// A bundle macro is more preffered way to create a bundle.

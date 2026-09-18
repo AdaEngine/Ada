@@ -1,13 +1,14 @@
 import Foundation
+
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+    import FoundationNetworking
 #endif
 
 protocol EditorImageGenerationHTTPClient: Sendable {
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse)
 }
 
-struct EditorURLSessionImageGenerationHTTPClient: EditorImageGenerationHTTPClient {
+struct EditorImageHTTPClient: EditorImageGenerationHTTPClient {
     var session: URLSession = .shared
 
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
@@ -42,23 +43,23 @@ enum EditorAgentImageToolError: Error, Equatable, LocalizedError, Sendable {
         switch self {
         case .disabled:
             "Image generation is disabled for this project."
-        case .unsupportedProvider(let provider):
+        case let .unsupportedProvider(provider):
             "Unsupported image generation provider: \(provider)"
-        case .invalidDestination(let path):
+        case let .invalidDestination(path):
             "Invalid generated image destination: \(path)"
-        case .invalidSource(let path):
+        case let .invalidSource(path):
             "Invalid source image path: \(path)"
-        case .destinationExists(let path):
+        case let .destinationExists(path):
             "Generated image destination already exists: \(path)"
         case .invalidHTTPResponse:
             "Image provider returned a non-HTTP response."
-        case .requestFailed(let statusCode, let message):
+        case let .requestFailed(statusCode, message):
             "Image provider request failed (HTTP \(statusCode)): \(message)"
         case .missingImageData:
             "Image provider response did not contain image data."
         case .invalidBase64Image:
             "Image provider returned invalid base64 image data."
-        case .invalidImageFormat(let format):
+        case let .invalidImageFormat(format):
             "Image provider returned data that is not a valid \(format) image."
         }
     }
@@ -96,7 +97,7 @@ actor EditorAgentImageToolService {
         project: AdaProject,
         projectURL: URL,
         credentials: any EditorImageCredentialProviding = EditorOpenAIImageCredentialStore(),
-        httpClient: any EditorImageGenerationHTTPClient = EditorURLSessionImageGenerationHTTPClient(),
+        httpClient: any EditorImageGenerationHTTPClient = EditorImageHTTPClient(),
         endpointBaseURL: URL = URL(string: "https://api.openai.com/v1") ?? URL(fileURLWithPath: "/"),
         fileManager: FileManager = .default
     ) {
@@ -119,7 +120,7 @@ actor EditorAgentImageToolService {
             "size": configuration.size,
             "quality": configuration.quality,
             "background": configuration.background,
-            "output_format": configuration.outputFormat
+            "output_format": configuration.outputFormat,
         ]
         var request = URLRequest(url: endpointBaseURL.appendingPathComponent("images/generations"))
         request.httpMethod = "POST"
@@ -153,7 +154,7 @@ actor EditorAgentImageToolService {
                 "size": configuration.size,
                 "quality": configuration.quality,
                 "background": configuration.background,
-                "output_format": configuration.outputFormat
+                "output_format": configuration.outputFormat,
             ],
             imageData: sourceData,
             fileName: sourceURL.lastPathComponent,
@@ -175,8 +176,9 @@ actor EditorAgentImageToolService {
 
         let (responseData, response) = try await httpClient.data(for: request)
         guard (200..<300).contains(response.statusCode) else {
-            let message = (try? JSONDecoder().decode(OpenAIErrorResponse.self, from: responseData).error.message)
-                ?? String(data: responseData, encoding: .utf8)
+            let message =
+                (try? JSONDecoder().decode(OpenAIErrorResponse.self, from: responseData).error.message)
+                ?? String(bytes: responseData, encoding: .utf8)
                 ?? "Unknown provider error"
             throw EditorAgentImageToolError.requestFailed(statusCode: response.statusCode, message: message)
         }
@@ -245,12 +247,15 @@ actor EditorAgentImageToolService {
 
     private static func validate(_ data: Data, outputFormat: String) throws {
         let bytes = [UInt8](data.prefix(12))
-        let valid: Bool = switch outputFormat.lowercased() {
-        case "png": bytes.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
-        case "jpeg", "jpg": bytes.starts(with: [0xFF, 0xD8])
-        case "webp": bytes.count >= 12 && Array(bytes[0..<4]) == Array("RIFF".utf8) && Array(bytes[8..<12]) == Array("WEBP".utf8)
-        default: false
-        }
+        let valid: Bool =
+            switch outputFormat.lowercased() {
+            case "png": bytes.starts(with: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+            case "jpeg",
+                "jpg":
+                bytes.starts(with: [0xFF, 0xD8])
+            case "webp": bytes.count >= 12 && Array(bytes[0..<4]) == Array("RIFF".utf8) && Array(bytes[8..<12]) == Array("WEBP".utf8)
+            default: false
+            }
         guard valid else {
             throw EditorAgentImageToolError.invalidImageFormat(outputFormat)
         }
@@ -258,7 +263,9 @@ actor EditorAgentImageToolService {
 
     private static func mimeType(forExtension fileExtension: String) -> String {
         switch fileExtension.lowercased() {
-        case "jpg", "jpeg": "image/jpeg"
+        case "jpg",
+            "jpeg":
+            "image/jpeg"
         case "webp": "image/webp"
         default: "image/png"
         }

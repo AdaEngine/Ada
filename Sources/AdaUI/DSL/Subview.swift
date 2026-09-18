@@ -8,22 +8,20 @@
 @MainActor
 @preconcurrency
 public struct Subview: View, Identifiable {
-
     public let id: ObjectIdentifier
     let view: AnyView
-    
+
     init<V: View>(_ view: V) {
         self.id = ObjectIdentifier(V.self)
         self.view = AnyView(view)
     }
-    
+
     public var body: some View {
         self.view
     }
 }
 
 public struct SubviewsCollection: Collection, Sequence, RandomAccessCollection {
-
     let subviews: [Subview]
 
     public typealias Element = Subview

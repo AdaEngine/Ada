@@ -13,7 +13,6 @@ import Math
 
 /// Setup 3D physics to the scene.
 public struct Physics3DPlugin: Plugin {
-
     public let gravity: Vector3
     public let subStepCount: Int32
 
@@ -30,11 +29,13 @@ public struct Physics3DPlugin: Plugin {
     }
 
     public func setup(in app: AppWorlds) {
-        let threading = app.getResource(PhysicsSimulationThreading.self) ?? {
-            let resource = PhysicsSimulationThreading()
-            app.insertResource(resource)
-            return resource
-        }()
+        let threading =
+            app.getResource(PhysicsSimulationThreading.self)
+            ?? {
+                let resource = PhysicsSimulationThreading()
+                app.insertResource(resource)
+                return resource
+            }()
 
         PhysicsBody3DComponent.registerComponent()
         PhysicsBody3DInitialized.registerComponent()
@@ -78,10 +79,10 @@ public struct Physics3DWorldHolder: Resource {
     public let world: PhysicsWorld3D
 }
 
-public extension World {
+extension World {
     /// Returns ``PhysicsWorld3D`` instance if ``Physics3DPlugin`` is connected to the scene.
     @MainActor
-    var physicsWorld3D: PhysicsWorld3D? {
+    public var physicsWorld3D: PhysicsWorld3D? {
         return self.getResource(Physics3DWorldHolder.self)?.world
     }
 }

@@ -70,13 +70,13 @@ public struct GlassPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = try! ShaderModule.loadBundled(at: "Shaders/glass.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/glass.glsl", from: .module)
     }
 
     public func configurate(
-        with configuration: RenderPipelineEmptyConfiguration
+        with _: RenderPipelineEmptyConfiguration
     ) -> RenderPipelineDescriptor {
-        var pipelineDesc = RenderPipelineDescriptor(vertex: shader.asset.getShader(for: .vertex)!)
+        var pipelineDesc = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex))
         pipelineDesc.fragment = shader.asset.getShader(for: .fragment)
         pipelineDesc.debugName = "Glass Pipeline"
         pipelineDesc.backfaceCulling = false

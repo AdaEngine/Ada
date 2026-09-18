@@ -18,7 +18,6 @@ import AdaECS
 /// }
 /// ```
 public protocol KeyframeAnimatable: Sendable {
-
     /// Write the current animated values into the entity's ECS components.
     func apply(to entityId: Entity.ID, in world: World)
 }

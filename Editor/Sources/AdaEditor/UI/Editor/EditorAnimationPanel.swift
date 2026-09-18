@@ -220,7 +220,7 @@ struct EditorAnimationPanel: View {
         .background(theme.editorColors.background.opacity(0.72))
     }
 
-    private func selectionInspector(clip: EditorAnimationClip, track: EditorAnimationTrack) -> some View {
+    private func selectionInspector(clip _: EditorAnimationClip, track: EditorAnimationTrack) -> some View {
         HStack(spacing: 8) {
             Text(track.property.title)
                 .font(.system(size: 10, weight: .semibold))
@@ -254,7 +254,9 @@ struct EditorAnimationPanel: View {
         HStack(spacing: 10) {
             Spacer()
             Text(title).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
-            if let actionTitle { compactTextButton(actionTitle, action: action) }
+            if let actionTitle {
+                compactTextButton(actionTitle, action: action)
+            }
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -302,7 +304,9 @@ struct EditorAnimationPanel: View {
             let y = inset + graphHeight * Float(index) / 4
             context.drawRect(Rect(x: inset, y: y, width: graphWidth, height: 1), color: theme.editorColors.border.opacity(0.25))
         }
-        guard let track, !track.keyframes.isEmpty else { return }
+        guard let track, !track.keyframes.isEmpty else {
+            return
+        }
         let values = track.keyframes.map(\.value)
         let minimum = values.min() ?? 0
         let maximum = values.max() ?? 1
@@ -320,7 +324,11 @@ struct EditorAnimationPanel: View {
                 inset + graphWidth * Float(time / safeDuration),
                 inset + graphHeight * (1 - Float((value - low) / valueRange))
             )
-            if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
+            if index == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
         }
         context.stroke(path, with: theme.editorColors.blue, style: StrokeStyle(lineWidth: 2))
         for keyframe in track.keyframes {
@@ -423,21 +431,33 @@ struct EditorAnimationPanel: View {
     private func clipDurationBinding(_ clip: EditorAnimationClip) -> Binding<String> {
         Binding(
             get: { EditorAnimationPanelFormatting.number(viewModel.selectedAnimationClip?.duration ?? clip.duration) },
-            set: { if let value = Double($0) { viewModel.updateSelectedAnimationClip(duration: value) } }
+            set: {
+                if let value = Double($0) {
+                    viewModel.updateSelectedAnimationClip(duration: value)
+                }
+            }
         )
     }
 
     private func keyframeTimeBinding(_ keyframe: EditorAnimationKeyframe) -> Binding<String> {
         Binding(
             get: { EditorAnimationPanelFormatting.number(viewModel.selectedAnimationKeyframe?.time ?? keyframe.time) },
-            set: { if let value = Double($0) { viewModel.updateSelectedAnimationKeyframe(time: value) } }
+            set: {
+                if let value = Double($0) {
+                    viewModel.updateSelectedAnimationKeyframe(time: value)
+                }
+            }
         )
     }
 
     private func keyframeValueBinding(_ keyframe: EditorAnimationKeyframe) -> Binding<String> {
         Binding(
             get: { EditorAnimationPanelFormatting.number(viewModel.selectedAnimationKeyframe?.value ?? keyframe.value) },
-            set: { if let value = Double($0) { viewModel.updateSelectedAnimationKeyframe(value: value) } }
+            set: {
+                if let value = Double($0) {
+                    viewModel.updateSelectedAnimationKeyframe(value: value)
+                }
+            }
         )
     }
 }

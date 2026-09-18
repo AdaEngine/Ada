@@ -7,12 +7,12 @@
 
 import Math
 
-public extension View {
+extension View {
     /// Positions this view within an invisible frame with the specified size.
     /// - Parameter width: A fixed width for the resulting view. If width is nil, the resulting view assumes this view’s sizing behavior.
     /// - Parameter height: A fixed height for the resulting view. If height is nil, the resulting view assumes this view’s sizing behavior.
     /// - Returns: A view with fixed dimensions of width and height, for the parameters that are non-nil.
-    func frame(width: Float? = nil, height: Float? = nil, alignment: Alignment = .center) -> some View {
+    public func frame(width: Float? = nil, height: Float? = nil, alignment: Alignment = .center) -> some View {
         self.modifier(
             _FrameViewModifier(
                 content: self,
@@ -25,7 +25,7 @@ public extension View {
     ///
     /// Behavior follows SwiftUI: `min`/`max` bound the measured size along each axis; `ideal` fills in when the parent proposal is unspecified.
     /// Pass `nil` for a bound to leave that bound open (maximum uses infinity when omitted).
-    func frame(
+    public func frame(
         minWidth: Float? = nil,
         idealWidth: Float? = nil,
         maxWidth: Float? = nil,
@@ -52,7 +52,6 @@ public extension View {
 }
 
 struct _FrameViewModifier<Content: View>: ViewModifier, ViewNodeBuilder {
-
     typealias Body = Never
     let content: Content
 
@@ -68,7 +67,6 @@ struct _FrameViewModifier<Content: View>: ViewModifier, ViewNodeBuilder {
 }
 
 final class FrameViewNode: ViewModifierNode {
-
     override var allowsNestedFrameAnimation: Bool {
         true
     }
@@ -108,7 +106,7 @@ final class FrameViewNode: ViewModifierNode {
 
     override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
         switch frameRule {
-        case .size(let width, let height, _):
+        case let .size(width, height, _):
             var newSize = self.contentNode.sizeThatFits(
                 ProposedViewSize(
                     width: width ?? proposal.width,
@@ -125,7 +123,7 @@ final class FrameViewNode: ViewModifierNode {
 
             return newSize
 
-        case .constraints(let minW, let idealW, let maxW, let minH, let idealH, let maxH, _):
+        case let .constraints(minW, idealW, maxW, minH, idealH, maxH, _):
             if Self.isOpenConstraints(
                 minWidth: minW,
                 idealWidth: idealW,
@@ -180,7 +178,7 @@ final class FrameViewNode: ViewModifierNode {
 
     override func performLayout() {
         switch frameRule {
-        case .size(_, _, let alignment):
+        case let .size(_, _, alignment):
             let alignment = alignment.resolved(for: environment.layoutDirection)
             let proposal = ProposedViewSize(self.frame.size)
             let origin = Self.placementOrigin(container: self.frame.size, alignment: alignment)
@@ -189,7 +187,7 @@ final class FrameViewNode: ViewModifierNode {
                 anchor: alignment.anchorPoint,
                 proposal: proposal
             )
-        case .constraints(_, _, _, _, _, _, let alignment):
+        case let .constraints(_, _, _, _, _, _, alignment):
             if Self.isOpenConstraintsFromFrame(frameRule) {
                 super.performLayout()
                 return
@@ -206,7 +204,7 @@ final class FrameViewNode: ViewModifierNode {
     }
 
     private static func isOpenConstraintsFromFrame(_ frame: Frame) -> Bool {
-        guard case .constraints(let minW, let idealW, let maxW, let minH, let idealH, let maxH, _) = frame else {
+        guard case let .constraints(minW, idealW, maxW, minH, idealH, maxH, _) = frame else {
             return false
         }
         return isOpenConstraints(
@@ -298,16 +296,18 @@ final class FrameViewNode: ViewModifierNode {
     }
 
     private static func placementOrigin(container: Size, alignment: Alignment) -> Point {
-        let x: Float = switch alignment.horizontal {
-        case .leading: 0
-        case .center: container.width * 0.5
-        case .trailing: container.width
-        }
-        let y: Float = switch alignment.vertical {
-        case .top: 0
-        case .center: container.height * 0.5
-        case .bottom: container.height
-        }
+        let x: Float =
+            switch alignment.horizontal {
+            case .leading: 0
+            case .center: container.width * 0.5
+            case .trailing: container.width
+            }
+        let y: Float =
+            switch alignment.vertical {
+            case .top: 0
+            case .center: container.height * 0.5
+            case .bottom: container.height
+            }
         return Point(x: x, y: y)
     }
 }

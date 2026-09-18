@@ -47,10 +47,12 @@ extension Material {
             return pipeline
         }
 
-        guard let (pipeline, shaderModule) = self.createUIShaderEffectPipeline(
-            for: materialKey,
-            device: device
-        ) else {
+        guard
+            let (pipeline, shaderModule) = self.createUIShaderEffectPipeline(
+                for: materialKey,
+                device: device
+            )
+        else {
             return nil
         }
 
@@ -68,11 +70,13 @@ extension Material {
     ) -> (RenderPipeline, ShaderModule)? {
         do {
             let shaderModule = try self.makeShaderModule(defines: materialKey.defines)
-            guard let pipelineDescriptor = self.configureRenderPipeline(
-                for: materialKey.vertexDescriptor,
-                keys: [],
-                shaderModule: shaderModule
-            ) else {
+            guard
+                let pipelineDescriptor = self.configureRenderPipeline(
+                    for: materialKey.vertexDescriptor,
+                    keys: [],
+                    shaderModule: shaderModule
+                )
+            else {
                 return nil
             }
 
@@ -84,7 +88,7 @@ extension Material {
     }
 }
 
-private extension VertexDescriptor {
+extension VertexDescriptor {
     static var uiShaderEffect: VertexDescriptor {
         var descriptor = VertexDescriptor()
         descriptor.attributes.append([

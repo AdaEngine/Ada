@@ -7,13 +7,13 @@
 
 import Math
 
-public extension View {
-    func drawingGroup() -> some View {
+extension View {
+    public func drawingGroup() -> some View {
         drawingGroup(cachesContents: true)
     }
 
     /// Groups drawing commands. Set `cachesContents` to false to redraw this entire subtree.
-    func drawingGroup(cachesContents: Bool) -> some View {
+    public func drawingGroup(cachesContents: Bool) -> some View {
         self.modifier(DrawingGroupModifier(content: self, cachesContents: cachesContents))
     }
 }
@@ -41,7 +41,9 @@ class DrawingGroupViewNode: ViewModifierNode {
     }
 
     override func update(from newNode: ViewNode) {
-        guard let node = newNode as? DrawingGroupViewNode else { return }
+        guard let node = newNode as? DrawingGroupViewNode else {
+            return
+        }
         cachesContents = node.cachesContents
         super.update(from: newNode)
         invalidateLayerIfNeeded()
@@ -52,7 +54,7 @@ class DrawingGroupViewNode: ViewModifierNode {
         context.allowsLayerCaching = context.allowsLayerCaching && cachesContents
         context.translateBy(x: frame.origin.x, y: -frame.origin.y)
 
-        if let layer = layer {
+        if let layer {
             layer.drawLayer(in: context)
         }
     }

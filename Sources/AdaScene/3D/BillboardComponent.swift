@@ -38,26 +38,34 @@ public struct BillboardSystem: Sendable {
     @Query<Entity, BillboardComponent, Ref<Transform>, GlobalTransform>
     private var billboards
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         var activeCameraTransform: GlobalTransform?
         cameras.forEach { camera, transform in
-            guard activeCameraTransform == nil, camera.isActive else { return }
+            guard activeCameraTransform == nil, camera.isActive else {
+                return
+            }
             activeCameraTransform = transform
         }
-        guard let cameraTransform = activeCameraTransform else { return }
+        guard let cameraTransform = activeCameraTransform else {
+            return
+        }
 
         let cameraPosition = cameraTransform.matrix.origin
         billboards.forEach { entity, billboard, transform, globalTransform in
-            guard billboard.isEnabled else { return }
+            guard billboard.isEnabled else {
+                return
+            }
 
             let position = globalTransform.matrix.origin
             var target = cameraPosition
             if billboard.rotationMode == .yAxis {
                 target.y = position.y
             }
-            guard target != position else { return }
+            guard target != position else {
+                return
+            }
 
             let globalRotation = Transform3D.lookAt(eye: position, center: target).rotation
             if let parentTransform = entity.parent?.components[GlobalTransform.self] {

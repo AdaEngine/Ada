@@ -8,16 +8,15 @@
 import AdaApp
 import AdaInput
 import AdaUtils
-import Observation
-import Math
 import Foundation
+import Math
+import Observation
 
 /// View node that can store children.
 /// Most used for tuple, layout stacks and other containers.
 ///
 /// When view did notify about changes, this container calls ``invalidateContent`` method to update it child and merge them if exists.
 class ViewContainerNode: ViewNode {
-
     var nodes: [ViewNode]
 
     /// Virtual container nodes used to move their child from this nodes to another.
@@ -85,7 +84,7 @@ class ViewContainerNode: ViewNode {
         UILayoutDebugCounters.recordContentInvalidation()
         UILayoutDebugCounters.recordRebuild()
         let observationRevision = beginContentObservation()
-        ViewContainerNode.observationTrackingDepth += 1
+        Self.observationTrackingDepth += 1
         let outputs = withObservationTracking {
             body(inputs)
         } onChange: { [weak self] in
@@ -93,9 +92,9 @@ class ViewContainerNode: ViewNode {
                 self?.scheduleObservedContentInvalidation(revision: observationRevision)
             }
         }
-        ViewContainerNode.observationTrackingDepth -= 1
+        Self.observationTrackingDepth -= 1
 
-        let outputNodes = outputs.outputs.map { $0.node }
+        let outputNodes = outputs.outputs.map(\.node)
         self.reconcileChildNodes(from: outputNodes, propagateLayout: propagateLayout)
     }
 
@@ -123,10 +122,12 @@ class ViewContainerNode: ViewNode {
     }
 
     private func deferInitialContentBuildIfNeeded() -> Bool {
-        guard !hasBuiltContent,
-              !isVirtual,
-              !(content is any AnyViewTuple),
-              ViewContainerNode.observationTrackingDepth > 0 else {
+        guard
+            !hasBuiltContent,
+            !isVirtual,
+            !(content is any AnyViewTuple),
+            Self.observationTrackingDepth > 0
+        else {
             return false
         }
 
@@ -188,7 +189,8 @@ class ViewContainerNode: ViewNode {
     }
 
     func completeLocalContentInvalidation(previousFrameSize: Size, mutationRevision: UInt64) {
-        let requiresAncestorLayout = Self.currentLayoutMutationRevision != mutationRevision
+        let requiresAncestorLayout =
+            Self.currentLayoutMutationRevision != mutationRevision
             || sizeThatFits(lastLayoutProposal) != previousFrameSize
         self.markNeedsLayout(propagateToParent: requiresAncestorLayout)
     }
@@ -198,12 +200,15 @@ class ViewContainerNode: ViewNode {
         let allNewNodes = Self.flattenVirtualNodes(newNodes)
 
         let oldNodes = self.nodes
-        let reconciliation = self.reconcileNodesById(allNewNodes)
+        let reconciliation =
+            self.reconcileNodesById(allNewNodes)
             ?? self.reconcileNodesByStructuralPosition(oldNodes: oldNodes, newNodes: allNewNodes)
-        let didReorderNodes = oldNodes.count == reconciliation.nodes.count
-            && zip(oldNodes, reconciliation.nodes).contains { oldNode, reconciledNode in
-                oldNode !== reconciledNode
-            }
+        let didReorderNodes =
+            oldNodes.count == reconciliation.nodes.count
+            && zip(oldNodes, reconciliation.nodes)
+                .contains { oldNode, reconciledNode in
+                    oldNode !== reconciledNode
+                }
         if oldNodes.count != reconciliation.nodes.count
             || oldNodes.count != reconciliation.reusedNodeIDs.count
             || didReorderNodes {
@@ -226,7 +231,7 @@ class ViewContainerNode: ViewNode {
         }
 
         if shouldNotifyAboutChanges {
-//            self._printDebugNode()
+            //            self._printDebugNode()
         }
 
         if !oldNodes.isEmpty || !allNewNodes.isEmpty {
@@ -316,13 +321,13 @@ class ViewContainerNode: ViewNode {
         oldNodes: [ViewNode],
         newNodes: [ViewNode]
     ) -> Reconciliation {
-        var resolvedNodes = Array<ViewNode?>(repeating: nil, count: newNodes.count)
+        var resolvedNodes = [ViewNode?](repeating: nil, count: newNodes.count)
         var reusedNodeIDs = Set<ObjectIdentifier>()
 
         var prefixEnd = 0
         while prefixEnd < oldNodes.count,
-              prefixEnd < newNodes.count,
-              newNodes[prefixEnd].canUpdate(oldNodes[prefixEnd]) {
+            prefixEnd < newNodes.count,
+            newNodes[prefixEnd].canUpdate(oldNodes[prefixEnd]) {
             let oldNode = oldNodes[prefixEnd]
             resolvedNodes[prefixEnd] = reuse(oldNode, with: newNodes[prefixEnd])
             reusedNodeIDs.insert(ObjectIdentifier(oldNode))
@@ -332,8 +337,8 @@ class ViewContainerNode: ViewNode {
         var oldSuffixIndex = oldNodes.count - 1
         var newSuffixIndex = newNodes.count - 1
         while oldSuffixIndex >= prefixEnd,
-              newSuffixIndex >= prefixEnd,
-              newNodes[newSuffixIndex].canUpdate(oldNodes[oldSuffixIndex]) {
+            newSuffixIndex >= prefixEnd,
+            newNodes[newSuffixIndex].canUpdate(oldNodes[oldSuffixIndex]) {
             let oldNode = oldNodes[oldSuffixIndex]
             resolvedNodes[newSuffixIndex] = reuse(oldNode, with: newNodes[newSuffixIndex])
             reusedNodeIDs.insert(ObjectIdentifier(oldNode))
@@ -347,8 +352,10 @@ class ViewContainerNode: ViewNode {
             }
         }
 
+        let nodes = resolvedNodes.compactMap { $0 }
+        precondition(nodes.count == resolvedNodes.count, "Every reconciled view node must be resolved.")
         return Reconciliation(
-            nodes: resolvedNodes.map { $0! },
+            nodes: nodes,
             reusedNodeIDs: reusedNodeIDs
         )
     }
@@ -361,12 +368,13 @@ class ViewContainerNode: ViewNode {
         // Only leaves are measured here. Measuring every reused container would
         // recursively walk its subtree at every level and turn reconciliation
         // into O(nodeCount * depth) work.
-        let previousSize = Self.isLayoutPropagationSuppressed && oldNode.transientEnvironmentChildren.isEmpty
+        let previousSize =
+            Self.isLayoutPropagationSuppressed && oldNode.transientEnvironmentChildren.isEmpty
             ? oldNode.sizeThatFits(oldNode.lastLayoutProposal)
             : nil
         oldNode.update(from: newNode)
         if let previousSize,
-           previousSize != oldNode.sizeThatFits(oldNode.lastLayoutProposal) {
+            previousSize != oldNode.sizeThatFits(oldNode.lastLayoutProposal) {
             Self.recordLayoutMutationRequiringAncestorPass()
         }
         oldNode.parent = self
@@ -414,7 +422,9 @@ class ViewContainerNode: ViewNode {
         // Only cascade to children when this node's environment actually changed.
         // super.updateEnvironment applies environmentTransform and skips storing if the
         // resulting version is unchanged — so comparing prevVersion detects no-ops cheaply.
-        guard self.environment.version != prevVersion else { return }
+        guard self.environment.version != prevVersion else {
+            return
+        }
         for node in nodes {
             // Pass self.environment (post-transform) so children inherit the correct base.
             node.updateEnvironment(self.environment)
@@ -435,7 +445,7 @@ class ViewContainerNode: ViewNode {
         if let node = super.findNodyByAccessibilityIdentifier(identifier) {
             return node
         }
-        
+
         for node in self.nodes {
             if let foundNode = node.findNodyByAccessibilityIdentifier(identifier) {
                 return foundNode
@@ -500,7 +510,7 @@ class ViewContainerNode: ViewNode {
 
     override func updateViewOwner(_ owner: ViewOwner) {
         super.updateViewOwner(owner)
-        
+
         for node in nodes {
             node.updateViewOwner(owner)
         }
@@ -556,9 +566,12 @@ class ViewContainerNode: ViewNode {
     override func debugDescription(hierarchy: Int = 0, identation: Int = 2) -> String {
         let indent = String(repeating: " ", count: hierarchy * identation)
         var string = super.debugDescription(hierarchy: hierarchy)
-        let newValue = self.nodes.reduce(into: indent, { partialResult, node in
-            partialResult += "\n" + node.debugDescription(hierarchy: hierarchy + 1, identation: identation)
-        })
+        let newValue = self.nodes.reduce(
+            into: indent,
+            { partialResult, node in
+                partialResult += "\n" + node.debugDescription(hierarchy: hierarchy + 1, identation: identation)
+            }
+        )
         string.append("\n\(indent)> nodes:")
         string.append(newValue)
         return string

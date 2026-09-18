@@ -7,9 +7,8 @@
 
 /// A control that displays an editable text interface.
 public struct TextField: View, ViewNodeBuilder {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let placeholder: String
     let text: Binding<String>

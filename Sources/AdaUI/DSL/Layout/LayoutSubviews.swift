@@ -51,7 +51,6 @@ final class LayoutMeasurementCache {
 
 /// A layout subview.
 public struct LayoutSubview: Equatable {
-
     /// The node.
     unowned let node: ViewNode
     private let measurementCache: LayoutMeasurementCache?
@@ -67,7 +66,7 @@ public struct LayoutSubview: Equatable {
     /// - Parameter lhs: The left layout subview.
     /// - Parameter rhs: The right layout subview.
     /// - Returns: A Boolean value indicating whether the two layout subviews are equal.
-    public static func == (lhs: LayoutSubview, rhs: LayoutSubview) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.node.id == rhs.node.id
     }
 
@@ -105,7 +104,7 @@ public struct LayoutSubview: Equatable {
     /// - Parameter proposal: The proposed view size.
     /// - Returns: The dimensions of the layout subview.
     @MainActor
-    func dimensions(in proposal: ProposedViewSize) -> Size {
+    func dimensions(in _: ProposedViewSize) -> Size {
         return node.frame.size
     }
 }

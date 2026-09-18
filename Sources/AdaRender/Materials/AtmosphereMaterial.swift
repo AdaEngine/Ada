@@ -14,7 +14,7 @@ public final class AtmosphereMaterial: PBRMaterial, @unchecked Sendable {
     /// Multiplies the opacity produced by the atmosphere shader.
     public var atmosphereIntensity: Float = 1
 
-    public override init() {
+    override public init() {
         super.init()
         baseColorFactor = [0.42, 0.78, 1, 0.42]
         metallicFactor = 0

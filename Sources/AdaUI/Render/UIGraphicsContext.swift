@@ -70,7 +70,7 @@ public struct UIGraphicsContext: Sendable {
     private(set) var commandQueue = CommandQueue()
 
     /// Create graphics context.
-    public init() { }
+    public init() {}
 
     /// Appends the given transform to the context’s existing transform.
     /// - Parameter matrix: A transform to append to the existing transform.
@@ -127,10 +127,10 @@ public struct UIGraphicsContext: Sendable {
         let transform = self.transform * rect.toTransform3D
         self.commandQueue.push(.drawShaderEffect(transform: transform, material: material))
     }
-    
+
     /// Paints the area of the ellipse that fits inside the provided rectangle, using the fill color in the current graphics state.
     public func drawEllipse(
-        in rect: Rect, 
+        in rect: Rect,
         color: Color,
         thickness: Float = 1
     ) {
@@ -284,8 +284,9 @@ public struct UIGraphicsContext: Sendable {
             Vector4(rect.minX, -rect.minY, 0, 1),
             Vector4(rect.maxX, -rect.minY, 0, 1),
             Vector4(rect.maxX, -rect.maxY, 0, 1),
-            Vector4(rect.minX, -rect.maxY, 0, 1)
-        ].map { transform * $0 }
+            Vector4(rect.minX, -rect.maxY, 0, 1),
+        ]
+        .map { transform * $0 }
         let horizontalEdge = corners[1] - corners[0]
         let verticalEdge = corners[3] - corners[0]
         let epsilon: Float = 0.0001
@@ -326,14 +327,14 @@ public struct UIGraphicsContext: Sendable {
     }
 
     /// Executes drawing with a clipping rectangle.
-    public mutating func clip(to rect: Rect, draw: (inout UIGraphicsContext) -> Void) {
+    public mutating func clip(to rect: Rect, draw: (inout Self) -> Void) {
         pushClipRect(rect)
         draw(&self)
         popClipRect()
     }
 
     /// Executes drawing with a clipping path.
-    public mutating func clip(to path: Path, draw: (inout UIGraphicsContext) -> Void) {
+    public mutating func clip(to path: Path, draw: (inout Self) -> Void) {
         pushClipPath(path)
         draw(&self)
         popClipPath()
@@ -347,13 +348,12 @@ public struct UIGraphicsContext: Sendable {
 
         return color.opacity(color.alpha * self.opacity)
     }
-
 }
 
 extension Rect {
     var toTransform3D: Transform3D {
         Transform3D(
-            translation: [self.midX, -self.midY, 0], 
+            translation: [self.midX, -self.midY, 0],
             rotation: .identity,
             scale: [self.size.width, self.size.height, 1]
         )
@@ -361,7 +361,6 @@ extension Rect {
 }
 
 extension UIGraphicsContext {
-
     /// Returns recorded draw commands.
     /// Use it for tesselation.
     public func getDrawCommands() -> [DrawCommand] {
@@ -444,11 +443,12 @@ extension UIGraphicsContext.DrawCommand {
         fade: Float,
         color: Color
     ) -> Self {
-        let transform = Transform3D(translation: position)
-        * Transform3D(quat: Quat(axis: [1, 0, 0], angle: rotation.x))
-        * Transform3D(quat: Quat(axis: [0, 1, 0], angle: rotation.y))
-        * Transform3D(quat: Quat(axis: [0, 0, 1], angle: rotation.z))
-        * Transform3D(scale: Vector3(radius))
+        let transform =
+            Transform3D(translation: position)
+            * Transform3D(quat: Quat(axis: [1, 0, 0], angle: rotation.x))
+            * Transform3D(quat: Quat(axis: [0, 1, 0], angle: rotation.y))
+            * Transform3D(quat: Quat(axis: [0, 0, 1], angle: rotation.z))
+            * Transform3D(scale: Vector3(radius))
 
         return .drawCircle(transform: transform, thickness: thickness, fade: fade, color: color)
     }

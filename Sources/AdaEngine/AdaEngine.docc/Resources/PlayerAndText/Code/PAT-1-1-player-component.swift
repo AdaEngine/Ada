@@ -1,4 +1,4 @@
 import AdaEngine
 
 @Component
-struct PlayerComponent { }
+struct PlayerComponent {}

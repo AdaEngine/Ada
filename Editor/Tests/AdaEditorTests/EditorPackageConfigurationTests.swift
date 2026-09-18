@@ -31,7 +31,7 @@ struct EditorPackageConfigurationTests {
         #expect(value["LSSupportsOpeningDocumentsInPlace"] as? Bool == true)
         #expect(value["UISupportsDocumentBrowser"] as? Bool == true)
         #expect(sceneManifest["UIApplicationSupportsMultipleScenes"] as? Bool == true)
-        #expect(value["UILaunchScreen"] as? [String: Any] != nil)
+        #expect(value["UILaunchScreen"] is [String: Any])
     }
 
     @Test("xcodegen project points at the local editor package")
@@ -50,7 +50,8 @@ struct EditorPackageConfigurationTests {
     func xcodegenPackagesAppIcon() throws {
         let editorRoot = try editorPackageRoot()
         let project = try String(contentsOf: editorRoot.appendingPathComponent("project.yml"), encoding: .utf8)
-        let iconURL = editorRoot
+        let iconURL =
+            editorRoot
             .deletingLastPathComponent()
             .appendingPathComponent("Assets/AdaEngine.icon", isDirectory: true)
 

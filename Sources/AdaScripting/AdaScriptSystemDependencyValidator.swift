@@ -49,8 +49,10 @@ enum AdaScriptSystemPlanBuilder {
             }
         }
         for dependency in annotations where dependency.name == "after" || dependency.name == "before" {
-            guard dependency.target.kind == .class,
-                  systemClassNames.contains(dependency.target.identifier) else {
+            guard
+                dependency.target.kind == .class,
+                systemClassNames.contains(dependency.target.identifier)
+            else {
                 throw AdaScriptError.invalidManifest("@\(dependency.name) can only annotate an @system class")
             }
         }
@@ -68,15 +70,18 @@ enum AdaScriptSystemPlanBuilder {
         let className = annotation.target.identifier
         return try AnnotatedSystemPlan(
             className: className,
-            dependencies: annotations
+            dependencies:
+                annotations
                 .filter { ($0.name == "after" || $0.name == "before") && $0.target.identifier == className }
                 .map(makeSystemDependency),
             identifier: annotation.stringArgument(label: "id") ?? className,
             scheduler: SchedulerName(rawValue: annotation.stringArgument(label: "scheduler") ?? "update"),
-            queries: annotations
+            queries:
+                annotations
                 .filter { $0.name == "query" && $0.target.parentIdentifier == className }
                 .map(makeQueryPlan),
-            resources: resourceBindings
+            resources:
+                resourceBindings
                 .filter { $0.systemName == className }
                 .map {
                     AnnotatedResourcePlan(
@@ -85,15 +90,18 @@ enum AdaScriptSystemPlanBuilder {
                         resourceName: $0.resourceName
                     )
                 },
-            usesDeferredCommands: systemCapabilities
+            usesDeferredCommands:
+                systemCapabilities
                 .first { $0.systemName == className }?
                 .usesDeferredCommands == true
         )
     }
 
     private static func makeSystemDependency(_ annotation: GravityAnnotation) throws -> SystemDependency {
-        guard annotation.arguments.count == 1,
-              let identifier = annotation.stringArgument(label: "id") else {
+        guard
+            annotation.arguments.count == 1,
+            let identifier = annotation.stringArgument(label: "id")
+        else {
             throw AdaScriptError.invalidManifest("@\(annotation.name) requires exactly one string id")
         }
         return annotation.name == "before" ? .before(identifier) : .after(identifier)
@@ -192,10 +200,11 @@ enum AdaScriptSystemDependencyValidator {
     }
 }
 
-private extension SystemDependency {
+extension SystemDependency {
     var identifier: String {
         switch self {
-        case .before(let identifier), .after(let identifier):
+        case let .before(identifier),
+            let .after(identifier):
             identifier
         }
     }

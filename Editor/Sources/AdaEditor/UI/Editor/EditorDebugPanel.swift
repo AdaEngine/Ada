@@ -64,7 +64,9 @@ struct EditorDebugPanel: View {
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 2) {
                 ForEach(EditorDebugLanguage.allCases, id: \.self) { language in
-                    Button { debugger.selectedLanguage = language } label: {
+                    Button {
+                        debugger.selectedLanguage = language
+                    } label: {
                         Text(language.rawValue)
                             .font(.system(size: 11))
                             .padding(.horizontal, 8)
@@ -83,7 +85,9 @@ struct EditorDebugPanel: View {
         ScrollView(.horizontal) {
             HStack(spacing: 4) {
                 ForEach(["Breakpoints", "Call Stack", "Variables", "Watches", "Console"], id: \.self) { tab in
-                    Button { selectedTab = tab } label: {
+                    Button {
+                        selectedTab = tab
+                    } label: {
                         Text(tab)
                             .font(.system(size: 11))
                             .padding(.horizontal, 10)
@@ -153,7 +157,9 @@ struct EditorDebugPanel: View {
         case "Breakpoints":
             ScrollView([.horizontal, .vertical]) {
                 VStack(alignment: .leading, spacing: 6) {
-                    if debugger.breakpoints.isEmpty { Text("Click the source gutter to add a breakpoint.") }
+                    if debugger.breakpoints.isEmpty {
+                        Text("Click the source gutter to add a breakpoint.")
+                    }
                     ForEach(debugger.breakpoints) { breakpoint in
                         let target = URL(fileURLWithPath: breakpoint.path).pathExtension == "swift" ? debugger.swift : debugger.adaScript
                         HStack(spacing: 8) {
@@ -165,9 +171,12 @@ struct EditorDebugPanel: View {
                                 .foregroundColor(theme.editorColors.muted)
                             Button("Remove") { debugger.toggleBreakpoint(path: breakpoint.path, line: breakpoint.line) }
                         }
-                        if let message = target.breakpointMessages[breakpoint.id] { Text(message) }
+                        if let message = target.breakpointMessages[breakpoint.id] {
+                            Text(message)
+                        }
                     }
-                }.font(.system(size: 11))
+                }
+                .font(.system(size: 11))
             }
         case "Call Stack":
             ScrollView([.horizontal, .vertical]) {
@@ -183,7 +192,8 @@ struct EditorDebugPanel: View {
                         }
                         .foregroundColor(debugger.session.selectedFrameID == frame.id ? theme.editorColors.blue : theme.editorColors.text)
                     }
-                }.font(.system(size: 11))
+                }
+                .font(.system(size: 11))
             }
         case "Variables":
             ScrollView([.horizontal, .vertical]) {
@@ -212,7 +222,8 @@ struct EditorDebugPanel: View {
                                 Button("Remove") { debugger.removeWatch(expression) }
                             }
                         }
-                    }.font(.system(size: 11))
+                    }
+                    .font(.system(size: 11))
                 }
             }
         default:
@@ -223,7 +234,8 @@ struct EditorDebugPanel: View {
                             .foregroundColor(theme.editorColors.text)
                     }
                 }
-            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
@@ -260,7 +272,6 @@ struct EditorDebugPanel: View {
             tooltip = title
         }
     }
-
 }
 
 private struct EditorDebugVariableRow: View {
@@ -279,23 +290,27 @@ private struct EditorDebugVariableRow: View {
                         expanded.toggle()
                         if expanded {
                             Task {
-                                do { children = try await session.children(reference: variable.reference) }
-                                catch { self.error = error.localizedDescription }
+                                do { children = try await session.children(reference: variable.reference) } catch { self.error = error.localizedDescription }
                             }
                         }
                     }
                 }
                 Text("\(variable.name): \(variable.type ?? "") = \(variable.value)")
-                if let address = variable.memoryReference { Text(address) }
+                if let address = variable.memoryReference {
+                    Text(address)
+                }
             }
             if expanded {
-                if let error { Text(error) }
+                if let error {
+                    Text(error)
+                }
                 ForEach(Array(children.enumerated()), id: \.offset) { child in
-                    AnyView(EditorDebugVariableRow(session: session, variable: child.element, depth: depth + 1))
+                    AnyView(Self(session: session, variable: child.element, depth: depth + 1))
                         .padding(.leading, 14)
                 }
             }
-        }.font(AdaEditorCodeFont.font(size: 11))
+        }
+        .font(AdaEditorCodeFont.font(size: 11))
     }
 }
 
@@ -307,8 +322,11 @@ private struct EditorDebugButtonStyle: ButtonStyle {
         let highlighted = configuration.state.isHighlighted || configuration.state.isSelected
         return configuration.label
             .foregroundColor(active ? theme.editorColors.blue : (highlighted ? theme.editorColors.text : theme.editorColors.muted))
-            .background(RoundedRectangleShape(cornerRadius: 5).fill(
-                active ? theme.editorColors.blue.opacity(0.16) : (highlighted ? theme.editorColors.surfaceElevated : Color.clear)
-            ))
+            .background(
+                RoundedRectangleShape(cornerRadius: 5)
+                    .fill(
+                        active ? theme.editorColors.blue.opacity(0.16) : (highlighted ? theme.editorColors.surfaceElevated : Color.clear)
+                    )
+            )
     }
 }

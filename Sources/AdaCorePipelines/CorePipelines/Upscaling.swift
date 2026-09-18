@@ -8,12 +8,11 @@
 import AdaApp
 import AdaAssets
 import AdaECS
-import AdaUtils
 import AdaRender
+import AdaUtils
 import Math
 
 public struct UpscalePlugin: Plugin {
-
     public init() {}
 
     public func setup(in app: borrowing AdaApp.AppWorlds) {
@@ -30,14 +29,13 @@ public struct UpscalePlugin: Plugin {
 }
 
 public struct UpscalePipeline: Resource {
-
     public let renderPipeline: RenderPipeline
     public let sampler: Sampler
 
     public init(device: RenderDevice) {
-        let spriteShader = try! ShaderModule.loadBundled(at: "Shaders/FullScreenShader.glsl", from: .module)
+        let spriteShader = ShaderModule.loadRequiredBundled(at: "Shaders/FullScreenShader.glsl", from: .module)
 
-        var descriptor = RenderPipelineDescriptor(vertex: spriteShader.asset.getShader(for: .vertex)!)
+        var descriptor = RenderPipelineDescriptor(vertex: spriteShader.asset.requiredShader(for: .vertex))
         descriptor.debugName = "Upscale Pipeline"
 
         descriptor.fragment = spriteShader.asset.getShader(for: .fragment)

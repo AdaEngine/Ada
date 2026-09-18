@@ -109,8 +109,13 @@ final class AdaScriptViewBridge: @unchecked Sendable {
             arguments["height"] = style.height.map { .init(value: .number(Double($0))) }
         default: break
         }
-        return AdaScriptViewBridge(model: AdaScriptViewModel(content: model.content, style: style,
-            modifiers: model.modifiers + [.init(id: "modifier-\(model.modifiers.count)", type: type, arguments: arguments)]))
+        return AdaScriptViewBridge(
+            model: AdaScriptViewModel(
+                content: model.content,
+                style: style,
+                modifiers: model.modifiers + [.init(id: "modifier-\(model.modifiers.count)", type: type, arguments: arguments)]
+            )
+        )
     }
 
     func nativeView(_ identifier: String) -> AdaScriptViewBridge {
@@ -118,8 +123,10 @@ final class AdaScriptViewBridge: @unchecked Sendable {
     }
 
     func argument(_ name: String, _ value: GSValue) -> AdaScriptViewBridge {
-        guard case .native(var node) = model.content,
-              let field = AdaScriptUIValueBridge.detached(value) else {
+        guard
+            case var .native(node) = model.content,
+            let field = AdaScriptUIValueBridge.detached(value)
+        else {
             return AdaScriptViewBridge(model: .init(content: .native(.init(type: "Invalid UI argument: " + name))))
         }
         node.arguments[name] = .init(value: field)
@@ -127,13 +134,15 @@ final class AdaScriptViewBridge: @unchecked Sendable {
     }
 
     func action(_ event: String, _ method: String) -> AdaScriptViewBridge {
-        guard case .native(var node) = model.content else { return self }
+        guard case var .native(node) = model.content else {
+            return self
+        }
         node.actions[event] = method
         return AdaScriptViewBridge(model: .init(content: .native(node), style: model.style, modifiers: model.modifiers))
     }
 
     func nativeModifier(_ identifier: String, _ values: GSValue) -> AdaScriptViewBridge {
-        guard let field = AdaScriptUIValueBridge.detached(values), case .object(let object) = field else {
+        guard let field = AdaScriptUIValueBridge.detached(values), case let .object(object) = field else {
             return AdaScriptViewBridge(model: .init(content: .native(.init(type: "Invalid modifier arguments: " + identifier))))
         }
         let modifier = UIModifierDescription(id: "modifier-\(model.modifiers.count)", type: identifier, arguments: object.mapValues { .init(value: $0) })
@@ -166,14 +175,14 @@ struct AdaScriptViewModel: Sendable {
 
     func addingChild(_ child: Self) -> Self {
         switch content {
-        case .native(var node):
+        case var .native(node):
             node.children.append(child.uiNode(id: "child-\(node.children.count)"))
             return Self(content: .native(node), style: style, modifiers: modifiers)
         case let .hStack(children, spacing):
             return Self(content: .hStack(children: children + [child], spacing: spacing), style: style, modifiers: modifiers)
         case let .vStack(children, spacing):
             return Self(content: .vStack(children: children + [child], spacing: spacing), style: style, modifiers: modifiers)
-        case .zStack(let children):
+        case let .zStack(children):
             return Self(content: .zStack(children: children + [child]), style: style, modifiers: modifiers)
         default:
             return self
@@ -189,9 +198,9 @@ struct AdaScriptViewModel: Sendable {
 
     func replacingSpacing(_ spacing: Float?) -> Self {
         switch content {
-        case .hStack(let children, _):
+        case let .hStack(children, _):
             Self(content: .hStack(children: children, spacing: spacing), style: style, modifiers: modifiers)
-        case .vStack(let children, _):
+        case let .vStack(children, _):
             Self(content: .vStack(children: children, spacing: spacing), style: style, modifiers: modifiers)
         default:
             self
@@ -233,19 +242,27 @@ extension AdaScriptViewModel {
         var node: UINodeDescription
         var children: [AdaScriptViewModel] = []
         switch content {
-        case .native(let value): node = value; node.id = id
-        case .button(let title, let action): node = .init(id: id, type: "Button", arguments: ["title": .init(value: .string(title))], actions: ["action": action])
+        case let .native(value):
+            node = value
+            node.id = id
+        case let .button(title, action): node = .init(id: id, type: "Button", arguments: ["title": .init(value: .string(title))], actions: ["action": action])
         case .divider: node = .init(id: id, type: "Divider")
         case .empty: node = .init(id: id, type: "EmptyView")
-        case .text(let text): node = .init(id: id, type: "Text", arguments: ["text": .init(value: .string(text))])
-        case .spacer(let length): node = .init(id: id, type: "Spacer", arguments: length.map { ["minLength": .init(value: .number(Double($0)))] } ?? [:])
-        case .hStack(let values, let spacing):
-            node = .init(id: id, type: "HStack", arguments: spacing.map { ["spacing": .init(value: .number(Double($0)))] } ?? [:]); children = values
-        case .vStack(let values, let spacing):
-            node = .init(id: id, type: "VStack", arguments: spacing.map { ["spacing": .init(value: .number(Double($0)))] } ?? [:]); children = values
-        case .zStack(let values): node = .init(id: id, type: "ZStack"); children = values
+        case let .text(text): node = .init(id: id, type: "Text", arguments: ["text": .init(value: .string(text))])
+        case let .spacer(length): node = .init(id: id, type: "Spacer", arguments: length.map { ["minLength": .init(value: .number(Double($0)))] } ?? [:])
+        case let .hStack(values, spacing):
+            node = .init(id: id, type: "HStack", arguments: spacing.map { ["spacing": .init(value: .number(Double($0)))] } ?? [:])
+            children = values
+        case let .vStack(values, spacing):
+            node = .init(id: id, type: "VStack", arguments: spacing.map { ["spacing": .init(value: .number(Double($0)))] } ?? [:])
+            children = values
+        case let .zStack(values):
+            node = .init(id: id, type: "ZStack")
+            children = values
         }
-        if !children.isEmpty { node.children = children.enumerated().map { $0.element.uiNode(id: "\(id)/\($0.offset)") } }
+        if !children.isEmpty {
+            node.children = children.enumerated().map { $0.element.uiNode(id: "\(id)/\($0.offset)") }
+        }
         node.modifiers += modifiers
         return node
     }
@@ -269,7 +286,7 @@ private struct AdaScriptColor {
         "black": .black, "blue": .blue, "brown": .brown, "clear": .clear,
         "gray": .gray, "green": .green, "grey": .gray, "mint": .mint,
         "orange": .orange, "pink": .pink, "purple": .purple, "red": .red,
-        "white": .white, "yellow": .yellow
+        "white": .white, "yellow": .yellow,
     ]
 
     private static func hex(_ source: String) -> Color? {
@@ -295,7 +312,7 @@ private struct AdaScriptColor {
     }
 }
 
-private extension GSValue {
+extension GSValue {
     var finiteFloat: Float? {
         // Gravity stores integers and floating-point numbers in the same union.
         // Read the active numeric type before converting to Swift floating point.

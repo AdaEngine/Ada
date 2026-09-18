@@ -9,9 +9,12 @@ public struct UISceneAsset: Asset {
     public var document: UISceneDocument
     public var assetMetaInfo: AssetMetaInfo?
 
-    public init(document: UISceneDocument) throws { try document.validate(); self.document = document }
+    public init(document: UISceneDocument) throws {
+        try document.validate()
+        self.document = document
+    }
     public init(from assetDecoder: any AssetDecoder) throws {
-        document = try UISceneDocument.decode(String(decoding: assetDecoder.assetData, as: UTF8.self))
+        document = try UISceneDocument.decode(String(bytes: assetDecoder.assetData, encoding: .utf8) ?? "")
     }
     public func encodeContents(with assetEncoder: any AssetEncoder) throws { try assetEncoder.encode(document) }
     public static func extensions() -> [String] { ["ui"] }
@@ -29,19 +32,28 @@ public final class UISceneResources {
 
     public func resolve(_ path: String, relativeTo source: URL? = nil) throws -> URL {
         let url: URL
-        if path.hasPrefix("@res://") { url = rootURL.appendingPathComponent(String(path.dropFirst(7))) }
-        else if path.hasPrefix("res://") { url = rootURL.appendingPathComponent(String(path.dropFirst(6))) }
-        else if path.hasPrefix("/") { url = URL(fileURLWithPath: path) }
-        else { url = (source?.deletingLastPathComponent() ?? rootURL).appendingPathComponent(path) }
+        if path.hasPrefix("@res://") {
+            url = rootURL.appendingPathComponent(String(path.dropFirst(7)))
+        } else if path.hasPrefix("res://") {
+            url = rootURL.appendingPathComponent(String(path.dropFirst(6)))
+        } else if path.hasPrefix("/") {
+            url = URL(fileURLWithPath: path)
+        } else {
+            url = (source?.deletingLastPathComponent() ?? rootURL).appendingPathComponent(path)
+        }
         let resolved = url.resolvingSymlinksInPath().standardizedFileURL
-        guard resolved.path.hasPrefix(rootURL.path + "/") else { throw UIDiagnostic("UI resource is outside resource root: \(path)") }
+        guard resolved.path.hasPrefix(rootURL.path + "/") else {
+            throw UIDiagnostic("UI resource is outside resource root: \(path)")
+        }
         return resolved
     }
 
     public func image(_ path: String, relativeTo source: URL? = nil) throws -> Image {
         let url = try resolve(path, relativeTo: source)
         dependencies.insert(url)
-        if let image = images[url] { return image }
+        if let image = images[url] {
+            return image
+        }
         let image = try Image(contentsOf: url)
         images[url] = image
         return image
@@ -49,7 +61,9 @@ public final class UISceneResources {
 
     public func load(_ url: URL) throws -> UISceneDocument {
         dependencies.insert(url)
-        if let document = documents[url] { return document }
+        if let document = documents[url] {
+            return document
+        }
         let document = try UISceneDocument.decode(String(contentsOf: url, encoding: .utf8))
         documents[url] = document
         return document
@@ -63,14 +77,17 @@ public final class UISceneResources {
 
     public func invalidate(_ url: URL) {
         let url = url.resolvingSymlinksInPath().standardizedFileURL
-        documents.removeValue(forKey: url); images.removeValue(forKey: url)
+        documents.removeValue(forKey: url)
+        images.removeValue(forKey: url)
     }
 }
-
 
 /// A file watcher or authoring tool publishes changes through the normal AdaUI event manager.
 public struct UISceneResourceChanged: Event {
     public let url: URL
     public let document: UISceneDocument?
-    public init(url: URL, document: UISceneDocument? = nil) { self.url = url; self.document = document }
+    public init(url: URL, document: UISceneDocument? = nil) {
+        self.url = url
+        self.document = document
+    }
 }

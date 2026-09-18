@@ -5,9 +5,9 @@
 //  Created by v.prusakov on 04/21/26.
 //
 
+import AdaAssets
 import AdaECS
 import AdaRender
-import AdaAssets
 
 /// A component that renders a 3D mesh.
 public struct Mesh3DComponent: Component {
@@ -15,7 +15,7 @@ public struct Mesh3DComponent: Component {
     public var materials: [Material]
     public var castShadows: Bool
     public var receiveShadows: Bool
-    
+
     public init(mesh: Mesh, materials: [Material]) {
         self.init(mesh: mesh, materials: materials, castShadows: true, receiveShadows: true)
     }

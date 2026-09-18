@@ -10,7 +10,7 @@ struct EditorThemeColors: Hashable, Sendable {
     var blue: Color
     var purple: Color
 
-    static let dark = EditorThemeColors(
+    static let dark = Self(
         background: Color(red: 30 / 255, green: 31 / 255, blue: 34 / 255),
         surface: Color(red: 39 / 255, green: 41 / 255, blue: 46 / 255),
         surfaceElevated: Color(red: 24 / 255, green: 25 / 255, blue: 29 / 255),

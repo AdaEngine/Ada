@@ -6,18 +6,17 @@
 //
 
 #if METAL
-import MetalKit
+    import MetalKit
 
-final class MetalVertexBuffer: MetalBuffer, VertexBuffer, @unchecked Sendable {
-    
-    var binding: Int
-    let offset: Int
-    
-    init(buffer: MTLBuffer, binding: Int, offset: Int) {
-        self.binding = binding
-        self.offset = offset
-        super.init(buffer: buffer)
+    final class MetalVertexBuffer: MetalBuffer, VertexBuffer, @unchecked Sendable {
+        var binding: Int
+        let offset: Int
+
+        init(buffer: MTLBuffer, binding: Int, offset: Int) {
+            self.binding = binding
+            self.offset = offset
+            super.init(buffer: buffer)
+        }
     }
-}
 
 #endif

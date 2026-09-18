@@ -57,7 +57,7 @@ extension EditorComponentRegistry {
             makeDefaultPayload: {
                 [
                     "mesh": .string(defaultPrimitive.rawValue), "size": .double(defaultSize), "color": white,
-                    "metallic": .double(0), "roughness": .double(0.5), "castShadows": .bool(true), "receiveShadows": .bool(true)
+                    "metallic": .double(0), "roughness": .double(0.5), "castShadows": .bool(true), "receiveShadows": .bool(true),
                 ]
             },
             decode: { payload in
@@ -78,7 +78,9 @@ extension EditorComponentRegistry {
         }
         let primitive = EditorMeshPrimitive(rawValue: payload["mesh"]?.stringValue ?? "") ?? defaultPrimitive
         let size = Float(payload["size"]?.doubleValue ?? defaultSize)
-        guard size.isFinite, size > 0 else { throw MeshComponentError.invalidSize }
+        guard size.isFinite, size > 0 else {
+            throw MeshComponentError.invalidSize
+        }
         let mesh = primitive.makeMesh(size: size, renderDevice: engine.renderDevice)
         let colorValue = payload["color"] ?? defaultColor
         let color = try JSONDecoder().decode(Color.self, from: JSONEncoder().encode(colorValue))

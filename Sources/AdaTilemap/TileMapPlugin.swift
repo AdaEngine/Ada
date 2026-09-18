@@ -8,20 +8,19 @@
 import AdaApp
 import AdaAssets
 import AdaECS
-import AdaTransform
 import AdaPhysics
 import AdaSprite
+import AdaTransform
 import Logging
 import Math
 import OrderedCollections
 
 public struct TileMapPlugin: Plugin {
-
     public init() {}
 
     public func setup(in app: AppWorlds) {
         TileMapComponent.registerComponent()
-        
+
         TextureAtlasTileSource.registerTileSource()
         TileEntityAtlasSource.registerTileSource()
 
@@ -31,7 +30,6 @@ public struct TileMapPlugin: Plugin {
 
 @PlainSystem
 public struct TileMapSystem: Sendable {
-
     private let logger = Logger(label: "org.adaengine.tilemap")
 
     @Query<Entity, Ref<TileMapComponent>, Transform>
@@ -43,9 +41,9 @@ public struct TileMapSystem: Sendable {
     @Commands
     private var commands
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         tileMap.forEach { entity, tileMapComponent, transform in
             let tileMap = tileMapComponent.tileMap
 
@@ -105,15 +103,18 @@ public struct TileMapSystem: Sendable {
     private func addTiles(
         for layer: TileMapLayer,
         tileMapComponent: Ref<TileMapComponent>,
-        transform: Transform,
+        transform _: Transform,
         entity: Entity,
         forceUpdate: Bool
     ) {
         let tileSize = tileMapComponent.wrappedValue.tileDisplaySize
         guard let tileSet = layer.tileSet else {
-            logger.error("TileSet not found for tiles", metadata: [
-                "layer": .string(layer.id.description)
-            ])
+            logger.error(
+                "TileSet not found for tiles",
+                metadata: [
+                    "layer": .string(layer.id.description)
+                ]
+            )
             return
         }
 
@@ -142,10 +143,13 @@ public struct TileMapSystem: Sendable {
 
             for (position, tile) in layer.tileCells {
                 guard let source = tileSet.sources[tile.sourceId] else {
-                    logger.critical("TileSource not found for id: \(tile.sourceId)", metadata: [
-                        "layer": .string(layer.id.description),
-                        "tileSourceId": .string(tile.sourceId.description)
-                    ])
+                    logger.critical(
+                        "TileSource not found for id: \(tile.sourceId)",
+                        metadata: [
+                            "layer": .string(layer.id.description),
+                            "tileSourceId": .string(tile.sourceId.description),
+                        ]
+                    )
                     continue
                 }
 
@@ -186,15 +190,15 @@ public struct TileMapSystem: Sendable {
 
                 tileEntity.isActive = layer.isEnabled
 
-//                if tileData.useCollisition {
-//                    tileEntity.components += Collision2DComponent(
-//                        shapes: [.generateBox()],
-//                        filter: CollisionFilter(
-//                            categoryBitMask: tileData.physicLayer.collisionLayer,
-//                            collisionBitMask: tileData.physicLayer.collisionMask
-//                        )
-//                    )
-//                }
+                //                if tileData.useCollisition {
+                //                    tileEntity.components += Collision2DComponent(
+                //                        shapes: [.generateBox()],
+                //                        filter: CollisionFilter(
+                //                            categoryBitMask: tileData.physicLayer.collisionLayer,
+                //                            collisionBitMask: tileData.physicLayer.collisionMask
+                //                        )
+                //                    )
+                //                }
 
                 _ = commands.insertEntity(tileEntity)
                 let tileEntityID = tileEntity.id

@@ -9,7 +9,7 @@ import AdaInput
 import AdaUtils
 import Math
 
-public extension View {
+extension View {
     /// Expands the view to fill the safe area on the specified edges.
     ///
     /// Use this modifier when a view should extend into the safe area (for example,
@@ -18,7 +18,7 @@ public extension View {
     /// zeroed insets on the cleared edges.
     ///
     /// - Parameter edges: The edges whose safe area insets are cleared. Defaults to all edges.
-    func ignoresSafeArea(_ edges: Edge.Set = .all) -> some View {
+    public func ignoresSafeArea(_ edges: Edge.Set = .all) -> some View {
         self.modifier(
             IgnoresSafeAreaModifier(
                 content: self,
@@ -36,23 +36,31 @@ public extension View {
     /// - Parameters:
     ///   - edges: The edges to add padding to. Defaults to all edges.
     ///   - length: The amount of padding to add, in points.
-    func safeAreaPadding(_ edges: Edge.Set = .all, _ length: Float) -> some View {
+    public func safeAreaPadding(_ edges: Edge.Set = .all, _ length: Float) -> some View {
         self.transformEnvironment(\.safeAreaInsets) { insets in
-            if edges.contains(.top)      { insets.top      += length }
-            if edges.contains(.leading)  { insets.leading  += length }
-            if edges.contains(.bottom)   { insets.bottom   += length }
-            if edges.contains(.trailing) { insets.trailing += length }
+            if edges.contains(.top) {
+                insets.top += length
+            }
+            if edges.contains(.leading) {
+                insets.leading += length
+            }
+            if edges.contains(.bottom) {
+                insets.bottom += length
+            }
+            if edges.contains(.trailing) {
+                insets.trailing += length
+            }
         }
     }
 
     /// Adds extra safe area padding using explicit per-edge insets.
     ///
     /// - Parameter insets: The insets to add to the current safe area.
-    func safeAreaPadding(_ insets: EdgeInsets) -> some View {
+    public func safeAreaPadding(_ insets: EdgeInsets) -> some View {
         self.transformEnvironment(\.safeAreaInsets) { current in
-            current.top      += insets.top
-            current.leading  += insets.leading
-            current.bottom   += insets.bottom
+            current.top += insets.top
+            current.leading += insets.leading
+            current.bottom += insets.bottom
             current.trailing += insets.trailing
         }
     }
@@ -80,7 +88,6 @@ private struct IgnoresSafeAreaModifier<Content: View>: ViewModifier, ViewNodeBui
 // MARK: - IgnoresSafeAreaNode
 
 private final class IgnoresSafeAreaNode: ViewNode {
-
     let edges: Edge.Set
     var contentNode: ViewNode
     private var originalInsets = EdgeInsets()
@@ -117,14 +124,24 @@ private final class IgnoresSafeAreaNode: ViewNode {
         originalInsets = environment.safeAreaInsets
 
         var env = environment
-        if edges.contains(.top)      { env.safeAreaInsets.top = 0 }
-        if edges.contains(.leading)  { env.safeAreaInsets.leading = 0 }
-        if edges.contains(.bottom)   { env.safeAreaInsets.bottom = 0 }
-        if edges.contains(.trailing) { env.safeAreaInsets.trailing = 0 }
+        if edges.contains(.top) {
+            env.safeAreaInsets.top = 0
+        }
+        if edges.contains(.leading) {
+            env.safeAreaInsets.leading = 0
+        }
+        if edges.contains(.bottom) {
+            env.safeAreaInsets.bottom = 0
+        }
+        if edges.contains(.trailing) {
+            env.safeAreaInsets.trailing = 0
+        }
 
         let prevVersion = self.environment.version
         super.updateEnvironment(env)
-        guard self.environment.version != prevVersion else { return }
+        guard self.environment.version != prevVersion else {
+            return
+        }
         contentNode.updateEnvironment(self.environment)
     }
 
@@ -151,7 +168,9 @@ private final class IgnoresSafeAreaNode: ViewNode {
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
-        guard let other = newNode as? IgnoresSafeAreaNode else { return }
+        guard let other = newNode as? IgnoresSafeAreaNode else {
+            return
+        }
         contentNode.update(from: other.contentNode)
         contentNode.parent = self
     }

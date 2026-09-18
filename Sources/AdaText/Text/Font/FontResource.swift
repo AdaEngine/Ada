@@ -7,10 +7,11 @@
 
 import AdaAssets
 import AdaUtils
-import Foundation
 import AtlasFontGenerator
+import Foundation
+
 #if canImport(CoreText)
-import CoreText
+    import CoreText
 #endif
 
 /// Contains font styles.
@@ -82,7 +83,8 @@ public enum FontCharset: Hashable, Sendable {
         switch self {
         case .default:
             return true
-        case .codepoints(_, let includeDefault), .text(_, let includeDefault):
+        case let .codepoints(_, includeDefault),
+            let .text(_, includeDefault):
             return includeDefault
         }
     }
@@ -91,9 +93,9 @@ public enum FontCharset: Hashable, Sendable {
         switch self {
         case .default:
             return []
-        case .codepoints(let codepoints, _):
+        case let .codepoints(codepoints, _):
             return codepoints
-        case .text(let text, _):
+        case let .text(text, _):
             return text.unicodeScalars.map(\.value)
         }
     }
@@ -101,19 +103,18 @@ public enum FontCharset: Hashable, Sendable {
 
 /// An object that provides access to the font's characteristics.
 public final class FontResource: Asset, Hashable, @unchecked Sendable {
-
     let handle: FontHandle
-    
+
     init(handle: FontHandle) {
         self.handle = handle
     }
-    
+
     public var assetMetaInfo: AssetMetaInfo?
 
     public static func extensions() -> [String] {
         return ["ttf", "otf"]
     }
-    
+
     public required convenience init(from decoder: AssetDecoder) throws {
         let emSizeStr = decoder.assetMeta.queryParams.first(where: { $0.name == "emSize" })?.value ?? ""
         let emSize = Double(emSizeStr)
@@ -122,36 +123,35 @@ public final class FontResource: Asset, Hashable, @unchecked Sendable {
         }
         self.init(handle: handle)
     }
-    
-    public func encodeContents(with encoder: AssetEncoder) throws {
+
+    public func encodeContents(with _: AssetEncoder) throws {
         fatalErrorMethodNotImplemented()
     }
 }
 
-public extension FontResource {
-
+extension FontResource {
     /// Returns font scale for font size.
-    func getFontScale(for size: Double) -> Double {
+    public func getFontScale(for size: Double) -> Double {
         return size / self.fontEmSize
     }
 
     /// The top y-coordinate, offset from the baseline, of the font’s longest ascender.
-    var ascender: Double {
+    public var ascender: Double {
         self.handle.metrics.ascenderY
     }
-    
+
     /// The bottom y-coordinate, offset from the baseline, of the font’s longest descender.
-    var descender: Double {
+    public var descender: Double {
         self.handle.metrics.descenderY
     }
-    
+
     /// The height, in points, of text lines.
-    var lineHeight: Double {
+    public var lineHeight: Double {
         self.handle.metrics.lineHeight
     }
 
     // The size of one EM.
-    var fontEmSize: Double {
+    public var fontEmSize: Double {
         self.handle.metrics.emSize
     }
 }
@@ -160,23 +160,22 @@ extension FontResource {
     public static func == (lhs: FontResource, rhs: FontResource) -> Bool {
         return lhs.handle == rhs.handle
     }
-    
+
     public func hash(into hasher: inout Hasher) {
         hasher.combine(self.handle)
     }
 }
 
-public extension FontResource {
-
+extension FontResource {
     private enum Constants {
         static let defaultEmFontScale: Double = 52
     }
 
-    static func registerPrebuiltAtlasBundle(_ bundle: Bundle, subdirectory: String) {
+    public static func registerPrebuiltAtlasBundle(_ bundle: Bundle, subdirectory: String) {
         FontAtlasGenerator.shared.registerPrebuiltAtlasBundle(bundle, subdirectory: subdirectory)
     }
 
-    static func prebuiltAtlasFileName(
+    public static func prebuiltAtlasFileName(
         fontFileName: String,
         emFontScale: Double,
         includeDefaultCharset: Bool = true,
@@ -192,7 +191,7 @@ public extension FontResource {
         return FontAtlasGenerator.cacheFileName(fontName: fontFileName, fontDescriptor: descriptor)
     }
 
-    static func prebuildCustomAtlas(
+    public static func prebuildCustomAtlas(
         fontPath: URL,
         emFontScale: Double? = nil,
         includeDefaultCharset: Bool = true,
@@ -208,7 +207,7 @@ public extension FontResource {
         return FontAtlasGenerator.shared.ensureCachedAtlas(fontPath: fontPath, fontDescriptor: descriptor)
     }
 
-    static func hasPrebuiltAtlas(
+    public static func hasPrebuiltAtlas(
         fontPath: URL,
         emFontScale: Double? = nil,
         includeDefaultCharset: Bool = true,
@@ -224,14 +223,16 @@ public extension FontResource {
         return FontAtlasGenerator.shared.hasPrebuiltCachedAtlas(fontPath: fontPath, fontDescriptor: descriptor)
     }
 
-    static func prebuildSystemAtlas(weight: FontWeight = .regular, emFontScale: Double? = nil) -> Bool {
+    public static func prebuildSystemAtlas(weight: FontWeight = .regular, emFontScale: Double? = nil) -> Bool {
         let resolvedScale = emFontScale ?? Constants.defaultEmFontScale
         let fontName = "OpenSans-\(weight.fileNameComponent)"
-        guard let fontPath = Bundle.module.url(
-            forResource: fontName,
-            withExtension: "ttf",
-            subdirectory: "Assets/Fonts/opensans"
-        ) else {
+        guard
+            let fontPath = Bundle.module.url(
+                forResource: fontName,
+                withExtension: "ttf",
+                subdirectory: "Assets/Fonts/opensans"
+            )
+        else {
             return false
         }
 
@@ -278,7 +279,8 @@ public extension FontResource {
 
             return values.first { cachedKey, _ in
                 cachedKey.covers(key)
-            }?.value
+            }?
+            .value
         }
 
         func set(_ value: FontResource, for key: CacheKey) {
@@ -298,7 +300,8 @@ public extension FontResource {
             valuesByTag[axis.tag] = axis.value
         }
 
-        return valuesByTag
+        return
+            valuesByTag
             .map { FontVariationAxis(tag: $0.key, value: $0.value) }
             .sorted { lhs, rhs in
                 lhs.tag == rhs.tag ? lhs.value < rhs.value : lhs.tag < rhs.tag
@@ -307,7 +310,7 @@ public extension FontResource {
 
     /// Create custom font from file path.
     /// - Returns: Returns font if font available or null if something went wrong.
-    static func custom(fontPath: URL, emFontScale: Double? = nil) -> FontResource? {
+    public static func custom(fontPath: URL, emFontScale: Double? = nil) -> FontResource? {
         custom(
             fontPath: fontPath,
             emFontScale: emFontScale,
@@ -317,7 +320,7 @@ public extension FontResource {
         )
     }
 
-    static func custom(
+    public static func custom(
         fontPath: URL,
         emFontScale: Double? = nil,
         includeDefaultCharset: Bool,
@@ -353,7 +356,7 @@ public extension FontResource {
         return resource
     }
 
-    static func dynamic(
+    public static func dynamic(
         fontPath: URL,
         emFontScale: Double? = nil,
         charset: FontCharset? = nil,
@@ -369,71 +372,72 @@ public extension FontResource {
         )
     }
 
-    static func fallback(for scalar: UnicodeScalar, baseFont: FontResource) -> FontResource? {
+    public static func fallback(for scalar: UnicodeScalar, baseFont: FontResource) -> FontResource? {
         #if canImport(CoreText)
-        guard let fontURL = fallbackFontURL(for: scalar, baseFontName: baseFont.handle.fontName) else {
-            return nil
-        }
+            guard let fontURL = fallbackFontURL(for: scalar, baseFontName: baseFont.handle.fontName) else {
+                return nil
+            }
 
-        return custom(
-            fontPath: fontURL,
-            emFontScale: baseFont.fontEmSize,
-            includeDefaultCharset: false,
-            additionalCodepoints: [scalar.value],
-            variations: []
-        )
+            return custom(
+                fontPath: fontURL,
+                emFontScale: baseFont.fontEmSize,
+                includeDefaultCharset: false,
+                additionalCodepoints: [scalar.value],
+                variations: []
+            )
         #else
-        return nil
+            return nil
         #endif
     }
 
     #if canImport(CoreText)
-    private static func fallbackFontURL(for scalar: UnicodeScalar, baseFontName: String) -> URL? {
-        let character = String(scalar)
-        let baseFont = CTFontCreateWithName(baseFontName as CFString, 12, nil)
-        let fallbackFont = CTFontCreateForString(
-            baseFont,
-            character as CFString,
-            CFRange(location: 0, length: (character as NSString).length)
-        )
+        private static func fallbackFontURL(for scalar: UnicodeScalar, baseFontName: String) -> URL? {
+            let character = String(scalar)
+            let baseFont = CTFontCreateWithName(baseFontName as CFString, 12, nil)
+            let fallbackFont = CTFontCreateForString(
+                baseFont,
+                character as CFString,
+                CFRange(location: 0, length: character.utf16.count)
+            )
 
-        guard font(fallbackFont, contains: scalar) else {
-            return nil
-        }
-
-        return CTFontCopyAttribute(fallbackFont, kCTFontURLAttribute) as? URL
-    }
-
-    private static func font(_ font: CTFont, contains scalar: UnicodeScalar) -> Bool {
-        let characters = String(scalar).utf16.map { UniChar($0) }
-        guard !characters.isEmpty else {
-            return false
-        }
-
-        var glyphs = Array(repeating: CGGlyph(), count: characters.count)
-        let foundGlyphs = characters.withUnsafeBufferPointer { charactersBuffer in
-            glyphs.withUnsafeMutableBufferPointer { glyphsBuffer in
-                CTFontGetGlyphsForCharacters(
-                    font,
-                    charactersBuffer.baseAddress!,
-                    glyphsBuffer.baseAddress!,
-                    characters.count
-                )
+            guard font(fallbackFont, contains: scalar) else {
+                return nil
             }
+
+            return CTFontCopyAttribute(fallbackFont, kCTFontURLAttribute) as? URL
         }
 
-        return foundGlyphs && glyphs.allSatisfy { $0 != 0 }
-    }
+        private static func font(_ font: CTFont, contains scalar: UnicodeScalar) -> Bool {
+            let characters = String(scalar).utf16.map { UniChar($0) }
+            guard !characters.isEmpty else {
+                return false
+            }
+
+            var glyphs = Array(repeating: CGGlyph(), count: characters.count)
+            let foundGlyphs = characters.withUnsafeBufferPointer { charactersBuffer in
+                glyphs.withUnsafeMutableBufferPointer { glyphsBuffer in
+                    guard let charactersAddress = charactersBuffer.baseAddress, let glyphsAddress = glyphsBuffer.baseAddress else {
+                        return false
+                    }
+                    return CTFontGetGlyphsForCharacters(
+                        font,
+                        charactersAddress,
+                        glyphsAddress,
+                        characters.count
+                    )
+                }
+            }
+
+            return foundGlyphs && glyphs.allSatisfy { $0 != 0 }
+        }
     #endif
-    
 }
 
 // TODO: Add cache
 
-public extension FontResource {
-    
+extension FontResource {
     /// Returns default font from AdaEngine bundle.
-    static func system(weight: FontWeight = .regular, emFontScale: Double? = nil) -> FontResource {
+    public static func system(weight: FontWeight = .regular, emFontScale: Double? = nil) -> FontResource {
         let resolvedScale = emFontScale ?? Constants.defaultEmFontScale
         let path = "Assets/Fonts/opensans/OpenSans-\(weight.fileNameComponent).ttf"
         let cachePath = "\(path)#emSize=\(resolvedScale)"
@@ -448,7 +452,7 @@ public extension FontResource {
         }
 
         let fontPath = resourceURL.appendingPathComponent(path)
-        guard let resource = FontResource.custom(fontPath: fontPath, emFontScale: resolvedScale) else {
+        guard let resource = Self.custom(fontPath: fontPath, emFontScale: resolvedScale) else {
             fatalError("[Font]: Failed to load system font resource at path \(fontPath.path)")
         }
 
@@ -457,7 +461,7 @@ public extension FontResource {
     }
 }
 
-private extension FontWeight {
+extension FontWeight {
     var fileNameComponent: String {
         switch self {
         case .boldItalic:

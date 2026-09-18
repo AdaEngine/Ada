@@ -88,6 +88,22 @@ struct Physics2DTests {
 
         #expect(boxes.allSatisfy { $0.components[PhysicsBody2DComponent.self]?.runtimeBody != nil })
     }
+
+    @Test
+    func nativePerformanceProfileReportsStepPhasesAndCounters() throws {
+        let metrics = PhysicsPerformanceMetrics()
+        let physicsWorld = try #require(world.main.physicsWorld2D)
+
+        physicsWorld.updateSimulation(1.0 / 60.0)
+        physicsWorld.recordPerformance(into: metrics)
+
+        let snapshot = try #require(metrics.snapshots.first { $0.dimension == .twoD })
+        #expect(snapshot.stepCount == 1)
+        #expect(snapshot.step != nil)
+        #expect(snapshot.phases.contains { $0.phase == .collide })
+        #expect(snapshot.phases.contains { $0.phase == .solve })
+        #expect(snapshot.counters.bodyCount >= 0)
+    }
 //    
 //    @Test
 //    func createStaticBody() async throws {

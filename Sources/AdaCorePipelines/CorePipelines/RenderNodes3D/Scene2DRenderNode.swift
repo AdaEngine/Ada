@@ -23,29 +23,35 @@ public struct Scene2DRenderNode: RenderNode {
     }
 
     public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
-        guard let view = context.viewEntity,
-              let camera = view.components[Camera.self],
-              let uniform = view.components[GlobalViewUniform.self],
-              let target = view.components[RenderViewTarget.self],
-              let color = target.mainTexture,
-              let depth = target.depthTexture else {
+        guard
+            let view = context.viewEntity,
+            let camera = view.components[Camera.self],
+            let uniform = view.components[GlobalViewUniform.self],
+            let target = view.components[RenderViewTarget.self],
+            let color = target.mainTexture,
+            let depth = target.depthTexture
+        else {
             return []
         }
 
         let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
         commandBuffer.label = "Scene 2D Render Pass"
-        let pass = commandBuffer.beginRenderPass(RenderPassDescriptor(
-            label: "Scene 2D Render Pass",
-            colorAttachments: [.init(
-                texture: color,
-                operation: OperationDescriptor(loadAction: .load, storeAction: .store)
-            )],
-            depthStencilAttachment: .init(
-                texture: depth,
-                depthOperation: OperationDescriptor(loadAction: .load, storeAction: .store),
-                stencilOperation: OperationDescriptor(loadAction: .load, storeAction: .store)
+        let pass = commandBuffer.beginRenderPass(
+            RenderPassDescriptor(
+                label: "Scene 2D Render Pass",
+                colorAttachments: [
+                    .init(
+                        texture: color,
+                        operation: OperationDescriptor(loadAction: .load, storeAction: .store)
+                    )
+                ],
+                depthStencilAttachment: .init(
+                    texture: depth,
+                    depthOperation: OperationDescriptor(loadAction: .load, storeAction: .store),
+                    stencilOperation: OperationDescriptor(loadAction: .load, storeAction: .store)
+                )
             )
-        ))
+        )
         pass.setVertexBuffer(uniform, slot: GlobalBufferIndex.viewUniform)
         pass.setViewport(camera.viewport.rect)
 
@@ -74,7 +80,9 @@ struct Scene2DPipelines: Resource {
 
     mutating func pipeline(for source: RenderPipeline, device: RenderDevice) -> RenderPipeline {
         let key = ObjectIdentifier(source)
-        if let entry = entries[key] { return entry.scene }
+        if let entry = entries[key] {
+            return entry.scene
+        }
         var descriptor = source.descriptor
         descriptor.debugName += " (Scene 2D)"
         descriptor.backfaceCulling = false

@@ -37,79 +37,83 @@ private enum ContextMenuPresenter {
     private static var activeSession: ContextMenuSession?
 
     static func present(_ presentation: ContextMenuPresentation, in app: AppWorlds) {
-        guard !presentation.items.isEmpty else { return }
+        guard !presentation.items.isEmpty else {
+            return
+        }
 
         #if os(iOS)
-        IOSContextMenuPresentationCenter.present(presentation)
+            IOSContextMenuPresentationCenter.present(presentation)
         #else
-        activeSession?.closeAll()
+            activeSession?.closeAll()
 
-        let session = ContextMenuSession(
-            sourceWindow: presentation.sourceWindow,
-            onDismiss: presentation.onDismiss
-        )
-        activeSession = session
-        let window = makeWindow(
-            items: presentation.items,
-            origin: menuOrigin(for: presentation, menuSize: menuSize(for: presentation.items)),
-            app: app,
-            session: session,
-            level: 0
-        )
-        session.setWindow(window, items: presentation.items, at: 0)
-        window.showWindow(makeFocused: false)
+            let session = ContextMenuSession(
+                sourceWindow: presentation.sourceWindow,
+                onDismiss: presentation.onDismiss
+            )
+            activeSession = session
+            let window = makeWindow(
+                items: presentation.items,
+                origin: menuOrigin(for: presentation, menuSize: menuSize(for: presentation.items)),
+                app: app,
+                session: session,
+                level: 0
+            )
+            session.setWindow(window, items: presentation.items, at: 0)
+            window.showWindow(makeFocused: false)
         #endif
     }
 
     @discardableResult
     static func dismissAll() -> Bool {
         #if os(iOS)
-        return IOSContextMenuPresentationCenter.dismissAll()
+            return IOSContextMenuPresentationCenter.dismissAll()
         #else
-        guard let session = activeSession else {
-            return false
-        }
+            guard let session = activeSession else {
+                return false
+            }
 
-        session.closeAll()
-        activeSession = nil
-        return true
+            session.closeAll()
+            activeSession = nil
+            return true
         #endif
     }
 
     static func dismissForInteraction(in window: UIWindow?) {
         #if os(iOS)
-        IOSContextMenuPresentationCenter.dismissForInteraction(in: window)
+            IOSContextMenuPresentationCenter.dismissForInteraction(in: window)
         #else
-        guard let activeSession, let window, !activeSession.contains(window) else {
-            return
-        }
+            guard let activeSession, let window, !activeSession.contains(window) else {
+                return
+            }
 
-        activeSession.closeAll()
-        self.activeSession = nil
+            activeSession.closeAll()
+            self.activeSession = nil
         #endif
     }
 
     static func dismissForDeactivation(of window: UIWindow?) {
         #if os(iOS)
-        IOSContextMenuPresentationCenter.dismissForDeactivation(of: window)
+            IOSContextMenuPresentationCenter.dismissForDeactivation(of: window)
         #else
-        guard let activeSession, let window, activeSession.sourceWindow === window else {
-            return
-        }
+            guard let activeSession, let window, activeSession.sourceWindow === window else {
+                return
+            }
 
-        activeSession.closeAll()
-        self.activeSession = nil
+            activeSession.closeAll()
+            self.activeSession = nil
         #endif
     }
 
-    fileprivate static func presentSubmenu(
+    static func presentSubmenu(
         items: [ContextMenuPresentation.Item],
         from parentWindow: UIWindow,
         parentLevel: Int,
         rowIndex: Int,
         in session: ContextMenuSession
     ) {
-        guard !items.isEmpty else { return }
+        guard !items.isEmpty else {
+            return
+        }
 
         session.closeSubmenus(from: parentLevel + 1)
         let level = parentLevel + 1
@@ -132,11 +136,11 @@ private enum ContextMenuPresenter {
         window.showWindow(makeFocused: false)
     }
 
-    fileprivate static func closeSubmenus(from level: Int, in session: ContextMenuSession) {
+    static func closeSubmenus(from level: Int, in session: ContextMenuSession) {
         session.closeSubmenus(from: level)
     }
 
-    fileprivate static func performAction(_ action: (() -> Void)?, in session: ContextMenuSession) {
+    static func performAction(_ action: (() -> Void)?, in session: ContextMenuSession) {
         session.closeAll()
         if activeSession === session {
             activeSession = nil
@@ -196,8 +200,9 @@ private enum ContextMenuPresenter {
     }
 
     private static func menuOrigin(for presentation: ContextMenuPresentation, menuSize: Size) -> Point {
-        guard let sourceWindow = presentation.sourceWindow,
-              let systemWindow = sourceWindow.systemWindow
+        guard
+            let sourceWindow = presentation.sourceWindow,
+            let systemWindow = sourceWindow.systemWindow
         else {
             return presentation.location
         }
@@ -247,9 +252,10 @@ private enum ContextMenuPresenter {
     }
 
     private static func rowOffset(for rowIndex: Int, in items: [ContextMenuPresentation.Item]) -> Float {
-        items.prefix(rowIndex).reduce(0) { offset, item in
-            offset + ContextMenuMetrics.height(for: item)
-        }
+        items.prefix(rowIndex)
+            .reduce(0) { offset, item in
+                offset + ContextMenuMetrics.height(for: item)
+            }
     }
 }
 
@@ -361,7 +367,7 @@ private struct ContextMenuWindowContent: View {
                         in: session
                     )
                 }
-            }) {
+            }, label: {
                 HStack(spacing: ContextMenuMetrics.itemSpacing) {
                     if items.contains(where: \.isSelected) {
                         ContextMenuCheckmark()
@@ -388,10 +394,12 @@ private struct ContextMenuWindowContent: View {
                 }
                 .padding(.horizontal, ContextMenuMetrics.horizontalPadding)
                 .frame(width: menuWidth, height: ContextMenuMetrics.rowHeight)
-            }
+            })
             .buttonStyle(ContextMenuButtonStyle(role: item.role))
             .onHover { isHovered in
-                guard isHovered else { return }
+                guard isHovered else {
+                    return
+                }
 
                 if item.submenu.isEmpty {
                     ContextMenuPresenter.closeSubmenus(from: level + 1, in: session)
@@ -433,9 +441,10 @@ private struct ContextMenuButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(
-                RoundedRectangleShape(cornerRadius: 5).fill(
-                    configuration.isHighlighted ? highlightColor : Color.clear
-                )
+                RoundedRectangleShape(cornerRadius: 5)
+                    .fill(
+                        configuration.isHighlighted ? highlightColor : Color.clear
+                    )
             )
     }
 }

@@ -41,7 +41,9 @@ struct EditorSourceControlSidebar: View {
                 .padding(8)
             }
             .frame(maxHeight: .infinity)
-            if !viewModel.sourceControl.showsHistory { commitSection.padding(8) }
+            if !viewModel.sourceControl.showsHistory {
+                commitSection.padding(8)
+            }
         }
         .background(
             RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
@@ -67,7 +69,7 @@ struct EditorSourceControlSidebar: View {
 
     private var repositoryHeader: some View {
         VStack(alignment: .leading, spacing: 7) {
-        HStack(spacing: 8) {
+            HStack(spacing: 8) {
                 Text(viewModel.sourceControl.snapshot.branchTitle)
                     .font(.system(size: 12))
                     .foregroundColor(theme.editorColors.text)

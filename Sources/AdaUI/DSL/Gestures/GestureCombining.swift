@@ -9,7 +9,6 @@
 
 /// Combines two gestures that are recognized at the same time.
 public struct SimultaneousGesture<First: Gesture, Second: Gesture>: Gesture {
-
     public struct Value {
         public let first: First.Value?
         public let second: Second.Value?
@@ -27,7 +26,7 @@ public struct SimultaneousGesture<First: Gesture, Second: Gesture>: Gesture {
 }
 
 extension SimultaneousGesture: _GestureRecognizerConvertible
-    where First: _GestureRecognizerConvertible, Second: _GestureRecognizerConvertible {
+where First: _GestureRecognizerConvertible, Second: _GestureRecognizerConvertible {
     func _buildRecognizers() -> [GestureRecognizer] {
         first._buildRecognizers() + second._buildRecognizers()
     }
@@ -38,7 +37,6 @@ extension SimultaneousGesture: _GestureRecognizerConvertible
 /// A gesture formed from a sequence of two gestures, where the second gesture is recognized
 /// only after the first has completed.
 public struct SequenceGesture<First: Gesture, Second: Gesture>: Gesture {
-
     public enum Value {
         case first(First.Value)
         case second(First.Value, Second.Value?)
@@ -59,7 +57,6 @@ public struct SequenceGesture<First: Gesture, Second: Gesture>: Gesture {
 
 /// A gesture where only one of two gestures succeeds.
 public struct ExclusiveGesture<First: Gesture, Second: Gesture>: Gesture {
-
     public enum Value {
         case first(First.Value)
         case second(Second.Value)
@@ -77,7 +74,7 @@ public struct ExclusiveGesture<First: Gesture, Second: Gesture>: Gesture {
 }
 
 extension ExclusiveGesture: _GestureRecognizerConvertible
-    where First: _GestureRecognizerConvertible, Second: _GestureRecognizerConvertible {
+where First: _GestureRecognizerConvertible, Second: _GestureRecognizerConvertible {
     func _buildRecognizers() -> [GestureRecognizer] {
         first._buildRecognizers() + second._buildRecognizers()
     }

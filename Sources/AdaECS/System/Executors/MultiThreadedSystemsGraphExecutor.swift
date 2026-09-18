@@ -13,7 +13,6 @@ import Tracing
 /// when their declared accesses are compatible. Any system that records
 /// deferred commands causes a world flush after its current batch completes.
 public struct MultiThreadedSystemsGraphExecutor: SystemsGraphExecutor {
-
     private struct NodeMetadata: Sendable {
         var dependencies: Set<String>
         var access: SystemAccessSet
@@ -83,7 +82,8 @@ public struct MultiThreadedSystemsGraphExecutor: SystemsGraphExecutor {
             for node in batch {
                 await node.queries.finish(world)
                 completedSystems.insert(node.name)
-                shouldFlushDeferredCommands = shouldFlushDeferredCommands
+                shouldFlushDeferredCommands =
+                    shouldFlushDeferredCommands
                     || (metadataByNode[node.name]?.access.hasDeferredWorldAccess == true)
             }
 
@@ -103,10 +103,11 @@ public struct MultiThreadedSystemsGraphExecutor: SystemsGraphExecutor {
         var batchAccess: [SystemAccessSet] = []
 
         for nodeName in nodeOrder where !completedSystems.contains(nodeName) {
-            guard let metadata = metadataByNode[nodeName],
-                  metadata.dependencies.isSubset(of: completedSystems),
-                  batchAccess.allSatisfy({ $0.isCompatible(with: metadata.access) }),
-                  let node = graph.nodes[nodeName]
+            guard
+                let metadata = metadataByNode[nodeName],
+                metadata.dependencies.isSubset(of: completedSystems),
+                batchAccess.allSatisfy({ $0.isCompatible(with: metadata.access) }),
+                let node = graph.nodes[nodeName]
             else {
                 continue
             }
@@ -120,20 +121,18 @@ public struct MultiThreadedSystemsGraphExecutor: SystemsGraphExecutor {
 
     private func makeSingleThreadedNodeOrder(from graph: borrowing SystemsGraph) -> [String] {
         var completedSystems: Set<String> = []
-        var nodes = Deque(graph.nodes.filter { $0.inputEdges.isEmpty })
+        var nodes = Deque(graph.nodes.filter(\.inputEdges.isEmpty))
         var order: [String] = []
 
-    nextNode:
-        while let currentNode = nodes.popLast() {
+        nextNode: while let currentNode = nodes.popLast() {
             if completedSystems.contains(currentNode.name) {
                 continue
             }
 
-            for inputNode in graph.getInputNodes(for: currentNode.name) {
-                if !completedSystems.contains(inputNode.name) {
-                    nodes.prepend(currentNode)
-                    continue nextNode
-                }
+            for inputNode in graph.getInputNodes(for: currentNode.name)
+                where !completedSystems.contains(inputNode.name) {
+                nodes.prepend(currentNode)
+                continue nextNode
             }
 
             completedSystems.insert(currentNode.name)
@@ -154,12 +153,15 @@ private func executeSystem(
     world: World,
     scheduler: SchedulerName
 ) async {
-    await AdaTrace.span(lazyName: "System.execute.\(system.name)", attributes: [
-        "ada.profile.category": "system",
-        "ada.scheduler.name": .string(scheduler.rawValue),
-        "ada.system.name": .string(system.name),
-        "ada.world.name": .string(world.name ?? "UnknownWorld")
-    ]) {
+    await AdaTrace.span(
+        lazyName: "System.execute.\(system.name)",
+        attributes: [
+            "ada.profile.category": "system",
+            "ada.scheduler.name": .string(scheduler.rawValue),
+            "ada.system.name": .string(system.name),
+            "ada.world.name": .string(world.name ?? "UnknownWorld"),
+        ]
+    ) {
         await system.system.update(
             context: WorldUpdateContext(
                 world: world,

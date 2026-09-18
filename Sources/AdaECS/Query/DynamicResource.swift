@@ -55,7 +55,7 @@ public final class DynamicResource: @unchecked Sendable {
 
     // Runtime metadata is required and cannot be recovered from World alone.
     // swiftlint:disable:next unavailable_function
-    public init(from world: World) {
+    public init(from _: World) {
         fatalError("DynamicResource must be initialized with a runtime resource plan")
     }
 
@@ -70,8 +70,10 @@ public final class DynamicResource: @unchecked Sendable {
 
     @discardableResult
     public func write(field: EditorComponentFieldDescriptor, value: EditorFieldValue) -> Bool {
-        guard field.accepts(value), let pointer = unsafe pointer, let writePointer = unsafe field.writePointer,
-              unsafe writePointer(pointer, value) else {
+        guard
+            field.accepts(value), let pointer = unsafe pointer, let writePointer = unsafe field.writePointer,
+            unsafe writePointer(pointer, value)
+        else {
             return false
         }
         changedTick?.wrappedValue = currentTick
@@ -91,7 +93,7 @@ extension DynamicResource: SystemParameter {
         currentTick = world.currentTick
     }
 
-    public func finish(_ world: World) {
+    public func finish(_: World) {
         unsafe pointer = nil
         changedTick = nil
     }

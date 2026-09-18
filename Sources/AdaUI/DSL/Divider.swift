@@ -10,27 +10,25 @@ import Math
 
 /// A view that draws a divider.
 public struct Divider: View, ViewNodeBuilder {
-
     /// Initialize a new divider.
     public init() {}
 
     /// The body of the divider.
     public var body: Never {
-        fatalError()
+        fatalError("Unreachable code")
     }
 
     /// Build a view node.
     ///
     /// - Parameter context: The build context.
     /// - Returns: The view node.
-    func buildViewNode(in context: BuildContext) -> ViewNode {
+    func buildViewNode(in _: BuildContext) -> ViewNode {
         return DividerNode(content: self)
     }
 }
 
 /// A node that draws a divider.
 final class DividerNode: ViewNode {
-
     /// Draw the divider.
     ///
     /// - Parameter context: The graphics context.

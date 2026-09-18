@@ -5,8 +5,9 @@ import Observation
 
 extension EditorViewModel {
     func activePreviewTextDocument() -> EditorTextDocument? {
-        guard case .text(let document)? = workbench.activeDocument,
-              document.language == .ada || document.language == .swift || document.language == .packageManifest
+        guard
+            case let .text(document)? = workbench.activeDocument,
+            document.language == .ada || document.language == .swift || document.language == .packageManifest
         else {
             return nil
         }
@@ -68,11 +69,12 @@ extension EditorViewModel {
             do {
                 let artifact = try await self.previewBuilder.build(request)
                 await MainActor.run {
-                    guard self.isCurrentPreviewBuild(
-                        generation,
-                        documentID: document.id,
-                        previewID: declaration.id
-                    )
+                    guard
+                        self.isCurrentPreviewBuild(
+                            generation,
+                            documentID: document.id,
+                            previewID: declaration.id
+                        )
                     else {
                         return
                     }
@@ -100,11 +102,13 @@ extension EditorViewModel {
                 }
             } catch {
                 await MainActor.run {
-                    guard self.isCurrentPreviewBuild(
-                        generation,
-                        documentID: document.id,
-                        previewID: declaration.id
-                    ) else {
+                    guard
+                        self.isCurrentPreviewBuild(
+                            generation,
+                            documentID: document.id,
+                            previewID: declaration.id
+                        )
+                    else {
                         return
                     }
                     self.workbench.previewStatus = .failed(
@@ -149,11 +153,13 @@ extension EditorViewModel {
                 )
                 let view = UIContainerView(rootView: rootView)
 
-                guard self.isCurrentPreviewBuild(
-                    generation,
-                    documentID: document.id,
-                    previewID: declaration.id
-                ) else {
+                guard
+                    self.isCurrentPreviewBuild(
+                        generation,
+                        documentID: document.id,
+                        previewID: declaration.id
+                    )
+                else {
                     return
                 }
                 self.workbench.loadedPreview = EditorLoadedPreview(
@@ -169,11 +175,13 @@ extension EditorViewModel {
                     self.previewTask = nil
                 }
             } catch {
-                guard self.isCurrentPreviewBuild(
-                    generation,
-                    documentID: document.id,
-                    previewID: declaration.id
-                ) else {
+                guard
+                    self.isCurrentPreviewBuild(
+                        generation,
+                        documentID: document.id,
+                        previewID: declaration.id
+                    )
+                else {
                     return
                 }
                 self.workbench.previewStatus = .failed(
@@ -201,8 +209,9 @@ extension EditorViewModel {
     }
 
     func isCurrentPreviewBuild(_ generation: Int, documentID: String, previewID: String) -> Bool {
-        guard generation == previewBuildGeneration,
-              case .text(let activeDocument)? = workbench.activeDocument
+        guard
+            generation == previewBuildGeneration,
+            case let .text(activeDocument)? = workbench.activeDocument
         else {
             return false
         }
@@ -219,7 +228,8 @@ extension EditorViewModel {
             return "\(prefix). See Build Output for details."
         }
         let maximumDetailLength = 220
-        let displayedDetail = detail.count > maximumDetailLength
+        let displayedDetail =
+            detail.count > maximumDetailLength
             ? "\(detail.prefix(maximumDetailLength))…"
             : detail
         return "\(prefix): \(displayedDetail)"
@@ -237,7 +247,9 @@ extension EditorViewModel {
             return
         }
 
-        guard !sourceControl.isRunning else { return }
+        guard !sourceControl.isRunning else {
+            return
+        }
         sourceControl.refreshTask?.cancel()
         sourceControl.refreshGeneration = UUID()
         sourceControl.isRefreshing = false
@@ -247,17 +259,27 @@ extension EditorViewModel {
         appendOutput("$ \(statusTitle)")
 
         sourceControlTask = Task { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             let result = await self.sourceControlService.execute(kind, projectURL: projectURL)
             await MainActor.run {
                 self.appendOutput(result)
                 self.sourceControl.commandError = result.succeeded ? nil : result.combinedOutput.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !result.succeeded {
-                    EditorNotificationCenter.shared.post(.init(source: .sourceControl, importance: .error,
-                        title: "\(statusTitle) failed", detail: String(result.combinedOutput.prefix(600)), projectName: self.project?.name,
-                        actions: [.init(title: "Open Git", destination: .sourceControl, projectID: self.project?.id)]))
+                    EditorNotificationCenter.shared.post(
+                        .init(
+                            source: .sourceControl,
+                            importance: .error,
+                            title: "\(statusTitle) failed",
+                            detail: String(result.combinedOutput.prefix(600)),
+                            projectName: self.project?.name,
+                            actions: [.init(title: "Open Git", destination: .sourceControl, projectID: self.project?.id)]
+                        )
+                    )
                 }
-                self.sourceControl.statusMessage = result.succeeded
+                self.sourceControl.statusMessage =
+                    result.succeeded
                     ? "\(statusTitle) finished."
                     : result.combinedOutput.trimmingCharacters(in: .whitespacesAndNewlines)
                 self.sourceControl.isRunning = false
@@ -286,14 +308,15 @@ extension EditorViewModel {
             return branchOutput.isEmpty ? "Source control unavailable." : branchOutput
         }
 
-        if let message = result.snapshot.statusMessage, message != "Working tree clean" { return message }
+        if let message = result.snapshot.statusMessage, message != "Working tree clean" {
+            return message
+        }
         if result.snapshot.hasChanges {
             return "\(result.snapshot.files.count) changed file\(result.snapshot.files.count == 1 ? "" : "s")."
         }
 
         return result.snapshot.statusMessage ?? "Working tree clean."
     }
-
 
     func handleWorkspaceProgress(_ progress: SwiftPMWorkspaceProgress) {
         let phaseChanged = lastLoggedWorkspaceProgressPhase != progress.phase
@@ -329,7 +352,9 @@ extension EditorViewModel {
     }
 
     func executeWorkspaceCommand(_ kind: SwiftPMCommandKind, statusTitle: String) {
-        guard workspaceTask == nil else { return }
+        guard workspaceTask == nil else {
+            return
+        }
         guard let projectURL else {
             workspaceStatus = .failed("No project is open.")
             return
@@ -343,26 +368,34 @@ extension EditorViewModel {
                 return
             }
             #if os(iOS)
-            do {
-                try ProjectSystem.validateRunCompatibility(
-                    of: settings,
-                    at: projectURL,
-                    destination: .iPadOS,
-                    fileManager: fileManager
-                )
-            } catch {
-                workspaceStatus = .failed(error.message)
-                footer.setWorkspaceFooterTitle(workspaceStatus.title)
-                appendOutput(error.message)
-                return
-            }
+                do {
+                    try ProjectSystem.validateRunCompatibility(
+                        of: settings,
+                        at: projectURL,
+                        destination: .iPadOS,
+                        fileManager: fileManager
+                    )
+                } catch {
+                    workspaceStatus = .failed(error.message)
+                    footer.setWorkspaceFooterTitle(workspaceStatus.title)
+                    appendOutput(error.message)
+                    return
+                }
             #endif
         }
 
         let source: EditorNotificationSource
-        if case .test = kind { source = .test } else { source = .build }
+        if case .test = kind {
+            source = .test
+        } else {
+            source = .build
+        }
         let notificationRunID = beginWorkspaceActivity(title: statusTitle, source: source)
-        if case .run = kind { workspaceOutputIsGame = true } else { workspaceOutputIsGame = false }
+        if case .run = kind {
+            workspaceOutputIsGame = true
+        } else {
+            workspaceOutputIsGame = false
+        }
         workspaceStatus = .running(statusTitle)
         buildActivity = EditorBuildActivity(title: statusTitle)
         pendingWorkspaceStandardOutput = ""
@@ -370,7 +403,9 @@ extension EditorViewModel {
         didReceiveStreamingWorkspaceOutput = false
         appendOutput("$ \(statusTitle)")
         workspaceTask = Task { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             let result = await self.workspaceService.execute(kind, projectURL: projectURL) { [weak self] event in
                 await MainActor.run {
                     self?.receiveWorkspaceOutput(event)
@@ -406,8 +441,11 @@ extension EditorViewModel {
                 self.replaceBuildDiagnostics(with: EditorDiagnostic.diagnostics(from: result, projectURL: projectURL))
                 self.showProblemsIfNeeded()
                 self.workspaceStatus = result.succeeded ? .ready : .failed(result.combinedOutput)
-                self.finishWorkspaceActivity(notificationRunID, succeeded: result.succeeded,
-                    detail: result.succeeded ? "" : result.combinedOutput)
+                self.finishWorkspaceActivity(
+                    notificationRunID,
+                    succeeded: result.succeeded,
+                    detail: result.succeeded ? "" : result.combinedOutput
+                )
                 self.workspaceTask = nil
             }
         }
@@ -435,7 +473,11 @@ extension EditorViewModel {
             let completed = step.fractionCompleted.map { Int64($0 * 1000) }
             EditorNotificationCenter.shared.activities.update(id, detail: step.title, completed: completed, total: completed == nil ? nil : 1000)
         }
-        if workspaceOutputIsGame { appendGameLog(lines) } else { appendOutput(lines) }
+        if workspaceOutputIsGame {
+            appendGameLog(lines)
+        } else {
+            appendOutput(lines)
+        }
     }
 
     static func streamingOutput(_ text: String, pending: String) -> (lines: [String], pending: String) {
@@ -454,7 +496,11 @@ extension EditorViewModel {
         for value in pendingLines {
             buildActivity?.consume(value)
         }
-        if workspaceOutputIsGame { appendGameLog(pendingLines) } else { appendOutput(pendingLines) }
+        if workspaceOutputIsGame {
+            appendGameLog(pendingLines)
+        } else {
+            appendOutput(pendingLines)
+        }
         pendingWorkspaceStandardOutput = ""
         pendingWorkspaceStandardError = ""
     }

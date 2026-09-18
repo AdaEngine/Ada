@@ -6,47 +6,48 @@
 //
 
 /// A type that can be sent as an event.
-public protocol Event: Sendable { }
+public protocol Event: Sendable {}
 
 /// An object on which events can be published and subscribed.
 public final class EventManager: @unchecked Sendable {
-
     public static let `default`: EventManager = EventManager()
-    
+
     public init() {}
 
     @LocalIsolated
-    private var subscribers: [ObjectIdentifier : WeakSet<EventSubscriber>] = [:]
-    
+    private var subscribers: [ObjectIdentifier: WeakSet<EventSubscriber>] = [:]
+
     public func subscribe<T: Event>(
-        to: T.Type,
+        to _: T.Type,
         on source: EventSource? = nil,
         completion: @escaping @Sendable (T) -> Void
     ) -> Cancellable {
         let subscriber = EventSubscriber(source: source, completion: completion)
-        
+
         let key = ObjectIdentifier(T.self)
         self.subscribers[key, default: []].insert(subscriber)
-        
+
         return AnyCancellable(subscriber)
     }
-    
+
     public func send<T: Event>(_ event: T) {
         let key = ObjectIdentifier(T.self)
-        self.subscribers[key]?.forEach { subscriber in
-            subscriber.completion?(event)
-        }
+        self.subscribers[key]?
+            .forEach { subscriber in
+                subscriber.completion?(event)
+            }
     }
-    
+
     public func send<T: Event>(_ event: T, source: EventSource) {
         let key = ObjectIdentifier(T.self)
-        self.subscribers[key]?.forEach { subscriber in
-            if let eventSource = subscriber.source, eventSource !== source {
-                return
+        self.subscribers[key]?
+            .forEach { subscriber in
+                if let eventSource = subscriber.source, eventSource !== source {
+                    return
+                }
+
+                subscriber.completion?(event)
             }
-            
-            subscriber.completion?(event)
-        }
     }
 }
 
@@ -61,7 +62,7 @@ private final class EventSubscriber: Cancellable, @unchecked Sendable {
             completion(value as! T)
         }
     }
-    
+
     func cancel() {
         self.completion = nil
     }
@@ -76,8 +77,8 @@ public protocol EventSource: AnyObject, Sendable {
     ) -> Cancellable
 }
 
-public extension EventSource {
-    func subscribe<E: Event>(
+extension EventSource {
+    public func subscribe<E: Event>(
         to event: E.Type,
         completion: @escaping @Sendable (E) -> Void
     ) -> Cancellable {

@@ -35,7 +35,7 @@ final class EditorViewModel {
     var activeOutputTab: String
     var workspaceStatus: EditorWorkspaceStatus {
         didSet {
-            if case .failed(let message) = workspaceStatus, workspaceStatus != oldValue, notificationWorkspaceRunID == nil {
+            if case let .failed(message) = workspaceStatus, workspaceStatus != oldValue, notificationWorkspaceRunID == nil {
                 reportProjectError(message)
             }
         }
@@ -186,10 +186,12 @@ final class EditorViewModel {
         self.autosaveDelay = autosaveDelay
         self.toolbar = toolbar
         self.toolStrip = toolStrip
-        self.projectSidebar = projectSidebar ?? EditorProjectSidebarViewModel(
-            items: Self.projectTreeItems(for: project, fileManager: fileManager),
-            sourceRootTarget: sourceRootTarget
-        )
+        self.projectSidebar =
+            projectSidebar
+            ?? EditorProjectSidebarViewModel(
+                items: Self.projectTreeItems(for: project, fileManager: fileManager),
+                sourceRootTarget: sourceRootTarget
+            )
         self.workbench = workbench ?? Self.defaultWorkbench(for: project)
         inspectorSidebar.scriptableObjectCatalog = scriptableObjectSupport?.descriptors ?? []
         self.inspectorSidebar = inspectorSidebar
@@ -206,9 +208,9 @@ final class EditorViewModel {
         self.symbolReferences = symbolReferences
         self.selectedRunProduct = selectedRunProduct
         #if os(iOS)
-        self.selectedRunDestination = selectedRunDestination ?? .iPadOS
+            self.selectedRunDestination = selectedRunDestination ?? .iPadOS
         #else
-        self.selectedRunDestination = selectedRunDestination ?? Self.editorRunDestination(from: savedProject?.run.destination ?? .macOS)
+            self.selectedRunDestination = selectedRunDestination ?? Self.editorRunDestination(from: savedProject?.run.destination ?? .macOS)
         #endif
         self.projectDisplayNameText = savedProject?.project.displayName ?? savedProject?.project.name ?? project?.name ?? ""
         self.projectBundleIdentifierText = savedProject?.project.bundleIdentifier ?? ""
@@ -226,11 +228,17 @@ final class EditorViewModel {
         self.inspectorSidebar.uiSceneFiles = Self.uiSceneFiles(from: self.projectSidebar.items)
         self.inspectorSidebar.uiSourceContent = { [weak workbench = self.workbench] path in
             let target = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
-            return workbench?.openDocuments.compactMap { document -> String? in
-                guard case .ui(let ui) = document, let sourcePath = ui.absolutePath,
-                      URL(fileURLWithPath: sourcePath).standardizedFileURL.resolvingSymlinksInPath() == target else { return nil }
-                return ui.content
-            }.first
+            return workbench?.openDocuments
+                .compactMap { document -> String? in
+                    guard
+                        case let .ui(ui) = document, let sourcePath = ui.absolutePath,
+                        URL(fileURLWithPath: sourcePath).standardizedFileURL.resolvingSymlinksInPath() == target
+                    else {
+                        return nil
+                    }
+                    return ui.content
+                }
+                .first
         }
         self.toolbar.searchableItems = self.projectSidebar.items
         self.agent.setProjectFileChangedHandler { [weak self] relativePath in
@@ -253,7 +261,9 @@ final class EditorViewModel {
         self.workbench.achievementAdaScriptProject = savedProject?.build.system.isAdaScript == true
         libraries.load(for: self)
         configureDebugger()
-        if workbench == nil { restoreProjectDocument() }
+        if workbench == nil {
+            restoreProjectDocument()
+        }
         synchronizeAgentSceneContext()
     }
 }

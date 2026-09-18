@@ -139,11 +139,11 @@ struct AddPluginsModifier<each T: Plugin>: SceneModifier {
     }
 }
 
-public extension AppScene {
+extension AppScene {
     /// Transform the app worlds.
     /// - Parameter transform: The transform to apply to the app worlds.
     @MainActor
-    func transformAppWorlds(
+    public func transformAppWorlds(
         transform: @escaping @MainActor (AppWorlds) -> Void
     ) -> some AppScene {
         self.modifier(
@@ -159,8 +159,8 @@ public extension AppScene {
     /// - Parameter keyPath: The key path of the resource to update.
     /// - Parameter value: The value to update the resource with.
     @MainActor
-    func updateResource<T: Resource, Value>(
-        of type: T.Type,
+    public func updateResource<T: Resource, Value>(
+        of _: T.Type,
         keyPath: WritableKeyPath<T, Value>,
         value: Value
     ) -> some AppScene {

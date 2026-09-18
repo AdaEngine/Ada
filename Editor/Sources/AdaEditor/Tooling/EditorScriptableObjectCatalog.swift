@@ -74,7 +74,8 @@ enum EditorScriptableObjectCatalogLoader {
         fileManager: FileManager = .default
     ) throws -> Result {
         let sourceRoot = projectURL.appendingPathComponent(project.paths.sources ?? "Sources", isDirectory: true)
-        let sources = try loadSources(at: sourceRoot, fileManager: fileManager)
+        let sources =
+            try loadSources(at: sourceRoot, fileManager: fileManager)
             + AdaScriptLibraryLock.load(at: projectURL).loadSources(at: projectURL)
         return try makeResult(project: project, sources: sources)
     }
@@ -96,11 +97,13 @@ enum EditorScriptableObjectCatalogLoader {
     }
 
     private static func loadSources(at rootURL: URL, fileManager: FileManager) throws -> [AdaScriptSource] {
-        guard let enumerator = fileManager.enumerator(
-            at: rootURL,
-            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
-            options: [.skipsHiddenFiles]
-        ) else {
+        guard
+            let enumerator = fileManager.enumerator(
+                at: rootURL,
+                includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+                options: [.skipsHiddenFiles]
+            )
+        else {
             return []
         }
 
@@ -110,13 +113,16 @@ enum EditorScriptableObjectCatalogLoader {
             guard values.isRegularFile == true, values.isSymbolicLink != true else {
                 continue
             }
-            let relativePath = fileURL.path.hasPrefix(rootURL.path + "/")
+            let relativePath =
+                fileURL.path.hasPrefix(rootURL.path + "/")
                 ? String(fileURL.path.dropFirst(rootURL.path.count + 1))
                 : fileURL.lastPathComponent
-            sources.append(AdaScriptSource(
-                path: relativePath,
-                source: try String(contentsOf: fileURL, encoding: .utf8)
-            ))
+            sources.append(
+                AdaScriptSource(
+                    path: relativePath,
+                    source: try String(contentsOf: fileURL, encoding: .utf8)
+                )
+            )
         }
         return sources.sorted { $0.path < $1.path }
     }
@@ -138,7 +144,8 @@ enum EditorScriptableObjectCatalogLoader {
                         descriptor.typeName == binding.typeName
                             || descriptor.displayName == binding.typeName
                             || descriptor.typeName.hasSuffix(".\(binding.typeName)")
-                    }?.typeName ?? binding.typeName
+                    }?
+                    .typeName ?? binding.typeName
                 }
                 return nil
             },
@@ -154,19 +161,22 @@ enum EditorScriptableObjectCatalogLoader {
             version: schema.version,
             aliases: schema.aliases,
             bindings: schema.bindings.map { binding in
-                let kind: AdaScriptObjectBinding.Kind = switch binding.kind {
-                case .component(let required): .component(required: required)
-                case .resource(let optional): .resource(optional: optional)
-                }
+                let kind: AdaScriptObjectBinding.Kind =
+                    switch binding.kind {
+                    case let .component(required): .component(required: required)
+                    case let .resource(optional): .resource(optional: optional)
+                    }
                 return AdaScriptObjectBinding(
                     kind: kind,
                     propertyName: binding.propertyName,
                     typeName: binding.typeName
                 )
             },
-            fields: Dictionary(uniqueKeysWithValues: schema.fields.map {
-                ($0.name, editorFieldValue($0.defaultValue))
-            })
+            fields: Dictionary(
+                uniqueKeysWithValues: schema.fields.map {
+                    ($0.name, editorFieldValue($0.defaultValue))
+                }
+            )
         )
     }
 
@@ -181,19 +191,19 @@ enum EditorScriptableObjectCatalogLoader {
 
     private static func editorSceneValue(_ value: AdaScriptSchemaField.Value) -> EditorSceneValue {
         switch value {
-        case .bool(let value): .bool(value)
-        case .double(let value): .double(value)
-        case .int(let value): .int(Int(value))
-        case .string(let value): .string(value)
+        case let .bool(value): .bool(value)
+        case let .double(value): .double(value)
+        case let .int(value): .int(Int(value))
+        case let .string(value): .string(value)
         }
     }
 
     private static func editorFieldValue(_ value: AdaScriptSchemaField.Value) -> EditorFieldValue {
         switch value {
-        case .bool(let value): .bool(value)
-        case .double(let value): .double(value)
-        case .int(let value): .int(Int(value))
-        case .string(let value): .string(value)
+        case let .bool(value): .bool(value)
+        case let .double(value): .double(value)
+        case let .int(value): .int(Int(value))
+        case let .string(value): .string(value)
         }
     }
 }

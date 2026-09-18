@@ -11,23 +11,30 @@ import box3d
 import Math
 
 @Component
-struct PhysicsBody3DInitialized: Sendable { }
+struct PhysicsBody3DInitialized: Sendable {}
 
 @MainActor
 @System
 public func Physics3DUpdate(
     _ physicsWorld: Res<Physics3DWorldHolder>,
+    _ performance: Res<PhysicsPerformanceMetrics?>,
     _ fixedTime: Res<FixedTime>
 ) {
     let deltaTime = fixedTime.deltaTime
     let world = physicsWorld.world
     world.updateSimulation(deltaTime)
+    performance.wrappedValue?.recordPerformance(from: world)
+}
+
+extension PhysicsPerformanceMetrics {
+    func recordPerformance(from world: PhysicsWorld3D) {
+        world.recordPerformance(into: self)
+    }
 }
 
 /// A system for simulating and updating physics bodies on the scene.
 @PlainSystem
 public struct Physics3DSyncSystem: Sendable {
-
     @FilterQuery<
         Entity,
         Ref<PhysicsBody3DComponent>,
@@ -42,9 +49,9 @@ public struct Physics3DSyncSystem: Sendable {
     @Commands
     private var commands
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         self.syncPhysicsBodyEntities(in: physicsWorld.world)
     }
 
@@ -93,13 +100,12 @@ public struct Physics3DSyncSystem: Sendable {
 /// A system for writing back simulated 3D physics state into scene components.
 @PlainSystem
 public struct Physics3DWritebackSystem: Sendable {
-
     @Res<Physics3DWorldHolder>
     private var physicsWorld
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         physicsWorld.world.forEachMovedBody { entity, position, rotation in
             guard var transform = entity.components[Transform.self] else {
                 return

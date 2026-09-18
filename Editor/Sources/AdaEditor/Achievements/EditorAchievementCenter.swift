@@ -4,7 +4,8 @@ import Observation
 @Observable @MainActor
 final class EditorAchievementCenter {
     static let shared: EditorAchievementCenter = {
-        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        let root =
+            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return EditorAchievementCenter(url: root.appendingPathComponent("AdaEditor/achievements.json"))
     }()
@@ -24,10 +25,14 @@ final class EditorAchievementCenter {
 
     init(url: URL? = nil) {
         self.url = url
-        guard let url, FileManager.default.fileExists(atPath: url.path) else { return }
+        guard let url, FileManager.default.fileExists(atPath: url.path) else {
+            return
+        }
         do {
             let loaded = try JSONDecoder().decode(EditorAchievementSnapshot.self, from: Data(contentsOf: url))
-            guard loaded.version == 1 else { throw CocoaError(.coderReadCorrupt) }
+            guard loaded.version == 1 else {
+                throw CocoaError(.coderReadCorrupt)
+            }
             snapshot = loaded
             profileID = loaded.activeProfileID
         } catch {
@@ -46,11 +51,16 @@ final class EditorAchievementCenter {
     func install(_ provider: any EditorAchievementProvider) {
         self.provider = provider
         provider.onPlayerChanged = { [weak self] player in self?.selectPlayer(player) }
-        if snapshot.gameCenterEnabled { provider.authenticate() }
+        if snapshot.gameCenterEnabled {
+            provider.authenticate()
+        }
     }
 
     func connect() {
-        guard let provider else { status = "Game Center is unavailable on this platform."; return }
+        guard let provider else {
+            status = "Game Center is unavailable on this platform."
+            return
+        }
         snapshot.gameCenterEnabled = true
         persist()
         status = "Connecting to Game Center…"
@@ -78,7 +88,9 @@ final class EditorAchievementCenter {
             destination.activeDays.formUnion(guest.activeDays)
             for (id, progress) in guest.progress {
                 let existing = destination.progress[id] ?? .init()
-                if progress.value > existing.value { destination.progress[id] = progress }
+                if progress.value > existing.value {
+                    destination.progress[id] = progress
+                }
             }
             snapshot.profiles[profileID] = destination
             snapshot.profiles["local"] = .init()
@@ -100,7 +112,9 @@ final class EditorAchievementCenter {
         }
         var earned: [EditorAchievement] = []
         for achievement in EditorAchievement.catalog {
-            guard let value = values[achievement.id] else { continue }
+            guard let value = values[achievement.id] else {
+                continue
+            }
             var progress = updated.progress[achievement.id] ?? .init()
             progress.value = min(achievement.goal, max(progress.value, value))
             if progress.value == achievement.goal, progress.earnedAt == nil {
@@ -109,22 +123,34 @@ final class EditorAchievementCenter {
             }
             updated.progress[achievement.id] = progress
         }
-        guard updated.progress != profile.progress || updated.activeDays != profile.activeDays else { return }
+        guard updated.progress != profile.progress || updated.activeDays != profile.activeDays else {
+            return
+        }
         snapshot.profiles[profileID] = updated
         revision += 1
-        guard persist() else { return }
-        if notificationsEnabled { for achievement in earned { onEarned?(achievement) } }
+        guard persist() else {
+            return
+        }
+        if notificationsEnabled {
+            for achievement in earned { onEarned?(achievement) }
+        }
         synchronize()
     }
 
     func synchronize() {
-        guard let provider, let player = provider.playerID,
-              profileID == "gamecenter:\(player)", !isSyncing, canPersist else { return }
+        guard
+            let provider, let player = provider.playerID,
+            profileID == "gamecenter:\(player)", !isSyncing, canPersist
+        else {
+            return
+        }
         syncTask?.cancel()
         let generation = generation
         syncTask = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(500)) } catch { return }
-            guard let self, self.generation == generation else { return }
+            guard let self, self.generation == generation else {
+                return
+            }
             await self.sync(provider: provider, player: player, generation: generation)
         }
     }
@@ -135,12 +161,16 @@ final class EditorAchievementCenter {
         defer {
             if self.generation == generation {
                 isSyncing = false
-                if self.revision != revision { synchronize() }
+                if self.revision != revision {
+                    synchronize()
+                }
             }
         }
         do {
             let remote = try await provider.load()
-            guard self.generation == generation, provider.playerID == player, !Task.isCancelled else { return }
+            guard self.generation == generation, provider.playerID == player, !Task.isCancelled else {
+                return
+            }
             var updated = profile
             var pending: [EditorAchievementID: Double] = [:]
             for achievement in EditorAchievement.catalog {
@@ -148,26 +178,42 @@ final class EditorAchievementCenter {
                 let percent = raw.isFinite ? min(100, max(0, raw)) : 0
                 var progress = updated.progress[achievement.id] ?? .init()
                 progress.value = max(progress.value, Int((percent * Double(achievement.goal) / 100).rounded(.down)))
-                if percent >= 100, progress.earnedAt == nil { progress.earnedAt = Date() }
+                if percent >= 100, progress.earnedAt == nil {
+                    progress.earnedAt = Date()
+                }
                 updated.progress[achievement.id] = progress
                 let local = Double(progress.value) / Double(achievement.goal) * 100
-                if local > percent, !achievement.secret || local >= 100 { pending[achievement.id] = local }
+                if local > percent, !achievement.secret || local >= 100 {
+                    pending[achievement.id] = local
+                }
             }
             snapshot.profiles[profileID] = updated
-            guard persist() else { return }
-            if !pending.isEmpty { try await provider.report(pending) }
-            guard self.generation == generation, provider.playerID == player else { return }
+            guard persist() else {
+                return
+            }
+            if !pending.isEmpty {
+                try await provider.report(pending)
+            }
+            guard self.generation == generation, provider.playerID == player else {
+                return
+            }
             status = "Game Center · Synced"
         } catch {
-            guard self.generation == generation else { return }
+            guard self.generation == generation else {
+                return
+            }
             status = "Saved locally · Sync unavailable: \(error.localizedDescription)"
         }
     }
 
     @discardableResult
     private func persist() -> Bool {
-        guard canPersist else { return false }
-        guard let url else { return true }
+        guard canPersist else {
+            return false
+        }
+        guard let url else {
+            return true
+        }
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONEncoder().encode(snapshot).write(to: url, options: .atomic)

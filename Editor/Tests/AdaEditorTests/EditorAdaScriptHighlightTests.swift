@@ -1,8 +1,9 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) @testable import AdaUI
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorAdaScriptHighlightTests {
@@ -39,17 +40,18 @@ struct EditorAdaScriptHighlightTests {
         func color(line: Int, column: Int) -> Color? {
             node.tokenSpans.first {
                 $0.line == line && $0.startColumn <= column && column < $0.startColumn + $0.length
-            }?.color
+            }?
+            .color
         }
         #expect(color(line: 0, column: 0) == palette.keyword)
         #expect(color(line: 0, column: 1) == palette.keyword)
         #expect(color(line: 2, column: 4) == palette.keyword)
-        #expect(color(line: 4, column: 21) == palette.type) // outer
-        #expect(color(line: 4, column: 34) == palette.type) // moveX
-        #expect(color(line: 5, column: 16) == palette.type) // world
-        #expect(color(line: 5, column: 22) == palette.type) // commands
-        #expect(color(line: 5, column: 31) == palette.type) // spawn
-        #expect(color(line: 6, column: 14) == palette.type) // restart
+        #expect(color(line: 4, column: 21) == palette.type)  // outer
+        #expect(color(line: 4, column: 34) == palette.type)  // moveX
+        #expect(color(line: 5, column: 16) == palette.type)  // world
+        #expect(color(line: 5, column: 22) == palette.type)  // commands
+        #expect(color(line: 5, column: 31) == palette.type)  // spawn
+        #expect(color(line: 6, column: 14) == palette.type)  // restart
         #expect(color(line: 7, column: 11) == palette.comment)
         #expect(color(line: 8, column: 21) == palette.string)
     }

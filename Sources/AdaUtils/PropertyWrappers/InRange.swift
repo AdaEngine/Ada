@@ -22,25 +22,24 @@
 /// ```
 @propertyWrapper
 public struct InRange<T: Comparable & Codable>: Codable {
-    
     let range: Range<T>
-    
+
     public var wrappedValue: T {
         didSet {
             self.wrappedValue = Self.applyRange(self.range, for: self.wrappedValue)
         }
     }
-    
+
     public init(wrappedValue: T, _ range: ClosedRange<T>) {
         self.range = unsafe Range(uncheckedBounds: (range.lowerBound, range.upperBound))
         self.wrappedValue = Self.applyRange(self.range, for: wrappedValue)
     }
-    
+
     public init(wrappedValue: T, _ range: Range<T>) {
         self.range = range
         self.wrappedValue = Self.applyRange(range, for: wrappedValue)
     }
-    
+
     @inline(__always)
     static func applyRange(_ range: Range<T>, for value: T) -> T {
         if value < range.lowerBound {

@@ -13,13 +13,12 @@ import Math
 
 /// Tessellator for converting UI draw commands into vertex and index data.
 public struct UITessellator {
-
     /// Quad corner positions in local space (centered at origin).
     public static let quadPositions: [Vector4] = [
         [-0.5, -0.5, 0.0, 1.0],
-        [ 0.5, -0.5, 0.0, 1.0],
-        [ 0.5,  0.5, 0.0, 1.0],
-        [-0.5,  0.5, 0.0, 1.0]
+        [0.5, -0.5, 0.0, 1.0],
+        [0.5, 0.5, 0.0, 1.0],
+        [-0.5, 0.5, 0.0, 1.0],
     ]
 
     /// Default texture coordinates for a quad.
@@ -27,7 +26,7 @@ public struct UITessellator {
         [0.0, 0.0],
         [1.0, 0.0],
         [1.0, 1.0],
-        [0.0, 1.0]
+        [0.0, 1.0],
     ]
 
     /// Texture coordinates for UI gradients. `Rect.toTransform3D` flips the
@@ -37,7 +36,7 @@ public struct UITessellator {
         [0.0, 1.0],
         [1.0, 1.0],
         [1.0, 0.0],
-        [0.0, 0.0]
+        [0.0, 0.0],
     ]
 
     /// Number of segments for Bezier curve tessellation.
@@ -62,14 +61,15 @@ public struct UITessellator {
     ) -> [QuadVertexData] {
         let textureCoords = texture?.textureCoordinates ?? Self.defaultTextureCoords
 
-        return Self.quadPositions.enumerated().map { index, quadPos in
-            QuadVertexData(
-                position: transform * quadPos,
-                color: color,
-                textureCoordinate: textureCoords[index],
-                textureIndex: textureIndex
-            )
-        }
+        return Self.quadPositions.enumerated()
+            .map { index, quadPos in
+                QuadVertexData(
+                    position: transform * quadPos,
+                    color: color,
+                    textureCoordinate: textureCoords[index],
+                    textureIndex: textureIndex
+                )
+            }
     }
 
     /// Generates 6 indices for a quad starting at the given vertex offset.
@@ -82,7 +82,7 @@ public struct UITessellator {
             vertexOffset + 2,
             vertexOffset + 2,
             vertexOffset + 3,
-            vertexOffset + 0
+            vertexOffset + 0,
         ]
     }
 
@@ -151,14 +151,15 @@ public struct UITessellator {
     public func tessellateLinearGradient(
         transform: Transform3D
     ) -> [QuadVertexData] {
-        Self.quadPositions.enumerated().map { index, quadPos in
-            QuadVertexData(
-                position: transform * quadPos,
-                color: .white,
-                textureCoordinate: Self.gradientTextureCoords[index],
-                textureIndex: 0
-            )
-        }
+        Self.quadPositions.enumerated()
+            .map { index, quadPos in
+                QuadVertexData(
+                    position: transform * quadPos,
+                    color: .white,
+                    textureCoordinate: Self.gradientTextureCoords[index],
+                    textureIndex: 0
+                )
+            }
     }
 
     func tessellateClippedLinearGradient(
@@ -240,7 +241,7 @@ public struct UITessellator {
     ) -> [LineVertexData] {
         return [
             LineVertexData(position: start, color: color, lineWidth: lineWidth),
-            LineVertexData(position: end, color: color, lineWidth: lineWidth)
+            LineVertexData(position: end, color: color, lineWidth: lineWidth),
         ]
     }
 
@@ -275,7 +276,7 @@ public struct UITessellator {
 
         // Glyph position: [x: pl, y: pb, z: pr, w: pt]
         let pos = glyph.position
-        
+
         // Apply offset to positions
         let x1 = pos.x + offset.x
         let y1 = pos.y + offset.y
@@ -314,7 +315,7 @@ public struct UITessellator {
                 outlineWidth: glyph.attributes.outlineWidth,
                 textureCoordinate: Vector2(texCoord.x, texCoord.y),
                 textureIndex: textureIndex
-            )
+            ),
         ]
     }
 
@@ -470,19 +471,20 @@ public struct UITessellator {
         )
 
         let tintColor = configuration.tintColor ?? Color(red: 0, green: 0, blue: 0, alpha: 0)
-        return Self.quadPositions.enumerated().map { index, quadPos in
-            GlassVertexData(
-                position: transform * quadPos,
-                color: tintColor,
-                texCoord: Self.defaultTextureCoords[index],
-                glassParams0: glassParams0,
-                glassParams1: glassParams1,
-                glassParams2: glassParams2,
-                glassParams3: glassParams3,
-                glassInfo0: glassInfo0,
-                glassInfo1: glassInfo1
-            )
-        }
+        return Self.quadPositions.enumerated()
+            .map { index, quadPos in
+                GlassVertexData(
+                    position: transform * quadPos,
+                    color: tintColor,
+                    texCoord: Self.defaultTextureCoords[index],
+                    glassParams0: glassParams0,
+                    glassParams1: glassParams1,
+                    glassParams2: glassParams2,
+                    glassParams3: glassParams3,
+                    glassInfo0: glassInfo0,
+                    glassInfo1: glassInfo1
+                )
+            }
     }
 
     // MARK: - Path Tessellation
@@ -514,24 +516,30 @@ public struct UITessellator {
                 subpathStart = point
 
             case let .line(to: end):
-                guard let start = currentPoint else { break }
+                guard let start = currentPoint else {
+                    break
+                }
 
                 let startWorld = transformedPathPoint(start, with: transform)
                 let endWorld = transformedPathPoint(end, with: transform)
 
                 let vertexOffset = UInt32(vertices.count)
-                vertices.append(contentsOf: tessellateLine(
-                    start: startWorld.xyz,
-                    end: endWorld.xyz,
-                    lineWidth: lineWidth,
-                    color: color
-                ))
+                vertices.append(
+                    contentsOf: tessellateLine(
+                        start: startWorld.xyz,
+                        end: endWorld.xyz,
+                        lineWidth: lineWidth,
+                        color: color
+                    )
+                )
                 indices.append(contentsOf: generateLineIndices(vertexOffset: vertexOffset))
 
                 currentPoint = end
 
             case let .quadCurve(to: end, control: control):
-                guard let start = currentPoint else { break }
+                guard let start = currentPoint else {
+                    break
+                }
 
                 // Tessellate quadratic Bezier curve
                 let curveVertices = tessellateQuadraticBezier(
@@ -551,7 +559,9 @@ public struct UITessellator {
                 currentPoint = end
 
             case let .curve(to: end, control1: control1, control2: control2):
-                guard let start = currentPoint else { break }
+                guard let start = currentPoint else {
+                    break
+                }
 
                 // Tessellate cubic Bezier curve
                 let curveVertices = tessellateCubicBezier(
@@ -572,18 +582,22 @@ public struct UITessellator {
                 currentPoint = end
 
             case .closeSubpath:
-                guard let start = currentPoint, let subStart = subpathStart else { break }
+                guard let start = currentPoint, let subStart = subpathStart else {
+                    break
+                }
 
                 let startWorld = transformedPathPoint(start, with: transform)
                 let endWorld = transformedPathPoint(subStart, with: transform)
 
                 let vertexOffset = UInt32(vertices.count)
-                vertices.append(contentsOf: tessellateLine(
-                    start: startWorld.xyz,
-                    end: endWorld.xyz,
-                    lineWidth: lineWidth,
-                    color: color
-                ))
+                vertices.append(
+                    contentsOf: tessellateLine(
+                        start: startWorld.xyz,
+                        end: endWorld.xyz,
+                        lineWidth: lineWidth,
+                        color: color
+                    )
+                )
                 indices.append(contentsOf: generateLineIndices(vertexOffset: vertexOffset))
 
                 currentPoint = nil
@@ -666,12 +680,13 @@ public struct UITessellator {
     }
 
     func clipPathPolygons(_ path: Path, transform: Transform3D) -> [[Vector2]] {
-        flattenClosedSubpaths(from: path).map { polygon in
-            polygon.map { point in
-                let transformed = transformedPathPoint(point, with: transform)
-                return Vector2(transformed.x, transformed.y)
+        flattenClosedSubpaths(from: path)
+            .map { polygon in
+                polygon.map { point in
+                    let transformed = transformedPathPoint(point, with: transform)
+                    return Vector2(transformed.x, transformed.y)
+                }
             }
-        }
     }
 
     func clipPolygons(_ polygons: [[Vector2]], to clipPolygons: [[Vector2]]) -> [[Vector2]] {
@@ -729,8 +744,10 @@ public struct UITessellator {
         }
 
         for clipPolygon in clipPolygons {
-            guard let polygonBounds = clipBounds(of: clipPolygon),
-                  vertexBounds.intersects(polygonBounds) else {
+            guard
+                let polygonBounds = clipBounds(of: clipPolygon),
+                vertexBounds.intersects(polygonBounds)
+            else {
                 continue
             }
             let polygonArea = signedArea(of: clipPolygon)
@@ -738,8 +755,8 @@ public struct UITessellator {
             // Bounding-box overlap alone is insufficient: every clip half-plane
             // must contain the entire vertex bounds before bypassing clipping.
             if polygonBounds.contains(vertexBounds),
-               (isAxisAlignedRectangle(clipPolygon, bounds: polygonBounds, signedArea: polygonArea)
-                || containsBounds(vertexBounds, in: clipPolygon, signedArea: polygonArea)) {
+                isAxisAlignedRectangle(clipPolygon, bounds: polygonBounds, signedArea: polygonArea)
+                    || containsBounds(vertexBounds, in: clipPolygon, signedArea: polygonArea) {
                 result.append(vertices)
                 continue
             }
@@ -776,9 +793,11 @@ public struct UITessellator {
     }
 
     private func containsBounds(_ bounds: ClipBounds, in polygon: [Vector2], signedArea: Float) -> Bool {
-        guard signedArea.isFinite, abs(signedArea) > 0.0001,
-              bounds.minX.isFinite, bounds.maxX.isFinite,
-              bounds.minY.isFinite, bounds.maxY.isFinite else {
+        guard
+            signedArea.isFinite, abs(signedArea) > 0.0001,
+            bounds.minX.isFinite, bounds.maxX.isFinite,
+            bounds.minY.isFinite, bounds.maxY.isFinite
+        else {
             return false
         }
 
@@ -927,9 +946,11 @@ public struct UITessellator {
     }
 
     private func classifyBounds(_ bounds: ClipBounds, in polygon: [Vector2], signedArea: Float) -> BoundsClipRelation {
-        guard signedArea.isFinite, abs(signedArea) > 0.0001,
-              bounds.minX.isFinite, bounds.maxX.isFinite,
-              bounds.minY.isFinite, bounds.maxY.isFinite else {
+        guard
+            signedArea.isFinite, abs(signedArea) > 0.0001,
+            bounds.minX.isFinite, bounds.maxX.isFinite,
+            bounds.minY.isFinite, bounds.maxY.isFinite
+        else {
             return .intersecting
         }
 
@@ -954,7 +975,9 @@ public struct UITessellator {
             if maximum < -0.0001 {
                 return .outside
             }
-            if minimum < 0 { fullyInside = false }
+            if minimum < 0 {
+                fullyInside = false
+            }
         }
         return fullyInside ? .inside : .intersecting
     }
@@ -1123,20 +1146,20 @@ public struct UITessellator {
 
             // Quadratic Bezier: B(t) = (1-t)^2 * P0 + 2*(1-t)*t * P1 + t^2 * P2
             let oneMinusT = 1 - t
-            let point = oneMinusT * oneMinusT * start +
-                        2 * oneMinusT * t * control +
-                        t * t * end
+            let point = oneMinusT * oneMinusT * start + 2 * oneMinusT * t * control + t * t * end
 
             let startWorld = transformedPathPoint(previousPoint, with: transform)
             let endWorld = transformedPathPoint(point, with: transform)
 
             let vertexOffset = UInt32(vertices.count)
-            vertices.append(contentsOf: tessellateLine(
-                start: startWorld.xyz,
-                end: endWorld.xyz,
-                lineWidth: lineWidth,
-                color: color
-            ))
+            vertices.append(
+                contentsOf: tessellateLine(
+                    start: startWorld.xyz,
+                    end: endWorld.xyz,
+                    lineWidth: lineWidth,
+                    color: color
+                )
+            )
             indices.append(contentsOf: generateLineIndices(vertexOffset: vertexOffset))
 
             previousPoint = point
@@ -1170,21 +1193,20 @@ public struct UITessellator {
             let t2 = t * t
             let t3 = t2 * t
 
-            let point = oneMinusT3 * start +
-                        3 * oneMinusT2 * t * control1 +
-                        3 * oneMinusT * t2 * control2 +
-                        t3 * end
+            let point = oneMinusT3 * start + 3 * oneMinusT2 * t * control1 + 3 * oneMinusT * t2 * control2 + t3 * end
 
             let startWorld = transformedPathPoint(previousPoint, with: transform)
             let endWorld = transformedPathPoint(point, with: transform)
 
             let vertexOffset = UInt32(vertices.count)
-            vertices.append(contentsOf: tessellateLine(
-                start: startWorld.xyz,
-                end: endWorld.xyz,
-                lineWidth: lineWidth,
-                color: color
-            ))
+            vertices.append(
+                contentsOf: tessellateLine(
+                    start: startWorld.xyz,
+                    end: endWorld.xyz,
+                    lineWidth: lineWidth,
+                    color: color
+                )
+            )
             indices.append(contentsOf: generateLineIndices(vertexOffset: vertexOffset))
 
             previousPoint = point
@@ -1232,22 +1254,29 @@ public struct UITessellator {
                 currentPoint = point
 
             case let .line(to: end):
-                guard currentPoint != nil else { break }
+                guard currentPoint != nil else {
+                    break
+                }
                 appendPoint(end)
 
             case let .quadCurve(to: end, control: control):
-                guard let start = currentPoint else { break }
+                guard let start = currentPoint else {
+                    break
+                }
                 for segmentIndex in 1...Self.curveSegments {
                     let t = Float(segmentIndex) / Float(Self.curveSegments)
                     let oneMinusT = 1 - t
-                    let point = oneMinusT * oneMinusT * start
+                    let point =
+                        oneMinusT * oneMinusT * start
                         + 2 * oneMinusT * t * control
                         + t * t * end
                     appendPoint(point)
                 }
 
             case let .curve(to: end, control1: control1, control2: control2):
-                guard let start = currentPoint else { break }
+                guard let start = currentPoint else {
+                    break
+                }
                 for segmentIndex in 1...Self.curveSegments {
                     let t = Float(segmentIndex) / Float(Self.curveSegments)
                     let oneMinusT = 1 - t
@@ -1255,7 +1284,8 @@ public struct UITessellator {
                     let oneMinusT3 = oneMinusT2 * oneMinusT
                     let t2 = t * t
                     let t3 = t2 * t
-                    let point = oneMinusT3 * start
+                    let point =
+                        oneMinusT3 * start
                         + 3 * oneMinusT2 * t * control1
                         + 3 * oneMinusT * t2 * control2
                         + t3 * end

@@ -28,20 +28,19 @@ extension ShaderStage {
 
 /// Name space for shader resources.
 public enum ShaderResource {
-    
     public struct DescriptorSet: Codable, Sendable {
         public var uniformsBuffers: [Int: ShaderBuffer] = [:]
         public var constantBuffers: [Int: ShaderBuffer] = [:]
         public var sampledImages: [Int: ImageSampler] = [:]
         public var samplers: [Int: Sampler] = [:]
     }
-    
+
     public enum ResourceAccess: Codable, Sendable {
         case read
         case write
         case readWrite
     }
-    
+
     /// Resource type that will be searching into shader.
     enum ResourceType: CaseIterable, Codable {
         case uniformBuffer
@@ -53,7 +52,7 @@ public enum ShaderResource {
         case inputAttachment
         case sampler
     }
-    
+
     /// Describe reflected uniform buffer information.
     public struct UniformBuffer: Codable {
         public let name: String
@@ -61,14 +60,14 @@ public enum ShaderResource {
         public let size: Int
         public let resourceAccess: ResourceAccess
     }
-    
+
     /// Describe reflected sampler information.
     public struct Sampler: Codable, Sendable {
         public let name: String
         public let binding: Int
         public let shaderStage: ShaderStageFlags
     }
-    
+
     /// Describe reflected texture information.
     public struct ImageSampler: Codable, Sendable {
         public let name: String
@@ -79,7 +78,7 @@ public enum ShaderResource {
         public let shaderStage: ShaderStageFlags
         public let resourceAccess: ResourceAccess
     }
-    
+
     /// Describe reflected shader buffer information. That shader buffer contains members (properties)
     public struct ShaderBuffer: Codable, Sendable {
         public let name: String
@@ -87,10 +86,10 @@ public enum ShaderResource {
         public let shaderStage: ShaderStageFlags
         public let binding: Int
         public let resourceAccess: ResourceAccess
-        
-        public let members: [String : ShaderBufferMember]
+
+        public let members: [String: ShaderBufferMember]
     }
-    
+
     public struct ShaderBufferMember: Codable, Sendable {
         let name: String
         let size: Int
@@ -124,7 +123,6 @@ extension ShaderResource.ResourceType {
 }
 
 extension ShaderValueType {
-    // swiftlint:disable:next cyclomatic_complexity
     init?(typeId: spvc_type_id, compiler: spvc_compiler) {
         let type = unsafe spvc_compiler_get_type_handle(compiler, typeId)
         let baseType = unsafe spvc_type_get_basetype(type)
@@ -138,17 +136,17 @@ extension ShaderValueType {
         case SPVC_BASETYPE_FP32:
             let vectorCount = unsafe spvc_type_get_vector_size(type)
             let columnCount = unsafe spvc_type_get_columns(type)
-            
+
             if columnCount == 3 {
                 self = .mat3
                 return
             }
-            
+
             if columnCount == 4 {
                 self = .mat4
                 return
             }
-            
+
             switch vectorCount {
             case 1:
                 self = .float
@@ -175,9 +173,8 @@ extension ShaderValueType {
 
 /// Contains information about shader stages. For example, shader reflection data can have one or more stage flags for specific resource or buffer.
 public struct ShaderStageFlags: OptionSet, Codable, Sendable {
-    
     public let rawValue: UInt32
-    
+
     public init(rawValue: UInt32) {
         self.rawValue = rawValue
     }
@@ -202,29 +199,29 @@ extension ShaderStageFlags {
     }
 }
 
-public extension ShaderStageFlags {
-    static let vertex = ShaderStageFlags(rawValue: 1 << 0)
-    static let fragment = ShaderStageFlags(rawValue: 1 << 1)
-    static let compute = ShaderStageFlags(rawValue: 1 << 2)
-    static let tesselationControl = ShaderStageFlags(rawValue: 1 << 3)
-    static let tesselationEvaluation = ShaderStageFlags(rawValue: 1 << 4)
-    
+extension ShaderStageFlags {
+    public static let vertex = ShaderStageFlags(rawValue: 1 << 0)
+    public static let fragment = ShaderStageFlags(rawValue: 1 << 1)
+    public static let compute = ShaderStageFlags(rawValue: 1 << 2)
+    public static let tesselationControl = ShaderStageFlags(rawValue: 1 << 3)
+    public static let tesselationEvaluation = ShaderStageFlags(rawValue: 1 << 4)
+
     /// Include all stages.
-    static let max: ShaderStageFlags = [.vertex, .fragment, .compute, .tesselationControl, .tesselationEvaluation]
+    public static let max: ShaderStageFlags = [.vertex, .fragment, .compute, .tesselationControl, .tesselationEvaluation]
 }
 
 /// Contains relfection data of shader like uniforms buffers, textures and etc.
 /// You can use this data to understand how to manipulate shader and how to build buffers for it.
 public struct ShaderReflectionData: Codable, Sendable {
     public var descriptorSets: [ShaderResource.DescriptorSet] = []
-    
+
     /// Collection information about shader buffers, like: Uniform, push values and etc.
     public var shaderBuffers: [String: ShaderResource.ShaderBuffer] = [:]
-    
+
     /// Collection information about shader resources, like: textures, samplers.
     public var resources: [String: ShaderResource.ImageSampler] = [:]
     public var samplers: [String: ShaderResource.Sampler] = [:]
-    
+
     /// Check if reflection data is empty.
     public var isEmpty: Bool {
         return self.shaderBuffers.isEmpty && self.resources.isEmpty && self.samplers.isEmpty && self.descriptorSets.isEmpty
@@ -233,11 +230,11 @@ public struct ShaderReflectionData: Codable, Sendable {
     public init() {}
 }
 
-public extension ShaderReflectionData {
+extension ShaderReflectionData {
     // FIXME: We should merge descriptor sets
-    
+
     /// Merge one ``ShaderReflectionData`` into another.
-    mutating func merge(_ data: ShaderReflectionData) {
+    public mutating func merge(_ data: ShaderReflectionData) {
         self.shaderBuffers.merge(data.shaderBuffers) { existing, new in
             ShaderResource.ShaderBuffer(
                 name: new.name,

@@ -2,11 +2,13 @@
 
 enum AdaEditorTitleFont {
     private static let resource: FontResource? = {
-        guard let fontURL = Foundation.Bundle.editor.url(
-            forResource: "CalSans-Regular",
-            withExtension: "ttf",
-            subdirectory: "Assets/Fonts"
-        ) else {
+        guard
+            let fontURL = Foundation.Bundle.editor.url(
+                forResource: "CalSans-Regular",
+                withExtension: "ttf",
+                subdirectory: "Assets/Fonts"
+            )
+        else {
             return nil
         }
 
@@ -39,6 +41,18 @@ func adaEditorPanelTitle(_ title: String, trailing: String, theme: Theme) -> som
         } else {
             Spacer()
         }
+    }
+    .padding(.horizontal, 12)
+    .frame(height: 34)
+}
+
+@MainActor
+func adaEditorInspectorTitle(theme: Theme) -> some View {
+    HStack {
+        Text("Inspector")
+            .font(.system(size: 14, weight: .bold))
+            .foregroundColor(theme.editorColors.text)
+        Spacer()
     }
     .padding(.horizontal, 12)
     .frame(height: 34)
@@ -137,15 +151,17 @@ enum AdaEditorMaterialSymbolFont {
         0xEB8E,
         0xEF42,
         0xF1C4,
-        0xF720
+        0xF720,
     ]
 
     private static let resource: FontResource? = {
-        guard let fontURL = Foundation.Bundle.editor.url(
-            forResource: "MaterialSymbolsRounded-Regular",
-            withExtension: "ttf",
-            subdirectory: "Assets/Fonts"
-        ) else {
+        guard
+            let fontURL = Foundation.Bundle.editor.url(
+                forResource: "MaterialSymbolsRounded-Regular",
+                withExtension: "ttf",
+                subdirectory: "Assets/Fonts"
+            )
+        else {
             return nil
         }
 
@@ -180,5 +196,5 @@ private struct AdaEditorStripButtonStyle: ButtonStyle {
             .foregroundColor(active ? accentColor : (isHighlighted ? colors.text : colors.muted))
             .frame(width: 34, height: 34)
             .background(RoundedRectangleShape(cornerRadius: 7).fill(active ? accentColor.opacity(0.20) : (isHighlighted ? colors.surfaceElevated : Color.clear)))
-        }
+    }
 }

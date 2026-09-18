@@ -50,9 +50,9 @@ public struct Light2DRenderPipelines: Resource {
     public let sampler: Sampler
 
     public init(device: RenderDevice) {
-        let compositeShader = try! ShaderModule.loadBundled(at: "Assets/light2d_composite.glsl", from: .module)
+        let compositeShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_composite.glsl", from: .module)
         var compositeDesc = RenderPipelineDescriptor(
-            vertex: compositeShader.asset.getShader(for: .vertex)!,
+            vertex: compositeShader.asset.requiredShader(for: .vertex),
             fragment: compositeShader.asset.getShader(for: .fragment),
             debugName: "Light2D Composite",
             backfaceCulling: false,
@@ -63,9 +63,9 @@ public struct Light2DRenderPipelines: Resource {
         ]
         self.compositePipeline = device.createRenderPipeline(from: compositeDesc)
 
-        let pointShader = try! ShaderModule.loadBundled(at: "Assets/light2d_point.glsl", from: .module)
+        let pointShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_point.glsl", from: .module)
         var pointDesc = RenderPipelineDescriptor(
-            vertex: pointShader.asset.getShader(for: .vertex)!,
+            vertex: pointShader.asset.requiredShader(for: .vertex),
             fragment: pointShader.asset.getShader(for: .fragment),
             debugName: "Light2D Point",
             backfaceCulling: false,
@@ -83,9 +83,9 @@ public struct Light2DRenderPipelines: Resource {
         ]
         self.pointLightPipeline = device.createRenderPipeline(from: pointDesc)
 
-        let dirShader = try! ShaderModule.loadBundled(at: "Assets/light2d_directional.glsl", from: .module)
+        let dirShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_directional.glsl", from: .module)
         var dirDesc = RenderPipelineDescriptor(
-            vertex: dirShader.asset.getShader(for: .vertex)!,
+            vertex: dirShader.asset.requiredShader(for: .vertex),
             fragment: dirShader.asset.getShader(for: .fragment),
             debugName: "Light2D Directional",
             backfaceCulling: false,
@@ -94,9 +94,9 @@ public struct Light2DRenderPipelines: Resource {
         dirDesc.colorAttachments = pointDesc.colorAttachments
         self.directionalLightPipeline = device.createRenderPipeline(from: dirDesc)
 
-        let quadShader = try! CorePipelineShaders.loadBundled(at: "Shaders/quad.glsl")
+        let quadShader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/quad.glsl")
         var shadowDesc = RenderPipelineDescriptor(
-            vertex: quadShader.asset.getShader(for: .vertex)!,
+            vertex: quadShader.asset.requiredShader(for: .vertex),
             fragment: quadShader.asset.getShader(for: .fragment),
             debugName: "Light2D Shadow Fin",
             backfaceCulling: false,

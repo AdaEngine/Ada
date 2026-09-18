@@ -23,7 +23,7 @@ extension EditorComponentRegistry {
             physicsField("filter.categoryBitMask", "Collision Category", .string, .unsignedInteger),
             physicsField("filter.collisionBitMask", "Collision Mask", .string, .unsignedInteger),
             physicsField("debugColor", "Debug Color", .color, defaultValue: .object(["red": .double(1), "green": .double(1), "blue": .double(1), "alpha": .double(1)])),
-            physicsField("shapes", "Shapes", .string, .json)
+            physicsField("shapes", "Shapes", .string, .json),
         ],
         makeDefaultPayload: {
             [
@@ -33,7 +33,7 @@ extension EditorComponentRegistry {
                 "massProperties": .object(["mass": .double(1), "inertia": .object(["x": .double(0), "y": .double(0), "z": .double(0)])]),
                 "shapes": .array([EditorPhysicsShapeValue.make(.box)]),
                 "isTrigger": .bool(false), "fixedRotation": .bool(false), "gravityScale": .double(1),
-                "linearVelocity": .object(["x": .double(0), "y": .double(0)]), "angularVelocity": .double(0)
+                "linearVelocity": .object(["x": .double(0), "y": .double(0)]), "angularVelocity": .double(0),
             ]
         },
         decode: { payload in
@@ -44,7 +44,7 @@ extension EditorComponentRegistry {
     static func resolvedPhysicsPayload(_ payload: EditorComponentPayload, is3D: Bool = false) -> EditorComponentPayload {
         var result = (is3D ? physicsBody3DDescriptor : physicsBody2DDescriptor).makeDefaultPayload()
         for (key, value) in payload {
-            if case .object(let defaults) = result[key], case .object(let incoming) = value, key != "mode" {
+            if case let .object(defaults) = result[key], case let .object(incoming) = value, key != "mode" {
                 result[key] = .object(defaults.merging(incoming) { _, new in new })
             } else {
                 result[key] = value
@@ -64,7 +64,9 @@ extension EditorComponentRegistry {
         field.valuePath = key.split(separator: ".").map(String.init)
         field.coding = coding
         field.defaultValue = defaultValue
-        if key.hasPrefix("material.") || key.hasPrefix("massProperties.") { field.minimumValue = 0 }
+        if key.hasPrefix("material.") || key.hasPrefix("massProperties.") {
+            field.minimumValue = 0
+        }
         return field
     }
 }

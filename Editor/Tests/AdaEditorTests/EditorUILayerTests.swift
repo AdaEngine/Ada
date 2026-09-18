@@ -1,7 +1,8 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorUILayerTests {
@@ -47,7 +48,7 @@ struct EditorUILayerTests {
             await refresh(container)
             #expect(model.selectedID == stackID)
             #expect(model.document.root.children.first?.children.count == expectedCount)
-            #expect(model.document.root.children.first?.children.allSatisfy { $0.children.isEmpty } == true)
+            #expect(model.document.root.children.first?.children.allSatisfy(\.children.isEmpty) == true)
             #expect(model.error == nil)
         }
     }
