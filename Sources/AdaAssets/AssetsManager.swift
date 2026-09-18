@@ -293,7 +293,7 @@ public struct AssetsManager: Resource {
         at path: String,
         name: String
     ) async throws {
-        try await AdaTrace.span(lazyName: "Assets.save.\(String(reflecting: R.self))") {
+        try await AdaTrace.span("Assets.save.\(String(reflecting: R.self))") {
             let fileSystem = FileSystem.current
             var processedPath = self.processPath(path)
 

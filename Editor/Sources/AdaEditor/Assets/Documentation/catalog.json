@@ -128,7 +128,7 @@
       },
       {
         "kind": "text",
-        "text": "• GitHub Repo\n• Discussions\n• AdaEngine Website",
+        "text": "• GitHub Repo\n• Discussions\n• Ada Website",
         "level": 0,
         "links": [
           {
@@ -140,7 +140,7 @@
             "destination": "https://github.com/adaengine/adaengine/discussions"
           },
           {
-            "title": "AdaEngine Website",
+            "title": "Ada Website",
             "destination": "https://www.adaengine.org/"
           }
         ]
@@ -153,25 +153,25 @@
       },
       {
         "kind": "text",
-        "text": "AdaEngine is a modern, open-source game engine written in Swift, designed for building 2D and 3D games with simplicity and performance in mind. Its architecture leverages the Entity Component System (ECS) paradigm, enabling developers to create games and interactive experiences using a modular and scalable approach.",
+        "text": "Ada is a modern, open-source game engine written in Swift, designed for building 2D and 3D games with simplicity and performance in mind. Its architecture leverages the Entity Component System (ECS) paradigm, enabling developers to create games and interactive experiences using a modular and scalable approach.",
         "level": 0,
         "links": []
       },
       {
         "kind": "text",
-        "text": "AdaEngine provides a suite of built-in features, including:\n• High-level rendering system supporting 2D and 3D graphics\n• Physics, animation, input handling, audio, and UI systems\n• Asset management pipeline and streamlined workflows\n• Cross-platform support across Apple platforms and Linux\n• Hot-reload capabilities for assets and scripts\n• Modern Swift API with async/await, property wrappers, and result builders",
+        "text": "Ada provides a suite of built-in features, including:\n• High-level rendering system supporting 2D and 3D graphics\n• Physics, animation, input handling, audio, and UI systems\n• Asset management pipeline and streamlined workflows\n• Cross-platform support across Apple platforms and Linux\n• Hot-reload capabilities for assets and scripts\n• Modern Swift API with async/await, property wrappers, and result builders",
         "level": 0,
         "links": []
       },
       {
         "kind": "text",
-        "text": "With AdaEngine, both beginners and experienced Swift developers can build games rapidly, focusing on gameplay instead of low-level boilerplate. Extensive documentation and tutorials make it easy to get started, from setting up your first scene to advanced gameplay mechanics.",
+        "text": "With Ada, both beginners and experienced Swift developers can build games rapidly, focusing on gameplay instead of low-level boilerplate. Extensive documentation and tutorials make it easy to get started, from setting up your first scene to advanced gameplay mechanics.",
         "level": 0,
         "links": []
       },
       {
         "kind": "text",
-        "text": "AdaEngine is actively developed, and contributions from the community are welcome.\nFor more details and guides, check out the tutorials below.",
+        "text": "Ada is actively developed, and contributions from the community are welcome.\nFor more details and guides, check out the tutorials below.",
         "level": 0,
         "links": []
       },
@@ -206,15 +206,15 @@
       },
       {
         "kind": "text",
-        "text": "• Building AdaEngine\n• Contributing to AdaEngine\n• AdaUI View Identity\n• visionOS Windowed Mode",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• visionOS Windowed Mode",
         "level": 0,
         "links": [
           {
-            "title": "Building AdaEngine",
+            "title": "Building Ada",
             "destination": "Building"
           },
           {
-            "title": "Contributing to AdaEngine",
+            "title": "Contributing to Ada",
             "destination": "Contributing"
           },
           {
@@ -231,13 +231,13 @@
   },
   {
     "id": "Building",
-    "title": "Building AdaEngine",
+    "title": "Building Ada",
     "section": "AdaEngine",
     "source": "Sources/AdaEngine/AdaEngine.docc/Building.md",
     "blocks": [
       {
         "kind": "text",
-        "text": "This guide covers two scenarios:\n• Development build for working on AdaEngine itself.\n• Using AdaEngine as a dependency in your own app.",
+        "text": "This guide covers two scenarios:\n• Development build for working on Ada itself.\n• Using Ada as a dependency in your own app.",
         "level": 0,
         "links": []
       },
@@ -327,7 +327,7 @@
       },
       {
         "kind": "heading",
-        "text": "Using AdaEngine in your app",
+        "text": "Using Ada in your app",
         "level": 2,
         "links": []
       },
@@ -357,7 +357,7 @@
       },
       {
         "kind": "text",
-        "text": "Add AdaEngine to your `Package.swift`:",
+        "text": "Add Ada to your `Package.swift`:",
         "level": 0,
         "links": []
       },
@@ -375,7 +375,7 @@
       },
       {
         "kind": "text",
-        "text": "If your app enables WebGPU, run the tint build plugin once in the AdaEngine package directory before the first build:",
+        "text": "If your app enables WebGPU, run the tint build plugin once in the Ada package directory before the first build:",
         "level": 0,
         "links": []
       },
@@ -399,7 +399,7 @@
       },
       {
         "kind": "text",
-        "text": "AdaEngine includes an experimental WebAssembly export command for browser-hosted games.",
+        "text": "Ada includes an experimental WebAssembly export command for browser-hosted games.",
         "level": 0,
         "links": []
       },
@@ -606,7 +606,7 @@
     "blocks": [
       {
         "kind": "text",
-        "text": "Run AdaEngine apps in visionOS Shared Space using the existing `WindowGroup` scene model.",
+        "text": "Run Ada apps in visionOS Shared Space using the existing `WindowGroup` scene model.",
         "level": 0,
         "links": []
       },
@@ -618,13 +618,13 @@
       },
       {
         "kind": "text",
-        "text": "AdaEngine's first visionOS milestone is windowed rendering. Apps launch as normal visionOS windows backed by UIKit scenes, `MTKView`, and the Metal render backend. Existing apps that use `WindowGroup` do not need a new public API for this mode.",
+        "text": "Ada's first visionOS milestone is windowed rendering. Apps launch as normal visionOS windows backed by UIKit scenes, `MTKView`, and the Metal render backend. Existing apps that use `WindowGroup` do not need a new public API for this mode.",
         "level": 0,
         "links": []
       },
       {
         "kind": "code",
-        "text": "import AdaEngine\n\n@main\nstruct VisionOSWindowedApp: App {\n    var body: some AppScene {\n        WindowGroup {\n            Text(\"AdaEngine on visionOS\")\n                .padding()\n        }\n    }\n}",
+        "text": "import AdaEngine\n\n@main\nstruct VisionOSWindowedApp: App {\n    var body: some AppScene {\n        WindowGroup {\n            Text(\"Ada on visionOS\")\n                .padding()\n        }\n    }\n}",
         "language": "swift",
         "links": []
       },
@@ -705,7 +705,7 @@
   },
   {
     "id": "Contributing",
-    "title": "Contributing to AdaEngine",
+    "title": "Contributing to Ada",
     "section": "AdaEngine",
     "source": "Sources/AdaEngine/AdaEngine.docc/Contributing.md",
     "blocks": [
@@ -1641,6 +1641,48 @@
       {
         "kind": "text",
         "text": "Queries are refreshed by the scheduler before each system execution.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Project input actions",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In **Project Settings → Input Bindings**, add an action such as `Jump`, then add\nkeyboard, mouse, gamepad or touch bindings. Click **Save Project Settings**.\nActions are stored in `.ada/project.json` and loaded by both Play Mode and the\nAdaScript project runtime. Multiple bindings act as alternatives: releasing one\ninput does not release the action while another binding is held.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Systems and scriptable components declare input as a read-only resource dependency\nwith `@res var input: Input;`. Only declarations that request Input receive it.\nUse `@res(optional: true) var input: Input;` and `input.available()` when the\nresource may be absent; a missing required resource produces a diagnostic.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@res var input: Input;\n\nfunc update(context) {\n    if (input.isActionJustPressed(\"Jump\")) {\n        // Start a jump once per press.\n    }\n    var movement = input.getActionStrength(\"MoveRight\");\n}",
+        "language": "adascript",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• `isActionPressed(name)` remains true while an input is held.\n• `isActionJustPressed(name)` and `isActionJustReleased(name)` describe transitions\n  during the current frame. Both can be true for a tap completed within one frame.\n• `getActionStrength(name)` returns 0...1. Gamepad axes use a direction and the\n  action's dead zone; buttons and touch return either zero or one.\n• Gamepad bindings match any connected controller. `Any Finger Held` stays active\n  until every contact ends or is cancelled. Touch lifecycle events, mouse motion,\n  and wheel bindings produce frame pulses.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Input snapshots are scoped to a callback; query input again on the next update.\nUnknown action names return false or zero. Names are case-sensitive.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Swift systems use the same methods on their `Input` resource. `InputPlugin()`\nloads the `inputActions` section from `.ada/project.json` in the current working\ndirectory, including games launched from the editor. Packaged Swift applications\ncan decode `[InputAction]` from an included resource and pass it to\n`InputPlugin(actions:)`, or call `try input.setInputActions(actions)` on an existing\nresource. Explicit `InputPlugin(actions: [])` disables automatic project loading.",
         "level": 0,
         "links": []
       }

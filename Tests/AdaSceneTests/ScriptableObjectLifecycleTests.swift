@@ -27,7 +27,7 @@ struct ScriptableObjectLifecycleTests {
         let app = AppWorlds(main: world)
         InputPlugin().setup(in: app)
         ScriptableObjectPlugin().setup(in: app)
-        world.insertResource(DeltaTime(deltaTime: 1.0 / 30.0))
+        world.insertResource(DeltaTime(deltaTime: 0))
         let entity = world.spawn { decoded }
 
         let event = KeyEvent(
@@ -48,8 +48,11 @@ struct ScriptableObjectLifecycleTests {
         #expect(script.calls.contains("update"))
         #expect(script.readyEntityID == entity.id)
 
-        try await Task.sleep(for: .milliseconds(20))
-        await world.runScheduler(.update)
+        let fixedUpdateDeadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while !script.calls.contains("fixedUpdate"), ContinuousClock.now < fixedUpdateDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+            await world.runScheduler(.update)
+        }
         #expect(script.calls.filter { $0 == "ready" }.count == 1)
         #expect(script.calls.contains("fixedUpdate"))
 

@@ -1,12 +1,12 @@
 {
-  "originHash" : "43819a6f7cecbba68a4eb86875d0f7212806998fb4f0f0e77957f66bace0128f",
+  "originHash" : "7fde20672c286e4bff18cadfa75eb7daefe1b20bfc63b24c3a3cba1f22acff15",
   "pins" : [
     {
       "identity" : "gravity-lang",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/AdaEngine/gravity-lang.git",
       "state" : {
-        "revision" : "24bff2589adaa835506e622266c9114960fa1a73"
+        "revision" : "664dfb05430be6303dc5da05210476d8b91de7f4"
       }
     },
     {
@@ -109,12 +109,30 @@
       }
     },
     {
+      "identity" : "swift-subprocess",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-subprocess.git",
+      "state" : {
+        "branch" : "0.2.1",
+        "revision" : "44922dfe46380cd354ca4b0208e717a3e92b13dd"
+      }
+    },
+    {
       "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-syntax",
       "state" : {
         "revision" : "4799286537280063c85a32f09884cfbca301b1a1",
         "version" : "602.0.0"
+      }
+    },
+    {
+      "identity" : "swift-system",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-system",
+      "state" : {
+        "revision" : "869129b7bf4ecc57b97d0193ad29690ca2134750",
+        "version" : "1.8.1"
       }
     },
     {

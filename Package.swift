@@ -1261,7 +1261,7 @@ let package = Package(
 package.dependencies += [
     .package(
         url: "https://github.com/AdaEngine/gravity-lang.git",
-        revision: "24bff2589adaa835506e622266c9114960fa1a73"
+        revision: "664dfb05430be6303dc5da05210476d8b91de7f4"
     ),
     .package(url: "https://github.com/apple/swift-collections", from: "1.3.0"),
     .package(url: "https://github.com/apple/swift-log", from: "1.8.0"),

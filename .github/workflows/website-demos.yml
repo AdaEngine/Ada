@@ -53,6 +53,11 @@ jobs:
           GH_TOKEN: ${{ secrets.WEBSITE_ACCESS_TOKEN }}
           ADAENGINE_REF: ${{ github.sha }}
         run: |
+          if [[ -z "${GH_TOKEN}" ]]; then
+            echo "::notice::Skipping website deployment notification because WEBSITE_ACCESS_TOKEN is not configured."
+            exit 0
+          fi
+
           curl --fail-with-body \
             --request POST \
             --url https://api.github.com/repos/AdaEngine/ada-website/dispatches \
