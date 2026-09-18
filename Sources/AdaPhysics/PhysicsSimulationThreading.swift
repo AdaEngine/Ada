@@ -67,6 +67,10 @@ final class Box2DTaskScheduler: @unchecked Sendable {
         let suggestedTaskCount = max(1, Int(ceil(Double(count) / Double(max(1, minRange)))))
         let taskCount = min(workerCount, suggestedTaskCount)
         let handle = Box2DTaskHandle(remainingTasks: taskCount)
+        let invocation = Box2DTaskInvocation(
+            task: task,
+            taskContext: taskContext
+        )
 
         let baseChunk = count / taskCount
         let remainder = count % taskCount
@@ -78,14 +82,13 @@ final class Box2DTaskScheduler: @unchecked Sendable {
             handle.enter()
 
             let currentStart = startIndex
-            queues[workerIndex].async { [handle] in
-                unsafe task(
-                    Int32(currentStart),
-                    Int32(endIndex),
-                    UInt32(workerIndex),
-                    taskContext
+            queues[workerIndex].async { [handle, invocation] in
+                defer { handle.leave() }
+                invocation(
+                    startIndex: Int32(currentStart),
+                    endIndex: Int32(endIndex),
+                    workerIndex: UInt32(workerIndex)
                 )
-                handle.leave()
             }
 
             startIndex = endIndex
@@ -101,6 +104,21 @@ final class Box2DTaskScheduler: @unchecked Sendable {
 
         let handle = unsafe Unmanaged<Box2DTaskHandle>.fromOpaque(task).takeRetainedValue()
         handle.wait()
+    }
+}
+
+/// Box2D keeps the callback and its context alive until `finishTask` returns.
+/// The scheduler waits for every submitted closure before releasing that task handle.
+private struct Box2DTaskInvocation: @unchecked Sendable {
+    let task: b2TaskCallback
+    let taskContext: UnsafeMutableRawPointer?
+
+    func callAsFunction(
+        startIndex: Int32,
+        endIndex: Int32,
+        workerIndex: UInt32
+    ) {
+        unsafe task(startIndex, endIndex, workerIndex, taskContext)
     }
 }
 
@@ -141,12 +159,7 @@ typealias Box2DFinishTaskCallback = @convention(c) (
     UnsafeMutableRawPointer?
 ) -> Void
 
-let PhysicsSimulationThreading_Box2DEnqueueTask: Box2DEnqueueTaskCallback = {
-    task,
-    itemCount,
-    minRange,
-    taskContext,
-    userContext in
+let PhysicsSimulationThreading_Box2DEnqueueTask: Box2DEnqueueTaskCallback = { task, itemCount, minRange, taskContext, userContext in
     guard
         let task = unsafe task,
         let userContext = unsafe userContext
@@ -166,9 +179,7 @@ let PhysicsSimulationThreading_Box2DEnqueueTask: Box2DEnqueueTaskCallback = {
     )
 }
 
-let PhysicsSimulationThreading_Box2DFinishTask: Box2DFinishTaskCallback = {
-    userTask,
-    userContext in
+let PhysicsSimulationThreading_Box2DFinishTask: Box2DFinishTaskCallback = { userTask, userContext in
     guard let userContext = unsafe userContext else {
         return
     }
