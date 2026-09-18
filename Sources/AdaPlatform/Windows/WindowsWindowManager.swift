@@ -21,6 +21,15 @@
     private let adaEngineWorkMessage = UINT(WM_APP + 1)
     nonisolated(unsafe) private var windowMinimumSizes: [UIWindow.ID: Size] = [:]
     nonisolated(unsafe) private var enumeratedWindowsScreens: [Screen] = []
+    nonisolated(unsafe) private let collectWindowsMonitor: MONITORENUMPROC = { hMonitor, _, _, _ in
+        guard let hMonitor = unsafe hMonitor else {
+            return WindowsBool(true)
+        }
+        if let screen = unsafe WindowsScreenManager.shared?.makeScreen(from: hMonitor) {
+            unsafe enumeratedWindowsScreens.append(screen)
+        }
+        return WindowsBool(true)
+    }
 
     // Static storage for window class name (must persist for RegisterClassW)
     private let windowClassName: [WCHAR] = "AdaEngineWindow".wide
@@ -1135,15 +1144,7 @@
             unsafe EnumDisplayMonitors(
                 nil,
                 nil,
-                { hMonitor, _, _, _ in
-                    guard let hMonitor = unsafe hMonitor else {
-                        return WindowsBool(true)
-                    }
-                    if let screen = unsafe Self.shared?.makeScreen(from: hMonitor) {
-                        unsafe enumeratedWindowsScreens.append(screen)
-                    }
-                    return WindowsBool(true)
-                },
+                collectWindowsMonitor,
                 0
             )
 
