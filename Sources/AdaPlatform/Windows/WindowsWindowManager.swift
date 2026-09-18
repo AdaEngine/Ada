@@ -1125,7 +1125,7 @@
         }
 
         func getScreens() -> [Screen] {
-            class ScreensCollector {
+            final class ScreensCollector: @unchecked Sendable {
                 var screens: [Screen] = []
             }
 
