@@ -16,20 +16,26 @@ struct GravityCompletionCandidate: Hashable, Sendable {
     }
 
     init(symbol: GravitySymbol) {
-        kind = switch symbol.kind {
-        case .class: .class
-        case .enum: .enum
-        case .function: .function
-        case .method: .method
-        case .struct: .struct
-        case .field, .property: .property
-        default: .variable
-        }
+        kind =
+            switch symbol.kind {
+            case .class: .class
+            case .enum: .enum
+            case .function: .function
+            case .method: .method
+            case .struct: .struct
+            case .field,
+                .property:
+                .property
+            default: .variable
+            }
         detail = symbol.detail
-        insertText = switch symbol.kind {
-        case .function, .method: "\(symbol.name)()"
-        default: symbol.name
-        }
+        insertText =
+            switch symbol.kind {
+            case .function,
+                .method:
+                "\(symbol.name)()"
+            default: symbol.name
+            }
         label = symbol.name
         sortText = symbol.kind == .class || symbol.kind == .struct || symbol.kind == .enum ? "20" : "21"
     }
@@ -122,29 +128,32 @@ enum GravityBuiltins {
             kind: .keyword,
             label: "tool",
             sortText: "11"
-        )
+        ),
     ]
 
-    static let globalCandidates: [GravityCompletionCandidate] = [
-        GravityCompletionCandidate(detail: "Function declaration", insertText: "func name() {\n    \n}", kind: .snippet, label: "func", sortText: "10"),
-        GravityCompletionCandidate(detail: "Class declaration", insertText: "class Name {\n    \n}", kind: .snippet, label: "class", sortText: "11"),
-        GravityCompletionCandidate(detail: "Variable declaration", insertText: "var ", kind: .keyword, label: "var", sortText: "12"),
-        GravityCompletionCandidate(detail: "Return statement", insertText: "return ", kind: .keyword, label: "return", sortText: "13"),
-        GravityCompletionCandidate(detail: "Conditional statement", insertText: "if () {\n    \n}", kind: .snippet, label: "if", sortText: "14"),
-        GravityCompletionCandidate(detail: "Alternative branch", insertText: "else {\n    \n}", kind: .snippet, label: "else", sortText: "15"),
-        GravityCompletionCandidate(detail: "For loop", insertText: "for (item in items) {\n    \n}", kind: .snippet, label: "for", sortText: "16"),
-        GravityCompletionCandidate(detail: "While loop", insertText: "while () {\n    \n}", kind: .snippet, label: "while", sortText: "17"),
-        GravityCompletionCandidate(detail: "AdaUI text", insertText: "Text(\"\")", kind: .class, label: "Text", sortText: "18"),
-        GravityCompletionCandidate(detail: "Vertical AdaUI stack", insertText: "VStack {\n    \n}", kind: .class, label: "VStack", sortText: "18"),
-        GravityCompletionCandidate(detail: "Horizontal AdaUI stack", insertText: "HStack {\n    \n}", kind: .class, label: "HStack", sortText: "18"),
-        GravityCompletionCandidate(detail: "Overlaying AdaUI stack", insertText: "ZStack {\n    \n}", kind: .class, label: "ZStack", sortText: "18"),
-        GravityCompletionCandidate(detail: "Flexible AdaUI space", insertText: "Spacer()", kind: .class, label: "Spacer", sortText: "18"),
-        GravityCompletionCandidate(detail: "AdaUI divider", insertText: "Divider()", kind: .class, label: "Divider", sortText: "18")
-    ] + keywordCandidates
+    static let globalCandidates: [GravityCompletionCandidate] =
+        [
+            GravityCompletionCandidate(detail: "Function declaration", insertText: "func name() {\n    \n}", kind: .snippet, label: "func", sortText: "10"),
+            GravityCompletionCandidate(detail: "Class declaration", insertText: "class Name {\n    \n}", kind: .snippet, label: "class", sortText: "11"),
+            GravityCompletionCandidate(detail: "Variable declaration", insertText: "var ", kind: .keyword, label: "var", sortText: "12"),
+            GravityCompletionCandidate(detail: "Return statement", insertText: "return ", kind: .keyword, label: "return", sortText: "13"),
+            GravityCompletionCandidate(detail: "Conditional statement", insertText: "if () {\n    \n}", kind: .snippet, label: "if", sortText: "14"),
+            GravityCompletionCandidate(detail: "Alternative branch", insertText: "else {\n    \n}", kind: .snippet, label: "else", sortText: "15"),
+            GravityCompletionCandidate(detail: "For loop", insertText: "for (item in items) {\n    \n}", kind: .snippet, label: "for", sortText: "16"),
+            GravityCompletionCandidate(detail: "While loop", insertText: "while () {\n    \n}", kind: .snippet, label: "while", sortText: "17"),
+            GravityCompletionCandidate(detail: "AdaUI text", insertText: "Text(\"\")", kind: .class, label: "Text", sortText: "18"),
+            GravityCompletionCandidate(detail: "Vertical AdaUI stack", insertText: "VStack {\n    \n}", kind: .class, label: "VStack", sortText: "18"),
+            GravityCompletionCandidate(detail: "Horizontal AdaUI stack", insertText: "HStack {\n    \n}", kind: .class, label: "HStack", sortText: "18"),
+            GravityCompletionCandidate(detail: "Overlaying AdaUI stack", insertText: "ZStack {\n    \n}", kind: .class, label: "ZStack", sortText: "18"),
+            GravityCompletionCandidate(detail: "Flexible AdaUI space", insertText: "Spacer()", kind: .class, label: "Spacer", sortText: "18"),
+            GravityCompletionCandidate(detail: "AdaUI divider", insertText: "Divider()", kind: .class, label: "Divider", sortText: "18"),
+        ] + keywordCandidates
 
     private static let keywordCandidates = [
-        "break", "case", "const", "continue", "enum", "event", "extern", "false", "import", "null", "private", "public", "repeat", "static", "struct", "switch", "true"
-    ].enumerated().map { index, keyword in
+        "break", "case", "const", "continue", "enum", "event", "extern", "false", "import", "null", "private", "public", "repeat", "static", "struct", "switch", "true",
+    ]
+    .enumerated()
+    .map { index, keyword in
         GravityCompletionCandidate(detail: "AdaScript keyword", insertText: keyword, kind: .keyword, label: keyword, sortText: "\(30 + index)")
     }
 }

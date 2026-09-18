@@ -24,14 +24,15 @@ final class EditorActivityCoordinator {
 
     func restore(_ saved: [EditorOperationActivity]) {
         let ids = Set(all.map(\.id))
-        all += saved.filter { !ids.contains($0.id) }.map { item in
-            var item = item
-            if !item.state.isTerminal {
-                item.state = .interrupted
-                item.detail = "Interrupted when the application exited."
+        all += saved.filter { !ids.contains($0.id) }
+            .map { item in
+                var item = item
+                if !item.state.isTerminal {
+                    item.state = .interrupted
+                    item.detail = "Interrupted when the application exited."
+                }
+                return item
             }
-            return item
-        }
         all = Array(all.prefix(500))
     }
 
@@ -65,7 +66,9 @@ final class EditorActivityCoordinator {
             all[index].completedUnits = max(0, min(completed, total))
             all[index].totalUnits = total
         }
-        if let backgroundStatus { all[index].backgroundStatus = backgroundStatus }
+        if let backgroundStatus {
+            all[index].backgroundStatus = backgroundStatus
+        }
         backgrounds[id]?.update(all[index])
         center?.persist()
     }
@@ -78,18 +81,19 @@ final class EditorActivityCoordinator {
         all[index].detail = detail
         backgrounds.removeValue(forKey: id)?.finish(success: false)
         let item = all[index]
-        center?.post(
-            .init(
-                id: eventID,
-                source: item.source,
-                importance: .attention,
-                title: "Action required",
-                detail: detail,
-                projectName: item.projectName,
-                operationID: id,
-                actions: item.action.map { [$0] } ?? []
+        center?
+            .post(
+                .init(
+                    id: eventID,
+                    source: item.source,
+                    importance: .attention,
+                    title: "Action required",
+                    detail: detail,
+                    projectName: item.projectName,
+                    operationID: id,
+                    actions: item.action.map { [$0] } ?? []
+                )
             )
-        )
         center?.persist()
     }
 
@@ -114,19 +118,20 @@ final class EditorActivityCoordinator {
         resolveAttention(id)
         let item = all[index]
         if item.source != .agent || state != .completed {
-            center?.post(
-                .init(
-                    id: "\(id):result",
-                    source: item.source,
-                    importance: state == .failed || state == .interrupted ? .error : (state == .cancelled ? .information : .success),
-                    title: "\(item.title) — \(state.rawValue)",
-                    detail: String(detail.prefix(600)),
-                    projectName: item.projectName,
-                    operationID: id,
-                    actions: item.action.map { [$0] } ?? [],
-                    requestsSystemDelivery: state != .cancelled && (item.source == .agent || item.source == .build || item.source == .test || state == .failed)
+            center?
+                .post(
+                    .init(
+                        id: "\(id):result",
+                        source: item.source,
+                        importance: state == .failed || state == .interrupted ? .error : (state == .cancelled ? .information : .success),
+                        title: "\(item.title) — \(state.rawValue)",
+                        detail: String(detail.prefix(600)),
+                        projectName: item.projectName,
+                        operationID: id,
+                        actions: item.action.map { [$0] } ?? [],
+                        requestsSystemDelivery: state != .cancelled && (item.source == .agent || item.source == .build || item.source == .test || state == .failed)
+                    )
                 )
-            )
         }
         trim()
         center?.persist()

@@ -4,9 +4,9 @@ import SwiftParser
 import SwiftSyntax
 
 #if canImport(Darwin)
-import Darwin.C
+    import Darwin.C
 #elseif canImport(Glibc)
-import Glibc
+    import Glibc
 #endif
 
 struct EditorPreviewDeclaration: Equatable, Sendable, Identifiable {
@@ -31,7 +31,7 @@ struct EditorPreviewBuildRequest: Equatable, Sendable {
     var document: EditorTextDocument
     var packageModel: SwiftPackageModel
     var declaration: EditorPreviewDeclaration
-    var uiExportProvider: String? = nil
+    var uiExportProvider: String?
 }
 
 struct EditorPreviewBuildFailure: Error, Equatable, Sendable, CustomStringConvertible {
@@ -53,7 +53,8 @@ enum EditorPreviewScanner {
         switch language {
         case .ada:
             adaScriptDeclarations(in: source)
-        case .packageManifest, .swift:
+        case .packageManifest,
+            .swift:
             declarations(in: source)
         default:
             []
@@ -66,9 +67,10 @@ enum EditorPreviewScanner {
 
         return sourceFile.statements.compactMap { item -> EditorPreviewDeclaration? in
             let declaration = item.item.as(DeclSyntax.self)
-            guard let previewType = PreviewTypeDeclaration(declaration),
-                  previewType.hasPreviewableAttribute,
-                  previewType.conformsToView
+            guard
+                let previewType = PreviewTypeDeclaration(declaration),
+                previewType.hasPreviewableAttribute,
+                previewType.conformsToView
             else {
                 return nil
             }
@@ -87,15 +89,16 @@ enum EditorPreviewScanner {
         let metadata = try? AdaScriptViewScanner.declarations(in: [
             AdaScriptSource(path: "Preview.ada", source: source)
         ])
-        return metadata?.filter(\.isPreviewable).map {
-            EditorPreviewDeclaration(
-                id: $0.identifier,
-                title: $0.title,
-                typeName: $0.className,
-                line: $0.line,
-                kind: .adaScript
-            )
-        } ?? []
+        return metadata?.filter(\.isPreviewable)
+            .map {
+                EditorPreviewDeclaration(
+                    id: $0.identifier,
+                    title: $0.title,
+                    typeName: $0.className,
+                    line: $0.line,
+                    kind: .adaScript
+                )
+            } ?? []
     }
 }
 
@@ -135,16 +138,18 @@ private struct PreviewTypeDeclaration {
     }
 
     var title: String? {
-        guard let attribute = previewableAttribute,
-              let arguments = attribute.arguments?.as(LabeledExprListSyntax.self)
+        guard
+            let attribute = previewableAttribute,
+            let arguments = attribute.arguments?.as(LabeledExprListSyntax.self)
         else {
             return nil
         }
 
-        guard let expression = (arguments.first { $0.label?.text == "title" } ?? arguments.first)?.expression,
-              let segments = expression.as(StringLiteralExprSyntax.self)?.segments,
-              segments.count == 1,
-              let segment = segments.first?.as(StringSegmentSyntax.self)
+        guard
+            let expression = (arguments.first { $0.label?.text == "title" } ?? arguments.first)?.expression,
+            let segments = expression.as(StringLiteralExprSyntax.self)?.segments,
+            segments.count == 1,
+            let segment = segments.first?.as(StringSegmentSyntax.self)
         else {
             return nil
         }
@@ -153,9 +158,10 @@ private struct PreviewTypeDeclaration {
     }
 
     var conformsToView: Bool {
-        inheritanceClause?.inheritedTypes.contains { inheritedType in
-            ["View", "AdaUI.View", "AdaEngine.View"].contains(inheritedType.type.trimmedDescription)
-        } == true
+        inheritanceClause?.inheritedTypes
+            .contains { inheritedType in
+                ["View", "AdaUI.View", "AdaEngine.View"].contains(inheritedType.type.trimmedDescription)
+            } == true
     }
 
     private var previewableAttribute: AttributeSyntax? {
@@ -166,7 +172,8 @@ private struct PreviewTypeDeclaration {
 
             let name = attribute.attributeName.trimmedDescription
             return name == "Previewable" || name == "AdaUI.Previewable" || name == "AdaEngine.Previewable" ? attribute : nil
-        }.first
+        }
+        .first
     }
 }
 
@@ -201,7 +208,8 @@ actor EditorPreviewBuilder {
         let previewDirectory = request.projectURL
             .appendingPathComponent(".build/adaeditor-previews", isDirectory: true)
             .appendingPathComponent(stablePreviewDirectoryName(for: request), isDirectory: true)
-        let scratchDirectory = previewDirectory
+        let scratchDirectory =
+            previewDirectory
             .appendingPathComponent(".build", isDirectory: true)
             .appendingPathComponent("build-\(UUID().uuidString)", isDirectory: true)
 
@@ -243,20 +251,32 @@ actor EditorPreviewBuilder {
     private func linkUIExportModule(request: EditorPreviewBuildRequest, target: SwiftPackageTarget, scratchDirectory: URL, toolchain: SwiftToolchain) async throws -> URL {
         var targetNames = Set<String>()
         func collect(_ target: SwiftPackageTarget) {
-            guard targetNames.insert(target.name).inserted else { return }
+            guard targetNames.insert(target.name).inserted else {
+                return
+            }
             for name in target.targetDependencies {
-                if let dependency = request.packageModel.target(named: name) { collect(dependency) }
+                if let dependency = request.packageModel.target(named: name) {
+                    collect(dependency)
+                }
             }
         }
         collect(target)
         let objects = compiledUIObjects(in: scratchDirectory, targetNames: targetNames)
-        guard !objects.isEmpty else { throw EditorPreviewBuildFailure(message: "No compiled object files for UI provider '\(target.name)'.") }
+        guard !objects.isEmpty else {
+            throw EditorPreviewBuildFailure(message: "No compiled object files for UI provider '\(target.name)'.")
+        }
         let output = scratchDirectory.appendingPathComponent("libAdaEditorUIExports.dylib")
         let compiler = URL(fileURLWithPath: toolchain.swiftExecutablePath).deletingLastPathComponent().appendingPathComponent("swiftc")
-        let result = await processRunner.run(EditorProcessCommand(executablePath: compiler.path,
-            arguments: ["-emit-library", "-Xlinker", "-undefined", "-Xlinker", "dynamic_lookup", "-o", output.path] + objects.sorted(),
-            workingDirectory: scratchDirectory))
-        guard result.succeeded else { throw EditorPreviewBuildFailure(message: result.combinedOutput) }
+        let result = await processRunner.run(
+            EditorProcessCommand(
+                executablePath: compiler.path,
+                arguments: ["-emit-library", "-Xlinker", "-undefined", "-Xlinker", "dynamic_lookup", "-o", output.path] + objects.sorted(),
+                workingDirectory: scratchDirectory
+            )
+        )
+        guard result.succeeded else {
+            throw EditorPreviewBuildFailure(message: result.combinedOutput)
+        }
         return output
     }
 
@@ -265,7 +285,9 @@ actor EditorPreviewBuilder {
         if let files = fileManager.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) {
             for case let url as URL in files where url.pathExtension == "o" {
                 let folder = url.deletingLastPathComponent().lastPathComponent
-                if folder.hasSuffix(".build"), targetNames.contains(String(folder.dropLast(".build".count))) { objects.append(url.path) }
+                if folder.hasSuffix(".build"), targetNames.contains(String(folder.dropLast(".build".count))) {
+                    objects.append(url.path)
+                }
             }
         }
         return objects
@@ -315,32 +337,33 @@ actor EditorPreviewBuilder {
         mirroredTargets: [MirroredPreviewTarget]
     ) -> String {
         let dependencies = dependencyEntries(for: request.packageModel, projectURL: request.projectURL)
-        let targetEntries = mirroredTargets
+        let targetEntries =
+            mirroredTargets
             .sorted { $0.name < $1.name }
             .map { targetEntry($0, packageModel: request.packageModel) }
             .joined(separator: ",\n")
 
         return """
-        // swift-tools-version: 6.2
-        import PackageDescription
+            // swift-tools-version: 6.2
+            import PackageDescription
 
-        let package = Package(
-            name: "AdaEditorPreviewHost",
-            platforms: [
-                .macOS(.v15),
-                .iOS(.v18),
-            ],
-            products: [
-                .library(name: "\(Self.productName)", type: .dynamic, targets: ["\(rootTarget.name)"])
-            ],
-            dependencies: [
-                \(dependencies)
-            ],
-            targets: [
-                \(targetEntries)
-            ]
-        )
-        """
+            let package = Package(
+                name: "AdaEditorPreviewHost",
+                platforms: [
+                    .macOS(.v15),
+                    .iOS(.v18),
+                ],
+                products: [
+                    .library(name: "\(Self.productName)", type: .dynamic, targets: ["\(rootTarget.name)"])
+                ],
+                dependencies: [
+                    \(dependencies)
+                ],
+                targets: [
+                    \(targetEntries)
+                ]
+            )
+            """
     }
 
     private func targetEntry(_ target: MirroredPreviewTarget, packageModel: SwiftPackageModel) -> String {
@@ -353,16 +376,16 @@ actor EditorPreviewBuilder {
         let dependencies = (targetDependencies + productDependencies).joined(separator: ", ")
 
         return """
-                .target(
-                    name: "\(target.name)",
-                    dependencies: [\(dependencies)],
-                    path: "\(target.path)",
-                    swiftSettings: [
-                        .enableUpcomingFeature("MemberImportVisibility"),
-                        .strictMemorySafety()
-                    ]
-                )
-        """
+                    .target(
+                        name: "\(target.name)",
+                        dependencies: [\(dependencies)],
+                        path: "\(target.path)",
+                        swiftSettings: [
+                            .enableUpcomingFeature("MemberImportVisibility"),
+                            .strictMemorySafety()
+                        ]
+                    )
+            """
     }
 
     private func mirrorTargets(
@@ -433,7 +456,8 @@ actor EditorPreviewBuilder {
         into previewDirectory: URL
     ) throws {
         let sourceRoot = targetSourceRoot(for: target, projectURL: request.projectURL)
-        let destinationRoot = previewDirectory
+        let destinationRoot =
+            previewDirectory
             .appendingPathComponent("Sources", isDirectory: true)
             .appendingPathComponent(target.name, isDirectory: true)
         try fileManager.createDirectory(at: destinationRoot, withIntermediateDirectories: true)
@@ -462,14 +486,14 @@ actor EditorPreviewBuilder {
         }
 
         if let provider = request.uiExportProvider,
-           target.name == request.packageModel.target(containing: request.document, projectURL: request.projectURL)?.name {
+            target.name == request.packageModel.target(containing: request.document, projectURL: request.projectURL)?.name {
             let bridge = """
-            import AdaUI
-            @_cdecl("\(request.declaration.symbolName)")
-            @MainActor public func __ada_ui_exports() -> UnsafeMutableRawPointer {
-                Unmanaged.passRetained(UIExportLibrary(\(provider).self)).toOpaque()
-            }
-            """
+                import AdaUI
+                @_cdecl("\(request.declaration.symbolName)")
+                @MainActor public func __ada_ui_exports() -> UnsafeMutableRawPointer {
+                    Unmanaged.passRetained(UIExportLibrary(\(provider).self)).toOpaque()
+                }
+                """
             try bridge.write(to: destinationRoot.appendingPathComponent("AdaUIExports.generated.swift"), atomically: true, encoding: .utf8)
         }
 
@@ -484,11 +508,11 @@ actor EditorPreviewBuilder {
         projectURL: URL
     ) throws -> [URL] {
         if fileManager.fileExists(atPath: sourceRoot.path),
-           let enumerator = fileManager.enumerator(
-            at: sourceRoot,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-           ) {
+            let enumerator = fileManager.enumerator(
+                at: sourceRoot,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            ) {
             var urls: [URL] = []
             for case let url as URL in enumerator where url.pathExtension == "swift" && isRegularFile(url) {
                 urls.append(url.standardizedFileURL)
@@ -525,7 +549,8 @@ actor EditorPreviewBuilder {
     private func sourceWithoutMainAttribute(_ sourceURL: URL) throws -> String {
         let source = try String(contentsOf: sourceURL, encoding: .utf8)
         let lines = source.split(separator: "\n", omittingEmptySubsequences: false)
-        return lines
+        return
+            lines
             .filter { $0.trimmingCharacters(in: .whitespacesAndNewlines) != "@main" }
             .joined(separator: "\n")
     }
@@ -599,20 +624,23 @@ actor EditorPreviewBuilder {
     }
 
     private func newestDynamicLibrary(in directory: URL) -> URL? {
-        guard let enumerator = fileManager.enumerator(
-            at: directory,
-            includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
+        guard
+            let enumerator = fileManager.enumerator(
+                at: directory,
+                includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
+        else {
             return nil
         }
 
         var candidates: [URL] = []
         for case let url as URL in enumerator {
-            guard !url.pathComponents.contains(where: { $0.hasSuffix(".dSYM") }),
-                  ["dylib", "so", "dll"].contains(url.pathExtension.lowercased()),
-                  url.deletingPathExtension().lastPathComponent.contains(Self.productName),
-                  (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            guard
+                !url.pathComponents.contains(where: { $0.hasSuffix(".dSYM") }),
+                ["dylib", "so", "dll"].contains(url.pathExtension.lowercased()),
+                url.deletingPathExtension().lastPathComponent.contains(Self.productName),
+                (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
             else {
                 continue
             }
@@ -708,23 +736,23 @@ final class EditorPreviewDynamicLibrary {
         retainActiveHandle()
 
         #if canImport(Darwin) || canImport(Glibc)
-        guard let handle = dlopen(artifact.libraryURL.path, RTLD_NOW | RTLD_LOCAL) else {
-            throw EditorPreviewBuildFailure(message: Self.lastDynamicLibraryError())
-        }
+            guard let handle = dlopen(artifact.libraryURL.path, RTLD_NOW | RTLD_LOCAL) else {
+                throw EditorPreviewBuildFailure(message: Self.lastDynamicLibraryError())
+            }
 
-        guard let symbol = dlsym(handle, artifact.symbolName) else {
-            dlclose(handle)
-            throw EditorPreviewBuildFailure(message: "Preview symbol \(artifact.symbolName) was not found.")
-        }
+            guard let symbol = dlsym(handle, artifact.symbolName) else {
+                dlclose(handle)
+                throw EditorPreviewBuildFailure(message: "Preview symbol \(artifact.symbolName) was not found.")
+            }
 
-        let function = unsafeBitCast(symbol, to: MakeViewFunction.self)
-        let rawView = function()
+            let function = unsafeBitCast(symbol, to: MakeViewFunction.self)
+            let rawView = function()
 
-        self.handle = handle
-        self.makeViewFunction = function
-        return Unmanaged<UIView>.fromOpaque(rawView).takeRetainedValue()
+            self.handle = handle
+            self.makeViewFunction = function
+            return Unmanaged<UIView>.fromOpaque(rawView).takeRetainedValue()
         #else
-        throw EditorPreviewBuildFailure(message: "AdaEditor previews are supported only on platforms with dynamic library loading.")
+            throw EditorPreviewBuildFailure(message: "AdaEditor previews are supported only on platforms with dynamic library loading.")
         #endif
     }
 
@@ -738,9 +766,9 @@ final class EditorPreviewDynamicLibrary {
 
     private static func lastDynamicLibraryError() -> String {
         #if canImport(Darwin) || canImport(Glibc)
-        if let error = dlerror() {
-            return String(cString: error)
-        }
+            if let error = dlerror() {
+                return String(cString: error)
+            }
         #endif
         return "Unknown dynamic library error."
     }

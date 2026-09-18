@@ -3,7 +3,9 @@ import Foundation
 extension EditorViewModel {
     @discardableResult
     func beginWorkspaceActivity(title: String, source: EditorNotificationSource, supportsCancellation: Bool = true) -> String {
-        if let previous = notificationWorkspaceRunID { EditorNotificationCenter.shared.activities.finish(previous, state: .cancelled) }
+        if let previous = notificationWorkspaceRunID {
+            EditorNotificationCenter.shared.activities.finish(previous, state: .cancelled)
+        }
         let cancel: (() -> Void)? =
             supportsCancellation
             ? { [weak self] in
@@ -28,7 +30,9 @@ extension EditorViewModel {
 
     func finishWorkspaceActivity(_ id: String, succeeded: Bool, detail: String = "") {
         EditorNotificationCenter.shared.activities.finish(id, state: succeeded ? .completed : .failed, detail: detail)
-        if notificationWorkspaceRunID == id { notificationWorkspaceRunID = nil }
+        if notificationWorkspaceRunID == id {
+            notificationWorkspaceRunID = nil
+        }
     }
 
     func reportProjectError(_ message: String) {

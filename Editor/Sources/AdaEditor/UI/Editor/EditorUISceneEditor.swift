@@ -1,8 +1,14 @@
 @_spi(AdaEngine) import AdaEngine
 
+enum EditorUISceneEditorPresentation {
+    case workspace
+    case inspector
+}
+
 struct EditorUISceneEditor: View {
     let model: EditorUISceneModel
     var colorPalette: EditorCodeColorPalette = .dark
+    var presentation: EditorUISceneEditorPresentation = .workspace
     @Environment(\.theme) var theme
     @State var libraryTab = "Components"
     @State var compactPane: EditorUIDesignerPane = .canvas
@@ -12,26 +18,55 @@ struct EditorUISceneEditor: View {
     @State var scriptBindingParameter: String?
 
     var body: some View {
-        designerBody
-            .fullScreenCover(item: $modifierPickerNodeID) { nodeID in
-                EditorAddModifierDialog(model: model, nodeID: nodeID)
+        Group {
+            switch presentation {
+            case .workspace:
+                designerBody
+            case .inspector:
+                designerInspector
             }
+        }
+        .fullScreenCover(item: $modifierPickerNodeID) { nodeID in
+            EditorAddModifierDialog(model: model, nodeID: nodeID)
+        }
     }
 
     var inputDeclarations: some View {
         VStack(alignment: .leading, spacing: 5) {
             ForEach(model.document.inputs, id: \.name) { input in
                 HStack {
-                    TextField("Name", text: Binding(get: { input.name }, set: { name in
-                        model.edit { document in if let index = document.inputs.firstIndex(where: { $0.name == input.name }) { document.inputs[index].name = name } }
-                    }))
+                    TextField(
+                        "Name",
+                        text: Binding(
+                            get: { input.name },
+                            set: { name in
+                                model.edit { document in
+                                    if let index = document.inputs.firstIndex(where: { $0.name == input.name }) {
+                                        document.inputs[index].name = name
+                                    }
+                                }
+                            }
+                        )
+                    )
                     Button("×") { model.edit { $0.inputs.removeAll { $0.name == input.name } } }
                 }
-                TextField("Default (JSON)", text: Binding(get: { Self.format(input.defaultValue ?? .null) }, set: { text in
-                    guard let value = Self.parse(text, type: input.type) else { return }
-                    model.edit { document in if let index = document.inputs.firstIndex(where: { $0.name == input.name }) { document.inputs[index].defaultValue = value } }
-                    model.session?.context.set(input.name, to: value)
-                }))
+                TextField(
+                    "Default (JSON)",
+                    text: Binding(
+                        get: { Self.format(input.defaultValue ?? .null) },
+                        set: { text in
+                            guard let value = Self.parse(text, type: input.type) else {
+                                return
+                            }
+                            model.edit { document in
+                                if let index = document.inputs.firstIndex(where: { $0.name == input.name }) {
+                                    document.inputs[index].defaultValue = value
+                                }
+                            }
+                            model.session?.context.set(input.name, to: value)
+                        }
+                    )
+                )
                 ScrollView(.horizontal) {
                     HStack(spacing: 2) {
                         ForEach(UIValueType.allCases, id: \.self) { type in
@@ -42,7 +77,8 @@ struct EditorUISceneEditor: View {
                                         document.inputs[index].defaultValue = Self.defaultValue(type)
                                     }
                                 }
-                            }.buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: input.type == type))
+                            }
+                            .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: input.type == type))
                         }
                     }
                 }
@@ -50,9 +86,19 @@ struct EditorUISceneEditor: View {
             Button("+ Input") { model.edit { $0.inputs.append(.init("input\($0.inputs.count + 1)", type: .string, defaultValue: .string(""))) } }
             ForEach(model.document.actions, id: \.name) { action in
                 HStack {
-                    TextField("Action name", text: Binding(get: { action.name }, set: { name in
-                        model.edit { document in if let index = document.actions.firstIndex(where: { $0.name == action.name }) { document.actions[index].name = name } }
-                    }))
+                    TextField(
+                        "Action name",
+                        text: Binding(
+                            get: { action.name },
+                            set: { name in
+                                model.edit { document in
+                                    if let index = document.actions.firstIndex(where: { $0.name == action.name }) {
+                                        document.actions[index].name = name
+                                    }
+                                }
+                            }
+                        )
+                    )
                     Button("×") { model.edit { $0.actions.removeAll { $0.name == action.name } } }
                 }
             }
@@ -61,7 +107,14 @@ struct EditorUISceneEditor: View {
     }
 
     static func defaultValue(_ type: UIValueType) -> UIValue {
-        switch type { case .string: .string(""); case .number: .number(0); case .bool: .bool(false); case .array: .array([]); case .object: .object([:]); case .any: .null }
+        switch type {
+        case .string: .string("")
+        case .number: .number(0)
+        case .bool: .bool(false)
+        case .array: .array([])
+        case .object: .object([:])
+        case .any: .null
+        }
     }
 
     func modifierEditor(_ modifier: UIModifierDescription) -> some View {
@@ -90,11 +143,19 @@ struct EditorUISceneEditor: View {
                     }
                 }
                 ForEach(signature.actions, id: \.name) { action in
-                    TextField(action.name, text: Binding(get: { modifier.actions[action.name] ?? "" }, set: { value in
-                        model.updateSelected { node in
-                            if let index = node.modifiers.firstIndex(where: { $0.id == modifier.id }) { node.modifiers[index].actions[action.name] = value.isEmpty ? nil : value }
-                        }
-                    }))
+                    TextField(
+                        action.name,
+                        text: Binding(
+                            get: { modifier.actions[action.name] ?? "" },
+                            set: { value in
+                                model.updateSelected { node in
+                                    if let index = node.modifiers.firstIndex(where: { $0.id == modifier.id }) {
+                                        node.modifiers[index].actions[action.name] = value.isEmpty ? nil : value
+                                    }
+                                }
+                            }
+                        )
+                    )
                 }
             }
         }
@@ -118,7 +179,9 @@ struct EditorUISceneEditor: View {
                 .buttonStyle(DefaultButtonStyle())
                 .accessibilityIdentifier("AdaEditor.UIScene.ScriptBinding.\(parameter.name)")
                 EditorUIArgumentModePicker(isBinding: argument?.binding != nil, parameterName: parameter.name) { isBinding in
-                    guard isBinding != (argument?.binding != nil) else { return }
+                    guard isBinding != (argument?.binding != nil) else {
+                        return
+                    }
                     onChange(isBinding ? UIArgument(binding: parameter.name) : UIArgument(value: parameter.defaultValue ?? .string("")))
                 }
             }
@@ -132,20 +195,36 @@ struct EditorUISceneEditor: View {
                         onChange(.init(value: .string($0)))
                     }
                     .accessibilityIdentifier("AdaEditor.UIScene.Color.\(parameter.name)")
-                case .enumeration(let cases):
-                    EditorEnumField(cases: cases, selection: Binding(
-                        get: { argument?.value?.string ?? parameter.defaultValue?.string ?? "" },
-                        set: { onChange(.init(value: .string($0))) }
-                    ))
+                case let .enumeration(cases):
+                    EditorEnumField(
+                        cases: cases,
+                        selection: Binding(
+                            get: { argument?.value?.string ?? parameter.defaultValue?.string ?? "" },
+                            set: { onChange(.init(value: .string($0))) }
+                        )
+                    )
                     .accessibilityIdentifier("AdaEditor.UIScene.Enum.\(parameter.name)")
                 }
             } else {
-                TextField(parameter.type.rawValue, text: Binding(get: {
-                    argument?.binding ?? Self.format(argument?.value ?? parameter.defaultValue ?? .null)
-                }, set: { value in
-                    if argument?.binding != nil { if !value.isEmpty { onChange(.init(binding: value)) }; return }
-                    if let parsed = Self.parse(value, type: parameter.type) { onChange(.init(value: parsed)) }
-                }))
+                TextField(
+                    parameter.type.rawValue,
+                    text: Binding(
+                        get: {
+                            argument?.binding ?? Self.format(argument?.value ?? parameter.defaultValue ?? .null)
+                        },
+                        set: { value in
+                            if argument?.binding != nil {
+                                if !value.isEmpty {
+                                    onChange(.init(binding: value))
+                                }
+                                return
+                            }
+                            if let parsed = Self.parse(value, type: parameter.type) {
+                                onChange(.init(value: parsed))
+                            }
+                        }
+                    )
+                )
                 .accessibilityIdentifier("AdaEditor.UIScene.Parameter.\(parameter.name)")
             }
         }
@@ -153,23 +232,37 @@ struct EditorUISceneEditor: View {
 
     func moveModifier(_ id: String, _ direction: Int) {
         model.updateSelected { node in
-            guard let index = node.modifiers.firstIndex(where: { $0.id == id }), node.modifiers.indices.contains(index + direction) else { return }
+            guard let index = node.modifiers.firstIndex(where: { $0.id == id }), node.modifiers.indices.contains(index + direction) else {
+                return
+            }
             node.modifiers.swapAt(index, index + direction)
         }
     }
 
     func floatBinding(_ key: ReferenceWritableKeyPath<EditorUISceneModel, Float>) -> Binding<String> {
-        Binding(get: { String(Int(model[keyPath: key])) }, set: { if let value = Float($0), value.isFinite, value >= 100, value <= 8192 { model[keyPath: key] = value } })
+        Binding(
+            get: { String(Int(model[keyPath: key])) },
+            set: {
+                if let value = Float($0), value.isFinite, value >= 100, value <= 8192 {
+                    model[keyPath: key] = value
+                }
+            }
+        )
     }
 
-
     static func format(_ value: UIValue) -> String {
-        if let string = value.string { return string }
-        if let data = try? JSONEncoder().encode(value) { return String(decoding: data, as: UTF8.self) }
+        if let string = value.string {
+            return string
+        }
+        if let data = try? JSONEncoder().encode(value) {
+            return String(bytes: data, encoding: .utf8) ?? ""
+        }
         return ""
     }
     static func parse(_ text: String, type: UIValueType) -> UIValue? {
-        if type == .string { return .string(text) }
+        if type == .string {
+            return .string(text)
+        }
         return try? JSONDecoder().decode(UIValue.self, from: Data(text.utf8))
     }
 }

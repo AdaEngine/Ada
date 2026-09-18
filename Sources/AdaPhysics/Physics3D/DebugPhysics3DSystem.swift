@@ -8,8 +8,8 @@ import AdaCorePipelines
 import AdaECS
 @_spi(Internal) import AdaRender
 import AdaTransform
-import Math
 import AdaUtils
+import Math
 
 public struct ExtractedPhysicsDebugShapes3D: Resource {
     public var lines: [DebugLine] = []
@@ -25,7 +25,7 @@ public struct PhysicsDebug3DDrawData: Resource, DefaultValue {
     public var lineVertexBuffer: BufferData<LineVertexData>
     public var lineIndexBuffer: BufferData<UInt32>
 
-    public static let defaultValue = PhysicsDebug3DDrawData(
+    public static let defaultValue = Self(
         lineVertexBuffer: .init(label: "PhysicsDebug3D_LineVertexBuffer", elements: []),
         lineIndexBuffer: .init(label: "PhysicsDebug3D_LineIndexBuffer", elements: [])
     )
@@ -69,7 +69,7 @@ public func ExtractPhysicsDebug3D(
         }
 
         if options.contains(.showBoundingBoxes),
-           let bounds = combinedLocalBounds(for: physicsBody.shapes) {
+            let bounds = combinedLocalBounds(for: physicsBody.shapes) {
             appendAABBLines(
                 bounds.transformed(by: worldTransform),
                 to: extractedShapes,
@@ -81,7 +81,6 @@ public func ExtractPhysicsDebug3D(
 
 @PlainSystem
 public struct PreparePhysicsDebug3DSystem: Sendable {
-
     @ResMut<RenderItems<Transparent2DRenderItem>>
     private var renderItems
 
@@ -97,9 +96,9 @@ public struct PreparePhysicsDebug3DSystem: Sendable {
     @Res
     private var lineDrawPass: PhysicsDebug3DLineDrawPass
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         guard !extractedShapes.lines.isEmpty else {
             return
         }
@@ -119,7 +118,6 @@ public struct PreparePhysicsDebug3DSystem: Sendable {
 
 @PlainSystem
 public struct PhysicsDebug3DRenderSystem: Sendable {
-
     @Res<ExtractedPhysicsDebugShapes3D>
     private var extractedShapes
 
@@ -132,9 +130,9 @@ public struct PhysicsDebug3DRenderSystem: Sendable {
     @Res<RenderDeviceHandler>
     private var renderDevice
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         drawData.lineVertexBuffer.elements.removeAll(keepingCapacity: true)
         drawData.lineIndexBuffer.elements.removeAll(keepingCapacity: true)
         batches.lineBatch = nil
@@ -171,7 +169,7 @@ public struct PhysicsDebug3DLineDrawPass: DrawPass, Resource {
     public func render(
         with renderEncoder: RenderCommandEncoder,
         world: World,
-        view: Entity,
+        view _: Entity,
         item: Transparent2DRenderItem
     ) throws {
         guard
@@ -206,14 +204,14 @@ private func appendShapeLines(
     color: Color
 ) {
     switch shape.fixture {
-    case .box(let box):
+    case let .box(box):
         appendOrientedBoxLines(
             halfExtents: box.halfExtents,
             transform: transform,
             to: extractedShapes,
             color: color
         )
-    case .sphere(let sphere):
+    case let .sphere(sphere):
         appendSphereLines(
             center: sphere.center,
             radius: sphere.radius,
@@ -234,10 +232,10 @@ private func combinedLocalBounds(for shapes: [Shape3DResource]) -> AABB? {
 
     for shape in shapes {
         switch shape.fixture {
-        case .box(let box):
+        case let .box(box):
             minimum = min(minimum, -box.halfExtents)
             maximum = max(maximum, box.halfExtents)
-        case .sphere(let sphere):
+        case let .sphere(sphere):
             let extents = Vector3(sphere.radius)
             minimum = min(minimum, sphere.center - extents)
             maximum = max(maximum, sphere.center + extents)
@@ -255,14 +253,15 @@ private func appendOrientedBoxLines(
 ) {
     let corners = [
         Vector3(-halfExtents.x, -halfExtents.y, -halfExtents.z),
-        Vector3( halfExtents.x, -halfExtents.y, -halfExtents.z),
-        Vector3( halfExtents.x,  halfExtents.y, -halfExtents.z),
-        Vector3(-halfExtents.x,  halfExtents.y, -halfExtents.z),
-        Vector3(-halfExtents.x, -halfExtents.y,  halfExtents.z),
-        Vector3( halfExtents.x, -halfExtents.y,  halfExtents.z),
-        Vector3( halfExtents.x,  halfExtents.y,  halfExtents.z),
-        Vector3(-halfExtents.x,  halfExtents.y,  halfExtents.z),
-    ].map { (transform * Vector4($0, 1)).xyz }
+        Vector3(halfExtents.x, -halfExtents.y, -halfExtents.z),
+        Vector3(halfExtents.x, halfExtents.y, -halfExtents.z),
+        Vector3(-halfExtents.x, halfExtents.y, -halfExtents.z),
+        Vector3(-halfExtents.x, -halfExtents.y, halfExtents.z),
+        Vector3(halfExtents.x, -halfExtents.y, halfExtents.z),
+        Vector3(halfExtents.x, halfExtents.y, halfExtents.z),
+        Vector3(-halfExtents.x, halfExtents.y, halfExtents.z),
+    ]
+    .map { (transform * Vector4($0, 1)).xyz }
 
     appendBoxEdges(corners: corners, to: extractedShapes, color: color)
 }
@@ -290,10 +289,12 @@ private func appendSphereLines(
             let currentAngle = (Float(index) / Float(segments)) * 2 * .pi
             let nextAngle = (Float(index + 1) / Float(segments)) * 2 * .pi
 
-            let current = center
+            let current =
+                center
                 + axisA * (Math.cos(currentAngle) * radius)
                 + axisB * (Math.sin(currentAngle) * radius)
-            let next = center
+            let next =
+                center
                 + axisA * (Math.cos(nextAngle) * radius)
                 + axisB * (Math.sin(nextAngle) * radius)
 
@@ -347,7 +348,7 @@ private func appendBoxEdges(
     }
 }
 
-private extension AABB {
+extension AABB {
     func transformed(by transform: Transform3D) -> AABB {
         let min = self.min
         let max = self.max
@@ -361,7 +362,7 @@ private extension AABB {
             Vector3(max.x, min.y, min.z),
             Vector3(max.x, min.y, max.z),
             Vector3(max.x, max.y, min.z),
-            max
+            max,
         ] {
             let transformedCorner = (transform * Vector4(corner, 1)).xyz
             transformedMin = Math.min(transformedMin, transformedCorner)

@@ -7,8 +7,8 @@ enum EditorAgentTranscriptEntry: Identifiable {
 
     var id: String {
         switch self {
-        case .event(let event): event.id
-        case .actions(let id, _): id
+        case let .event(event): event.id
+        case let .actions(id, _): id
         }
     }
 
@@ -24,7 +24,8 @@ enum EditorAgentTranscriptEntry: Identifiable {
                 groupIndex = nil
             }
             let isThinking = event.message.map { !$0.segments.isEmpty && $0.segments.allSatisfy { $0.kind == .thinking } } ?? false
-            let isAction = event.kind == .runStatus || event.toolCall != nil || isThinking
+            let isAction =
+                event.kind == .runStatus || event.toolCall != nil || isThinking
                 || (event.permission != nil && event.permission?.state != .pending)
             if isAction && event.kind != .error && event.permission?.state != .pending {
                 if let groupIndex {
@@ -40,7 +41,7 @@ enum EditorAgentTranscriptEntry: Identifiable {
             }
         }
         return entries.map { entry in
-            if case .actions(let id, _) = entry {
+            if case let .actions(id, _) = entry {
                 return .actions(id: id, events: actionsByID[id] ?? [])
             }
             return entry
@@ -100,7 +101,7 @@ struct EditorAgentTranscript: View {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(EditorAgentTranscriptEntry.grouped(viewModel.activeSession?.events ?? [])) { entry in
                             switch entry {
-                            case .event(let event):
+                            case let .event(event):
                                 EditorAgentEventCard(event: event, viewModel: viewModel)
                             case let .actions(id, events):
                                 EditorAgentActionsDisclosure(id: id, events: events, viewModel: viewModel)
@@ -147,7 +148,9 @@ private final class EditorAgentTranscriptFollower {
         self.proxy = proxy
         // During view reconciliation the proxy can also contain temporary, unlaid-out nodes.
         // Use the reading position sampled on the last completed UI update instead.
-        if force || followsBottom { pending = proxy }
+        if force || followsBottom {
+            pending = proxy
+        }
     }
 
     func flush() {
@@ -161,18 +164,18 @@ private final class EditorAgentTranscriptFollower {
 
 private struct EditorAgentTranscriptScrollDriver: UIViewRepresentable {
     let follower: EditorAgentTranscriptFollower
-    func makeUIView(in context: Context) -> EditorAgentTranscriptScrollView { EditorAgentTranscriptScrollView() }
-    func updateUIView(_ view: EditorAgentTranscriptScrollView, in context: Context) {
+    func makeUIView(in _: Context) -> EditorAgentTranscriptScrollView { EditorAgentTranscriptScrollView() }
+    func updateUIView(_ view: EditorAgentTranscriptScrollView, in _: Context) {
         view.follower = follower
         view.backgroundColor = .clear
         view.isInteractionEnabled = false
     }
-    func sizeThatFits(_ proposal: ProposedViewSize, view: EditorAgentTranscriptScrollView, context: Context) -> Size {
+    func sizeThatFits(_ proposal: ProposedViewSize, view _: EditorAgentTranscriptScrollView, context _: Context) -> Size {
         proposal.replacingUnspecifiedDimensions()
     }
 }
 
 private final class EditorAgentTranscriptScrollView: UIView {
     var follower: EditorAgentTranscriptFollower?
-    override func update(_ deltaTime: Float) { follower?.flush() }
+    override func update(_: Float) { follower?.flush() }
 }

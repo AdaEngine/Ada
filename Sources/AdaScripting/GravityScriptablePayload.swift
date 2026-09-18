@@ -50,17 +50,17 @@ private struct CodableFieldValue: Codable {
         switch value {
         case .null:
             try container.encodeNil()
-        case .bool(let value):
+        case let .bool(value):
             try container.encode(value)
-        case .int(let value):
+        case let .int(value):
             try container.encode(value)
-        case .double(let value):
+        case let .double(value):
             try container.encode(value)
-        case .string(let value):
+        case let .string(value):
             try container.encode(value)
-        case .array(let values):
+        case let .array(values):
             try container.encode(values.map(Self.init))
-        case .object(let values):
+        case let .object(values):
             try container.encode(values.mapValues(Self.init))
         }
     }

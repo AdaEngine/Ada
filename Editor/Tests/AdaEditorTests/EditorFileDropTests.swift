@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 private func makeEditorStoreTemporaryDirectory(named name: String) throws -> URL {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name)-\(UUID().uuidString)")
@@ -97,61 +98,63 @@ struct EditorFileDropTests {
 }
 
 #if canImport(AppKit) && os(macOS)
-import AppKit
+    import AppKit
 
-@Suite("Editor file drop AppKit bridge")
-@MainActor
-struct EditorFileDropBridgeTests {
-    @Test("Native drop overlay forwards mouse input to the view beneath it")
-    func forwardsMouseInput() throws {
-        _ = NSApplication.shared
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 300),
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: false
-        )
-        window.isReleasedWhenClosed = false
-        defer { window.close() }
-        let content = try #require(window.contentView)
-        let underlying = MouseReceiver(frame: content.bounds)
-        content.addSubview(underlying)
-        let overlay = EditorProjectFileDropTarget.FileDropView(isEnabled: true, onDrop: { _ in true })
-        overlay.frame = content.bounds
-        content.addSubview(overlay)
-        let event = try #require(NSEvent.mouseEvent(
-            with: .leftMouseDown,
-            location: NSPoint(x: 50, y: 50),
-            modifierFlags: [],
-            timestamp: 0,
-            windowNumber: window.windowNumber,
-            context: nil,
-            eventNumber: 0,
-            clickCount: 1,
-            pressure: 1
-        ))
-        #expect(content.hitTest(NSPoint(x: 50, y: 50)) === overlay)
-        overlay.mouseDown(with: event)
-        #expect(underlying.clickCount == 1)
-        #expect(content.hitTest(NSPoint(x: 50, y: 50)) === overlay)
-    }
+    @Suite("Editor file drop AppKit bridge")
+    @MainActor
+    struct EditorFileDropBridgeTests {
+        @Test("Native drop overlay forwards mouse input to the view beneath it")
+        func forwardsMouseInput() throws {
+            _ = NSApplication.shared
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 300, height: 300),
+                styleMask: [.borderless],
+                backing: .buffered,
+                defer: false
+            )
+            window.isReleasedWhenClosed = false
+            defer { window.close() }
+            let content = try #require(window.contentView)
+            let underlying = MouseReceiver(frame: content.bounds)
+            content.addSubview(underlying)
+            let overlay = EditorProjectFileDropTarget.FileDropView(isEnabled: true, onDrop: { _ in true })
+            overlay.frame = content.bounds
+            content.addSubview(overlay)
+            let event = try #require(
+                NSEvent.mouseEvent(
+                    with: .leftMouseDown,
+                    location: NSPoint(x: 50, y: 50),
+                    modifierFlags: [],
+                    timestamp: 0,
+                    windowNumber: window.windowNumber,
+                    context: nil,
+                    eventNumber: 0,
+                    clickCount: 1,
+                    pressure: 1
+                )
+            )
+            #expect(content.hitTest(NSPoint(x: 50, y: 50)) === overlay)
+            overlay.mouseDown(with: event)
+            #expect(underlying.clickCount == 1)
+            #expect(content.hitTest(NSPoint(x: 50, y: 50)) === overlay)
+        }
 
-    @Test("File pasteboard accepts multiple file URLs and rejects text")
-    func readsFileURLs() {
-        let pasteboard = NSPasteboard.withUniqueName()
-        defer { pasteboard.releaseGlobally() }
-        let urls = [URL(fileURLWithPath: "/tmp/a.png"), URL(fileURLWithPath: "/tmp/b.ada")]
-        // swiftlint:disable:next legacy_objc_type
-        pasteboard.writeObjects(urls.map { $0 as NSURL })
-        #expect(EditorProjectFileDropTarget.FileDropView.fileURLs(from: pasteboard) == urls)
-        pasteboard.clearContents()
-        pasteboard.setString("https://example.com", forType: .string)
-        #expect(EditorProjectFileDropTarget.FileDropView.fileURLs(from: pasteboard).isEmpty)
-    }
+        @Test("File pasteboard accepts multiple file URLs and rejects text")
+        func readsFileURLs() {
+            let pasteboard = NSPasteboard.withUniqueName()
+            defer { pasteboard.releaseGlobally() }
+            let urls = [URL(fileURLWithPath: "/tmp/a.png"), URL(fileURLWithPath: "/tmp/b.ada")]
+            // swiftlint:disable:next legacy_objc_type
+            pasteboard.writeObjects(urls.map { $0 as NSURL })
+            #expect(EditorProjectFileDropTarget.FileDropView.fileURLs(from: pasteboard) == urls)
+            pasteboard.clearContents()
+            pasteboard.setString("https://example.com", forType: .string)
+            #expect(EditorProjectFileDropTarget.FileDropView.fileURLs(from: pasteboard).isEmpty)
+        }
 
-    private final class MouseReceiver: NSView {
-        var clickCount = 0
-        override func mouseDown(with event: NSEvent) { clickCount += 1 }
+        private final class MouseReceiver: NSView {
+            var clickCount = 0
+            override func mouseDown(with _: NSEvent) { clickCount += 1 }
+        }
     }
-}
 #endif

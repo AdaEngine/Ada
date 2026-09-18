@@ -71,7 +71,9 @@ final class EditorLibrariesViewModel {
             status = "Libraries saved. Rebuild or restart Play to apply."
             onChange?(projectURL)
         } catch {
-            if self.projectURL == projectURL { status = error.localizedDescription }
+            if self.projectURL == projectURL {
+                status = error.localizedDescription
+            }
         }
     }
 }
@@ -101,13 +103,21 @@ struct EditorLibrariesView: View {
 
     private var installControls: some View {
         VStack(alignment: .leading, spacing: 10) {
-            libraryField("owner/repository or GitHub URL", text: Binding(
-                get: { viewModel.repository }, set: { viewModel.repository = $0 }
-            ))
+            libraryField(
+                "owner/repository or GitHub URL",
+                text: Binding(
+                    get: { viewModel.repository },
+                    set: { viewModel.repository = $0 }
+                )
+            )
             .accessibilityIdentifier("AdaEditor.Libraries.Repository")
-            libraryField("Tag or commit (e.g. v1.0.0)", text: Binding(
-                get: { viewModel.revision }, set: { viewModel.revision = $0 }
-            ))
+            libraryField(
+                "Tag or commit (e.g. v1.0.0)",
+                text: Binding(
+                    get: { viewModel.revision },
+                    set: { viewModel.revision = $0 }
+                )
+            )
             .accessibilityIdentifier("AdaEditor.Libraries.Revision")
             VStack(alignment: .leading, spacing: 8) {
                 Button("Install / Update") { Task { await viewModel.install() } }

@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Math
 import Observation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Observed panel layouts", .serialized)
 @MainActor
@@ -19,11 +20,13 @@ struct EditorPanelLayoutTests {
     func previewResize() async throws {
         let state = EditorPreviewResizeState()
         let builds = PanelLayoutBuildCounter()
-        let container = makeContainer(EditorPreviewPanelsLayout(state: state) {
-            PanelLayoutProbe(counter: builds).accessibilityIdentifier("editor")
-            Color.clear
-            PanelLayoutProbe(counter: builds).accessibilityIdentifier("preview")
-        })
+        let container = makeContainer(
+            EditorPreviewPanelsLayout(state: state) {
+                PanelLayoutProbe(counter: builds).accessibilityIdentifier("editor")
+                Color.clear
+                PanelLayoutProbe(counter: builds).accessibilityIdentifier("preview")
+            }
+        )
         let original = try container.uiNode(matching: .accessibilityIdentifier("preview"))
         let originalBuilds = builds.count
         for delta in [Float(-50), -120, -200, 100] {
@@ -40,13 +43,15 @@ struct EditorPanelLayoutTests {
     func intrinsicLayoutSize() async throws {
         let state = PanelLayoutDimensions()
         let builds = PanelLayoutBuildCounter()
-        let container = makeContainer(HStack(spacing: 0) {
-            IntrinsicPanelLayout(state: state) {
-                PanelLayoutProbe(counter: builds)
+        let container = makeContainer(
+            HStack(spacing: 0) {
+                IntrinsicPanelLayout(state: state) {
+                    PanelLayoutProbe(counter: builds)
+                }
+                .accessibilityIdentifier("sized")
+                Color.red.frame(width: 20, height: 20).accessibilityIdentifier("neighbor")
             }
-            .accessibilityIdentifier("sized")
-            Color.red.frame(width: 20, height: 20).accessibilityIdentifier("neighbor")
-        })
+        )
         let oldSize = try container.uiNode(matching: .accessibilityIdentifier("sized"))
         let oldNeighbor = try container.uiNode(matching: .accessibilityIdentifier("neighbor"))
         let originalBuilds = builds.count
@@ -98,11 +103,11 @@ private final class PanelLayoutDimensions {
 private struct IntrinsicPanelLayout: Layout {
     let state: PanelLayoutDimensions
 
-    func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> Size {
+    func sizeThatFits(_: ProposedViewSize, subviews _: Subviews, cache _: inout ()) -> Size {
         Size(width: state.width, height: 30)
     }
 
-    func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
         var childProposal = proposal
         childProposal.width = bounds.width
         childProposal.height = bounds.height

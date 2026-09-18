@@ -61,61 +61,61 @@ private enum EditorProjectTemplateSourceFactory {
 
     static func swiftBootstrap(for template: EditorProjectTemplate) -> String {
         let appDeclaration = """
-            struct Game: App {
-                var body: some AppScene {
-                    WindowGroup(
-                        content: {
-                            AdaScriptViewsGenerated.mainView
-                        },
-                        assetBundle: .module
-                    )
-                    .addPlugins(AdaScriptPluginsGenerated())
+                struct Game: App {
+                    var body: some AppScene {
+                        WindowGroup(
+                            content: {
+                                AdaScriptViewsGenerated.mainView
+                            },
+                            assetBundle: .module
+                        )
+                        .addPlugins(AdaScriptPluginsGenerated())
+                    }
                 }
-            }
-        """
+            """
 
         switch template {
         case .adaScript:
             return """
-            import AdaEngine
+                import AdaEngine
 
-            @main
-            \(appDeclaration)
+                @main
+                \(appDeclaration)
 
-            """
+                """
         case .adaScriptWithSwift:
             return """
-            import AdaEngine
-            import Foundation
+                import AdaEngine
+                import Foundation
 
-            try await Game.main()
+                try await Game.main()
 
-            \(appDeclaration)
+                \(appDeclaration)
 
-            """
+                """
         }
     }
 
     static let adaScript = """
-    @previewable
-    @view(id: "game.main")
-    class MainView {
-        func body() {
-            VStack(spacing: 12) {
-                Text("Hello, Ada!").fontSize(28);
-                Text("Edit Main.ada to build your interface.");
-            }.padding(24);
+        @previewable
+        @view(id: "game.main")
+        class MainView {
+            func body() {
+                VStack(spacing: 12) {
+                    Text("Hello, Ada!").fontSize(28);
+                    Text("Edit Main.ada to build your interface.");
+                }.padding(24);
+            }
         }
-    }
 
-    @system(scheduler: "update", id: "game.main")
-    class MainSystem {
-        func update(context: AdaSystemContext) {
-            // Add gameplay here. This system runs once per frame.
+        @system(scheduler: "update", id: "game.main")
+        class MainSystem {
+            func update(context: AdaSystemContext) {
+                // Add gameplay here. This system runs once per frame.
+            }
         }
-    }
 
-    """
+        """
 
     private static func escapedManifestString(_ value: String) -> String {
         value
@@ -157,9 +157,9 @@ public struct EditorProjectStore {
     /// iPad projects are portable packages; desktop projects start as ordinary directories.
     public static var defaultUsesProjectPackage: Bool {
         #if os(iOS)
-        true
+            true
         #else
-        false
+            false
         #endif
     }
 
@@ -188,7 +188,7 @@ public struct EditorProjectStore {
         named name: String,
         at parentDirectory: URL,
         template: EditorProjectTemplate = .adaScriptWithSwift,
-        asPackage: Bool = EditorProjectStore.defaultUsesProjectPackage,
+        asPackage: Bool = Self.defaultUsesProjectPackage,
         openedAt: Date = Date()
     ) throws -> EditorProjectReference {
         try distribution.validate(buildSystem: template == .adaScript ? .adaScript : .swiftpm)
@@ -344,16 +344,18 @@ public struct EditorProjectStore {
         )
 
         try manifest.write(to: manifestURL, atomically: true, encoding: .utf8)
-        let sourcesURL = projectURL
+        let sourcesURL =
+            projectURL
             .appendingPathComponent("Sources", isDirectory: true)
             .appendingPathComponent(safeTargetName, isDirectory: true)
         try fileManager.createDirectory(at: sourcesURL, withIntermediateDirectories: true)
         let swiftFileName = template == .adaScript ? "AdaRuntimeBootstrap.swift" : "main.swift"
-        try EditorProjectTemplateSourceFactory.swiftBootstrap(for: template).write(
-            to: sourcesURL.appendingPathComponent(swiftFileName, isDirectory: false),
-            atomically: true,
-            encoding: .utf8
-        )
+        try EditorProjectTemplateSourceFactory.swiftBootstrap(for: template)
+            .write(
+                to: sourcesURL.appendingPathComponent(swiftFileName, isDirectory: false),
+                atomically: true,
+                encoding: .utf8
+            )
 
         try EditorProjectTemplateSourceFactory.adaScript.write(
             to: sourcesURL.appendingPathComponent("Main.ada", isDirectory: false),
@@ -436,11 +438,12 @@ public struct EditorProjectStore {
             return
         }
 
-        try SceneDocumentFormat.defaultSceneYAML(projectName: projectName).write(
-            to: sceneURL,
-            atomically: true,
-            encoding: .utf8
-        )
+        try SceneDocumentFormat.defaultSceneYAML(projectName: projectName)
+            .write(
+                to: sceneURL,
+                atomically: true,
+                encoding: .utf8
+            )
     }
 
     private func createReadme(named projectName: String, at projectURL: URL, template: EditorProjectTemplate) throws {
@@ -449,25 +452,27 @@ public struct EditorProjectStore {
             return
         }
 
-        let buildDescription = template == .adaScript
+        let buildDescription =
+            template == .adaScript
             ? "`build.system` is `adascript`; AdaEditor loads the project directly without compiling Swift."
             : "`Package.swift` defines the native Swift executable and AdaScript build plugin."
-        let packageDescription = template == .adaScript
+        let packageDescription =
+            template == .adaScript
             ? ""
             : "- `Package.swift` — SwiftPM package manifest.\n"
         let readme = """
-        # \(projectName)
+            # \(projectName)
 
-        Created with AdaEditor.
+            Created with AdaEditor.
 
-        \(buildDescription)
+            \(buildDescription)
 
-        ## Structure
+            ## Structure
 
-        \(packageDescription)- `.ada/project.json` — AdaEditor project metadata.
-        - `Sources/` — game source files.
-        - `Assets/` — game assets and scene documents.
-        """
+            \(packageDescription)- `.ada/project.json` — AdaEditor project metadata.
+            - `Sources/` — game source files.
+            - `Assets/` — game assets and scene documents.
+            """
         try readme.write(to: readmeURL, atomically: true, encoding: .utf8)
     }
 
@@ -495,11 +500,11 @@ extension EditorProjectStoreError: LocalizedError {
         switch self {
         case .emptyProjectName:
             "Project name must not be empty."
-        case .projectPathIsNotDirectory(let path):
+        case let .projectPathIsNotDirectory(path):
             "The project destination is not a directory: \(path)"
-        case .projectDirectoryNotEmpty(let path):
+        case let .projectDirectoryNotEmpty(path):
             "The project destination already exists and is not empty: \(path)"
-        case .manifestVerificationFailed(let path):
+        case let .manifestVerificationFailed(path):
             "Package manifest verification failed after writing: \(path)"
         }
     }

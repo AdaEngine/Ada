@@ -8,9 +8,11 @@ struct AdaScriptLibraryDownload: Sendable {
 
     func validate() throws {
         try manifest.validate()
-        guard Set(files.keys) == Set(manifest.sources),
-              files.values.reduce(0, { $0 + $1.count }) <= 8 * 1_024 * 1_024,
-              files.values.allSatisfy({ $0.count <= 1_024 * 1_024 && String(data: $0, encoding: .utf8) != nil }) else {
+        guard
+            Set(files.keys) == Set(manifest.sources),
+            files.values.reduce(0, { $0 + $1.count }) <= 8 * 1_024 * 1_024,
+            files.values.allSatisfy({ $0.count <= 1_024 * 1_024 && String(bytes: $0, encoding: .utf8) != nil })
+        else {
             throw AdaScriptLibraryError.invalid("Incomplete, oversized, or invalid library \(manifest.id).")
         }
     }
@@ -31,11 +33,17 @@ struct GitHubAdaScriptLibraryProvider: AdaScriptLibraryProvider {
 
     static func source(repository: String, revision: String) throws -> AdaScriptLibrarySource {
         var location = repository.trimmingCharacters(in: .whitespacesAndNewlines)
-        if location.hasPrefix("https://github.com/") { location.removeFirst("https://github.com/".count) }
-        if location.hasSuffix(".git") { location.removeLast(4) }
-        guard location.range(of: #"^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$"#, options: .regularExpression) != nil,
-              !location.hasSuffix("/.."), !location.hasSuffix("/."), !revision.isEmpty,
-              revision.count <= 200 else {
+        if location.hasPrefix("https://github.com/") {
+            location.removeFirst("https://github.com/".count)
+        }
+        if location.hasSuffix(".git") {
+            location.removeLast(4)
+        }
+        guard
+            location.range(of: #"^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$"#, options: .regularExpression) != nil,
+            !location.hasSuffix("/.."), !location.hasSuffix("/."), !revision.isEmpty,
+            revision.count <= 200
+        else {
             throw AdaScriptLibraryError.invalid("Enter a GitHub owner/repository and a tag or commit.")
         }
         return AdaScriptLibrarySource(provider: "github", location: location.lowercased(), revision: revision)
@@ -47,7 +55,9 @@ struct GitHubAdaScriptLibraryProvider: AdaScriptLibraryProvider {
         }
         let normalized = try Self.source(repository: source.location, revision: source.revision)
         let commit: Commit = try await get(location: normalized.location, path: ["commits", normalized.revision])
-        guard Self.isCommit(commit.sha) else { throw AdaScriptLibraryError.invalid("GitHub returned an invalid commit.") }
+        guard Self.isCommit(commit.sha) else {
+            throw AdaScriptLibraryError.invalid("GitHub returned an invalid commit.")
+        }
         let pinned = AdaScriptLibrarySource(provider: "github", location: normalized.location, revision: commit.sha)
         let tree: Tree = try await get(location: pinned.location, path: ["git", "trees", commit.sha], recursive: true)
         guard !tree.truncated else {
@@ -80,14 +90,18 @@ struct GitHubAdaScriptLibraryProvider: AdaScriptLibraryProvider {
     }
 
     private func read(_ path: String, tree: Tree, location: String) async throws -> Data {
-        guard let entry = tree.tree.first(where: { $0.path == path }), entry.type == "blob",
-              entry.mode == "100644" || entry.mode == "100755",
-              let size = entry.size, size <= 1_024 * 1_024, Self.isCommit(entry.sha) else {
+        guard
+            let entry = tree.tree.first(where: { $0.path == path }), entry.type == "blob",
+            entry.mode == "100644" || entry.mode == "100755",
+            let size = entry.size, size <= 1_024 * 1_024, Self.isCommit(entry.sha)
+        else {
             throw AdaScriptLibraryError.invalid("Missing, oversized, or non-regular library file: \(path).")
         }
         let blob: Blob = try await get(location: location, path: ["git", "blobs", entry.sha])
-        guard blob.encoding == "base64", let data = Data(base64Encoded: blob.content, options: .ignoreUnknownCharacters),
-              data.count == size, String(data: data, encoding: .utf8) != nil else {
+        guard
+            blob.encoding == "base64", let data = Data(base64Encoded: blob.content, options: .ignoreUnknownCharacters),
+            data.count == size, String(bytes: data, encoding: .utf8) != nil
+        else {
             throw AdaScriptLibraryError.invalid("Library file is not valid UTF-8: \(path).")
         }
         return data
@@ -100,13 +114,17 @@ struct GitHubAdaScriptLibraryProvider: AdaScriptLibraryProvider {
         for component in path {
             // appendingPathComponent preserves slash in branch names; encode it as one API segment.
             let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
-            guard let encoded = component.addingPercentEncoding(withAllowedCharacters: allowed),
-                  let next = URL(string: url.absoluteString + "/" + encoded) else {
+            guard
+                let encoded = component.addingPercentEncoding(withAllowedCharacters: allowed),
+                let next = URL(string: url.absoluteString + "/" + encoded)
+            else {
                 throw AdaScriptLibraryError.invalid("Invalid GitHub reference.")
             }
             url = next
         }
-        if recursive { url.append(queryItems: [URLQueryItem(name: "recursive", value: "1")]) }
+        if recursive {
+            url.append(queryItems: [URLQueryItem(name: "recursive", value: "1")])
+        }
         var urlRequest = URLRequest(url: url)
         urlRequest.timeoutInterval = 30
         urlRequest.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -121,7 +139,9 @@ struct GitHubAdaScriptLibraryProvider: AdaScriptLibraryProvider {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw AdaScriptLibraryError.invalid("GitHub request failed (HTTP \(status)). Check the public repository, revision, and API rate limit.")
         }
-        guard data.count <= 10 * 1_024 * 1_024 else { throw AdaScriptLibraryError.invalid("GitHub response is too large.") }
+        guard data.count <= 10 * 1_024 * 1_024 else {
+            throw AdaScriptLibraryError.invalid("GitHub response is too large.")
+        }
         return data
     }
 

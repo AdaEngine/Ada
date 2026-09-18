@@ -12,10 +12,18 @@ extension EditorViewModel {
         var editor: [String] = []
         for entry in batch.entries {
             let line = "\(entry.level.uppercased()) [\(entry.label)] \(entry.message)"
-            if entry.source == "Game" { game.append(line) } else { editor.append(line) }
+            if entry.source == "Game" {
+                game.append(line)
+            } else {
+                editor.append(line)
+            }
         }
-        if !game.isEmpty { appendGameLog(game) }
-        if !editor.isEmpty { appendOutput(editor) }
+        if !game.isEmpty {
+            appendGameLog(game)
+        }
+        if !editor.isEmpty {
+            appendOutput(editor)
+        }
     }
 
     func clearVisibleLog() {

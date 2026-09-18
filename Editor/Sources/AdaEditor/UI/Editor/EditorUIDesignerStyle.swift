@@ -4,7 +4,6 @@ import Math
 enum EditorUIDesignerPane: String, CaseIterable {
     case library = "Library"
     case canvas = "Canvas"
-    case inspector = "Inspector"
 }
 
 struct EditorUIDesignerLayout {
@@ -12,9 +11,8 @@ struct EditorUIDesignerLayout {
     var showsSidebars: Bool { size.width >= 900 }
     var toolbarHeight: Float { size.width >= 1100 ? 52 : (size.width >= 560 ? 88 : 124) }
     var sidebarWidth: Float { 220 }
-    var inspectorWidth: Float { 268 }
     var contentHeight: Float { max(0, size.height - toolbarHeight - 29 - (showsSidebars ? 0 : 38)) }
-    var canvasWidth: Float { max(0, size.width - (showsSidebars ? sidebarWidth + inspectorWidth + 2 : 0)) }
+    var canvasWidth: Float { max(0, size.width - (showsSidebars ? sidebarWidth + 1 : 0)) }
 
     func fitZoom(width: Float, height: Float) -> Float {
         min(1, max(0.02, min(max(0, canvasWidth - 64) / max(1, width), max(0, contentHeight - 112) / max(1, height))))
@@ -33,9 +31,12 @@ struct EditorUIDesignerButtonStyle: ButtonStyle {
             .foregroundColor(colors.text)
             .padding(.horizontal, 8)
             .frame(height: 30)
-            .background(RoundedRectangleShape(cornerRadius: 6).fill(
-                selected ? colors.blue.opacity(0.16) : (highlighted || bordered ? colors.surfaceElevated : .clear)
-            ))
+            .background(
+                RoundedRectangleShape(cornerRadius: 6)
+                    .fill(
+                        selected ? colors.blue.opacity(0.16) : (highlighted || bordered ? colors.surfaceElevated : .clear)
+                    )
+            )
             .overlay {
                 RoundedRectangleShape(cornerRadius: 6)
                     .stroke(highlighted ? colors.blue.opacity(0.65) : (bordered ? colors.border.opacity(0.65) : .clear), lineWidth: 1)
@@ -66,23 +67,65 @@ struct EditorUIDesignerField: View {
 enum EditorUIDesignerSymbols {
     static func icon(_ type: String) -> String {
         switch type {
-        case "Text", "TextField", "TextEditor": "\u{E264}"
+        case "Text",
+            "TextField",
+            "TextEditor":
+            "\u{E264}"
         case "Image": "\u{E3F4}"
-        case "Button", "SearchBar", "NavigationLink": "\u{E913}"
+        case "Button",
+            "SearchBar",
+            "NavigationLink":
+            "\u{E913}"
         case "Divider": "\u{E15B}"
         case "Spacer": "\u{E256}"
-        case "Circle", "Rectangle", "RoundedRectangle", "Color", "LinearGradient", "RadialGradient": "\u{E3B7}"
-        case "HStack", "VStack", "ZStack", "Grid", "LazyVStack", "ScrollView", "Group": "\u{E8F1}"
+        case "Circle",
+            "Rectangle",
+            "RoundedRectangle",
+            "Color",
+            "LinearGradient",
+            "RadialGradient":
+            "\u{E3B7}"
+        case "HStack",
+            "VStack",
+            "ZStack",
+            "Grid",
+            "LazyVStack",
+            "ScrollView",
+            "Group":
+            "\u{E8F1}"
         default: "\u{E8F0}"
         }
     }
 
     static func category(_ type: String) -> String {
         switch type {
-        case "HStack", "VStack", "ZStack", "Grid", "LazyVStack", "ScrollView", "Group", "Spacer", "Divider": "Layout"
-        case "Text", "TextEditor", "TextField", "Image": "Content"
-        case "Button", "SearchBar", "NavigationLink", "NavigationStack": "Controls"
-        case "Circle", "Rectangle", "RoundedRectangle", "Color", "LinearGradient", "RadialGradient": "Drawing"
+        case "HStack",
+            "VStack",
+            "ZStack",
+            "Grid",
+            "LazyVStack",
+            "ScrollView",
+            "Group",
+            "Spacer",
+            "Divider":
+            "Layout"
+        case "Text",
+            "TextEditor",
+            "TextField",
+            "Image":
+            "Content"
+        case "Button",
+            "SearchBar",
+            "NavigationLink",
+            "NavigationStack":
+            "Controls"
+        case "Circle",
+            "Rectangle",
+            "RoundedRectangle",
+            "Color",
+            "LinearGradient",
+            "RadialGradient":
+            "Drawing"
         default: "Advanced"
         }
     }
@@ -103,8 +146,11 @@ extension EditorUISceneEditor {
         HStack(spacing: 8) {
             Text(title).font(.system(size: 12, weight: .semibold)).foregroundColor(theme.editorColors.text)
             Spacer()
-            if let detail { Text(detail).font(.system(size: 10)).foregroundColor(theme.editorColors.muted) }
-        }.frame(height: 20)
+            if let detail {
+                Text(detail).font(.system(size: 10)).foregroundColor(theme.editorColors.muted)
+            }
+        }
+        .frame(height: 20)
     }
 
     var panelDivider: some View {

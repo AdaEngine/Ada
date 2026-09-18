@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @Suite("AdaScript project runtime", .serialized)
 struct AdaScriptProjectRuntimeTests {
@@ -29,7 +30,8 @@ struct AdaScriptProjectRuntimeTests {
         defer { try? fileManager.removeItem(at: rootURL) }
         let project = try EditorProjectStore(
             storageURL: rootURL.appendingPathComponent("projects.json")
-        ).createProject(named: "RuntimeGame", at: rootURL, template: .adaScript)
+        )
+        .createProject(named: "RuntimeGame", at: rootURL, template: .adaScript)
 
         let previousManager = UIWindowManager.shared
         let windowManager = AdaScriptRuntimeTestWindowManager()
@@ -95,7 +97,7 @@ struct AdaScriptProjectRuntimeTests {
 
         viewModel.refreshPreviewForActiveDocument()
         for _ in 0..<100 {
-            if case .loaded(let declaration, _) = workbench.previewStatus {
+            if case let .loaded(declaration, _) = workbench.previewStatus {
                 #expect(declaration.id == "HUDView")
                 return
             }
@@ -125,8 +127,8 @@ private final class AdaScriptRuntimeTestWindowManager: UIWindowManager {
         window.windowDidDisappear()
     }
 
-    override func setWindowMode(_ window: UIWindow, mode: UIWindow.Mode) {}
-    override func setMinimumSize(_ size: Size, for window: UIWindow) {}
-    override func resizeWindow(_ window: UIWindow, size: Size) {}
-    override func getScreen(for window: UIWindow) -> Screen? { nil }
+    override func setWindowMode(_: UIWindow, mode _: UIWindow.Mode) {}
+    override func setMinimumSize(_: Size, for _: UIWindow) {}
+    override func resizeWindow(_: UIWindow, size _: Size) {}
+    override func getScreen(for _: UIWindow) -> Screen? { nil }
 }

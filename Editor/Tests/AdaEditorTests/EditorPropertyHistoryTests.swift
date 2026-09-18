@@ -1,10 +1,11 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorPropertyHistoryTests {
@@ -127,9 +128,13 @@ struct EditorPropertyHistoryTests {
         )
         let workbench = EditorWorkbenchViewModel(openDocuments: [.scene(document), .ui(uiDocument)], activeDocumentID: document.id)
         let ui = workbench.uiSceneModel(for: uiDocument, resourceRoot: nil)
-        let container = UIContainerView(rootView: Color.clear.keyboardShortcuts(EditorHistoryShortcuts.actions {
-            workbench.performDocumentHistory(redo: $0 == .redo)
-        }))
+        let container = UIContainerView(
+            rootView: Color.clear.keyboardShortcuts(
+                EditorHistoryShortcuts.actions {
+                    workbench.performDocumentHistory(redo: $0 == .redo)
+                }
+            )
+        )
         container.frame = Rect(x: 0, y: 0, width: 100, height: 100)
         container.layoutSubviews()
         let count = document.sceneModel?.entities.count ?? 0
@@ -162,15 +167,20 @@ struct EditorPropertyHistoryTests {
         let type = EditorBuiltInComponentType.visibility
         workbench.addComponent(typeName: type, toSelectedEntityIn: document.id)
         let field = try #require(EditorComponentRegistry.descriptor(named: type)?.fields.first)
-        guard case .enumeration(let cases) = field.kind else {
+        guard case let .enumeration(cases) = field.kind else {
             Issue.record("Expected a reflected enum field")
             return
         }
         let before = try #require(workbench.activeSceneDocument?.content)
-        let container = UIContainerView(rootView: EditorEnumField(cases: cases, selection: Binding(
-            get: { "visible" },
-            set: { workbench.updateComponentField(typeName: type, field: field, value: $0, inSelectedEntityOf: document.id) }
-        )))
+        let container = UIContainerView(
+            rootView: EditorEnumField(
+                cases: cases,
+                selection: Binding(
+                    get: { "visible" },
+                    set: { workbench.updateComponentField(typeName: type, field: field, value: $0, inSelectedEntityOf: document.id) }
+                )
+            )
+        )
         container.frame = Rect(x: 0, y: 0, width: 300, height: 220)
         container.layoutSubviews()
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Enum.Toggle"))

@@ -1,7 +1,8 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("EditorTreeSitterSyntaxHighlighter")
 struct EditorTreeSitterSyntaxHighlighterTests {
@@ -21,7 +22,7 @@ struct EditorTreeSitterSyntaxHighlighterTests {
             #expect(EditorSourceLanguage.detect(fileName: name) == expected)
             let item = try #require(editor.projectSidebar.items.first { $0.title == name })
             editor.openProjectItem(item)
-            guard case .text(let document)? = editor.workbench.activeDocument else {
+            guard case let .text(document)? = editor.workbench.activeDocument else {
                 Issue.record("Shader should open in the code editor: \(name)")
                 continue
             }
@@ -42,12 +43,12 @@ struct EditorTreeSitterSyntaxHighlighterTests {
 
         let tokens = EditorSyntaxHighlighter.tokens(
             for: """
-            const speed = 12.5;
-            var title = 'AdaScript';
-            /* outer /* nested */ comment */
-            @system(scheduler: "update")
-            class MovementSystem { func update(context) {} }
-            """,
+                const speed = 12.5;
+                var title = 'AdaScript';
+                /* outer /* nested */ comment */
+                @system(scheduler: "update")
+                class MovementSystem { func update(context) {} }
+                """,
             language: .ada,
             palette: palette
         )
@@ -73,10 +74,10 @@ struct EditorTreeSitterSyntaxHighlighterTests {
 
         let tokens = EditorSyntaxHighlighter.tokens(
             for: """
-            @MainActor
-            let enabled = true
-            let package = Package(name: "Ada", platforms: [.macOS(.v15)]) // manifest
-            """,
+                @MainActor
+                let enabled = true
+                let package = Package(name: "Ada", platforms: [.macOS(.v15)]) // manifest
+                """,
             language: .packageManifest,
             palette: palette
         )

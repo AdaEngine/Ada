@@ -10,7 +10,9 @@ struct EditorProjectToolSidebar: View {
         VStack(alignment: .leading, spacing: 0) {
             adaEditorPanelTitle(title, trailing: viewModel.workspaceStatus.title, theme: theme)
             content
-            if viewModel.toolStrip.activeRightTool != "swiftPackageTasks" && viewModel.toolStrip.activeRightTool != "projectDependencies" { Spacer() }
+            if viewModel.toolStrip.activeRightTool != "swiftPackageTasks" && viewModel.toolStrip.activeRightTool != "projectDependencies" {
+                Spacer()
+            }
         }
         .background(
             RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
@@ -97,7 +99,9 @@ struct EditorProjectToolSidebar: View {
         case "clean": viewModel.cleanPackageCache()
         case "reset": viewModel.resetPackageCache()
         default:
-            guard id.hasPrefix("product:") else { return }
+            guard id.hasPrefix("product:") else {
+                return
+            }
             viewModel.selectedRunProduct = String(id.dropFirst("product:".count))
             viewModel.runSelectedTarget()
         }

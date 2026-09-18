@@ -3,7 +3,9 @@ import Foundation
 extension EditorViewModel {
     func selectGitHistory() {
         sourceControl.showsHistory = true
-        if sourceControl.historyHead == nil && !sourceControl.isLoadingHistory { loadGitHistory(reset: true) }
+        if sourceControl.historyHead == nil && !sourceControl.isLoadingHistory {
+            loadGitHistory(reset: true)
+        }
     }
 
     func loadGitHistory(reset: Bool = false) {
@@ -32,11 +34,11 @@ extension EditorViewModel {
             }
             self.sourceControl.isLoadingHistory = false
             switch result {
-            case .success(let page):
+            case let .success(page):
                 self.sourceControl.commits.append(contentsOf: page.commits)
                 self.sourceControl.historyHead = page.head
                 self.sourceControl.hasMoreHistory = page.hasMore
-            case .failure(let error): self.sourceControl.historyError = error.message
+            case let .failure(error): self.sourceControl.historyError = error.message
             }
         }
     }
@@ -64,14 +66,18 @@ extension EditorViewModel {
             self?.openGitWorkingFile(url)
         }
         if commit != nil {
-            if document.files.isEmpty { document.loadCommit() }
+            if document.files.isEmpty {
+                document.loadCommit()
+            }
         } else if let root = sourceControl.snapshot.rootURL {
             document.apply(GitReview(rootURL: root, files: sourceControl.snapshot.diffFiles, commit: nil))
         } else {
             document.message = sourceControl.statusMessage
         }
         workbench.open(.git(document))
-        if let fileID { document.reveal(fileID) }
+        if let fileID {
+            document.reveal(fileID)
+        }
     }
 
     func updateOpenGitReviews() {
@@ -83,7 +89,9 @@ extension EditorViewModel {
                 document.message = sourceControl.statusMessage
             }
         }
-        if sourceControl.showsHistory { loadGitHistory(reset: true) }
+        if sourceControl.showsHistory {
+            loadGitHistory(reset: true)
+        }
     }
 
     func openGitWorkingFile(_ url: URL) {

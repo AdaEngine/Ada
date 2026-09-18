@@ -30,7 +30,11 @@ enum EditorTextSearchPresentationText {
             language = .detect(fileName: match.relativePath)
         }
         var text = EditorSourceHoverPresentation.attributedText(
-            excerpt, language: language, palette: palette, font: font, keywordFont: keywordFont
+            excerpt,
+            language: language,
+            palette: palette,
+            font: font,
+            keywordFont: keywordFont
         )
         let selectionStart = excerpt.index(excerpt.startIndex, offsetBy: prefix.count + source.distance(from: start, to: matchRange.lowerBound))
         let selectionEnd = excerpt.index(selectionStart, offsetBy: source.distance(from: matchRange.lowerBound, to: matchRange.upperBound))

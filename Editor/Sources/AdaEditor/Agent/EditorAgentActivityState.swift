@@ -5,7 +5,9 @@ enum EditorAgentActivityState: String, Equatable, Sendable {
 
     var motion: Float {
         switch self {
-        case .idle, .completed: 0
+        case .idle,
+            .completed:
+            0
         case .working: 1
         case .needsInput: 0.32
         case .failed: 0.15
@@ -15,7 +17,9 @@ enum EditorAgentActivityState: String, Equatable, Sendable {
     var intensity: Float {
         switch self {
         case .idle: 0
-        case .working, .needsInput: 1.15
+        case .working,
+            .needsInput:
+            1.15
         case .completed: 0.98
         case .failed: 1.09
         }
@@ -23,7 +27,9 @@ enum EditorAgentActivityState: String, Equatable, Sendable {
 
     func color(accent: Color) -> Color {
         switch self {
-        case .idle, .working: accent
+        case .idle,
+            .working:
+            accent
         case .completed: Color(red: 52 / 255, green: 210 / 255, blue: 123 / 255)
         case .needsInput: Color(red: 245 / 255, green: 200 / 255, blue: 66 / 255)
         case .failed: Color(red: 240 / 255, green: 100 / 255, blue: 100 / 255)
@@ -49,7 +55,9 @@ enum EditorAgentActivityState: String, Equatable, Sendable {
         }
         switch operation {
         case .completed: return .completed
-        case .failed, .interrupted: return .failed
+        case .failed,
+            .interrupted:
+            return .failed
         case .cancelled: return .idle
         default: return isSending ? .working : .idle
         }

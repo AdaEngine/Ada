@@ -11,7 +11,6 @@ import Math
 /// A component that defines an entity's behavior in 3D physics simulations.
 @Component
 public struct PhysicsBody3DComponent: Codable {
-
     /// The physics body's mode, indicating how or if it moves.
     public var mode: PhysicsBodyMode
 

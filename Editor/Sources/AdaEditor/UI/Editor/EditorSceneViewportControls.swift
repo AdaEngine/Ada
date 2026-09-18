@@ -126,7 +126,7 @@ struct EditorSceneViewportControls: View {
     }
 }
 
-private extension EditorSceneViewportTool {
+extension EditorSceneViewportTool {
     var symbol: String {
         switch self {
         case .select: "\u{E8B6}"

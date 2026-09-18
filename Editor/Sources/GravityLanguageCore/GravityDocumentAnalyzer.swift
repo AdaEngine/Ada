@@ -38,23 +38,26 @@ struct GravityDocumentAnalyzer {
     static func typeContaining(_ position: GravitySourcePosition, in regions: [GravityTypeRegion]) -> GravitySymbol? {
         regions.first { region in
             region.symbol.range.start <= position && position <= region.symbol.range.end
-        }?.symbol
+        }?
+        .symbol
     }
 
     private static func duplicatePropertyDiagnostics(_ regions: [GravityTypeRegion], tokens: [GravityToken]) -> [GravityDiagnostic] {
-        let staticProperties = Set(tokens.indices.compactMap { index -> GravitySourceRange? in
-            guard tokens[index].text == "var" || tokens[index].text == "const", index + 1 < tokens.count else {
+        let staticProperties = Set(
+            tokens.indices.compactMap { index -> GravitySourceRange? in
+                guard tokens[index].text == "var" || tokens[index].text == "const", index + 1 < tokens.count else {
+                    return nil
+                }
+                var cursor = index - 1
+                while cursor >= 0, ["static", "private", "public", "extern"].contains(tokens[cursor].text) {
+                    if tokens[cursor].text == "static" {
+                        return tokens[index + 1].range
+                    }
+                    cursor -= 1
+                }
                 return nil
             }
-            var cursor = index - 1
-            while cursor >= 0, ["static", "private", "public", "extern"].contains(tokens[cursor].text) {
-                if tokens[cursor].text == "static" {
-                    return tokens[index + 1].range
-                }
-                cursor -= 1
-            }
-            return nil
-        })
+        )
         return regions.flatMap { region in
             var names: Set<String> = []
             return region.symbol.members.compactMap { member -> GravityDiagnostic? in
@@ -74,9 +77,10 @@ struct GravityDocumentAnalyzer {
         var regions: [GravityTypeRegion] = []
         var index = 0
         while index < tokens.count {
-            guard let kind = typeKind(for: tokens[index].text),
-                  let nameIndex = nextIdentifier(after: index, in: tokens),
-                  let openBraceIndex = nextToken("{", after: nameIndex, in: tokens)
+            guard
+                let kind = typeKind(for: tokens[index].text),
+                let nameIndex = nextIdentifier(after: index, in: tokens),
+                let openBraceIndex = nextToken("{", after: nameIndex, in: tokens)
             else {
                 index += 1
                 continue
@@ -101,18 +105,20 @@ struct GravityDocumentAnalyzer {
                 selectionRange: nameToken.range,
                 members: members
             )
-            regions.append(GravityTypeRegion(
-                annotations: annotations,
-                closeBraceIndex: closeBraceIndex,
-                implicitTypes: implicitTypes(
+            regions.append(
+                GravityTypeRegion(
                     annotations: annotations,
-                    openBraceIndex: openBraceIndex,
                     closeBraceIndex: closeBraceIndex,
-                    tokens: tokens
-                ),
-                openBraceIndex: openBraceIndex,
-                symbol: symbol
-            ))
+                    implicitTypes: implicitTypes(
+                        annotations: annotations,
+                        openBraceIndex: openBraceIndex,
+                        closeBraceIndex: closeBraceIndex,
+                        tokens: tokens
+                    ),
+                    openBraceIndex: openBraceIndex,
+                    symbol: symbol
+                )
+            )
             index = memberUpperBound
         }
         return regions
@@ -160,8 +166,9 @@ struct GravityDocumentAnalyzer {
                 index += 1
                 continue
             }
-            guard braceDepth == baseDepth,
-                  let nameIndex = nextIdentifier(after: index, upperBound: range.upperBound, in: tokens)
+            guard
+                braceDepth == baseDepth,
+                let nameIndex = nextIdentifier(after: index, upperBound: range.upperBound, in: tokens)
             else {
                 index += 1
                 continue
@@ -201,14 +208,20 @@ struct GravityDocumentAnalyzer {
     private static func inferTypes(_ tokens: [GravityToken]) -> [String: String] {
         var inferred: [String: String] = [:]
         for index in tokens.indices where tokens[index].text == "@" {
-            guard index + 1 < tokens.count, tokens[index + 1].text == "query" else { continue }
+            guard index + 1 < tokens.count, tokens[index + 1].text == "query" else {
+                continue
+            }
             var declarationIndex = index + 2
             var parenthesisDepth = 0
             while declarationIndex < tokens.count {
-                if tokens[declarationIndex].text == "(" { parenthesisDepth += 1 }
-                if tokens[declarationIndex].text == ")" { parenthesisDepth -= 1 }
+                if tokens[declarationIndex].text == "(" {
+                    parenthesisDepth += 1
+                }
+                if tokens[declarationIndex].text == ")" {
+                    parenthesisDepth -= 1
+                }
                 if parenthesisDepth == 0, tokens[declarationIndex].text == "var",
-                   declarationIndex + 1 < tokens.count {
+                    declarationIndex + 1 < tokens.count {
                     inferred[tokens[declarationIndex + 1].text] = "$AdaQueryCollection"
                     break
                 }
@@ -216,10 +229,11 @@ struct GravityDocumentAnalyzer {
             }
         }
         for index in tokens.indices {
-            guard tokens[index].text == "var" || tokens[index].text == "const",
-                  index + 3 < tokens.count,
-                  tokens[index + 1].kind == .identifier,
-                  tokens[index + 2].text == "="
+            guard
+                tokens[index].text == "var" || tokens[index].text == "const",
+                index + 3 < tokens.count,
+                tokens[index + 1].kind == .identifier,
+                tokens[index + 2].text == "="
             else {
                 continue
             }
@@ -236,14 +250,20 @@ struct GravityDocumentAnalyzer {
         }
 
         for index in tokens.indices where tokens[index].text == "for" {
-            guard index + 4 < tokens.count, tokens[index + 1].text == "(" else { continue }
+            guard index + 4 < tokens.count, tokens[index + 1].text == "(" else {
+                continue
+            }
             let hasVariableKeyword = tokens[index + 2].text == "var"
             let entityIndex = hasVariableKeyword ? index + 3 : index + 2
             let inIndex = entityIndex + 1
             let queryIndex = inIndex + 1
-            guard queryIndex < tokens.count,
-                  tokens[inIndex].text == "in",
-                  inferred[tokens[queryIndex].text] == "$AdaQueryCollection" else { continue }
+            guard
+                queryIndex < tokens.count,
+                tokens[inIndex].text == "in",
+                inferred[tokens[queryIndex].text] == "$AdaQueryCollection"
+            else {
+                continue
+            }
             inferred[tokens[entityIndex].text] = "$AdaEntity"
         }
         return inferred
@@ -306,7 +326,7 @@ struct GravityDocumentAnalyzer {
     }
 }
 
-private extension Sequence {
+extension Sequence {
     func uniqued<Key: Hashable>(on key: (Element) -> Key) -> [Element] {
         var seen: Set<Key> = []
         return filter { seen.insert(key($0)).inserted }

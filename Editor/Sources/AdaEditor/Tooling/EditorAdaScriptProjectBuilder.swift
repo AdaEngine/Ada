@@ -37,11 +37,11 @@ enum EditorAdaScriptProjectBuildError: Error, Equatable, LocalizedError, Sendabl
 
     var errorDescription: String? {
         switch self {
-        case .entryViewMissing(let identifier):
+        case let .entryViewMissing(identifier):
             "AdaScript entry view '\(identifier)' was not found. Set runtime.entry.view to an existing @view id."
-        case .nativeDataRequiresRuntimeLayout(let names):
+        case let .nativeDataRequiresRuntimeLayout(names):
             "AdaScript runtime components and resources are not available yet: \(names.joined(separator: ", "))."
-        case .noSources(let path):
+        case let .noSources(path):
             "No .ada source files were found under \(path)."
         case let .notAdaScriptProject(buildSystem):
             "Expected an AdaScript project, but build.system is '\(buildSystem)'."
@@ -49,7 +49,7 @@ enum EditorAdaScriptProjectBuildError: Error, Equatable, LocalizedError, Sendabl
             "Failed to read \(path): \(message)"
         case let .startupSceneInvalid(path, message):
             "AdaScript startup scene '\(path)' is invalid: \(message)"
-        case .startupSceneMissing(let path):
+        case let .startupSceneMissing(path):
             "AdaScript startup scene was not found at \(path)."
         }
     }
@@ -73,7 +73,8 @@ struct EditorAdaScriptProjectBuilder {
         }
 
         let sourceRoot = project.paths.sources ?? "Sources"
-        let sources = try loadSources(at: projectURL.appendingPathComponent(sourceRoot, isDirectory: true))
+        let sources =
+            try loadSources(at: projectURL.appendingPathComponent(sourceRoot, isDirectory: true))
             + AdaScriptLibraryLock.load(at: projectURL).loadSources(at: projectURL)
         guard !sources.isEmpty else {
             throw EditorAdaScriptProjectBuildError.noSources(path: sourceRoot)
@@ -95,8 +96,9 @@ struct EditorAdaScriptProjectBuilder {
         let entryDescription = [
             preparedEntry.entry.scene.map { "scene \($0)" },
             preparedEntry.entry.view.map { "view \($0)" },
-            preparedEntry.entry.startupSystem.map { "startup \($0)" }
-        ].compactMap { $0 }.joined(separator: ", ")
+            preparedEntry.entry.startupSystem.map { "startup \($0)" },
+        ]
+        .compactMap { $0 }.joined(separator: ", ")
 
         let report = EditorAdaScriptProjectBuildReport(
             entryDescription: entryDescription,
@@ -176,11 +178,13 @@ struct EditorAdaScriptProjectBuilder {
     }
 
     private func loadSources(at sourceRoot: URL) throws -> [AdaScriptSource] {
-        guard let enumerator = fileManager.enumerator(
-            at: sourceRoot,
-            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
-            options: [.skipsHiddenFiles]
-        ) else {
+        guard
+            let enumerator = fileManager.enumerator(
+                at: sourceRoot,
+                includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+                options: [.skipsHiddenFiles]
+            )
+        else {
             return []
         }
 
@@ -223,10 +227,4 @@ private struct PreparedAdaScriptRuntimeEntry {
     let sceneModel: EditorSceneModel?
     let systemCount: Int
     let viewCount: Int
-}
-
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
-    }
 }

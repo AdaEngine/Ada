@@ -29,19 +29,19 @@ extension EditorViewModel {
                 return
             }
             #if os(iOS)
-            do {
-                try ProjectSystem.validateRunCompatibility(
-                    of: settings,
-                    at: projectURL,
-                    destination: .iPadOS,
-                    fileManager: fileManager
-                )
-            } catch {
-                workspaceStatus = .failed(error.message)
-                footer.setWorkspaceFooterTitle(workspaceStatus.title)
-                appendOutput(error.message)
-                return
-            }
+                do {
+                    try ProjectSystem.validateRunCompatibility(
+                        of: settings,
+                        at: projectURL,
+                        destination: .iPadOS,
+                        fileManager: fileManager
+                    )
+                } catch {
+                    workspaceStatus = .failed(error.message)
+                    footer.setWorkspaceFooterTitle(workspaceStatus.title)
+                    appendOutput(error.message)
+                    return
+                }
             #endif
         }
 
@@ -59,7 +59,9 @@ extension EditorViewModel {
         appendOutput("Loading \(ProjectSystem.metadataFileName) and resolving SwiftPM dependencies...")
 
         workspaceTask = Task { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             await self.workspaceService.setDiagnosticsHandler { [weak self] uri, diagnostics in
                 await MainActor.run {
                     self?.receiveSourceDiagnostics(diagnostics, uri: uri)
@@ -74,7 +76,8 @@ extension EditorViewModel {
                 self.packageModel = result.packageModel
                 self.replaceBuildDiagnostics(with: result.diagnostics)
                 self.showProblemsIfNeeded()
-                let failureOutput = result.describeResult.combinedOutput.isEmpty
+                let failureOutput =
+                    result.describeResult.combinedOutput.isEmpty
                     ? result.resolveResult.combinedOutput
                     : result.describeResult.combinedOutput
                 self.workspaceStatus = result.succeeded ? .ready : .failed(failureOutput)
@@ -87,9 +90,10 @@ extension EditorViewModel {
                     self.footer.setWorkspaceFooterTitle(self.workspaceStatus.title)
                     self.appendOutput(indexBuildResult)
                 }
-                self.buildActivity?.finish(
-                    succeeded: result.succeeded && result.indexBuildResult?.succeeded != false
-                )
+                self.buildActivity?
+                    .finish(
+                        succeeded: result.succeeded && result.indexBuildResult?.succeeded != false
+                    )
                 self.workspaceTask = nil
                 self.refreshPreviewForActiveDocument()
             }
@@ -97,8 +101,12 @@ extension EditorViewModel {
     }
 
     func refreshSourceControl() {
-        guard EditorDistribution.current.supportsSwiftProjects else { return }
-        guard !sourceControl.isRunning else { return }
+        guard EditorDistribution.current.supportsSwiftProjects else {
+            return
+        }
+        guard !sourceControl.isRunning else {
+            return
+        }
         sourceControl.refreshTask?.cancel()
         let generation = UUID()
         sourceControl.refreshGeneration = generation
@@ -113,12 +121,16 @@ extension EditorViewModel {
         sourceControl.statusMessage = "Refreshing source control…"
         sourceControl.refreshTask = Task { [weak self, sourceControlService] in
             let result = await sourceControlService.snapshot(projectURL: projectURL)
-            guard let self, self.projectURL == projectURL, self.sourceControl.refreshGeneration == generation, !Task.isCancelled else { return }
+            guard let self, self.projectURL == projectURL, self.sourceControl.refreshGeneration == generation, !Task.isCancelled else {
+                return
+            }
             self.sourceControl.snapshot = result.snapshot
             self.sourceControl.statusMessage = self.sourceControlStatusMessage(for: result)
             self.sourceControl.isRefreshing = false
             self.footer.setSourceControlFooterTitle(result.snapshot.footerTitle)
-            if !result.succeeded { self.appendOutput(result.statusResult) }
+            if !result.succeeded {
+                self.appendOutput(result.statusResult)
+            }
             self.updateOpenGitReviews()
         }
     }
@@ -191,8 +203,8 @@ extension EditorViewModel {
 
     func buildAll() {
         if let projectURL,
-           let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
-           settings.build.system == .adaScript {
+            let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
+            settings.build.system == .adaScript {
             buildAdaScriptProject(settings, at: projectURL, statusTitle: "Build AdaScript Project")
             return
         }
@@ -201,8 +213,8 @@ extension EditorViewModel {
 
     func buildTarget(_ target: String) {
         if let projectURL,
-           let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
-           settings.build.system == .adaScript {
+            let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
+            settings.build.system == .adaScript {
             buildAdaScriptProject(settings, at: projectURL, statusTitle: "Build AdaScript Project")
             return
         }
@@ -210,7 +222,9 @@ extension EditorViewModel {
     }
 
     func runSelectedTarget() {
-        guard !debugger.isActive else { return }
+        guard !debugger.isActive else {
+            return
+        }
         let product = selectedRunProduct ?? runProducts.first
         if workbench.activeDocument?.isDirty == true {
             guard saveActiveDocumentIfNeeded() else {
@@ -229,8 +243,8 @@ extension EditorViewModel {
             try? ProjectSystem.loadProject(at: $0, fileManager: fileManager)
         }
         if let projectURL,
-           let settings = projectSettings,
-           settings.build.system == .adaScript {
+            let settings = projectSettings,
+            settings.build.system == .adaScript {
             let projectName = settings.project.displayName ?? settings.project.name ?? project?.name ?? "AdaScript Project"
             buildAdaScriptProject(
                 settings,
@@ -259,8 +273,10 @@ extension EditorViewModel {
                 statusTitle: "Run \(product) on Web · http://127.0.0.1:8080"
             )
         case .iPadOS:
-            guard let projectURL,
-                  let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager) else {
+            guard
+                let projectURL,
+                let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager)
+            else {
                 workspaceStatus = .failed("Unable to load project settings for iPadOS.")
                 return
             }
@@ -290,26 +306,28 @@ extension EditorViewModel {
         appendOutput("Compiling AdaScript sources (SwiftPM disabled)...")
         let destination = selectedRunDestination.adaProjectDestination
         workspaceTask = Task { [weak self] in
-            let outcome = await Task.detached(priority: .userInitiated) {
-                Self.prepareAdaScriptProject(
-                    settings,
-                    at: projectURL,
-                    destination: destination
-                )
-            }.value
+            let outcome =
+                await Task.detached(priority: .userInitiated) {
+                    Self.prepareAdaScriptProject(
+                        settings,
+                        at: projectURL,
+                        destination: destination
+                    )
+                }
+                .value
             guard !Task.isCancelled, let self else {
                 return
             }
             self.workspaceTask = nil
             switch outcome {
-            case .success(let artifact):
+            case let .success(artifact):
                 self.finishWorkspaceActivity(notificationRunID, succeeded: true)
                 self.finishAdaScriptProjectBuild(artifact)
                 onSuccess(artifact)
-            case .projectFailure(let error):
+            case let .projectFailure(error):
                 self.finishAdaScriptProjectBuildFailure(message: error.message)
                 self.finishWorkspaceActivity(notificationRunID, succeeded: false, detail: error.message)
-            case .failure(let message):
+            case let .failure(message):
                 self.finishAdaScriptProjectBuildFailure(message: message)
                 self.finishWorkspaceActivity(notificationRunID, succeeded: false, detail: message)
             }
@@ -330,10 +348,11 @@ extension EditorViewModel {
                 fileManager: fileManager
             )
             return .success(
-                try EditorAdaScriptProjectBuilder(fileManager: fileManager).prepare(
-                    project: settings,
-                    at: projectURL
-                )
+                try EditorAdaScriptProjectBuilder(fileManager: fileManager)
+                    .prepare(
+                        project: settings,
+                        at: projectURL
+                    )
             )
         } catch let error as ProjectSystemError {
             return .projectFailure(error)
@@ -373,7 +392,7 @@ extension EditorViewModel {
             let windowSettings = artifact.window
             let width = Float(windowSettings.size.width)
             let height = Float(windowSettings.size.height)
-            let windowTitle = windowSettings.title?.nilIfEmpty ?? projectName
+            let windowTitle = windowSettings.title.flatMap { $0.isEmpty ? nil : $0 } ?? projectName
             let configuration = UIWindow.Configuration(
                 title: windowTitle,
                 frame: Rect(x: 0, y: 0, width: width, height: height),
@@ -417,8 +436,12 @@ extension EditorViewModel {
     }
 
     var isProjectRunning: Bool {
-        if playerSession.isRunning || playerSession.isBusy { return true }
-        if debugger.isActive { return true }
+        if playerSession.isRunning || playerSession.isBusy {
+            return true
+        }
+        if debugger.isActive {
+            return true
+        }
         if case .running = workspaceStatus {
             return true
         }
@@ -432,14 +455,23 @@ extension EditorViewModel {
             previewStatus: workbench.previewStatus,
             sourceControlIsRunning: sourceControl.isRunning,
             sourceControlTitle: sourceControl.statusMessage
-        ) + EditorNotificationCenter.shared.activities.active.filter { $0.source == .agent }.map {
-            EditorActivityEvent(id: $0.id, kind: .agent, title: $0.title, detail: $0.detail,
-                fractionCompleted: $0.fractionCompleted.map { Float($0) })
-        }
+        )
+            + EditorNotificationCenter.shared.activities.active.filter { $0.source == .agent }
+            .map {
+                EditorActivityEvent(
+                    id: $0.id,
+                    kind: .agent,
+                    title: $0.title,
+                    detail: $0.detail,
+                    fractionCompleted: $0.fractionCompleted.map { Float($0) }
+                )
+            }
     }
 
     func runActiveSceneInEditor() {
-        guard !debugger.isActive else { return }
+        guard !debugger.isActive else {
+            return
+        }
         guard !playModeState.isPlaying else {
             return
         }
@@ -501,7 +533,10 @@ extension EditorViewModel {
     }
 
     func runTests(filter: String? = nil) {
-        executeWorkspaceCommand(.test(filter: filter ?? selectedTestFilter.nilIfEmpty), statusTitle: "Test")
+        executeWorkspaceCommand(
+            .test(filter: filter ?? (selectedTestFilter.isEmpty ? nil : selectedTestFilter)),
+            statusTitle: "Test"
+        )
     }
 
     func updateDependencies() {
@@ -587,9 +622,13 @@ extension EditorViewModel {
         case .refreshProjectFiles:
             refreshProjectFiles()
         case .revealProject:
-            if let projectURL { _ = EditorPlatformFileActions.reveal(projectURL) }
+            if let projectURL {
+                _ = EditorPlatformFileActions.reveal(projectURL)
+            }
         case .openProjectInTerminal:
-            if let projectURL { _ = EditorPlatformFileActions.openInTerminal(projectURL) }
+            if let projectURL {
+                _ = EditorPlatformFileActions.openInTerminal(projectURL)
+            }
         case .showProjectSettings:
             presentSettings(.project)
         case .showProjectDependencies:
@@ -614,6 +653,8 @@ extension EditorViewModel {
             cleanPackageCache()
         case .updateDependencies:
             updateDependencies()
+        case .showPreview:
+            showPreview()
         case .rebuildPreview:
             rebuildSelectedPreview()
         case .closeEditorTab:
@@ -630,16 +671,19 @@ extension EditorViewModel {
             return workbench.performDocumentHistory(redo: false)
         case .redo:
             return workbench.performDocumentHistory(redo: true)
-        case .closeEditor, .cut, .copy, .paste, .selectAll, .enterFullScreen,
-             .minimizeWindow, .zoomWindow, .bringAllToFront, .showDocumentation, .showSourceRepository:
+        case .closeEditor,
+            .cut,
+            .copy,
+            .paste,
+            .selectAll,
+            .enterFullScreen,
+            .minimizeWindow,
+            .zoomWindow,
+            .bringAllToFront,
+            .showDocumentation,
+            .showSourceRepository:
             return false
         }
         return true
-    }
-}
-
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
     }
 }

@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("EditorProjectStore")
 struct EditorProjectStoreTests {
@@ -95,7 +96,6 @@ struct EditorProjectStoreTests {
             #expect(error == .swiftPackageManifestMissing(path: "Package.swift"))
         }
     }
-
 
     @Test("open existing requires Ada metadata")
     func openRequiresAdaMetadata() throws {
@@ -566,7 +566,7 @@ struct EditorProjectStoreTests {
         for (url, requirement) in [
             ("https://example.com/lib.git", ""),
             ("https://example.com/lib.git", "from: latest"),
-            ("https://example.com/\nlib.git", #"branch: "main""#)
+            ("https://example.com/\nlib.git", #"branch: "main""#),
         ] {
             do {
                 _ = try store.addDependency(to: projectURL, url: url, requirement: requirement)
@@ -620,7 +620,8 @@ struct EditorProjectStoreTests {
             dependencies: [],
             targets: [.executableTarget(name: "Game", dependencies: [])]
         )
-        """.write(to: projectURL.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
+        """
+        .write(to: projectURL.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
         var project = try ProjectSystem.createDefaultProject(at: projectURL)
         project.paths.resourceRoots = ["Assets"]
         let store = EditorProjectStore(storageURL: rootURL.appendingPathComponent("projects.json"))
@@ -687,7 +688,8 @@ private func createSwiftPMManifest(at projectURL: URL) throws {
         dependencies: [],
         targets: [.executableTarget(name: "\(targetName)", dependencies: [])]
     )
-    """.write(
+    """
+    .write(
         to: projectURL.appendingPathComponent("Package.swift"),
         atomically: true,
         encoding: .utf8
@@ -706,5 +708,5 @@ private func runSwiftPackageDump(at projectURL: URL) throws -> (status: Int32, e
     try process.run()
     process.waitUntilExit()
     let errorData = standardError.fileHandleForReading.readDataToEndOfFile()
-    return (process.terminationStatus, String(data: errorData, encoding: .utf8) ?? "")
+    return (process.terminationStatus, String(bytes: errorData, encoding: .utf8) ?? "")
 }

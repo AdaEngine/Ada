@@ -20,6 +20,9 @@ enum EditorBuiltInComponentType {
     static let mesh3D = String(reflecting: Mesh3DComponent.self)
     static let physicsBody3D = String(reflecting: PhysicsBody3DComponent.self)
     static let directionalLight3D = String(reflecting: DirectionalLightComponent.self)
+    static let pointLight3D = String(reflecting: PointLightComponent.self)
+    static let spotLight3D = String(reflecting: SpotLightComponent.self)
+    static let tileMap = String(reflecting: TileMapComponent.self)
 }
 
 enum EditorComponentFieldKind: Equatable, Sendable {
@@ -48,7 +51,7 @@ extension EditorComponentFieldKind {
             self = .float
         case .string:
             self = .string
-        case .enumeration(let cases):
+        case let .enumeration(cases):
             self = .enumeration(cases)
         case .vector2:
             self = .vector2
@@ -86,9 +89,13 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
 
     func displayValue(in payload: EditorComponentPayload) -> String {
         let value = storedValue(in: payload) ?? defaultValue
-        if coding == .enumCase, case .object(let cases) = value { return cases.keys.sorted().first ?? "" }
-        if coding == .json { return value?.jsonString ?? "" }
-        if coding == .vectorObject, case .object(let axes) = value {
+        if coding == .enumCase, case let .object(cases) = value {
+            return cases.keys.min() ?? ""
+        }
+        if coding == .json {
+            return value?.jsonString ?? ""
+        }
+        if coding == .vectorObject, case let .object(axes) = value {
             let count = kind == .vector2 ? 2 : (kind == .vector3 ? 3 : 4)
             return ["x", "y", "z", "w"].prefix(count)
                 .map { axes[$0]?.stringValue ?? "0" }.joined(separator: ", ")
@@ -105,30 +112,46 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
     }
 
     func write(_ rawValue: String, to payload: inout EditorComponentPayload) {
-        guard isEditable else { return }
+        guard isEditable else {
+            return
+        }
         if let minimumValue {
-            guard let number = Double(rawValue), number.isFinite, number >= minimumValue else { return }
+            guard let number = Double(rawValue), number.isFinite, number >= minimumValue else {
+                return
+            }
         }
         var temporary: EditorComponentPayload = [:]
         writePlainValue(rawValue, to: &temporary)
-        guard var value = temporary[key] else { return }
+        guard var value = temporary[key] else {
+            return
+        }
         switch coding {
         case .standard: break
         case .enumCase: value = .object([value.stringValue: .object([:])])
         case .json:
-            guard let decoded = try? JSONDecoder().decode(EditorSceneValue.self, from: Data(rawValue.utf8)) else { return }
+            guard let decoded = try? JSONDecoder().decode(EditorSceneValue.self, from: Data(rawValue.utf8)) else {
+                return
+            }
             value = decoded
         case .unsignedInteger:
-            guard let number = UInt64(rawValue.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+            guard let number = UInt64(rawValue.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+                return
+            }
             value = .uint(number)
         case .vectorObject:
-            guard case .array(let axes) = value else { return }
+            guard case let .array(axes) = value else {
+                return
+            }
             value = .object(Dictionary(uniqueKeysWithValues: zip(["x", "y", "z", "w"], axes)))
         }
-        if valuePath.isEmpty { payload[key] = value } else {
+        if valuePath.isEmpty {
+            payload[key] = value
+        } else {
             var root = EditorSceneValue.object(payload)
             root.setValue(value, at: valuePath[...])
-            if case .object(let updated) = root { payload = updated }
+            if case let .object(updated) = root {
+                payload = updated
+            }
         }
     }
 
@@ -144,9 +167,11 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
             payload[key] = .int(Int(rawValue.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0)
         case .float:
             payload[key] = .double(Double(rawValue.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0)
-        case .string, .assetReference, .sceneReference:
+        case .string,
+            .assetReference,
+            .sceneReference:
             payload[key] = rawValue.isEmpty ? .null : .string(rawValue)
-        case .enumeration(let cases):
+        case let .enumeration(cases):
             payload[key] = .string(cases.contains(rawValue) ? rawValue : cases.first ?? rawValue)
         case .vector2:
             payload[key] = .array(Self.parseVector(rawValue, count: 2))
@@ -160,7 +185,7 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
                 "red": .double(values[0]),
                 "green": .double(values[1]),
                 "blue": .double(values[2]),
-                "alpha": .double(values[3])
+                "alpha": .double(values[3]),
             ])
         case .readOnly:
             break
@@ -168,7 +193,8 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
     }
 
     private static func parseVector(_ value: String, count: Int) -> [EditorSceneValue] {
-        var numbers = value
+        var numbers =
+            value
             .split { $0 == "," || $0 == " " || $0 == "\t" }
             .map { Double($0.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0 }
         if numbers.count < count {
@@ -192,7 +218,8 @@ struct EditorComponentDescriptor: @unchecked Sendable {
 enum EditorComponentRegistry {
     static var descriptors: [EditorComponentDescriptor] {
         let overrideNames = Set(overrideDescriptors.map(\.typeName))
-        let reflectedDescriptors = EditorComponentReflectionRegistry
+        let reflectedDescriptors =
+            EditorComponentReflectionRegistry
             .allDescriptors()
             .filter { !overrideNames.contains($0.typeName) }
             .map(editorDescriptor(from:))
@@ -212,6 +239,9 @@ enum EditorComponentRegistry {
         mesh3DDescriptor,
         physicsBody3DDescriptor,
         directionalLight3DDescriptor,
+        pointLight3DDescriptor,
+        spotLight3DDescriptor,
+        tileMapDescriptor,
         sceneInstanceDescriptor,
         uiComponentDescriptor,
         companionPanelDescriptor,
@@ -241,6 +271,9 @@ enum EditorComponentRegistry {
         RuntimeTypeRegistry.registerComponent(Mesh3DComponent.self, names: ["Mesh3DComponent"])
         RuntimeTypeRegistry.registerComponent(PhysicsBody3DComponent.self, names: ["PhysicsBody3DComponent"])
         RuntimeTypeRegistry.registerComponent(DirectionalLightComponent.self, names: ["DirectionalLightComponent"])
+        RuntimeTypeRegistry.registerComponent(PointLightComponent.self, names: ["PointLightComponent"])
+        RuntimeTypeRegistry.registerComponent(SpotLightComponent.self, names: ["SpotLightComponent"])
+        RuntimeTypeRegistry.registerComponent(TileMapComponent.self, names: ["TileMapComponent"])
 
         EditorComponentReflectionRegistry.register(Transform.editorComponentDescriptor)
         EditorComponentReflectionRegistry.register(GlobalTransform.editorComponentDescriptor)
@@ -276,8 +309,10 @@ enum EditorComponentRegistry {
             return try descriptor.decode(payload)
         }
 
-        guard let componentType = RuntimeTypeRegistry.componentType(named: typeName),
-              let decodableType = componentType as? Decodable.Type else {
+        guard
+            let componentType = RuntimeTypeRegistry.componentType(named: typeName),
+            let decodableType = componentType as? Decodable.Type
+        else {
             return nil
         }
         let value = try EditorComponentPayloadDecoder.decode(decodableType, payload: payload)
@@ -301,9 +336,11 @@ enum EditorComponentRegistry {
             },
             makeDefaultPayload: { [:] },
             decode: { payload in
-                guard let componentType = RuntimeTypeRegistry.componentType(named: descriptor.typeName),
-                      let decodableType = componentType as? Decodable.Type,
-                      let component = try EditorComponentPayloadDecoder.decode(decodableType, payload: payload) as? any Component else {
+                guard
+                    let componentType = RuntimeTypeRegistry.componentType(named: descriptor.typeName),
+                    let decodableType = componentType as? Decodable.Type,
+                    let component = try EditorComponentPayloadDecoder.decode(decodableType, payload: payload) as? any Component
+                else {
                     throw DecodingError.dataCorrupted(
                         DecodingError.Context(codingPath: [], debugDescription: "Cannot decode reflected component \(descriptor.typeName)")
                     )
@@ -314,8 +351,8 @@ enum EditorComponentRegistry {
     }
 }
 
-private extension EditorComponentRegistry {
-    static let transformDescriptor = EditorComponentDescriptor(
+extension EditorComponentRegistry {
+    private static let transformDescriptor = EditorComponentDescriptor(
         typeName: EditorBuiltInComponentType.transform,
         displayName: "Transform",
         category: "Core",
@@ -324,13 +361,13 @@ private extension EditorComponentRegistry {
         fields: [
             EditorComponentField(key: "position", label: "Position", kind: .vector3),
             EditorComponentField(key: "rotation", label: "Rotation", kind: .vector4),
-            EditorComponentField(key: "scale", label: "Scale", kind: .vector3)
+            EditorComponentField(key: "scale", label: "Scale", kind: .vector3),
         ],
         makeDefaultPayload: {
             [
                 "position": .array([.double(0), .double(0), .double(0)]),
                 "rotation": .array([.double(0), .double(0), .double(0), .double(1)]),
-                "scale": .array([.double(1), .double(1), .double(1)])
+                "scale": .array([.double(1), .double(1), .double(1)]),
             ]
         },
         decode: { payload in
@@ -338,31 +375,46 @@ private extension EditorComponentRegistry {
         }
     )
 
-    static let cameraDescriptor = EditorComponentDescriptor(
+    private static let cameraDescriptor = EditorComponentDescriptor(
         typeName: EditorBuiltInComponentType.camera,
         displayName: "Camera",
         category: "Rendering",
         description: "Renders the scene from this entity with configurable order and background.",
         requiredComponentTypeNames: [],
-        fields: [
-            EditorComponentField(key: "isActive", label: "Active", kind: .bool),
-            EditorComponentField(key: "renderOrder", label: "Render Order", kind: .int),
-            EditorComponentField(key: "backgroundColor", label: "Background", kind: .color)
-        ],
+        fields: {
+            var projection = EditorComponentField(
+                key: "projection",
+                label: "Projection",
+                kind: .enumeration(["orthographic", "perspective"])
+            )
+            projection.defaultValue = .string("orthographic")
+            return [
+                projection,
+                EditorComponentField(key: "isActive", label: "Active", kind: .bool),
+                EditorComponentField(key: "renderOrder", label: "Render Order", kind: .int),
+                EditorComponentField(key: "backgroundColor", label: "Background", kind: .color),
+            ]
+        }(),
         makeDefaultPayload: {
             [
+                "projection": .string("orthographic"),
                 "isActive": .bool(true),
                 "renderOrder": .int(0),
                 "backgroundColor": .object([
                     "red": .double(43.0 / 255.0),
                     "green": .double(44.0 / 255.0),
                     "blue": .double(47.0 / 255.0),
-                    "alpha": .double(1)
-                ])
+                    "alpha": .double(1),
+                ]),
             ]
         },
         decode: { payload in
             var camera = Camera()
+            if payload["projection"]?.stringValue == "perspective" {
+                camera.projection = .perspective(PerspectiveProjection())
+            } else {
+                camera.projection = .orthographic(OrthographicProjection())
+            }
             camera.isActive = payload["isActive"]?.boolValue ?? true
             camera.renderOrder = Int(payload["renderOrder"]?.doubleValue ?? 0)
             camera.backgroundColor = payload["backgroundColor"]?.colorValue ?? .surfaceClearColor
@@ -370,7 +422,7 @@ private extension EditorComponentRegistry {
         }
     )
 
-    static let spriteDescriptor = EditorComponentDescriptor(
+    private static let spriteDescriptor = EditorComponentDescriptor(
         typeName: EditorBuiltInComponentType.sprite,
         displayName: "Sprite",
         category: "2D",
@@ -381,7 +433,7 @@ private extension EditorComponentRegistry {
             EditorComponentField(key: "flipX", label: "Flip X", kind: .bool),
             EditorComponentField(key: "flipY", label: "Flip Y", kind: .bool),
             EditorComponentField(key: "texture", label: "Texture", kind: .assetReference),
-            EditorComponentField(key: "size", label: "Size", kind: .vector2)
+            EditorComponentField(key: "size", label: "Size", kind: .vector2),
         ],
         makeDefaultPayload: {
             [
@@ -389,7 +441,7 @@ private extension EditorComponentRegistry {
                 "tintColor": .object(["red": .double(1), "green": .double(1), "blue": .double(1), "alpha": .double(1)]),
                 "flipX": .bool(false),
                 "flipY": .bool(false),
-                "size": .null
+                "size": .null,
             ]
         },
         decode: { payload in
@@ -410,7 +462,7 @@ private extension EditorComponentRegistry {
         }
     )
 
-    static let visibilityDescriptor = EditorComponentDescriptor(
+    private static let visibilityDescriptor = EditorComponentDescriptor(
         typeName: EditorBuiltInComponentType.visibility,
         displayName: "Visibility",
         category: "Rendering",
@@ -434,7 +486,7 @@ private extension EditorComponentRegistry {
         }
     )
 
-    static let light2DDescriptor = EditorComponentDescriptor(
+    private static let light2DDescriptor = EditorComponentDescriptor(
         typeName: EditorBuiltInComponentType.light2D,
         displayName: "Light 2D",
         category: "2D",
@@ -448,7 +500,7 @@ private extension EditorComponentRegistry {
             EditorComponentField(key: "direction", label: "Direction", kind: .vector2),
             EditorComponentField(key: "radius", label: "Radius", kind: .float),
             EditorComponentField(key: "spotAngle", label: "Spot Angle", kind: .float),
-            EditorComponentField(key: "castsShadows", label: "Casts Shadows", kind: .bool)
+            EditorComponentField(key: "castsShadows", label: "Casts Shadows", kind: .bool),
         ],
         makeDefaultPayload: {
             [
@@ -460,7 +512,7 @@ private extension EditorComponentRegistry {
                 "radius": .double(400),
                 "spotAngle": .double(0),
                 "texture": .null,
-                "castsShadows": .bool(true)
+                "castsShadows": .bool(true),
             ]
         },
         decode: { payload in
@@ -478,7 +530,7 @@ private extension EditorComponentRegistry {
         }
     )
 
-    static let lightOccluder2DDescriptor = EditorComponentDescriptor(
+    private static let lightOccluder2DDescriptor = EditorComponentDescriptor(
         typeName: EditorBuiltInComponentType.lightOccluder2D,
         displayName: "Light Occluder 2D",
         category: "2D",
@@ -486,7 +538,7 @@ private extension EditorComponentRegistry {
         requiredComponentTypeNames: [EditorBuiltInComponentType.visibility],
         fields: [
             EditorComponentField(key: "isEnabled", label: "Enabled", kind: .bool),
-            EditorComponentField(key: "points", label: "Points", kind: .readOnly, isEditable: false)
+            EditorComponentField(key: "points", label: "Points", kind: .readOnly, isEditable: false),
         ],
         makeDefaultPayload: {
             ["points": .array([]), "isEnabled": .bool(true)]
@@ -496,7 +548,7 @@ private extension EditorComponentRegistry {
         }
     )
 
-    static let lightModulate2DDescriptor = EditorComponentDescriptor(
+    private static let lightModulate2DDescriptor = EditorComponentDescriptor(
         typeName: EditorBuiltInComponentType.lightModulate2D,
         displayName: "Light Modulate 2D",
         category: "2D",
@@ -513,9 +565,10 @@ private extension EditorComponentRegistry {
         }
     )
 
-    static let uiComponentDescriptor = EditorComponentDescriptor(
+    private static let uiComponentDescriptor = EditorComponentDescriptor(
         typeName: EditorBuiltInComponentType.uiComponent,
-        displayName: "UI Component", category: "UI",
+        displayName: "UI Component",
+        category: "UI",
         description: "Displays a UI scene, AdaScript View, or exported Swift View.",
         requiredComponentTypeNames: [EditorBuiltInComponentType.transform],
         fields: [
@@ -525,31 +578,37 @@ private extension EditorComponentRegistry {
             .init(key: "contextName", label: "Data context", kind: .string),
             .init(key: "inputs", label: "Inputs (JSON)", kind: .string),
             .init(key: "scriptBindings", label: "Script field bindings", kind: .string),
-            .init(key: "behaviour", label: "Behaviour", kind: .enumeration(["overlay", "default"]))
+            .init(key: "behaviour", label: "Behaviour", kind: .enumeration(["overlay", "default"])),
         ],
-        makeDefaultPayload: { ["kind": .string("ui"), "path": .string(""), "identifier": .string(""), "contextName": .string(""), "inputs": .string("{}"), "behaviour": .string("overlay")] },
+        makeDefaultPayload: {
+            ["kind": .string("ui"), "path": .string(""), "identifier": .string(""), "contextName": .string(""), "inputs": .string("{}"), "behaviour": .string("overlay")]
+        },
         decode: { payload in
             let inputsText = payload["inputs"]?.stringValue ?? "{}"
             let inputs = try JSONDecoder().decode([String: UIValue].self, from: Data(inputsText.utf8))
             let bindings = try JSONDecoder().decode([String: UIScriptFieldBinding].self, from: Data((payload["scriptBindings"]?.stringValue ?? "{}").utf8))
             let source = UIComponentSource(
                 kind: UIComponentSource.Kind(rawValue: payload["kind"]?.stringValue ?? "ui") ?? .ui,
-                path: payload["path"]?.stringValue ?? "", identifier: payload["identifier"]?.stringValue ?? "",
-                contextName: payload["contextName"]?.stringValue ?? "", inputs: inputs, scriptBindings: bindings
+                path: payload["path"]?.stringValue ?? "",
+                identifier: payload["identifier"]?.stringValue ?? "",
+                contextName: payload["contextName"]?.stringValue ?? "",
+                inputs: inputs,
+                scriptBindings: bindings
             )
             return UIComponent(source: source, behaviour: UIComponent.Behaviour(rawValue: payload["behaviour"]?.stringValue ?? "overlay") ?? .overlay)
         }
     )
 
-    static let companionPanelDescriptor = EditorComponentDescriptor(
+    private static let companionPanelDescriptor = EditorComponentDescriptor(
         typeName: EditorBuiltInComponentType.companionPanel,
-        displayName: "Companion Panel", category: "UI",
+        displayName: "Companion Panel",
+        category: "UI",
         description: "Displays a .ui scene in the secondary display region using this entity's script bindings.",
         requiredComponentTypeNames: [EditorBuiltInComponentType.transform],
         fields: [
             .init(key: "path", label: "UI file", kind: .string),
             .init(key: "inputs", label: "Inputs (JSON)", kind: .string),
-            .init(key: "scriptBindings", label: "Script field bindings", kind: .string)
+            .init(key: "scriptBindings", label: "Script field bindings", kind: .string),
         ],
         makeDefaultPayload: { ["path": .string(""), "inputs": .string("{}"), "scriptBindings": .string("{}")] },
         decode: { payload in
@@ -559,7 +618,7 @@ private extension EditorComponentRegistry {
         }
     )
 
-    static let sceneInstanceDescriptor = EditorComponentDescriptor(
+    private static let sceneInstanceDescriptor = EditorComponentDescriptor(
         typeName: EditorBuiltInComponentType.sceneInstance,
         displayName: "Scene Instance",
         category: "Scene",
@@ -592,7 +651,8 @@ enum EditorComponentPayloadDecoder {
         }
 
         switch (key, array.count) {
-        case ("position", 3), ("scale", 3):
+        case ("position", 3),
+            ("scale", 3):
             return ["x": array[0], "y": array[1], "z": array[2]]
         case ("rotation", 4):
             return ["x": array[0], "y": array[1], "z": array[2], "w": array[3]]
@@ -625,16 +685,16 @@ private struct DynamicDecodableValue: Decodable {
     }
 }
 
-private extension EditorSceneValue {
+extension EditorSceneValue {
     var colorComponents: [Double]? {
-        guard case .object(let object) = self else {
+        guard case let .object(object) = self else {
             return nil
         }
         return [
             object["red"]?.doubleValue ?? 0,
             object["green"]?.doubleValue ?? 0,
             object["blue"]?.doubleValue ?? 0,
-            object["alpha"]?.doubleValue ?? 1
+            object["alpha"]?.doubleValue ?? 1,
         ]
     }
 
@@ -651,7 +711,7 @@ private extension EditorSceneValue {
     }
 
     var vector2Value: Vector2? {
-        guard case .array(let values) = self, values.count >= 2 else {
+        guard case let .array(values) = self, values.count >= 2 else {
             return nil
         }
         return Vector2(Float(values[0].doubleValue ?? 0), Float(values[1].doubleValue ?? 0))

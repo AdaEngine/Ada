@@ -1,12 +1,17 @@
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 
+enum EditorSceneHierarchyPresentation {
+    case workspacePanel
+    case embedded
+}
+
 struct EditorSceneHierarchySidebar: View {
     let document: EditorSceneDocument?
+    let presentation: EditorSceneHierarchyPresentation
     let onSelectEntity: (String) -> Void
     let onToggleEntityExpanded: (String) -> Void
     let onAddEntity: (String?) -> Void
-    let onAddScenePrefab: (String?) -> Void
     let onSetEntityEnabled: (String, Bool) -> Void
     let onRenameEntity: (String, String) -> Void
     let onDeleteEntity: (String) -> Void
@@ -25,10 +30,10 @@ struct EditorSceneHierarchySidebar: View {
 
     init(
         document: EditorSceneDocument?,
+        presentation: EditorSceneHierarchyPresentation = .workspacePanel,
         onSelectEntity: @escaping (String) -> Void,
         onToggleEntityExpanded: @escaping (String) -> Void,
         onAddEntity: @escaping (String?) -> Void = { _ in },
-        onAddScenePrefab: @escaping (String?) -> Void = { _ in },
         onSetEntityEnabled: @escaping (String, Bool) -> Void = { _, _ in },
         onRenameEntity: @escaping (String, String) -> Void = { _, _ in },
         onDeleteEntity: @escaping (String) -> Void = { _ in },
@@ -38,10 +43,10 @@ struct EditorSceneHierarchySidebar: View {
         onReparentEntity: @escaping (String, String) -> Void = { _, _ in }
     ) {
         self.document = document
+        self.presentation = presentation
         self.onSelectEntity = onSelectEntity
         self.onToggleEntityExpanded = onToggleEntityExpanded
         self.onAddEntity = onAddEntity
-        self.onAddScenePrefab = onAddScenePrefab
         self.onSetEntityEnabled = onSetEntityEnabled
         self.onRenameEntity = onRenameEntity
         self.onDeleteEntity = onDeleteEntity
@@ -53,7 +58,7 @@ struct EditorSceneHierarchySidebar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            adaEditorPanelTitle("HIERARCHY", trailing: trailingTitle, theme: theme)
+            hierarchyHeader
 
             if let document, let sceneModel = document.sceneModel {
                 let items = EditorSceneHierarchyModel.visibleItems(for: sceneModel)
@@ -77,13 +82,55 @@ struct EditorSceneHierarchySidebar: View {
                 emptyState
             }
         }
-        .background(
-            RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
-                .fill(theme.editorColors.surfaceElevated)
-        )
-        .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+        .background(panelBackground)
+        .mask(panelMask)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityIdentifier("AdaEditor.SceneHierarchy")
+    }
+
+    @ViewBuilder
+    private var hierarchyHeader: some View {
+        switch presentation {
+        case .workspacePanel:
+            adaEditorPanelTitle("HIERARCHY", trailing: trailingTitle, theme: theme)
+        case .embedded:
+            HStack(spacing: 8) {
+                Text("Hierarchy")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(theme.editorColors.text)
+                    .padding(.horizontal, 8)
+                    .frame(height: 30)
+                    .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.16)))
+                Spacer()
+                Text(trailingTitle)
+                    .font(.system(size: 10))
+                    .foregroundColor(theme.editorColors.muted)
+                    .lineLimit(1)
+                Button(action: { onAddEntity(defaultParentID) }) {
+                    Text("+")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(theme.editorColors.blue)
+                        .frame(width: 28, height: 28)
+                        .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.14)))
+                }
+                .buttonStyle(DefaultButtonStyle())
+                .accessibilityIdentifier("AdaEditor.SceneHierarchy.AddEntity")
+            }
+            .frame(height: 32)
+            .padding(10)
+            RectangleShape()
+                .fill(theme.editorColors.border.opacity(0.45))
+                .frame(height: 1)
+        }
+    }
+
+    private var panelBackground: some View {
+        RoundedRectangleShape(cornerRadius: presentation == .embedded ? 0 : metrics.panelsRoundedCorner)
+            .fill(presentation == .embedded ? theme.editorColors.surface : theme.editorColors.surfaceElevated)
+    }
+
+    private var panelMask: RoundedRectangleShape {
+        RoundedRectangleShape(cornerRadius: presentation == .embedded ? 0 : metrics.panelsRoundedCorner)
     }
 
     private var trailingTitle: String {
@@ -92,6 +139,10 @@ struct EditorSceneHierarchySidebar: View {
         }
 
         return "\(sceneModel.entities.count) entities"
+    }
+
+    private var defaultParentID: String? {
+        document?.sceneModel?.editor?.selectedEntity ?? document?.sceneModel?.rootEntityID
     }
 
     private var emptyState: some View {
@@ -119,13 +170,8 @@ struct EditorSceneHierarchySidebar: View {
         Color.clear
             .frame(width: size.width, height: size.height)
             .contextMenu {
-                ContextMenuSubmenu("Add") {
-                    Button("Entity") {
-                        onAddEntity(sceneModel.rootEntityID)
-                    }
-                    Button("Scene Prefab") {
-                        onAddScenePrefab(sceneModel.rootEntityID)
-                    }
+                Button("Add") {
+                    onAddEntity(sceneModel.rootEntityID)
                 }
                 Button("Paste") {
                     onPasteEntity(sceneModel.rootEntityID)
@@ -231,11 +277,8 @@ struct EditorSceneHierarchySidebar: View {
                 .accessibilityIdentifier("AdaEditor.SceneHierarchy.Separator.\(item.id)")
         }
         .contextMenu(onPresent: { onSelectEntity(item.id) }) {
-            Button("Add Child Entity") {
+            Button("Add Child") {
                 onAddEntity(item.id)
-            }
-            Button("Add Child Scene Prefab") {
-                onAddScenePrefab(item.id)
             }
             Divider()
             Button(item.isEnabled ? "Hide" : "Show") {
@@ -274,15 +317,16 @@ struct EditorSceneHierarchySidebar: View {
     }
 
     private func rowBackground(item: EditorSceneHierarchyItem, isHovered: Bool, isDropTarget: Bool) -> some View {
-        let color = if isDropTarget {
-            theme.editorColors.blue.opacity(0.38)
-        } else if item.isSelected {
-            theme.editorColors.blue.opacity(0.24)
-        } else if isHovered {
-            theme.editorColors.surface
-        } else {
-            Color.clear
-        }
+        let color =
+            if isDropTarget {
+                theme.editorColors.blue.opacity(0.38)
+            } else if item.isSelected {
+                theme.editorColors.blue.opacity(0.24)
+            } else if isHovered {
+                theme.editorColors.surface
+            } else {
+                Color.clear
+            }
         let state = isDropTarget ? "dropTarget" : (item.isSelected ? "selected" : (isHovered ? "hovered" : "normal"))
         return RoundedRectangleShape(cornerRadius: 5)
             .fill(color)
@@ -355,13 +399,15 @@ struct EditorSceneHierarchySidebar: View {
                     draggedEntityID = nil
                     dropTargetEntityID = nil
                 }
-                guard draggedEntityID == item.id,
-                      let targetID = dragTargetEntityID(
-                          for: item,
-                          translationY: value.translation.height,
-                          items: items,
-                          sceneModel: sceneModel
-                      ) else {
+                guard
+                    draggedEntityID == item.id,
+                    let targetID = dragTargetEntityID(
+                        for: item,
+                        translationY: value.translation.height,
+                        items: items,
+                        sceneModel: sceneModel
+                    )
+                else {
                     return
                 }
                 onReparentEntity(item.id, targetID)

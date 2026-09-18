@@ -1,4 +1,3 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 @_spi(Internal) import AdaUI
@@ -8,6 +7,8 @@ import Math
 import Observation
 import Synchronization
 import Testing
+
+@testable import AdaEditor
 
 @Suite("AdaEngineStyle UI mock")
 struct AdaEngineStyleUITests {
@@ -239,6 +240,7 @@ struct AdaEngineStyleUITests {
                 onCopyDocumentPath: nil,
                 onSelectPreview: nil,
                 onRebuildPreview: nil,
+                onHidePreview: nil,
                 onShowPreviewBuildOutput: nil
             )
         )
@@ -255,12 +257,81 @@ struct AdaEngineStyleUITests {
         #expect(workbench.openDocuments.isEmpty)
     }
 
+    @Test("preview panel exposes a close button")
+    @MainActor
+    func previewPanelExposesCloseButton() throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            let app = AppWorlds(main: World(name: "AdaEditorPreviewPanelTests"))
+            RenderWorldPlugin().setup(in: app)
+        }
+
+        let source = "@previewable @view class HUDView { func body() { Text(\"Preview\"); } }"
+        let document = EditorTextDocument(
+            id: "text:Sources/HUD.ada",
+            title: "HUD.ada",
+            relativePath: "Sources/HUD.ada",
+            language: .ada,
+            content: source
+        )
+        let declaration = EditorPreviewDeclaration(
+            id: "HUDView",
+            title: "HUD Preview",
+            typeName: "HUDView",
+            line: 1,
+            kind: .adaScript
+        )
+        let workbench = EditorWorkbenchViewModel(
+            openDocuments: [.text(document)],
+            activeDocumentID: document.id,
+            previewStatus: .available([declaration])
+        )
+        var hideCount = 0
+        let container = UIContainerView(
+            rootView: EditorCenterWorkbench(
+                viewModel: workbench,
+                inspectorViewModel: EditorInspectorSidebarViewModel(),
+                playModeState: .editing,
+                scenePlayRuntime: nil,
+                sceneResourceRootURL: nil,
+                onPlayScene: nil,
+                onStopScene: nil,
+                onSceneEntitySelected: nil,
+                onSourceHover: nil,
+                onGoToDefinition: nil,
+                onCompletionPosition: nil,
+                onCompletionRequest: nil,
+                onApplyCompletion: nil,
+                onMoveCompletionSelection: nil,
+                onAcceptCompletion: nil,
+                onTextSelection: nil,
+                onChatSelection: nil,
+                sourceContextMenuItems: nil,
+                onSelectDocument: nil,
+                onRevealDocument: nil,
+                onCopyDocumentPath: nil,
+                onSelectPreview: nil,
+                onRebuildPreview: nil,
+                onHidePreview: { hideCount += 1 },
+                onShowPreviewBuildOutput: nil
+            )
+        )
+        container.frame = Rect(x: 0, y: 0, width: 900, height: 600)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.PreviewPanel.Close"))
+
+        #expect(hideCount == 1)
+    }
+
     @Test("project search results use the editor viewport instead of the toolbar frame")
     func projectSearchResultsEscapeToolbarFrame() {
         let toolbarHeight = AdaEngineStyleLayoutSpec.topToolbarHeight
         let popupTop = EditorProjectSearchResultsLayout.topOffset(toolbarHeight: toolbarHeight)
         let popupHeight = EditorProjectSearchResultsLayout.height(itemCount: 3)
-        let expectedPopupHeight = EditorProjectSearchResultsLayout.rowHeight * 3
+        let expectedPopupHeight =
+            EditorProjectSearchResultsLayout.rowHeight * 3
             + EditorProjectSearchResultsLayout.rowSpacing * 2
             + EditorProjectSearchResultsLayout.padding * 2
 
@@ -349,11 +420,13 @@ struct AdaEngineStyleUITests {
             RenderWorldPlugin().setup(in: app)
         }
         let size = Size(width: 260, height: 700)
-        let container = UIContainerView(rootView: EditorSceneHierarchySidebar(
-            document: nil,
-            onSelectEntity: { _ in },
-            onToggleEntityExpanded: { _ in }
-        ))
+        let container = UIContainerView(
+            rootView: EditorSceneHierarchySidebar(
+                document: nil,
+                onSelectEntity: { _ in },
+                onToggleEntityExpanded: { _ in }
+            )
+        )
         container.frame = Rect(origin: .zero, size: size)
         container.bounds.size = size
         container.layoutIfNeeded()
@@ -400,15 +473,17 @@ struct AdaEngineStyleUITests {
         var contextMenu: ContextMenuPresentation?
         ContextMenuPresentationCenter.present = { contextMenu = $0 }
         defer { ContextMenuPresentationCenter.present = nil }
-        let container = UIContainerView(rootView: EditorSceneHierarchySidebar(
-            document: document,
-            onSelectEntity: { selectedEntityID = $0 },
-            onToggleEntityExpanded: { _ in },
-            onAddEntity: { addedChildParentID = $0 },
-            onReparentEntity: { entityID, parentID in
-                reparentedEntityIDs = (entityID, parentID)
-            }
-        ))
+        let container = UIContainerView(
+            rootView: EditorSceneHierarchySidebar(
+                document: document,
+                onSelectEntity: { selectedEntityID = $0 },
+                onToggleEntityExpanded: { _ in },
+                onAddEntity: { addedChildParentID = $0 },
+                onReparentEntity: { entityID, parentID in
+                    reparentedEntityIDs = (entityID, parentID)
+                }
+            )
+        )
         container.frame = Rect(x: 0, y: 0, width: 320, height: 300)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
@@ -449,17 +524,18 @@ struct AdaEngineStyleUITests {
         )
         container.onMouseEvent(MouseEvent(window: RID(), button: .right, mousePosition: selectedPoint, phase: .began, modifierKeys: [], time: 0.02))
         let menuItems = contextMenu?.items.filter { !$0.isSeparator } ?? []
-        #expect(menuItems.map(\.title) == [
-            "Add Child Entity",
-            "Add Child Scene Prefab",
-            "Hide",
-            "Rename",
-            "Duplicate",
-            "Copy",
-            "Paste as Child",
-            "Delete"
-        ])
-        menuItems.first(where: { $0.title == "Add Child Entity" })?.action?()
+        #expect(
+            menuItems.map(\.title) == [
+                "Add Child",
+                "Hide",
+                "Rename",
+                "Duplicate",
+                "Copy",
+                "Paste as Child",
+                "Delete",
+            ]
+        )
+        menuItems.first(where: { $0.title == "Add Child" })?.action?()
         #expect(addedChildParentID == selectedEntity.id)
 
         let rootPoint = container.convert(
@@ -484,7 +560,9 @@ struct AdaEngineStyleUITests {
             )
         )
         #expect(contextMenu?.items.filter { !$0.isSeparator }.map(\.title) == ["Add", "Paste"])
-        #expect(contextMenu?.items.first?.submenu.map(\.title) == ["Entity", "Scene Prefab"])
+        #expect(contextMenu?.items.first?.submenu.isEmpty == true)
+        contextMenu?.items.first(where: { $0.title == "Add" })?.action?()
+        #expect(addedChildParentID == rootID)
 
         menuItems.first(where: { $0.title == "Rename" })?.action?()
         container.layoutIfNeeded()
@@ -754,7 +832,8 @@ struct AdaEngineStyleUITests {
 
     @Test("sidebar tools use renderable compact glyphs")
     func sidebarToolsUseRenderableCompactGlyphs() {
-        let allIcons = AdaEngineStyleContent.leftTopSidebarTools
+        let allIcons =
+            AdaEngineStyleContent.leftTopSidebarTools
             + AdaEngineStyleContent.leftBottomSidebarTools
             + AdaEngineStyleContent.rightSidebarTools
         let iconCodepoints = allIcons.compactMap { $0.icon.unicodeScalars.first?.value }
@@ -900,7 +979,7 @@ struct AdaEngineStyleUITests {
 
         viewModel.replaceBuildDiagnostics(with: [diagnostic])
 
-        guard case .text(let updatedDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(updatedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected active text document")
             return
         }
@@ -987,11 +1066,13 @@ struct AdaEngineStyleUITests {
         let urls = EditorHotReloadConfiguration.watchedDirectoryURLs(forProjectAt: rootURL, metadata: metadata)
             .map(\.path)
 
-        #expect(urls == [
-            sourcesURL.resolvingSymlinksInPath().path,
-            assetsURL.resolvingSymlinksInPath().path,
-            metadataURL.resolvingSymlinksInPath().path
-        ])
+        #expect(
+            urls == [
+                sourcesURL.resolvingSymlinksInPath().path,
+                assetsURL.resolvingSymlinksInPath().path,
+                metadataURL.resolvingSymlinksInPath().path,
+            ]
+        )
     }
 
     @Test("hot reload watch paths deduplicate matching source and asset directories")
@@ -1011,10 +1092,12 @@ struct AdaEngineStyleUITests {
         let urls = EditorHotReloadConfiguration.watchedDirectoryURLs(forProjectAt: rootURL, metadata: metadata)
             .map(\.path)
 
-        #expect(urls == [
-            sharedURL.resolvingSymlinksInPath().path,
-            metadataURL.resolvingSymlinksInPath().path
-        ])
+        #expect(
+            urls == [
+                sharedURL.resolvingSymlinksInPath().path,
+                metadataURL.resolvingSymlinksInPath().path,
+            ]
+        )
     }
 
     @Test("editor theme exposes AdaUI theme tokens")
@@ -1236,7 +1319,7 @@ struct AdaEngineStyleUITests {
 
         let yAxis = viewModel.componentVectorAxisBinding(typeName: EditorBuiltInComponentType.transform, field: positionField, axisIndex: 1)
         yAxis.wrappedValue = ""
-        #expect(yAxis.wrappedValue == "")
+        #expect(yAxis.wrappedValue.isEmpty)
         #expect(appliedValues.isEmpty)
         #expect(viewModel.componentVectorAxisBinding(typeName: EditorBuiltInComponentType.transform, field: positionField, axisIndex: 0).wrappedValue == "1")
         #expect(viewModel.componentVectorAxisBinding(typeName: EditorBuiltInComponentType.transform, field: positionField, axisIndex: 2).wrappedValue == "3")
@@ -1250,6 +1333,7 @@ struct AdaEngineStyleUITests {
     @MainActor
     func sidebarToolstripTogglesVisiblePanelsByRegion() {
         let viewModel = EditorViewModel()
+        #expect(!viewModel.toolStrip.leftTopTools.contains { $0.identifier == "entityTree" })
         let fileTree = AdaEngineStyleContent.leftTopSidebarTools[0]
         let build = AdaEngineStyleContent.leftBottomSidebarTools[1]
         let inspector = AdaEngineStyleContent.rightSidebarTools[1]
@@ -1434,8 +1518,8 @@ struct AdaEngineStyleUITests {
 
         workbench.closeDocument(id: activeDocumentID)
         #expect(workbench.openDocuments.isEmpty)
-        #expect(workbench.activeDocumentID == "")
-        #expect(workbench.activeEditorTab == "")
+        #expect(workbench.activeDocumentID.isEmpty)
+        #expect(workbench.activeEditorTab.isEmpty)
     }
 
     @Test("workbench navigates backward and forward through visited documents")
@@ -1551,11 +1635,12 @@ struct AdaEngineStyleUITests {
         try "{}\n".write(to: rootURL.appendingPathComponent("Package.resolved"), atomically: true, encoding: .utf8)
         try "{}\n".write(to: metadataURL.appendingPathComponent(ProjectSystem.metadataFileName), atomically: true, encoding: .utf8)
         try "import AdaEngine\n\nstruct GameScene {}\n".write(to: sourcesURL.appendingPathComponent("main.swift"), atomically: true, encoding: .utf8)
-        try "format: ada.scene\nschemaVersion: 1\nscene:\n  id: main\n  name: Main\nentities: []\n".write(
-            to: scenesURL.appendingPathComponent("Main.ascn"),
-            atomically: true,
-            encoding: .utf8
-        )
+        try "format: ada.scene\nschemaVersion: 1\nscene:\n  id: main\n  name: Main\nentities: []\n"
+            .write(
+                to: scenesURL.appendingPathComponent("Main.ascn"),
+                atomically: true,
+                encoding: .utf8
+            )
 
         let project = EditorProjectReference(name: "EditorProjectDocuments", path: rootURL.path)
         let viewModel = EditorViewModel(project: project)
@@ -1567,7 +1652,7 @@ struct AdaEngineStyleUITests {
         let swiftItem = try #require(viewModel.projectSidebar.items.first { $0.relativePath == "Sources/Game/main.swift" })
         viewModel.openProjectItem(swiftItem)
 
-        guard case .text(let textDocument) = viewModel.workbench.activeDocument else {
+        guard case let .text(textDocument) = viewModel.workbench.activeDocument else {
             Issue.record("Expected a text document")
             return
         }
@@ -1578,7 +1663,7 @@ struct AdaEngineStyleUITests {
         let sceneItem = try #require(viewModel.projectSidebar.items.first { $0.relativePath == "Assets/Scenes/Main.ascn" })
         viewModel.openProjectItem(sceneItem)
 
-        guard case .scene(let sceneDocument) = viewModel.workbench.activeDocument else {
+        guard case let .scene(sceneDocument) = viewModel.workbench.activeDocument else {
             Issue.record("Expected a scene document")
             return
         }
@@ -1587,7 +1672,7 @@ struct AdaEngineStyleUITests {
         #expect(sceneDocument.isDirty == false)
         #expect(sceneDocument.loadSummary.entityCount == 0)
         viewModel.workbench.updateSceneLine(documentID: sceneDocument.id, lineIndex: 1, value: "schemaVersion: 2")
-        guard case .scene(let editedSceneDocument) = viewModel.workbench.activeDocument else {
+        guard case let .scene(editedSceneDocument) = viewModel.workbench.activeDocument else {
             Issue.record("Expected an edited scene document")
             return
         }
@@ -1599,7 +1684,7 @@ struct AdaEngineStyleUITests {
         #expect(viewModel.toolbar.sceneName == "Main")
 
         viewModel.openProjectItemAsRaw(sceneItem)
-        guard case .text(let rawDocument) = viewModel.workbench.activeDocument else {
+        guard case let .text(rawDocument) = viewModel.workbench.activeDocument else {
             Issue.record("Expected a raw text document")
             return
         }
@@ -1640,7 +1725,7 @@ struct AdaEngineStyleUITests {
         viewModel.saveActiveDocument()
 
         #expect(try String(contentsOf: mainURL, encoding: .utf8) == "let value = 42\n")
-        guard case .text(let savedMainDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(savedMainDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected the saved text document to remain active")
             return
         }
@@ -1654,7 +1739,7 @@ struct AdaEngineStyleUITests {
         viewModel.openProjectItem(otherItem)
 
         #expect(try String(contentsOf: mainURL, encoding: .utf8) == "let value = 99\n")
-        guard case .text(let otherDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(otherDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected tab switch to activate the other text document")
             return
         }
@@ -1736,22 +1821,26 @@ struct AdaEngineStyleUITests {
         let viewModel = EditorViewModel(project: EditorProjectReference(name: "EditorProjectSidebarTargets", path: rootURL.path))
 
         #expect(viewModel.projectSidebar.displayMode == .targets)
-        #expect(viewModel.projectSidebar.visibleItems.map(\.relativePath) == [
-            "Assets",
-            "Assets/Scenes",
-            "Assets/Scenes/Main.ascn",
-            "Sources/Game",
-            "Sources/Game/main.swift",
-            "Sources/Tools",
-            "Sources/Tools/tool.swift",
-        ])
+        #expect(
+            viewModel.projectSidebar.visibleItems.map(\.relativePath) == [
+                "Assets",
+                "Assets/Scenes",
+                "Assets/Scenes/Main.ascn",
+                "Sources/Game",
+                "Sources/Game/main.swift",
+                "Sources/Tools",
+                "Sources/Tools/tool.swift",
+            ]
+        )
 
         viewModel.projectSidebar.collapseAll()
-        #expect(viewModel.projectSidebar.visibleItems.map(\.relativePath) == [
-            "Assets",
-            "Sources/Game",
-            "Sources/Tools",
-        ])
+        #expect(
+            viewModel.projectSidebar.visibleItems.map(\.relativePath) == [
+                "Assets",
+                "Sources/Game",
+                "Sources/Tools",
+            ]
+        )
 
         viewModel.projectSidebar.expandAll()
         #expect(viewModel.projectSidebar.visibleItems.contains { $0.relativePath == "Sources/Game/main.swift" })
@@ -1770,11 +1859,12 @@ struct AdaEngineStyleUITests {
 
         let sourcesURL = rootURL.appendingPathComponent("Sources", isDirectory: true)
         try FileManager.default.createDirectory(at: sourcesURL, withIntermediateDirectories: true)
-        try "@view(id: \"game.main\") class MainView {}\n".write(
-            to: sourcesURL.appendingPathComponent("Main.ada", isDirectory: false),
-            atomically: true,
-            encoding: .utf8
-        )
+        try "@view(id: \"game.main\") class MainView {}\n"
+            .write(
+                to: sourcesURL.appendingPathComponent("Main.ada", isDirectory: false),
+                atomically: true,
+                encoding: .utf8
+            )
         _ = try ProjectSystem.createDefaultProject(at: rootURL, buildSystem: .adaScript)
 
         let viewModel = EditorViewModel(
@@ -1782,10 +1872,12 @@ struct AdaEngineStyleUITests {
         )
 
         #expect(viewModel.projectSidebar.displayMode == .targets)
-        #expect(viewModel.projectSidebar.visibleItems.map(\.relativePath) == [
-            "Sources",
-            "Sources/Main.ada",
-        ])
+        #expect(
+            viewModel.projectSidebar.visibleItems.map(\.relativePath) == [
+                "Sources",
+                "Sources/Main.ada",
+            ]
+        )
         #expect(viewModel.projectSidebar.visibleItems.first?.title == "EditorProjectSidebarAdaScript")
 
         viewModel.projectSidebar.collapseAll()
@@ -1836,10 +1928,12 @@ struct AdaEngineStyleUITests {
 
         let viewModel = EditorViewModel(project: EditorProjectReference(name: "EditorProjectSearch", path: rootURL.path))
         viewModel.toolbar.searchText = "main"
-        #expect(viewModel.toolbar.searchResults.map(\.relativePath) == [
-            "Sources/Game/main.swift",
-            "Sources/Tools/main-tool.swift",
-        ])
+        #expect(
+            viewModel.toolbar.searchResults.map(\.relativePath) == [
+                "Sources/Game/main.swift",
+                "Sources/Tools/main-tool.swift",
+            ]
+        )
         #expect(!viewModel.toolbar.searchResults.contains { $0.relativePath.hasPrefix(".ada") })
 
         let gameFolder = try #require(viewModel.projectSidebar.items.first { $0.relativePath == "Sources/Game" })
@@ -1862,11 +1956,12 @@ struct AdaEngineStyleUITests {
 
         let sourcesURL = rootURL.appendingPathComponent("Sources/Game", isDirectory: true)
         try FileManager.default.createDirectory(at: sourcesURL, withIntermediateDirectories: true)
-        try "// swift-tools-version: 6.2\n".write(
-            to: rootURL.appendingPathComponent("Package.swift"),
-            atomically: true,
-            encoding: .utf8
-        )
+        try "// swift-tools-version: 6.2\n"
+            .write(
+                to: rootURL.appendingPathComponent("Package.swift"),
+                atomically: true,
+                encoding: .utf8
+            )
 
         let viewModel = EditorViewModel(
             project: EditorProjectReference(name: "EditorNewFile", path: rootURL.path)
@@ -1901,15 +1996,17 @@ struct AdaEngineStyleUITests {
         let scene = try String(contentsOf: sourcesURL.appendingPathComponent("Level.ascn"), encoding: .utf8)
         #expect(scene.contains("format: ada.scene"))
         let adaSource = try String(contentsOf: sourcesURL.appendingPathComponent("Movement.ada"), encoding: .utf8)
-        #expect(adaSource == """
-        // Movement.ada
+        #expect(
+            adaSource == """
+                // Movement.ada
 
-        @system(scheduler: "update")
-        class MovementSystem {
-            func update(context: AdaSystemContext) {
-            }
-        }
-        """)
+                @system(scheduler: "update")
+                class MovementSystem {
+                    func update(context: AdaSystemContext) {
+                    }
+                }
+                """
+        )
         let gravityPlugin = try AdaScriptPlugin(source: adaSource)
         #expect(gravityPlugin.name == "AdaScript")
         #expect(try String(contentsOf: sourcesURL.appendingPathComponent("Player.swift"), encoding: .utf8) == "import AdaEngine\n\n")
@@ -2086,12 +2183,12 @@ struct AdaEngineStyleUITests {
 
 @MainActor
 private final class EditorWindowTestWindowManager: UIWindowManager {
-    override func showWindow(_ window: UIWindow, isFocused: Bool) {}
-    override func closeWindow(_ window: UIWindow) {}
-    override func setWindowMode(_ window: UIWindow, mode: UIWindow.Mode) {}
-    override func setMinimumSize(_ size: Size, for window: UIWindow) {}
-    override func resizeWindow(_ window: UIWindow, size: Size) {}
-    override func getScreen(for window: UIWindow) -> Screen? { nil }
+    override func showWindow(_: UIWindow, isFocused _: Bool) {}
+    override func closeWindow(_: UIWindow) {}
+    override func setWindowMode(_: UIWindow, mode _: UIWindow.Mode) {}
+    override func setMinimumSize(_: Size, for _: UIWindow) {}
+    override func resizeWindow(_: UIWindow, size _: Size) {}
+    override func getScreen(for _: UIWindow) -> Screen? { nil }
 }
 
 private func makeAdaEngineStyleUITemporaryDirectory(named name: String) throws -> URL {
@@ -2109,10 +2206,11 @@ private func createPlayableProject(at rootURL: URL, sceneName: String) throws {
     let scenesURL = rootURL.appendingPathComponent("Assets/Scenes", isDirectory: true)
     try FileManager.default.createDirectory(at: scenesURL, withIntermediateDirectories: true)
     try "// swift-tools-version: 6.2\n".write(to: rootURL.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-    try SceneDocumentFormat.defaultSceneYAML(projectName: sceneName).write(
-        to: rootURL.appendingPathComponent(SceneDocumentFormat.defaultScenePath, isDirectory: false),
-        atomically: true,
-        encoding: .utf8
-    )
+    try SceneDocumentFormat.defaultSceneYAML(projectName: sceneName)
+        .write(
+            to: rootURL.appendingPathComponent(SceneDocumentFormat.defaultScenePath, isDirectory: false),
+            atomically: true,
+            encoding: .utf8
+        )
     _ = try ProjectSystem.createDefaultProject(at: rootURL)
 }

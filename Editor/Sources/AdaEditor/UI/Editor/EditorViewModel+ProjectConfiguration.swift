@@ -108,8 +108,10 @@ extension EditorViewModel {
 
     var newFilePreviewPath: String {
         let name = newFileName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return "" }
-        let fileName = (name as NSString).pathExtension.isEmpty ? "\(name).\(newFileKind.fileExtension)" : name
+        guard !name.isEmpty else {
+            return ""
+        }
+        let fileName = URL(fileURLWithPath: name).pathExtension.isEmpty ? "\(name).\(newFileKind.fileExtension)" : name
         return newFileDestinationRelativePath.isEmpty ? fileName : "\(newFileDestinationRelativePath)/\(fileName)"
     }
 
@@ -120,13 +122,16 @@ extension EditorViewModel {
         }
 
         isNewFileKindPreselected = kind != nil
-        if let kind { newFileKind = kind }
+        if let kind {
+            newFileKind = kind
+        }
 
         let selectedItem = projectSidebar.selectedItem
         if let selectedItem {
-            newFileDestinationRelativePath = selectedItem.isFolder
+            newFileDestinationRelativePath =
+                selectedItem.isFolder
                 ? selectedItem.relativePath
-                : (selectedItem.relativePath as NSString).deletingLastPathComponent
+                : URL(fileURLWithPath: selectedItem.relativePath).deletingLastPathComponent().relativePath
             if newFileDestinationRelativePath == "." {
                 newFileDestinationRelativePath = ""
             }
@@ -161,8 +166,9 @@ extension EditorViewModel {
 
         let standardizedProjectURL = projectURL.standardizedFileURL
         let standardizedItemURL = itemURL.standardizedFileURL
-        guard standardizedItemURL.path != standardizedProjectURL.path,
-              standardizedItemURL.path.hasPrefix("\(standardizedProjectURL.path)/")
+        guard
+            standardizedItemURL.path != standardizedProjectURL.path,
+            standardizedItemURL.path.hasPrefix("\(standardizedProjectURL.path)/")
         else {
             appendOutput("Delete failed: the item is outside the project.")
             return false
@@ -193,8 +199,9 @@ extension EditorViewModel {
             newFileErrorMessage = "Enter a file name."
             return false
         }
-        guard trimmedName != ".", trimmedName != "..",
-              !trimmedName.contains("/"), !trimmedName.contains("\\")
+        guard
+            trimmedName != ".", trimmedName != "..",
+            !trimmedName.contains("/"), !trimmedName.contains("\\")
         else {
             newFileErrorMessage = "Enter a name without folders or path separators."
             return false
@@ -207,12 +214,14 @@ extension EditorViewModel {
         }
 
         let fileName = enteredExtension.isEmpty ? "\(trimmedName).\(newFileKind.fileExtension)" : trimmedName
-        let destinationDirectory = newFileDestinationRelativePath.isEmpty
+        let destinationDirectory =
+            newFileDestinationRelativePath.isEmpty
             ? projectURL
             : projectURL.appendingPathComponent(newFileDestinationRelativePath, isDirectory: true)
         let resolvedProjectURL = projectURL.resolvingSymlinksInPath().standardizedFileURL
         let resolvedDirectoryURL = destinationDirectory.resolvingSymlinksInPath().standardizedFileURL
-        guard resolvedDirectoryURL.path == resolvedProjectURL.path
+        guard
+            resolvedDirectoryURL.path == resolvedProjectURL.path
                 || resolvedDirectoryURL.path.hasPrefix("\(resolvedProjectURL.path)/")
         else {
             newFileErrorMessage = "The selected folder is outside the project."
@@ -282,7 +291,9 @@ extension EditorViewModel {
     func selectRunDestination(_ destination: EditorRunDestination) {
         selectedRunDestination = destination
         // A paired device is session state, not a change to project platform settings.
-        guard destination != .player else { return }
+        guard destination != .player else {
+            return
+        }
         guard let projectURL else {
             return
         }
@@ -361,7 +372,9 @@ extension EditorViewModel {
             } else {
                 targetName = ""
             }
-            if let inputActions { settings.inputActions = inputActions }
+            if let inputActions {
+                settings.inputActions = inputActions
+            }
             settings.project.displayName = Self.optionalText(from: projectDisplayNameText)
             settings.project.bundleIdentifier = Self.optionalText(from: projectBundleIdentifierText)
             settings.editor.startupScene = Self.optionalText(from: projectMainSceneText)
@@ -377,7 +390,8 @@ extension EditorViewModel {
                 }
             }
             try EditorProjectStore(fileManager: fileManager).saveProjectSettings(settings, at: projectURL, targetName: targetName)
-            projectSettingsStatusMessage = settings.build.system == .adaScript
+            projectSettingsStatusMessage =
+                settings.build.system == .adaScript
                 ? "Project settings saved to .ada/project.json."
                 : "Project settings saved to .ada/project.json and Package.swift."
             bootstrapWorkspaceIfNeeded(force: true)
@@ -388,7 +402,8 @@ extension EditorViewModel {
 
     static func pathList(from text: String) -> [String] {
         var seen = Set<String>()
-        return text
+        return
+            text
             .components(separatedBy: CharacterSet(charactersIn: ",\n"))
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && seen.insert($0).inserted }

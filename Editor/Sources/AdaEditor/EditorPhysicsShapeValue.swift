@@ -11,25 +11,33 @@ enum EditorPhysicsShapeValue {
     static func make(_ kind: Kind, is3D: Bool = false) -> EditorSceneValue {
         if is3D {
             let resource: Shape3DResource = kind == .sphere ? .generateSphere(radius: 0.5) : .generateBox()
-            guard let data = try? JSONEncoder().encode(resource),
-                  let value = try? JSONDecoder().decode(EditorSceneValue.self, from: data) else { return .null }
+            guard
+                let data = try? JSONEncoder().encode(resource),
+                let value = try? JSONDecoder().decode(EditorSceneValue.self, from: data)
+            else {
+                return .null
+            }
             return value
         }
         let resource: Shape2DResource
         switch kind {
         case .box: resource = .generateBox()
-        case .circle, .sphere: resource = .generateCircle(radius: 1)
+        case .circle,
+            .sphere:
+            resource = .generateCircle(radius: 1)
         case .polygon: resource = .generatePolygon(vertices: [Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(0, 0.5)])
         }
-        guard let data = try? JSONEncoder().encode(resource),
-              let value = try? JSONDecoder().decode(EditorSceneValue.self, from: data) else {
-                  return .null
-              }
+        guard
+            let data = try? JSONEncoder().encode(resource),
+            let value = try? JSONDecoder().decode(EditorSceneValue.self, from: data)
+        else {
+            return .null
+        }
         return value
     }
 
     static func kind(of value: EditorSceneValue) -> Kind? {
-        guard case .object(let fixture) = value.value(at: ["fixture"][...]), let key = fixture.keys.first else {
+        guard case let .object(fixture) = value.value(at: ["fixture"][...]), let key = fixture.keys.first else {
             return nil
         }
         return Kind(rawValue: key)
@@ -43,14 +51,16 @@ enum EditorPhysicsShapeValue {
         guard kind(of: value) == .polygon else {
             return true
         }
-        guard case .array(let vertices) = value.value(at: path(.polygon, "verticies")[...]), vertices.count >= 3 else {
+        guard case let .array(vertices) = value.value(at: path(.polygon, "verticies")[...]), vertices.count >= 3 else {
             return false
         }
         let points: [Vector2] = vertices.compactMap { vertex in
-            guard let x = vertex.value(at: ["x"][...])?.doubleValue,
-                  let y = vertex.value(at: ["y"][...])?.doubleValue else {
-                      return nil
-                  }
+            guard
+                let x = vertex.value(at: ["x"][...])?.doubleValue,
+                let y = vertex.value(at: ["y"][...])?.doubleValue
+            else {
+                return nil
+            }
             return Vector2(Float(x), Float(y))
         }
         guard points.count == vertices.count else {

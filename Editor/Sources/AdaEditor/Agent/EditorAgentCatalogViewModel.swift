@@ -4,7 +4,11 @@ import Observation
 @Observable
 @MainActor
 final class EditorAgentCatalogViewModel {
-    enum Filter: String, CaseIterable { case all = "All", installed = "Added", available = "Not Added" }
+    enum Filter: String, CaseIterable {
+        case all = "All"
+        case installed = "Added"
+        case available = "Not Added"
+    }
     var query = ""
     var filter = Filter.all
     var agents: [EditorRegistryAgent] = []
@@ -22,8 +26,7 @@ final class EditorAgentCatalogViewModel {
     var visibleAgents: [EditorRegistryAgent] {
         agents.filter { agent in
             let added = installed.contains { $0.id == agent.id }
-            return (filter == .all || (filter == .installed ? added : !added)) &&
-                (query.isEmpty || "\(agent.name) \(agent.id) \(agent.description)".localizedCaseInsensitiveContains(query))
+            return (filter == .all || (filter == .installed ? added : !added)) && (query.isEmpty || "\(agent.name) \(agent.id) \(agent.description)".localizedCaseInsensitiveContains(query))
         }
         .sorted { lhs, rhs in
             let left = discovered.contains { $0.id == lhs.id }
@@ -57,7 +60,9 @@ final class EditorAgentCatalogViewModel {
             reportError(error.localizedDescription)
             return
         }
-        if agents.isEmpty { agents = await service.cachedRegistry() }
+        if agents.isEmpty {
+            agents = await service.cachedRegistry()
+        }
         do {
             agents = try await service.refresh()
             status = "\(agents.count) agents • \(discovered.count) found on this Mac"
@@ -96,7 +101,8 @@ final class EditorAgentCatalogViewModel {
         do {
             let entry = try await service.install(agent)
             installed = try await service.installed()
-            status = entry.version == agent.version
+            status =
+                entry.version == agent.version
                 ? "\(agent.name) \(entry.version) installed."
                 : "Registry version \(agent.version) is unavailable. Installed published version \(entry.version)."
             filter = .all
@@ -109,8 +115,16 @@ final class EditorAgentCatalogViewModel {
 
     private func reportError(_ message: String) {
         status = message
-        EditorNotificationCenter.shared.post(.init(source: .catalog, importance: .error, title: "Agent catalog operation failed",
-            detail: message, projectName: notificationProjectName, actions: [notificationAction]))
+        EditorNotificationCenter.shared.post(
+            .init(
+                source: .catalog,
+                importance: .error,
+                title: "Agent catalog operation failed",
+                detail: message,
+                projectName: notificationProjectName,
+                actions: [notificationAction]
+            )
+        )
     }
 
     func remove(_ agent: EditorInstalledAgent) async {

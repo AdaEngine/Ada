@@ -15,9 +15,11 @@ struct EditorNewFileDialog: View {
                 templatePicker
             }
         }
-        .keyboardShortcuts([KeyboardShortcutAction(.escape) {
-            EditorNewFileDialogActions.cancel(viewModel: viewModel, dismiss: dismiss)
-        }])
+        .keyboardShortcuts([
+            KeyboardShortcutAction(.escape) {
+                EditorNewFileDialogActions.cancel(viewModel: viewModel, dismiss: dismiss)
+            }
+        ])
     }
 
     private var templatePicker: some View {

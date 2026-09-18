@@ -16,21 +16,27 @@ extension EditorViewModel {
             return
         }
         handleTextSelection(document: document, range: range, text: text)
-        agent.prefillCodeSelection(EditorAgentCodeSelectionContext(
-            documentTitle: document.title,
-            documentRelativePath: document.relativePath,
-            language: document.language.rawValue,
-            range: range,
-            text: text
-        ))
+        agent.prefillCodeSelection(
+            EditorAgentCodeSelectionContext(
+                documentTitle: document.title,
+                documentRelativePath: document.relativePath,
+                language: document.language.rawValue,
+                range: range,
+                text: text
+            )
+        )
         toolStrip.activeRightTool = "agentChat"
         showRightPanel = true
     }
 
     func openProjectFromMenu() {
-        guard workbench.saveAllDocuments() else { return }
+        guard workbench.saveAllDocuments() else {
+            return
+        }
         ProjectOpenPicker.presentProjectPicker { [weak self] url in
-            guard let self, let url else { return }
+            guard let self, let url else {
+                return
+            }
             do {
                 let project = try EditorProjectStore(fileManager: self.fileManager).openProject(at: url)
                 ProjectEditorLauncher.openEditor(for: project)
@@ -97,14 +103,16 @@ extension EditorViewModel {
     }
 
     func reloadScriptableObjectSupport() {
-        guard let projectURL,
-              let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
-              settings.build.system.isAdaScript,
-              let support = try? EditorScriptableObjectCatalogLoader.load(
-                  project: settings,
-                  at: projectURL,
-                  fileManager: fileManager
-              ) else {
+        guard
+            let projectURL,
+            let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
+            settings.build.system.isAdaScript,
+            let support = try? EditorScriptableObjectCatalogLoader.load(
+                project: settings,
+                at: projectURL,
+                fileManager: fileManager
+            )
+        else {
             return
         }
         inspectorSidebar.scriptableObjectCatalog = support.descriptors
@@ -112,7 +120,7 @@ extension EditorViewModel {
     }
 
     func synchronizeAgentSceneContext() {
-        guard case .scene(let document)? = workbench.activeDocument else {
+        guard case let .scene(document)? = workbench.activeDocument else {
             agent.setSceneContext(nil)
             return
         }
@@ -121,11 +129,13 @@ extension EditorViewModel {
     }
 
     func selectPreview(_ declaration: EditorPreviewDeclaration) {
+        workbench.isPreviewEnabled = true
         workbench.selectedPreviewID = declaration.id
         buildPreview(declaration)
     }
 
     func rebuildSelectedPreview() {
+        workbench.isPreviewEnabled = true
         guard let document = activePreviewTextDocument() else {
             workbench.previewStatus = .hidden
             return
@@ -142,7 +152,24 @@ extension EditorViewModel {
         buildPreview(selected)
     }
 
+    func showPreview() {
+        workbench.isPreviewEnabled = true
+        refreshPreviewForActiveDocument()
+    }
+
+    func hidePreview() {
+        workbench.isPreviewEnabled = false
+        workbench.previewStatus = .hidden
+        workbench.loadedPreview = nil
+        cancelPreviewBuild()
+    }
+
     func refreshPreviewForActiveDocument() {
+        guard workbench.isPreviewEnabled else {
+            workbench.previewStatus = .hidden
+            cancelPreviewBuild()
+            return
+        }
         guard let document = activePreviewTextDocument() else {
             workbench.previewStatus = .hidden
             workbench.selectedPreviewID = nil
@@ -154,7 +181,7 @@ extension EditorViewModel {
         let declarations = EditorPreviewScanner.declarations(in: document.content, language: document.language)
         guard !declarations.isEmpty else {
             if let loadedPreview = workbench.loadedPreview,
-               loadedPreview.documentID == document.id {
+                loadedPreview.documentID == document.id {
                 workbench.selectedPreviewID = loadedPreview.declaration.id
                 buildPreview(loadedPreview.declaration)
                 return
@@ -208,8 +235,8 @@ extension EditorViewModel {
             return nil
         }
 
-        if case .scene(let openDocument)? = workbench.openDocuments.first(where: { document in
-            guard case .scene(let sceneDocument) = document else {
+        if case let .scene(openDocument)? = workbench.openDocuments.first(where: { document in
+            guard case let .scene(sceneDocument) = document else {
                 return false
             }
             return sceneDocument.relativePath == startupScene && (sceneDocument.absolutePath != nil || sceneDocument.isDirty)
@@ -285,8 +312,12 @@ extension EditorViewModel {
         }
 
         toolStrip.selectLeftBottomTool(item)
-        if item.identifier == "logs" { selectOutputTab("Output") }
-        if item.identifier == "build" { selectOutputTab("Build") }
+        if item.identifier == "logs" {
+            selectOutputTab("Output")
+        }
+        if item.identifier == "build" {
+            selectOutputTab("Build")
+        }
         showBottomPanel = true
     }
 

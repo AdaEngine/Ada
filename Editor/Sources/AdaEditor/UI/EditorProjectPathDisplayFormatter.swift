@@ -10,10 +10,11 @@ enum EditorProjectPathDisplayFormatter {
             return labeledPath(root: "iCloud Drive", relativePath: iCloudRelativePath)
         }
 
-        let isApplicationContainer = standardizedPath.contains("/CoreSimulator/Devices/")
+        let isApplicationContainer =
+            standardizedPath.contains("/CoreSimulator/Devices/")
             || standardizedPath.contains("/Containers/Data/Application/")
         if isApplicationContainer,
-           let documentsRelativePath = pathSuffix(after: "/Documents/", in: standardizedPath) {
+            let documentsRelativePath = pathSuffix(after: "/Documents/", in: standardizedPath) {
             return labeledPath(root: "On My iPad", relativePath: documentsRelativePath)
         }
 

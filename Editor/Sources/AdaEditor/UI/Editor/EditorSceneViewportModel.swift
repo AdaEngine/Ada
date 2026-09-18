@@ -16,6 +16,8 @@ enum EditorSceneViewportTool: String, CaseIterable {
 
 @MainActor
 final class EditorSceneViewportModel {
+    static let twoDCameraDepth: Float = -10
+
     private weak var world: World?
     private var cameraEntityID: Entity.ID?
     var displayMode: EditorSceneViewportDisplayMode = .twoD
@@ -92,8 +94,12 @@ final class EditorSceneViewportModel {
 
         // A live drag updates the runtime/Inspector; publish one document edit on release.
         // Redraws still carry the last published document until then.
-        if let transformDrag, sceneContent == transformDrag.startContent { return nil }
-        guard contentChanged else { return nil }
+        if let transformDrag, sceneContent == transformDrag.startContent {
+            return nil
+        }
+        guard contentChanged else {
+            return nil
+        }
         cancelTransformInspectorUpdate()
         self.sceneContent = sceneContent
         transformDrag = nil
@@ -187,7 +193,9 @@ final class EditorSceneViewportModel {
     }
 
     func setActiveTool(_ tool: EditorSceneViewportTool) {
-        guard tool != activeTool else { return }
+        guard tool != activeTool else {
+            return
+        }
         endTransformDrag(cancelled: true)
         hoveredGizmoHandle = nil
         activeTool = tool
@@ -278,8 +286,12 @@ final class EditorSceneViewportModel {
         let selectedPoint = selectedEditorID.flatMap { gizmoWorldMatrix(for: $0) }.flatMap { project($0.origin, size: size) }
         for entity in model.entities {
             let isSelected = entity.id == selectedEditorID
-            guard let payload = entity.components[EditorBuiltInComponentType.transform],
-                  let point = isSelected ? selectedPoint : projectedPoint(from: payload, size: size) else { continue }
+            guard
+                let payload = entity.components[EditorBuiltInComponentType.transform],
+                let point = isSelected ? selectedPoint : projectedPoint(from: payload, size: size)
+            else {
+                continue
+            }
             let radius: Float = isSelected ? 6 : 4
             drawViewportMarker(
                 at: point,
@@ -352,7 +364,14 @@ extension EditorSceneViewportModel {
         }
 
         switch event.keyCode {
-        case .space, .w, .a, .s, .d, .q, .e, .shift:
+        case .space,
+            .w,
+            .a,
+            .s,
+            .d,
+            .q,
+            .e,
+            .shift:
             return true
         default:
             return false
@@ -405,7 +424,8 @@ extension EditorSceneViewportModel {
             pan2D(byScreenDelta: event.mousePosition - lastMousePosition)
             self.lastMousePosition = event.mousePosition
             return true
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             defer {
                 isTwoDPanning = false
                 lastMousePosition = nil
@@ -413,9 +433,13 @@ extension EditorSceneViewportModel {
                 endTransformDrag(cancelled: event.phase == .cancelled)
                 suppressSelectionOnPointerEnd = false
             }
-            if suppressSelectionOnPointerEnd { return true }
+            if suppressSelectionOnPointerEnd {
+                return true
+            }
             if transformDrag != nil {
-                if event.phase == .ended { _ = updateTransformDrag(to: event.mousePosition) }
+                if event.phase == .ended {
+                    _ = updateTransformDrag(to: event.mousePosition)
+                }
                 return true
             }
             guard event.phase == .ended, !isTwoDPanning, event.button == .left, isClickEnd(at: event.mousePosition) else {
@@ -450,7 +474,8 @@ extension EditorSceneViewportModel {
             rotate3D(by: event.mousePosition - lastMousePosition)
             self.lastMousePosition = event.mousePosition
             return true
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             defer {
                 isThreeDRotating = false
                 lastMousePosition = nil
@@ -458,9 +483,13 @@ extension EditorSceneViewportModel {
                 endTransformDrag(cancelled: event.phase == .cancelled)
                 suppressSelectionOnPointerEnd = false
             }
-            if suppressSelectionOnPointerEnd { return true }
+            if suppressSelectionOnPointerEnd {
+                return true
+            }
             if transformDrag != nil {
-                if event.phase == .ended { _ = updateTransformDrag(to: event.mousePosition) }
+                if event.phase == .ended {
+                    _ = updateTransformDrag(to: event.mousePosition)
+                }
                 return true
             }
             guard event.phase == .ended, !isThreeDRotating, event.button == .left, isClickEnd(at: event.mousePosition) else {
@@ -479,12 +508,16 @@ extension EditorSceneViewportModel {
     }
 
     func beginTransformDragIfNeeded(at position: Point, button: MouseButton) -> Bool {
-        guard button == .left,
-              let selectedEditorID,
-              let entity = sceneModel?.entities.first(where: { $0.id == selectedEditorID }),
-              let payload = entity.components[EditorBuiltInComponentType.transform],
-              let transform = try? EditorComponentPayloadDecoder.decode(Transform.self, payload: payload) as? Transform,
-              let gizmo = transformGizmo(), let handle = gizmo.hitTest(position) else { return false }
+        guard
+            button == .left,
+            let selectedEditorID,
+            let entity = sceneModel?.entities.first(where: { $0.id == selectedEditorID }),
+            let payload = entity.components[EditorBuiltInComponentType.transform],
+            let transform = try? EditorComponentPayloadDecoder.decode(Transform.self, payload: payload) as? Transform,
+            let gizmo = transformGizmo(), let handle = gizmo.hitTest(position)
+        else {
+            return false
+        }
         transformDrag = TransformDrag(
             editorID: selectedEditorID,
             startContent: sceneContent,
@@ -496,7 +529,9 @@ extension EditorSceneViewportModel {
     }
 
     func updateTransformDrag(to position: Point) -> Bool {
-        guard var drag = transformDrag else { return false }
+        guard var drag = transformDrag else {
+            return false
+        }
         let transform = drag.interaction.updated(at: position)
         transformDrag = drag
         var payload = drag.startPayload
@@ -516,8 +551,12 @@ extension EditorSceneViewportModel {
     }
 
     private func applyTransformPayload(_ payload: EditorComponentPayload, editorID: String) {
-        guard var model = sceneModel, let index = model.entities.firstIndex(where: { $0.id == editorID }),
-              model.entities[index].components[EditorBuiltInComponentType.transform] != payload else { return }
+        guard
+            var model = sceneModel, let index = model.entities.firstIndex(where: { $0.id == editorID }),
+            model.entities[index].components[EditorBuiltInComponentType.transform] != payload
+        else {
+            return
+        }
         model.entities[index].components[EditorBuiltInComponentType.transform] = payload
         sceneModel = model
         syncRuntimeTransform(editorID: editorID, payload: payload)
@@ -533,8 +572,12 @@ extension EditorSceneViewportModel {
             } catch {
                 return
             }
-            guard !Task.isCancelled, let self, self.selectedEditorID == editorID,
-                  let model = self.sceneModel else { return }
+            guard
+                !Task.isCancelled, let self, self.selectedEditorID == editorID,
+                let model = self.sceneModel
+            else {
+                return
+            }
             self.transformInspectorUpdateTask = nil
             self.onSelectionChanged?(self.selectedEntityViewModel(editorID: editorID, model: model))
         }
@@ -549,7 +592,9 @@ extension EditorSceneViewportModel {
         let drag = transformDrag
         transformDrag = nil
         hoveredGizmoHandle = nil
-        guard let drag else { return }
+        guard let drag else {
+            return
+        }
         if cancelled {
             suppressSelectionOnPointerEnd = true
             applyTransformPayload(drag.startPayload, editorID: drag.editorID)
@@ -559,9 +604,9 @@ extension EditorSceneViewportModel {
                 onSelectionChanged?(selectedEntityViewModel(editorID: drag.editorID, model: model))
             }
         } else if let model = sceneModel,
-                  let entity = model.entities.first(where: { $0.id == drag.editorID }),
-                  entity.components[EditorBuiltInComponentType.transform] != drag.startPayload,
-                  let content = try? model.encodedYAML() {
+            let entity = model.entities.first(where: { $0.id == drag.editorID }),
+            entity.components[EditorBuiltInComponentType.transform] != drag.startPayload,
+            let content = try? model.encodedYAML() {
             // Commit once on release so Save and Undo see the latest transform immediately.
             sceneContent = content
             onDocumentContentChanged?(content)
@@ -569,16 +614,18 @@ extension EditorSceneViewportModel {
     }
 
     func syncRuntimeTransform(editorID: String, payload: EditorComponentPayload) {
-        guard let runtimeID = entitiesByEditorID[editorID],
-              let entity = world?.getEntityByID(runtimeID),
-              let transform = try? EditorComponentPayloadDecoder.decode(Transform.self, payload: payload) as? Transform else {
+        guard
+            let runtimeID = entitiesByEditorID[editorID],
+            let entity = world?.getEntityByID(runtimeID),
+            let transform = try? EditorComponentPayloadDecoder.decode(Transform.self, payload: payload) as? Transform
+        else {
             return
         }
         entity.components += transform
     }
 
     func vector(_ value: EditorSceneValue?, count: Int, defaultValues: [Double]) -> [Double] {
-        guard case .array(let values)? = value else {
+        guard case let .array(values)? = value else {
             return Array(defaultValues.prefix(count))
         }
         var result = values.map { $0.doubleValue ?? 0 }
@@ -606,7 +653,9 @@ extension EditorSceneViewportModel {
     }
 
     func handleTouchEvent(_ event: TouchEvent) -> Bool {
-        guard lastPinchScale == nil else { return true }
+        guard lastPinchScale == nil else {
+            return true
+        }
         switch event.phase {
         case .began:
             suppressSelectionOnPointerEnd = false
@@ -615,7 +664,9 @@ extension EditorSceneViewportModel {
             _ = beginTransformDragIfNeeded(at: event.location, button: .left)
             return true
         case .moved:
-            if updateTransformDrag(to: event.location) { return true }
+            if updateTransformDrag(to: event.location) {
+                return true
+            }
             guard let lastTouchPosition else {
                 return false
             }
@@ -629,9 +680,12 @@ extension EditorSceneViewportModel {
             }
             self.lastTouchPosition = event.location
             return true
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             if transformDrag != nil {
-                if event.phase == .ended { _ = updateTransformDrag(to: event.location) }
+                if event.phase == .ended {
+                    _ = updateTransformDrag(to: event.location)
+                }
                 endTransformDrag(cancelled: event.phase == .cancelled)
             } else if !suppressSelectionOnPointerEnd, event.phase == .ended, let touchDownPosition, (event.location - touchDownPosition).squaredLength < 16 {
                 onSelectEntity?(displayMode == .twoD ? pick2D(at: event.location) : pick3D(at: event.location))
@@ -744,7 +798,8 @@ extension EditorSceneViewportModel {
             Math.sin(threeDYaw) * Math.cos(threeDPitch),
             Math.sin(threeDPitch),
             Math.cos(threeDYaw) * Math.cos(threeDPitch)
-        ).normalized
+        )
+        .normalized
     }
 
     var right3D: Vector3 {
@@ -760,8 +815,10 @@ extension EditorSceneViewportModel {
             return
         }
 
-        guard var camera = cameraEntity.components[Camera.self],
-              var transform = cameraEntity.components[Transform.self] else {
+        guard
+            var camera = cameraEntity.components[Camera.self],
+            var transform = cameraEntity.components[Transform.self]
+        else {
             return
         }
 
@@ -800,13 +857,18 @@ extension EditorSceneViewportModel {
         )
         perspective.updateView(width: safeWidth, height: safeHeight)
 
-        let twoDTransform = Transform(position: Vector3(twoDCenter.x, twoDCenter.y, 0))
-        let threeDTransform = Transform(matrix: Transform3D(columns: [
-            Vector4(right3D, 0),
-            Vector4(up3D, 0),
-            Vector4(front3D, 0),
-            Vector4(threeDPosition, 1)
-        ]))
+        // Keep the orthographic editor camera behind the authored XY plane.
+        // At z = 0 it sits inside meshes created at the default origin, so
+        // their front faces are clipped or back-face culled in the 3D graph.
+        let twoDTransform = Transform(position: Vector3(twoDCenter.x, twoDCenter.y, Self.twoDCameraDepth))
+        let threeDTransform = Transform(
+            matrix: Transform3D(columns: [
+                Vector4(right3D, 0),
+                Vector4(up3D, 0),
+                Vector4(front3D, 0),
+                Vector4(threeDPosition, 1),
+            ])
+        )
         let blend = smoothPerspectiveBlend
 
         let projection: Projection
@@ -818,13 +880,15 @@ extension EditorSceneViewportModel {
             projection = .perspective(perspective)
             transform = threeDTransform
         } else {
-            projection = .custom(EditorSceneViewportTransitionProjection(
-                matrix: interpolateMatrix(
-                    from: orthographic.makeClipView(),
-                    to: perspective.makeClipView(),
-                    progress: blend
+            projection = .custom(
+                EditorSceneViewportTransitionProjection(
+                    matrix: interpolateMatrix(
+                        from: orthographic.makeClipView(),
+                        to: perspective.makeClipView(),
+                        progress: blend
+                    )
                 )
-            ))
+            )
             transform = interpolateTransform(from: twoDTransform, to: threeDTransform, progress: blend)
         }
 
@@ -854,7 +918,8 @@ extension EditorSceneViewportModel {
             y: start.rotation.y + (endRotation.y - start.rotation.y) * progress,
             z: start.rotation.z + (endRotation.z - start.rotation.z) * progress,
             w: start.rotation.w + (endRotation.w - start.rotation.w) * progress
-        ).normalized
+        )
+        .normalized
         return Transform(
             rotation: rotation,
             scale: lerp(start.scale, end.scale, progress),
@@ -877,12 +942,13 @@ extension EditorSceneViewportModel {
     }
 
     func findCameraEntity(in world: World) -> Entity? {
-        world.getEntities().first { entity in
-            entity.name == "SceneView_Camera"
-                && editorIDsByEntityID[entity.id] == nil
-                && entity.components[Camera.self] != nil
-                && entity.components[Transform.self] != nil
-        }
+        world.getEntities()
+            .first { entity in
+                entity.name == "SceneView_Camera"
+                    && editorIDsByEntityID[entity.id] == nil
+                    && entity.components[Camera.self] != nil
+                    && entity.components[Transform.self] != nil
+            }
     }
 }
 
@@ -899,9 +965,11 @@ extension EditorSceneViewportModel {
 
         return world.getEntities()
             .compactMap { entity -> (editorID: String, sortZ: Float)? in
-                guard entity.id != cameraEntityID,
-                      let editorID = editorIDsByEntityID[entity.id],
-                      let transform = entity.components[Transform.self] else {
+                guard
+                    entity.id != cameraEntityID,
+                    let editorID = editorIDsByEntityID[entity.id],
+                    let transform = entity.components[Transform.self]
+                else {
                     return nil
                 }
 
@@ -911,8 +979,7 @@ extension EditorSceneViewportModel {
                 }
                 return (editorID, transform.position.z)
             }
-            .sorted { lhs, rhs in lhs.sortZ > rhs.sortZ }
-            .first?
+            .max { lhs, rhs in lhs.sortZ < rhs.sortZ }?
             .editorID
     }
 
@@ -932,9 +999,11 @@ extension EditorSceneViewportModel {
 
         return world.getEntities()
             .compactMap { entity -> (editorID: String, distance: Float)? in
-                guard entity.id != cameraEntityID,
-                      let editorID = editorIDsByEntityID[entity.id],
-                      let transform = entity.components[Transform.self] else {
+                guard
+                    entity.id != cameraEntityID,
+                    let editorID = editorIDsByEntityID[entity.id],
+                    let transform = entity.components[Transform.self]
+                else {
                     return nil
                 }
 
@@ -944,14 +1013,13 @@ extension EditorSceneViewportModel {
                 }
                 return (editorID, distance)
             }
-            .sorted { lhs, rhs in lhs.distance < rhs.distance }
-            .first?
+            .min { lhs, rhs in lhs.distance < rhs.distance }?
             .editorID
     }
 }
 
-private extension EditorSceneViewportModel {
-    func selectEntity(_ editorID: String?) {
+extension EditorSceneViewportModel {
+    private func selectEntity(_ editorID: String?) {
         cancelTransformInspectorUpdate()
         selectedEditorID = editorID
         guard var model = sceneModel else {
@@ -968,12 +1036,14 @@ private extension EditorSceneViewportModel {
         onSelectionChanged?(selectedEntityViewModel(editorID: editorID, model: model))
     }
 
-    func selectedEntityViewModel(
+    private func selectedEntityViewModel(
         editorID: String?,
         model: EditorSceneModel
     ) -> EditorInspectorSidebarViewModel.SelectedEntity? {
-        guard let editorID,
-              let entity = model.entities.first(where: { $0.id == editorID }) else {
+        guard
+            let editorID,
+            let entity = model.entities.first(where: { $0.id == editorID })
+        else {
             return nil
         }
 
@@ -982,14 +1052,15 @@ private extension EditorSceneViewportModel {
             .filter { $0 != EditorBuiltInComponentType.scriptableComponents }
             .sorted()
         let components = componentNames.map { componentSection(typeName: $0, payload: entity.components[$0] ?? [:]) }
-        let addableComponents = EditorComponentRegistry.addableDescriptors(for: entity).map {
-            EditorInspectorSidebarViewModel.AddableComponent(
-                typeName: $0.typeName,
-                displayName: $0.displayName,
-                category: $0.category,
-                description: $0.description
-            )
-        }
+        let addableComponents = EditorComponentRegistry.addableDescriptors(for: entity)
+            .map {
+                EditorInspectorSidebarViewModel.AddableComponent(
+                    typeName: $0.typeName,
+                    displayName: $0.displayName,
+                    category: $0.category,
+                    description: $0.description
+                )
+            }
         let gizmo = decodeGizmo(from: entity)
         let scriptableObjects = scriptableObjectSections(from: entity)
         let attachedScriptableIDs = Set(scriptableObjects.map(\.identifier))
@@ -1008,21 +1079,24 @@ private extension EditorSceneViewportModel {
         )
     }
 
-    func scriptableObjectSections(from entity: EditorSceneEntity) -> [EditorInspectorSidebarViewModel.ScriptableObjectSection] {
-        guard case .array(let values)? = entity.components[EditorBuiltInComponentType.scriptableComponents]?["scripts"] else {
+    private func scriptableObjectSections(from entity: EditorSceneEntity) -> [EditorInspectorSidebarViewModel.ScriptableObjectSection] {
+        guard case let .array(values)? = entity.components[EditorBuiltInComponentType.scriptableComponents]?["scripts"] else {
             return []
         }
         return values.compactMap { value in
-            guard case .object(let object) = value,
-                  case .string(let identifier)? = object["type"] else {
+            guard
+                case let .object(object) = value,
+                case let .string(identifier)? = object["type"]
+            else {
                 return nil
             }
             let descriptor = scriptableObjectCatalog.first { $0.identifier == identifier }
-            let payload: EditorComponentPayload = if case .object(let payload)? = object["payload"] {
-                payload
-            } else {
-                [:]
-            }
+            let payload: EditorComponentPayload =
+                if case let .object(payload)? = object["payload"] {
+                    payload
+                } else {
+                    [:]
+                }
             let fields: [EditorInspectorSidebarViewModel.ComponentField]
             if let descriptor {
                 fields = descriptor.fields.map { field in
@@ -1034,11 +1108,13 @@ private extension EditorSceneViewportModel {
                     )
                 }
             } else {
-                fields = [EditorInspectorSidebarViewModel.ComponentField(
-                    typeName: identifier,
-                    field: EditorComponentField(key: "payload", label: "Payload", kind: .readOnly, isEditable: false),
-                    value: EditorSceneValue.object(payload).stringValue
-                )]
+                fields = [
+                    EditorInspectorSidebarViewModel.ComponentField(
+                        typeName: identifier,
+                        field: EditorComponentField(key: "payload", label: "Payload", kind: .readOnly, isEditable: false),
+                        value: EditorSceneValue.object(payload).stringValue
+                    )
+                ]
             }
             return EditorInspectorSidebarViewModel.ScriptableObjectSection(
                 identifier: identifier,
@@ -1048,8 +1124,9 @@ private extension EditorSceneViewportModel {
         }
     }
 
-    func componentSection(typeName: String, payload: EditorComponentPayload) -> EditorInspectorSidebarViewModel.ComponentSection {
-        let payload = [EditorBuiltInComponentType.physicsBody2D, EditorBuiltInComponentType.physicsBody3D].contains(typeName)
+    private func componentSection(typeName: String, payload: EditorComponentPayload) -> EditorInspectorSidebarViewModel.ComponentSection {
+        let payload =
+            [EditorBuiltInComponentType.physicsBody2D, EditorBuiltInComponentType.physicsBody3D].contains(typeName)
             ? EditorComponentRegistry.resolvedPhysicsPayload(payload, is3D: typeName == EditorBuiltInComponentType.physicsBody3D) : payload
         guard let descriptor = EditorComponentRegistry.descriptor(named: typeName) else {
             return EditorInspectorSidebarViewModel.ComponentSection(
@@ -1080,9 +1157,11 @@ private extension EditorSceneViewportModel {
         )
     }
 
-    func transformFields(from entity: EditorSceneEntity) -> [EditorInspectorSidebarViewModel.TransformField] {
-        guard let payload = entity.components[EditorBuiltInComponentType.transform],
-              let descriptor = EditorComponentRegistry.descriptor(named: EditorBuiltInComponentType.transform) else {
+    private func transformFields(from entity: EditorSceneEntity) -> [EditorInspectorSidebarViewModel.TransformField] {
+        guard
+            let payload = entity.components[EditorBuiltInComponentType.transform],
+            let descriptor = EditorComponentRegistry.descriptor(named: EditorBuiltInComponentType.transform)
+        else {
             return []
         }
 
@@ -1091,15 +1170,15 @@ private extension EditorSceneViewportModel {
         }
     }
 
-    func decodeGizmo(from entity: EditorSceneEntity) -> EditorGizmo? {
+    private func decodeGizmo(from entity: EditorSceneEntity) -> EditorGizmo? {
         guard let payload = entity.components[EditorSceneYAMLDocument.editorGizmoComponentName] else {
             return nil
         }
         return try? EditorComponentPayloadDecoder.decode(EditorGizmo.self, payload: payload) as? EditorGizmo
     }
 
-    func projectedPoint(from transformPayload: EditorComponentPayload, size: Size) -> Point? {
-        guard case .array(let position)? = transformPayload["position"], position.count >= 2 else {
+    private func projectedPoint(from transformPayload: EditorComponentPayload, size: Size) -> Point? {
+        guard case let .array(position)? = transformPayload["position"], position.count >= 2 else {
             return nil
         }
 
@@ -1108,11 +1187,11 @@ private extension EditorSceneViewportModel {
         return projectedPoint(from: Vector3(world.x, world.y, z), size: size)
     }
 
-    func projectedPoint(from position: Vector3, size: Size) -> Point? {
+    private func projectedPoint(from position: Vector3, size: Size) -> Point? {
         project(position, size: size)
     }
 
-    func shortComponentName(_ componentName: String) -> String {
+    private func shortComponentName(_ componentName: String) -> String {
         componentName.components(separatedBy: ".").last ?? componentName
     }
 }

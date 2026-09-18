@@ -104,21 +104,25 @@ struct ProjectOpeningRecentProjectTests {
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
         let row = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Launcher.Project.\(reference.id)"))
-        container.onMouseEvent(MouseEvent(
-            window: RID(),
-            button: .right,
-            mousePosition: Point(row.absoluteFrame.midX, row.absoluteFrame.midY),
-            phase: .began,
-            modifierKeys: [],
-            time: 0
-        ))
+        container.onMouseEvent(
+            MouseEvent(
+                window: RID(),
+                button: .right,
+                mousePosition: Point(row.absoluteFrame.midX, row.absoluteFrame.midY),
+                phase: .began,
+                modifierKeys: [],
+                time: 0
+            )
+        )
         let rename = try #require(menu?.items.first { $0.title == "Rename…" }?.action)
         #expect(model.projectToOpenInEditor == nil)
         rename()
         for _ in 0..<100 {
             await Task.yield()
             container.layoutIfNeeded()
-            if !container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Launcher.Rename.Save")).isEmpty { break }
+            if !container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Launcher.Rename.Save")).isEmpty {
+                break
+            }
         }
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Launcher.Rename.Name"))
         model.renamedProjectNameBinding.wrappedValue = "Renamed from Menu"

@@ -1,12 +1,12 @@
 @_spi(Internal) @testable import AdaApp
 @_spi(AdaEngine) import AdaEngine
-@testable import AdaPhysics
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
 
 @testable import AdaEditor
+@testable import AdaPhysics
 
 @MainActor
 @Suite(.serialized)
@@ -46,7 +46,11 @@ struct Editor3DComponentCatalogTests {
         #expect(abs(search.absoluteFrame.width - (dialog.absoluteFrame.width - 40)) < 0.1)
         #expect(abs(search.absoluteFrame.minX - dialog.absoluteFrame.minX - 20) < 0.1)
         model.componentSearchText = "3D"
-        for _ in 0..<10 { await Task.yield(); container.update(1.0 / 60.0); container.layoutIfNeeded() }
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1.0 / 60.0)
+            container.layoutIfNeeded()
+        }
         let searched = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AddComponent.SearchBar"))
         #expect(searched.absoluteFrame.width == search.absoluteFrame.width)
         for type in types {
@@ -79,7 +83,10 @@ struct Editor3DComponentCatalogTests {
         let app = AppWorlds(main: World())
         app.addPlugin(MainSchedulerPlugin()).addPlugin(Physics3DPlugin()).addPlugin(TransformPlugin())
         try await app.build()
-        let entity = app.main.spawn { restored; Transform() }
+        let entity = app.main.spawn {
+            restored
+            Transform()
+        }
         await app.main.runScheduler(.physicsSync)
         let body = try #require(entity.components[PhysicsBody3DComponent.self])
         #expect(body.runtimeBody != nil)

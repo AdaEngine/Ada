@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import AdaEditor
 
 @Suite("Cloud website sign-in")
@@ -7,7 +8,8 @@ import Testing
 struct EditorCloudSignInTests {
     @Test("Only a matching one-time callback is accepted")
     func callbackValidation() throws {
-        let code = String(repeating: "a", count: 43), state = String(repeating: "b", count: 43)
+        let code = String(repeating: "a", count: 43)
+        let state = String(repeating: "b", count: 43)
         let callback = try #require(URL(string: "adaeditor://cloud/callback?code=\(code)&state=\(state)"))
         #expect(try EditorCloudAccount.exchangeCode(from: callback, expectedState: state) == code)
         for invalid in [

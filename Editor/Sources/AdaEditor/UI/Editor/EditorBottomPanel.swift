@@ -30,7 +30,7 @@ struct EditorBottomPanel: View {
             }
             .frame(height: 34)
             .background(theme.editorColors.surface)
-            
+
             if viewModel.activeOutputTab == "Output" {
                 HStack(spacing: 8) {
                     ForEach(["Game", "Editor"], id: \.self) { source in

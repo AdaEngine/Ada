@@ -9,13 +9,13 @@ struct GravityLanguageSemanticTests {
     func annotatedLifecycleCompletion() {
         let service = GravityLanguageService()
         let systemSource = """
-        @system(id: "movement")
-        class MovementSystem {
-            func update(context) {
-                context.
+            @system(id: "movement")
+            class MovementSystem {
+                func update(context) {
+                    context.
+                }
             }
-        }
-        """
+            """
         let systemItems = service.completions(
             text: systemSource,
             position: GravitySourcePosition(line: 3, utf16Column: 16)
@@ -24,13 +24,13 @@ struct GravityLanguageSemanticTests {
         #expect(systemItems.contains { $0.label == "world" })
 
         let commandSource = """
-        @system(id: "commands")
-        class CommandsSystem {
-            func update(context) {
-                context.world.commands.sp
+            @system(id: "commands")
+            class CommandsSystem {
+                func update(context) {
+                    context.world.commands.sp
+                }
             }
-        }
-        """
+            """
         let commandItems = service.completions(
             text: commandSource,
             position: GravitySourcePosition(line: 3, utf16Column: 33)
@@ -38,13 +38,13 @@ struct GravityLanguageSemanticTests {
         #expect(commandItems.contains { $0.label == "spawn" })
 
         let toolSource = """
-        @tool(id: "com.example.tool", permissions: [])
-        class ExampleTool {
-            func activate(editor) {
-                editor.add
+            @tool(id: "com.example.tool", permissions: [])
+            class ExampleTool {
+                func activate(editor) {
+                    editor.add
+                }
             }
-        }
-        """
+            """
         let toolItems = service.completions(
             text: toolSource,
             position: GravitySourcePosition(line: 3, utf16Column: 18)
@@ -66,20 +66,28 @@ struct GravityLanguageSemanticTests {
         let source = Self.systemSource
         let tokens = service.semanticTokens(text: source)
 
-        #expect(tokens.contains {
-            $0.kind == .macro
-                && $0.range.start == GravitySourcePosition(line: 0, utf16Column: 0)
-                && $0.range.end == GravitySourcePosition(line: 0, utf16Column: 1)
-        })
-        #expect(tokens.contains {
-            $0.kind == .macro && $0.range.start == GravitySourcePosition(line: 0, utf16Column: 1)
-        })
-        #expect(tokens.contains {
-            $0.kind == .method && $0.range.start == GravitySourcePosition(line: 2, utf16Column: 9)
-        })
-        #expect(tokens.contains {
-            $0.kind == .method && $0.range.start == GravitySourcePosition(line: 3, utf16Column: 31)
-        })
+        #expect(
+            tokens.contains {
+                $0.kind == .macro
+                    && $0.range.start == GravitySourcePosition(line: 0, utf16Column: 0)
+                    && $0.range.end == GravitySourcePosition(line: 0, utf16Column: 1)
+            }
+        )
+        #expect(
+            tokens.contains {
+                $0.kind == .macro && $0.range.start == GravitySourcePosition(line: 0, utf16Column: 1)
+            }
+        )
+        #expect(
+            tokens.contains {
+                $0.kind == .method && $0.range.start == GravitySourcePosition(line: 2, utf16Column: 9)
+            }
+        )
+        #expect(
+            tokens.contains {
+                $0.kind == .method && $0.range.start == GravitySourcePosition(line: 3, utf16Column: 31)
+            }
+        )
         let hover = service.hover(text: source, position: GravitySourcePosition(line: 3, utf16Column: 32))
         #expect(hover?.contents.contains("spawn(componentNames)") == true)
         let signature = service.signatureHelp(text: source, position: GravitySourcePosition(line: 3, utf16Column: 37))
@@ -100,13 +108,13 @@ struct GravityLanguageSemanticTests {
             "method": "textDocument/didOpen",
             "params": [
                 "textDocument": ["languageId": "adascript", "text": Self.systemSource, "uri": uri, "version": 1]
-            ]
+            ],
         ])
         let response = session.handle([
             "id": 2,
             "jsonrpc": "2.0",
             "method": "textDocument/semanticTokens/full",
-            "params": ["textDocument": ["uri": uri]]
+            "params": ["textDocument": ["uri": uri]],
         ])
         let message = try #require(response.outgoingMessages.first)
         let result = try #require(message["result"] as? [String: Any])
@@ -120,8 +128,8 @@ struct GravityLanguageSemanticTests {
             "method": "textDocument/hover",
             "params": [
                 "position": ["character": 32, "line": 3],
-                "textDocument": ["uri": uri]
-            ]
+                "textDocument": ["uri": uri],
+            ],
         ])
         let hoverMessage = try #require(hoverResponse.outgoingMessages.first)
         let hoverResult = try #require(hoverMessage["result"] as? [String: Any])
@@ -134,7 +142,7 @@ struct GravityLanguageSemanticTests {
             "id": 1,
             "jsonrpc": "2.0",
             "method": "initialize",
-            "params": ["rootUri": NSNull()]
+            "params": ["rootUri": NSNull()],
         ])
         let response = try #require(initialize.outgoingMessages.first)
         let result = try #require(response["result"] as? [String: Any])
@@ -145,11 +153,11 @@ struct GravityLanguageSemanticTests {
     }
 
     private static let systemSource = """
-    @system(id: "commands")
-    class CommandsSystem {
-        func update(context) {
-            context.world.commands.spawn([]);
+        @system(id: "commands")
+        class CommandsSystem {
+            func update(context) {
+                context.world.commands.spawn([]);
+            }
         }
-    }
-    """
+        """
 }

@@ -1,10 +1,11 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor agent chat UI", .serialized)
 @MainActor
@@ -31,7 +32,9 @@ struct EditorAgentChatUITests {
         container.onTextInputEvent(TextInputEvent(window: .empty, text: "world", action: .insert, time: 2))
         container.onKeyEvent(KeyEvent(window: .empty, keyCode: .enter, modifiers: [], status: .down, time: 3, isRepeated: false))
         for _ in 0..<100 {
-            if await service.recordedRequest() != nil { break }
+            if await service.recordedRequest() != nil {
+                break
+            }
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(await service.recordedRequest()?.prompt == "Hello\nworld")
@@ -84,8 +87,17 @@ struct EditorAgentChatUITests {
     @Test("narrow composer keeps attachment and send controls visible without a skills button")
     func narrowComposer() async throws {
         let model = EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())
-        model.availableSkills = [EditorAgentSkill(id: "sample", name: "Sample", description: nil,
-            localPath: "/tmp/sample", userInvocable: true, allowedTools: [], instructions: "Sample")]
+        model.availableSkills = [
+            EditorAgentSkill(
+                id: "sample",
+                name: "Sample",
+                description: nil,
+                localPath: "/tmp/sample",
+                userInvocable: true,
+                allowedTools: [],
+                instructions: "Sample"
+            )
+        ]
         let container = makeContainer(model)
         container.frame.size.width = 300
         container.bounds.size = container.frame.size
@@ -110,7 +122,7 @@ struct EditorAgentChatUITests {
         let model = EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())
         model.sessionConfiguration.commands = [
             .init(name: "compact", description: "Compact conversation"),
-            .init(name: "help", description: "Get help")
+            .init(name: "help", description: "Get help"),
         ]
         let container = makeContainer(model)
         let prompt = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Prompt")).absoluteFrame
@@ -137,10 +149,13 @@ struct EditorAgentChatUITests {
     func streamingRelayout() async throws {
         let model = EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())
         model.activeSession = EditorAgentSession(title: "Streaming")
-        model.activeSession?.events = [EditorAgentEvent(
-            id: "stream", kind: .message,
-            message: EditorAgentMessage(role: .assistant, segments: [.init(kind: .text, text: "First delta")])
-        )]
+        model.activeSession?.events = [
+            EditorAgentEvent(
+                id: "stream",
+                kind: .message,
+                message: EditorAgentMessage(role: .assistant, segments: [.init(kind: .text, text: "First delta")])
+            )
+        ]
         model.isSending = true
         let container = makeContainer(model)
         let selector = UINodeSelector.accessibilityIdentifier("AdaEditor.Agent.Event.stream")
@@ -199,12 +214,22 @@ struct EditorAgentChatUITests {
     @Test("model control opens a menu with all advertised choices")
     func modelMenu() throws {
         let model = EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())
-        model.sessionConfiguration = EditorAgentSessionConfiguration(agentName: "Test", selectors: [
-            EditorAgentConfigurationSelector(id: "model", name: "Model", category: .model, currentValueID: "a", choices: [
-                .init(id: "a", name: "Model A", description: nil),
-                .init(id: "b", name: "Model B", description: nil)
-            ], usesLegacyMethod: false)
-        ])
+        model.sessionConfiguration = EditorAgentSessionConfiguration(
+            agentName: "Test",
+            selectors: [
+                EditorAgentConfigurationSelector(
+                    id: "model",
+                    name: "Model",
+                    category: .model,
+                    currentValueID: "a",
+                    choices: [
+                        .init(id: "a", name: "Model A", description: nil),
+                        .init(id: "b", name: "Model B", description: nil),
+                    ],
+                    usesLegacyMethod: false
+                )
+            ]
+        )
         let container = makeContainer(model)
         var menu: ContextMenuPresentation?
         let previous = ContextMenuPresentationCenter.present
@@ -220,7 +245,7 @@ struct EditorAgentChatUITests {
         let model = EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())
         model.activeSession = EditorAgentSession(events: [
             EditorAgentEvent(id: "user", kind: .message, message: EditorAgentMessage(role: .user, segments: [.init(kind: .text, text: "Hello")])),
-            EditorAgentEvent(id: "assistant", kind: .message, message: EditorAgentMessage(role: .assistant, segments: [.init(kind: .text, text: "Hello")]))
+            EditorAgentEvent(id: "assistant", kind: .message, message: EditorAgentMessage(role: .assistant, segments: [.init(kind: .text, text: "Hello")])),
         ])
         let container = makeContainer(model)
         let user = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.EventContent.user")).absoluteFrame
@@ -229,5 +254,4 @@ struct EditorAgentChatUITests {
         #expect(assistant.minX < 30)
         #expect(user.width < 140)
     }
-
 }

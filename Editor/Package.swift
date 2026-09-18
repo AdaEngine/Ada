@@ -3,7 +3,8 @@ import Foundation
 import PackageDescription
 
 let adaMCPLocalPath = ProcessInfo.processInfo.environment["ADA_MCP_LOCAL_PATH"] ?? "../../AdaMCP"
-let adaMCPPackage: Package.Dependency = true/*ProcessInfo.processInfo.environment["ADA_MCP_LOCAL"] == "1"*/
+let adaMCPPackage: Package.Dependency =
+    true /*ProcessInfo.processInfo.environment["ADA_MCP_LOCAL"] == "1"*/
     ? .package(name: "AdaMCP", path: adaMCPLocalPath)
     : .package(url: "https://github.com/AdaEngine/AdaMCP.git", branch: "main")
 
@@ -24,7 +25,7 @@ let package = Package(
         .executable(
             name: "gravity-lsp",
             targets: ["GravityLanguageServer"]
-        )
+        ),
     ],
     dependencies: [
         .package(name: "AdaEngine", path: ".."),
@@ -35,7 +36,7 @@ let package = Package(
         .package(url: "https://github.com/TeamSloppy/swift-acp", branch: "main"),
         .package(url: "https://github.com/swiftlang/swift-syntax", from: "602.0.0"),
         .package(url: "https://github.com/tree-sitter/swift-tree-sitter", from: "0.9.0"),
-        .package(url: "https://github.com/alex-pinkus/tree-sitter-swift", branch: "with-generated-files")
+        .package(url: "https://github.com/alex-pinkus/tree-sitter-swift", branch: "with-generated-files"),
     ],
     targets: [
         .target(
@@ -84,11 +85,11 @@ let package = Package(
                 .product(name: "TreeSitterSwift", package: "tree-sitter-swift"),
                 "Yams",
                 "AdaPackageManifestTool",
-                "GravityLanguageCore"
+                "GravityLanguageCore",
             ],
             exclude: [
                 "Platforms/iOS/Info.plist",
-                "Platforms/macOS/Info.plist"
+                "Platforms/macOS/Info.plist",
             ],
             resources: [
                 .copy("Assets")
@@ -109,12 +110,12 @@ let package = Package(
                 .product(name: "AdaEngine", package: "AdaEngine"),
                 .product(name: "Math", package: "AdaEngine"),
                 .product(name: "SwiftTreeSitter", package: "swift-tree-sitter"),
-                .product(name: "TreeSitterSwift", package: "tree-sitter-swift")
+                .product(name: "TreeSitterSwift", package: "tree-sitter-swift"),
             ],
             exclude: [
                 "Fixtures"
             ]
-        )
+        ),
     ]
 )
 

@@ -49,7 +49,11 @@ enum EditorSettingsSection: String, CaseIterable, Hashable, Sendable {
 @MainActor
 final class EditorSettingsWindowViewModel {
     var selectedSection: EditorSettingsSection {
-        didSet { if selectedSection != oldValue { selectedPage = pages(in: selectedSection).first } }
+        didSet {
+            if selectedSection != oldValue {
+                selectedPage = pages(in: selectedSection).first
+            }
+        }
     }
     var selectedPage: String?
     var collapsedSections: Set<EditorSettingsSection> = []
@@ -57,7 +61,9 @@ final class EditorSettingsWindowViewModel {
     var agent: EditorAgentViewModel { editorViewModel?.agent ?? globalAgent }
     var searchText = "" {
         didSet {
-            guard !searchText.isEmpty else { return }
+            guard !searchText.isEmpty else {
+                return
+            }
             for section in filteredSections { collapsedSections.remove(section) }
         }
     }
@@ -170,9 +176,10 @@ final class EditorSettingsWindowViewModel {
     }
 
     var isAdaScriptProject: Bool {
-        editorViewModel?.projectURL.flatMap {
-            try? ProjectSystem.loadProject(at: $0).build.system.isAdaScript
-        } ?? false
+        editorViewModel?.projectURL
+            .flatMap {
+                try? ProjectSystem.loadProject(at: $0).build.system.isAdaScript
+            } ?? false
     }
 
     func runtimeTextBinding(_ keyPath: WritableKeyPath<EditorRuntimeSettingsDraft, String>) -> Binding<String> {
@@ -258,8 +265,10 @@ final class EditorSettingsWindowViewModel {
     }
 
     private static func loadRuntimeSettings(from editorViewModel: EditorViewModel?) -> AdaProjectRuntime {
-        guard let projectURL = editorViewModel?.projectURL,
-              let project = try? ProjectSystem.loadProject(at: projectURL) else {
+        guard
+            let projectURL = editorViewModel?.projectURL,
+            let project = try? ProjectSystem.loadProject(at: projectURL)
+        else {
             return AdaProjectRuntime()
         }
         return project.runtime
@@ -294,55 +303,56 @@ enum EditorSettingsWindowController {
     }
 
     #if os(macOS)
-    private static weak var settingsWindow: UIWindow?
-    private static var settingsViewModel: EditorSettingsWindowViewModel?
+        private static weak var settingsWindow: UIWindow?
+        private static var settingsViewModel: EditorSettingsWindowViewModel?
 
-    static func open(
-        editorViewModel: EditorViewModel? = nil,
-        project: EditorProjectReference? = nil,
-        selectedSection: EditorSettingsSection = .general
-    ) {
-        guard let windowManager = UIWindowManager.shared else {
-            return
-        }
+        static func open(
+            editorViewModel: EditorViewModel? = nil,
+            project: EditorProjectReference? = nil,
+            selectedSection: EditorSettingsSection = .general
+        ) {
+            guard let windowManager = UIWindowManager.shared else {
+                return
+            }
 
-        let resolvedEditorViewModel: EditorViewModel?
-        if let editorViewModel {
-            resolvedEditorViewModel = editorViewModel
-        } else if let project,
-                  let existingEditorViewModel = settingsViewModel?.editorViewModel,
-                  existingEditorViewModel.project?.path == project.path {
-            resolvedEditorViewModel = existingEditorViewModel
-        } else {
-            resolvedEditorViewModel = project.map { EditorViewModel(project: $0) }
-        }
+            let resolvedEditorViewModel: EditorViewModel?
+            if let editorViewModel {
+                resolvedEditorViewModel = editorViewModel
+            } else if let project,
+                let existingEditorViewModel = settingsViewModel?.editorViewModel,
+                existingEditorViewModel.project?.path == project.path {
+                resolvedEditorViewModel = existingEditorViewModel
+            } else {
+                resolvedEditorViewModel = project.map { EditorViewModel(project: $0) }
+            }
 
-        if let settingsWindow,
-           windowManager.windows[settingsWindow.id] != nil,
-           let settingsViewModel {
-            settingsViewModel.update(editorViewModel: resolvedEditorViewModel, selectedSection: selectedSection)
-            settingsWindow.showWindow(makeFocused: true)
-            return
-        }
+            if let settingsWindow,
+                windowManager.windows[settingsWindow.id] != nil,
+                let settingsViewModel {
+                settingsViewModel.update(editorViewModel: resolvedEditorViewModel, selectedSection: selectedSection)
+                settingsWindow.showWindow(makeFocused: true)
+                return
+            }
 
-        let viewModel = EditorSettingsWindowViewModel(
-            editorViewModel: resolvedEditorViewModel,
-            selectedSection: selectedSection
-        )
-        let window = windowManager.spawnWindow(configuration: windowConfiguration) {
-            EditorSettingsWindowView(viewModel: viewModel)
-                .theme(.adaEditor)
+            let viewModel = EditorSettingsWindowViewModel(
+                editorViewModel: resolvedEditorViewModel,
+                selectedSection: selectedSection
+            )
+            let window = windowManager.spawnWindow(configuration: windowConfiguration) {
+                EditorSettingsWindowView(viewModel: viewModel)
+                    .theme(.adaEditor)
+            }
+            settingsViewModel = viewModel
+            settingsWindow = window
+            window.showWindow(makeFocused: true)
         }
-        settingsViewModel = viewModel
-        settingsWindow = window
-        window.showWindow(makeFocused: true)
-    }
     #endif
 }
 
 struct EditorSettingsWindowView: View {
     static let accessibilityIdentifier = "AdaEditor.Settings.Window"
     static let closeAccessibilityIdentifier = "AdaEditor.Settings.Close"
+    static let sidebarContextAccessibilityIdentifier = "AdaEditor.Settings.SidebarContext"
 
     let viewModel: EditorSettingsWindowViewModel
     let showsCloseButton: Bool
@@ -409,6 +419,7 @@ struct EditorSettingsWindowView: View {
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
             }
+            .frame(minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(viewModel.selectedSection == .agent ? "APPLIES TO" : "CURRENT PROJECT")
@@ -420,6 +431,7 @@ struct EditorSettingsWindowView: View {
                     .lineLimit(1)
             }
             .padding(16)
+            .accessibilityIdentifier(Self.sidebarContextAccessibilityIdentifier)
         }
         .frame(width: 216)
         .frame(minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
@@ -458,9 +470,9 @@ struct EditorSettingsWindowView: View {
     private var navigationBarTrailingContent: some View {
         HStack(spacing: 8) {
             #if os(macOS)
-            if viewModel.selectedSection == .agent {
-                EditorAgentCatalogToolbar(agent: viewModel.agent)
-            }
+                if viewModel.selectedSection == .agent {
+                    EditorAgentCatalogToolbar(agent: viewModel.agent)
+                }
             #endif
             Text(viewModel.selectedSection == .agent ? "All Projects" : viewModel.projectName)
                 .font(.system(size: 10))
@@ -905,12 +917,14 @@ struct EditorSettingsWindowView: View {
         }
 
         switch viewModel.selectedSection {
-        case .notifications, .achievements:
+        case .notifications,
+            .achievements:
             return ("Done", "Settings are saved automatically.", {})
         case .general:
             return ("Apply", viewModel.generalSettingsStatusMessage, viewModel.applyGeneralSettings)
         case .project:
-            let status = viewModel.runtimeSettingsStatusMessage.isEmpty
+            let status =
+                viewModel.runtimeSettingsStatusMessage.isEmpty
                 ? editorViewModel.projectSettingsStatusMessage
                 : viewModel.runtimeSettingsStatusMessage
             return ("Save Project Settings", status, viewModel.saveProjectSettings)

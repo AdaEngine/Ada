@@ -33,7 +33,7 @@ struct EditorTextSearchDialog: View {
         .keyboardShortcuts([
             KeyboardShortcutAction(.escape) { close() },
             KeyboardShortcutAction(.arrowDown) { model.moveSelection(by: 1) },
-            KeyboardShortcutAction(.arrowUp) { model.moveSelection(by: -1) }
+            KeyboardShortcutAction(.arrowUp) { model.moveSelection(by: -1) },
         ])
         .onAppear {
             Task { @MainActor in
@@ -52,7 +52,9 @@ struct EditorTextSearchDialog: View {
                 .foregroundColor(theme.editorColors.muted)
                 .accessibilityIdentifier("AdaEditor.TextSearch.Status")
             Spacer()
-            Button { close() } label: {
+            Button {
+                close()
+            } label: {
                 Text("\u{E5CD}")
                     .font(AdaEditorMaterialSymbolFont.font(size: 18))
                     .foregroundColor(theme.editorColors.muted)
@@ -73,15 +75,18 @@ struct EditorTextSearchDialog: View {
                 "Search text in project",
                 text: Binding(
                     get: { model.query },
-                    set: { model.query = $0; viewModel.refreshTextSearch() }
+                    set: {
+                        model.query = $0
+                        viewModel.refreshTextSearch()
+                    }
                 ),
                 onSubmit: { openSelected() }
             )
-                .textFieldStyle(PlainTextFieldStyle())
-                .font(.system(size: 15))
-                .foregroundColor(theme.editorColors.text)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier(Self.fieldIdentifier)
+            .textFieldStyle(PlainTextFieldStyle())
+            .font(.system(size: 15))
+            .foregroundColor(theme.editorColors.text)
+            .frame(maxWidth: .infinity)
+            .accessibilityIdentifier(Self.fieldIdentifier)
             Button("Aa") {
                 model.caseSensitive.toggle()
                 viewModel.refreshTextSearch()
@@ -116,7 +121,9 @@ struct EditorTextSearchDialog: View {
                     .padding(.horizontal, 12)
                 }
                 .onChange(of: model.selectedID) { _, id in
-                    if let id { proxy.scrollTo(id) }
+                    if let id {
+                        proxy.scrollTo(id)
+                    }
                 }
             }
         }
@@ -140,9 +147,12 @@ struct EditorTextSearchDialog: View {
             }
             .padding(.horizontal, 10)
             .frame(width: width, height: 52, alignment: .leading)
-            .background(RoundedRectangleShape(cornerRadius: 6).fill(
-                model.selectedID == match.id ? theme.editorColors.blue.opacity(0.20) : Color.clear
-            ))
+            .background(
+                RoundedRectangleShape(cornerRadius: 6)
+                    .fill(
+                        model.selectedID == match.id ? theme.editorColors.blue.opacity(0.20) : Color.clear
+                    )
+            )
             .mask(RoundedRectangleShape(cornerRadius: 6))
         }
         .buttonStyle(DefaultButtonStyle())
@@ -197,7 +207,9 @@ struct EditorTextSearchDialog: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Button { openSelected() } label: {
+            Button {
+                openSelected()
+            } label: {
                 Text("Open in Editor")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white)
@@ -244,10 +256,16 @@ struct EditorTextSearchPresentation: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .fullScreenCover(isPresented: Binding(
-                get: { viewModel.textSearch.isPresented },
-                set: { if !$0 { viewModel.textSearch.close() } }
-            )) {
+            .fullScreenCover(
+                isPresented: Binding(
+                    get: { viewModel.textSearch.isPresented },
+                    set: {
+                        if !$0 {
+                            viewModel.textSearch.close()
+                        }
+                    }
+                )
+            ) {
                 EditorTextSearchDialog(viewModel: viewModel)
             }
             .keyboardShortcuts([

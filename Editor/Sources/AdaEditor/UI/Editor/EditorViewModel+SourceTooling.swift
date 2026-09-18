@@ -28,7 +28,9 @@ extension EditorViewModel {
         }
 
         Task { [weak self] in
-            guard let self, let fileURL = document.fileURL else { return }
+            guard let self, let fileURL = document.fileURL else {
+                return
+            }
             async let highlightsRequest = self.workspaceService.documentHighlights(
                 fileURL: fileURL,
                 language: document.language,
@@ -42,9 +44,12 @@ extension EditorViewModel {
                 position: position
             )
             let (highlights, hover) = await (highlightsRequest, hoverRequest)
-            let hoveredRange = hover?.range ?? highlights.first(where: { highlight in
-                Self.sourceRange(highlight.range, contains: position)
-            })?.range
+            let hoveredRange =
+                hover?.range
+                ?? highlights.first(where: { highlight in
+                    Self.sourceRange(highlight.range, contains: position)
+                })?
+                .range
 
             await MainActor.run {
                 guard self.latestSourceHoverKey == hoverKey else {
@@ -112,8 +117,8 @@ extension EditorViewModel {
             return
         }
 
-        if case .text(let currentDocument)? = workbench.openDocuments.first(where: { $0.id == document.id }),
-           !currentDocument.completionItems.isEmpty {
+        if case let .text(currentDocument)? = workbench.openDocuments.first(where: { $0.id == document.id }),
+            !currentDocument.completionItems.isEmpty {
             completionTask?.cancel()
             completionTask = nil
             workbench.updateTextDocument(id: document.id) { updatedDocument in
@@ -136,7 +141,6 @@ extension EditorViewModel {
         text: String,
         delay: Duration?
     ) {
-
         completionTask = Task { [weak self] in
             if let delay {
                 do {
@@ -145,7 +149,9 @@ extension EditorViewModel {
                     return
                 }
             }
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             let items = await self.workspaceService.completions(
                 fileURL: fileURL,
                 language: document.language,
@@ -171,8 +177,9 @@ extension EditorViewModel {
     }
 
     func applyCompletion(_ item: EditorCompletionItem, to document: EditorTextDocument) {
-        guard let position = document.completionPosition,
-              let edit = Self.applyingCompletion(item, to: document.content, at: position)
+        guard
+            let position = document.completionPosition,
+            let edit = Self.applyingCompletion(item, to: document.content, at: position)
         else {
             return
         }
@@ -193,9 +200,10 @@ extension EditorViewModel {
 
     @discardableResult
     func moveCompletionSelection(in document: EditorTextDocument, by delta: Int) -> Bool {
-        guard delta != 0,
-              case .text(let currentDocument)? = workbench.openDocuments.first(where: { $0.id == document.id }),
-              !currentDocument.completionItems.isEmpty
+        guard
+            delta != 0,
+            case let .text(currentDocument)? = workbench.openDocuments.first(where: { $0.id == document.id }),
+            !currentDocument.completionItems.isEmpty
         else {
             return false
         }
@@ -211,8 +219,9 @@ extension EditorViewModel {
 
     @discardableResult
     func applySelectedCompletion(in document: EditorTextDocument) -> Bool {
-        guard case .text(let currentDocument)? = workbench.openDocuments.first(where: { $0.id == document.id }),
-              currentDocument.completionItems.indices.contains(currentDocument.selectedCompletionIndex)
+        guard
+            case let .text(currentDocument)? = workbench.openDocuments.first(where: { $0.id == document.id }),
+            currentDocument.completionItems.indices.contains(currentDocument.selectedCompletionIndex)
         else {
             return false
         }
@@ -232,11 +241,12 @@ extension EditorViewModel {
         }
 
         let range = item.replacementRange ?? inferredCompletionRange(in: lines[position.line], at: position)
-        guard range.start.line == range.end.line,
-              lines.indices.contains(range.start.line),
-              range.start.character >= 0,
-              range.end.character >= range.start.character,
-              range.end.character <= lines[range.start.line].count
+        guard
+            range.start.line == range.end.line,
+            lines.indices.contains(range.start.line),
+            range.start.character >= 0,
+            range.end.character >= range.start.character,
+            range.end.character <= lines[range.start.line].count
         else {
             return nil
         }
@@ -247,11 +257,12 @@ extension EditorViewModel {
         let end = line.index(line.startIndex, offsetBy: range.end.character)
         updatedLines[range.start.line].replaceSubrange(start..<end, with: item.insertText)
         let insertedLines = item.insertText.components(separatedBy: .newlines)
-        let caret = if insertedLines.count == 1 {
-            EditorSourceLocation(line: range.start.line, character: range.start.character + item.insertText.count)
-        } else {
-            EditorSourceLocation(line: range.start.line + insertedLines.count - 1, character: insertedLines.last?.count ?? 0)
-        }
+        let caret =
+            if insertedLines.count == 1 {
+                EditorSourceLocation(line: range.start.line, character: range.start.character + item.insertText.count)
+            } else {
+                EditorSourceLocation(line: range.start.line + insertedLines.count - 1, character: insertedLines.last?.count ?? 0)
+            }
         return (
             updatedLines.joined(separator: "\n"),
             caret
@@ -301,8 +312,9 @@ extension EditorViewModel {
 
     func synchronizeOpenDocumentDiagnostics() {
         for document in workbench.openDocuments {
-            guard case .text(let textDocument) = document,
-                  let absolutePath = textDocument.absolutePath
+            guard
+                case let .text(textDocument) = document,
+                let absolutePath = textDocument.absolutePath
             else {
                 continue
             }
@@ -326,7 +338,9 @@ extension EditorViewModel {
         }
 
         Task { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             let targets = await self.workspaceService.definition(
                 fileURL: fileURL,
                 language: document.language,
@@ -351,7 +365,9 @@ extension EditorViewModel {
         }
 
         Task { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             let references = await self.workspaceService.references(
                 fileURL: fileURL,
                 language: document.language,
@@ -374,7 +390,9 @@ extension EditorViewModel {
         }
 
         Task { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             let hover = await self.workspaceService.hover(
                 fileURL: fileURL,
                 language: document.language,
@@ -397,7 +415,9 @@ extension EditorViewModel {
 
         return [
             TextEditorContextMenuItem(title: "Toggle Breakpoint") { [weak self] in
-                guard let path = document.absolutePath else { return }
+                guard let path = document.absolutePath else {
+                    return
+                }
                 self?.debugger.toggleBreakpoint(path: path, line: position.line + 1)
             },
             TextEditorContextMenuItem(
@@ -408,7 +428,7 @@ extension EditorViewModel {
                     },
                     TextEditorContextMenuItem(title: "References") { [weak self] in
                         self?.findReferences(document: document, position: position)
-                    }
+                    },
                 ]
             ),
             TextEditorContextMenuItem(title: "Show Hover Info") { [weak self] in
@@ -418,20 +438,23 @@ extension EditorViewModel {
                 self?.handleSourceHover(document: document, position: position)
             },
             TextEditorContextMenuItem(title: "Rename (Unavailable)"),
-            TextEditorContextMenuItem(title: "Code Actions (Unavailable)")
+            TextEditorContextMenuItem(title: "Code Actions (Unavailable)"),
         ]
     }
 
     func refreshSemanticTokens(for document: EditorWorkbenchDocument) {
-        guard case .text(let textDocument) = document,
-              textDocument.language.supportsLanguageTooling,
-              let absolutePath = textDocument.absolutePath
+        guard
+            case let .text(textDocument) = document,
+            textDocument.language.supportsLanguageTooling,
+            let absolutePath = textDocument.absolutePath
         else {
             return
         }
 
         Task { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             if let projectURL = self.projectURL {
                 await self.workspaceService.configureSourceWorkspace(projectURL: projectURL)
             }
@@ -461,8 +484,8 @@ extension EditorViewModel {
 
     func openSourceTarget(_ target: EditorSourceSymbolTarget) {
         let filePath = target.filePath
-        if case .text(let document)? = workbench.openDocuments.first(where: { document in
-            if case .text(let textDocument) = document {
+        if case let .text(document)? = workbench.openDocuments.first(where: { document in
+            if case let .text(textDocument) = document {
                 return textDocument.absolutePath == filePath
             }
             return false
@@ -522,7 +545,7 @@ extension EditorViewModel {
     }
 }
 
-private extension EditorTextDocument {
+extension EditorTextDocument {
     var fileURL: URL? {
         absolutePath.map { URL(fileURLWithPath: $0, isDirectory: false) }
     }

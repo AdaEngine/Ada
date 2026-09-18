@@ -27,8 +27,8 @@ enum EditorSceneValue: Codable, Equatable, Sendable {
     case uint(UInt64)
     case double(Double)
     case string(String)
-    case array([EditorSceneValue])
-    case object([String: EditorSceneValue])
+    case array([Self])
+    case object([String: Self])
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -45,9 +45,9 @@ enum EditorSceneValue: Codable, Equatable, Sendable {
             self = .double(value)
         } else if let value = try? container.decode(String.self) {
             self = .string(value)
-        } else if let value = try? container.decode([EditorSceneValue].self) {
+        } else if let value = try? container.decode([Self].self) {
             self = .array(value)
-        } else if let value = try? container.decode([String: EditorSceneValue].self) {
+        } else if let value = try? container.decode([String: Self].self) {
             self = .object(value)
         } else {
             throw DecodingError.dataCorruptedError(
@@ -63,19 +63,19 @@ enum EditorSceneValue: Codable, Equatable, Sendable {
         switch self {
         case .null:
             try container.encodeNil()
-        case .bool(let value):
+        case let .bool(value):
             try container.encode(value)
-        case .int(let value):
+        case let .int(value):
             try container.encode(value)
-        case .uint(let value):
+        case let .uint(value):
             try container.encode(value)
-        case .double(let value):
+        case let .double(value):
             try container.encode(value)
-        case .string(let value):
+        case let .string(value):
             try container.encode(value)
-        case .array(let values):
+        case let .array(values):
             try container.encode(values)
-        case .object(let values):
+        case let .object(values):
             try container.encode(values)
         }
     }
@@ -86,19 +86,19 @@ extension EditorSceneValue {
         switch self {
         case .null:
             NSNull()
-        case .bool(let value):
+        case let .bool(value):
             value
-        case .int(let value):
+        case let .int(value):
             value
-        case .uint(let value):
+        case let .uint(value):
             value
-        case .double(let value):
+        case let .double(value):
             value
-        case .string(let value):
+        case let .string(value):
             value
-        case .array(let values):
+        case let .array(values):
             values.map(\.jsonCompatibleValue)
-        case .object(let values):
+        case let .object(values):
             values.mapValues(\.jsonCompatibleValue)
         }
     }
@@ -107,19 +107,19 @@ extension EditorSceneValue {
         switch self {
         case .null:
             ""
-        case .bool(let value):
+        case let .bool(value):
             value ? "true" : "false"
-        case .int(let value):
+        case let .int(value):
             String(value)
-        case .uint(let value):
+        case let .uint(value):
             String(value)
-        case .double(let value):
+        case let .double(value):
             EditorSceneModelFormatting.format(value)
-        case .string(let value):
+        case let .string(value):
             value
-        case .array(let values):
+        case let .array(values):
             values.map(\.stringValue).joined(separator: ", ")
-        case .object(let values):
+        case let .object(values):
             values
                 .sorted { $0.key < $1.key }
                 .map { "\($0.key): \($0.value.stringValue)" }
@@ -129,13 +129,13 @@ extension EditorSceneValue {
 
     var doubleValue: Double? {
         switch self {
-        case .int(let value):
+        case let .int(value):
             Double(value)
-        case .uint(let value):
+        case let .uint(value):
             Double(value)
-        case .double(let value):
+        case let .double(value):
             value
-        case .string(let value):
+        case let .string(value):
             Double(value)
         default:
             nil
@@ -144,7 +144,7 @@ extension EditorSceneValue {
 
     var boolValue: Bool? {
         switch self {
-        case .bool(let value):
+        case let .bool(value):
             value
         case .string("true"):
             true
@@ -183,17 +183,17 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
         self.editor = editor
     }
 
-    static func decode(from content: String) throws -> EditorSceneModel {
-        try YAMLDecoder(encoding: .utf8).decode(EditorSceneModel.self, from: content)
+    static func decode(from content: String) throws -> Self {
+        try YAMLDecoder(encoding: .utf8).decode(Self.self, from: content)
     }
 
     func encodedYAML() throws -> String {
         try YAMLEncoder().encode(self)
     }
 
-    static func `default`(projectName: String) -> EditorSceneModel {
+    static func `default`(projectName: String) -> Self {
         let rootID = "root"
-        return EditorSceneModel(
+        return Self(
             scene: EditorSceneMetadata(id: UUID().uuidString, name: normalizedSceneName(projectName)),
             entities: [
                 EditorSceneEntity(
@@ -206,10 +206,14 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
                     ]
                 )
             ],
-            editor: EditorSceneState(selectedEntity: rootID, expandedEntities: [rootID], viewport: [
-                "position": .array([.double(0), .double(0)]),
-                "zoom": .double(1)
-            ])
+            editor: EditorSceneState(
+                selectedEntity: rootID,
+                expandedEntities: [rootID],
+                viewport: [
+                    "position": .array([.double(0), .double(0)]),
+                    "zoom": .double(1),
+                ]
+            )
         )
     }
 
@@ -236,18 +240,67 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
     }
 
     mutating func addEntity(preset: EditorSceneEntityPreset) -> EditorSceneEntity {
-        let entity = addEntity(name: preset.title)
-        switch preset {
-        case .empty:
-            break
-        case .camera:
-            addComponent(typeName: EditorBuiltInComponentType.camera, to: entity.id)
-        case .sprite:
-            addComponent(typeName: EditorBuiltInComponentType.sprite, to: entity.id)
-        case .light2D:
-            addComponent(typeName: EditorBuiltInComponentType.light2D, to: entity.id)
+        let template: EditorSceneEntityTemplate =
+            switch preset {
+            case .empty: .empty
+            case .camera: .camera2D
+            case .sprite: .sprite
+            case .light2D: .light2D
+            }
+        return addEntity(template: template, parentID: editor?.selectedEntity)
+    }
+
+    mutating func addEntity(template: EditorSceneEntityTemplate, parentID: String?) -> EditorSceneEntity {
+        let entity = addEntity(name: template.title, parentID: parentID)
+        let componentTypes: [String] =
+            switch template {
+            case .empty,
+                .scriptable:
+                []
+            case .sceneInstance:
+                [EditorBuiltInComponentType.sceneInstance]
+            case .camera2D,
+                .camera3D:
+                [EditorBuiltInComponentType.camera, EditorBuiltInComponentType.visibility]
+            case .sprite:
+                [EditorBuiltInComponentType.sprite]
+            case .mesh2D:
+                [EditorBuiltInComponentType.mesh2D]
+            case .tileMap:
+                [EditorBuiltInComponentType.tileMap]
+            case .light2D:
+                [EditorBuiltInComponentType.light2D]
+            case .model3D:
+                [EditorBuiltInComponentType.mesh3D]
+            case .directionalLight3D:
+                [EditorBuiltInComponentType.directionalLight3D]
+            case .pointLight3D:
+                [EditorBuiltInComponentType.pointLight3D]
+            case .spotLight3D:
+                [EditorBuiltInComponentType.spotLight3D]
+            case .ui:
+                [EditorBuiltInComponentType.uiComponent]
+            case .physicsBody2D:
+                [EditorBuiltInComponentType.physicsBody2D]
+            case .physicsBody3D:
+                [EditorBuiltInComponentType.physicsBody3D]
+            }
+        for componentType in componentTypes {
+            addComponent(typeName: componentType, to: entity.id)
         }
-        return entities.first { $0.id == entity.id } ?? entity
+
+        guard let entityIndex = entities.firstIndex(where: { $0.id == entity.id }) else {
+            return entity
+        }
+        if template == .scriptable {
+            entities[entityIndex].components[EditorBuiltInComponentType.scriptableComponents] = ["scripts": .array([])]
+        } else if template == .camera3D {
+            entities[entityIndex].components[EditorBuiltInComponentType.camera]?["projection"] = .string("perspective")
+            entities[entityIndex].components[EditorBuiltInComponentType.transform]?["position"] = .array([
+                .double(0), .double(0), .double(5),
+            ])
+        }
+        return entities[entityIndex]
     }
 
     mutating func selectEntity(_ entityID: String?) {
@@ -296,8 +349,10 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
     }
 
     mutating func updateField(typeName: String, field: EditorComponentField, value: String, in entityID: String) {
-        guard let entityIndex = entities.firstIndex(where: { $0.id == entityID }),
-              var payload = entities[entityIndex].components[typeName] else {
+        guard
+            let entityIndex = entities.firstIndex(where: { $0.id == entityID }),
+            var payload = entities[entityIndex].components[typeName]
+        else {
             return
         }
 
@@ -320,11 +375,13 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
         guard !scripts.contains(where: { $0.scriptableObjectIdentifier == descriptor.identifier }) else {
             return
         }
-        scripts.append(.object([
-            "type": .string(descriptor.identifier),
-            "version": .int(descriptor.version),
-            "payload": .object(Dictionary(uniqueKeysWithValues: descriptor.fields.map { ($0.name, $0.defaultValue) }))
-        ]))
+        scripts.append(
+            .object([
+                "type": .string(descriptor.identifier),
+                "version": .int(descriptor.version),
+                "payload": .object(Dictionary(uniqueKeysWithValues: descriptor.fields.map { ($0.name, $0.defaultValue) })),
+            ])
+        )
         entities[entityIndex].components[EditorBuiltInComponentType.scriptableComponents] = ["scripts": .array(scripts)]
     }
 
@@ -332,9 +389,10 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
         guard let entityIndex = entities.firstIndex(where: { $0.id == entityID }) else {
             return
         }
-        let scripts = scriptableObjectValues(in: entities[entityIndex]).filter {
-            $0.scriptableObjectIdentifier != identifier
-        }
+        let scripts = scriptableObjectValues(in: entities[entityIndex])
+            .filter {
+                $0.scriptableObjectIdentifier != identifier
+            }
         if scripts.isEmpty {
             entities[entityIndex].components[EditorBuiltInComponentType.scriptableComponents] = nil
         } else {
@@ -352,12 +410,14 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
             return
         }
         var scripts = scriptableObjectValues(in: entities[entityIndex])
-        guard let scriptIndex = scripts.firstIndex(where: { $0.scriptableObjectIdentifier == identifier }),
-              case .object(var script) = scripts[scriptIndex] else {
+        guard
+            let scriptIndex = scripts.firstIndex(where: { $0.scriptableObjectIdentifier == identifier }),
+            case var .object(script) = scripts[scriptIndex]
+        else {
             return
         }
         var payload: EditorComponentPayload
-        if case .object(let existingPayload)? = script["payload"] {
+        if case let .object(existingPayload)? = script["payload"] {
             payload = existingPayload
         } else {
             payload = [:]
@@ -376,7 +436,7 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
     }
 
     private func scriptableObjectValues(in entity: EditorSceneEntity) -> [EditorSceneValue] {
-        guard case .array(let scripts)? = entity.components[EditorBuiltInComponentType.scriptableComponents]?["scripts"] else {
+        guard case let .array(scripts)? = entity.components[EditorBuiltInComponentType.scriptableComponents]?["scripts"] else {
             return []
         }
         return scripts
@@ -400,13 +460,14 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
 
         return result.reversed()
     }
-
 }
 
-private extension EditorSceneValue {
+extension EditorSceneValue {
     var scriptableObjectIdentifier: String? {
-        guard case .object(let object) = self,
-              case .string(let identifier)? = object["type"] else {
+        guard
+            case let .object(object) = self,
+            case let .string(identifier)? = object["type"]
+        else {
             return nil
         }
         return identifier

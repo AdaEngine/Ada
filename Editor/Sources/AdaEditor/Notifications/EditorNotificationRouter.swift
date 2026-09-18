@@ -35,15 +35,17 @@ final class EditorNotificationRouter {
                 throw CocoaError(.fileNoSuchFile)
             }
             let url = store.resolveProjectURL(for: project)
-            guard FileManager.default.fileExists(atPath: url.path) else { throw CocoaError(.fileNoSuchFile) }
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                throw CocoaError(.fileNoSuchFile)
+            }
             pending = action
             // This router already buffers URLs until the launch UI is ready and retains iPad bookmarks.
             if destinations.contains(where: { $0.model != nil }) {
                 var resolved = project
                 #if os(iOS)
-                resolved.path = ProjectOpenPicker.retainSecurityScopedAccess(to: url).path
+                    resolved.path = ProjectOpenPicker.retainSecurityScopedAccess(to: url).path
                 #else
-                resolved.path = url.path
+                    resolved.path = url.path
                 #endif
                 ProjectEditorLauncher.openEditor(for: resolved, closing: nil)
             } else {
@@ -67,8 +69,11 @@ final class EditorNotificationRouter {
         case .chat:
             model.toolStrip.activeRightTool = "agentChat"
             model.showRightPanel = true
-            if let id = action.sessionID { model.agent.openNotificationSession(id) }
-        case .build, .tests:
+            if let id = action.sessionID {
+                model.agent.openNotificationSession(id)
+            }
+        case .build,
+            .tests:
             model.selectOutputTab(action.destination == .tests ? "Tests" : "Build")
             model.showBottomPanel = true
             model.toolStrip.activeLeftBottomTool = "build"

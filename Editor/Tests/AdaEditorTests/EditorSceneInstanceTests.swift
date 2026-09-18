@@ -1,7 +1,8 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor scene instances")
 struct EditorSceneInstanceTests {
@@ -32,23 +33,25 @@ struct EditorSceneInstanceTests {
         ]
         var appliedValue: String?
         viewModel.updateComponentField = { _, _, value in appliedValue = value }
-        viewModel.selectEntity(EditorInspectorSidebarViewModel.SelectedEntity(
-            editorID: "instance",
-            name: "Enemy Instance",
-            componentNames: [EditorBuiltInComponentType.sceneInstance],
-            transformFields: [],
-            components: [
-                .init(
-                    typeName: EditorBuiltInComponentType.sceneInstance,
-                    displayName: descriptor.displayName,
-                    fields: [.init(typeName: EditorBuiltInComponentType.sceneInstance, field: field, value: "")],
-                    canRemove: true
-                )
-            ],
-            addableComponents: [],
-            gizmo: nil,
-            hasExplicitGizmo: false
-        ))
+        viewModel.selectEntity(
+            EditorInspectorSidebarViewModel.SelectedEntity(
+                editorID: "instance",
+                name: "Enemy Instance",
+                componentNames: [EditorBuiltInComponentType.sceneInstance],
+                transformFields: [],
+                components: [
+                    .init(
+                        typeName: EditorBuiltInComponentType.sceneInstance,
+                        displayName: descriptor.displayName,
+                        fields: [.init(typeName: EditorBuiltInComponentType.sceneInstance, field: field, value: "")],
+                        canRemove: true
+                    )
+                ],
+                addableComponents: [],
+                gizmo: nil,
+                hasExplicitGizmo: false
+            )
+        )
 
         #expect(viewModel.sceneAssets(matching: "enemy").map(\.reference) == ["@res://Prefabs/Enemy.ascn"])
         viewModel.componentFieldBinding(typeName: EditorBuiltInComponentType.sceneInstance, field: field).wrappedValue = "@res://Prefabs/Enemy.ascn"
@@ -125,7 +128,7 @@ struct EditorSceneInstanceTests {
                     parent: nil,
                     components: [
                         EditorBuiltInComponentType.transform: EditorComponentRegistry.defaultPayload(for: EditorBuiltInComponentType.transform),
-                        EditorBuiltInComponentType.sceneInstance: ["scene": .string(reference)]
+                        EditorBuiltInComponentType.sceneInstance: ["scene": .string(reference)],
                     ]
                 )
             }

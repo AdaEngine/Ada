@@ -15,13 +15,13 @@ extension GravityDocumentAnalyzer {
             } else if token.text == "(" {
                 parenthesisDepth = max(0, parenthesisDepth - 1)
             } else if parenthesisDepth == 0,
-                      token.kind == .identifier,
-                      cursor > 0,
-                      tokens[cursor - 1].text == "@" {
+                token.kind == .identifier,
+                cursor > 0,
+                tokens[cursor - 1].text == "@" {
                 annotations.insert(token.text)
                 cursor -= 1
             } else if parenthesisDepth == 0,
-                      token.text == ";" || token.text == "}" || typeKeywordNames.contains(token.text) {
+                token.text == ";" || token.text == "}" || typeKeywordNames.contains(token.text) {
                 break
             }
             cursor -= 1
@@ -50,8 +50,8 @@ extension GravityDocumentAnalyzer {
             } else if token.text == "}" {
                 braceDepth = max(0, braceDepth - 1)
             } else if braceDepth == 0,
-                      token.text == "func",
-                      let binding = lifecycleBinding(at: index, upperBound: closeBraceIndex, tokens: tokens, lifecycleTypes: lifecycleTypes) {
+                token.text == "func",
+                let binding = lifecycleBinding(at: index, upperBound: closeBraceIndex, tokens: tokens, lifecycleTypes: lifecycleTypes) {
                 result[binding.name] = binding.type
             }
             index += 1
@@ -65,11 +65,13 @@ extension GravityDocumentAnalyzer {
         tokens: [GravityToken],
         lifecycleTypes: [String: String]
     ) -> (name: String, type: String)? {
-        guard let methodIndex = nextLifecycleIdentifier(after: functionIndex, upperBound: upperBound, tokens: tokens),
-              let parameterType = lifecycleTypes[tokens[methodIndex].text],
-              let openParenthesisIndex = nextLifecycleToken("(", after: methodIndex, upperBound: upperBound, tokens: tokens),
-              openParenthesisIndex + 1 < upperBound,
-              tokens[openParenthesisIndex + 1].kind == .identifier else {
+        guard
+            let methodIndex = nextLifecycleIdentifier(after: functionIndex, upperBound: upperBound, tokens: tokens),
+            let parameterType = lifecycleTypes[tokens[methodIndex].text],
+            let openParenthesisIndex = nextLifecycleToken("(", after: methodIndex, upperBound: upperBound, tokens: tokens),
+            openParenthesisIndex + 1 < upperBound,
+            tokens[openParenthesisIndex + 1].kind == .identifier
+        else {
             return nil
         }
         return (tokens[openParenthesisIndex + 1].text, parameterType)

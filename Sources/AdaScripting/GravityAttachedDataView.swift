@@ -52,10 +52,12 @@ final class GravityAttachedComponentView: @unchecked Sendable {
     }
 
     func get(_ fieldName: String) -> GSValue? {
-        guard let world, let descriptor,
-              let field = descriptor.fields.first(where: { $0.key == fieldName }),
-              let component = world.getComponent(named: descriptor.typeName, from: entityID),
-              let value = field.read(component) else {
+        guard
+            let world, let descriptor,
+            let field = descriptor.fields.first(where: { $0.key == fieldName }),
+            let component = world.getComponent(named: descriptor.typeName, from: entityID),
+            let value = field.read(component)
+        else {
             reportDiagnostic("Unknown or unavailable attached component field '\(fieldName)'")
             return nil
         }
@@ -64,9 +66,11 @@ final class GravityAttachedComponentView: @unchecked Sendable {
 
     @discardableResult
     func set(_ fieldName: String, _ value: GSValue) -> Bool {
-        guard let world, let descriptor,
-              let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
-              descriptor.write(fieldValue, toField: fieldName, in: world, entity: entityID) else {
+        guard
+            let world, let descriptor,
+            let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
+            descriptor.write(fieldValue, toField: fieldName, in: world, entity: entityID)
+        else {
             reportDiagnostic("Invalid attached component field '\(fieldName)'")
             return false
         }
@@ -125,8 +129,10 @@ final class GravityAttachedResourceView: @unchecked Sendable {
     }
 
     func get(_ fieldName: String) -> GSValue? {
-        guard let world, let field = fields[fieldName],
-              let value = world.readResourceField(type: resourceType, field: field) else {
+        guard
+            let world, let field = fields[fieldName],
+            let value = world.readResourceField(type: resourceType, field: field)
+        else {
             if !optional {
                 reportDiagnostic("Unknown or unavailable attached resource field '\(fieldName)'")
             }
@@ -137,9 +143,11 @@ final class GravityAttachedResourceView: @unchecked Sendable {
 
     @discardableResult
     func set(_ fieldName: String, _ value: GSValue) -> Bool {
-        guard let world, let field = fields[fieldName],
-              let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
-              world.writeResourceField(type: resourceType, field: field, value: fieldValue) else {
+        guard
+            let world, let field = fields[fieldName],
+            let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
+            world.writeResourceField(type: resourceType, field: field, value: fieldValue)
+        else {
             reportDiagnostic("Invalid attached resource field '\(fieldName)'")
             return false
         }

@@ -2,8 +2,9 @@ import AdaEngine
 import AdaPlayerConnect
 import Foundation
 import Observation
+
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 
 struct AdaPlayerApp: App {
@@ -30,19 +31,21 @@ final class AdaPlayerController {
 
     func watchLifecycle() {
         #if canImport(UIKit)
-        guard lifecycleTasks.isEmpty else { return }
-        lifecycleTasks = [
-            Task { [weak self] in
-                for await _ in NotificationCenter.default.notifications(named: UIApplication.didEnterBackgroundNotification).map({ _ in true }) {
-                    self?.shutdown()
-                }
-            },
-            Task { [weak self] in
-                for await _ in NotificationCenter.default.notifications(named: UIApplication.willEnterForegroundNotification).map({ _ in true }) {
-                    self?.start()
-                }
+            guard lifecycleTasks.isEmpty else {
+                return
             }
-        ]
+            lifecycleTasks = [
+                Task { [weak self] in
+                    for await _ in NotificationCenter.default.notifications(named: UIApplication.didEnterBackgroundNotification).map({ _ in true }) {
+                        self?.shutdown()
+                    }
+                },
+                Task { [weak self] in
+                    for await _ in NotificationCenter.default.notifications(named: UIApplication.willEnterForegroundNotification).map({ _ in true }) {
+                        self?.start()
+                    }
+                },
+            ]
         #endif
     }
 
@@ -53,7 +56,9 @@ final class AdaPlayerController {
     }
 
     func start() {
-        guard logTask == nil else { return }
+        guard logTask == nil else {
+            return
+        }
         startupError = nil
         host.onDeploy = { [weak self] snapshot in
             let prepared = try await Self.prepare(snapshot)
@@ -73,21 +78,28 @@ final class AdaPlayerController {
         host.onStop = { [weak self] in self?.stop() }
         do {
             #if canImport(UIKit)
-            let name = UIDevice.current.name
+                let name = UIDevice.current.name
             #else
-            let name = Host.current().localizedName ?? "AdaPlayer"
+                let name = Host.current().localizedName ?? "AdaPlayer"
             #endif
             try host.start(name: name)
-        } catch { startupError = error.localizedDescription; return }
+        } catch {
+            startupError = error.localizedDescription
+            return
+        }
         RuntimeLogStore.shared.setEnabled(true)
         logTask = Task { [weak self] in
             var cursor = RuntimeLogStore.shared.read(after: Int.max, limit: 1).nextCursor
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
-                guard let self else { return }
+                guard let self else {
+                    return
+                }
                 let batch = RuntimeLogStore.shared.read(after: cursor, limit: 100)
                 cursor = batch.nextCursor
-                guard self.host.isPaired else { continue }
+                guard self.host.isPaired else {
+                    continue
+                }
                 do {
                     if batch.dropped > 0 {
                         try await self.host.send(PlayerMessage(.log, text: "[warning] \(batch.dropped) log entries dropped."))
@@ -150,7 +162,10 @@ private struct AdaPlayerHomeView: View {
                         Text("On the same Wi-Fi, choose AdaPlayer in AdaEditor and press Run. Enter this code to connect.")
                             .font(.system(size: 16))
                     }
-                    Button("Restart connection") { controller.shutdown(); controller.start() }
+                    Button("Restart connection") {
+                        controller.shutdown()
+                        controller.start()
+                    }
                 }
                 .padding(.all, 28)
                 .frame(maxWidth: 520)
@@ -167,11 +182,15 @@ private struct AdaPlayerHomeView: View {
                             .accessibilityIdentifier("AdaPlayer.Disconnect")
                     }
                     Spacer()
-                }.padding(.all, 16)
+                }
+                .padding(.all, 16)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { controller.watchLifecycle(); controller.start() }
+        .onAppear {
+            controller.watchLifecycle()
+            controller.start()
+        }
         .onDisappear { controller.close() }
     }
 }

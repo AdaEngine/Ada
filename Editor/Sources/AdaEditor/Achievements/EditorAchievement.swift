@@ -22,11 +22,24 @@ struct EditorAchievement: Identifiable, Sendable {
     var gameCenterID: String { "org.adaengine.editor.achievement.\(id.rawValue)" }
     static var isRussian: Bool { Locale.preferredLanguages.first?.hasPrefix("ru") == true }
 
-    init(_ id: EditorAchievementID, _ title: String, _ ru: String, _ detail: String, _ ruDetail: String,
-         goal: Int = 1, points: Int = 10, secret: Bool = false) {
-        self.id = id; englishTitle = title; russianTitle = ru
-        englishDetail = detail; russianDetail = ruDetail
-        self.goal = goal; self.points = points; self.secret = secret
+    init(
+        _ id: EditorAchievementID,
+        _ title: String,
+        _ ru: String,
+        _ detail: String,
+        _ ruDetail: String,
+        goal: Int = 1,
+        points: Int = 10,
+        secret: Bool = false
+    ) {
+        self.id = id
+        englishTitle = title
+        russianTitle = ru
+        englishDetail = detail
+        russianDetail = ruDetail
+        self.goal = goal
+        self.points = points
+        self.secret = secret
     }
 
     static let catalog: [Self] = [
@@ -45,17 +58,48 @@ struct EditorAchievement: Identifiable, Sendable {
         .init(.animation, "Action!", "Мотор!", "Preview an animation with two different keyframes.", "Включите предпросмотр анимации с двумя различающимися ключевыми кадрами.", points: 20),
         .init(.choreography, "Choreographer", "Хореограф", "Save a clip animating three properties.", "Сохраните клип с анимацией трёх свойств.", points: 30),
         .init(.firstUI, "First Screen", "Первый экран", "Add an element to a UI document and save.", "Добавьте элемент в UI Designer и сохраните документ."),
-        .init(.layout, "Everything in Place", "Всё по полочкам", "Save a UI with nested containers and five content elements.", "Сохраните UI с вложенными контейнерами и пятью элементами.", points: 30),
+        .init(
+            .layout,
+            "Everything in Place",
+            "Всё по полочкам",
+            "Save a UI with nested containers and five content elements.",
+            "Сохраните UI с вложенными контейнерами и пятью элементами.",
+            points: 30
+        ),
         .init(.binding, "Connected", "Связь установлена", "Run a scene with a UI bound to an AdaScript field.", "Запустите сцену с UI, привязанным к полю AdaScript.", points: 30),
         .init(.sceneInstance, "World Within a World", "Мир внутри мира", "Save a scene containing another scene.", "Добавьте экземпляр другой сцены и сохраните.", points: 20),
-        .init(.population, "Growing World", "Набирая масштаб", "Save a scene with 50 entities, excluding its root.", "Сохраните сцену с 50 сущностями, не считая корня.", goal: 50, points: 40),
-        .init(.activeDays, "Returning Author", "Возвращение автора", "Edit and save on seven different days. No streak required.", "Редактируйте и сохраняйте в 7 разных дней. Подряд не требуется.", goal: 7, points: 40),
+        .init(
+            .population,
+            "Growing World",
+            "Набирая масштаб",
+            "Save a scene with 50 entities, excluding its root.",
+            "Сохраните сцену с 50 сущностями, не считая корня.",
+            goal: 50,
+            points: 40
+        ),
+        .init(
+            .activeDays,
+            "Returning Author",
+            "Возвращение автора",
+            "Edit and save on seven different days. No streak required.",
+            "Редактируйте и сохраняйте в 7 разных дней. Подряд не требуется.",
+            goal: 7,
+            points: 40
+        ),
         .init(.answer42, "The Answer", "Ответ на главный вопрос", "Save exactly 42 entities, excluding the root.", "Сохраните ровно 42 сущности, не считая корня.", points: 20, secret: true),
-        .init(.newton, "Newton Approves", "Ньютон одобряет", "Run a dynamic body named Apple with a collision shape.", "Запустите динамическое тело Apple с коллайдером.", points: 20, secret: true),
+        .init(
+            .newton,
+            "Newton Approves",
+            "Ньютон одобряет",
+            "Run a dynamic body named Apple with a collision shape.",
+            "Запустите динамическое тело Apple с коллайдером.",
+            points: 20,
+            secret: true
+        ),
         .init(.inception, "Inception", "Начало", "Save a chain of three nested scenes: A → B → C.", "Сохраните три уровня вложенных сцен: A → B → C.", points: 30, secret: true),
         .init(.redo, "As Intended", "Я так и задумал", "Undo an edit, redo it, then save the document.", "Отмените изменение, верните через Redo и сохраните.", points: 10, secret: true),
         .init(.flip, "Inside Out", "Наизнанку", "Save a sprite with both Flip X and Flip Y enabled.", "Сохраните спрайт с включёнными Flip X и Flip Y.", points: 10, secret: true),
-        .init(.helloAda, "Hello, Ada", "Привет, Ада", "Save a UI Text element saying Hello, Ada!", "Сохраните текстовый элемент UI со строкой Hello, Ada!", points: 10, secret: true)
+        .init(.helloAda, "Hello, Ada", "Привет, Ада", "Save a UI Text element saying Hello, Ada!", "Сохраните текстовый элемент UI со строкой Hello, Ada!", points: 10, secret: true),
     ]
 }
 

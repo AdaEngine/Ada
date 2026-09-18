@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
 @_spi(Internal) import AdaUI
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorModifierDialogTests {
@@ -57,10 +58,6 @@ struct EditorModifierDialogTests {
     @Test(arguments: [Size(width: 480, height: 700), Size(width: 768, height: 700), Size(width: 1440, height: 900)])
     func dialogFitsCompactAndDesktopEditors(_ size: Size) async throws {
         let container = makeContainer(try makeModel(), size: size)
-        if size.width < 900 {
-            _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Pane.Inspector"))
-            await refresh(container)
-        }
         try await open(container)
         let frame = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AddModifier.Dialog")).absoluteFrame
         #expect(frame.minX >= 0 && frame.maxX <= size.width)
@@ -86,8 +83,9 @@ struct EditorModifierDialogTests {
         await refresh(container)
         try await open(container)
         let before = model.document
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Add.Text"))
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Modifiers.Toggle"))
         #expect(model.document == before)
+        #expect(!container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.AddModifier.Dialog")).isEmpty)
     }
 
     @Test func workbenchPresentsOverEntireWindowAndUpdatesItsDocument() async throws {
@@ -95,15 +93,20 @@ struct EditorModifierDialogTests {
         let document = EditorTextDocument(id: "UI", title: "UI", relativePath: "UI.ui", language: .plainText, content: source, errorMessage: nil)
         let workbench = EditorWorkbenchViewModel(openDocuments: [.ui(document)], activeDocumentID: document.id)
         let model = workbench.uiSceneModel(for: document, resourceRoot: nil)
-        let container = UIContainerView(rootView: HStack(spacing: 0) {
-            Color.blue.frame(width: 180)
-            EditorUISceneEditor(model: model)
-        }.fullScreenCover(item: Binding(
-            get: { workbench.modifierPickerRequest },
-            set: { workbench.modifierPickerRequest = $0 }
-        )) { request in
-            EditorAddModifierDialog(model: request.model, nodeID: request.nodeID)
-        })
+        let container = UIContainerView(
+            rootView: HStack(spacing: 0) {
+                Color.blue.frame(width: 180)
+                EditorUISceneEditor(model: model, presentation: .inspector)
+            }
+            .fullScreenCover(
+                item: Binding(
+                    get: { workbench.modifierPickerRequest },
+                    set: { workbench.modifierPickerRequest = $0 }
+                )
+            ) { request in
+                EditorAddModifierDialog(model: request.model, nodeID: request.nodeID)
+            }
+        )
         container.frame = Rect(x: 0, y: 0, width: 1440, height: 900)
         await refresh(container)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.UIScene.Modifiers.Toggle"))
@@ -131,7 +134,7 @@ struct EditorModifierDialogTests {
     }
 
     private func makeContainer(_ model: EditorUISceneModel, size: Size) -> UIContainerView<EditorUISceneEditor> {
-        let container = UIContainerView(rootView: EditorUISceneEditor(model: model))
+        let container = UIContainerView(rootView: EditorUISceneEditor(model: model, presentation: .inspector))
         container.frame = Rect(origin: .zero, size: size)
         container.layoutSubviews()
         return container

@@ -1,6 +1,7 @@
 import Foundation
+
 #if canImport(Security)
-import Security
+    import Security
 #endif
 
 protocol EditorImageCredentialProviding: Sendable {
@@ -16,7 +17,7 @@ enum EditorImageCredentialError: Error, LocalizedError, Sendable {
         switch self {
         case .missingAPIKey:
             "OpenAI API key is not configured. Add it in Agent Settings or set OPENAI_API_KEY."
-        case .keychainFailure(let status):
+        case let .keychainFailure(status):
             "Keychain operation failed with status \(status)."
         case .unsupportedPlatform:
             "Secure credential storage is unavailable on this platform."
@@ -47,66 +48,66 @@ actor EditorOpenAIImageCredentialStore: EditorImageCredentialProviding {
         }
 
         #if canImport(Security)
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.service,
-            kSecAttrAccount as String: Self.account
-        ]
-        let attributes: [String: Any] = [kSecValueData as String: Data(value.utf8)]
-        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        if updateStatus == errSecSuccess {
-            return
-        }
-        guard updateStatus == errSecItemNotFound else {
-            throw EditorImageCredentialError.keychainFailure(updateStatus)
-        }
-        var createQuery = query
-        createQuery[kSecValueData as String] = Data(value.utf8)
-        let createStatus = SecItemAdd(createQuery as CFDictionary, nil)
-        guard createStatus == errSecSuccess else {
-            throw EditorImageCredentialError.keychainFailure(createStatus)
-        }
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: Self.service,
+                kSecAttrAccount as String: Self.account,
+            ]
+            let attributes: [String: Any] = [kSecValueData as String: Data(value.utf8)]
+            let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+            if updateStatus == errSecSuccess {
+                return
+            }
+            guard updateStatus == errSecItemNotFound else {
+                throw EditorImageCredentialError.keychainFailure(updateStatus)
+            }
+            var createQuery = query
+            createQuery[kSecValueData as String] = Data(value.utf8)
+            let createStatus = SecItemAdd(createQuery as CFDictionary, nil)
+            guard createStatus == errSecSuccess else {
+                throw EditorImageCredentialError.keychainFailure(createStatus)
+            }
         #else
-        throw EditorImageCredentialError.unsupportedPlatform
+            throw EditorImageCredentialError.unsupportedPlatform
         #endif
     }
 
     func delete() throws {
         #if canImport(Security)
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.service,
-            kSecAttrAccount as String: Self.account
-        ]
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw EditorImageCredentialError.keychainFailure(status)
-        }
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: Self.service,
+                kSecAttrAccount as String: Self.account,
+            ]
+            let status = SecItemDelete(query as CFDictionary)
+            guard status == errSecSuccess || status == errSecItemNotFound else {
+                throw EditorImageCredentialError.keychainFailure(status)
+            }
         #else
-        throw EditorImageCredentialError.unsupportedPlatform
+            throw EditorImageCredentialError.unsupportedPlatform
         #endif
     }
 
     private func read() throws -> String? {
         #if canImport(Security)
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.service,
-            kSecAttrAccount as String: Self.account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        if status == errSecItemNotFound {
-            return nil
-        }
-        guard status == errSecSuccess, let data = result as? Data else {
-            throw EditorImageCredentialError.keychainFailure(status)
-        }
-        return String(data: data, encoding: .utf8)
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: Self.service,
+                kSecAttrAccount as String: Self.account,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+            ]
+            var result: CFTypeRef?
+            let status = SecItemCopyMatching(query as CFDictionary, &result)
+            if status == errSecItemNotFound {
+                return nil
+            }
+            guard status == errSecSuccess, let data = result as? Data else {
+                throw EditorImageCredentialError.keychainFailure(status)
+            }
+            return String(bytes: data, encoding: .utf8)
         #else
-        return nil
+            return nil
         #endif
     }
 }

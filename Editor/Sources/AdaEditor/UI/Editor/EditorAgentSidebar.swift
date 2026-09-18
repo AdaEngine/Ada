@@ -163,7 +163,8 @@ struct EditorAgentSidebar: View {
     @ViewBuilder
     private var fallbackModelSelector: some View {
         switch viewModel.currentConnectionState {
-        case .ready, .running:
+        case .ready,
+            .running:
             Text("Agent default")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(theme.editorColors.muted)
@@ -173,7 +174,8 @@ struct EditorAgentSidebar: View {
             Text("Loading models…")
                 .font(.system(size: 11))
                 .foregroundColor(theme.editorColors.muted)
-        case .disconnected, .failed:
+        case .disconnected,
+            .failed:
             Button(action: viewModel.connect) {
                 configurationLabel("Select model")
             }
@@ -421,20 +423,20 @@ struct EditorAgentSidebar: View {
             return [
                 "Explain the selected entity and its components",
                 "Improve this scene and verify it with a screenshot",
-                "Find missing assets or invalid references"
+                "Find missing assets or invalid references",
             ]
         }
         if viewModel.codeSelection != nil {
             return [
                 "Explain and improve the selected code",
                 "Find related project code and tests",
-                "Fix this code and validate the result"
+                "Fix this code and validate the result",
             ]
         }
         return [
             "Build a playable scene for this project",
             "Find and fix current project errors",
-            "Explain the project architecture"
+            "Explain the project architecture",
         ]
     }
 
@@ -463,8 +465,10 @@ struct EditorAgentSidebar: View {
                                 .foregroundColor(theme.editorColors.text)
                                 .padding(.horizontal, 8)
                                 .frame(height: 36)
-                                .background(RoundedRectangleShape(cornerRadius: 5)
-                                    .fill(index == viewModel.selectedCompletionIndex ? theme.editorColors.blue.opacity(0.14) : .clear))
+                                .background(
+                                    RoundedRectangleShape(cornerRadius: 5)
+                                        .fill(index == viewModel.selectedCompletionIndex ? theme.editorColors.blue.opacity(0.14) : .clear)
+                                )
                             }
                             .buttonStyle(DefaultButtonStyle())
                             .accessibilityIdentifier("AdaEditor.Agent.Completion.\(entry.id)")

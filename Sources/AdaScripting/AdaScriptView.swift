@@ -47,17 +47,18 @@ public struct AdaScriptViewEnvironment: Equatable, Sendable {
 /// Finds `@view` declarations without executing their source.
 public enum AdaScriptViewScanner {
     public static func declarations(in sources: [AdaScriptSource]) throws -> [AdaScriptViewMetadata] {
-        try AdaScriptSchemaParser.parseViews(sources: sources).map {
-            AdaScriptViewMetadata(
-                className: $0.className,
-                environment: $0.environment.map { AdaScriptViewEnvironment(key: $0.key, propertyName: $0.propertyName) },
-                identifier: $0.id,
-                isPreviewable: $0.isPreviewable,
-                line: $0.line,
-                sourcePath: $0.sourcePath,
-                title: $0.title
-            )
-        }
+        try AdaScriptSchemaParser.parseViews(sources: sources)
+            .map {
+                AdaScriptViewMetadata(
+                    className: $0.className,
+                    environment: $0.environment.map { AdaScriptViewEnvironment(key: $0.key, propertyName: $0.propertyName) },
+                    identifier: $0.id,
+                    isPreviewable: $0.isPreviewable,
+                    line: $0.line,
+                    sourcePath: $0.sourcePath,
+                    title: $0.title
+                )
+            }
     }
 }
 
@@ -125,7 +126,7 @@ public struct AdaScriptView: View {
                 "colorScheme": .string(colorScheme == .dark ? "dark" : "light"),
                 "isEnabled": .bool(isEnabled),
                 "scaleFactor": .double(Double(scaleFactor)),
-                "userInterfaceIdiom": .string(userInterfaceIdiom.adaScriptName)
+                "userInterfaceIdiom": .string(userInterfaceIdiom.adaScriptName),
             ])
             if let error = resolvedStorage.error {
                 return AnyView(
@@ -234,9 +235,12 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
         }
         self.exportedParameters = exportedParameters
         let module = try GravityScriptModuleResolver.resolve(sources)
-        self.factoryNamesByIdentifier = Dictionary(uniqueKeysWithValues: views.enumerated().map { index, view in
-            (view.identifier, "__ada_make_view_\(index)")
-        })
+        self.factoryNamesByIdentifier = Dictionary(
+            uniqueKeysWithValues: views.enumerated()
+                .map { index, view in
+                    (view.identifier, "__ada_make_view_\(index)")
+                }
+        )
         self.viewsByIdentifier = Dictionary(uniqueKeysWithValues: views.map { ($0.identifier, $0) })
 
         let delegate = AnnotatedGravityRuntimeDelegate(module: module)
@@ -252,9 +256,11 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
                     "func __ada_make_view_\(index)() { return \(view.className)(); }"
                 }
                 .joined(separator: "\n")
-            let getters = exportedParameters.enumerated().map { index, name in
-                "func __ada_ui_get_\(index)(instance) { return instance.\(name); }"
-            }.joined(separator: "\n")
+            let getters = exportedParameters.enumerated()
+                .map { index, name in
+                    "func __ada_ui_get_\(index)(instance) { return instance.\(name); }"
+                }
+                .joined(separator: "\n")
             let binary = virtualMachine.loadGravityFile(from: module.entrySource + "\n" + factories + "\n" + getters)
             guard delegate.errors.isEmpty else {
                 throw AdaScriptError.compilation(delegate.errors)
@@ -287,9 +293,11 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
                 throw AdaScriptError.invalidManifest("Unknown @view id '\(identifier)'")
             }
             let factory = virtualMachine.getValue(forKey: factoryName)
-            guard factory.isClosure,
-                  let instance = factory.callConstructor(with: []),
-                  instance.isInstance else {
+            guard
+                factory.isClosure,
+                let instance = factory.callConstructor(with: []),
+                instance.isInstance
+            else {
                 throw AdaScriptError.invalidManifest("Unable to instantiate @view '\(identifier)'")
             }
             guard instance.hasMethod(named: "body") else {
@@ -313,9 +321,11 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
     @MainActor
     func readInput(_ name: String, instance: GSValue) throws -> UIValue {
         try AdaScriptRuntimeCoordinator.lock.withLock {
-            guard let index = exportedParameters.firstIndex(of: name),
-                  let value = virtualMachine.getValue(forKey: "__ada_ui_get_\(index)").callConstructor(with: [instance]),
-                  let field = AdaScriptUIValueBridge.detached(value) else {
+            guard
+                let index = exportedParameters.firstIndex(of: name),
+                let value = virtualMachine.getValue(forKey: "__ada_ui_get_\(index)").callConstructor(with: [instance]),
+                let field = AdaScriptUIValueBridge.detached(value)
+            else {
                 throw UIDiagnostic("Cannot read exported binding '\(name)'.")
             }
             return field
@@ -336,17 +346,21 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
                 guard let value = environment[binding.key] else {
                     throw AdaScriptError.invalidManifest("Unknown environment key '\(binding.key)' in @view '\(identifier)'")
                 }
-                guard instance.setStoredProperty(
-                    named: binding.propertyName,
-                    to: AnnotatedGravityValueBridge.makeGravityValue(value, virtualMachine: virtualMachine)
-                ) else {
+                guard
+                    instance.setStoredProperty(
+                        named: binding.propertyName,
+                        to: AnnotatedGravityValueBridge.makeGravityValue(value, virtualMachine: virtualMachine)
+                    )
+                else {
                     throw AdaScriptError.invalidManifest("Unable to bind @environment property '\(binding.propertyName)' in @view '\(identifier)'")
                 }
             }
             let builder = AdaScriptViewBridge()
             virtualMachine.setValue(builder, forKey: "adaUIBuilder")
-            guard let value = instance.callMethod(named: "body", with: []),
-                  let bridge = value.toObjectOf(AdaScriptViewBridge.self) else {
+            guard
+                let value = instance.callMethod(named: "body", with: []),
+                let bridge = value.toObjectOf(AdaScriptViewBridge.self)
+            else {
                 let diagnostic = delegate.errors.last.map { ": \($0)" } ?? ""
                 throw AdaScriptError.invalidManifest("@view '\(identifier)' body() must return a View value\(diagnostic)")
             }
@@ -389,7 +403,9 @@ final class AdaScriptViewStorage {
     private var inputs: [String: UIValue] = [:]
 
     func updateInputs(_ values: [String: UIValue]) throws {
-        guard inputs != values else { return }
+        guard inputs != values else {
+            return
+        }
         try runtime.writeInputs(values, instance: instance)
         inputs = values
         model = nil
@@ -412,7 +428,7 @@ final class AdaScriptViewStorage {
     }
 }
 
-private extension UserInterfaceIdiom {
+extension UserInterfaceIdiom {
     var adaScriptName: String {
         switch self {
         case .desktop: "desktop"
@@ -429,6 +445,6 @@ private func defaultAdaScriptViewEnvironment() -> [String: EditorFieldValue] {
         "colorScheme": .string("light"),
         "isEnabled": .bool(true),
         "scaleFactor": .double(1),
-        "userInterfaceIdiom": .string("desktop")
+        "userInterfaceIdiom": .string("desktop"),
     ]
 }

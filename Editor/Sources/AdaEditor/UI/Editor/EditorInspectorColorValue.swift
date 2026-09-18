@@ -18,7 +18,8 @@ struct EditorInspectorColorValue: Equatable, Sendable {
     }
 
     init?(rgbaText: String) {
-        let components = rgbaText
+        let components =
+            rgbaText
             .split { $0 == "," || $0 == " " || $0 == "\t" }
             .compactMap { Float($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
         guard components.count == 4 else {
@@ -69,7 +70,8 @@ struct EditorInspectorColorValue: Equatable, Sendable {
 
     private static func format(_ value: Float) -> String {
         let formatted = String(format: "%.3f", value)
-        return formatted
+        return
+            formatted
             .replacingOccurrences(of: #"0+$"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"\.$"#, with: "", options: .regularExpression)
     }

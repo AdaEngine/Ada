@@ -24,6 +24,8 @@ struct EditorSceneViewportView: View {
     @Environment(\.viewProxy) var viewProxy
 
     var body: some View {
+        // A declaration is required inside AdaUI's result builder.
+        // swiftlint:disable:next redundant_discardable_let
         let _ = isPlayingThisDocument ? preparePlayModeViewport() : configureViewportModel()
         ZStack {
             theme.editorColors.surfaceElevated
@@ -39,7 +41,9 @@ struct EditorSceneViewportView: View {
         }
         .accessibilityIdentifier("AdaEditor.SceneViewport.\(document.title)")
         .onAppear {
-            if let resourceRootURL { displayPreview.load(projectRoot: Self.uiProjectRoot(from: resourceRootURL)) }
+            if let resourceRootURL {
+                displayPreview.load(projectRoot: Self.uiProjectRoot(from: resourceRootURL))
+            }
         }
         .onDisappear {
             viewportModel.disconnect()
@@ -48,7 +52,7 @@ struct EditorSceneViewportView: View {
     }
 
     private var isPlayingThisDocument: Bool {
-        if case .playing(let sceneDocumentID, _) = playModeState {
+        if case let .playing(sceneDocumentID, _) = playModeState {
             return sceneDocumentID == document.id
         }
 
@@ -60,32 +64,35 @@ struct EditorSceneViewportView: View {
             toolbar
             GeometryReader { geometry in
                 ZStack(anchor: .bottomLeading) {
-                    SceneView(make: { app in
-                        configureSceneViewApp(&app)
-                        let result = EditorSceneFileLoader.load(
-                            content: document.content,
-                            into: app.main,
-                            loadsScriptableObjects: false,
-                            sourceURL: document.absolutePath.map { URL(fileURLWithPath: $0) },
-                            resourceRootURL: resourceRootURL
-                        )
-                        if runtimeWarnings != result.warnings {
-                            runtimeWarnings = result.warnings
-                        }
-                        viewportModel.attachSceneWorld(app.main, loadResult: result)
-                    }, updateContent: { world, deltaTime in
-                        if let input = world.getResource(Input.self) {
-                            for event in input.getInputEvents() {
-                                let handled = viewportModel.handleInput(event)
-                                if handled {
-                                    redrawViewport()
+                    SceneView(
+                        make: { app in
+                            configureSceneViewApp(&app)
+                            let result = EditorSceneFileLoader.load(
+                                content: document.content,
+                                into: app.main,
+                                loadsScriptableObjects: false,
+                                sourceURL: document.absolutePath.map { URL(fileURLWithPath: $0) },
+                                resourceRootURL: resourceRootURL
+                            )
+                            if runtimeWarnings != result.warnings {
+                                runtimeWarnings = result.warnings
+                            }
+                            viewportModel.attachSceneWorld(app.main, loadResult: result)
+                        },
+                        updateContent: { world, deltaTime in
+                            if let input = world.getResource(Input.self) {
+                                for event in input.getInputEvents() {
+                                    let handled = viewportModel.handleInput(event)
+                                    if handled {
+                                        redrawViewport()
+                                    }
                                 }
                             }
+                            if viewportModel.update(deltaTime: deltaTime) {
+                                redrawViewport()
+                            }
                         }
-                        if viewportModel.update(deltaTime: deltaTime) {
-                            redrawViewport()
-                        }
-                    })
+                    )
                     .frame(width: geometry.size.width, height: geometry.size.height)
 
                     viewportSceneOverlay
@@ -106,9 +113,12 @@ struct EditorSceneViewportView: View {
             playToolbar
             GeometryReader { geometry in
                 ZStack(anchor: .bottomLeading) {
-                    AdaptiveSceneView(layout: displayPreview.settings.layout, fitsAvailableSpace: displayPreview.fitsAvailableSpace,
-                                      make: configurePlayWorld)
-                        .frame(width: geometry.size.width, height: geometry.size.height)
+                    AdaptiveSceneView(
+                        layout: displayPreview.settings.layout,
+                        fitsAvailableSpace: displayPreview.fitsAvailableSpace,
+                        make: configurePlayWorld
+                    )
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                     sceneControls(size: geometry.size)
                     playStatusBar
                 }
@@ -145,9 +155,11 @@ struct EditorSceneViewportView: View {
             sourceURL: document.absolutePath.map { URL(fileURLWithPath: $0) },
             resourceRootURL: resourceRootURL
         )
-        if runtimeInstalled { runtimeWarnings = result.warnings }
+        if runtimeInstalled {
+            runtimeWarnings = result.warnings
+        }
         if runtimeInstalled, result.warnings.isEmpty, document.absolutePath != nil,
-           let model = document.sceneModel {
+            let model = document.sceneModel {
             EditorAchievementBootstrap.center?.record(EditorAchievementRules.playedScene(model, adaScript: playRuntime != nil))
         }
     }
@@ -157,7 +169,9 @@ struct EditorSceneViewportView: View {
         var candidate = resourceRoot
         while candidate.path != "/" {
             if FileManager.default.fileExists(atPath: candidate.appendingPathComponent(".ada/project.json").path)
-                || FileManager.default.fileExists(atPath: candidate.appendingPathComponent("Package.swift").path) { return candidate }
+                || FileManager.default.fileExists(atPath: candidate.appendingPathComponent("Package.swift").path) {
+                return candidate
+            }
             candidate.deleteLastPathComponent()
         }
         return resourceRoot
@@ -194,7 +208,9 @@ struct EditorSceneViewportView: View {
     @MainActor
     static func configureSimulation(in app: AppWorlds, isPlaying: Bool) {
         // Edit worlds render authored transforms without creating simulation bodies.
-        guard isPlaying else { return }
+        guard isPlaying else {
+            return
+        }
         app.addPlugin(ScriptableObjectPlugin())
         app.addPlugin(Physics2DPlugin())
         app.addPlugin(Physics3DPlugin())
@@ -263,6 +279,8 @@ struct EditorSceneViewportView: View {
 
     private var viewportGridLayer: some View {
         GeometryReader { proxy in
+            // A declaration is required inside AdaUI's result builder.
+            // swiftlint:disable:next redundant_discardable_let
             let _ = viewportModel.setViewportSize(proxy.size)
             Canvas { context, size in
                 viewportModel.drawGrid(in: &context, size: size, theme: theme)

@@ -57,7 +57,7 @@ enum EditorShaderSyntaxHighlighter {
                     index = identifierEnd(chars, from: index)
                     kind = .keyword
                 } else if chars[index].isASCII && chars[index].isNumber
-                            || (chars[index] == "." && index + 1 < chars.count && chars[index + 1].isNumber) {
+                    || (chars[index] == "." && index + 1 < chars.count && chars[index + 1].isNumber) {
                     index = numberEnd(chars, from: index)
                     kind = .number
                 } else if isIdentifierStart(chars[index]) {
@@ -158,24 +158,32 @@ enum EditorShaderSyntaxHighlighter {
         let exponent = hexadecimal ? Set("pP") : Set("eE")
         if index < chars.count && exponent.contains(chars[index]) {
             index += 1
-            if index < chars.count && (chars[index] == "+" || chars[index] == "-") { index += 1 }
+            if index < chars.count && (chars[index] == "+" || chars[index] == "-") {
+                index += 1
+            }
             while index < chars.count && chars[index].isASCII && chars[index].isNumber { index += 1 }
         }
         while index < chars.count && "uUiIfFhHlL".contains(chars[index]) { index += 1 }
         return max(start + 1, index)
     }
 
-    private static let glslKeywords = Set("""
+    private static let glslKeywords = Set(
+        """
         attribute const uniform varying buffer shared coherent volatile restrict readonly writeonly atomic_uint
         layout centroid flat smooth noperspective patch sample invariant precise precision highp mediump lowp
         break continue do for while switch case default if else subroutine in out inout discard return struct
-        """.split(whereSeparator: \.isWhitespace).map(String.init))
+        """
+        .split(whereSeparator: \.isWhitespace).map(String.init)
+    )
 
-    private static let wgslKeywords = Set("""
+    private static let wgslKeywords = Set(
+        """
         alias break case const const_assert continue continuing default diagnostic discard else enable fn for if
         let loop override requires return struct switch var while function private workgroup uniform storage
         read write read_write handle push_constant
-        """.split(whereSeparator: \.isWhitespace).map(String.init))
+        """
+        .split(whereSeparator: \.isWhitespace).map(String.init)
+    )
 
     private static let glslTypes: Set<String> = {
         var types = Set(["void", "bool", "int", "uint", "float", "double", "atomic_uint"])
@@ -189,19 +197,24 @@ enum EditorShaderSyntaxHighlighter {
         for prefix in ["sampler", "isampler", "usampler", "image", "iimage", "uimage"] {
             for shape in ["1D", "2D", "3D", "Cube", "2DRect", "1DArray", "2DArray", "CubeArray", "Buffer", "2DMS", "2DMSArray"] {
                 types.insert(prefix + shape)
-                if prefix == "sampler" { types.insert(prefix + shape + "Shadow") }
+                if prefix == "sampler" {
+                    types.insert(prefix + shape + "Shadow")
+                }
             }
         }
         return types
     }()
 
     private static let wgslTypes: Set<String> = {
-        var types = Set("""
+        var types = Set(
+            """
             bool i32 u32 f32 f16 array atomic ptr sampler sampler_comparison texture_1d texture_2d texture_2d_array
             texture_3d texture_cube texture_cube_array texture_multisampled_2d texture_storage_1d texture_storage_2d
             texture_storage_2d_array texture_storage_3d texture_depth_2d texture_depth_2d_array texture_depth_cube
             texture_depth_cube_array texture_depth_multisampled_2d texture_external binding_array
-            """.split(whereSeparator: \.isWhitespace).map(String.init))
+            """
+            .split(whereSeparator: \.isWhitespace).map(String.init)
+        )
         for width in 2...4 {
             for suffix in ["", "f", "h", "i", "u"] { types.insert("vec\(width)\(suffix)") }
             for height in 2...4 {

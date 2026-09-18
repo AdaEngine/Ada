@@ -72,8 +72,8 @@ final class EditorGitDocument: Equatable {
             }
             self.isLoading = false
             switch result {
-            case .success(let review): self.apply(review)
-            case .failure(let error): self.message = error.message
+            case let .success(review): self.apply(review)
+            case let .failure(error): self.message = error.message
             }
         }
     }
@@ -152,8 +152,8 @@ final class EditorGitDocument: Equatable {
             }
             self.tasks[file.id] = nil
             switch result {
-            case .success(let patch): self.patches[file.id] = patch
-            case .failure(let error): self.errors[file.id] = error.message
+            case let .success(patch): self.patches[file.id] = patch
+            case let .failure(error): self.errors[file.id] = error.message
             }
             self.rebuildRows()
         }
@@ -171,7 +171,9 @@ final class EditorGitDocument: Equatable {
         var rows: [EditorGitRow] = []
         for file in files {
             rows.append(EditorGitRow(id: file.id, file: file, content: .file(file)))
-            guard expandedFiles.contains(file.id) else { continue }
+            guard expandedFiles.contains(file.id) else {
+                continue
+            }
             guard let patch = patches[file.id] else {
                 rows.append(EditorGitRow(id: "\(file.id):loading", file: file, content: .message(errors[file.id] ?? "Loading diff…")))
                 continue

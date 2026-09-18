@@ -1,8 +1,9 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) @testable import AdaUI
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor
 @Suite(.serialized)
@@ -19,17 +20,19 @@ struct EditorTitleFontTests {
         let font = AdaEditorTitleFont.font(size: 22)
         #expect(font.name.contains("Cal"))
 
-        let container = UIContainerView(rootView: NavigationStack {
-            Text("Body")
-                .accessibilityIdentifier("body")
-                .navigationTitle("New Project")
-                .navigationTitleFont(font)
-                .navigationTitlePosition(.leading)
-                .navigationBarTrailingItems {
-                    Text("Action")
-                        .accessibilityIdentifier("action")
-                }
-        })
+        let container = UIContainerView(
+            rootView: NavigationStack {
+                Text("Body")
+                    .accessibilityIdentifier("body")
+                    .navigationTitle("New Project")
+                    .navigationTitleFont(font)
+                    .navigationTitlePosition(.leading)
+                    .navigationBarTrailingItems {
+                        Text("Action")
+                            .accessibilityIdentifier("action")
+                    }
+            }
+        )
         container.frame = Rect(x: 0, y: 0, width: 600, height: 400)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
@@ -53,12 +56,14 @@ struct EditorTitleFontTests {
 
     @Test
     func nilNavigationTitleFontKeepsDefaultSize() throws {
-        let container = UIContainerView(rootView: NavigationStack {
-            Color.clear
-                .navigationTitle("Settings")
-                .navigationTitlePosition(.leading)
-                .navigationTitleFont(nil)
-        })
+        let container = UIContainerView(
+            rootView: NavigationStack {
+                Color.clear
+                    .navigationTitle("Settings")
+                    .navigationTitlePosition(.leading)
+                    .navigationTitleFont(nil)
+            }
+        )
         container.frame = Rect(x: 0, y: 0, width: 600, height: 400)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()

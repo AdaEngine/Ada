@@ -26,7 +26,11 @@ struct EditorSettingsUXTests {
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Settings.SkillFolders.Add"))
         #expect(agent.agentSkillsDirectories == [".skills", "Skills, Shared", ""])
         agent.skillDirectoryBinding(at: 2).wrappedValue = "More Skills"
-        for _ in 0..<10 { await Task.yield(); container.update(1.0 / 60.0); container.layoutIfNeeded() }
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1.0 / 60.0)
+            container.layoutIfNeeded()
+        }
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.SkillFolders.Path.2"))
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Settings.SkillFolders.Remove.0"))
         #expect(agent.agentSkillsDirectories == ["Skills, Shared", "More Skills"])
@@ -72,7 +76,9 @@ struct EditorSettingsUXTests {
             #expect(!center.preferences.enabledSources.contains(source))
         }
         for _ in 0..<100 {
-            if try await store.load().preferences == center.preferences { break }
+            if try await store.load().preferences == center.preferences {
+                break
+            }
             await Task.yield()
         }
         let reloaded = EditorNotificationCenter(store: store)
@@ -94,7 +100,11 @@ struct EditorSettingsUXTests {
         #expect(calls == ["build", "product:Game"])
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Tasks.Group.build"))
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Tasks.Group.maintenance"))
-        for _ in 0..<10 { await Task.yield(); container.update(1.0 / 60.0); container.layoutIfNeeded() }
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1.0 / 60.0)
+            container.layoutIfNeeded()
+        }
         #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Tasks.Run.build")).isEmpty)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Tasks.Run.clean"))
         #expect(calls.last == "clean")

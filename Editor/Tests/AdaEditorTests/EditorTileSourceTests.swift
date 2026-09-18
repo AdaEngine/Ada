@@ -1,8 +1,9 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor tile source", .serialized)
 struct EditorTileSourceTests {
@@ -113,7 +114,7 @@ struct EditorTileSourceTests {
         let project = EditorViewModel(project: EditorProjectReference(name: "Tiles", path: fixture.root.path))
         let item = try #require(project.projectSidebar.items.first { $0.relativePath == "Assets/game.tileset" })
         project.openProjectItem(item)
-        guard case .asset(let document)? = project.workbench.activeDocument else {
+        guard case let .asset(document)? = project.workbench.activeDocument else {
             Issue.record("Expected a visual tile source asset document")
             return
         }

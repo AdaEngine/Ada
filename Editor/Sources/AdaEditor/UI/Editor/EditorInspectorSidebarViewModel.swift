@@ -116,7 +116,7 @@ final class EditorInspectorSidebarViewModel {
     init(
         transformFields: [TransformField] = [
             TransformField(label: "Position", value: "0.0, 1.2, -5.4"),
-            TransformField(label: "Rotation", value: "0, 180, 0")
+            TransformField(label: "Rotation", value: "0, 180, 0"),
         ],
         scriptName: String = AdaEngineStyleContent.inspectorScript,
         scriptDescription: String = AdaEngineStyleContent.inspectorScriptDescription
@@ -148,8 +148,12 @@ final class EditorInspectorSidebarViewModel {
     }
 
     func updateLiveTransform(editorID: String, payload: EditorComponentPayload) {
-        guard selectedEntity?.editorID == editorID,
-              let descriptor = EditorComponentRegistry.descriptor(named: EditorBuiltInComponentType.transform) else { return }
+        guard
+            selectedEntity?.editorID == editorID,
+            let descriptor = EditorComponentRegistry.descriptor(named: EditorBuiltInComponentType.transform)
+        else {
+            return
+        }
         for field in descriptor.fields {
             liveTransformAxes[field.key] = vectorComponents(from: field.displayValue(in: payload), count: field.kind.vectorComponentCount)
             for axisIndex in 0..<field.kind.vectorComponentCount {
@@ -305,8 +309,10 @@ final class EditorInspectorSidebarViewModel {
                     .value ?? ""
             },
             set: { value in
-                guard let objectIndex = self.selectedEntity?.scriptableObjects.firstIndex(where: { $0.identifier == identifier }),
-                      let fieldIndex = self.selectedEntity?.scriptableObjects[objectIndex].fields.firstIndex(where: { $0.field.key == field.key }) else {
+                guard
+                    let objectIndex = self.selectedEntity?.scriptableObjects.firstIndex(where: { $0.identifier == identifier }),
+                    let fieldIndex = self.selectedEntity?.scriptableObjects[objectIndex].fields.firstIndex(where: { $0.field.key == field.key })
+                else {
                     return
                 }
                 self.selectedEntity?.scriptableObjects[objectIndex].fields[fieldIndex].value = value
@@ -339,7 +345,7 @@ final class EditorInspectorSidebarViewModel {
                 }
 
                 if typeName == EditorBuiltInComponentType.transform,
-                   let axes = self.liveTransformAxes[field.key], axes.indices.contains(axisIndex) {
+                    let axes = self.liveTransformAxes[field.key], axes.indices.contains(axisIndex) {
                     return axes[axisIndex]
                 }
 
@@ -375,8 +381,10 @@ final class EditorInspectorSidebarViewModel {
     }
 
     private func setComponentField(typeName: String, field: EditorComponentField, value: String) {
-        guard let componentIndex = selectedEntity?.components.firstIndex(where: { $0.typeName == typeName }),
-              let fieldIndex = selectedEntity?.components[componentIndex].fields.firstIndex(where: { $0.field.key == field.key }) else {
+        guard
+            let componentIndex = selectedEntity?.components.firstIndex(where: { $0.typeName == typeName }),
+            let fieldIndex = selectedEntity?.components[componentIndex].fields.firstIndex(where: { $0.field.key == field.key })
+        else {
             return
         }
         selectedEntity?.components[componentIndex].fields[fieldIndex].value = value
@@ -406,7 +414,8 @@ final class EditorInspectorSidebarViewModel {
     }
 
     private func vectorComponents(from value: String, count: Int) -> [String] {
-        var components = value
+        var components =
+            value
             .split { $0 == "," || $0 == " " || $0 == "\t" }
             .map { String($0) }
         if components.count < count {
@@ -453,7 +462,7 @@ private struct VectorAxisDraftKey: Hashable {
     var axisIndex: Int
 }
 
-private extension EditorComponentFieldKind {
+extension EditorComponentFieldKind {
     var vectorComponentCount: Int {
         switch self {
         case .vector2:

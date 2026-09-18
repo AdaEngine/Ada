@@ -16,7 +16,7 @@ struct EditorTopToolbar: View {
     let onToggleProjectSwitcher: () -> Void
     let onRun: () -> Void
     let onStop: () -> Void
-    var onDebug: (() -> Void)? = nil
+    var onDebug: (() -> Void)?
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
@@ -284,9 +284,9 @@ private struct EditorToolbarSearchBarClearButtonStyle: ButtonStyle {
     }
 }
 
-private extension Glass {
+extension Glass {
     static func editorToolbarSearch(theme: Theme) -> Glass {
-        var glass = Glass.regular
+        var glass = Self.regular
         glass.blurRadius = 18
         glass.glassTintStrength = 0.52
         glass.edgeShadowStrength = 0

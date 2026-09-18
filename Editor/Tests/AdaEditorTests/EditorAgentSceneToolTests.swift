@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor agent scene tools")
 @MainActor
@@ -18,7 +19,7 @@ struct EditorAgentSceneToolTests {
             operations: [
                 .createEntity(id: "player", name: "Player", parentID: "root", components: [:]),
                 .setEntityEnabled(id: "player", enabled: false),
-                .renameEntity(id: "root", name: "Game Root")
+                .renameEntity(id: "root", name: "Game Root"),
             ]
         )
 
@@ -64,7 +65,7 @@ struct EditorAgentSceneToolTests {
                 expectedRevision: before.revision,
                 operations: [
                     .createEntity(id: "child", name: "Child", parentID: "root", components: [:]),
-                    .reparentEntity(id: "root", parentID: "child")
+                    .reparentEntity(id: "root", parentID: "child"),
                 ]
             )
         }
@@ -82,7 +83,7 @@ struct EditorAgentSceneToolTests {
             expectedRevision: before.revision,
             operations: [
                 .createEntity(id: "parent", name: "Parent", parentID: "root", components: [:]),
-                .createEntity(id: "child", name: "Child", parentID: "parent", components: [:])
+                .createEntity(id: "child", name: "Child", parentID: "parent", components: [:]),
             ]
         )
         let deleted = try service.apply(

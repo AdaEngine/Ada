@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Project opening templates")
 struct ProjectOpeningTemplateTests {
@@ -51,7 +52,8 @@ struct ProjectOpeningTemplateTests {
         defer { try? FileManager.default.removeItem(at: rootURL) }
         let reference = try EditorProjectStore(
             storageURL: rootURL.appendingPathComponent("projects.json")
-        ).createProject(named: "Runtime Data", at: rootURL, template: .adaScript)
+        )
+        .createProject(named: "Runtime Data", at: rootURL, template: .adaScript)
         let projectURL = URL(fileURLWithPath: reference.path, isDirectory: true)
         let mainURL = projectURL.appendingPathComponent("Sources/Main.ada")
         try """
@@ -60,7 +62,8 @@ struct ProjectOpeningTemplateTests {
             @export
             var current = 100.0;
         }
-        """.write(to: mainURL, atomically: true, encoding: .utf8)
+        """
+        .write(to: mainURL, atomically: true, encoding: .utf8)
         let project = try ProjectSystem.loadProject(at: projectURL)
 
         #expect(throws: EditorAdaScriptProjectBuildError.nativeDataRequiresRuntimeLayout(names: ["Health"])) {

@@ -14,23 +14,23 @@ enum EditorAgentCompletion: Equatable, Identifiable, Sendable {
 
     var id: String {
         switch self {
-        case .file(let file): "file:\(file.path)"
-        case .skill(let skill): "skill:\(skill.id)"
-        case .command(let command): "command:\(command.name)"
+        case let .file(file): "file:\(file.path)"
+        case let .skill(skill): "skill:\(skill.id)"
+        case let .command(command): "command:\(command.name)"
         }
     }
 
     var title: String {
         switch self {
-        case .file(let file): file.path
-        case .skill(let skill): skill.id
-        case .command(let command): command.name
+        case let .file(file): file.path
+        case let .skill(skill): skill.id
+        case let .command(command): command.name
         }
     }
 
     var kind: String {
         switch self {
-        case .file(let file): file.isDirectory ? "Folder" : "File"
+        case let .file(file): file.isDirectory ? "Folder" : "File"
         case .skill: "Skill"
         case .command: "Command"
         }
@@ -39,8 +39,8 @@ enum EditorAgentCompletion: Equatable, Identifiable, Sendable {
     var detail: String? {
         switch self {
         case .file: nil
-        case .skill(let skill): skill.description
-        case .command(let command): command.description
+        case let .skill(skill): skill.description
+        case let .command(command): command.description
         }
     }
 }

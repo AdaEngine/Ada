@@ -13,7 +13,9 @@ actor EditorAdaScriptLibraryManager {
 
     func install(_ source: AdaScriptLibrarySource, at projectURL: URL) async throws -> AdaScriptLibraryLock {
         let key = projectURL.resolvingSymlinksInPath().path
-        guard busyProjects.insert(key).inserted else { throw AdaScriptLibraryError.invalid("A library operation is already running.") }
+        guard busyProjects.insert(key).inserted else {
+            throw AdaScriptLibraryError.invalid("A library operation is already running.")
+        }
         defer { busyProjects.remove(key) }
         let previous = try AdaScriptLibraryLock.load(at: projectURL)
         let download = try await provider.download(source)
@@ -35,7 +37,9 @@ actor EditorAdaScriptLibraryManager {
 
     func restore(at projectURL: URL) async throws -> AdaScriptLibraryLock {
         let key = projectURL.resolvingSymlinksInPath().path
-        guard busyProjects.insert(key).inserted else { throw AdaScriptLibraryError.invalid("A library operation is already running.") }
+        guard busyProjects.insert(key).inserted else {
+            throw AdaScriptLibraryError.invalid("A library operation is already running.")
+        }
         defer { busyProjects.remove(key) }
         let previous = try AdaScriptLibraryLock.load(at: projectURL)
         var lock = previous
@@ -68,12 +72,18 @@ actor EditorAdaScriptLibraryManager {
         var created: [URL] = []
         var committed = false
         defer {
-            if !committed { for url in created { try? fileManager.removeItem(at: url) } }
+            if !committed {
+                for url in created { try? fileManager.removeItem(at: url) }
+            }
         }
         for library in lock.libraries {
-            guard let download = downloads[library.manifest.id] else { continue }
+            guard let download = downloads[library.manifest.id] else {
+                continue
+            }
             let root = try AdaScriptLibraryLock.containedURL(".ada/libraries/\(library.directory)", in: projectURL)
-            guard !fileManager.fileExists(atPath: root.path) else { throw AdaScriptLibraryError.invalid("Library installation already exists.") }
+            guard !fileManager.fileExists(atPath: root.path) else {
+                throw AdaScriptLibraryError.invalid("Library installation already exists.")
+            }
             try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
             created.append(root)
             for (path, data) in download.files {

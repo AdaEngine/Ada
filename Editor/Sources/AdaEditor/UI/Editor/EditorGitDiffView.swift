@@ -76,21 +76,26 @@ struct EditorGitDiffView: View {
     }
 
     private func scroll(using proxy: ScrollViewProxy) {
-        if let target = document.scrollTarget { proxy.scrollTo(target, anchor: .topLeading) }
+        if let target = document.scrollTarget {
+            proxy.scrollTo(target, anchor: .topLeading)
+        }
     }
 
     @ViewBuilder
     private func diffRow(_ row: EditorGitRow, width: Float) -> some View {
         switch row.content {
-        case .file(let file):
+        case let .file(file):
             HStack(spacing: 8) {
-                Button(action: { document.toggle(file) }, label: {
-                    HStack(spacing: 8) {
-                        Text(document.expandedFiles.contains(file.id) ? "−" : "+").frame(width: 14)
-                        Text("\(file.comparison.title) · \(file.path)").lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                Button(
+                    action: { document.toggle(file) },
+                    label: {
+                        HStack(spacing: 8) {
+                            Text(document.expandedFiles.contains(file.id) ? "−" : "+").frame(width: 14)
+                            Text("\(file.comparison.title) · \(file.path)").lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                        }
+                        .font(.system(size: 12))
                     }
-                    .font(.system(size: 12))
-                })
+                )
                 .buttonStyle(DefaultButtonStyle())
                 .fixedSize(horizontal: true, vertical: false)
                 .accessibilityIdentifier("AdaEditor.Git.Diff.File.\(file.id)")
@@ -107,9 +112,9 @@ struct EditorGitDiffView: View {
             .padding(.horizontal, 10)
             .frame(width: width, height: 36, alignment: .leading)
             .background(theme.editorColors.surfaceElevated)
-        case .message(let message):
+        case let .message(message):
             notice(message).frame(width: width, alignment: .leading)
-        case .hunk(let header):
+        case let .hunk(header):
             Text(header)
                 .font(AdaEditorCodeFont.font(size: workbench.codeFontSize))
                 .foregroundColor(theme.editorColors.muted)
@@ -140,13 +145,15 @@ struct EditorGitDiffView: View {
                 .font(font)
                 .foregroundColor(line?.kind == .addition ? GitDiffColors.addition : line?.kind == .deletion ? GitDiffColors.deletion : theme.editorColors.muted)
                 .frame(width: 12)
-            Text(EditorSourceHoverPresentation.attributedText(
-                line?.text ?? "",
-                language: .detect(fileName: file.name),
-                palette: workbench.codeColorPalette,
-                font: font,
-                keywordFont: AdaEditorCodeFont.font(family: workbench.codeFontFamily, weight: workbench.keywordFontWeight, size: workbench.codeFontSize)
-            ))
+            Text(
+                EditorSourceHoverPresentation.attributedText(
+                    line?.text ?? "",
+                    language: .detect(fileName: file.name),
+                    palette: workbench.codeColorPalette,
+                    font: font,
+                    keywordFont: AdaEditorCodeFont.font(family: workbench.codeFontFamily, weight: workbench.keywordFontWeight, size: workbench.codeFontSize)
+                )
+            )
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
             Spacer()
@@ -172,7 +179,9 @@ struct EditorGitDiffView: View {
         switch line.kind {
         case .addition: return GitDiffColors.addition.opacity(0.13)
         case .deletion: return GitDiffColors.deletion.opacity(0.13)
-        case .context, .note: return .clear
+        case .context,
+            .note:
+            return .clear
         }
     }
 

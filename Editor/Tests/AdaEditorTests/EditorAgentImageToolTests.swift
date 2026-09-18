@@ -1,9 +1,11 @@
-@testable import AdaEditor
 import Foundation
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
 import Testing
+
+@testable import AdaEditor
+
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 @Suite("Editor agent image tools")
 struct EditorAgentImageToolTests {
@@ -12,22 +14,27 @@ struct EditorAgentImageToolTests {
         let defaults = try ProjectSystem.loadProject(from: Data(#"{"schemaVersion":3}"#.utf8))
         #expect(defaults.ai.imageGeneration == AdaProjectImageGeneration())
 
-        let configured = try ProjectSystem.loadProject(from: Data("""
-        {
-          "schemaVersion": 3,
-          "ai": {
-            "imageGeneration": {
-              "enabled": true,
-              "provider": "openai",
-              "model": "gpt-image-2",
-              "size": "1536x1024",
-              "quality": "high",
-              "background": "opaque",
-              "outputFormat": "webp"
-            }
-          }
-        }
-        """.utf8))
+        let configured = try ProjectSystem.loadProject(
+            from: Data(
+                """
+                {
+                  "schemaVersion": 3,
+                  "ai": {
+                    "imageGeneration": {
+                      "enabled": true,
+                      "provider": "openai",
+                      "model": "gpt-image-2",
+                      "size": "1536x1024",
+                      "quality": "high",
+                      "background": "opaque",
+                      "outputFormat": "webp"
+                    }
+                  }
+                }
+                """
+                .utf8
+            )
+        )
 
         #expect(configured.ai.imageGeneration.enabled)
         #expect(configured.ai.imageGeneration.size == "1536x1024")
@@ -89,7 +96,7 @@ struct EditorAgentImageToolTests {
         #expect(result.assetReference == "@res://Textures/outlined.png")
         let request = try #require(await client.recordedRequests().first)
         #expect(request.url?.path == "/v1/images/edits")
-        let body = String(decoding: try #require(request.httpBody), as: UTF8.self)
+        let body = try #require(String(bytes: try #require(request.httpBody), encoding: .utf8))
         #expect(body.contains("name=\"image\"; filename=\"source.png\""))
         #expect(body.contains("Add a gold outline"))
 
@@ -105,7 +112,7 @@ struct EditorAgentImageToolTests {
         defer { try? FileManager.default.removeItem(at: fixture.projectURL) }
         let client = RecordingImageHTTPClient(responses: [
             .failure(statusCode: 400, message: "bad prompt"),
-            .success(Data("not an image".utf8))
+            .success(Data("not an image".utf8)),
         ])
         let service = EditorAgentImageToolService(
             project: fixture.project,
@@ -173,19 +180,21 @@ private actor RecordingImageHTTPClient: EditorImageGenerationHTTPClient {
         let statusCode: Int
         let data: Data
         switch response {
-        case .success(let imageData):
+        case let .success(imageData):
             statusCode = 200
             data = Data("{\"data\":[{\"b64_json\":\"\(imageData.base64EncodedString())\"}]}".utf8)
-        case .failure(let code, let message):
+        case let .failure(code, message):
             statusCode = code
             data = Data("{\"error\":{\"message\":\"\(message)\"}}".utf8)
         }
-        guard let response = HTTPURLResponse(
-            url: request.url ?? URL(fileURLWithPath: "/"),
-            statusCode: statusCode,
-            httpVersion: "HTTP/1.1",
-            headerFields: ["Content-Type": "application/json"]
-        ) else {
+        guard
+            let response = HTTPURLResponse(
+                url: request.url ?? URL(fileURLWithPath: "/"),
+                statusCode: statusCode,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )
+        else {
             throw EditorAgentImageToolError.invalidHTTPResponse
         }
         return (data, response)

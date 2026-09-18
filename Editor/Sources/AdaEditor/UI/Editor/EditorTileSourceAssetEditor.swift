@@ -58,18 +58,25 @@ struct EditorTileSourceAssetEditor: View {
                     grid(layout: layout)
                         .frame(width: Float(image.width) * model.zoom, height: Float(image.height) * model.zoom)
                 }
-                .gesture(DragGesture(minimumDistance: 0).onEnded { value in
-                    let x = value.location.x / model.zoom - Float(layout.margin.width)
-                    let y = value.location.y / model.zoom - Float(layout.margin.height)
-                    guard x >= 0, y >= 0 else {
-                        return
-                    }
-                    let strideX = Float(layout.tileSize.width + layout.spacing.width)
-                    let strideY = Float(layout.tileSize.height + layout.spacing.height)
-                    guard x.truncatingRemainder(dividingBy: strideX) < Float(layout.tileSize.width),
-                          y.truncatingRemainder(dividingBy: strideY) < Float(layout.tileSize.height) else { return }
-                    model.selectTile([Int(x / strideX), Int(y / strideY)])
-                })
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onEnded { value in
+                            let x = value.location.x / model.zoom - Float(layout.margin.width)
+                            let y = value.location.y / model.zoom - Float(layout.margin.height)
+                            guard x >= 0, y >= 0 else {
+                                return
+                            }
+                            let strideX = Float(layout.tileSize.width + layout.spacing.width)
+                            let strideY = Float(layout.tileSize.height + layout.spacing.height)
+                            guard
+                                x.truncatingRemainder(dividingBy: strideX) < Float(layout.tileSize.width),
+                                y.truncatingRemainder(dividingBy: strideY) < Float(layout.tileSize.height)
+                            else {
+                                return
+                            }
+                            model.selectTile([Int(x / strideX), Int(y / strideY)])
+                        }
+                )
                 .padding(24)
             }
             .background(theme.editorColors.surface)

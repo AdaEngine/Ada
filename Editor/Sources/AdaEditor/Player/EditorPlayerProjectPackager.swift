@@ -33,8 +33,12 @@ enum EditorPlayerProjectPackager {
             let path = String(canonical.path.dropFirst(canonicalRoot.path.count + 1))
             try PlayerProjectSnapshot.validatePath(path)
             let attributes = try url.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey])
-            guard attributes.isSymbolicLink != true else { throw PlayerConnectError.invalid("Preview does not support symbolic links: \(path)") }
-            guard attributes.isRegularFile == true, !seen.contains(path) else { return }
+            guard attributes.isSymbolicLink != true else {
+                throw PlayerConnectError.invalid("Preview does not support symbolic links: \(path)")
+            }
+            guard attributes.isRegularFile == true, !seen.contains(path) else {
+                return
+            }
             size += attributes.fileSize ?? 0
             guard size <= PlayerProjectSnapshot.maximumBytes, files.count < PlayerProjectSnapshot.maximumFiles else {
                 throw PlayerConnectError.invalid("Preview limit: 64 MB and 4096 files.")
@@ -47,15 +51,22 @@ enum EditorPlayerProjectPackager {
         for path in roots {
             try PlayerProjectSnapshot.validatePath(path)
             let directory = canonicalRoot.appendingPathComponent(path)
-            guard manager.fileExists(atPath: directory.path) else { continue }
-            guard directory.resolvingSymlinksInPath().path.hasPrefix(canonicalRoot.path + "/"),
-                  (try directory.resourceValues(forKeys: [.isSymbolicLinkKey])).isSymbolicLink != true else {
+            guard manager.fileExists(atPath: directory.path) else {
+                continue
+            }
+            guard
+                directory.resolvingSymlinksInPath().path.hasPrefix(canonicalRoot.path + "/"),
+                (try directory.resourceValues(forKeys: [.isSymbolicLinkKey])).isSymbolicLink != true
+            else {
                 throw PlayerConnectError.invalid("Preview resource folder must be inside the project.")
             }
             guard let enumerator = manager.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles]) else {
                 throw PlayerConnectError.invalid("Cannot read resource folder: \(path)")
             }
-            while let file = enumerator.nextObject() as? URL { try Task.checkCancellation(); try append(file) }
+            while let file = enumerator.nextObject() as? URL {
+                try Task.checkCancellation()
+                try append(file)
+            }
         }
         if let scene = project.runtime.entry.scene {
             try PlayerProjectSnapshot.validatePath(scene)

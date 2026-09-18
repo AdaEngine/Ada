@@ -1,19 +1,25 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("AdaScript runtime configuration")
 struct AdaScriptRuntimeConfigurationTests {
     @Test("schema v2 entry fields migrate into the runtime entry plan")
     func legacyEntryFieldsDecode() throws {
-        let project = try ProjectSystem.loadProject(from: Data(
-            #"{"schemaVersion":2,"build":{"system":"adascript"},"runtime":{"moduleName":"Game","entryView":"game.hud","startupScene":"Assets/Scenes/Main.ascn"}}"#.utf8
-        ))
+        let project = try ProjectSystem.loadProject(
+            from: Data(
+                #"{"schemaVersion":2,"build":{"system":"adascript"},"runtime":{"moduleName":"Game","entryView":"game.hud","startupScene":"Assets/Scenes/Main.ascn"}}"#.utf8
+            )
+        )
 
-        #expect(project.runtime.entry == AdaProjectRuntimeEntry(
-            scene: "Assets/Scenes/Main.ascn",
-            view: "game.hud"
-        ))
+        #expect(
+            project.runtime.entry
+                == AdaProjectRuntimeEntry(
+                    scene: "Assets/Scenes/Main.ascn",
+                    view: "game.hud"
+                )
+        )
         #expect(project.runtime.plugins.preset == .game2D)
     }
 
@@ -23,9 +29,11 @@ struct AdaScriptRuntimeConfigurationTests {
         let projectURL = fileManager.temporaryDirectory
             .appendingPathComponent("AdaScriptSchemaUpgrade-\(UUID().uuidString)", isDirectory: true)
         defer { try? fileManager.removeItem(at: projectURL) }
-        let project = try ProjectSystem.loadProject(from: Data(
-            #"{"schemaVersion":2,"build":{"system":"adascript"},"runtime":{"moduleName":"Game","entryView":"game.hud"}}"#.utf8
-        ))
+        let project = try ProjectSystem.loadProject(
+            from: Data(
+                #"{"schemaVersion":2,"build":{"system":"adascript"},"runtime":{"moduleName":"Game","entryView":"game.hud"}}"#.utf8
+            )
+        )
 
         try ProjectSystem.saveProject(project, at: projectURL, fileManager: fileManager)
 
@@ -67,10 +75,12 @@ struct AdaScriptRuntimeConfigurationTests {
             disable: [.sprite]
         )
 
-        #expect(throws: EditorRuntimePluginResolutionError.disabledDependency(
-            plugin: "sprite",
-            requiredBy: "tilemap"
-        )) {
+        #expect(
+            throws: EditorRuntimePluginResolutionError.disabledDependency(
+                plugin: "sprite",
+                requiredBy: "tilemap"
+            )
+        ) {
             try EditorAdaScriptRuntimePluginResolver.resolve(configuration)
         }
     }
@@ -86,23 +96,26 @@ struct AdaScriptRuntimeConfigurationTests {
         let scenesURL = projectURL.appendingPathComponent("Assets/Scenes", isDirectory: true)
         try fileManager.createDirectory(at: sourcesURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: scenesURL, withIntermediateDirectories: true)
-        try "func helper() { return 1; }".write(
-            to: sourcesURL.appendingPathComponent("Main.ada"),
-            atomically: true,
-            encoding: .utf8
-        )
-        try SceneDocumentFormat.defaultSceneYAML(projectName: "SceneOnly").write(
-            to: scenesURL.appendingPathComponent("Main.ascn"),
-            atomically: true,
-            encoding: .utf8
-        )
+        try "func helper() { return 1; }"
+            .write(
+                to: sourcesURL.appendingPathComponent("Main.ada"),
+                atomically: true,
+                encoding: .utf8
+            )
+        try SceneDocumentFormat.defaultSceneYAML(projectName: "SceneOnly")
+            .write(
+                to: scenesURL.appendingPathComponent("Main.ascn"),
+                atomically: true,
+                encoding: .utf8
+            )
         var project = ProjectSystem.defaultProject(projectName: "SceneOnly", buildSystem: .adaScript)
         project.runtime.entry.view = nil
 
-        let artifact = try EditorAdaScriptProjectBuilder(fileManager: fileManager).prepare(
-            project: project,
-            at: projectURL
-        )
+        let artifact = try EditorAdaScriptProjectBuilder(fileManager: fileManager)
+            .prepare(
+                project: project,
+                at: projectURL
+            )
 
         #expect(artifact.entry.view == nil)
         #expect(artifact.sceneModel != nil)
@@ -119,18 +132,20 @@ struct AdaScriptRuntimeConfigurationTests {
         defer { try? fileManager.removeItem(at: rootURL) }
         let reference = try EditorProjectStore(
             storageURL: rootURL.appendingPathComponent("projects.json")
-        ).createProject(named: "ConfiguredGame", at: rootURL, template: .adaScript)
+        )
+        .createProject(named: "ConfiguredGame", at: rootURL, template: .adaScript)
         let editorViewModel = EditorViewModel(project: reference, fileManager: fileManager)
         let settingsViewModel = EditorSettingsWindowViewModel(
             editorViewModel: editorViewModel,
             selectedSection: .project
         )
         let alternateScenePath = "Assets/Scenes/Opening.ascn"
-        try SceneDocumentFormat.defaultSceneYAML(projectName: "Opening").write(
-            to: URL(fileURLWithPath: reference.path, isDirectory: true).appendingPathComponent(alternateScenePath),
-            atomically: true,
-            encoding: .utf8
-        )
+        try SceneDocumentFormat.defaultSceneYAML(projectName: "Opening")
+            .write(
+                to: URL(fileURLWithPath: reference.path, isDirectory: true).appendingPathComponent(alternateScenePath),
+                atomically: true,
+                encoding: .utf8
+            )
         editorViewModel.projectDisplayNameText = "Configured Game"
         editorViewModel.projectBundleIdentifierText = "dev.adaengine.configured-game"
         editorViewModel.projectMainSceneText = alternateScenePath
@@ -163,10 +178,11 @@ struct AdaScriptRuntimeConfigurationTests {
         #expect(saved.editor.startupScene == alternateScenePath)
         #expect(saved.runtime.entry.scene == alternateScenePath)
 
-        let artifact = try EditorAdaScriptProjectBuilder(fileManager: fileManager).prepare(
-            project: saved,
-            at: URL(fileURLWithPath: reference.path, isDirectory: true)
-        )
+        let artifact = try EditorAdaScriptProjectBuilder(fileManager: fileManager)
+            .prepare(
+                project: saved,
+                at: URL(fileURLWithPath: reference.path, isDirectory: true)
+            )
         #expect(artifact.report.startupScene == alternateScenePath)
         #expect(artifact.report.entryDescription.contains("scene \(alternateScenePath)"))
     }

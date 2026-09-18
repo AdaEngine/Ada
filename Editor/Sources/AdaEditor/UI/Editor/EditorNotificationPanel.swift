@@ -70,7 +70,8 @@ struct EditorNotificationOverlay: View {
 
     private var displayedActivities: [EditorOperationActivity] {
         center.activities.active
-            + model.activeActivities.filter {
+            + model.activeActivities
+            .filter {
                 $0.kind != .agent && ($0.id != "workspace" || model.notificationWorkspaceRunID == nil)
             }
             .map { item in
@@ -98,9 +99,11 @@ struct EditorNotificationOverlay: View {
             }
             .font(.system(size: 13))
             .foregroundColor(theme.editorColors.text)
-            if let error = center.storageError { Text(error).foregroundColor(theme.editorColors.text).font(.system(size: 11)) }
+            if let error = center.storageError {
+                Text(error).foregroundColor(theme.editorColors.text).font(.system(size: 11))
+            }
             ScrollView { eventList }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             if model.notificationTab == .notifications {
                 HStack(spacing: 14) {
                     Button("Mark all read") { center.markAllRead() }
@@ -120,10 +123,14 @@ struct EditorNotificationOverlay: View {
     private var eventList: some View {
         VStack(alignment: .leading, spacing: 8) {
             if model.notificationTab == .notifications {
-                if center.notifications.isEmpty { Text("No notifications").padding(.all, 12) }
+                if center.notifications.isEmpty {
+                    Text("No notifications").padding(.all, 12)
+                }
                 ForEach(center.notifications) { item in EditorNotificationCard(item: item, center: center) }
             } else {
-                if displayedActivities.isEmpty { Text("No active work").padding(.all, 12) }
+                if displayedActivities.isEmpty {
+                    Text("No active work").padding(.all, 12)
+                }
                 ForEach(displayedActivities) { item in activityCard(item) }
             }
         }
@@ -135,11 +142,19 @@ struct EditorNotificationOverlay: View {
             Text(item.title).font(.system(size: 14))
             Text([item.projectName, item.state == .needsAttention ? "Needs attention" : item.detail].compactMap { $0 }.joined(separator: " · "))
                 .font(.system(size: 12))
-            if let fraction = item.fractionCompleted { Text("\(Int(fraction * 100))%").font(.system(size: 12)) }
-            if let status = item.backgroundStatus { Text(status).font(.system(size: 11)) }
+            if let fraction = item.fractionCompleted {
+                Text("\(Int(fraction * 100))%").font(.system(size: 12))
+            }
+            if let status = item.backgroundStatus {
+                Text(status).font(.system(size: 11))
+            }
             HStack(spacing: 12) {
-                if let action = item.action { Button(action.title) { center.perform(action) } }
-                if center.activities.canCancel(item.id) { Button("Cancel") { center.activities.cancel(item.id) } }
+                if let action = item.action {
+                    Button(action.title) { center.perform(action) }
+                }
+                if center.activities.canCancel(item.id) {
+                    Button("Cancel") { center.activities.cancel(item.id) }
+                }
             }
         }
         .padding(.all, 12)
@@ -165,14 +180,20 @@ struct EditorNotificationCard: View {
                 Button("×") { center.dismiss(item.id) }.accessibilityIdentifier("AdaEditor.Notification.Close.\(item.id)")
             }
             Text(item.title).font(.system(size: 14)).lineLimit(3)
-            if let name = item.projectName { Text(name).font(.system(size: 11)) }
-            if !item.detail.isEmpty { Text(item.detail).font(.system(size: 12)).lineLimit(4) }
+            if let name = item.projectName {
+                Text(name).font(.system(size: 11))
+            }
+            if !item.detail.isEmpty {
+                Text(item.detail).font(.system(size: 12)).lineLimit(4)
+            }
             HStack(spacing: 12) {
                 ForEach(Array(item.actions.enumerated()), id: \.offset) { entry in
                     Button(entry.element.title) { center.perform(entry.element, notificationID: item.id) }
                         .accessibilityIdentifier("AdaEditor.Notification.Action.\(item.id).\(entry.offset)")
                 }
-                if !item.isRead { Button("Mark read") { center.markRead(item.id) } }
+                if !item.isRead {
+                    Button("Mark read") { center.markRead(item.id) }
+                }
             }
             .foregroundColor(theme.editorColors.blue)
             .font(.system(size: 12))
@@ -198,10 +219,10 @@ struct EditorNotificationSettings: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("SYSTEM NOTIFICATIONS").font(.system(size: 14))
             #if DEBUG && os(iOS)
-            if ProcessInfo.processInfo.environment["ADA_EDITOR_BACKGROUND_TEST"] == "1" {
-                Button("Run background diagnostic") { EditorBackgroundDiagnostic.shared.start() }
-                    .accessibilityIdentifier("AdaEditor.Notifications.BackgroundDiagnostic")
-            }
+                if ProcessInfo.processInfo.environment["ADA_EDITOR_BACKGROUND_TEST"] == "1" {
+                    Button("Run background diagnostic") { EditorBackgroundDiagnostic.shared.start() }
+                        .accessibilityIdentifier("AdaEditor.Notifications.BackgroundDiagnostic")
+                }
             #endif
             EditorSettingsToggleRow(title: "System notifications", isOn: center.preferences.systemEnabled) {
                 isRequestingPermission = true
@@ -224,7 +245,9 @@ struct EditorNotificationSettings: View {
             VStack(spacing: 6) {
                 ForEach(EditorNotificationSource.allCases, id: \.self) { source in
                     EditorSettingsToggleRow(title: source.rawValue, isOn: center.preferences.enabledSources.contains(source)) {
-                        if !center.preferences.enabledSources.insert(source).inserted { center.preferences.enabledSources.remove(source) }
+                        if !center.preferences.enabledSources.insert(source).inserted {
+                            center.preferences.enabledSources.remove(source)
+                        }
                         center.persist()
                     }
                     .accessibilityIdentifier("AdaEditor.Notifications.Source.\(source.rawValue)")

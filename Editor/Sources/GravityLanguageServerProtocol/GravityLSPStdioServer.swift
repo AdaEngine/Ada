@@ -31,7 +31,7 @@ public final class GravityLSPStdioServer {
                         [
                             "error": ["code": -32700, "message": "Parse error"],
                             "id": NSNull(),
-                            "jsonrpc": "2.0"
+                            "jsonrpc": "2.0",
                         ]
                     ])
                 }

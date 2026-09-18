@@ -13,52 +13,58 @@ struct EditorAgentCatalogView: View {
             HStack {
                 Text("ACP Registry").font(.system(size: 16, weight: .semibold))
                 Spacer()
-                if showsToolbar { EditorAgentCatalogToolbar(agent: agent) }
+                if showsToolbar {
+                    EditorAgentCatalogToolbar(agent: agent)
+                }
             }
             #if os(macOS)
-            Text("Choose an agent for all projects, then open Agent Chat. Sign in through the agent's own account setup.")
-                .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
-            HStack(spacing: 2) {
-                ForEach(EditorAgentCatalogViewModel.Filter.allCases, id: \.rawValue) { filter in
-                    Button(filter.rawValue) { catalog.filter = filter }
-                        .buttonStyle(
-                            EditorAgentCatalogFilterButtonStyle(
-                                isActive: catalog.filter == filter,
-                                theme: theme
+                Text("Choose an agent for all projects, then open Agent Chat. Sign in through the agent's own account setup.")
+                    .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+                HStack(spacing: 2) {
+                    ForEach(EditorAgentCatalogViewModel.Filter.allCases, id: \.rawValue) { filter in
+                        Button(filter.rawValue) { catalog.filter = filter }
+                            .buttonStyle(
+                                EditorAgentCatalogFilterButtonStyle(
+                                    isActive: catalog.filter == filter,
+                                    theme: theme
+                                )
                             )
-                        )
-                        .accessibilityIdentifier("AdaEditor.Agents.Filter.\(filter.rawValue)")
+                            .accessibilityIdentifier("AdaEditor.Agents.Filter.\(filter.rawValue)")
+                    }
                 }
-            }
-            .padding(3)
-            .background(RoundedRectangleShape(cornerRadius: 7).fill(theme.editorColors.surface))
-            .overlay { RoundedRectangleShape(cornerRadius: 7).stroke(theme.editorColors.border, lineWidth: 1) }
-            .accessibilityIdentifier("AdaEditor.Agents.Filter")
-            Text(catalog.status).font(.system(size: 11)).foregroundColor(theme.editorColors.muted).lineLimit(4)
-            if !agent.settingsStatusMessage.isEmpty {
-                Text(agent.settingsStatusMessage)
-                    .font(.system(size: 11)).foregroundColor(theme.editorColors.text).lineLimit(6)
-                    .accessibilityIdentifier("AdaEditor.Agents.ConnectionStatus")
-            }
-            if catalog.filter != .available {
-                installedAgents
-            }
-            if catalog.filter != .installed {
-                localAgents
-                ForEach(catalog.visibleAgents.filter { item in
-                    !catalog.installed.contains { $0.id == item.id } && !catalog.discovered.contains { $0.id == item.id }
-                }) { item in
-                    registryRow(item)
+                .padding(3)
+                .background(RoundedRectangleShape(cornerRadius: 7).fill(theme.editorColors.surface))
+                .overlay { RoundedRectangleShape(cornerRadius: 7).stroke(theme.editorColors.border, lineWidth: 1) }
+                .accessibilityIdentifier("AdaEditor.Agents.Filter")
+                Text(catalog.status).font(.system(size: 11)).foregroundColor(theme.editorColors.muted).lineLimit(4)
+                if !agent.settingsStatusMessage.isEmpty {
+                    Text(agent.settingsStatusMessage)
+                        .font(.system(size: 11)).foregroundColor(theme.editorColors.text).lineLimit(6)
+                        .accessibilityIdentifier("AdaEditor.Agents.ConnectionStatus")
                 }
-            }
+                if catalog.filter != .available {
+                    installedAgents
+                }
+                if catalog.filter != .installed {
+                    localAgents
+                    ForEach(
+                        catalog.visibleAgents.filter { item in
+                            !catalog.installed.contains { $0.id == item.id } && !catalog.discovered.contains { $0.id == item.id }
+                        }
+                    ) { item in
+                        registryRow(item)
+                    }
+                }
             #else
-            Text("Local ACP agents can be installed and launched on macOS.").font(.system(size: 12))
+                Text("Local ACP agents can be installed and launched on macOS.").font(.system(size: 12))
             #endif
         }
         .accessibilityIdentifier("AdaEditor.Agents.Catalog")
         .onAppear {
             #if os(macOS)
-            if loadsCatalog { Task { await catalog.loadIfNeeded() } }
+                if loadsCatalog {
+                    Task { await catalog.loadIfNeeded() }
+                }
             #endif
         }
     }
@@ -85,11 +91,12 @@ struct EditorAgentCatalogView: View {
     }
 
     private var localAgents: some View {
-        ForEach(catalog.discovered.filter { local in
-            let searchableText = "\(local.name) \(local.id) \(local.path) \(catalog.adapter(for: local)?.description ?? "")"
-            return !catalog.installed.contains { $0.id == local.id } &&
-                (catalog.query.isEmpty || searchableText.localizedCaseInsensitiveContains(catalog.query))
-        }) { local in
+        ForEach(
+            catalog.discovered.filter { local in
+                let searchableText = "\(local.name) \(local.id) \(local.path) \(catalog.adapter(for: local)?.description ?? "")"
+                return !catalog.installed.contains { $0.id == local.id } && (catalog.query.isEmpty || searchableText.localizedCaseInsensitiveContains(catalog.query))
+            }
+        ) { local in
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Found \(local.name)").font(.system(size: 12, weight: .semibold))
@@ -108,10 +115,12 @@ struct EditorAgentCatalogView: View {
                 }
                 Text(local.path).font(.system(size: 10)).foregroundColor(theme.editorColors.muted).lineLimit(2)
                 if local.target == nil {
-                    Text(catalog.adapter(for: local) != nil
-                        ? "An ACP adapter is required. Install & Connect sets it up for all projects."
-                        : "ACP adapter unavailable. Refresh the registry or configure an ACP command below.")
-                        .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+                    Text(
+                        catalog.adapter(for: local) != nil
+                            ? "An ACP adapter is required. Install & Connect sets it up for all projects."
+                            : "ACP adapter unavailable. Refresh the registry or configure an ACP command below."
+                    )
+                    .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
                 }
             }
         }
@@ -191,7 +200,8 @@ private struct EditorAgentCatalogActionButtonStyle: ButtonStyle {
         glass.blurRadius = 14
         glass.glassTintStrength = isHighlighted ? 0.72 : 0.46
         glass.edgeShadowStrength = 0
-        glass.tintColor = isHighlighted
+        glass.tintColor =
+            isHighlighted
             ? theme.editorColors.surfaceElevated.opacity(0.62)
             : theme.editorColors.surface.opacity(0.48)
         return glass

@@ -1,29 +1,33 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor agent")
 struct EditorAgentTests {
     @Test("project agent config decodes defaults and explicit target")
     func projectAgentConfigDecoding() throws {
-        let data = Data("""
-        {
-          "schemaVersion": 1,
-          "ai": {
-            "agent": {
-              "enabled": true,
-              "target": {
-                "command": "/usr/bin/agent",
-                "arguments": ["--stdio"],
-                "environment": {"A": "B"},
-                "cwd": "Tools"
-              },
-              "permissionMode": "deny",
-              "skillsDirectories": [".skills"]
+        let data = Data(
+            """
+            {
+              "schemaVersion": 1,
+              "ai": {
+                "agent": {
+                  "enabled": true,
+                  "target": {
+                    "command": "/usr/bin/agent",
+                    "arguments": ["--stdio"],
+                    "environment": {"A": "B"},
+                    "cwd": "Tools"
+                  },
+                  "permissionMode": "deny",
+                  "skillsDirectories": [".skills"]
+                }
+              }
             }
-          }
-        }
-        """.utf8)
+            """
+            .utf8
+        )
 
         let project = try ProjectSystem.loadProject(from: data)
 
@@ -139,19 +143,21 @@ struct EditorAgentTests {
 
     @Test("tool updates preserve earlier call details")
     func toolUpdatesMergeIntoOneTranscriptEvent() throws {
-        var events = [EditorAgentEvent(
-            id: "tool-write",
-            kind: .toolCall,
-            title: "Write file",
-            toolCall: EditorAgentToolCall(
-                id: "write",
+        var events = [
+            EditorAgentEvent(
+                id: "tool-write",
+                kind: .toolCall,
                 title: "Write file",
-                kind: "edit",
-                status: .inProgress,
-                content: [.init(kind: .diff, path: "Sources/main.swift", newText: "print(1)")],
-                locations: [.init(path: "Sources/main.swift", line: 1)]
+                toolCall: EditorAgentToolCall(
+                    id: "write",
+                    title: "Write file",
+                    kind: "edit",
+                    status: .inProgress,
+                    content: [.init(kind: .diff, path: "Sources/main.swift", newText: "print(1)")],
+                    locations: [.init(path: "Sources/main.swift", line: 1)]
+                )
             )
-        )]
+        ]
         let update = EditorAgentEvent(
             id: "tool-write",
             kind: .toolCall,
@@ -190,7 +196,8 @@ struct EditorAgentTests {
         allowed_tools: files.read, files.write
         ---
         Use careful refactors.
-        """.write(to: skillURL, atomically: true, encoding: .utf8)
+        """
+        .write(to: skillURL, atomically: true, encoding: .utf8)
 
         let skills = EditorAgentSkillStore.discoverSkills(
             projectURL: rootURL,
@@ -355,20 +362,23 @@ struct EditorAgentTests {
 
         let service = FakeEditorAgentService()
         let viewModel = EditorAgentViewModel(
-            project: EditorProjectReference(name: "ViewModel", path: rootURL.path, lastOpenedAt: Date()), settings: EditorAgentSettingsStore(),
+            project: EditorProjectReference(name: "ViewModel", path: rootURL.path, lastOpenedAt: Date()),
+            settings: EditorAgentSettingsStore(),
             service: service
         )
         await viewModel.loadSessions()
         viewModel.prompt = "Please inspect @Sources/main.swift"
-        viewModel.setSceneContext(EditorAgentSceneContext(
-            sceneTitle: "Main.ascn",
-            sceneRelativePath: "Assets/Scenes/Main.ascn",
-            selectedEntityID: "root",
-            selectedEntityName: "Root",
-            parentID: nil,
-            componentNames: ["Transform"],
-            entityYAML: "entity:\n  id: root\n  name: Root"
-        ))
+        viewModel.setSceneContext(
+            EditorAgentSceneContext(
+                sceneTitle: "Main.ascn",
+                sceneRelativePath: "Assets/Scenes/Main.ascn",
+                selectedEntityID: "root",
+                selectedEntityName: "Root",
+                parentID: nil,
+                componentNames: ["Transform"],
+                entityYAML: "entity:\n  id: root\n  name: Root"
+            )
+        )
 
         await viewModel.sendPromptAsync()
 
@@ -436,7 +446,8 @@ struct EditorAgentTests {
         try writeProjectMetadata(ProjectSystem.defaultProject(projectName: "AgentSettings"), to: rootURL)
 
         let viewModel = EditorAgentViewModel(
-            project: EditorProjectReference(name: "AgentSettings", path: rootURL.path, lastOpenedAt: Date()), settings: EditorAgentSettingsStore(fileURL: rootURL.appendingPathComponent("global/settings.json")),
+            project: EditorProjectReference(name: "AgentSettings", path: rootURL.path, lastOpenedAt: Date()),
+            settings: EditorAgentSettingsStore(fileURL: rootURL.appendingPathComponent("global/settings.json")),
             service: FakeEditorAgentService()
         )
         viewModel.agentEnabled = true
@@ -486,7 +497,7 @@ struct EditorAgentTests {
         #expect(viewModel.agent.codeSelection?.documentRelativePath == "Sources/Player.swift")
         #expect(viewModel.agent.prompt.contains("func jump() {}"))
         let activeDocument = try #require(viewModel.workbench.activeDocument)
-        guard case .text(let updatedDocument) = activeDocument else {
+        guard case let .text(updatedDocument) = activeDocument else {
             Issue.record("Expected an active text document")
             return
         }
@@ -509,7 +520,9 @@ actor FakeEditorAgentService: EditorAgentServicing {
         onProjectFileChanged _: @escaping @Sendable (String) async -> Void
     ) async throws -> EditorAgentSessionConfiguration {
         lastRequest = request
-        if let connectionError { throw connectionError }
+        if let connectionError {
+            throw connectionError
+        }
         return .empty
     }
 
@@ -523,10 +536,12 @@ actor FakeEditorAgentService: EditorAgentServicing {
         onProjectFileChanged: @escaping @Sendable (String) async -> Void
     ) async throws -> EditorAgentRunResult {
         lastRequest = request
-        await onEvent(EditorAgentEvent(
-            kind: .message,
-            message: EditorAgentMessage(role: .assistant, segments: [.init(kind: .text, text: "done")])
-        ))
+        await onEvent(
+            EditorAgentEvent(
+                kind: .message,
+                message: EditorAgentMessage(role: .assistant, segments: [.init(kind: .text, text: "done")])
+            )
+        )
         await onProjectFileChanged("Sources/main.swift")
         return EditorAgentRunResult(
             upstreamSessionID: "fake-upstream",

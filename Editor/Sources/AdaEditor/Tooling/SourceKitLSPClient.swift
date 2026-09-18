@@ -28,21 +28,21 @@ struct EditorDiagnostic: Equatable, Hashable, Sendable {
         source == "sourcekit-lsp" || source == "adascript-lsp"
     }
 
-    static func diagnostics(from result: EditorProcessResult, projectURL: URL) -> [EditorDiagnostic] {
+    static func diagnostics(from result: EditorProcessResult, projectURL: URL) -> [Self] {
         parseBuildOutput(result.standardOutput, projectURL: projectURL)
             + parseStandardError(result.standardError, command: result.command, projectURL: projectURL, failed: !result.succeeded)
     }
 
-    static func parseBuildOutput(_ output: String, projectURL: URL) -> [EditorDiagnostic] {
+    static func parseBuildOutput(_ output: String, projectURL: URL) -> [Self] {
         output
             .components(separatedBy: .newlines)
             .compactMap { parseBuildDiagnosticLine($0, projectURL: projectURL) }
     }
 
-    private static func parseStandardError(_ output: String, command: EditorProcessCommand, projectURL: URL, failed: Bool) -> [EditorDiagnostic] {
+    private static func parseStandardError(_ output: String, command: EditorProcessCommand, projectURL: URL, failed: Bool) -> [Self] {
         output
             .components(separatedBy: .newlines)
-            .compactMap { line -> EditorDiagnostic? in
+            .compactMap { line -> Self? in
                 let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedLine.isEmpty else {
                     return nil
@@ -52,7 +52,7 @@ struct EditorDiagnostic: Equatable, Hashable, Sendable {
                     return diagnostic
                 }
 
-                return EditorDiagnostic(
+                return Self(
                     filePath: projectURL.appendingPathComponent("Package.swift", isDirectory: false).path,
                     range: EditorSourceRange(
                         start: EditorSourceLocation(line: 0, character: 0),
@@ -76,32 +76,34 @@ struct EditorDiagnostic: Equatable, Hashable, Sendable {
         return .information
     }
 
-    private static func parseBuildDiagnosticLine(_ line: String, projectURL: URL) -> EditorDiagnostic? {
+    private static func parseBuildDiagnosticLine(_ line: String, projectURL: URL) -> Self? {
         let parts = line.split(separator: ":", maxSplits: 4, omittingEmptySubsequences: false).map(String.init)
-        guard parts.count == 5,
-              let lineNumber = Int(parts[1]),
-              let columnNumber = Int(parts[2])
+        guard
+            parts.count == 5,
+            let lineNumber = Int(parts[1]),
+            let columnNumber = Int(parts[2])
         else {
             return nil
         }
 
-        let severity: EditorDiagnosticSeverity = switch parts[3].trimmingCharacters(in: .whitespaces) {
-        case "error":
-            .error
-        case "warning":
-            .warning
-        case "note":
-            .information
-        default:
-            .hint
-        }
+        let severity: EditorDiagnosticSeverity =
+            switch parts[3].trimmingCharacters(in: .whitespaces) {
+            case "error":
+                .error
+            case "warning":
+                .warning
+            case "note":
+                .information
+            default:
+                .hint
+            }
 
         let rawPath = parts[0]
         let absolutePath = rawPath.hasPrefix("/") ? rawPath : projectURL.appendingPathComponent(rawPath).path
         let zeroBasedLine = max(0, lineNumber - 1)
         let zeroBasedColumn = max(0, columnNumber - 1)
 
-        return EditorDiagnostic(
+        return Self(
             filePath: absolutePath,
             range: EditorSourceRange(
                 start: EditorSourceLocation(line: zeroBasedLine, character: zeroBasedColumn),
@@ -186,34 +188,35 @@ enum EditorCompletionKind: Equatable, Hashable, Sendable {
             return
         }
 
-        self = switch lspValue {
-        case 1: .text
-        case 2: .method
-        case 3: .function
-        case 4: .constructor
-        case 5: .field
-        case 6: .variable
-        case 7: .class
-        case 8: .interface
-        case 9: .module
-        case 10: .property
-        case 11: .unit
-        case 12: .value
-        case 13: .enum
-        case 14: .keyword
-        case 15: .snippet
-        case 16: .color
-        case 17: .file
-        case 18: .reference
-        case 19: .folder
-        case 20: .enumMember
-        case 21: .constant
-        case 22: .struct
-        case 23: .event
-        case 24: .operator
-        case 25: .typeParameter
-        default: .unknown
-        }
+        self =
+            switch lspValue {
+            case 1: .text
+            case 2: .method
+            case 3: .function
+            case 4: .constructor
+            case 5: .field
+            case 6: .variable
+            case 7: .class
+            case 8: .interface
+            case 9: .module
+            case 10: .property
+            case 11: .unit
+            case 12: .value
+            case 13: .enum
+            case 14: .keyword
+            case 15: .snippet
+            case 16: .color
+            case 17: .file
+            case 18: .reference
+            case 19: .folder
+            case 20: .enumMember
+            case 21: .constant
+            case 22: .struct
+            case 23: .event
+            case 24: .operator
+            case 25: .typeParameter
+            default: .unknown
+            }
     }
 }
 
@@ -234,11 +237,11 @@ struct SourceKitLSPDocumentIdentifier: Equatable, Hashable, Sendable {
     }
 }
 
-private extension EditorSourceLocation {
+extension EditorSourceLocation {
     var jsonRPCValue: JSONRPCValue {
         .object([
             "line": .int(line),
-            "character": .int(character)
+            "character": .int(character),
         ])
     }
 }
@@ -282,7 +285,7 @@ actor SourceKitLSPClient {
                 "workspaceFolders": .array([
                     .object([
                         "name": .string(projectURL.lastPathComponent),
-                        "uri": .string(projectURL.absoluteString)
+                        "uri": .string(projectURL.absoluteString),
                     ])
                 ]),
                 "capabilities": .object([
@@ -293,25 +296,25 @@ actor SourceKitLSPClient {
                         "completion": .object([
                             "completionItem": .object([
                                 "snippetSupport": .bool(false),
-                                "insertReplaceSupport": .bool(false)
+                                "insertReplaceSupport": .bool(false),
                             ])
                         ]),
                         "publishDiagnostics": .object([
                             "relatedInformation": .bool(true),
-                            "versionSupport": .bool(true)
+                            "versionSupport": .bool(true),
                         ]),
                         "semanticTokens": .object([
                             "dynamicRegistration": .bool(false),
                             "formats": .array([.string("relative")]),
                             "requests": .object([
                                 "full": .bool(true),
-                                "range": .bool(false)
+                                "range": .bool(false),
                             ]),
                             "tokenTypes": .array(Self.semanticTokenTypes.map { .string($0) }),
-                            "tokenModifiers": .array(Self.semanticTokenModifiers.map { .string($0) })
-                        ])
-                    ])
-                ])
+                            "tokenModifiers": .array(Self.semanticTokenModifiers.map { .string($0) }),
+                        ]),
+                    ]),
+                ]),
             ])
         )
         try await connection.notify(method: "initialized", params: .object([:]))
@@ -344,7 +347,7 @@ actor SourceKitLSPClient {
                     "uri": .string(identifier.uri),
                     "languageId": .string(language.lspLanguageID),
                     "version": .int(1),
-                    "text": .string(text)
+                    "text": .string(text),
                 ])
             ])
         )
@@ -362,11 +365,11 @@ actor SourceKitLSPClient {
             params: .object([
                 "textDocument": .object([
                     "uri": .string(identifier.uri),
-                    "version": .int(version)
+                    "version": .int(version),
                 ]),
                 "contentChanges": .array([
                     .object(["text": .string(text)])
-                ])
+                ]),
             ])
         )
     }
@@ -441,7 +444,7 @@ actor SourceKitLSPClient {
     }
 
     func references(fileURL: URL, position: EditorSourceLocation, includeDeclaration: Bool = true) async throws -> [EditorSourceReference] {
-        guard case .object(var params) = textDocumentPositionParams(fileURL: fileURL, position: position) else {
+        guard case var .object(params) = textDocumentPositionParams(fileURL: fileURL, position: position) else {
             return []
         }
         params["context"] = .object(["includeDeclaration": .bool(includeDeclaration)])
@@ -505,11 +508,11 @@ actor SourceKitLSPClient {
                 params: .object([
                     "textDocument": .object(["uri": .string(uri)]),
                     "prepareTarget": .bool(true),
-                    "allowFallbackSettings": .bool(false)
+                    "allowFallbackSettings": .bool(false),
                 ])
             )
-            if case .object(let options)? = response,
-               options["kind"]?.stringValue == "normal" {
+            if case let .object(options)? = response,
+                options["kind"]?.stringValue == "normal" {
                 preparedURIs.insert(uri)
                 return
             }
@@ -520,8 +523,9 @@ actor SourceKitLSPClient {
     }
 
     private func handleNotification(method: String, params: JSONRPCValue?) async {
-        guard method == "textDocument/publishDiagnostics",
-              let published = Self.decodePublishedDiagnostics(from: params)
+        guard
+            method == "textDocument/publishDiagnostics",
+            let published = Self.decodePublishedDiagnostics(from: params)
         else {
             return
         }
@@ -547,7 +551,7 @@ actor SourceKitLSPClient {
             "textDocument": .object([
                 "uri": .string(uri)
             ]),
-            "position": lspPosition.jsonRPCValue
+            "position": lspPosition.jsonRPCValue,
         ])
     }
 
@@ -589,8 +593,9 @@ actor SourceKitLSPClient {
     }
 
     static func decodeSemanticTokens(from response: JSONRPCValue?, legend: [String], modifiersLegend: [String]) -> [EditorSemanticToken] {
-        guard case .object(let object)? = response,
-              case .array(let values)? = object["data"]
+        guard
+            case let .object(object)? = response,
+            case let .array(values)? = object["data"]
         else {
             return []
         }
@@ -615,9 +620,10 @@ actor SourceKitLSPClient {
             character = deltaLine == 0 ? character + deltaStart : deltaStart
 
             let type = legend.indices.contains(typeIndex) ? legend[typeIndex] : "unknown"
-            let modifiers = modifiersLegend.enumerated().compactMap { offset, modifier in
-                (modifiersMask & (1 << offset)) == 0 ? nil : modifier
-            }
+            let modifiers = modifiersLegend.enumerated()
+                .compactMap { offset, modifier in
+                    (modifiersMask & (1 << offset)) == 0 ? nil : modifier
+                }
 
             tokens.append(
                 EditorSemanticToken(
@@ -636,10 +642,10 @@ actor SourceKitLSPClient {
     static func decodeCompletionItems(from response: JSONRPCValue?) -> [EditorCompletionItem] {
         let values: [JSONRPCValue]
         switch response {
-        case .array(let items)?:
+        case let .array(items):
             values = items
-        case .object(let object)?:
-            guard case .array(let items)? = object["items"] else {
+        case let .object(object):
+            guard case let .array(items)? = object["items"] else {
                 return []
             }
             values = items
@@ -647,74 +653,80 @@ actor SourceKitLSPClient {
             return []
         }
 
-        return values.compactMap { value in
-            guard case .object(let object) = value,
-                  case .string(let label)? = object["label"]
-            else {
-                return nil
-            }
-
-            let textEdit: (newText: String, range: EditorSourceRange)? = {
-                guard case .object(let edit)? = object["textEdit"],
-                      case .string(let newText)? = edit["newText"],
-                      let rangeValue = edit["range"],
-                      let range = decodeRange(rangeValue)
+        return
+            values.compactMap { value in
+                guard
+                    case let .object(object) = value,
+                    case let .string(label)? = object["label"]
                 else {
                     return nil
                 }
-                return (newText, range)
-            }()
-            let insertText: String
-            if let textEdit {
-                insertText = textEdit.newText
-            } else if case .string(let value)? = object["insertText"] {
-                insertText = value
-            } else {
-                insertText = label
-            }
 
-            return EditorCompletionItem(
-                label: label,
-                detail: object["detail"]?.stringValue,
-                insertText: insertText,
-                replacementRange: textEdit?.range,
-                sortText: object["sortText"]?.stringValue,
-                kind: EditorCompletionKind(lspValue: object["kind"]?.intValue, label: label, insertText: insertText)
-            )
-        }
-        .sorted { lhs, rhs in
-            (lhs.sortText ?? lhs.label).localizedStandardCompare(rhs.sortText ?? rhs.label) == .orderedAscending
-        }
+                let textEdit: (newText: String, range: EditorSourceRange)? = {
+                    guard
+                        case let .object(edit)? = object["textEdit"],
+                        case let .string(newText)? = edit["newText"],
+                        let rangeValue = edit["range"],
+                        let range = decodeRange(rangeValue)
+                    else {
+                        return nil
+                    }
+                    return (newText, range)
+                }()
+                let insertText: String
+                if let textEdit {
+                    insertText = textEdit.newText
+                } else if case let .string(value)? = object["insertText"] {
+                    insertText = value
+                } else {
+                    insertText = label
+                }
+
+                return EditorCompletionItem(
+                    label: label,
+                    detail: object["detail"]?.stringValue,
+                    insertText: insertText,
+                    replacementRange: textEdit?.range,
+                    sortText: object["sortText"]?.stringValue,
+                    kind: EditorCompletionKind(lspValue: object["kind"]?.intValue, label: label, insertText: insertText)
+                )
+            }
+            .sorted { lhs, rhs in
+                (lhs.sortText ?? lhs.label).localizedStandardCompare(rhs.sortText ?? rhs.label) == .orderedAscending
+            }
     }
 
     static func decodePublishedDiagnostics(from params: JSONRPCValue?) -> (uri: String, diagnostics: [EditorDiagnostic])? {
-        guard case .object(let object)? = params,
-              case .string(let uri)? = object["uri"],
-              case .array(let values)? = object["diagnostics"]
+        guard
+            case let .object(object)? = params,
+            case let .string(uri)? = object["uri"],
+            case let .array(values)? = object["diagnostics"]
         else {
             return nil
         }
 
         let filePath = filePath(fromURI: uri)
         let diagnostics = values.compactMap { value -> EditorDiagnostic? in
-            guard case .object(let diagnostic) = value,
-                  let rangeValue = diagnostic["range"],
-                  let range = decodeRange(rangeValue),
-                  case .string(let message)? = diagnostic["message"]
+            guard
+                case let .object(diagnostic) = value,
+                let rangeValue = diagnostic["range"],
+                let range = decodeRange(rangeValue),
+                case let .string(message)? = diagnostic["message"]
             else {
                 return nil
             }
 
-            let severity: EditorDiagnosticSeverity = switch diagnostic["severity"]?.intValue {
-            case 1:
-                .error
-            case 2:
-                .warning
-            case 3:
-                .information
-            default:
-                .hint
-            }
+            let severity: EditorDiagnosticSeverity =
+                switch diagnostic["severity"]?.intValue {
+                case 1:
+                    .error
+                case 2:
+                    .warning
+                case 3:
+                    .information
+                default:
+                    .hint
+                }
             return EditorDiagnostic(
                 filePath: filePath,
                 range: range,
@@ -728,16 +740,18 @@ actor SourceKitLSPClient {
 
     static func decodeDefinitionTargets(from response: JSONRPCValue?) -> [EditorSourceSymbolTarget] {
         switch response {
-        case .object(let object)?:
-            if let target = decodeLocationLink(object) ?? decodeLocation(object).map({ location in
-                EditorSourceSymbolTarget(uri: location.uri, filePath: location.filePath, range: location.range, selectionRange: location.range)
-            }) {
+        case let .object(object):
+            if let target = decodeLocationLink(object)
+                ?? decodeLocation(object)
+                .map({ location in
+                    EditorSourceSymbolTarget(uri: location.uri, filePath: location.filePath, range: location.range, selectionRange: location.range)
+                }) {
                 return [target]
             }
             return []
-        case .array(let values)?:
+        case let .array(values):
             return values.flatMap { value -> [EditorSourceSymbolTarget] in
-                guard case .object(let object) = value else {
+                guard case let .object(object) = value else {
                     return []
                 }
                 if let link = decodeLocationLink(object) {
@@ -761,13 +775,14 @@ actor SourceKitLSPClient {
     }
 
     static func decodeReferences(from response: JSONRPCValue?) -> [EditorSourceReference] {
-        guard case .array(let values)? = response else {
+        guard case let .array(values)? = response else {
             return []
         }
 
         return values.compactMap { value in
-            guard case .object(let object) = value,
-                  let location = decodeLocation(object)
+            guard
+                case let .object(object) = value,
+                let location = decodeLocation(object)
             else {
                 return nil
             }
@@ -777,10 +792,11 @@ actor SourceKitLSPClient {
     }
 
     static func decodeHover(from response: JSONRPCValue?) -> EditorSymbolHover? {
-        guard case .object(let object)? = response,
-              let contents = object["contents"],
-              let text = decodeMarkupContent(contents)?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !text.isEmpty
+        guard
+            case let .object(object)? = response,
+            let contents = object["contents"],
+            let text = decodeMarkupContent(contents)?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !text.isEmpty
         else {
             return nil
         }
@@ -789,35 +805,38 @@ actor SourceKitLSPClient {
     }
 
     static func decodeDocumentHighlights(from response: JSONRPCValue?) -> [EditorDocumentHighlight] {
-        guard case .array(let values)? = response else {
+        guard case let .array(values)? = response else {
             return []
         }
 
         return values.compactMap { value in
-            guard case .object(let object) = value,
-                  let rangeValue = object["range"],
-                  let range = decodeRange(rangeValue)
+            guard
+                case let .object(object) = value,
+                let rangeValue = object["range"],
+                let range = decodeRange(rangeValue)
             else {
                 return nil
             }
 
-            let kind: EditorDocumentHighlightKind = switch object["kind"]?.intValue {
-            case 2:
-                .read
-            case 3:
-                .write
-            default:
-                .text
-            }
+            let kind: EditorDocumentHighlightKind =
+                switch object["kind"]?.intValue {
+                case 2:
+                    .read
+                case 3:
+                    .write
+                default:
+                    .text
+                }
 
             return EditorDocumentHighlight(range: range, kind: kind)
         }
     }
 
     private static func decodeLocation(_ object: [String: JSONRPCValue]) -> (uri: String, filePath: String, range: EditorSourceRange)? {
-        guard case .string(let uri)? = object["uri"],
-              let rangeValue = object["range"],
-              let range = decodeRange(rangeValue)
+        guard
+            case let .string(uri)? = object["uri"],
+            let rangeValue = object["range"],
+            let range = decodeRange(rangeValue)
         else {
             return nil
         }
@@ -826,11 +845,12 @@ actor SourceKitLSPClient {
     }
 
     private static func decodeLocationLink(_ object: [String: JSONRPCValue]) -> EditorSourceSymbolTarget? {
-        guard case .string(let uri)? = object["targetUri"],
-              let targetRangeValue = object["targetRange"],
-              let targetSelectionRangeValue = object["targetSelectionRange"],
-              let targetRange = decodeRange(targetRangeValue),
-              let targetSelectionRange = decodeRange(targetSelectionRangeValue)
+        guard
+            case let .string(uri)? = object["targetUri"],
+            let targetRangeValue = object["targetRange"],
+            let targetSelectionRangeValue = object["targetSelectionRange"],
+            let targetRange = decodeRange(targetRangeValue),
+            let targetSelectionRange = decodeRange(targetSelectionRangeValue)
         else {
             return nil
         }
@@ -844,11 +864,12 @@ actor SourceKitLSPClient {
     }
 
     private static func decodeRange(_ value: JSONRPCValue) -> EditorSourceRange? {
-        guard case .object(let object) = value,
-              let startValue = object["start"],
-              let endValue = object["end"],
-              let start = decodePosition(startValue),
-              let end = decodePosition(endValue)
+        guard
+            case let .object(object) = value,
+            let startValue = object["start"],
+            let endValue = object["end"],
+            let start = decodePosition(startValue),
+            let end = decodePosition(endValue)
         else {
             return nil
         }
@@ -857,9 +878,10 @@ actor SourceKitLSPClient {
     }
 
     private static func decodePosition(_ value: JSONRPCValue) -> EditorSourceLocation? {
-        guard case .object(let object) = value,
-              let line = object["line"]?.intValue,
-              let character = object["character"]?.intValue
+        guard
+            case let .object(object) = value,
+            let line = object["line"]?.intValue,
+            let character = object["character"]?.intValue
         else {
             return nil
         }
@@ -869,14 +891,14 @@ actor SourceKitLSPClient {
 
     private static func decodeMarkupContent(_ value: JSONRPCValue) -> String? {
         switch value {
-        case .string(let string):
+        case let .string(string):
             return string
-        case .object(let object):
-            if case .string(let value)? = object["value"] {
+        case let .object(object):
+            if case let .string(value)? = object["value"] {
                 return value
             }
             return nil
-        case .array(let values):
+        case let .array(values):
             let parts = values.compactMap(decodeMarkupContent)
             return parts.isEmpty ? nil : parts.joined(separator: "\n\n")
         default:
@@ -895,12 +917,12 @@ actor SourceKitLSPClient {
     private static let semanticTokenTypes = [
         "namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter",
         "variable", "property", "enumMember", "event", "function", "method", "macro", "keyword",
-        "modifier", "comment", "string", "number", "regexp", "operator", "decorator"
+        "modifier", "comment", "string", "number", "regexp", "operator", "decorator",
     ]
 
     private static let semanticTokenModifiers = [
         "declaration", "definition", "readonly", "static", "deprecated", "abstract", "async",
-        "modification", "documentation", "defaultLibrary"
+        "modification", "documentation", "defaultLibrary",
     ]
 }
 
@@ -913,258 +935,263 @@ enum SourceKitLSPError: Error, Equatable, Sendable {
 }
 
 #if os(macOS) || os(Linux) || os(Windows)
-actor SourceKitLSPStdioConnection: SourceKitLSPConnecting {
-    nonisolated static let launchArguments = ["--experimental-feature", "sourcekit-options-request"]
+    actor SourceKitLSPStdioConnection: SourceKitLSPConnecting {
+        nonisolated static let launchArguments = ["--experimental-feature", "sourcekit-options-request"]
 
-    enum IncomingMessageRoute: Equatable {
-        case serverMessage(method: String, id: JSONRPCValue?)
-        case response(id: Int)
-        case invalid
-    }
+        enum IncomingMessageRoute: Equatable {
+            case serverMessage(method: String, id: JSONRPCValue?)
+            case response(id: Int)
+            case invalid
+        }
 
-    private var process: Process?
-    private var input: Pipe?
-    private var output: Pipe?
-    private var nextRequestID = 1
-    private var pendingResponses: [Int: CheckedContinuation<JSONRPCValue?, any Error>] = [:]
-    private var readBuffer = Data()
-    private var notificationHandler: (@Sendable (String, JSONRPCValue?) async -> Void)?
+        private var process: Process?
+        private var input: Pipe?
+        private var output: Pipe?
+        private var nextRequestID = 1
+        private var pendingResponses: [Int: CheckedContinuation<JSONRPCValue?, any Error>] = [:]
+        private var readBuffer = Data()
+        private var notificationHandler: (@Sendable (String, JSONRPCValue?) async -> Void)?
 
-    func start(executablePath: String, projectURL: URL) async throws {
-        let process = Process()
-        let input = Pipe()
-        let output = Pipe()
+        func start(executablePath: String, projectURL: URL) async throws {
+            let process = Process()
+            let input = Pipe()
+            let output = Pipe()
 
-        process.executableURL = URL(fileURLWithPath: executablePath)
-        process.arguments = Self.launchArguments
-        process.currentDirectoryURL = projectURL
-        process.standardInput = input
-        process.standardOutput = output
-        process.standardError = FileHandle.standardError
+            process.executableURL = URL(fileURLWithPath: executablePath)
+            process.arguments = Self.launchArguments
+            process.currentDirectoryURL = projectURL
+            process.standardInput = input
+            process.standardOutput = output
+            process.standardError = FileHandle.standardError
 
-        try process.run()
+            try process.run()
 
-        self.process = process
-        self.input = input
-        self.output = output
-        output.fileHandleForReading.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            Task {
-                await self?.receive(data)
+            self.process = process
+            self.input = input
+            self.output = output
+            output.fileHandleForReading.readabilityHandler = { [weak self] handle in
+                let data = handle.availableData
+                Task {
+                    await self?.receive(data)
+                }
+            }
+            process.terminationHandler = { [weak self] _ in
+                Task {
+                    await self?.connectionDidClose()
+                }
             }
         }
-        process.terminationHandler = { [weak self] _ in
-            Task {
-                await self?.connectionDidClose()
+
+        func request(method: String, params: JSONRPCValue?) async throws -> JSONRPCValue? {
+            let requestID = nextRequestID
+            nextRequestID += 1
+            return try await withCheckedThrowingContinuation { continuation in
+                pendingResponses[requestID] = continuation
+                do {
+                    try write(
+                        .object([
+                            "jsonrpc": .string("2.0"),
+                            "id": .int(requestID),
+                            "method": .string(method),
+                            "params": params ?? .null,
+                        ])
+                    )
+                } catch {
+                    pendingResponses[requestID] = nil
+                    continuation.resume(throwing: error)
+                }
             }
         }
-    }
 
-    func request(method: String, params: JSONRPCValue?) async throws -> JSONRPCValue? {
-        let requestID = nextRequestID
-        nextRequestID += 1
-        return try await withCheckedThrowingContinuation { continuation in
-            pendingResponses[requestID] = continuation
-            do {
-                try write(
-                    .object([
-                        "jsonrpc": .string("2.0"),
-                        "id": .int(requestID),
-                        "method": .string(method),
-                        "params": params ?? .null
-                    ])
-                )
-            } catch {
-                pendingResponses[requestID] = nil
-                continuation.resume(throwing: error)
-            }
-        }
-    }
-
-    func notify(method: String, params: JSONRPCValue?) async throws {
-        try write(
-            .object([
-                "jsonrpc": .string("2.0"),
-                "method": .string(method),
-                "params": params ?? .null
-            ])
-        )
-    }
-
-    func setNotificationHandler(_ handler: (@Sendable (String, JSONRPCValue?) async -> Void)?) {
-        notificationHandler = handler
-    }
-
-    func stop() {
-        output?.fileHandleForReading.readabilityHandler = nil
-        process?.terminate()
-        process = nil
-        input = nil
-        output = nil
-        readBuffer.removeAll(keepingCapacity: false)
-        let responses = pendingResponses.values
-        pendingResponses.removeAll()
-        for response in responses {
-            response.resume(throwing: SourceKitLSPError.connectionClosed)
-        }
-    }
-
-    private func write(_ value: JSONRPCValue) throws {
-        guard let input else {
-            throw SourceKitLSPError.connectionClosed
-        }
-
-        let data = try JSONEncoder().encode(value)
-        var message = Data("Content-Length: \(data.count)\r\n\r\n".utf8)
-        message.append(data)
-        input.fileHandleForWriting.write(message)
-    }
-
-    private func receive(_ data: Data) async {
-        guard !data.isEmpty else {
-            connectionDidClose()
-            return
-        }
-
-        readBuffer.append(data)
-        let separator = Data("\r\n\r\n".utf8)
-        while let headerRange = readBuffer.range(of: separator) {
-            let header = readBuffer[..<headerRange.lowerBound]
-            guard let headerString = String(data: header, encoding: .utf8),
-                  let contentLengthLine = headerString.components(separatedBy: "\r\n").first(where: { $0.lowercased().hasPrefix("content-length:") }),
-                  let length = Int(contentLengthLine.split(separator: ":", maxSplits: 1).last?.trimmingCharacters(in: .whitespaces) ?? "")
-            else {
-                failPendingResponses(with: .invalidResponse)
-                readBuffer.removeAll()
-                return
-            }
-
-            let bodyStart = headerRange.upperBound
-            guard readBuffer.count >= bodyStart + length else {
-                return
-            }
-            let body = readBuffer[bodyStart..<(bodyStart + length)]
-            readBuffer.removeSubrange(..<(bodyStart + length))
-
-            do {
-                let message = try JSONDecoder().decode(JSONRPCValue.self, from: body)
-                await handle(message)
-            } catch {
-                failPendingResponses(with: .invalidResponse)
-            }
-        }
-    }
-
-    private func handle(_ message: JSONRPCValue) async {
-        guard case .object(let object) = message else {
-            return
-        }
-
-        switch Self.route(for: object) {
-        case .serverMessage(let method, let requestID):
-            if let requestID {
-                try? write(.object([
+        func notify(method: String, params: JSONRPCValue?) async throws {
+            try write(
+                .object([
                     "jsonrpc": .string("2.0"),
-                    "id": requestID,
-                    "result": serverRequestResult(method: method, params: object["params"])
-                ]))
-            } else {
-                await notificationHandler?(method, object["params"])
+                    "method": .string(method),
+                    "params": params ?? .null,
+                ])
+            )
+        }
+
+        func setNotificationHandler(_ handler: (@Sendable (String, JSONRPCValue?) async -> Void)?) {
+            notificationHandler = handler
+        }
+
+        func stop() {
+            output?.fileHandleForReading.readabilityHandler = nil
+            process?.terminate()
+            process = nil
+            input = nil
+            output = nil
+            readBuffer.removeAll(keepingCapacity: false)
+            let responses = pendingResponses.values
+            pendingResponses.removeAll()
+            for response in responses {
+                response.resume(throwing: SourceKitLSPError.connectionClosed)
             }
-        case .response(let requestID):
-            guard let response = pendingResponses.removeValue(forKey: requestID) else {
+        }
+
+        private func write(_ value: JSONRPCValue) throws {
+            guard let input else {
+                throw SourceKitLSPError.connectionClosed
+            }
+
+            let data = try JSONEncoder().encode(value)
+            var message = Data("Content-Length: \(data.count)\r\n\r\n".utf8)
+            message.append(data)
+            input.fileHandleForWriting.write(message)
+        }
+
+        private func receive(_ data: Data) async {
+            guard !data.isEmpty else {
+                connectionDidClose()
                 return
             }
-            if case .object(let error)? = object["error"] {
-                response.resume(throwing: SourceKitLSPError.serverError(
-                    code: error["code"]?.intValue,
-                    message: error["message"]?.stringValue ?? "Unknown SourceKit-LSP server error"
-                ))
-            } else {
-                response.resume(returning: object["result"])
+
+            readBuffer.append(data)
+            let separator = Data("\r\n\r\n".utf8)
+            while let headerRange = readBuffer.range(of: separator) {
+                let header = readBuffer[..<headerRange.lowerBound]
+                guard
+                    let headerString = String(bytes: header, encoding: .utf8),
+                    let contentLengthLine = headerString.components(separatedBy: "\r\n").first(where: { $0.lowercased().hasPrefix("content-length:") }),
+                    let length = Int(contentLengthLine.split(separator: ":", maxSplits: 1).last?.trimmingCharacters(in: .whitespaces) ?? "")
+                else {
+                    failPendingResponses(with: .invalidResponse)
+                    readBuffer.removeAll()
+                    return
+                }
+
+                let bodyStart = headerRange.upperBound
+                guard readBuffer.count >= bodyStart + length else {
+                    return
+                }
+                let body = readBuffer[bodyStart..<(bodyStart + length)]
+                readBuffer.removeSubrange(..<(bodyStart + length))
+
+                do {
+                    let message = try JSONDecoder().decode(JSONRPCValue.self, from: body)
+                    await handle(message)
+                } catch {
+                    failPendingResponses(with: .invalidResponse)
+                }
             }
-        case .invalid:
-            return
         }
-    }
 
-    nonisolated static func route(for object: [String: JSONRPCValue]) -> IncomingMessageRoute {
-        if case .string(let method)? = object["method"] {
-            return .serverMessage(method: method, id: object["id"])
-        }
-        if let requestID = object["id"]?.intValue {
-            return .response(id: requestID)
-        }
-        return .invalid
-    }
+        private func handle(_ message: JSONRPCValue) async {
+            guard case let .object(object) = message else {
+                return
+            }
 
-    private func serverRequestResult(method: String, params: JSONRPCValue?) -> JSONRPCValue {
-        if method == "workspace/configuration",
-           case .object(let object)? = params,
-           case .array(let items)? = object["items"] {
-            return .array(items.map { _ in .null })
+            switch Self.route(for: object) {
+            case let .serverMessage(method, requestID):
+                if let requestID {
+                    try? write(
+                        .object([
+                            "jsonrpc": .string("2.0"),
+                            "id": requestID,
+                            "result": serverRequestResult(method: method, params: object["params"]),
+                        ])
+                    )
+                } else {
+                    await notificationHandler?(method, object["params"])
+                }
+            case let .response(requestID):
+                guard let response = pendingResponses.removeValue(forKey: requestID) else {
+                    return
+                }
+                if case let .object(error)? = object["error"] {
+                    response.resume(
+                        throwing: SourceKitLSPError.serverError(
+                            code: error["code"]?.intValue,
+                            message: error["message"]?.stringValue ?? "Unknown SourceKit-LSP server error"
+                        )
+                    )
+                } else {
+                    response.resume(returning: object["result"])
+                }
+            case .invalid:
+                return
+            }
         }
-        if method == "workspace/workspaceFolders" {
-            return .array([])
-        }
-        return .null
-    }
 
-    private func connectionDidClose() {
-        guard process != nil || !pendingResponses.isEmpty else {
-            return
+        nonisolated static func route(for object: [String: JSONRPCValue]) -> IncomingMessageRoute {
+            if case let .string(method)? = object["method"] {
+                return .serverMessage(method: method, id: object["id"])
+            }
+            if let requestID = object["id"]?.intValue {
+                return .response(id: requestID)
+            }
+            return .invalid
         }
-        output?.fileHandleForReading.readabilityHandler = nil
-        process = nil
-        input = nil
-        output = nil
-        failPendingResponses(with: .connectionClosed)
-    }
 
-    private func failPendingResponses(with error: SourceKitLSPError) {
-        let responses = pendingResponses.values
-        pendingResponses.removeAll()
-        for response in responses {
-            response.resume(throwing: error)
+        private func serverRequestResult(method: String, params: JSONRPCValue?) -> JSONRPCValue {
+            if method == "workspace/configuration",
+                case let .object(object)? = params,
+                case let .array(items)? = object["items"] {
+                return .array(items.map { _ in .null })
+            }
+            if method == "workspace/workspaceFolders" {
+                return .array([])
+            }
+            return .null
+        }
+
+        private func connectionDidClose() {
+            guard process != nil || !pendingResponses.isEmpty else {
+                return
+            }
+            output?.fileHandleForReading.readabilityHandler = nil
+            process = nil
+            input = nil
+            output = nil
+            failPendingResponses(with: .connectionClosed)
+        }
+
+        private func failPendingResponses(with error: SourceKitLSPError) {
+            let responses = pendingResponses.values
+            pendingResponses.removeAll()
+            for response in responses {
+                response.resume(throwing: error)
+            }
         }
     }
-}
 #else
-actor SourceKitLSPStdioConnection: SourceKitLSPConnecting {
-    nonisolated static let launchArguments = ["--experimental-feature", "sourcekit-options-request"]
+    actor SourceKitLSPStdioConnection: SourceKitLSPConnecting {
+        nonisolated static let launchArguments = ["--experimental-feature", "sourcekit-options-request"]
 
-    enum IncomingMessageRoute: Equatable {
-        case serverMessage(method: String, id: JSONRPCValue?)
-        case response(id: Int)
-        case invalid
-    }
-
-    func start(executablePath _: String, projectURL _: URL) async throws {
-        throw SourceKitLSPError.sourceKitLSPUnavailable
-    }
-
-    func request(method _: String, params _: JSONRPCValue?) async throws -> JSONRPCValue? {
-        throw SourceKitLSPError.sourceKitLSPUnavailable
-    }
-
-    func notify(method _: String, params _: JSONRPCValue?) async throws {
-        throw SourceKitLSPError.sourceKitLSPUnavailable
-    }
-
-    func setNotificationHandler(_: (@Sendable (String, JSONRPCValue?) async -> Void)?) {}
-
-    func stop() {}
-
-    nonisolated static func route(for object: [String: JSONRPCValue]) -> IncomingMessageRoute {
-        if case .string(let method)? = object["method"] {
-            return .serverMessage(method: method, id: object["id"])
+        enum IncomingMessageRoute: Equatable {
+            case serverMessage(method: String, id: JSONRPCValue?)
+            case response(id: Int)
+            case invalid
         }
-        if let requestID = object["id"]?.intValue {
-            return .response(id: requestID)
+
+        func start(executablePath _: String, projectURL _: URL) async throws {
+            throw SourceKitLSPError.sourceKitLSPUnavailable
         }
-        return .invalid
+
+        func request(method _: String, params _: JSONRPCValue?) async throws -> JSONRPCValue? {
+            throw SourceKitLSPError.sourceKitLSPUnavailable
+        }
+
+        func notify(method _: String, params _: JSONRPCValue?) async throws {
+            throw SourceKitLSPError.sourceKitLSPUnavailable
+        }
+
+        func setNotificationHandler(_: (@Sendable (String, JSONRPCValue?) async -> Void)?) {}
+
+        func stop() {}
+
+        nonisolated static func route(for object: [String: JSONRPCValue]) -> IncomingMessageRoute {
+            if case let .string(method)? = object["method"] {
+                return .serverMessage(method: method, id: object["id"])
+            }
+            if let requestID = object["id"]?.intValue {
+                return .response(id: requestID)
+            }
+            return .invalid
+        }
     }
-}
 #endif
 
 enum JSONRPCValue: Codable, Equatable, Sendable {
@@ -1172,8 +1199,8 @@ enum JSONRPCValue: Codable, Equatable, Sendable {
     case int(Int)
     case double(Double)
     case bool(Bool)
-    case array([JSONRPCValue])
-    case object([String: JSONRPCValue])
+    case array([Self])
+    case object([String: Self])
     case null
 
     init(from decoder: Decoder) throws {
@@ -1188,27 +1215,27 @@ enum JSONRPCValue: Codable, Equatable, Sendable {
             self = .double(value)
         } else if let value = try? container.decode(String.self) {
             self = .string(value)
-        } else if let value = try? container.decode([JSONRPCValue].self) {
+        } else if let value = try? container.decode([Self].self) {
             self = .array(value)
         } else {
-            self = .object(try container.decode([String: JSONRPCValue].self))
+            self = .object(try container.decode([String: Self].self))
         }
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
-        case .string(let value):
+        case let .string(value):
             try container.encode(value)
-        case .int(let value):
+        case let .int(value):
             try container.encode(value)
-        case .double(let value):
+        case let .double(value):
             try container.encode(value)
-        case .bool(let value):
+        case let .bool(value):
             try container.encode(value)
-        case .array(let value):
+        case let .array(value):
             try container.encode(value)
-        case .object(let value):
+        case let .object(value):
             try container.encode(value)
         case .null:
             try container.encodeNil()
@@ -1217,9 +1244,9 @@ enum JSONRPCValue: Codable, Equatable, Sendable {
 
     var intValue: Int? {
         switch self {
-        case .int(let value):
+        case let .int(value):
             value
-        case .double(let value):
+        case let .double(value):
             Int(value)
         default:
             nil
@@ -1227,7 +1254,7 @@ enum JSONRPCValue: Codable, Equatable, Sendable {
     }
 
     var stringValue: String? {
-        guard case .string(let value) = self else {
+        guard case let .string(value) = self else {
             return nil
         }
         return value
@@ -1241,7 +1268,8 @@ extension EditorSourceLanguage {
             "c"
         case .cpp:
             "cpp"
-        case .swift, .packageManifest:
+        case .swift,
+            .packageManifest:
             "swift"
         default:
             rawValue

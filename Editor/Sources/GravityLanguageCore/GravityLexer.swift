@@ -53,10 +53,12 @@ struct GravityLexer {
         }
 
         for (delimiter, position) in delimiters.reversed() {
-            diagnostics.append(GravityDiagnostic(
-                message: "Unclosed '\(delimiter)'",
-                range: GravitySourceRange(start: position, end: positionAfterCharacter(at: position, character: delimiter))
-            ))
+            diagnostics.append(
+                GravityDiagnostic(
+                    message: "Unclosed '\(delimiter)'",
+                    range: GravitySourceRange(start: position, end: positionAfterCharacter(at: position, character: delimiter))
+                )
+            )
         }
         return GravityLexResult(diagnostics: diagnostics, tokens: tokens)
     }
@@ -123,10 +125,12 @@ struct GravityLexer {
         }
         appendToken(kind: .comment, from: startIndex, position: startPosition)
         if depth != 0 {
-            diagnostics.append(GravityDiagnostic(
-                message: "Unterminated block comment",
-                range: GravitySourceRange(start: startPosition, end: position)
-            ))
+            diagnostics.append(
+                GravityDiagnostic(
+                    message: "Unterminated block comment",
+                    range: GravitySourceRange(start: startPosition, end: position)
+                )
+            )
         }
     }
 
@@ -149,10 +153,12 @@ struct GravityLexer {
         }
         appendToken(kind: .string, from: startIndex, position: startPosition)
         if !terminated {
-            diagnostics.append(GravityDiagnostic(
-                message: "Unterminated string literal",
-                range: GravitySourceRange(start: startPosition, end: position)
-            ))
+            diagnostics.append(
+                GravityDiagnostic(
+                    message: "Unterminated string literal",
+                    range: GravitySourceRange(start: startPosition, end: position)
+                )
+            )
         }
     }
 
@@ -183,28 +189,33 @@ struct GravityLexer {
         if "([{".contains(character) {
             delimiters.append((character, startPosition))
         } else if ")]}".contains(character) {
-            let expectedOpening: Character = switch character {
-            case ")": "("
-            case "]": "["
-            default: "{"
-            }
+            let expectedOpening: Character =
+                switch character {
+                case ")": "("
+                case "]": "["
+                default: "{"
+                }
             if delimiters.last?.0 == expectedOpening {
                 delimiters.removeLast()
             } else {
-                diagnostics.append(GravityDiagnostic(
-                    message: "Unexpected '\(character)'",
-                    range: GravitySourceRange(start: startPosition, end: position)
-                ))
+                diagnostics.append(
+                    GravityDiagnostic(
+                        message: "Unexpected '\(character)'",
+                        range: GravitySourceRange(start: startPosition, end: position)
+                    )
+                )
             }
         }
     }
 
     private mutating func appendToken(kind: GravityToken.Kind, from startIndex: String.Index, position startPosition: GravitySourcePosition) {
-        tokens.append(GravityToken(
-            kind: kind,
-            text: String(source[startIndex..<index]),
-            range: GravitySourceRange(start: startPosition, end: position)
-        ))
+        tokens.append(
+            GravityToken(
+                kind: kind,
+                text: String(source[startIndex..<index]),
+                range: GravitySourceRange(start: startPosition, end: position)
+            )
+        )
     }
 
     private func isIdentifierStart(_ character: Character) -> Bool {

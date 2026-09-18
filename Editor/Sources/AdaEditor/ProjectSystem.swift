@@ -84,7 +84,8 @@ public enum ProjectSystem {
             }
         }
 
-        let inferredProjectName = projectURL.pathExtension.lowercased() == "adaproject"
+        let inferredProjectName =
+            projectURL.pathExtension.lowercased() == "adaproject"
             ? projectURL.deletingPathExtension().lastPathComponent
             : projectURL.lastPathComponent
         let project = defaultProject(projectName: inferredProjectName, buildSystem: buildSystem)
@@ -153,7 +154,7 @@ public enum ProjectSystem {
 
     public static func defaultProjectJSON() throws(ProjectSystemError) -> String {
         do {
-            return String(decoding: try encode(defaultProject()), as: UTF8.self)
+            return String(bytes: try encode(defaultProject()), encoding: .utf8) ?? ""
         } catch let error as EncodingError {
             throw .encodingFailed(message: error.localizedDescription)
         } catch {
@@ -166,7 +167,7 @@ public enum ProjectSystem {
     }
 
     /// Validates supported schema versions without rewriting older project metadata.
-    public static func migrateAndValidate(_ project: AdaProject, sourcePath: String = ProjectSystemPath.metadataFile) throws(ProjectSystemError) -> AdaProject {
+    public static func migrateAndValidate(_ project: AdaProject, sourcePath _: String = ProjectSystemPath.metadataFile) throws(ProjectSystemError) -> AdaProject {
         guard supportedSchemaVersions.contains(project.schemaVersion) else {
             throw .unsupportedSchemaVersion(path: "schemaVersion", version: project.schemaVersion, supportedVersions: supportedSchemaVersions.sorted())
         }
@@ -206,9 +207,10 @@ public enum ProjectSystem {
                 throw .invalidField(path: "runtime.moduleName", message: "AdaScript projects require a module name.")
             }
             let entry = project.runtime.entry
-            let hasEntry = [entry.scene, entry.startupSystem, entry.view].contains { value in
-                value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            }
+            let hasEntry = [entry.scene, entry.startupSystem, entry.view]
+                .contains { value in
+                    value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                }
             guard hasEntry else {
                 throw .invalidField(
                     path: "runtime.entry",
@@ -246,17 +248,20 @@ public enum ProjectSystem {
 
         let sourceRoot = project.paths.sources ?? "Sources"
         let sourceURL = projectURL.appendingPathComponent(sourceRoot, isDirectory: true)
-        guard let enumerator = fileManager.enumerator(
-            at: sourceURL,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
+        guard
+            let enumerator = fileManager.enumerator(
+                at: sourceURL,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
+        else {
             throw .sourceDirectoryMissing(path: sourceRoot)
         }
         for case let fileURL as URL in enumerator where fileURL.pathExtension.lowercased() == "swift" {
             let rootPath = projectURL.standardizedFileURL.path
             let filePath = fileURL.standardizedFileURL.path
-            let relativePath = filePath.hasPrefix(rootPath + "/")
+            let relativePath =
+                filePath.hasPrefix(rootPath + "/")
                 ? String(filePath.dropFirst(rootPath.count + 1))
                 : fileURL.lastPathComponent
             throw .unsupportedSourceLanguage(platform: destination.rawValue, path: relativePath)
@@ -271,13 +276,14 @@ public enum ProjectSystem {
 
     private static func decodeError(from error: DecodingError, sourcePath: String) -> ProjectSystemError {
         switch error {
-        case .keyNotFound(let key, let context) where key.stringValue == "schemaVersion":
+        case let .keyNotFound(key, context) where key.stringValue == "schemaVersion":
             .missingSchemaVersion(path: codingPathString(context.codingPath + [key]))
-        case .dataCorrupted(let context):
+        case let .dataCorrupted(context):
             .invalidJSON(path: sourcePath, message: context.debugDescription)
-        case .keyNotFound(let key, let context):
+        case let .keyNotFound(key, context):
             .missingRequiredField(path: codingPathString(context.codingPath + [key]), message: context.debugDescription)
-        case .typeMismatch(_, let context), .valueNotFound(_, let context):
+        case let .typeMismatch(_, context),
+            let .valueNotFound(_, context):
             .invalidField(path: codingPathString(context.codingPath), message: context.debugDescription)
         @unknown default:
             .invalidJSON(path: sourcePath, message: error.localizedDescription)
@@ -296,7 +302,9 @@ public enum ProjectSystem {
     }
 
     private static func validateRelativePath(_ path: String?, keyPath: String) throws(ProjectSystemError) {
-        guard let path else { return }
+        guard let path else {
+            return
+        }
 
         guard !path.isEmpty else {
             throw .invalidPath(path: keyPath, value: path, reason: "Path must not be empty.")
@@ -319,7 +327,7 @@ public enum ProjectSystem {
         }
 
         let segments = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
-        if segments.contains(where: { $0.isEmpty }) {
+        if segments.contains(where: \.isEmpty) {
             throw .invalidPath(path: keyPath, value: path, reason: "Empty path segments are not allowed.")
         }
 
@@ -329,7 +337,9 @@ public enum ProjectSystem {
     }
 
     private static func isWindowsAbsolutePath(_ path: String) -> Bool {
-        guard path.count >= 3 else { return false }
+        guard path.count >= 3 else {
+            return false
+        }
 
         let scalars = Array(path.unicodeScalars)
         return CharacterSet.letters.contains(scalars[0])
@@ -411,7 +421,9 @@ public struct AdaProject: Codable, Equatable, Sendable {
         try container.encode(paths, forKey: .paths)
         try container.encode(build, forKey: .build)
         try container.encode(run, forKey: .run)
-        if !inputActions.isEmpty { try container.encode(inputActions, forKey: .inputActions) }
+        if !inputActions.isEmpty {
+            try container.encode(inputActions, forKey: .inputActions)
+        }
         if runtime != AdaProjectRuntime() {
             try container.encode(runtime, forKey: .runtime)
         }
@@ -802,9 +814,9 @@ public struct AdaProjectBuildSystem: RawRepresentable, Codable, Equatable, Hasha
         self.rawValue = rawValue
     }
 
-    public static let swiftpm = AdaProjectBuildSystem(rawValue: "swiftpm")
-    public static let adaScript = AdaProjectBuildSystem(rawValue: "adascript")
-    static let legacyGravity = AdaProjectBuildSystem(rawValue: "gravity")
+    public static let swiftpm = Self(rawValue: "swiftpm")
+    public static let adaScript = Self(rawValue: "adascript")
+    static let legacyGravity = Self(rawValue: "gravity")
     @available(*, deprecated, renamed: "adaScript")
     public static let gravity = legacyGravity
 
@@ -856,30 +868,29 @@ public enum ProjectSystemError: Error, Equatable, Sendable {
 
     public var message: String {
         switch self {
-        case .metadataFileMissing(let path): "Ada project metadata file is missing at \(path)."
-        case .swiftPackageManifestMissing(let path): "SwiftPM manifest is missing at \(path)."
-        case .sourceDirectoryMissing(let path): "Project source directory is missing at \(path)."
-        case .fileReadFailed(let path, let message): "Failed to read \(path): \(message)"
-        case .fileWriteFailed(let path, let message): "Failed to write \(path): \(message)"
-        case .invalidJSON(let path, let message): "Invalid JSON in \(path): \(message)"
-        case .missingSchemaVersion(let path): "Missing required schemaVersion at \(path)."
-        case .unsupportedSchemaVersion(_, let version, let supportedVersions):
+        case let .metadataFileMissing(path): "Ada project metadata file is missing at \(path)."
+        case let .swiftPackageManifestMissing(path): "SwiftPM manifest is missing at \(path)."
+        case let .sourceDirectoryMissing(path): "Project source directory is missing at \(path)."
+        case let .fileReadFailed(path, message): "Failed to read \(path): \(message)"
+        case let .fileWriteFailed(path, message): "Failed to write \(path): \(message)"
+        case let .invalidJSON(path, message): "Invalid JSON in \(path): \(message)"
+        case let .missingSchemaVersion(path): "Missing required schemaVersion at \(path)."
+        case let .unsupportedSchemaVersion(_, version, supportedVersions):
             "Unsupported Ada project schemaVersion \(version). Supported versions: \(supportedVersions.map(String.init).joined(separator: ", "))."
-        case .missingRequiredField(let path, let message): "Missing required field at \(path): \(message)"
-        case .invalidField(let path, let message): "Invalid field at \(path): \(message)"
-        case .unknownBuildSystem(_, let value, let supportedValues):
+        case let .missingRequiredField(path, message): "Missing required field at \(path): \(message)"
+        case let .invalidField(path, message): "Invalid field at \(path): \(message)"
+        case let .unknownBuildSystem(_, value, supportedValues):
             "Unknown build system '\(value)'. Supported values: \(supportedValues.joined(separator: ", "))."
         case let .unsupportedBuildSystemForPlatform(platform, buildSystem):
             "Projects using '\(buildSystem)' cannot run on \(platform). iPadOS runs AdaScript-only projects."
         case let .unsupportedSourceLanguage(platform, path):
             "Swift source '\(path)' cannot run on \(platform). AdaScript projects must contain only AdaScript gameplay code."
-        case .absolutePathNotAllowed(let path, let value): "Absolute path is not allowed at \(path): \(value)"
-        case .pathTraversalNotAllowed(let path, let value): "Path traversal is not allowed at \(path): \(value)"
-        case .invalidPath(let path, let value, let reason): "Invalid path at \(path): \(value). \(reason)"
-        case .encodingFailed(let message): "Failed to encode Ada project metadata: \(message)"
+        case let .absolutePathNotAllowed(path, value): "Absolute path is not allowed at \(path): \(value)"
+        case let .pathTraversalNotAllowed(path, value): "Path traversal is not allowed at \(path): \(value)"
+        case let .invalidPath(path, value, reason): "Invalid path at \(path): \(value). \(reason)"
+        case let .encodingFailed(message): "Failed to encode Ada project metadata: \(message)"
         }
     }
-
 
     public var recoverySuggestion: String {
         switch self {
@@ -905,9 +916,12 @@ public enum ProjectSystemError: Error, Equatable, Sendable {
             "Update the field value in .ada/project.json to match the expected type."
         case .unknownBuildSystem:
             "Set build.system to adascript or swiftpm in .ada/project.json."
-        case .unsupportedBuildSystemForPlatform, .unsupportedSourceLanguage:
+        case .unsupportedBuildSystemForPlatform,
+            .unsupportedSourceLanguage:
             "Open this project on macOS, or convert it to an AdaScript project without Swift sources."
-        case .absolutePathNotAllowed, .pathTraversalNotAllowed, .invalidPath:
+        case .absolutePathNotAllowed,
+            .pathTraversalNotAllowed,
+            .invalidPath:
             "Use project-relative POSIX paths such as Sources or Assets/Scenes/Main.ascn."
         case .encodingFailed:
             "Try creating the project again. If the problem persists, report this AdaEditor error."
@@ -916,24 +930,24 @@ public enum ProjectSystemError: Error, Equatable, Sendable {
 
     public var fieldPath: String? {
         switch self {
-        case .metadataFileMissing(let path),
-             .swiftPackageManifestMissing(let path),
-             .sourceDirectoryMissing(let path),
-             .fileReadFailed(let path, _),
-             .fileWriteFailed(let path, _),
-             .invalidJSON(let path, _),
-             .missingSchemaVersion(let path),
-             .unsupportedSchemaVersion(let path, _, _),
-             .missingRequiredField(let path, _),
-             .invalidField(let path, _),
-             .unknownBuildSystem(let path, _, _),
-             .absolutePathNotAllowed(let path, _),
-             .pathTraversalNotAllowed(let path, _),
-             .invalidPath(let path, _, _):
+        case let .metadataFileMissing(path),
+            let .swiftPackageManifestMissing(path),
+            let .sourceDirectoryMissing(path),
+            let .fileReadFailed(path, _),
+            let .fileWriteFailed(path, _),
+            let .invalidJSON(path, _),
+            let .missingSchemaVersion(path),
+            let .unsupportedSchemaVersion(path, _, _),
+            let .missingRequiredField(path, _),
+            let .invalidField(path, _),
+            let .unknownBuildSystem(path, _, _),
+            let .absolutePathNotAllowed(path, _),
+            let .pathTraversalNotAllowed(path, _),
+            let .invalidPath(path, _, _):
             path
         case .unsupportedBuildSystemForPlatform:
             "build.system"
-        case .unsupportedSourceLanguage(_, let path):
+        case let .unsupportedSourceLanguage(_, path):
             path
         case .encodingFailed:
             nil

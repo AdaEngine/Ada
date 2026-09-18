@@ -10,14 +10,14 @@ struct EditorInspectorSidebar: View {
     @State var activeSceneFieldID: String?
     @State var sceneSearchText = ""
     @State private var collapsedComponentTypeNames: Set<String> = []
-    
+
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) var theme
 
     var body: some View {
         ZStack(anchor: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
-                adaEditorPanelTitle("INSPECTOR", trailing: "", theme: theme)
+                adaEditorInspectorTitle(theme: theme)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         inspectorSection("CREATE") {
@@ -78,6 +78,8 @@ struct EditorInspectorSidebar: View {
             RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
                 .fill(theme.editorColors.surfaceElevated)
         )
+        .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func inspectorSection<Content: View>(
@@ -157,7 +159,8 @@ struct EditorInspectorSidebar: View {
                                 }
                             }
                         }
-                    }.frame(maxHeight: 180)
+                    }
+                    .frame(maxHeight: 180)
                 }
             }
             if [EditorBuiltInComponentType.uiComponent, EditorBuiltInComponentType.companionPanel].contains(field.typeName), field.field.key == "scriptBindings" {
@@ -167,7 +170,7 @@ struct EditorInspectorSidebar: View {
                     text: viewModel.componentFieldBinding(typeName: field.typeName, field: field.field),
                     is3D: field.typeName == EditorBuiltInComponentType.physicsBody3D
                 )
-                    .id(viewModel.selectedEntity?.editorID)
+                .id(viewModel.selectedEntity?.editorID)
             } else {
                 fieldControl(
                     fieldID: "\(field.typeName).\(field.field.key)",
@@ -202,7 +205,7 @@ struct EditorInspectorSidebar: View {
         } else if case .bool = kind, isEditable {
             boolField(text: scalarBinding)
                 .accessibilityIdentifier("AdaEditor.Inspector.Bool.\(fieldID)")
-        } else if case .enumeration(let cases) = kind, isEditable {
+        } else if case let .enumeration(cases) = kind, isEditable {
             EditorEnumField(cases: cases, selection: scalarBinding, accessibilityID: "AdaEditor.Inspector.Enum.\(fieldID)")
         } else if case .color = kind, isEditable {
             colorField(fieldID: fieldID, value: value, text: scalarBinding)
@@ -216,7 +219,7 @@ struct EditorInspectorSidebar: View {
             readonlyField(value)
         }
     }
-    
+
     private func vectorField(
         fieldID: String,
         axes: [String],
@@ -276,7 +279,7 @@ struct EditorInspectorSidebar: View {
             .frame(height: 26)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surface))
-        .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
+            .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
     }
 
     private func axisColor(for label: String) -> Color {
@@ -344,7 +347,8 @@ struct EditorInspectorSidebar: View {
     }
 
     private func vectorDisplayValue(from value: String, index: Int) -> String {
-        let components = value
+        let components =
+            value
             .split { $0 == "," || $0 == " " || $0 == "\t" }
             .map { String($0) }
         guard components.indices.contains(index) else {

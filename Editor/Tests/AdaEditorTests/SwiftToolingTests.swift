@@ -1,8 +1,9 @@
-@testable import AdaEditor
 import AdaPackageManifestTool
 import Foundation
 import GravityLanguageCore
 import Testing
+
+@testable import AdaEditor
 
 @Suite("SwiftPM workspace tooling")
 struct SwiftToolingTests {
@@ -41,10 +42,12 @@ struct SwiftToolingTests {
         #expect(testBuild.arguments == buildPrefix + ["--build-tests"])
         #expect(service.makeCommand(.run(target: "Game", arguments: ["--debug"]), projectURL: projectURL, toolchain: toolchain).arguments == ["run", "Game", "--", "--debug"])
         let webCommand = service.makeCommand(.runWeb(target: "Game", outputPath: "dist/web", serve: true), projectURL: projectURL, toolchain: toolchain)
-        #expect(webCommand.arguments == [
-            "package", "--allow-writing-to-package-directory", "--allow-network-connections", "all",
-            "export-web", "--product", "Game", "--output", "dist/web", "--serve"
-        ])
+        #expect(
+            webCommand.arguments == [
+                "package", "--allow-writing-to-package-directory", "--allow-network-connections", "all",
+                "export-web", "--product", "Game", "--output", "dist/web", "--serve",
+            ]
+        )
         #expect(webCommand.environment["ADAENGINE_WEB_EXPORT"] == "1")
         #expect(webCommand.environment["BUILD_WASM"] == "1")
         #expect(service.makeCommand(.test(filter: "GameTests"), projectURL: projectURL, toolchain: toolchain).arguments == ["test", "--parallel", "--filter", "GameTests"])
@@ -67,7 +70,7 @@ struct SwiftToolingTests {
             results: [
                 EditorProcessResult(command: placeholderCommand, exitCode: 0, standardOutput: "", standardError: ""),
                 EditorProcessResult(command: placeholderCommand, exitCode: 0, standardOutput: packageDescriptionJSON, standardError: ""),
-                EditorProcessResult(command: placeholderCommand, exitCode: 0, standardOutput: "", standardError: "")
+                EditorProcessResult(command: placeholderCommand, exitCode: 0, standardOutput: "", standardError: ""),
             ],
             outputChunks: [
                 [],
@@ -77,7 +80,7 @@ struct SwiftToolingTests {
                         stream: .standardOutput,
                         text: "[1/2] Compiling Game main.swift\n[2/2] Compiling Game Player.swift\n"
                     )
-                ]
+                ],
             ]
         )
         let recorder = WorkspaceProgressRecorder()
@@ -183,7 +186,7 @@ struct SwiftToolingTests {
         await Task.yield()
 
         #expect(await service.commands.isEmpty)
-        guard case .failed(let message) = viewModel.workspaceStatus else {
+        guard case let .failed(message) = viewModel.workspaceStatus else {
             Issue.record("Expected run to fail before starting a process")
             return
         }
@@ -200,7 +203,8 @@ struct SwiftToolingTests {
         defer { try? FileManager.default.removeItem(at: rootURL) }
         let project = try EditorProjectStore(
             storageURL: rootURL.appendingPathComponent("projects.json")
-        ).createProject(named: "TabletGame", at: rootURL, template: .adaScript)
+        )
+        .createProject(named: "TabletGame", at: rootURL, template: .adaScript)
         let service = RecordingWorkspaceService()
         let viewModel = EditorViewModel(project: project, workspaceService: service)
 
@@ -238,7 +242,7 @@ struct SwiftToolingTests {
 
         viewModel.handleCompletionPosition(document: document, position: EditorSourceLocation(line: 0, character: 1), text: "o")
 
-        guard case .text(let updatedDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(updatedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected active text document")
             return
         }
@@ -281,34 +285,42 @@ struct SwiftToolingTests {
 
     @Test("automatic completion still runs for identifiers and member access")
     func automaticCompletionAcceptsTypingContexts() {
-        #expect(EditorViewModel.shouldRequestAutomaticCompletion(
-            in: "player.upd",
-            at: EditorSourceLocation(line: 0, character: 10)
-        ))
-        #expect(EditorViewModel.shouldRequestAutomaticCompletion(
-            in: "player.",
-            at: EditorSourceLocation(line: 0, character: 7)
-        ))
-        #expect(!EditorViewModel.shouldRequestAutomaticCompletion(
-            in: "player.update()",
-            at: EditorSourceLocation(line: 0, character: 15)
-        ))
-        #expect(!EditorViewModel.shouldRequestAutomaticCompletion(
-            in: "}",
-            at: EditorSourceLocation(line: 0, character: 1)
-        ))
+        #expect(
+            EditorViewModel.shouldRequestAutomaticCompletion(
+                in: "player.upd",
+                at: EditorSourceLocation(line: 0, character: 10)
+            )
+        )
+        #expect(
+            EditorViewModel.shouldRequestAutomaticCompletion(
+                in: "player.",
+                at: EditorSourceLocation(line: 0, character: 7)
+            )
+        )
+        #expect(
+            !EditorViewModel.shouldRequestAutomaticCompletion(
+                in: "player.update()",
+                at: EditorSourceLocation(line: 0, character: 15)
+            )
+        )
+        #expect(
+            !EditorViewModel.shouldRequestAutomaticCompletion(
+                in: "}",
+                at: EditorSourceLocation(line: 0, character: 1)
+            )
+        )
     }
 
     @Test("AdaScript completion offers Ada APIs and document declarations")
     func gravityCompletionOffersAdaAPIsAndSymbols() async throws {
         let service = SwiftPMWorkspaceService()
         let source = """
-        @system(scheduler: "update")
-        class MovementSystem {
-            @que
-            func update(context) {}
-        }
-        """
+            @system(scheduler: "update")
+            class MovementSystem {
+                @que
+                func update(context) {}
+            }
+            """
         let apiItems = await service.completions(
             fileURL: URL(fileURLWithPath: "/tmp/Movement.ada"),
             language: .ada,
@@ -319,10 +331,13 @@ struct SwiftToolingTests {
         let query = try #require(apiItems.first { $0.label == "query" })
         #expect(query.insertText == "query()")
         #expect(query.kind == .annotation)
-        #expect(query.replacementRange == EditorSourceRange(
-            start: EditorSourceLocation(line: 2, character: 5),
-            end: EditorSourceLocation(line: 2, character: 8)
-        ))
+        #expect(
+            query.replacementRange
+                == EditorSourceRange(
+                    start: EditorSourceLocation(line: 2, character: 5),
+                    end: EditorSourceLocation(line: 2, character: 8)
+                )
+        )
 
         let symbolItems = await service.completions(
             fileURL: URL(fileURLWithPath: "/tmp/Movement.ada"),
@@ -364,10 +379,13 @@ struct SwiftToolingTests {
 
         let target = try #require(targets.first)
         #expect(target.filePath == fileURL.path)
-        #expect(target.selectionRange == EditorSourceRange(
-            start: EditorSourceLocation(line: 0, character: 5),
-            end: EditorSourceLocation(line: 0, character: 9)
-        ))
+        #expect(
+            target.selectionRange
+                == EditorSourceRange(
+                    start: EditorSourceLocation(line: 0, character: 5),
+                    end: EditorSourceLocation(line: 0, character: 9)
+                )
+        )
     }
 
     @Test("AdaScript editor completion uses workspace symbols and character columns")
@@ -376,11 +394,12 @@ struct SwiftToolingTests {
             .appendingPathComponent("AdaScriptEditorCompletion-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: projectURL) }
         try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
-        try "class SharedSystem { func tick() {} }".write(
-            to: projectURL.appendingPathComponent("Shared.ada"),
-            atomically: true,
-            encoding: .utf8
-        )
+        try "class SharedSystem { func tick() {} }"
+            .write(
+                to: projectURL.appendingPathComponent("Shared.ada"),
+                atomically: true,
+                encoding: .utf8
+            )
 
         let workspace = GravityWorkspace()
         workspace.configure(rootURIs: [projectURL.absoluteString])
@@ -393,10 +412,13 @@ struct SwiftToolingTests {
         )
 
         let tick = try #require(items.first { $0.label == "tick" })
-        #expect(tick.replacementRange == EditorSourceRange(
-            start: EditorSourceLocation(line: 0, character: source.count - 2),
-            end: EditorSourceLocation(line: 0, character: source.count)
-        ))
+        #expect(
+            tick.replacementRange
+                == EditorSourceRange(
+                    start: EditorSourceLocation(line: 0, character: source.count - 2),
+                    end: EditorSourceLocation(line: 0, character: source.count)
+                )
+        )
     }
 
     @Test("Ada documents request automatic completion through the editor path")
@@ -479,7 +501,7 @@ struct SwiftToolingTests {
             text: document.content
         )
 
-        guard case .text(let updatedDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(updatedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected active text document")
             return
         }
@@ -511,21 +533,21 @@ struct SwiftToolingTests {
         )
 
         #expect(viewModel.moveCompletionSelection(in: document, by: 1))
-        guard case .text(let selectedDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(selectedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected active text document")
             return
         }
         #expect(selectedDocument.selectedCompletionIndex == 1)
         #expect(viewModel.moveCompletionSelection(in: selectedDocument, by: 1))
 
-        guard case .text(let clampedDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(clampedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected active text document")
             return
         }
         #expect(clampedDocument.selectedCompletionIndex == 1)
         #expect(viewModel.applySelectedCompletion(in: clampedDocument))
 
-        guard case .text(let completedDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(completedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected active text document")
             return
         }
@@ -561,14 +583,14 @@ struct SwiftToolingTests {
 
         viewModel.handleSourceHover(document: document, position: EditorSourceLocation(line: 0, character: 12))
         for _ in 0..<100 {
-            if case .text(let updatedDocument)? = viewModel.workbench.activeDocument,
-               updatedDocument.sourceHoverDescription != nil {
+            if case let .text(updatedDocument)? = viewModel.workbench.activeDocument,
+                updatedDocument.sourceHoverDescription != nil {
                 break
             }
             try await Task.sleep(for: .milliseconds(5))
         }
 
-        guard case .text(let hoveredDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(hoveredDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected active text document")
             return
         }
@@ -577,7 +599,7 @@ struct SwiftToolingTests {
         #expect(hoveredDocument.symbolHighlights == [hoveredRange])
 
         viewModel.handleSourceHover(document: hoveredDocument, position: nil)
-        guard case .text(let clearedDocument)? = viewModel.workbench.activeDocument else {
+        guard case let .text(clearedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected active text document")
             return
         }
@@ -631,36 +653,40 @@ struct SwiftToolingTests {
 
     @Test("preview scanner finds top-level previewable views")
     func previewScannerFindsDeclarations() {
-        let declarations = EditorPreviewScanner.declarations(in: """
-        import AdaEngine
+        let declarations = EditorPreviewScanner.declarations(
+            in: """
+                import AdaEngine
 
-        @Previewable(title: "Primary")
-        public struct PrimaryView: View {
-            var body: some View { EmptyView() }
-        }
+                @Previewable(title: "Primary")
+                public struct PrimaryView: View {
+                    var body: some View { EmptyView() }
+                }
 
-        @Previewable
-        struct SecondaryView: View {
-            var body: some View { EmptyView() }
-        }
+                @Previewable
+                struct SecondaryView: View {
+                    var body: some View { EmptyView() }
+                }
 
-        @AdaUI.Previewable(title: "Private")
-        private final class PrivatePreviewView: AdaUI.View {
-            var body: some View { EmptyView() }
-        }
+                @AdaUI.Previewable(title: "Private")
+                private final class PrivatePreviewView: AdaUI.View {
+                    var body: some View { EmptyView() }
+                }
 
-        @Previewable
-        struct NotAView {
-        }
-        """)
+                @Previewable
+                struct NotAView {
+                }
+                """
+        )
 
         #expect(declarations.map(\.typeName) == ["PrimaryView", "SecondaryView", "PrivatePreviewView"])
         #expect(declarations.map(\.title) == ["Primary", "SecondaryView", "Private"])
-        #expect(declarations.map(\.symbolName) == [
-            "ada_editor_preview_make_PrimaryView",
-            "ada_editor_preview_make_SecondaryView",
-            "ada_editor_preview_make_PrivatePreviewView"
-        ])
+        #expect(
+            declarations.map(\.symbolName) == [
+                "ada_editor_preview_make_PrimaryView",
+                "ada_editor_preview_make_SecondaryView",
+                "ada_editor_preview_make_PrivatePreviewView",
+            ]
+        )
     }
 
     @Test("preview builder mirrors executable preview from entrypoint file")
@@ -688,7 +714,8 @@ struct SwiftToolingTests {
         struct GameView: View {
             var body: some View { EmptyView() }
         }
-        """.write(to: gameSourceURL.appendingPathComponent("main.swift"), atomically: true, encoding: .utf8)
+        """
+        .write(to: gameSourceURL.appendingPathComponent("main.swift"), atomically: true, encoding: .utf8)
         try "struct SharedHelper {}\n".write(to: sharedSourceURL.appendingPathComponent("SharedHelper.swift"), atomically: true, encoding: .utf8)
 
         let model = SwiftPackageModel(
@@ -712,7 +739,7 @@ struct SwiftToolingTests {
                     sources: ["SharedHelper.swift"],
                     targetDependencies: [],
                     productDependencies: ["Collections"]
-                )
+                ),
             ],
             dependencies: [
                 SwiftPackageDependency(identity: "adaengine", type: "fileSystem", url: nil, path: "../AdaEngine", requirement: nil),
@@ -722,7 +749,7 @@ struct SwiftToolingTests {
                     url: "https://github.com/apple/swift-collections.git",
                     path: nil,
                     requirement: "from: 1.2.0"
-                )
+                ),
             ]
         )
         let document = EditorTextDocument(
@@ -745,17 +772,20 @@ struct SwiftToolingTests {
                 }
                 return command.arguments[valueIndex]
             }
-            let buildRoot = scratchPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
+            let buildRoot =
+                scratchPath.map { URL(fileURLWithPath: $0, isDirectory: true) }
                 ?? command.workingDirectory.appendingPathComponent(".build", isDirectory: true)
             let buildDirectory = buildRoot.appendingPathComponent("debug", isDirectory: true)
             try? fileManager.createDirectory(at: buildDirectory, withIntermediateDirectories: true)
             try? Data().write(to: buildDirectory.appendingPathComponent("libAdaEditorPreviewBundle.dylib"))
         }
         let previewPackageName = previewDirectoryName(relativePath: document.relativePath, declarationID: declaration.id)
-        let previewPackageRoot = projectURL
+        let previewPackageRoot =
+            projectURL
             .appendingPathComponent(".build/adaeditor-previews", isDirectory: true)
             .appendingPathComponent(previewPackageName, isDirectory: true)
-        let retainedBuildMarker = previewPackageRoot
+        let retainedBuildMarker =
+            previewPackageRoot
             .appendingPathComponent(".build", isDirectory: true)
             .appendingPathComponent("retained-artifact.txt")
         try fileManager.createDirectory(at: retainedBuildMarker.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -763,15 +793,16 @@ struct SwiftToolingTests {
         try fileManager.createDirectory(at: previewPackageRoot.appendingPathComponent("Sources/Game", isDirectory: true), withIntermediateDirectories: true)
         try "stale".write(to: previewPackageRoot.appendingPathComponent("Sources/Game/Stale.swift"), atomically: true, encoding: .utf8)
 
-        let artifact = try await EditorPreviewBuilder(processRunner: runner).build(
-            EditorPreviewBuildRequest(
-                projectURL: projectURL,
-                document: document,
-                packageModel: model,
-                declaration: declaration
-            ),
-            toolchain: SwiftToolchain(swiftExecutablePath: "/usr/bin/swift", sourceKitLSPExecutablePath: nil)
-        )
+        let artifact = try await EditorPreviewBuilder(processRunner: runner)
+            .build(
+                EditorPreviewBuildRequest(
+                    projectURL: projectURL,
+                    document: document,
+                    packageModel: model,
+                    declaration: declaration
+                ),
+                toolchain: SwiftToolchain(swiftExecutablePath: "/usr/bin/swift", sourceKitLSPExecutablePath: nil)
+            )
 
         let previewRoot = projectURL.appendingPathComponent(".build/adaeditor-previews", isDirectory: true)
         let previewPackageURL = try #require(findFirstFile(named: "Package.swift", under: previewRoot, fileManager: fileManager))
@@ -816,7 +847,7 @@ struct SwiftToolingTests {
             products: [],
             targets: [
                 SwiftPackageTarget(name: "Game", type: "regular", path: "Sources/Game", sources: ["Game.swift"], targetDependencies: [], productDependencies: []),
-                SwiftPackageTarget(name: "GameTests", type: "test", path: "Tests/GameTests", sources: [], targetDependencies: ["Game"], productDependencies: [])
+                SwiftPackageTarget(name: "GameTests", type: "test", path: "Tests/GameTests", sources: [], targetDependencies: ["Game"], productDependencies: []),
             ],
             dependencies: []
         )
@@ -846,7 +877,7 @@ struct SwiftToolingTests {
     func buildProgressParserTracksCompiledSwiftFiles() {
         let knownFiles = [
             URL(fileURLWithPath: "/tmp/Game/Sources/Game/main.swift"),
-            URL(fileURLWithPath: "/tmp/Game/Sources/Game/Player.swift")
+            URL(fileURLWithPath: "/tmp/Game/Sources/Game/Player.swift"),
         ]
         var parser = SwiftPMBuildProgressParser()
 
@@ -865,7 +896,7 @@ struct SwiftToolingTests {
     func indexingProgressCoalescesOutput() async throws {
         let knownFiles = [
             URL(fileURLWithPath: "/tmp/Game/Sources/Game/main.swift"),
-            URL(fileURLWithPath: "/tmp/Game/Sources/Game/Player.swift")
+            URL(fileURLWithPath: "/tmp/Game/Sources/Game/Player.swift"),
         ]
         let tracker = SwiftPMBuildProgressTracker(minimumEmissionInterval: 60, now: 0)
 
@@ -883,32 +914,34 @@ struct SwiftToolingTests {
 
         #expect(firstBatch == nil)
         #expect(secondBatch == nil)
-        #expect(flushedBatch.lines == [
-            "[1/2] Compiling Game main.swift",
-            "[2/2] Compiling Game Player.swift"
-        ])
+        #expect(
+            flushedBatch.lines == [
+                "[1/2] Compiling Game main.swift",
+                "[2/2] Compiling Game Player.swift",
+            ]
+        )
         #expect(flushedBatch.buildProgress == SwiftPMBuildProgress(completed: 2, currentFile: "Player.swift", currentTarget: "Game"))
     }
 
     #if os(macOS) || os(Linux)
-    @Test("process runner remains responsive while a child process is running")
-    func processRunnerCanCancelRunningProcess() async throws {
-        let runner = EditorProcessRunner()
-        let command = EditorProcessCommand(
-            executablePath: "/bin/sleep",
-            arguments: ["3"],
-            workingDirectory: URL(fileURLWithPath: "/tmp", isDirectory: true)
-        )
-        let resultTask = Task {
-            await runner.run(command)
+        @Test("process runner remains responsive while a child process is running")
+        func processRunnerCanCancelRunningProcess() async throws {
+            let runner = EditorProcessRunner()
+            let command = EditorProcessCommand(
+                executablePath: "/bin/sleep",
+                arguments: ["3"],
+                workingDirectory: URL(fileURLWithPath: "/tmp", isDirectory: true)
+            )
+            let resultTask = Task {
+                await runner.run(command)
+            }
+
+            try await Task.sleep(for: .milliseconds(100))
+            await runner.cancelAll()
+            let result = await resultTask.value
+
+            #expect(!result.succeeded)
         }
-
-        try await Task.sleep(for: .milliseconds(100))
-        await runner.cancelAll()
-        let result = await resultTask.value
-
-        #expect(!result.succeeded)
-    }
     #endif
 
     @Test("fake process runner streams output before returning final result")
@@ -951,18 +984,20 @@ struct SwiftToolingTests {
             exitCode: 0,
             standardOutput: "/tmp/Game/Sources/Game/main.swift:3:12: warning: unused value\n",
             standardError: """
-            Fetching https://example.com/Dependency.git
-            /tmp/Game/Sources/Game/main.swift:4:8: error: cannot find 'bar' in scope
-            """
+                Fetching https://example.com/Dependency.git
+                /tmp/Game/Sources/Game/main.swift:4:8: error: cannot find 'bar' in scope
+                """
         )
 
         let diagnostics = EditorDiagnostic.diagnostics(from: result, projectURL: projectURL)
 
-        #expect(diagnostics.map(\.message) == [
-            "unused value",
-            "Fetching https://example.com/Dependency.git",
-            "cannot find 'bar' in scope"
-        ])
+        #expect(
+            diagnostics.map(\.message) == [
+                "unused value",
+                "Fetching https://example.com/Dependency.git",
+                "cannot find 'bar' in scope",
+            ]
+        )
         #expect(diagnostics.map(\.severity) == [.warning, .information, .error])
         #expect(diagnostics[1].filePath == "/tmp/Game/Package.swift")
     }
@@ -977,63 +1012,74 @@ struct SwiftToolingTests {
             from: response,
             legend: [
                 "namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable", "property",
-                "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment", "string"
+                "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment", "string",
             ],
             modifiersLegend: []
         )
 
-        #expect(tokens == [
-            EditorSemanticToken(line: 0, startCharacter: 0, length: 6, type: "keyword", modifiers: []),
-            EditorSemanticToken(line: 1, startCharacter: 4, length: 4, type: "string", modifiers: [])
-        ])
+        #expect(
+            tokens == [
+                EditorSemanticToken(line: 0, startCharacter: 0, length: 6, type: "keyword", modifiers: []),
+                EditorSemanticToken(line: 1, startCharacter: 4, length: 4, type: "string", modifiers: []),
+            ]
+        )
     }
 
     @Test("LSP completion decodes list results and text edits")
     func completionDecode() {
-        let items = SourceKitLSPClient.decodeCompletionItems(from: .object([
-            "isIncomplete": .bool(false),
-            "items": .array([
-                .object([
-                    "label": .string("update"),
-                    "detail": .string("func update()"),
-                    "kind": .int(2),
-                    "sortText": .string("002"),
-                    "textEdit": .object([
-                        "newText": .string("update()"),
-                        "range": sourceRange(4, 8, 4, 10)
-                    ])
+        let items = SourceKitLSPClient.decodeCompletionItems(
+            from: .object([
+                "isIncomplete": .bool(false),
+                "items": .array([
+                    .object([
+                        "label": .string("update"),
+                        "detail": .string("func update()"),
+                        "kind": .int(2),
+                        "sortText": .string("002"),
+                        "textEdit": .object([
+                            "newText": .string("update()"),
+                            "range": sourceRange(4, 8, 4, 10),
+                        ]),
+                    ]),
+                    .object([
+                        "label": .string("upAxis"),
+                        "insertText": .string("upAxis"),
+                        "kind": .int(10),
+                        "sortText": .string("001"),
+                    ]),
                 ]),
-                .object([
-                    "label": .string("upAxis"),
-                    "insertText": .string("upAxis"),
-                    "kind": .int(10),
-                    "sortText": .string("001")
-                ])
             ])
-        ]))
+        )
 
         #expect(items.map(\.label) == ["upAxis", "update"])
         #expect(items.map(\.kind) == [.property, .method])
         #expect(items[1].insertText == "update()")
-        #expect(items[1].replacementRange == EditorSourceRange(
-            start: EditorSourceLocation(line: 4, character: 8),
-            end: EditorSourceLocation(line: 4, character: 10)
-        ))
+        #expect(
+            items[1].replacementRange
+                == EditorSourceRange(
+                    start: EditorSourceLocation(line: 4, character: 8),
+                    end: EditorSourceLocation(line: 4, character: 10)
+                )
+        )
     }
 
     @Test("LSP publish diagnostics decodes severity and canonical source")
     func publishDiagnosticsDecode() throws {
-        let result = try #require(SourceKitLSPClient.decodePublishedDiagnostics(from: .object([
-            "uri": .string("file:///tmp/Game/Sources/Game/main.swift"),
-            "diagnostics": .array([
-                .object([
-                    "range": sourceRange(2, 4, 2, 10),
-                    "severity": .int(1),
-                    "source": .string("swift"),
-                    "message": .string("cannot find 'player' in scope")
+        let result = try #require(
+            SourceKitLSPClient.decodePublishedDiagnostics(
+                from: .object([
+                    "uri": .string("file:///tmp/Game/Sources/Game/main.swift"),
+                    "diagnostics": .array([
+                        .object([
+                            "range": sourceRange(2, 4, 2, 10),
+                            "severity": .int(1),
+                            "source": .string("swift"),
+                            "message": .string("cannot find 'player' in scope"),
+                        ])
+                    ]),
                 ])
-            ])
-        ])))
+            )
+        )
 
         #expect(result.uri == "file:///tmp/Game/Sources/Game/main.swift")
         #expect(result.diagnostics.count == 1)
@@ -1051,8 +1097,8 @@ struct SwiftToolingTests {
                     "label": .string("update"),
                     "textEdit": .object([
                         "newText": .string("update"),
-                        "range": sourceRange(0, 2, 0, 4)
-                    ])
+                        "range": sourceRange(0, 2, 0, 4),
+                    ]),
                 ])
             ]),
             "textDocument/semanticTokens/full": .object([
@@ -1064,11 +1110,11 @@ struct SwiftToolingTests {
             "textDocument/hover": .object([
                 "contents": .object([
                     "kind": .string("markdown"),
-                    "value": .string("func update()")
+                    "value": .string("func update()"),
                 ]),
-                "range": sourceRange(0, 2, 0, 4)
+                "range": sourceRange(0, 2, 0, 4),
             ]),
-            "textDocument/references": .array([])
+            "textDocument/references": .array([]),
         ])
         let client = SourceKitLSPClient(connection: connection)
         let fileURL = URL(fileURLWithPath: "/tmp/Game/Sources/Game/main.swift")
@@ -1087,13 +1133,14 @@ struct SwiftToolingTests {
         let requests = await connection.requests
 
         let initializeParams = try #require(requests.first { $0.method == "initialize" }?.params)
-        guard case .object(let initializeObject) = initializeParams,
-              case .array(let workspaceFolders)? = initializeObject["workspaceFolders"],
-              case .object(let workspaceFolder)? = workspaceFolders.first,
-              case .object(let capabilities)? = initializeObject["capabilities"],
-              case .object(let workspaceCapabilities)? = capabilities["workspace"],
-              case .object(let textDocumentCapabilities)? = capabilities["textDocument"],
-              case .object(let semanticTokenCapabilities)? = textDocumentCapabilities["semanticTokens"]
+        guard
+            case let .object(initializeObject) = initializeParams,
+            case let .array(workspaceFolders)? = initializeObject["workspaceFolders"],
+            case let .object(workspaceFolder)? = workspaceFolders.first,
+            case let .object(capabilities)? = initializeObject["capabilities"],
+            case let .object(workspaceCapabilities)? = capabilities["workspace"],
+            case let .object(textDocumentCapabilities)? = capabilities["textDocument"],
+            case let .object(semanticTokenCapabilities)? = textDocumentCapabilities["semanticTokens"]
         else {
             Issue.record("Expected SourceKit-LSP workspace and semantic token initialize capabilities")
             return
@@ -1103,7 +1150,7 @@ struct SwiftToolingTests {
         #expect(workspaceCapabilities["workspaceFolders"] == .bool(true))
         #expect(semanticTokenCapabilities["formats"] == .array([.string("relative")]))
         let preparationParams = try #require(requests.first { $0.method == "workspace/_sourceKitOptions" }?.params)
-        guard case .object(let preparationObject) = preparationParams else {
+        guard case let .object(preparationObject) = preparationParams else {
             Issue.record("Expected SourceKit-LSP document preparation parameters")
             return
         }
@@ -1113,39 +1160,54 @@ struct SwiftToolingTests {
 
         #expect(notifications.map(\.method).contains("textDocument/didOpen"))
         let change = try #require(notifications.first { $0.method == "textDocument/didChange" }?.params)
-        guard case .object(let changeObject) = change,
-              case .object(let versionedDocument)? = changeObject["textDocument"] else {
+        guard
+            case let .object(changeObject) = change,
+            case let .object(versionedDocument)? = changeObject["textDocument"]
+        else {
             Issue.record("Expected versioned didChange parameters")
             return
         }
         #expect(versionedDocument["version"] == .int(2))
 
         let completionParams = try #require(requests.last { $0.method == "textDocument/completion" }?.params)
-        guard case .object(let completionObject) = completionParams,
-              case .object(let position)? = completionObject["position"] else {
+        guard
+            case let .object(completionObject) = completionParams,
+            case let .object(position)? = completionObject["position"]
+        else {
             Issue.record("Expected completion position parameters")
             return
         }
         #expect(position["character"] == .int(4))
-        #expect(items.first?.replacementRange == EditorSourceRange(
-            start: EditorSourceLocation(line: 0, character: 1),
-            end: EditorSourceLocation(line: 0, character: 3)
-        ))
+        #expect(
+            items.first?.replacementRange
+                == EditorSourceRange(
+                    start: EditorSourceLocation(line: 0, character: 1),
+                    end: EditorSourceLocation(line: 0, character: 3)
+                )
+        )
         let applied = try #require(EditorViewModel.applyingCompletion(items[0], to: "😀up", at: EditorSourceLocation(line: 0, character: 3)))
         #expect(applied.text == "😀update")
         #expect(tokens.first?.startCharacter == 1)
         #expect(tokens.first?.length == 2)
-        #expect(highlights.first?.range == EditorSourceRange(
-            start: EditorSourceLocation(line: 0, character: 1),
-            end: EditorSourceLocation(line: 0, character: 3)
-        ))
-        #expect(hover?.range == EditorSourceRange(
-            start: EditorSourceLocation(line: 0, character: 1),
-            end: EditorSourceLocation(line: 0, character: 3)
-        ))
+        #expect(
+            highlights.first?.range
+                == EditorSourceRange(
+                    start: EditorSourceLocation(line: 0, character: 1),
+                    end: EditorSourceLocation(line: 0, character: 3)
+                )
+        )
+        #expect(
+            hover?.range
+                == EditorSourceRange(
+                    start: EditorSourceLocation(line: 0, character: 1),
+                    end: EditorSourceLocation(line: 0, character: 3)
+                )
+        )
         let referencesParams = try #require(requests.last { $0.method == "textDocument/references" }?.params)
-        guard case .object(let referencesObject) = referencesParams,
-              case .object(let referencesPosition)? = referencesObject["position"] else {
+        guard
+            case let .object(referencesObject) = referencesParams,
+            case let .object(referencesPosition)? = referencesObject["position"]
+        else {
             Issue.record("Expected references position parameters")
             return
         }
@@ -1159,7 +1221,7 @@ struct SwiftToolingTests {
             "jsonrpc": .string("2.0"),
             "id": .int(1),
             "method": .string("workspace/configuration"),
-            "params": .object(["items": .array([])])
+            "params": .object(["items": .array([])]),
         ])
 
         #expect(route == .serverMessage(method: "workspace/configuration", id: .int(1)))
@@ -1169,30 +1231,36 @@ struct SwiftToolingTests {
     @Test("completion application replaces the LSP range or inferred identifier prefix")
     @MainActor
     func completionApplication() throws {
-        let explicit = try #require(EditorViewModel.applyingCompletion(
-            EditorCompletionItem(
-                label: "update",
-                detail: nil,
-                insertText: "update()",
-                replacementRange: EditorSourceRange(
-                    start: EditorSourceLocation(line: 1, character: 8),
-                    end: EditorSourceLocation(line: 1, character: 10)
+        let explicit = try #require(
+            EditorViewModel.applyingCompletion(
+                EditorCompletionItem(
+                    label: "update",
+                    detail: nil,
+                    insertText: "update()",
+                    replacementRange: EditorSourceRange(
+                        start: EditorSourceLocation(line: 1, character: 8),
+                        end: EditorSourceLocation(line: 1, character: 10)
+                    ),
+                    sortText: nil
                 ),
-                sortText: nil
-            ),
-            to: "struct Game {\n    let up\n}",
-            at: EditorSourceLocation(line: 1, character: 10)
-        ))
-        let inferred = try #require(EditorViewModel.applyingCompletion(
-            EditorCompletionItem(label: "player", detail: nil, insertText: "player", replacementRange: nil, sortText: nil),
-            to: "let pla = 1",
-            at: EditorSourceLocation(line: 0, character: 7)
-        ))
-        let multiline = try #require(EditorViewModel.applyingCompletion(
-            EditorCompletionItem(label: "func", detail: nil, insertText: "func main() {\n}", replacementRange: nil, sortText: nil),
-            to: "fu",
-            at: EditorSourceLocation(line: 0, character: 2)
-        ))
+                to: "struct Game {\n    let up\n}",
+                at: EditorSourceLocation(line: 1, character: 10)
+            )
+        )
+        let inferred = try #require(
+            EditorViewModel.applyingCompletion(
+                EditorCompletionItem(label: "player", detail: nil, insertText: "player", replacementRange: nil, sortText: nil),
+                to: "let pla = 1",
+                at: EditorSourceLocation(line: 0, character: 7)
+            )
+        )
+        let multiline = try #require(
+            EditorViewModel.applyingCompletion(
+                EditorCompletionItem(label: "func", detail: nil, insertText: "func main() {\n}", replacementRange: nil, sortText: nil),
+                to: "fu",
+                at: EditorSourceLocation(line: 0, character: 2)
+            )
+        )
 
         #expect(explicit.text == "struct Game {\n    let update()\n}")
         #expect(explicit.caret == EditorSourceLocation(line: 1, character: 16))
@@ -1206,13 +1274,13 @@ struct SwiftToolingTests {
         let response: JSONRPCValue = .array([
             .object([
                 "uri": .string("file:///tmp/Game/Sources/Game/main.swift"),
-                "range": sourceRange(2, 4, 2, 12)
+                "range": sourceRange(2, 4, 2, 12),
             ]),
             .object([
                 "targetUri": .string("file:///tmp/Game/Sources/Game/Player.swift"),
                 "targetRange": sourceRange(10, 0, 20, 1),
-                "targetSelectionRange": sourceRange(12, 9, 12, 15)
-            ])
+                "targetSelectionRange": sourceRange(12, 9, 12, 15),
+            ]),
         ])
 
         let targets = SourceKitLSPClient.decodeDefinitionTargets(from: response)
@@ -1226,38 +1294,46 @@ struct SwiftToolingTests {
 
     @Test("LSP references hover and document highlights decode")
     func symbolFeatureDecoders() {
-        let references = SourceKitLSPClient.decodeReferences(from: .array([
-            .object([
-                "uri": .string("file:///tmp/Game/Sources/Game/main.swift"),
-                "range": sourceRange(3, 2, 3, 8)
+        let references = SourceKitLSPClient.decodeReferences(
+            from: .array([
+                .object([
+                    "uri": .string("file:///tmp/Game/Sources/Game/main.swift"),
+                    "range": sourceRange(3, 2, 3, 8),
+                ])
             ])
-        ]))
-        let hover = SourceKitLSPClient.decodeHover(from: .object([
-            "contents": .object([
-                "kind": .string("markdown"),
-                "value": .string("func update()")
-            ]),
-            "range": sourceRange(3, 2, 3, 8)
-        ]))
-        let highlights = SourceKitLSPClient.decodeDocumentHighlights(from: .array([
-            .object([
+        )
+        let hover = SourceKitLSPClient.decodeHover(
+            from: .object([
+                "contents": .object([
+                    "kind": .string("markdown"),
+                    "value": .string("func update()"),
+                ]),
                 "range": sourceRange(3, 2, 3, 8),
-                "kind": .int(3)
             ])
-        ]))
+        )
+        let highlights = SourceKitLSPClient.decodeDocumentHighlights(
+            from: .array([
+                .object([
+                    "range": sourceRange(3, 2, 3, 8),
+                    "kind": .int(3),
+                ])
+            ])
+        )
 
         #expect(references.map(\.filePath) == ["/tmp/Game/Sources/Game/main.swift"])
         #expect(hover?.contents == "func update()")
         #expect(hover?.range?.start.character == 2)
-        #expect(highlights == [
-            EditorDocumentHighlight(
-                range: EditorSourceRange(
-                    start: EditorSourceLocation(line: 3, character: 2),
-                    end: EditorSourceLocation(line: 3, character: 8)
-                ),
-                kind: .write
-            )
-        ])
+        #expect(
+            highlights == [
+                EditorDocumentHighlight(
+                    range: EditorSourceRange(
+                        start: EditorSourceLocation(line: 3, character: 2),
+                        end: EditorSourceLocation(line: 3, character: 8)
+                    ),
+                    kind: .write
+                )
+            ]
+        )
     }
 
     @Test("package manifest editor adds executable target")
@@ -1321,14 +1397,18 @@ struct SwiftToolingTests {
 
     @Test("package manifest editor adds and removes real dependencies by normalized identity")
     func manifestEditorAddsAndRemovesDependencies() throws {
-        var manifest = try PackageManifestEditor.edit(
-            simpleManifestWithExecutableTarget,
-            command: .addLocalDependency(name: "My_Library", path: "../MyLibrary")
-        ).manifest
-        manifest = try PackageManifestEditor.edit(
-            manifest,
-            command: .addDependency(url: "https://example.com/Other-Library.git", requirement: #"from: "1.2.0""#)
-        ).manifest
+        var manifest =
+            try PackageManifestEditor.edit(
+                simpleManifestWithExecutableTarget,
+                command: .addLocalDependency(name: "My_Library", path: "../MyLibrary")
+            )
+            .manifest
+        manifest =
+            try PackageManifestEditor.edit(
+                manifest,
+                command: .addDependency(url: "https://example.com/Other-Library.git", requirement: #"from: "1.2.0""#)
+            )
+            .manifest
 
         let removedLocal = try PackageManifestEditor.edit(manifest, command: .removeDependency(identity: "my-library"))
         let removedRemote = try PackageManifestEditor.edit(removedLocal.manifest, command: .removeDependency(identity: "OTHER_library.git"))
@@ -1489,7 +1569,7 @@ private actor FakeSourceKitLSPConnection: SourceKitLSPConnecting {
         self.responses = responses
     }
 
-    func start(executablePath: String, projectURL: URL) {}
+    func start(executablePath _: String, projectURL _: URL) {}
 
     func request(method: String, params: JSONRPCValue?) -> JSONRPCValue? {
         requests.append(FakeSourceKitLSPCall(method: method, params: params))
@@ -1551,7 +1631,7 @@ private actor FakeProcessRunner: EditorProcessRunning {
         return EditorProcessResult(command: command, exitCode: 0, standardOutput: "", standardError: "")
     }
 
-    func semanticTokens(fileURL: URL, language: EditorSourceLanguage, text: String) async -> [EditorSemanticToken] {
+    func semanticTokens(fileURL _: URL, language _: EditorSourceLanguage, text _: String) async -> [EditorSemanticToken] {
         []
     }
 
@@ -1625,15 +1705,15 @@ private actor RecordingWorkspaceService: SwiftPMWorkspaceServicing {
         )
     }
 
-    func semanticTokens(fileURL: URL, language: EditorSourceLanguage, text: String) -> [EditorSemanticToken] { [] }
-    func completions(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) -> [EditorCompletionItem] {
+    func semanticTokens(fileURL _: URL, language _: EditorSourceLanguage, text _: String) -> [EditorSemanticToken] { [] }
+    func completions(fileURL _: URL, language _: EditorSourceLanguage, text: String, position: EditorSourceLocation) -> [EditorCompletionItem] {
         completionRequests.append((position, text))
         return []
     }
-    func definition(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) -> [EditorSourceSymbolTarget] { [] }
-    func references(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) -> [EditorSourceReference] { [] }
-    func hover(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) -> EditorSymbolHover? { hoverResponse }
-    func documentHighlights(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) -> [EditorDocumentHighlight] {
+    func definition(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) -> [EditorSourceSymbolTarget] { [] }
+    func references(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) -> [EditorSourceReference] { [] }
+    func hover(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) -> EditorSymbolHover? { hoverResponse }
+    func documentHighlights(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) -> [EditorDocumentHighlight] {
         documentHighlightResponse
     }
     func cancel() {}
@@ -1673,11 +1753,13 @@ private func testDiagnostic(message: String, source: String) -> EditorDiagnostic
 }
 
 private func findFirstFile(named fileName: String, under root: URL, fileManager: FileManager) -> URL? {
-    guard let enumerator = fileManager.enumerator(
-        at: root,
-        includingPropertiesForKeys: [.isRegularFileKey],
-        options: [.skipsHiddenFiles]
-    ) else {
+    guard
+        let enumerator = fileManager.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        )
+    else {
         return nil
     }
 
@@ -1706,107 +1788,107 @@ private func previewDirectoryName(relativePath: String, declarationID: String) -
 }
 
 private let packageDescriptionJSON = """
-{
-  "name": "Game",
-  "dependencies": [
-    {"identity":"adaengine","type":"fileSystem","path":"../AdaEngine"}
-  ],
-  "products": [
-    {"name":"Game","targets":["Game"],"type":{"executable":null}},
-    {"name":"GamePlugin","targets":["GamePlugin"],"type":{"plugin":null}}
-  ],
-  "targets": [
-    {"name":"Game","type":"executable","path":"Sources/Game","sources":["main.swift"],"target_dependencies":[],"product_dependencies":["AdaEngine"]},
-    {"name":"GameTests","type":"test","path":"Tests/GameTests","sources":["GameTests.swift"],"target_dependencies":["Game"],"product_dependencies":[]},
-    {"name":"GamePlugin","type":"plugin","path":"Plugins/GamePlugin","sources":["main.swift"],"target_dependencies":[],"product_dependencies":[]}
-  ]
-}
-"""
+    {
+      "name": "Game",
+      "dependencies": [
+        {"identity":"adaengine","type":"fileSystem","path":"../AdaEngine"}
+      ],
+      "products": [
+        {"name":"Game","targets":["Game"],"type":{"executable":null}},
+        {"name":"GamePlugin","targets":["GamePlugin"],"type":{"plugin":null}}
+      ],
+      "targets": [
+        {"name":"Game","type":"executable","path":"Sources/Game","sources":["main.swift"],"target_dependencies":[],"product_dependencies":["AdaEngine"]},
+        {"name":"GameTests","type":"test","path":"Tests/GameTests","sources":["GameTests.swift"],"target_dependencies":["Game"],"product_dependencies":[]},
+        {"name":"GamePlugin","type":"plugin","path":"Plugins/GamePlugin","sources":["main.swift"],"target_dependencies":[],"product_dependencies":[]}
+      ]
+    }
+    """
 
 private let simpleManifest = """
-// swift-tools-version: 6.2
-import PackageDescription
+    // swift-tools-version: 6.2
+    import PackageDescription
 
-let package = Package(
-    name: "Game",
-    products: [
-    ],
-    dependencies: [
-    ],
-    targets: [
-    ]
-)
-"""
+    let package = Package(
+        name: "Game",
+        products: [
+        ],
+        dependencies: [
+        ],
+        targets: [
+        ]
+    )
+    """
 
 private let simpleManifestWithExecutableTarget = """
-// swift-tools-version: 6.2
-import PackageDescription
+    // swift-tools-version: 6.2
+    import PackageDescription
 
-let package = Package(
-    name: "Game",
-    products: [
-        .executable(name: "Game", targets: ["Game"])
-    ],
-    dependencies: [
-    ],
-    targets: [
-        .executableTarget(name: "Game", dependencies: [])
-    ]
-)
-"""
+    let package = Package(
+        name: "Game",
+        products: [
+            .executable(name: "Game", targets: ["Game"])
+        ],
+        dependencies: [
+        ],
+        targets: [
+            .executableTarget(name: "Game", dependencies: [])
+        ]
+    )
+    """
 
 private let multiExecutableManifest = """
-// swift-tools-version: 6.2
-import PackageDescription
+    // swift-tools-version: 6.2
+    import PackageDescription
 
-let package = Package(
-    name: "Game",
-    products: [
-        .executable(name: "Game", targets: ["Game"]),
-        .executable(name: "Tools", targets: ["Tools"])
-    ],
-    dependencies: [
-    ],
-    targets: [
-        .executableTarget(name: "Game", dependencies: []),
-        .executableTarget(name: "Tools", dependencies: [])
-    ]
-)
-"""
+    let package = Package(
+        name: "Game",
+        products: [
+            .executable(name: "Game", targets: ["Game"]),
+            .executable(name: "Tools", targets: ["Tools"])
+        ],
+        dependencies: [
+        ],
+        targets: [
+            .executableTarget(name: "Game", dependencies: []),
+            .executableTarget(name: "Tools", dependencies: [])
+        ]
+    )
+    """
 
 private let standardImplicitTargetManifest = """
-// swift-tools-version: 6.2
-import PackageDescription
+    // swift-tools-version: 6.2
+    import PackageDescription
 
-let package = Package(
-    name: "Game",
-    products: [.executable(name: "Game", targets: ["Game"])],
-    dependencies: [],
-    targets: [.executableTarget(name: "Game", dependencies: [])]
-)
-"""
+    let package = Package(
+        name: "Game",
+        products: [.executable(name: "Game", targets: ["Game"])],
+        dependencies: [],
+        targets: [.executableTarget(name: "Game", dependencies: [])]
+    )
+    """
 
 private let packageRootTargetManifest = """
-// swift-tools-version: 6.2
-import PackageDescription
+    // swift-tools-version: 6.2
+    import PackageDescription
 
-let package = Package(
-    name: "Game",
-    products: [.executable(name: "Game", targets: ["Game"])],
-    dependencies: [],
-    targets: [.executableTarget(name: "Game", dependencies: [], path: ".")]
-)
-"""
+    let package = Package(
+        name: "Game",
+        products: [.executable(name: "Game", targets: ["Game"])],
+        dependencies: [],
+        targets: [.executableTarget(name: "Game", dependencies: [], path: ".")]
+    )
+    """
 
 private func sourceRange(_ startLine: Int, _ startCharacter: Int, _ endLine: Int, _ endCharacter: Int) -> JSONRPCValue {
     .object([
         "start": .object([
             "line": .int(startLine),
-            "character": .int(startCharacter)
+            "character": .int(startCharacter),
         ]),
         "end": .object([
             "line": .int(endLine),
-            "character": .int(endCharacter)
-        ])
+            "character": .int(endCharacter),
+        ]),
     ])
 }

@@ -44,7 +44,7 @@ struct EditorProjectSidebar: View {
     let onDeleteItem: (EditorProjectSidebarViewModel.Item) -> Void
 
     @State private var hoveredItemID: String?
-    
+
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
 
@@ -117,11 +117,11 @@ struct EditorProjectSidebar: View {
         )
         .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
         #if canImport(AppKit) && os(macOS)
-        .overlay {
-            EditorProjectFileDropTarget(isEnabled: projectRootItem != nil, onDrop: onDropFiles)
+            .overlay {
+                EditorProjectFileDropTarget(isEnabled: projectRootItem != nil, onDrop: onDropFiles)
                 .nativeRenderingMode(.overlay)
                 .allowsHitTesting(false)
-        }
+            }
         #endif
     }
 
@@ -165,7 +165,9 @@ struct EditorProjectSidebar: View {
         Color.clear
             .frame(width: width, height: height)
             .contextMenu(onPresent: {
-                if let projectRootItem { viewModel.select(projectRootItem) }
+                if let projectRootItem {
+                    viewModel.select(projectRootItem)
+                }
             }) {
                 newFileAction
                 Button("Import Assets") {
@@ -302,7 +304,7 @@ struct EditorProjectSidebar: View {
             return viewModel.isCollapsed(item) ? EditorProjectTreeIcon.folder : EditorProjectTreeIcon.folderOpen
         case .scene:
             return EditorProjectTreeIcon.scene
-        case .text(let language):
+        case let .text(language):
             return textFileIcon(for: language)
         case .image:
             return EditorProjectTreeIcon.image
@@ -317,11 +319,20 @@ struct EditorProjectSidebar: View {
 
     private func textFileIcon(for language: EditorSourceLanguage) -> String {
         switch language {
-        case .json, .yaml:
+        case .json,
+            .yaml:
             return EditorProjectTreeIcon.code
-        case .markdown, .plainText:
+        case .markdown,
+            .plainText:
             return EditorProjectTreeIcon.article
-        case .packageManifest, .swift, .ada, .c, .cpp, .glsl, .wgsl, .metal:
+        case .packageManifest,
+            .swift,
+            .ada,
+            .c,
+            .cpp,
+            .glsl,
+            .wgsl,
+            .metal:
             return EditorProjectTreeIcon.code
         }
     }
@@ -338,7 +349,8 @@ struct EditorProjectSidebar: View {
             return theme.editorColors.purple
         case .genericAsset:
             return theme.editorColors.text.opacity(0.72)
-        case .folder, .unsupported:
+        case .folder,
+            .unsupported:
             return theme.editorColors.muted
         }
     }

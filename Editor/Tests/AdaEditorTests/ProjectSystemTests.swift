@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("ProjectSystem")
 struct ProjectSystemTests {
@@ -16,10 +17,10 @@ struct ProjectSystemTests {
         #expect(project.paths.assets == nil)
         #expect(project.paths.build == nil)
         #expect(project.paths.generated == nil)
-        #expect(project.paths.resourceRoots == [])
+        #expect(project.paths.resourceRoots.isEmpty)
         #expect(project.paths.run.workingDirectory == nil)
-        #expect(project.build.includedFiles == [])
-        #expect(project.build.excludedFiles == [])
+        #expect(project.build.includedFiles.isEmpty)
+        #expect(project.build.excludedFiles.isEmpty)
         #expect(project.run.destination == .macOS)
         #expect(project.run.workingDirectory == nil)
         #expect(project.ai.mcp.enabled)
@@ -107,14 +108,17 @@ struct ProjectSystemTests {
         }
     }
 
-    @Test("committed negative fixtures are rejected", arguments: [
-        ("invalid/missing-schema-version.project.json", "project.missingSchemaVersion", "schemaVersion"),
-        ("invalid/unsupported-schema-version.project.json", "project.unsupportedSchemaVersion", "schemaVersion"),
-        ("invalid/invalid-path-syntax.project.json", "project.invalidPath", "paths.assets"),
-        ("invalid/path-traversal.project.json", "project.pathTraversalNotAllowed", "paths.sources"),
-        ("invalid/absolute-posix-path.project.json", "project.absolutePathNotAllowed", "paths.build"),
-        ("invalid/absolute-windows-path.project.json", "project.absolutePathNotAllowed", "run.executable")
-    ])
+    @Test(
+        "committed negative fixtures are rejected",
+        arguments: [
+            ("invalid/missing-schema-version.project.json", "project.missingSchemaVersion", "schemaVersion"),
+            ("invalid/unsupported-schema-version.project.json", "project.unsupportedSchemaVersion", "schemaVersion"),
+            ("invalid/invalid-path-syntax.project.json", "project.invalidPath", "paths.assets"),
+            ("invalid/path-traversal.project.json", "project.pathTraversalNotAllowed", "paths.sources"),
+            ("invalid/absolute-posix-path.project.json", "project.absolutePathNotAllowed", "paths.build"),
+            ("invalid/absolute-windows-path.project.json", "project.absolutePathNotAllowed", "run.executable"),
+        ]
+    )
     func committedNegativeFixturesAreRejected(fixture: String, code: String, fieldPath: String) throws {
         do {
             _ = try loadFixture(fixture)
@@ -137,15 +141,18 @@ struct ProjectSystemTests {
         }
     }
 
-    @Test("invalid path values are rejected", arguments: [
-        (#"{"schemaVersion":1,"paths":{"sources":"/Sources"}}"#, "project.absolutePathNotAllowed", "paths.sources"),
-        (#"{"schemaVersion":1,"paths":{"assets":"~/Assets"}}"#, "project.absolutePathNotAllowed", "paths.assets"),
-        (#"{"schemaVersion":1,"paths":{"generated":".ada//generated"}}"#, "project.invalidPath", "paths.generated"),
-        (#"{"schemaVersion":1,"paths":{"run":{"workingDirectory":"../run"}}}"#, "project.pathTraversalNotAllowed", "paths.run.workingDirectory"),
-        (#"{"schemaVersion":1,"build":{"targets":["Sources","../Secrets"]}}"#, "project.pathTraversalNotAllowed", "build.targets.1"),
-        (#"{"schemaVersion":1,"ai":{"mcp":{"allowedResourceRoots":["Sources","C:\\Secrets"]}}}"#, "project.absolutePathNotAllowed", "ai.mcp.allowedResourceRoots.1"),
-        (#"{"schemaVersion":1,"editor":{"startupScene":"https://example.com/scene"}}"#, "project.invalidPath", "editor.startupScene")
-    ])
+    @Test(
+        "invalid path values are rejected",
+        arguments: [
+            (#"{"schemaVersion":1,"paths":{"sources":"/Sources"}}"#, "project.absolutePathNotAllowed", "paths.sources"),
+            (#"{"schemaVersion":1,"paths":{"assets":"~/Assets"}}"#, "project.absolutePathNotAllowed", "paths.assets"),
+            (#"{"schemaVersion":1,"paths":{"generated":".ada//generated"}}"#, "project.invalidPath", "paths.generated"),
+            (#"{"schemaVersion":1,"paths":{"run":{"workingDirectory":"../run"}}}"#, "project.pathTraversalNotAllowed", "paths.run.workingDirectory"),
+            (#"{"schemaVersion":1,"build":{"targets":["Sources","../Secrets"]}}"#, "project.pathTraversalNotAllowed", "build.targets.1"),
+            (#"{"schemaVersion":1,"ai":{"mcp":{"allowedResourceRoots":["Sources","C:\\Secrets"]}}}"#, "project.absolutePathNotAllowed", "ai.mcp.allowedResourceRoots.1"),
+            (#"{"schemaVersion":1,"editor":{"startupScene":"https://example.com/scene"}}"#, "project.invalidPath", "editor.startupScene"),
+        ]
+    )
     func invalidPathsAreRejected(json: String, code: String, fieldPath: String) throws {
         do {
             _ = try ProjectSystem.loadProject(from: Data(json.utf8))
@@ -225,11 +232,12 @@ struct ProjectSystemTests {
         try FileManager.default.createDirectory(at: sourcesURL, withIntermediateDirectories: true)
 
         let adaScriptProject = ProjectSystem.defaultProject(projectName: "TabletGame", buildSystem: .adaScript)
-        try "@view(id: \"game.main\") class MainView {}\n".write(
-            to: sourcesURL.appendingPathComponent("Main.ada"),
-            atomically: true,
-            encoding: .utf8
-        )
+        try "@view(id: \"game.main\") class MainView {}\n"
+            .write(
+                to: sourcesURL.appendingPathComponent("Main.ada"),
+                atomically: true,
+                encoding: .utf8
+            )
         try ProjectSystem.validateRunCompatibility(of: adaScriptProject, at: projectURL, destination: .iPadOS)
 
         let swiftPMProject = ProjectSystem.defaultProject(projectName: "HybridGame")
@@ -278,60 +286,60 @@ struct ProjectSystemTests {
 }
 
 private let expectedDefaultProjectJSON = """
-{
-  "ai" : {
-    "mcp" : {
-      "allowedResourceRoots" : [
+    {
+      "ai" : {
+        "mcp" : {
+          "allowedResourceRoots" : [
 
-      ],
-      "enabled" : true
+          ],
+          "enabled" : true
+        }
+      },
+      "build" : {
+        "excludedFiles" : [
+
+        ],
+        "includedFiles" : [
+
+        ],
+        "system" : "swiftpm",
+        "targets" : [
+
+        ]
+      },
+      "editor" : {
+        "startupScene" : "Assets/Scenes/Main.ascn"
+      },
+      "engine" : {
+        "package" : "AdaEngine"
+      },
+      "paths" : {
+        "assets" : "Assets",
+        "build" : ".build",
+        "resourceRoots" : [
+          "Assets"
+        ],
+        "run" : {
+          "workingDirectory" : "."
+        },
+        "sources" : "Sources"
+      },
+      "project" : {
+        "name" : "AdaEngineProject"
+      },
+      "run" : {
+        "arguments" : [
+
+        ],
+        "destination" : "macos",
+        "environment" : {
+
+        },
+        "workingDirectory" : "."
+      },
+      "schemaVersion" : 3
     }
-  },
-  "build" : {
-    "excludedFiles" : [
-
-    ],
-    "includedFiles" : [
-
-    ],
-    "system" : "swiftpm",
-    "targets" : [
-
-    ]
-  },
-  "editor" : {
-    "startupScene" : "Assets/Scenes/Main.ascn"
-  },
-  "engine" : {
-    "package" : "AdaEngine"
-  },
-  "paths" : {
-    "assets" : "Assets",
-    "build" : ".build",
-    "resourceRoots" : [
-      "Assets"
-    ],
-    "run" : {
-      "workingDirectory" : "."
-    },
-    "sources" : "Sources"
-  },
-  "project" : {
-    "name" : "AdaEngineProject"
-  },
-  "run" : {
-    "arguments" : [
-
-    ],
-    "destination" : "macos",
-    "environment" : {
-
-    },
-    "workingDirectory" : "."
-  },
-  "schemaVersion" : 3
-}
-"""
+    """
 
 private let expectedCreatedProjectJSON = expectedDefaultProjectJSON.replacingOccurrences(
     of: "\"name\" : \"AdaEngineProject\"",

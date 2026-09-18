@@ -6,17 +6,20 @@ enum GravitySemanticAnalyzer {
         let lexedTokens = lexer.lex().tokens
         let parsed = GravityDocumentAnalyzer.parse(text)
 
-        return lexedTokens.enumerated().flatMap { index, token -> [GravitySemanticToken] in
-            guard let kind = semanticKind(
-                at: index,
-                token: token,
-                tokens: lexedTokens,
-                typeRegions: parsed.typeRegions
-            ) else {
-                return []
+        return lexedTokens.enumerated()
+            .flatMap { index, token -> [GravitySemanticToken] in
+                guard
+                    let kind = semanticKind(
+                        at: index,
+                        token: token,
+                        tokens: lexedTokens,
+                        typeRegions: parsed.typeRegions
+                    )
+                else {
+                    return []
+                }
+                return semanticTokens(for: token, kind: kind)
             }
-            return semanticTokens(for: token, kind: kind)
-        }
     }
 
     private static func semanticTokens(for token: GravityToken, kind: GravitySemanticTokenKind) -> [GravitySemanticToken] {
@@ -24,17 +27,18 @@ enum GravitySemanticAnalyzer {
         guard lines.count > 1 else {
             return [GravitySemanticToken(kind: kind, range: token.range)]
         }
-        return lines.enumerated().compactMap { offset, line in
-            let length = line.utf16.count
-            guard length > 0 else {
-                return nil
+        return lines.enumerated()
+            .compactMap { offset, line in
+                let length = line.utf16.count
+                guard length > 0 else {
+                    return nil
+                }
+                let lineNumber = token.range.start.line + offset
+                let startColumn = offset == 0 ? token.range.start.utf16Column : 0
+                let start = GravitySourcePosition(line: lineNumber, utf16Column: startColumn)
+                let end = GravitySourcePosition(line: lineNumber, utf16Column: startColumn + length)
+                return GravitySemanticToken(kind: kind, range: GravitySourceRange(start: start, end: end))
             }
-            let lineNumber = token.range.start.line + offset
-            let startColumn = offset == 0 ? token.range.start.utf16Column : 0
-            let start = GravitySourcePosition(line: lineNumber, utf16Column: startColumn)
-            let end = GravitySourcePosition(line: lineNumber, utf16Column: startColumn + length)
-            return GravitySemanticToken(kind: kind, range: GravitySourceRange(start: start, end: end))
-        }
     }
 
     private static func semanticKind(
@@ -100,7 +104,8 @@ enum GravitySemanticAnalyzer {
             .type
         case "func":
             typeRegions.contains(where: { $0.symbol.range.contains(token.range.start) }) ? .method : .function
-        case "var", "const":
+        case "var",
+            "const":
             typeRegions.contains(where: { $0.symbol.range.contains(token.range.start) }) ? .property : .variable
         default:
             nil
@@ -123,6 +128,6 @@ enum GravitySemanticAnalyzer {
 
     private static let keywords: Set<String> = [
         "break", "case", "class", "const", "continue", "else", "enum", "event", "extern", "false", "for", "func", "if", "import", "in", "null",
-        "private", "public", "repeat", "return", "static", "struct", "switch", "true", "var", "while"
+        "private", "public", "repeat", "return", "static", "struct", "switch", "true", "var", "while",
     ]
 }

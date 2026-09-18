@@ -101,7 +101,8 @@ struct GitDiffHunk: Equatable, Sendable, Identifiable {
             switch line.kind {
             case .deletion: deleted.append(line)
             case .addition: added.append(line)
-            case .context, .note:
+            case .context,
+                .note:
                 flush()
                 result.append((line, line))
             }
@@ -122,9 +123,13 @@ struct GitFilePatch: Equatable, Sendable {
         for line in output.components(separatedBy: "\n") {
             if line.hasPrefix("@@ ") {
                 let parts = line.split(separator: " ")
-                guard parts.count >= 3,
-                      let old = Int(parts[1].dropFirst().split(separator: ",")[0]),
-                      let new = Int(parts[2].dropFirst().split(separator: ",")[0]) else { continue }
+                guard
+                    parts.count >= 3,
+                    let old = Int(parts[1].dropFirst().split(separator: ",")[0]),
+                    let new = Int(parts[2].dropFirst().split(separator: ",")[0])
+                else {
+                    continue
+                }
                 oldNumber = old
                 newNumber = new
                 hunks.append(GitDiffHunk(id: hunks.count, header: line, lines: []))

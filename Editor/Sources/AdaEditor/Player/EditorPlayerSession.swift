@@ -21,7 +21,9 @@ final class EditorPlayerSession {
     @ObservationIgnored private var timeout: Task<Void, Never>?
 
     func connect(to endpoint: NWEndpoint, project: URL) {
-        guard !isBusy else { return }
+        guard !isBusy else {
+            return
+        }
         disconnect()
         isBusy = true
         status = "Connecting…"
@@ -30,16 +32,24 @@ final class EditorPlayerSession {
         channel.start()
         timeout = Task { [weak self, weak channel] in
             do { try await Task.sleep(for: .seconds(15)) } catch { return }
-            guard let self, self.channel === channel, !self.connected else { return }
+            guard let self, self.channel === channel, !self.connected else {
+                return
+            }
             self.fail("Connection timed out. Check Wi-Fi and Local Network access.")
         }
         receiver = Task { [weak self] in
             do {
-                guard let self else { return }
+                guard let self else {
+                    return
+                }
                 try await channel.send(PlayerMessage(.pair, text: self.code.trimmingCharacters(in: .whitespacesAndNewlines)))
                 let reply = try await channel.receive(maximumBytes: 4096)
-                guard reply.kind == .paired else { throw PlayerConnectError.invalid(reply.text ?? "Pairing failed.") }
-                guard self.channel === channel else { return }
+                guard reply.kind == .paired else {
+                    throw PlayerConnectError.invalid(reply.text ?? "Pairing failed.")
+                }
+                guard self.channel === channel else {
+                    return
+                }
                 self.timeout?.cancel()
                 self.connected = true
                 self.isBusy = false
@@ -49,7 +59,9 @@ final class EditorPlayerSession {
                 self.deploy(project)
                 while !Task.isCancelled {
                     let message = try await channel.receive(maximumBytes: 64 * 1024)
-                    guard self.channel === channel else { return }
+                    guard self.channel === channel else {
+                        return
+                    }
                     switch message.kind {
                     case .log: self.onOutput?(message.text ?? "")
                     case .status:
@@ -66,14 +78,18 @@ final class EditorPlayerSession {
                     }
                 }
             } catch {
-                guard let self, self.channel === channel else { return }
+                guard let self, self.channel === channel else {
+                    return
+                }
                 self.fail(error.localizedDescription)
             }
         }
     }
 
     func deploy(_ project: URL) {
-        guard connected, !isBusy, let channel else { return }
+        guard connected, !isBusy, let channel else {
+            return
+        }
         isBusy = true
         status = "Preparing device preview…"
         onOutput?(status)
@@ -84,7 +100,9 @@ final class EditorPlayerSession {
                 try await channel.send(PlayerMessage(.deploy, project: snapshot))
                 self?.status = "Launching on device…"
             } catch {
-                guard let self, self.channel === channel else { return }
+                guard let self, self.channel === channel else {
+                    return
+                }
                 self.isBusy = false
                 self.status = error.localizedDescription
                 self.onOutput?(self.status)
@@ -93,21 +111,31 @@ final class EditorPlayerSession {
     }
 
     func stop() {
-        if isBusy { disconnect(); return }
-        guard let channel else { return }
+        if isBusy {
+            disconnect()
+            return
+        }
+        guard let channel else {
+            return
+        }
         isBusy = true
         operation = Task { [weak self] in
-            do { try await channel.send(PlayerMessage(.stop)) }
-            catch { self?.fail(error.localizedDescription) }
+            do { try await channel.send(PlayerMessage(.stop)) } catch { self?.fail(error.localizedDescription) }
         }
     }
 
     func disconnect() {
-        operation?.cancel(); operation = nil
-        receiver?.cancel(); receiver = nil
-        timeout?.cancel(); timeout = nil
-        channel?.cancel(); channel = nil
-        connected = false; isRunning = false; isBusy = false
+        operation?.cancel()
+        operation = nil
+        receiver?.cancel()
+        receiver = nil
+        timeout?.cancel()
+        timeout = nil
+        channel?.cancel()
+        channel = nil
+        connected = false
+        isRunning = false
+        isBusy = false
         browser.stop()
         onState?(false)
     }
@@ -160,10 +188,13 @@ struct EditorPlayerPairingView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Pairing code")
                 .font(.system(size: 12, weight: .semibold))
-            TextField("Six-digit code", text: Binding(
-                get: { session.code },
-                set: { session.code = String($0.filter(\.isNumber).prefix(6)) }
-            ))
+            TextField(
+                "Six-digit code",
+                text: Binding(
+                    get: { session.code },
+                    set: { session.code = String($0.filter(\.isNumber).prefix(6)) }
+                )
+            )
             .textFieldStyle(PlainTextFieldStyle())
             .font(.system(size: 16))
             .foregroundColor(theme.editorColors.text)
@@ -191,7 +222,10 @@ struct EditorPlayerPairingView: View {
                     .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: true, bordered: true))
                     .disabled(session.code.count != 6 || session.isBusy)
                 }
-                Button(action: { session.browser.stop(); session.browser.start() }) {
+                Button(action: {
+                    session.browser.stop()
+                    session.browser.start()
+                }) {
                     Text("Search again").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, bordered: true))

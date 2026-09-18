@@ -11,7 +11,6 @@ enum AdaEngineStyleContent {
     static let topToolbarLabels = ["Search Everywhere", "main_scene", "Run"]
     static let leftTopSidebarTools = [
         EditorToolStripItem(identifier: "fileTree", title: "File Tree", icon: "\u{E2C7}"),
-        EditorToolStripItem(identifier: "entityTree", title: "Entity Tree", icon: "\u{E97A}"),
         EditorToolStripItem(identifier: "sourceControl", title: "Source Control", icon: "\u{F1C4}"),
     ]
     static let leftBottomSidebarTools = [
@@ -24,12 +23,21 @@ enum AdaEngineStyleContent {
         EditorToolStripItem(identifier: "agentChat", title: "Agent Chat", icon: "\u{E65F}"),
         EditorToolStripItem(identifier: "inspector", title: "Inspector", icon: "\u{E88E}"),
         EditorToolStripItem(
-            identifier: "projectDependencies", title: "Project Dependencies", icon: "\u{E48F}"),
+            identifier: "projectDependencies",
+            title: "Project Dependencies",
+            icon: "\u{E48F}"
+        ),
         EditorToolStripItem(
-            identifier: "swiftPackageTasks", title: "Swift Package Tasks", icon: "\u{F720}"),
+            identifier: "swiftPackageTasks",
+            title: "Swift Package Tasks",
+            icon: "\u{F720}"
+        ),
         EditorToolStripItem(identifier: "plugins", title: "Plugins", icon: "\u{E87B}"),
         EditorToolStripItem(
-            identifier: "projectSettings", title: "Project Settings", icon: "\u{E8B8}"),
+            identifier: "projectSettings",
+            title: "Project Settings",
+            icon: "\u{E8B8}"
+        ),
     ]
     static let projectTreeItems = ["src", "EngineLoop.ada", "Renderer.ada", "Main.ascn"]
     static let editorTabs = ["EngineLoop.ada", "Main.ascn"]
@@ -86,7 +94,7 @@ enum AdaEngineStyleContent {
                 statusMessage: "Sample scene",
                 loadSummary: EditorSceneFileLoader.summary(from: defaultSceneContent)
             )
-        )
+        ),
     ]
     static let aiTitle = "Ada Intelligence"
     static let aiHint = "⌘L to Focus"
@@ -143,10 +151,13 @@ struct EditorView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 EditorFooterRegion(viewModel: viewModel)
-                .frame(height: metrics.footerHeight)
+                    .frame(height: metrics.footerHeight)
             }
             .frame(
-                minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity,
+                minWidth: 0,
+                maxWidth: .infinity,
+                minHeight: 0,
+                maxHeight: .infinity,
                 alignment: .topLeading
             )
             .foregroundColor(theme.editorColors.text)
@@ -214,90 +225,100 @@ struct EditorView: View {
     var body: some View {
         // Keep the window presentation value small as editor overlays grow.
         AnyView(editorContent)
-        .modifier(EditorTextSearchPresentation(viewModel: viewModel))
-        .fullScreenCover(isPresented: viewModel.isNewFileDialogPresentedBinding) {
-            EditorNewFileDialog(viewModel: viewModel)
-        }
-        .fullScreenCover(item: Binding(
-            get: { viewModel.workbench.modifierPickerRequest },
-            set: { viewModel.workbench.modifierPickerRequest = $0 }
-        )) { request in
-            EditorAddModifierDialog(model: request.model, nodeID: request.nodeID)
-        }
-        .fullScreenCover(isPresented: viewModel.inspectorSidebar.componentPickerPresentationBinding) {
-            EditorAddComponentDialog(viewModel: viewModel.inspectorSidebar)
-        }
-        #if os(iOS)
-        .fullScreenCover(item: viewModel.settingsPresentationBinding) { section in
-            EditorSettingsWindowView(
-                viewModel: EditorSettingsWindowViewModel(editorViewModel: viewModel, selectedSection: section),
-                showsCloseButton: true
-            )
-            .theme(.adaEditor)
-        }
-        #endif
-        .alert(
-            "Delete item?",
-            isPresented: viewModel.isDeleteProjectItemAlertPresentedBinding,
-            presenting: viewModel.pendingDeleteProjectItem,
-            actions: { item in
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
-                    viewModel.deleteProjectItem(item)
+            .modifier(EditorTextSearchPresentation(viewModel: viewModel))
+            .fullScreenCover(isPresented: viewModel.isNewFileDialogPresentedBinding) {
+                EditorNewFileDialog(viewModel: viewModel)
+            }
+            .fullScreenCover(
+                item: Binding(
+                    get: { viewModel.workbench.entityPickerRequest },
+                    set: { viewModel.workbench.entityPickerRequest = $0 }
+                )
+            ) { request in
+                EditorEntityPickerDialog(workbench: viewModel.workbench, request: request)
+            }
+            .fullScreenCover(
+                item: Binding(
+                    get: { viewModel.workbench.modifierPickerRequest },
+                    set: { viewModel.workbench.modifierPickerRequest = $0 }
+                )
+            ) { request in
+                EditorAddModifierDialog(model: request.model, nodeID: request.nodeID)
+            }
+            .fullScreenCover(isPresented: viewModel.inspectorSidebar.componentPickerPresentationBinding) {
+                EditorAddComponentDialog(viewModel: viewModel.inspectorSidebar)
+            }
+            #if os(iOS)
+                .fullScreenCover(item: viewModel.settingsPresentationBinding) { section in
+                    EditorSettingsWindowView(
+                        viewModel: EditorSettingsWindowViewModel(editorViewModel: viewModel, selectedSection: section),
+                        showsCloseButton: true
+                    )
+                    .theme(.adaEditor)
                 }
-            },
-            message: { item in
-                Text("\(item.title) will be permanently deleted from the project.")
-            }
-        )
-        .menuBar(EditorMenuBar.makeMenus())
-        .keyboardShortcuts(editorKeyboardShortcuts)
-        #if os(macOS)
-        .onChange(of: viewModel.settingsPresentationToken) { _, _ in
-            guard let section = viewModel.requestedSettingsSection else {
-                return
-            }
-            EditorSettingsWindowController.open(editorViewModel: viewModel, selectedSection: section)
-        }
-        #endif
-        .task {
-            RuntimeLogStore.shared.setEnabled(true)
-            while !Task.isCancelled {
-                await viewModel.collectRuntimeLogs()
-                do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
-            }
-        }
-        .task {
-            while !Task.isCancelled {
-                do { try await Task.sleep(for: .seconds(5)) } catch { return }
-                // The branch can also change in a terminal while the editor stays open.
-                await viewModel.refreshSourceControlFooter()
-            }
-        }
-        .onAppear {
-            viewModel.startProjectFileWatching()
-            EditorNotificationRouter.shared.attach(viewModel)
-            EditorMenuCommandRouter.shared.install(owner: viewModel) { [weak viewModel] command in
-                viewModel?.handleMenuCommand(command) ?? false
-            }
-            EditorSearchShortcutMonitor.shared.start()
-            EditorNavigationMouseShortcutMonitor.shared.start(
-                back: { [weak viewModel] in viewModel?.navigateBack() },
-                forward: { [weak viewModel] in viewModel?.navigateForward() }
+            #endif
+            .alert(
+                "Delete item?",
+                isPresented: viewModel.isDeleteProjectItemAlertPresentedBinding,
+                presenting: viewModel.pendingDeleteProjectItem,
+                actions: { item in
+                    Button("Cancel", role: .cancel) {}
+                    Button("Delete", role: .destructive) {
+                        viewModel.deleteProjectItem(item)
+                    }
+                },
+                message: { item in
+                    Text("\(item.title) will be permanently deleted from the project.")
+                }
             )
-        }
-        .onDisappear {
-            viewModel.playerSession.disconnect()
-            viewModel.playerPairingWindow?.close()
-            viewModel.playerPairingWindow = nil
-            viewModel.stopProjectFileWatching()
-            EditorNotificationRouter.shared.detach(viewModel)
-            viewModel.debugger.stop()
-            EditorMenuCommandRouter.shared.uninstall(owner: viewModel)
-            EditorSearchShortcutMonitor.shared.stop()
-            EditorNavigationMouseShortcutMonitor.shared.stop()
-        }
-        .debugOverlay(viewModel.showsDebugOverlay ?? .off)
+            .menuBar(EditorMenuBar.makeMenus())
+            .keyboardShortcuts(editorKeyboardShortcuts)
+            #if os(macOS)
+                .onChange(of: viewModel.settingsPresentationToken) { _, _ in
+                    guard let section = viewModel.requestedSettingsSection else {
+                        return
+                    }
+                    EditorSettingsWindowController.open(editorViewModel: viewModel, selectedSection: section)
+                }
+            #endif
+            .task {
+                RuntimeLogStore.shared.setEnabled(true)
+                while !Task.isCancelled {
+                    await viewModel.collectRuntimeLogs()
+                    do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
+                }
+            }
+            .task {
+                while !Task.isCancelled {
+                    do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                    // The branch can also change in a terminal while the editor stays open.
+                    await viewModel.refreshSourceControlFooter()
+                }
+            }
+            .onAppear {
+                viewModel.startProjectFileWatching()
+                EditorNotificationRouter.shared.attach(viewModel)
+                EditorMenuCommandRouter.shared.install(owner: viewModel) { [weak viewModel] command in
+                    viewModel?.handleMenuCommand(command) ?? false
+                }
+                EditorSearchShortcutMonitor.shared.start()
+                EditorNavigationMouseShortcutMonitor.shared.start(
+                    back: { [weak viewModel] in viewModel?.navigateBack() },
+                    forward: { [weak viewModel] in viewModel?.navigateForward() }
+                )
+            }
+            .onDisappear {
+                viewModel.playerSession.disconnect()
+                viewModel.playerPairingWindow?.close()
+                viewModel.playerPairingWindow = nil
+                viewModel.stopProjectFileWatching()
+                EditorNotificationRouter.shared.detach(viewModel)
+                viewModel.debugger.stop()
+                EditorMenuCommandRouter.shared.uninstall(owner: viewModel)
+                EditorSearchShortcutMonitor.shared.stop()
+                EditorNavigationMouseShortcutMonitor.shared.stop()
+            }
+            .debugOverlay(viewModel.showsDebugOverlay ?? .off)
     }
 
     private var editorKeyboardShortcuts: [KeyboardShortcutAction] {
@@ -432,6 +453,9 @@ private struct EditorWorkspaceRegion: View {
                             onRebuildPreview: {
                                 viewModel.rebuildSelectedPreview()
                             },
+                            onHidePreview: {
+                                viewModel.hidePreview()
+                            },
                             onShowPreviewBuildOutput: {
                                 viewModel.showBuildOutput()
                             },
@@ -467,8 +491,12 @@ private struct EditorWorkspaceRegion: View {
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         }
         .frame(
-            minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity,
-            alignment: .topLeading)
+            minWidth: 0,
+            maxWidth: .infinity,
+            minHeight: 0,
+            maxHeight: .infinity,
+            alignment: .topLeading
+        )
     }
 }
 
@@ -476,87 +504,7 @@ private struct EditorLeftSidebarContent: View {
     let viewModel: EditorViewModel
 
     var body: some View {
-        if viewModel.toolStrip.activeLeftTopTool == "entityTree" {
-            EditorSceneHierarchySidebar(
-                document: viewModel.workbench.activeSceneDocument,
-                onSelectEntity: { entityID in
-                    guard let documentID = viewModel.workbench.activeSceneDocument?.id else {
-                        return
-                    }
-                    viewModel.workbench.selectSceneEntity(
-                        documentID: documentID, entityID: entityID)
-                },
-                onToggleEntityExpanded: { entityID in
-                    guard let documentID = viewModel.workbench.activeSceneDocument?.id else {
-                        return
-                    }
-                    viewModel.workbench.toggleSceneEntityExpanded(
-                        documentID: documentID, entityID: entityID)
-                },
-                onAddEntity: { parentID in
-                    guard let documentID = viewModel.workbench.activeSceneDocument?.id else {
-                        return
-                    }
-                    viewModel.workbench.addSceneEntity(documentID: documentID, parentID: parentID)
-                },
-                onAddScenePrefab: { parentID in
-                    guard let documentID = viewModel.workbench.activeSceneDocument?.id else {
-                        return
-                    }
-                    viewModel.workbench.addScenePrefab(documentID: documentID, parentID: parentID)
-                },
-                onSetEntityEnabled: { entityID, isEnabled in
-                    guard let documentID = viewModel.workbench.activeSceneDocument?.id else {
-                        return
-                    }
-                    viewModel.workbench.setSceneEntityEnabled(
-                        documentID: documentID,
-                        entityID: entityID,
-                        isEnabled: isEnabled
-                    )
-                },
-                onRenameEntity: { entityID, name in
-                    guard let documentID = viewModel.workbench.activeSceneDocument?.id else {
-                        return
-                    }
-                    viewModel.workbench.renameSceneEntity(documentID: documentID, entityID: entityID, name: name)
-                },
-                onDeleteEntity: { entityID in
-                    guard let documentID = viewModel.workbench.activeSceneDocument?.id else {
-                        return
-                    }
-                    viewModel.workbench.deleteSceneEntity(documentID: documentID, entityID: entityID)
-                },
-                onDuplicateEntity: { entityID in
-                    guard let documentID = viewModel.workbench.activeSceneDocument?.id else {
-                        return
-                    }
-                    viewModel.workbench.duplicateSceneEntity(documentID: documentID, entityID: entityID)
-                },
-                onCopyEntity: { entityID in
-                    guard let documentID = viewModel.workbench.activeSceneDocument?.id else {
-                        return
-                    }
-                    viewModel.workbench.copySceneEntity(documentID: documentID, entityID: entityID)
-                },
-                onPasteEntity: { parentID in
-                    guard let documentID = viewModel.workbench.activeSceneDocument?.id else {
-                        return
-                    }
-                    viewModel.workbench.pasteSceneEntity(documentID: documentID, parentID: parentID)
-                },
-                onReparentEntity: { entityID, parentID in
-                    guard let documentID = viewModel.workbench.activeSceneDocument?.id else {
-                        return
-                    }
-                    viewModel.workbench.reparentSceneEntity(
-                        documentID: documentID,
-                        entityID: entityID,
-                        parentID: parentID
-                    )
-                }
-            )
-        } else if viewModel.toolStrip.activeLeftTopTool == "sourceControl" {
+        if viewModel.toolStrip.activeLeftTopTool == "sourceControl" {
             EditorSourceControlSidebar(viewModel: viewModel)
         } else {
             EditorProjectSidebar(
@@ -610,7 +558,12 @@ private struct EditorRightSidebarContent: View {
         if viewModel.toolStrip.activeRightTool == "agentChat" {
             EditorAgentSidebar(viewModel: viewModel.agent, onOpenCatalog: { viewModel.presentSettings(.agent) })
         } else if viewModel.toolStrip.activeRightTool == "inspector" {
-            EditorInspectorSidebar(viewModel: viewModel.inspectorSidebar)
+            EditorContextualInspector(
+                document: viewModel.workbench.activeDocument,
+                workbench: viewModel.workbench,
+                sceneInspectorViewModel: viewModel.inspectorSidebar,
+                resourceRootURL: viewModel.projectAssetsURL
+            )
         } else {
             EditorProjectToolSidebar(viewModel: viewModel)
         }
@@ -622,11 +575,15 @@ private struct EditorFooterRegion: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            EditorFooter(viewModel: viewModel.footer, activities: viewModel.activeActivities, onOpenActivity: {
-                viewModel.notificationTab = .activity
-                viewModel.showsNotifications = true
-            })
-                .frame(maxWidth: .infinity)
+            EditorFooter(
+                viewModel: viewModel.footer,
+                activities: viewModel.activeActivities,
+                onOpenActivity: {
+                    viewModel.notificationTab = .activity
+                    viewModel.showsNotifications = true
+                }
+            )
+            .frame(maxWidth: .infinity)
             EditorNotificationBell(model: viewModel)
         }
     }
@@ -643,7 +600,8 @@ struct EditorResizeHandle: View {
     let onResizeEnded: () -> Void
 
     init(
-        axis: Axis, onResize: @escaping (Size) -> Void = { _ in },
+        axis: Axis,
+        onResize: @escaping (Size) -> Void = { _ in },
         onResizeEnded: @escaping () -> Void = {}
     ) {
         self.axis = axis
@@ -691,8 +649,8 @@ struct EditorResizeHandle: View {
 }
 
 extension Glass {
-    fileprivate static func editorWindowBackground(theme: Theme) -> Glass {
-        var glass = Glass.regular
+    private static func editorWindowBackground(theme: Theme) -> Glass {
+        var glass = Self.regular
         glass.blurRadius = 24
         glass.glassTintStrength = 0.72
         glass.edgeShadowStrength = 0

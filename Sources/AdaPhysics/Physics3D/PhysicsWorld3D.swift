@@ -12,7 +12,6 @@ import Math
 
 /// Box3D-backed 3D physics world.
 public final class PhysicsWorld3D: Codable, @unchecked Sendable {
-
     private let worldId: b3WorldId
 
     private var configuredSubStepCount: Int32
@@ -65,14 +64,21 @@ public final class PhysicsWorld3D: Codable, @unchecked Sendable {
         b3DestroyWorld(worldId)
     }
 
-    public convenience init(from decoder: Decoder) throws {
+    public convenience init(from _: Decoder) throws {
         self.init()
     }
 
-    public func encode(to encoder: Encoder) throws { }
+    public func encode(to _: Encoder) throws {}
 
     public func updateSimulation(_ deltaTime: Float, subStepCount: Int32? = nil) {
         b3World_Step(worldId, deltaTime, max(1, subStepCount ?? configuredSubStepCount))
+    }
+
+    func recordPerformance(into metrics: PhysicsPerformanceMetrics) {
+        metrics.record(
+            b3World_GetProfile(worldId),
+            counters: b3World_GetCounters(worldId)
+        )
     }
 
     /// Iterates only bodies moved by the most recent simulation step.

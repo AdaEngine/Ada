@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor project persistence")
 struct EditorProjectPersistenceTests {
@@ -23,7 +24,8 @@ struct EditorProjectPersistenceTests {
             at: currentDocumentsURL,
             template: .adaScript
         )
-        let stalePath = rootURL
+        let stalePath =
+            rootURL
             .appendingPathComponent("Containers/Data/Application/OLD-CONTAINER/Documents", isDirectory: true)
             .appendingPathComponent("Migrated-Game.adaproject", isDirectory: true)
             .path

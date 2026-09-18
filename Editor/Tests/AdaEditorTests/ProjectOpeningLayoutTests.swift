@@ -1,16 +1,20 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
 
+@testable import AdaEditor
+
 @Suite("Project opening layout")
 struct ProjectOpeningLayoutTests {
-    @Test("iPad creation uses a navigation title and ordered fields", arguments: [
-        Size(width: 1194, height: 834),
-        Size(width: 834, height: 1194)
-    ])
+    @Test(
+        "iPad creation uses a navigation title and ordered fields",
+        arguments: [
+            Size(width: 1194, height: 834),
+            Size(width: 834, height: 1194),
+        ]
+    )
     @MainActor
     func iPadCreationLayout(_ size: Size) async throws {
         if unsafe RenderEngine.shared == nil {
@@ -22,8 +26,10 @@ struct ProjectOpeningLayoutTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let model = ProjectOpeningViewModel(store: EditorProjectStore(storageURL: root.appendingPathComponent("projects.json")))
         model.beginCreateNewProject()
-        let container = UIContainerView(rootView: ProjectOpeningView(autoOpenLastProject: false, viewModel: model)
-            .environment(\.userInterfaceIdiom, .pad))
+        let container = UIContainerView(
+            rootView: ProjectOpeningView(autoOpenLastProject: false, viewModel: model)
+                .environment(\.userInterfaceIdiom, .pad)
+        )
         container.safeAreaInsets = EdgeInsets(top: 32, leading: 0, bottom: 20, trailing: 0)
         container.frame = Rect(origin: .zero, size: size)
         container.bounds.size = size

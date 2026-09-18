@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor update restart protection")
 @MainActor
@@ -56,8 +57,14 @@ struct EditorUpdateCenterTests {
 
     private func workbench(path: URL, content: String) -> EditorWorkbenchViewModel {
         let document = EditorTextDocument(
-            id: "document", title: "Main.ada", relativePath: "Main.ada", absolutePath: path.path,
-            language: .ada, content: content, lastSavedContent: "", isDirty: true
+            id: "document",
+            title: "Main.ada",
+            relativePath: "Main.ada",
+            absolutePath: path.path,
+            language: .ada,
+            content: content,
+            lastSavedContent: "",
+            isDirty: true
         )
         return EditorWorkbenchViewModel(openDocuments: [.text(document)], activeDocumentID: document.id)
     }

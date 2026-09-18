@@ -15,7 +15,9 @@ struct EditorScriptFieldOption: Identifiable, Equatable {
         switch kind {
         case .string: .string
         case .bool: .bool
-        case .float, .int: .number
+        case .float,
+            .int:
+            .number
         default: nil
         }
     }
@@ -23,7 +25,7 @@ struct EditorScriptFieldOption: Identifiable, Equatable {
     static func encode(_ mappings: [String: UIScriptFieldBinding]) -> String? {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        return (try? encoder.encode(mappings)).map { String(decoding: $0, as: UTF8.self) }
+        return (try? encoder.encode(mappings)).flatMap { String(bytes: $0, encoding: .utf8) }
     }
 }
 
@@ -37,7 +39,9 @@ struct EditorScriptFieldPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button { expanded.toggle() } label: {
+            Button {
+                expanded.toggle()
+            } label: {
                 HStack(spacing: 6) {
                     Text("\u{E157}").font(AdaEditorMaterialSymbolFont.font(size: 15))
                     Text(selectionLabel).lineLimit(1).frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
@@ -54,15 +58,22 @@ struct EditorScriptFieldPicker: View {
                 TextField("Find script or field…", text: $search)
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Button("Not bound") { onSelect(nil); expanded = false }
-                            .accessibilityIdentifier("AdaEditor.ScriptFieldPicker.Unlink")
+                        Button("Not bound") {
+                            onSelect(nil)
+                            expanded = false
+                        }
+                        .accessibilityIdentifier("AdaEditor.ScriptFieldPicker.Unlink")
                         ForEach(options.filter { search.isEmpty || "\($0.script) \($0.label)".localizedCaseInsensitiveContains(search) }) { option in
-                            Button { onSelect(option.binding); expanded = false } label: {
+                            Button {
+                                onSelect(option.binding)
+                                expanded = false
+                            } label: {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(option.label).font(.system(size: 12))
                                     Text("\(option.script) · \(option.type.rawValue)").font(.system(size: 10))
                                         .foregroundColor(theme.editorColors.muted)
-                                }.frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .buttonStyle(DefaultButtonStyle())
                             .accessibilityIdentifier("AdaEditor.ScriptFieldPicker.Option.\(option.id)")
@@ -71,13 +82,16 @@ struct EditorScriptFieldPicker: View {
                             Text("No compatible exported fields.").font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
                         }
                     }
-                }.frame(height: min(180, Float(options.count + 1) * 44))
+                }
+                .frame(height: min(180, Float(options.count + 1) * 44))
             }
         }
     }
 
     private var selectionLabel: String {
-        guard let selection else { return "Not bound" }
+        guard let selection else {
+            return "Not bound"
+        }
         return options.first { $0.binding == selection }?.label ?? "\(selection.script).\(selection.field)"
     }
 }
@@ -95,7 +109,9 @@ struct EditorScriptBindingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Connect UI inputs to exported fields on this entity.")
                 .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
-            if let failure { Text(failure).font(.system(size: 11)).foregroundColor(.red) }
+            if let failure {
+                Text(failure).font(.system(size: 11)).foregroundColor(.red)
+            }
             ForEach(inputs, id: \.name) { input in
                 bindingRow(input.name, type: input.type, mapping: mappings[input.name])
                     .disabled(failure != nil)
@@ -135,6 +151,7 @@ struct EditorScriptBindingsView: View {
             if let mapping, let issue = model.uiBindingIssue(input: name, mapping: mapping, typeName: typeName) {
                 Text(issue).font(.system(size: 11)).foregroundColor(.red)
             }
-        }.accessibilityIdentifier("AdaEditor.UIBinding.\(name)")
+        }
+        .accessibilityIdentifier("AdaEditor.UIBinding.\(name)")
     }
 }

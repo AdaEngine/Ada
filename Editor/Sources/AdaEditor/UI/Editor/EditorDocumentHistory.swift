@@ -40,17 +40,29 @@ extension EditorWorkbenchViewModel {
     @discardableResult
     func performDocumentHistory(redo: Bool) -> Bool {
         switch activeDocument {
-        case .ui(let document):
+        case let .ui(document):
             guard !document.isReadOnly, let model = uiSceneModels[document.id] else {
                 return false
             }
-            guard redo ? model.canRedo : model.canUndo else { return false }
-            if redo { model.redo() } else { model.undo() }
-            if redo { achievementRedos.insert(document.id) } else { achievementRedos.remove(document.id) }
+            guard redo ? model.canRedo : model.canUndo else {
+                return false
+            }
+            if redo {
+                model.redo()
+            } else {
+                model.undo()
+            }
+            if redo {
+                achievementRedos.insert(document.id)
+            } else {
+                achievementRedos.remove(document.id)
+            }
             return true
-        case .scene(let current):
-            guard !current.isReadOnly,
-                  let index = openDocuments.firstIndex(where: { $0.id == current.id }) else {
+        case let .scene(current):
+            guard
+                !current.isReadOnly,
+                let index = openDocuments.firstIndex(where: { $0.id == current.id })
+            else {
                 return false
             }
             let snapshot = redo ? sceneRedoHistory[current.id]?.popLast() : sceneUndoHistory[current.id]?.popLast()
@@ -66,7 +78,11 @@ extension EditorWorkbenchViewModel {
             restored.lastSavedContent = current.lastSavedContent
             restored.isDirty = restored.content != current.lastSavedContent
             restored.statusMessage = redo ? "Redo" : "Undo"
-            if redo { achievementRedos.insert(current.id) } else { achievementRedos.remove(current.id) }
+            if redo {
+                achievementRedos.insert(current.id)
+            } else {
+                achievementRedos.remove(current.id)
+            }
             openDocuments[index] = .scene(restored)
             notifyActiveDocumentChangedIfNeeded(documentID: current.id)
             onDocumentEdited?(current.id)

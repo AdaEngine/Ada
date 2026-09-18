@@ -1,9 +1,10 @@
 @_spi(Internal) import AdaApp
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor screenshot fixes")
 @MainActor
@@ -60,7 +61,8 @@ struct EditorScreenshotFixesTests {
         await app.withExecutionContext {
             await Task {
                 store.append(level: "info", label: "Test", message: "Game message")
-            }.value
+            }
+            .value
         }
         store.append(level: "warning", label: "Test", message: "Editor message")
         let model = EditorViewModel(outputLines: [])

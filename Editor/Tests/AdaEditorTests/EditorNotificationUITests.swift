@@ -1,6 +1,6 @@
 @_spi(AdaEngine) import AdaEngine
-@_spi(Internal) import AdaUI
 import AdaInput
+@_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
@@ -48,8 +48,13 @@ struct EditorNotificationUITests {
     func middleClick() throws {
         prepareRenderer()
         let center = EditorNotificationCenter()
-        let item = EditorNotification(id: "middle", source: .build, importance: .information, title: "Built",
-            actions: [.init(title: "Open build", destination: .build)])
+        let item = EditorNotification(
+            id: "middle",
+            source: .build,
+            importance: .information,
+            title: "Built",
+            actions: [.init(title: "Open build", destination: .build)]
+        )
         center.post(item)
         var actionCount = 0
         center.onAction = { _ in actionCount += 1 }
@@ -59,8 +64,16 @@ struct EditorNotificationUITests {
         container.layoutIfNeeded()
         let frame = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Notification.Action.middle.0")).absoluteFrame
         for phase in [MouseEvent.Phase.began, .ended] {
-            container.onMouseEvent(MouseEvent(window: .empty, button: .middle, mousePosition: Point(frame.midX, frame.midY),
-                phase: phase, modifierKeys: [], time: 0))
+            container.onMouseEvent(
+                MouseEvent(
+                    window: .empty,
+                    button: .middle,
+                    mousePosition: Point(frame.midX, frame.midY),
+                    phase: phase,
+                    modifierKeys: [],
+                    time: 0
+                )
+            )
         }
         #expect(center.toasts.isEmpty)
         #expect(center.notifications.first?.isRead == true)
@@ -73,8 +86,9 @@ struct EditorNotificationUITests {
         prepareRenderer()
         let model = EditorViewModel(project: nil)
         model.showsNotifications = true
-        let container = UIContainerView(rootView:
-            RectangleShape().stroke(Color.red, lineWidth: 1)
+        let container = UIContainerView(
+            rootView:
+                RectangleShape().stroke(Color.red, lineWidth: 1)
                 .overlay {
                     EditorNotificationOverlay(model: model, size: Size(width: 480, height: 640), center: EditorNotificationCenter())
                 }
@@ -85,42 +99,54 @@ struct EditorNotificationUITests {
         let context = UIGraphicsContext()
         container.draw(with: context)
         let commands = context.getDrawCommands()
-        let border = try #require(commands.firstIndex {
-            if case .drawPath(_, _, .stroke) = $0 { return true }
-            return false
-        })
-        #expect(commands.dropFirst(border + 1).contains {
-            if case .beginLayer = $0 { return true }
-            return false
-        })
+        let border = try #require(
+            commands.firstIndex {
+                if case .drawPath(_, _, .stroke) = $0 {
+                    return true
+                }
+                return false
+            }
+        )
+        #expect(
+            commands.dropFirst(border + 1)
+                .contains {
+                    if case .beginLayer = $0 {
+                        return true
+                    }
+                    return false
+                }
+        )
     }
 
     #if os(macOS)
-    @Test("Cancel from Activity terminates the actual workspace process")
-    func cancelWorkspaceProcess() async {
-        let runner = EditorProcessRunner()
-        let service = SwiftPMWorkspaceService(processRunner: runner)
-        let model = EditorViewModel(project: nil, workspaceService: service)
-        let (ready, continuation) = AsyncStream<Void>.makeStream()
-        let command = EditorProcessCommand(
-            executablePath: "/usr/bin/python3",
-            arguments: ["-c", "import time; print('ready', flush=True); time.sleep(30)"],
-            workingDirectory: FileManager.default.temporaryDirectory
-        )
-        let process = Task {
-            let result = await runner.run(command) { event in
-                if event.text.contains("ready") { continuation.yield(()); continuation.finish() }
+        @Test("Cancel from Activity terminates the actual workspace process")
+        func cancelWorkspaceProcess() async {
+            let runner = EditorProcessRunner()
+            let service = SwiftPMWorkspaceService(processRunner: runner)
+            let model = EditorViewModel(project: nil, workspaceService: service)
+            let (ready, continuation) = AsyncStream<Void>.makeStream()
+            let command = EditorProcessCommand(
+                executablePath: "/usr/bin/python3",
+                arguments: ["-c", "import time; print('ready', flush=True); time.sleep(30)"],
+                workingDirectory: FileManager.default.temporaryDirectory
+            )
+            let process = Task {
+                let result = await runner.run(command) { event in
+                    if event.text.contains("ready") {
+                        continuation.yield(())
+                        continuation.finish()
+                    }
+                }
+                continuation.finish()
+                return result
             }
-            continuation.finish()
-            return result
+            for await _ in ready { break }
+            let id = model.beginWorkspaceActivity(title: "Cancellation check", source: .build)
+            EditorNotificationCenter.shared.activities.cancel(id)
+            let result = await process.value
+            #expect(result.exitCode == 15)
+            #expect(EditorNotificationCenter.shared.activities.all.first(where: { $0.id == id })?.state == .cancelled)
         }
-        for await _ in ready { break }
-        let id = model.beginWorkspaceActivity(title: "Cancellation check", source: .build)
-        EditorNotificationCenter.shared.activities.cancel(id)
-        let result = await process.value
-        #expect(result.exitCode == 15)
-        #expect(EditorNotificationCenter.shared.activities.all.first(where: { $0.id == id })?.state == .cancelled)
-    }
     #endif
 
     @Test("The full editor window constructs with its notification overlay")

@@ -39,19 +39,29 @@ final class EditorUISceneModel {
 
     init(content: String, sourceURL: URL?, resourceRoot: URL?, isReadOnly: Bool = false, catalog: UICatalog = .standard) {
         self.rawSource = content
-        self.catalog = catalog; self.sourceURL = sourceURL; self.isReadOnly = isReadOnly
+        self.catalog = catalog
+        self.sourceURL = sourceURL
+        self.isReadOnly = isReadOnly
         resources = UISceneResources(rootURL: resourceRoot ?? sourceURL?.deletingLastPathComponent() ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
         let decoded = Result { try UISceneDocument.decode(content) }
         let parsed = (try? decoded.get()) ?? UISceneDocument()
         document = parsed
         selectedID = parsed.root.id
-        if case .failure(let failure) = decoded { error = failure.localizedDescription; showsSource = true }
-        else { rebuild() }
+        if case let .failure(failure) = decoded {
+            error = failure.localizedDescription
+            showsSource = true
+        } else {
+            rebuild()
+        }
     }
 
     var selectedNode: UINodeDescription? {
         var result: UINodeDescription?
-        document.root.visit { if $0.id == selectedID { result = $0 } }
+        document.root.visit {
+            if $0.id == selectedID {
+                result = $0
+            }
+        }
         return result
     }
     var canUndo: Bool { !undoStack.isEmpty }
@@ -61,18 +71,23 @@ final class EditorUISceneModel {
     }
 
     func edit(_ change: (inout UISceneDocument) throws -> Void, externalChange: ((Bool) -> Bool)? = nil) {
-        guard !isReadOnly else { return }
+        guard !isReadOnly else {
+            return
+        }
         do {
             var candidate = document
             try change(&candidate)
             try candidate.validate()
             try validateChildren(candidate.root)
-            guard candidate != document else { return }
+            guard candidate != document else {
+                return
+            }
             guard externalChange?(true) != false else {
                 error = "The scene binding changed or its owner is no longer available. Reopen the binding picker."
                 return
             }
-            undoStack.append(.init(document: document, externalChange: externalChange)); redoStack.removeAll()
+            undoStack.append(.init(document: document, externalChange: externalChange))
+            redoStack.removeAll()
             document = candidate
             publish()
         } catch { self.error = error.localizedDescription }
@@ -84,10 +99,14 @@ final class EditorUISceneModel {
     }
 
     func add(_ type: String, selectingNewNode: Bool = true) {
-        guard let signature = catalog.views[type]?.signature else { return }
+        guard let signature = catalog.views[type]?.signature else {
+            return
+        }
         var node = UINodeDescription(type: type)
         for parameter in signature.parameters {
-            if let value = parameter.defaultValue { node.arguments[parameter.name] = .init(value: value) }
+            if let value = parameter.defaultValue {
+                node.arguments[parameter.name] = .init(value: value)
+            }
         }
         let id = selectedID
         let modifierID = insertionModifierID
@@ -95,7 +114,9 @@ final class EditorUISceneModel {
             Self.modify(&document.root, id: id) { parent in
                 if let modifierID, let index = parent.modifiers.firstIndex(where: { $0.id == modifierID }) {
                     parent.modifiers[index].children.append(node)
-                } else { parent.children.append(node) }
+                } else {
+                    parent.children.append(node)
+                }
             }
         }
         if contains(node.id) {
@@ -109,16 +130,22 @@ final class EditorUISceneModel {
 
     func removeSelected() {
         let id = selectedID
-        guard id != document.root.id else { return }
+        guard id != document.root.id else {
+            return
+        }
         edit { Self.remove(&$0.root, id: id) }
         selectedID = document.root.id
     }
 
     func duplicateSelected() {
-        guard let node = selectedNode, node.id != document.root.id else { return }
+        guard let node = selectedNode, node.id != document.root.id else {
+            return
+        }
         let copy = Self.reidentified(node)
         edit { Self.insertSibling(&$0.root, after: node.id, node: copy) }
-        if contains(copy.id) { selectedID = copy.id }
+        if contains(copy.id) {
+            selectedID = copy.id
+        }
     }
 
     func wrap(_ type: String) {
@@ -127,13 +154,28 @@ final class EditorUISceneModel {
     }
 
     func move(_ id: String, into parentID: String, at index: Int? = nil) {
-        guard id != document.root.id, id != parentID, contains(parentID) else { return }
+        guard id != document.root.id, id != parentID, contains(parentID) else {
+            return
+        }
         var moving: UINodeDescription?
-        document.root.visit { if $0.id == id { moving = $0 } }
-        guard let moving else { return }
+        document.root.visit {
+            if $0.id == id {
+                moving = $0
+            }
+        }
+        guard let moving else {
+            return
+        }
         var cyclic = false
-        moving.visit { if $0.id == parentID { cyclic = true } }
-        guard !cyclic else { error = "A node cannot contain itself."; return }
+        moving.visit {
+            if $0.id == parentID {
+                cyclic = true
+            }
+        }
+        guard !cyclic else {
+            error = "A node cannot contain itself."
+            return
+        }
         edit {
             Self.remove(&$0.root, id: id)
             Self.modify(&$0.root, id: parentID) { parent in
@@ -146,30 +188,48 @@ final class EditorUISceneModel {
         let id = selectedID
         edit { document in
             Self.walk(&document.root) { parent in
-                guard let index = parent.children.firstIndex(where: { $0.id == id }), parent.children.indices.contains(index + direction) else { return }
+                guard let index = parent.children.firstIndex(where: { $0.id == id }), parent.children.indices.contains(index + direction) else {
+                    return
+                }
                 parent.children.swapAt(index, index + direction)
             }
         }
     }
 
     func undo() {
-        guard !isReadOnly, let previous = undoStack.last else { return }
-        guard previous.externalChange?(false) != false else { error = "Cannot undo: the scene binding changed or its owner was closed."; return }
+        guard !isReadOnly, let previous = undoStack.last else {
+            return
+        }
+        guard previous.externalChange?(false) != false else {
+            error = "Cannot undo: the scene binding changed or its owner was closed."
+            return
+        }
         undoStack.removeLast()
         redoStack.append(.init(document: document, externalChange: previous.externalChange))
-        document = previous.document; publish(); onHistoryChange?(false)
+        document = previous.document
+        publish()
+        onHistoryChange?(false)
     }
 
     func redo() {
-        guard !isReadOnly, let next = redoStack.last else { return }
-        guard next.externalChange?(true) != false else { error = "Cannot redo: the scene binding changed or its owner was closed."; return }
+        guard !isReadOnly, let next = redoStack.last else {
+            return
+        }
+        guard next.externalChange?(true) != false else {
+            error = "Cannot redo: the scene binding changed or its owner was closed."
+            return
+        }
         redoStack.removeLast()
         undoStack.append(.init(document: document, externalChange: next.externalChange))
-        document = next.document; publish(); onHistoryChange?(true)
+        document = next.document
+        publish()
+        onHistoryChange?(true)
     }
 
     func addModifier(_ type: String, to nodeID: String? = nil) {
-        guard let descriptor = catalog.modifiers[type] else { return }
+        guard let descriptor = catalog.modifiers[type] else {
+            return
+        }
         let arguments = Dictionary(uniqueKeysWithValues: descriptor.signature.parameters.compactMap { p in p.defaultValue.map { (p.name, UIArgument(value: $0)) } })
         let targetID = nodeID ?? selectedID
         edit { document in
@@ -178,55 +238,81 @@ final class EditorUISceneModel {
     }
 
     func editSource(_ source: String) {
-        guard !isReadOnly else { return }
+        guard !isReadOnly else {
+            return
+        }
         rawSource = source
         onChange?(source)
         do {
             let candidate = try UISceneDocument.decode(source)
-            if candidate != document { undoStack.append(.init(document: document, externalChange: nil)); redoStack.removeAll(); document = candidate }
+            if candidate != document {
+                undoStack.append(.init(document: document, externalChange: nil))
+                redoStack.removeAll()
+                document = candidate
+            }
             rebuild()
         } catch { self.error = error.localizedDescription }
     }
 
     func signature(for node: UINodeDescription) -> UIDescriptorSignature? {
-        guard node.type == "UI", let path = node.arguments["path"]?.value?.string,
-              let url = try? resources.resolve(path, relativeTo: sourceURL), let nested = try? resources.load(url) else {
+        guard
+            node.type == "UI", let path = node.arguments["path"]?.value?.string,
+            let url = try? resources.resolve(path, relativeTo: sourceURL), let nested = try? resources.load(url)
+        else {
             return catalog.views[node.type]?.signature
         }
         return .init(id: "UI", name: "UI", parameters: [.init("path", type: .string)] + nested.inputs, actions: nested.actions)
     }
 
     func openNestedUI() {
-        guard let node = selectedNode, let path = node.arguments["path"]?.value?.string else { return }
-        do { onOpenUI?(try resources.resolve(path, relativeTo: sourceURL)) }
-        catch { self.error = error.localizedDescription }
+        guard let node = selectedNode, let path = node.arguments["path"]?.value?.string else {
+            return
+        }
+        do { onOpenUI?(try resources.resolve(path, relativeTo: sourceURL)) } catch { self.error = error.localizedDescription }
     }
 
     func reload(content: String) {
         // The file watcher also reports our own autosaves. Keep their undo history.
-        guard content != rawSource else { return }
-        do { rawSource = content; document = try UISceneDocument.decode(content); undoStack.removeAll(); redoStack.removeAll(); rebuild() }
-        catch { self.error = error.localizedDescription }
+        guard content != rawSource else {
+            return
+        }
+        do {
+            rawSource = content
+            document = try UISceneDocument.decode(content)
+            undoStack.removeAll()
+            redoStack.removeAll()
+            rebuild()
+        } catch { self.error = error.localizedDescription }
     }
 
     private func contains(_ id: String) -> Bool {
         var found = false
-        document.root.visit { if $0.id == id { found = true } }
+        document.root.visit {
+            if $0.id == id {
+                found = true
+            }
+        }
         return found
     }
 
     private func publish() {
-        if !contains(selectedID) { selectedID = document.root.id }
+        if !contains(selectedID) {
+            selectedID = document.root.id
+        }
         do {
             rawSource = try document.encodedYAML()
             onChange?(rawSource)
             rebuild()
-            if let sourceURL { EventManager.default.send(UISceneResourceChanged(url: sourceURL, document: document)) }
+            if let sourceURL {
+                EventManager.default.send(UISceneResourceChanged(url: sourceURL, document: document))
+            }
         } catch { self.error = error.localizedDescription }
     }
 
     func install(catalog: UICatalog) {
-        guard self.catalog.generation != catalog.generation else { return }
+        guard self.catalog.generation != catalog.generation else {
+            return
+        }
         let context = session?.context ?? UIBindingContext()
         self.catalog = catalog
         do {
@@ -242,7 +328,7 @@ final class EditorUISceneModel {
         let context = session?.context ?? UIBindingContext()
         for input in document.inputs {
             if let value = input.defaultValue,
-               session?.document.inputs.first(where: { $0.name == input.name })?.defaultValue != input.defaultValue {
+                session?.document.inputs.first(where: { $0.name == input.name })?.defaultValue != input.defaultValue {
                 context.set(input.name, to: value)
             }
         }
@@ -255,20 +341,27 @@ final class EditorUISceneModel {
         for action in actions { context.on(action) { [weak self] _ in self?.lastAction = action } }
         do {
             if let session {
-                if !session.update(document) { error = session.diagnostic; return }
+                if !session.update(document) {
+                    error = session.diagnostic
+                    return
+                }
             } else {
                 let newSession = try UISceneInstance(document: document, context: context, catalog: catalog, resources: resources, sourceURL: sourceURL)
                 session = newSession
                 preview = UIContainerView(rootView: UISceneView(session: newSession))
                 preview?.backgroundColor = .clear
             }
-            if let sourceURL { try resources.publish(document, at: sourceURL) }
+            if let sourceURL {
+                try resources.publish(document, at: sourceURL)
+            }
             error = nil
         } catch { self.error = error.localizedDescription }
     }
 
     private func validateChildren(_ node: UINodeDescription) throws {
-        guard let signature = catalog.views[node.type]?.signature else { return }
+        guard let signature = catalog.views[node.type]?.signature else {
+            return
+        }
         if signature.content == .none && !node.children.isEmpty || signature.content == .single && node.children.count > 1 {
             throw UIDiagnostic("\(signature.name) cannot accept these children.", nodeID: node.id)
         }
@@ -284,7 +377,10 @@ final class EditorUISceneModel {
     }
 
     static func modify(_ node: inout UINodeDescription, id: String, _ body: (inout UINodeDescription) -> Void) {
-        if node.id == id { body(&node); return }
+        if node.id == id {
+            body(&node)
+            return
+        }
         for index in node.children.indices { modify(&node.children[index], id: id, body) }
         for modifier in node.modifiers.indices {
             for index in node.modifiers[modifier].children.indices { modify(&node.modifiers[modifier].children[index], id: id, body) }
@@ -304,7 +400,10 @@ final class EditorUISceneModel {
         }
     }
     private static func insertSibling(_ node: inout UINodeDescription, after id: String, node copy: UINodeDescription) {
-        if let index = node.children.firstIndex(where: { $0.id == id }) { node.children.insert(copy, at: index + 1); return }
+        if let index = node.children.firstIndex(where: { $0.id == id }) {
+            node.children.insert(copy, at: index + 1)
+            return
+        }
         for index in node.children.indices { insertSibling(&node.children[index], after: id, node: copy) }
     }
     private static func reidentified(_ node: UINodeDescription) -> UINodeDescription {
@@ -312,7 +411,10 @@ final class EditorUISceneModel {
         copy.id = UUID().uuidString
         copy.children = copy.children.map(reidentified)
         copy.modifiers = copy.modifiers.map { modifier in
-            var value = modifier; value.id = UUID().uuidString; value.children = value.children.map(reidentified); return value
+            var value = modifier
+            value.id = UUID().uuidString
+            value.children = value.children.map(reidentified)
+            return value
         }
         return copy
     }
@@ -324,21 +426,52 @@ extension EditorWorkbenchViewModel {
             configureBindings(model, resourceRoot: resourceRoot, catalog: bindingCatalog)
             return model
         }
-        let model = EditorUISceneModel(content: document.content, sourceURL: document.absolutePath.map { URL(fileURLWithPath: $0) }, resourceRoot: resourceRoot, isReadOnly: document.isReadOnly, catalog: uiCatalog)
+        let model = EditorUISceneModel(
+            content: document.content,
+            sourceURL: document.absolutePath.map { URL(fileURLWithPath: $0) },
+            resourceRoot: resourceRoot,
+            isReadOnly: document.isReadOnly,
+            catalog: uiCatalog
+        )
         model.onPresentModifierPicker = { [weak self, weak model] nodeID in
-            guard let self, let model else { return }
+            guard let self, let model else {
+                return
+            }
             self.modifierPickerRequest = .init(model: model, nodeID: nodeID)
         }
         model.onHistoryChange = { [weak self] redo in
-            if redo { self?.achievementRedos.insert(document.id) } else { self?.achievementRedos.remove(document.id) }
+            if redo {
+                self?.achievementRedos.insert(document.id)
+            } else {
+                self?.achievementRedos.remove(document.id)
+            }
         }
         model.onChange = { [weak self] content in
-            self?.updateTextDocument(id: document.id) { $0.content = content; $0.isDirty = content != $0.lastSavedContent; $0.errorMessage = nil }
+            self?
+                .updateTextDocument(id: document.id) {
+                    $0.content = content
+                    $0.isDirty = content != $0.lastSavedContent
+                    $0.errorMessage = nil
+                }
         }
         model.onOpenUI = { [weak self] url in
-            guard let self, let content = try? String(contentsOf: url, encoding: .utf8) else { return }
-            self.open(.ui(EditorTextDocument(id: "ui:\(url.path)", title: url.lastPathComponent, relativePath: url.lastPathComponent,
-                absolutePath: url.path, language: .plainText, content: content, lastSavedContent: content, errorMessage: nil)))
+            guard let self, let content = try? String(contentsOf: url, encoding: .utf8) else {
+                return
+            }
+            self.open(
+                .ui(
+                    EditorTextDocument(
+                        id: "ui:\(url.path)",
+                        title: url.lastPathComponent,
+                        relativePath: url.lastPathComponent,
+                        absolutePath: url.path,
+                        language: .plainText,
+                        content: content,
+                        lastSavedContent: content,
+                        errorMessage: nil
+                    )
+                )
+            )
         }
         configureBindings(model, resourceRoot: resourceRoot, catalog: bindingCatalog)
         uiSceneModels[document.id] = model
@@ -349,7 +482,9 @@ extension EditorWorkbenchViewModel {
         let url = model.sourceURL
         model.onBindingOwners = { [weak self] in self?.uiBindingOwners(sourceURL: url, resourceRoot: resourceRoot, catalog: catalog) ?? [] }
         model.onBindingChange = { [weak self, weak model] owner, before, after in
-            guard self?.replaceUIBindings(owner: owner, expected: before, replacement: after) == true else { return false }
+            guard self?.replaceUIBindings(owner: owner, expected: before, replacement: after) == true else {
+                return false
+            }
             model?.bindingSceneDocumentIDs.insert(owner.documentID)
             return true
         }

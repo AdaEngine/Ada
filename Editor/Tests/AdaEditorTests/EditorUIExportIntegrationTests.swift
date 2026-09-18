@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorUIExportIntegrationTests {
@@ -18,8 +19,14 @@ struct EditorUIExportIntegrationTests {
             .deletingLastPathComponent().deletingLastPathComponent()
         let project = engine.appendingPathComponent("Documentation/Examples/UIScenes")
         let toolchain = await SwiftToolchainLocator.locate()
-        let result = await EditorProcessRunner().run(.init(executablePath: toolchain.swiftExecutablePath,
-            arguments: ["package", "describe", "--type", "json"], workingDirectory: project))
+        let result = await EditorProcessRunner()
+            .run(
+                .init(
+                    executablePath: toolchain.swiftExecutablePath,
+                    arguments: ["package", "describe", "--type", "json"],
+                    workingDirectory: project
+                )
+            )
         #expect(result.succeeded, Comment(rawValue: result.combinedOutput))
         let package = try #require(SwiftPackageModel.parse(from: result.standardOutput))
         let loader = EditorUIExportLoader()
@@ -44,7 +51,9 @@ struct EditorUIExportIntegrationTests {
         let deadline = ContinuousClock.now.advanced(by: .seconds(2))
         while ContinuousClock.now < deadline {
             container.layoutSubviews()
-            if flatten(container.uiTreeRoots()).filter({ $0.sceneNodeID == "use-item" }).count == 1 { break }
+            if flatten(container.uiTreeRoots()).filter({ $0.sceneNodeID == "use-item" }).count == 1 {
+                break
+            }
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(flatten(container.uiTreeRoots()).filter { $0.sceneNodeID == "use-item" }.count == 1)

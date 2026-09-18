@@ -1,6 +1,7 @@
-@testable import AdaEditor
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor code completion layout")
 struct EditorCodeCompletionLayoutTests {

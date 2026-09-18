@@ -23,19 +23,25 @@ extension EditorViewModel {
     }
 
     func presentBuildFilePicker(for selection: EditorBuildFileSelection) {
-        guard let projectURL else { return }
+        guard let projectURL else {
+            return
+        }
         ProjectOpenPicker.presentBuildFilePicker(directoryURL: projectURL) { [weak self] result in
-            guard let self, self.projectURL == projectURL else { return }
+            guard let self, self.projectURL == projectURL else {
+                return
+            }
             switch result {
-            case .selected(let urls): addBuildFiles(urls, to: selection)
+            case let .selected(urls): addBuildFiles(urls, to: selection)
             case .cancelled: break
-            case .unavailable(let message): projectSettingsStatusMessage = message
+            case let .unavailable(message): projectSettingsStatusMessage = message
             }
         }
     }
 
     func addBuildFiles(_ urls: [URL], to selection: EditorBuildFileSelection) {
-        guard let projectURL else { return }
+        guard let projectURL else {
+            return
+        }
         let root = projectURL.standardizedFileURL.resolvingSymlinksInPath().path
         let prefix = root.hasSuffix("/") ? root : root + "/"
         var paths = buildFiles(for: selection)

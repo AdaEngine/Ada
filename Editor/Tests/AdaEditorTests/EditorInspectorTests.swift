@@ -1,28 +1,30 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 import Testing
+
+@testable import AdaEditor
+
 #if canImport(AppKit) && os(macOS)
-import AppKit
+    import AppKit
 #endif
 
 @Suite("Editor inspector")
 struct EditorInspectorTests {
     #if canImport(AppKit) && os(macOS)
-    @Test("platform color picker presents a real NSColorPanel")
-    @MainActor
-    func platformColorPickerPresentsNSColorPanel() {
-        _ = NSApplication.shared
-        EditorPlatformColorPicker.present(
-            value: EditorInspectorColorValue(red: 0.2, green: 0.4, blue: 0.6, alpha: 0.8),
-            onChange: { _ in }
-        )
+        @Test("platform color picker presents a real NSColorPanel")
+        @MainActor
+        func platformColorPickerPresentsNSColorPanel() {
+            _ = NSApplication.shared
+            EditorPlatformColorPicker.present(
+                value: EditorInspectorColorValue(red: 0.2, green: 0.4, blue: 0.6, alpha: 0.8),
+                onChange: { _ in }
+            )
 
-        let panel = NSColorPanel.shared
-        #expect(panel.showsAlpha)
-        #expect(panel.isVisible)
-        panel.orderOut(nil)
-    }
+            let panel = NSColorPanel.shared
+            #expect(panel.showsAlpha)
+            #expect(panel.isVisible)
+            panel.orderOut(nil)
+        }
     #endif
 
     @Test("component picker searches names, categories, and descriptions")
@@ -38,7 +40,7 @@ struct EditorInspectorTests {
                 components: [],
                 addableComponents: [
                     .init(typeName: "Camera", displayName: "Camera", category: "Rendering", description: "Renders the scene."),
-                    .init(typeName: "Light2D", displayName: "Light 2D", category: "2D", description: "Casts shadows.")
+                    .init(typeName: "Light2D", displayName: "Light 2D", category: "2D", description: "Casts shadows."),
                 ],
                 gizmo: nil,
                 hasExplicitGizmo: false
@@ -63,7 +65,7 @@ struct EditorInspectorTests {
                 components: [],
                 addableComponents: [
                     .init(typeName: "Camera", displayName: "Camera", category: "Rendering", description: "Renders the scene."),
-                    .init(typeName: "Light2D", displayName: "Light 2D", category: "2D", description: "Casts shadows.")
+                    .init(typeName: "Light2D", displayName: "Light 2D", category: "2D", description: "Casts shadows."),
                 ],
                 gizmo: nil,
                 hasExplicitGizmo: false
@@ -112,7 +114,7 @@ struct EditorInspectorTests {
         let viewModel = EditorInspectorSidebarViewModel()
         viewModel.textureAssets = [
             .init(name: "player.png", reference: "@res://Textures/player.png", absolutePath: "/tmp/Game/Assets/Textures/player.png"),
-            .init(name: "sky.png", reference: "@res://Backgrounds/sky.png", absolutePath: "/tmp/Game/Assets/Backgrounds/sky.png")
+            .init(name: "sky.png", reference: "@res://Backgrounds/sky.png", absolutePath: "/tmp/Game/Assets/Backgrounds/sky.png"),
         ]
 
         #expect(viewModel.textureAssets(matching: "player").map(\.reference) == ["@res://Textures/player.png"])

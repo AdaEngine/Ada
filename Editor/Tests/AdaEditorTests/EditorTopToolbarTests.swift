@@ -1,9 +1,10 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Foundation
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor top toolbar")
 struct EditorTopToolbarTests {
@@ -71,28 +72,39 @@ struct EditorTopToolbarTests {
     }
 
     #if os(macOS)
-    @Test("available updates fit beside the run controls")
-    @MainActor
-    func updateButtonFitsToolbar() throws {
-        prepareRendererIfNeeded()
-        EditorUpdateCenter.shared.start()
-        NotificationCenter.default.post(name: EditorUpdateBridge.stateChanged, object: nil, userInfo: ["version": "2.0"])
-        defer { NotificationCenter.default.post(name: EditorUpdateBridge.stateChanged, object: nil) }
-        let size = Size(width: 1_280, height: AdaEngineStyleLayoutSpec.topToolbarHeight)
-        let container = UIContainerView(rootView: EditorTopToolbar(
-            project: nil, isProjectSwitcherPresented: false, isRunDestinationMenuPresented: false,
-            viewModel: EditorToolbarViewModel(), runDestination: .macOS, isRunEnabled: true, isStopEnabled: false,
-            onToggleRunDestinationMenu: {}, onToggleProjectSwitcher: {}, onRun: {}, onStop: {}
-        ).environment(\.metrics, AdaEngineStyleLayoutMetrics(size: size)))
-        container.frame = Rect(origin: .zero, size: size)
-        container.bounds.size = size
-        container.layoutIfNeeded()
-        let update = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Update"))
-        let destination = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.RunDestination.Button"))
-        #expect(update.absoluteFrame.width > 40)
-        #expect(update.absoluteFrame.height == 28)
-        #expect(update.absoluteFrame.maxX <= destination.absoluteFrame.minX)
-    }
+        @Test("available updates fit beside the run controls")
+        @MainActor
+        func updateButtonFitsToolbar() throws {
+            prepareRendererIfNeeded()
+            EditorUpdateCenter.shared.start()
+            NotificationCenter.default.post(name: EditorUpdateBridge.stateChanged, object: nil, userInfo: ["version": "2.0"])
+            defer { NotificationCenter.default.post(name: EditorUpdateBridge.stateChanged, object: nil) }
+            let size = Size(width: 1_280, height: AdaEngineStyleLayoutSpec.topToolbarHeight)
+            let container = UIContainerView(
+                rootView: EditorTopToolbar(
+                    project: nil,
+                    isProjectSwitcherPresented: false,
+                    isRunDestinationMenuPresented: false,
+                    viewModel: EditorToolbarViewModel(),
+                    runDestination: .macOS,
+                    isRunEnabled: true,
+                    isStopEnabled: false,
+                    onToggleRunDestinationMenu: {},
+                    onToggleProjectSwitcher: {},
+                    onRun: {},
+                    onStop: {}
+                )
+                .environment(\.metrics, AdaEngineStyleLayoutMetrics(size: size))
+            )
+            container.frame = Rect(origin: .zero, size: size)
+            container.bounds.size = size
+            container.layoutIfNeeded()
+            let update = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Update"))
+            let destination = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.RunDestination.Button"))
+            #expect(update.absoluteFrame.width > 40)
+            #expect(update.absoluteFrame.height == 28)
+            #expect(update.absoluteFrame.maxX <= destination.absoluteFrame.minX)
+        }
     #endif
 
     @MainActor

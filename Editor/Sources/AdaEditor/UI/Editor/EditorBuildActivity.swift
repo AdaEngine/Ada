@@ -50,34 +50,36 @@ struct EditorBuildActivity: Equatable, Sendable {
     }
 
     mutating func consume(_ progress: SwiftPMWorkspaceProgress) {
-        let update: StepUpdate? = switch progress.phase {
-        case .loadingProjectMetadata:
-            StepUpdate(id: "metadata", title: "Loading project metadata", detail: progress.detail)
-        case .locatingToolchain:
-            StepUpdate(id: "toolchain", title: "Locating Swift toolchain", detail: progress.detail)
-        case .resolvingDependencies:
-            StepUpdate(id: "dependencies", title: "Resolving dependencies", detail: progress.detail)
-        case .describingPackage:
-            StepUpdate(id: "package-graph", title: "Reading package graph", detail: progress.detail)
-        case .startingSourceKitLSP:
-            StepUpdate(id: "sourcekit-lsp", title: "Starting SourceKit-LSP", detail: progress.detail)
-        case .scanningSources:
-            StepUpdate(
-                id: "scanning",
-                title: "Scanning source files",
-                detail: progress.currentFile ?? progress.detail,
-                fractionCompleted: Self.fraction(completed: progress.completedFileCount, total: progress.totalFileCount)
-            )
-        case .indexingBuild:
-            StepUpdate(
-                id: "indexing",
-                title: "Indexing Swift package",
-                detail: progress.currentTarget ?? progress.currentFile ?? progress.detail,
-                fractionCompleted: Self.fraction(completed: progress.completedFileCount, total: progress.totalFileCount)
-            )
-        case .failed, .ready:
-            nil
-        }
+        let update: StepUpdate? =
+            switch progress.phase {
+            case .loadingProjectMetadata:
+                StepUpdate(id: "metadata", title: "Loading project metadata", detail: progress.detail)
+            case .locatingToolchain:
+                StepUpdate(id: "toolchain", title: "Locating Swift toolchain", detail: progress.detail)
+            case .resolvingDependencies:
+                StepUpdate(id: "dependencies", title: "Resolving dependencies", detail: progress.detail)
+            case .describingPackage:
+                StepUpdate(id: "package-graph", title: "Reading package graph", detail: progress.detail)
+            case .startingSourceKitLSP:
+                StepUpdate(id: "sourcekit-lsp", title: "Starting SourceKit-LSP", detail: progress.detail)
+            case .scanningSources:
+                StepUpdate(
+                    id: "scanning",
+                    title: "Scanning source files",
+                    detail: progress.currentFile ?? progress.detail,
+                    fractionCompleted: Self.fraction(completed: progress.completedFileCount, total: progress.totalFileCount)
+                )
+            case .indexingBuild:
+                StepUpdate(
+                    id: "indexing",
+                    title: "Indexing Swift package",
+                    detail: progress.currentTarget ?? progress.currentFile ?? progress.detail,
+                    fractionCompleted: Self.fraction(completed: progress.completedFileCount, total: progress.totalFileCount)
+                )
+            case .failed,
+                .ready:
+                nil
+            }
 
         guard let update else {
             return
@@ -236,7 +238,7 @@ struct EditorBuildActivity: Equatable, Sendable {
     private struct StepUpdate {
         var id: String
         var title: String
-        var detail: String? = nil
-        var fractionCompleted: Float? = nil
+        var detail: String?
+        var fractionCompleted: Float?
     }
 }

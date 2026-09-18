@@ -30,7 +30,9 @@ struct EditorTaskRunner: View {
     private func groupRow(_ group: EditorTaskRunnerGroup) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Button {
-                if !collapsed.insert(group.id).inserted { collapsed.remove(group.id) }
+                if !collapsed.insert(group.id).inserted {
+                    collapsed.remove(group.id)
+                }
             } label: {
                 HStack(spacing: 6) {
                     Text(collapsed.contains(group.id) ? "\u{E5CC}" : "\u{E5CF}")
@@ -54,7 +56,9 @@ struct EditorTaskRunner: View {
     }
 
     private func taskRow(_ task: EditorTaskRunnerGroup.Item) -> some View {
-        Button { onRun(task.id) } label: {
+        Button {
+            onRun(task.id)
+        } label: {
             HStack(spacing: 8) {
                 Text("\u{E037}")
                     .font(AdaEditorMaterialSymbolFont.font(size: 16))
@@ -74,7 +78,6 @@ struct EditorTaskRunner: View {
         .opacity(isEnabled ? 1 : 0.5)
         .accessibilityIdentifier("AdaEditor.Tasks.Run.\(task.id)")
     }
-
 }
 
 private struct EditorTaskRowStyle: ButtonStyle {
@@ -91,7 +94,7 @@ extension EditorTaskRunnerGroup {
             .init(id: "run", title: "Run", tasks: [.init(id: "runSelected", title: "Run Selected")]),
             .init(id: "products", title: "Run Products", tasks: products.map { .init(id: "product:\($0)", title: $0) }),
             .init(id: "dependencies", title: "Dependencies", tasks: [.init(id: "resolve", title: "Resolve Dependencies"), .init(id: "update", title: "Update Dependencies")]),
-            .init(id: "maintenance", title: "Maintenance", tasks: [.init(id: "clean", title: "Clean Build Artifacts"), .init(id: "reset", title: "Reset Package Cache")])
+            .init(id: "maintenance", title: "Maintenance", tasks: [.init(id: "clean", title: "Clean Build Artifacts"), .init(id: "reset", title: "Reset Package Cache")]),
         ]
     }
 }

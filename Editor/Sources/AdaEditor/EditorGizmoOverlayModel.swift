@@ -13,23 +13,26 @@ enum EditorGizmoOverlayModel {
 
     @MainActor
     static func icons(in world: World, editorIDsByEntityID: [Entity.ID: String]) -> [Icon] {
-        world.getEntities().compactMap { entity in
-            guard let editorID = editorIDsByEntityID[entity.id],
-                  let transform = entity.components[Transform.self],
-                  let resolved = visibleGizmo(for: entity) else {
-                return nil
-            }
+        world.getEntities()
+            .compactMap { entity in
+                guard
+                    let editorID = editorIDsByEntityID[entity.id],
+                    let transform = entity.components[Transform.self],
+                    let resolved = visibleGizmo(for: entity)
+                else {
+                    return nil
+                }
 
-            return Icon(
-                editorEntityID: editorID,
-                kind: resolved.gizmo.kind,
-                name: resolved.gizmo.name,
-                position: transform.position,
-                size: resolved.gizmo.size,
-                color: resolved.gizmo.color,
-                isExplicit: resolved.isExplicit
-            )
-        }
+                return Icon(
+                    editorEntityID: editorID,
+                    kind: resolved.gizmo.kind,
+                    name: resolved.gizmo.name,
+                    position: transform.position,
+                    size: resolved.gizmo.size,
+                    color: resolved.gizmo.color,
+                    isExplicit: resolved.isExplicit
+                )
+            }
     }
 
     @MainActor
@@ -38,10 +41,8 @@ enum EditorGizmoOverlayModel {
             return gizmo.isEnabled ? (gizmo, true) : nil
         }
 
-        if entity.components[Light2D.self] != nil ||
-            entity.components[SpotLightComponent.self] != nil ||
-            entity.components[PointLightComponent.self] != nil ||
-            entity.components[DirectionalLightComponent.self] != nil {
+        if entity.components[Light2D.self] != nil || entity.components[SpotLightComponent.self] != nil || entity.components[PointLightComponent.self] != nil
+            || entity.components[DirectionalLightComponent.self] != nil {
             return (EditorGizmo(name: entity.name, kind: .light), false)
         }
 

@@ -14,17 +14,17 @@ public enum AdaScriptError: Error, Sendable, Equatable, CustomStringConvertible 
 
     public var description: String {
         switch self {
-        case .compilation(let diagnostics):
+        case let .compilation(diagnostics):
             diagnostics.joined(separator: "\n")
-        case .duplicateSourcePath(let path):
+        case let .duplicateSourcePath(path):
             "Duplicate Ada Script source path '\(path)'"
-        case .importCycle(let paths):
+        case let .importCycle(paths):
             "Ada Script import cycle: \(paths.joined(separator: " -> "))"
         case let .invalidImport(source, message):
             "Invalid Ada Script import in '\(source)': \(message)"
-        case .invalidManifest(let message):
+        case let .invalidManifest(message):
             "Invalid Ada Script annotations: \(message)"
-        case .invalidSourcePath(let path):
+        case let .invalidSourcePath(path):
             "Invalid Ada Script source path '\(path)'"
         case let .unknownComponent(system, queryIndex, component):
             "Unknown component '\(component)' in query \(queryIndex) of system '\(system)'"
@@ -93,13 +93,16 @@ enum GravityScriptModuleResolver {
         var sourcesByPath: [String: ResolvedGravityScriptModule.Source] = [:]
         var pathsByFileID: [UInt32: String] = [:]
         for (offset, path) in sortedPaths.enumerated() {
-            guard let source = parsedSources[path] else { continue }
+            guard let source = parsedSources[path] else {
+                continue
+            }
             let fileID = UInt32(offset + 1)
             sourcesByPath[path] = .init(fileID: fileID, source: source.sanitizedSource)
             pathsByFileID[fileID] = path
         }
 
-        let includes = orderedPaths
+        let includes =
+            orderedPaths
             .map { path in "#include \"\(escapeGravityString(path))\"" }
             .joined(separator: "\n")
         let entrySource = "extern var adaUIBuilder;\n\(includes)"
@@ -116,7 +119,7 @@ enum GravityScriptModuleResolver {
         "resource",
         "scriptable",
         "system",
-        "view"
+        "view",
     ]
 
     private static func visit(
@@ -179,7 +182,9 @@ enum GravityScriptModuleResolver {
                 throw AdaScriptError.invalidImport(source: sourcePath, message: "library imports use @library.id/path")
             }
             var path = String(parts[1])
-            if URL(fileURLWithPath: path).pathExtension.isEmpty { path += ".ada" }
+            if URL(fileURLWithPath: path).pathExtension.isEmpty {
+                path += ".ada"
+            }
             guard AdaScriptLibraryManifest.isSourcePath(path) else {
                 throw AdaScriptError.invalidImport(source: sourcePath, message: "invalid library source path")
             }
@@ -202,17 +207,20 @@ enum GravityScriptModuleResolver {
 
     private static func canonicalPath(_ path: String, baseComponents: [String]) throws -> String {
         let normalizedSeparators = path.replacingOccurrences(of: "\\", with: "/")
-        guard !normalizedSeparators.isEmpty,
-              !normalizedSeparators.hasPrefix("/"),
-              !isWindowsAbsolutePath(normalizedSeparators),
-              !normalizedSeparators.contains("\"") else {
+        guard
+            !normalizedSeparators.isEmpty,
+            !normalizedSeparators.hasPrefix("/"),
+            !isWindowsAbsolutePath(normalizedSeparators),
+            !normalizedSeparators.contains("\"")
+        else {
             throw AdaScriptError.invalidSourcePath(path)
         }
 
         var components = baseComponents
         for component in normalizedSeparators.split(separator: "/", omittingEmptySubsequences: false) {
             switch component {
-            case "", ".":
+            case "",
+                ".":
                 continue
             case "..":
                 guard !components.isEmpty else {
@@ -291,9 +299,10 @@ private struct AdaScriptSourceScanner {
 
         var sanitizedSource = source
         for item in imports.reversed() {
-            let replacement = source[item.range].map { character in
-                character == "\n" || character == "\r" ? character : " "
-            }
+            let replacement = source[item.range]
+                .map { character in
+                    character == "\n" || character == "\r" ? character : " "
+                }
             sanitizedSource.replaceSubrange(item.range, with: replacement)
         }
         return ParsedSource(

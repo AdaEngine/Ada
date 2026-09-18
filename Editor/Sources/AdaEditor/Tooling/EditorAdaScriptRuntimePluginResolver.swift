@@ -10,12 +10,12 @@ struct EditorAdaScriptRuntimePluginSection: Equatable, Identifiable, Sendable {
     let id: String
     let title: String
     let plugins: [AdaProjectRuntimePluginID]
-    let sections: [EditorAdaScriptRuntimePluginSection]
+    let sections: [Self]
 
     init(
         _ title: String,
         plugins: [AdaProjectRuntimePluginID] = [],
-        sections: [EditorAdaScriptRuntimePluginSection] = []
+        sections: [Self] = []
     ) {
         self.id = title
         self.title = title
@@ -40,7 +40,7 @@ enum EditorAdaScriptRuntimePluginCatalog {
         .init(dependencies: [.core3D], displayName: "3D Physics", id: .physics3D),
         .init(dependencies: [.core2D, .mesh2D, .sprite], displayName: "Tilemaps", id: .tilemap),
         .init(dependencies: [], displayName: "Audio", id: .audio),
-        .init(dependencies: [], displayName: "Upscaling", id: .upscale)
+        .init(dependencies: [], displayName: "Upscaling", id: .upscale),
     ]
 
     static let descriptorByID = Dictionary(uniqueKeysWithValues: descriptors.map { ($0.id, $0) })
@@ -51,17 +51,17 @@ enum EditorAdaScriptRuntimePluginCatalog {
             "Rendering",
             sections: [
                 .init("2D", plugins: [.core2D, .sprite, .mesh2D, .light2D]),
-                .init("3D", plugins: [.core3D, .model3D])
+                .init("3D", plugins: [.core3D, .model3D]),
             ]
         ),
         .init(
             "Simulation",
             sections: [
                 .init("2D", plugins: [.physics2D, .tilemap]),
-                .init("3D", plugins: [.physics3D])
+                .init("3D", plugins: [.physics3D]),
             ]
         ),
-        .init("Platform", plugins: [.audio, .upscale])
+        .init("Platform", plugins: [.audio, .upscale]),
     ]
 
     static func presetPlugins(_ preset: AdaProjectRuntimePluginPreset) -> Set<AdaProjectRuntimePluginID> {
@@ -94,9 +94,9 @@ enum EditorRuntimePluginResolutionError: Error, Equatable, LocalizedError, Senda
         switch self {
         case let .disabledDependency(plugin, requiredBy):
             "Runtime plugin '\(plugin)' is disabled but required by '\(requiredBy)'."
-        case .unsupportedPresetVersion(let version):
+        case let .unsupportedPresetVersion(version):
             "Runtime plugin preset version \(version) is not supported."
-        case .unknownPlugin(let plugin):
+        case let .unknownPlugin(plugin):
             "Runtime plugin '\(plugin)' is not compiled into this AdaEditor build."
         }
     }

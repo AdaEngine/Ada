@@ -1,8 +1,9 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) @testable import AdaUI
 import Math
 import Testing
+
+@testable import AdaEditor
 
 @MainActor @Suite(.serialized)
 struct EditorShaderEditorTests {
@@ -29,10 +30,18 @@ struct EditorShaderEditorTests {
     func codeEditorDisplaysAndRefreshesShaderColors(_ language: EditorSourceLanguage) async throws {
         let source = language == .glsl ? "uniform vec4 color; // shader" : "var color: vec4f; // shader"
         let model = EditorWorkbenchViewModel()
-        model.open(.text(EditorTextDocument(
-            id: "shader", title: "test.\(language.rawValue)", relativePath: "test.\(language.rawValue)",
-            language: language, content: source, errorMessage: nil
-        )))
+        model.open(
+            .text(
+                EditorTextDocument(
+                    id: "shader",
+                    title: "test.\(language.rawValue)",
+                    relativePath: "test.\(language.rawValue)",
+                    language: language,
+                    content: source,
+                    errorMessage: nil
+                )
+            )
+        )
         let container = UIContainerView(rootView: ShaderCodeTestView(model: model).theme(.adaEditor))
         container.frame = Rect(x: 0, y: 0, width: 900, height: 600)
         container.bounds.size = container.frame.size
@@ -67,7 +76,7 @@ private struct ShaderCodeTestView: View {
     let model: EditorWorkbenchViewModel
 
     var body: some View {
-        if case .text(let document)? = model.activeDocument {
+        if case let .text(document)? = model.activeDocument {
             EditorCodeFileView(
                 document: document,
                 text: model.textDocumentBinding(documentID: document.id),

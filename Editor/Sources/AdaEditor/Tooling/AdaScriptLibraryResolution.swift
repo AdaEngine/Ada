@@ -20,7 +20,9 @@ actor AdaScriptLibraryResolution {
 
     func resolve(previous: AdaScriptLibraryLock, download: AdaScriptLibraryDownload) async throws -> Result {
         var roots = previous.roots
-        if !roots.contains(download.manifest.id) { roots.append(download.manifest.id) }
+        if !roots.contains(download.manifest.id) {
+            roots.append(download.manifest.id)
+        }
         pending[download.manifest.id] = download
         existing = Dictionary(uniqueKeysWithValues: previous.libraries.map { ($0.manifest.id, $0) })
         for id in roots.sorted() {
@@ -36,12 +38,18 @@ actor AdaScriptLibraryResolution {
     }
 
     private func visit(id: String, source: AdaScriptLibrarySource) async throws {
-        guard !visiting.contains(id) else { throw AdaScriptLibraryError.invalid("Library dependency cycle at \(id).") }
+        guard !visiting.contains(id) else {
+            throw AdaScriptLibraryError.invalid("Library dependency cycle at \(id).")
+        }
         if let entry = resolved[id] {
-            guard entry.source == source else { throw AdaScriptLibraryError.invalid("Conflicting library revisions for \(id).") }
+            guard entry.source == source else {
+                throw AdaScriptLibraryError.invalid("Conflicting library revisions for \(id).")
+            }
             return
         }
-        guard visiting.count + resolved.count < 128 else { throw AdaScriptLibraryError.invalid("Too many library dependencies.") }
+        guard visiting.count + resolved.count < 128 else {
+            throw AdaScriptLibraryError.invalid("Too many library dependencies.")
+        }
         visiting.insert(id)
         defer { visiting.remove(id) }
         let entry: AdaScriptLockedLibrary

@@ -5,45 +5,47 @@ extension EditorUISceneEditor {
     var designerBody: some View {
         GeometryReader { geometry in
             let layout = EditorUIDesignerLayout(size: geometry.size)
-            AnyView(VStack(spacing: 0) {
-                AnyView(designerToolbar(layout: layout)).frame(height: layout.toolbarHeight)
-                panelDivider
-                if !layout.showsSidebars, !model.showsSource {
-                    HStack(spacing: 4) {
-                        ForEach(EditorUIDesignerPane.allCases, id: \.self) { pane in
-                            Button(pane.rawValue) { compactPane = pane }
-                                .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: compactPane == pane))
-                                .accessibilityIdentifier("AdaEditor.UIScene.Pane.\(pane.rawValue)")
+            AnyView(
+                VStack(spacing: 0) {
+                    AnyView(designerToolbar(layout: layout)).frame(height: layout.toolbarHeight)
+                    panelDivider
+                    if !layout.showsSidebars, !model.showsSource {
+                        HStack(spacing: 4) {
+                            ForEach(EditorUIDesignerPane.allCases, id: \.self) { pane in
+                                Button(pane.rawValue) { compactPane = pane }
+                                    .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: compactPane == pane))
+                                    .accessibilityIdentifier("AdaEditor.UIScene.Pane.\(pane.rawValue)")
+                            }
+                            Spacer()
                         }
-                        Spacer()
-                    }.padding(.horizontal, 12).frame(height: 38)
-                }
-                if model.showsSource {
-                    AnyView(sourceEditor).frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if layout.showsSidebars {
-                    HStack(spacing: 0) {
-                        AnyView(designerLibrary).frame(width: layout.sidebarWidth, height: layout.contentHeight)
-                        RectangleShape().fill(theme.editorColors.border.opacity(0.5)).frame(width: 1)
-                        AnyView(designerCanvas(layout: layout)).frame(width: layout.canvasWidth, height: layout.contentHeight)
-                            .accessibilityIdentifier("AdaEditor.UIScene.CanvasPanel")
-                        RectangleShape().fill(theme.editorColors.border.opacity(0.5)).frame(width: 1)
-                        AnyView(designerInspector).frame(width: layout.inspectorWidth, height: layout.contentHeight)
-                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    switch compactPane {
-                    case .library: AnyView(designerLibrary).frame(width: layout.size.width, height: layout.contentHeight)
-                    case .canvas: AnyView(designerCanvas(layout: layout)).frame(width: layout.canvasWidth, height: layout.contentHeight)
-                            .accessibilityIdentifier("AdaEditor.UIScene.CanvasPanel")
-                    case .inspector: AnyView(designerInspector).frame(width: layout.size.width, height: layout.contentHeight)
+                        .padding(.horizontal, 12).frame(height: 38)
                     }
+                    if model.showsSource {
+                        AnyView(sourceEditor).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if layout.showsSidebars {
+                        HStack(spacing: 0) {
+                            AnyView(designerLibrary).frame(width: layout.sidebarWidth, height: layout.contentHeight)
+                            RectangleShape().fill(theme.editorColors.border.opacity(0.5)).frame(width: 1)
+                            AnyView(designerCanvas(layout: layout)).frame(width: layout.canvasWidth, height: layout.contentHeight)
+                                .accessibilityIdentifier("AdaEditor.UIScene.CanvasPanel")
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        switch compactPane {
+                        case .library: AnyView(designerLibrary).frame(width: layout.size.width, height: layout.contentHeight)
+                        case .canvas:
+                            AnyView(designerCanvas(layout: layout)).frame(width: layout.canvasWidth, height: layout.contentHeight)
+                                .accessibilityIdentifier("AdaEditor.UIScene.CanvasPanel")
+                        }
+                    }
+                    AnyView(designerStatus)
                 }
-                AnyView(designerStatus)
-            }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-            .background(theme.editorColors.surface)
-            .foregroundColor(theme.editorColors.text)
-            .font(.system(size: 12))
-            .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors)))
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .background(theme.editorColors.surface)
+                .foregroundColor(theme.editorColors.text)
+                .font(.system(size: 12))
+                .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors))
+            )
         }
         .accessibilityIdentifier("AdaEditor.UIScene")
     }
@@ -55,7 +57,9 @@ extension EditorUISceneEditor {
                     symbol("\u{E8F1}").foregroundColor(theme.editorColors.blue)
                     Text("UI Designer").font(.system(size: 12, weight: .semibold))
                 }
-                if layout.size.width >= 1100 { modeControls }
+                if layout.size.width >= 1100 {
+                    modeControls
+                }
                 Spacer()
                 iconButton("\u{E166}", title: "Undo", action: model.undo).disabled(!model.canUndo || model.isReadOnly)
                     .opacity(model.canUndo && !model.isReadOnly ? 1 : 0.35)
@@ -68,29 +72,44 @@ extension EditorUISceneEditor {
                     dimensions
                     zoomControls(layout: layout)
                 }
-            }.frame(height: 34)
+            }
+            .frame(height: 34)
             if layout.size.width < 1100 {
                 HStack(spacing: 8) {
                     modeControls
                     Spacer()
-                    if layout.size.width >= 560 { dimensions }
+                    if layout.size.width >= 560 {
+                        dimensions
+                    }
                     zoomControls(layout: layout)
-                }.frame(height: 30)
+                }
+                .frame(height: 30)
             }
             if layout.size.width < 560 {
-                HStack { Text("Canvas size").foregroundColor(theme.editorColors.muted); Spacer(); dimensions }
+                HStack {
+                    Text("Canvas size").foregroundColor(theme.editorColors.muted)
+                    Spacer()
+                    dimensions
+                }
             }
-        }.padding(.horizontal, 12).padding(.vertical, 8)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
     }
 
     var modeControls: some View {
         HStack(spacing: 2) {
-            Button("Design") { model.isInteractive = false; model.showsSource = false }
-                .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: !model.isInteractive && !model.showsSource))
-                .accessibilityIdentifier("AdaEditor.UIScene.Mode")
-            Button("Interact") { model.isInteractive = true; model.showsSource = false }
-                .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: model.isInteractive && !model.showsSource))
-                .accessibilityIdentifier("AdaEditor.UIScene.Interact")
+            Button("Design") {
+                model.isInteractive = false
+                model.showsSource = false
+            }
+            .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: !model.isInteractive && !model.showsSource))
+            .accessibilityIdentifier("AdaEditor.UIScene.Mode")
+            Button("Interact") {
+                model.isInteractive = true
+                model.showsSource = false
+            }
+            .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: model.isInteractive && !model.showsSource))
+            .accessibilityIdentifier("AdaEditor.UIScene.Interact")
         }
         .padding(2)
         .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surfaceElevated))
@@ -104,15 +123,28 @@ extension EditorUISceneEditor {
             Text("H").font(.system(size: 10, weight: .semibold)).foregroundColor(theme.editorColors.muted)
             EditorUIDesignerField(placeholder: "Height", text: floatBinding(\.height)).frame(width: 58)
                 .accessibilityIdentifier("AdaEditor.UIScene.Height")
-        }.frame(height: 30)
+        }
+        .frame(height: 30)
     }
 
     func zoomControls(layout: EditorUIDesignerLayout) -> some View {
         let zoom = fitsCanvas ? layout.fitZoom(width: model.width, height: model.height) : model.zoom
         return HStack(spacing: 2) {
-            Button("−") { model.zoom = max(0.02, zoom - 0.1); fitsCanvas = false }.frame(width: 26)
-            Button("\(Int((zoom * 100).rounded()))%") { model.zoom = 1; fitsCanvas = false }.frame(width: 46)
-            Button("+") { model.zoom = min(3, zoom + 0.1); fitsCanvas = false }.frame(width: 26)
+            Button("−") {
+                model.zoom = max(0.02, zoom - 0.1)
+                fitsCanvas = false
+            }
+            .frame(width: 26)
+            Button("\(Int((zoom * 100).rounded()))%") {
+                model.zoom = 1
+                fitsCanvas = false
+            }
+            .frame(width: 46)
+            Button("+") {
+                model.zoom = min(3, zoom + 0.1)
+                fitsCanvas = false
+            }
+            .frame(width: 26)
             Button("Fit") { fitsCanvas = true }
                 .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: fitsCanvas))
                 .accessibilityIdentifier("AdaEditor.UIScene.Fit")
@@ -185,7 +217,8 @@ extension EditorUISceneEditor {
                 .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, selected: true, bordered: true))
                 .disabled(model.isReadOnly)
                 .accessibilityIdentifier("AdaEditor.UIScene.Empty.AddText")
-        }.padding(16)
+        }
+        .padding(16)
     }
 
     var sourceEditor: some View {
@@ -193,17 +226,22 @@ extension EditorUISceneEditor {
             text: Binding(get: { model.rawSource }, set: { model.editSource($0) }),
             tokenSpans: EditorSyntaxHighlighter.spans(for: model.rawSource, language: .yaml, palette: colorPalette)
         )
-            .font(AdaEditorCodeFont.font(size: 12))
-            .foregroundColor(colorPalette.plainText)
-            .accentColor(theme.editorColors.blue)
-            .textEditorColors(TextEditorColors(
-                background: theme.editorColors.surfaceElevated, border: .clear,
-                focusedBorder: theme.editorColors.blue, gutter: colorPalette.lineNumber,
+        .font(AdaEditorCodeFont.font(size: 12))
+        .foregroundColor(colorPalette.plainText)
+        .accentColor(theme.editorColors.blue)
+        .textEditorColors(
+            TextEditorColors(
+                background: theme.editorColors.surfaceElevated,
+                border: .clear,
+                focusedBorder: theme.editorColors.blue,
+                gutter: colorPalette.lineNumber,
                 gutterRule: theme.editorColors.border.opacity(0.45),
-                currentLineBackground: colorPalette.currentLineBackground, selection: colorPalette.selection
-            ))
-            .disabled(model.isReadOnly)
-            .accessibilityIdentifier("AdaEditor.UIScene.Source")
+                currentLineBackground: colorPalette.currentLineBackground,
+                selection: colorPalette.selection
+            )
+        )
+        .disabled(model.isReadOnly)
+        .accessibilityIdentifier("AdaEditor.UIScene.Source")
     }
 
     var designerStatus: some View {

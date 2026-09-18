@@ -34,7 +34,7 @@ class LayoutInspectableView: UIView {
         return super.hitTest(point, with: event)
     }
 
-    override func update(_ deltaTime: TimeInterval) {
+    override func update(_: TimeInterval) {
         if !inspectLayout {
             self.viewMatrix = .identity
             self.cameraTransform = .identity
@@ -87,7 +87,7 @@ class LayoutInspectableView: UIView {
 
         if pitch.radians > 89.0 {
             pitch = 89.0
-        } else if(pitch.radians < -89.0) {
+        } else if pitch.radians < -89.0 {
             pitch = -89.0
         }
 

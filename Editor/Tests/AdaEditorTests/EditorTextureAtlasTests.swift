@@ -1,8 +1,9 @@
-@testable import AdaEditor
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
 import Foundation
 import Testing
+
+@testable import AdaEditor
 
 @Suite("Editor texture atlas", .serialized)
 struct EditorTextureAtlasTests {
@@ -16,13 +17,17 @@ struct EditorTextureAtlasTests {
         let model = EditorTextureAtlasEditorModel(document: fixture.document)
         model.addImages(from: [fixture.sourceURL])
 
-        #expect(model.descriptor.images == [
-            NamedTextureAtlas.Source(path: "game.images/AdaEngine.png")
-        ])
-        #expect(FileManager.default.fileExists(
-            atPath: fixture.atlasURL.deletingLastPathComponent()
-                .appendingPathComponent("game.images/AdaEngine.png").path
-        ))
+        #expect(
+            model.descriptor.images == [
+                NamedTextureAtlas.Source(path: "game.images/AdaEngine.png")
+            ]
+        )
+        #expect(
+            FileManager.default.fileExists(
+                atPath: fixture.atlasURL.deletingLastPathComponent()
+                    .appendingPathComponent("game.images/AdaEngine.png").path
+            )
+        )
 
         let reloaded = EditorTextureAtlasEditorModel(document: fixture.document)
         #expect(reloaded.descriptor == model.descriptor)
@@ -51,12 +56,16 @@ struct EditorTextureAtlasTests {
         let model = EditorTextureAtlasEditorModel(document: fixture.document)
         model.addImages(from: [projectImageURL])
 
-        #expect(model.descriptor.images == [
-            NamedTextureAtlas.Source(path: "../Textures/player.png")
-        ])
-        #expect(!FileManager.default.fileExists(
-            atPath: fixture.atlasURL.deletingLastPathComponent().appendingPathComponent("game.images").path
-        ))
+        #expect(
+            model.descriptor.images == [
+                NamedTextureAtlas.Source(path: "../Textures/player.png")
+            ]
+        )
+        #expect(
+            !FileManager.default.fileExists(
+                atPath: fixture.atlasURL.deletingLastPathComponent().appendingPathComponent("game.images").path
+            )
+        )
         try await waitForPreview(in: model)
         #expect(model.atlasImage != nil)
     }
@@ -68,13 +77,15 @@ struct EditorTextureAtlasTests {
         defer { try? FileManager.default.removeItem(at: fixture.temporaryURL) }
         let project = EditorProjectReference(name: "AtlasProject", path: fixture.temporaryURL.path)
         let viewModel = EditorViewModel(project: project)
-        let item = try #require(viewModel.projectSidebar.items.first {
-            $0.relativePath == "Assets/Atlases/game.atlas"
-        })
+        let item = try #require(
+            viewModel.projectSidebar.items.first {
+                $0.relativePath == "Assets/Atlases/game.atlas"
+            }
+        )
 
         viewModel.openProjectItem(item)
 
-        guard case .asset(let document)? = viewModel.workbench.activeDocument else {
+        guard case let .asset(document)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected an atlas asset document")
             return
         }
