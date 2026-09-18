@@ -57,7 +57,7 @@ struct Text2DSpawnPipelineTests {
         renderWorld.addSystem(ExtractTextSystem.self, on: .extract)
         renderWorld.addSystem(PrepareTextsSystem.self, on: .preUpdate)
         renderWorld.addSystem(ClearTransparent2dRenderItemsSystem.self, on: .preUpdate)
-        renderWorld.addSystem(BatchAndSortTransparent2DRenderItemsSystem.self, on: .batching)
+        renderWorld.addSystem(Transparent2DBatchingSystem.self, on: .batching)
         renderWorld.addSystem(Text2DRenderSystem.self, on: .update)
 
         await renderWorld.runScheduler(.extract)
