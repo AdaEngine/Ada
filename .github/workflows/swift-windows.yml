@@ -33,7 +33,7 @@ jobs:
           run: swift -version
 
         - name: Test
-          # Swift Testing 6.2.3 on Windows exits before reporting results when
-          # hundreds of tests are scheduled with the legacy --parallel flag.
-          # The test runner still performs its own supported scheduling.
-          run: swift test
+          # Swift Testing 6.2.3 on Windows becomes unstable when all tests are
+          # scheduled at once. Keep bounded parallelism so the suite still
+          # makes progress without exhausting the runner.
+          run: swift test --parallel --num-workers 2
