@@ -36,4 +36,4 @@ jobs:
           # Swift Testing 6.2.3 on Windows becomes unstable when all tests are
           # scheduled at once. Keep bounded parallelism so the suite still
           # makes progress without exhausting the runner.
-          run: swift test --parallel --num-workers 2
+          run: swift test -j 2 --parallel --num-workers 2
