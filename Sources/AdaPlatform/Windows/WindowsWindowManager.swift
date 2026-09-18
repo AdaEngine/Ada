@@ -17,13 +17,13 @@
     import WinSDK
 
     // Windows cursor resource identifiers
-    nonisolated(unsafe) private let IDC_ARROW: LPCWSTR = unsafe UnsafePointer<WCHAR>(bitPattern: UInt(32512))
+    nonisolated(unsafe) private let IDC_ARROW: LPCWSTR? = unsafe UnsafePointer<WCHAR>(bitPattern: UInt(32512))
     private let adaEngineWorkMessage = UINT(WM_APP + 1)
     nonisolated(unsafe) private var windowMinimumSizes: [UIWindow.ID: Size] = [:]
 
     // Static storage for window class name (must persist for RegisterClassW)
     private let windowClassName: [WCHAR] = "AdaEngineWindow".wide
-    private var windowClassNamePtr: LPCWSTR {
+    private var windowClassNamePtr: LPCWSTR? {
         return unsafe windowClassName.withUnsafeBufferPointer { $0.baseAddress }
     }
 
