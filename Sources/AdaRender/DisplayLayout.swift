@@ -33,7 +33,9 @@ public struct DisplayLayout: Resource, Codable, Equatable, Sendable {
     }
 
     public func fitScale(in available: Size) -> Float {
-        guard available.width.isFinite, available.height.isFinite, available.width > 0, available.height > 0 else { return 0.02 }
+        guard available.width.isFinite, available.height.isFinite, available.width > 0, available.height > 0 else {
+            return 0.02
+        }
         return max(0.02, min(3, min(available.width / size.width, available.height / size.height)))
     }
 
@@ -45,29 +47,41 @@ public struct DisplayLayout: Resource, Codable, Equatable, Sendable {
     @MainActor public static func registerRuntimeType() {
         RuntimeTypeRegistry.registerResource(Self.self, names: ["DisplayLayout"])
         let keys = ["state", "isExpanded", "primary", "secondary", "hinge"]
-        RuntimeResourceReflectionRegistry.register(Self.self, fields: keys.map { key in
-            // ECS supplies this pointer only for the duration of a declared resource access.
-            unsafe EditorComponentFieldDescriptor(
-                key: key, label: key, kind: .readOnly, isEditable: false, accepts: { _ in false },
-                read: { _ in nil }, write: { _, _ in nil },
-                readPointer: { pointer in
-                    let layout = unsafe pointer.assumingMemoryBound(to: Self.self).pointee
-                    switch key {
-                    case "state": return .string(layout.state.rawValue)
-                    case "isExpanded": return .bool(layout.isExpanded)
-                    case "primary": return rectangleValue(layout.primary)
-                    case "secondary": return layout.secondary.map(rectangleValue) ?? .null
-                    case "hinge": return layout.hinge.map(rectangleValue) ?? .null
-                    default: return nil
+        RuntimeResourceReflectionRegistry.register(
+            Self.self,
+            fields: keys.map { key in
+                // ECS supplies this pointer only for the duration of a declared resource access.
+                unsafe EditorComponentFieldDescriptor(
+                    key: key,
+                    label: key,
+                    kind: .readOnly,
+                    isEditable: false,
+                    accepts: { _ in false },
+                    read: { _ in nil },
+                    write: { _, _ in nil },
+                    readPointer: { pointer in
+                        let layout = unsafe pointer.assumingMemoryBound(to: Self.self).pointee
+                        switch key {
+                        case "state": return .string(layout.state.rawValue)
+                        case "isExpanded": return .bool(layout.isExpanded)
+                        case "primary": return rectangleValue(layout.primary)
+                        case "secondary": return layout.secondary.map(rectangleValue) ?? .null
+                        case "hinge": return layout.hinge.map(rectangleValue) ?? .null
+                        default: return nil
+                        }
                     }
-                }
-            )
-        })
+                )
+            }
+        )
     }
 
     private static func rectangleValue(_ rect: Rect) -> EditorFieldValue {
-        .object(["x": .double(Double(rect.minX)), "y": .double(Double(rect.minY)),
-                 "width": .double(Double(rect.width)), "height": .double(Double(rect.height))])
+        .object([
+            "x": .double(Double(rect.minX)),
+            "y": .double(Double(rect.minY)),
+            "width": .double(Double(rect.width)),
+            "height": .double(Double(rect.height)),
+        ])
     }
 }
 

@@ -13,16 +13,15 @@ import Math
     dependencies: [.after("AdaRender.ConfigurateRenderViewTargetSystem")]
 )
 public struct PrepareLighting2DTexturesSystem {
-
     @Res<ExtractedLighting2D>
     private var extracted
 
     @Query<Entity, Camera, Ref<RenderViewTarget>>
     private var cameras
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         cameras.forEach { _, camera, renderViewTarget in
             guard camera.isActive else {
                 renderViewTarget.lighting2DUsesDeferredTargets = false

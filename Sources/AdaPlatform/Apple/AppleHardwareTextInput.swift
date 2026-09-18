@@ -24,7 +24,8 @@ struct AppleHardwareTextInput {
             return nil
         }
 
-        let sanitizedText = characters
+        let sanitizedText =
+            characters
             .replacingOccurrences(of: "\r\n", with: " ")
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: "\r", with: " ")

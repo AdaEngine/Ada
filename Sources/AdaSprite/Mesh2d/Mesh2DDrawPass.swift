@@ -5,9 +5,9 @@
 //  Created by v.prusakov on 4/2/23.
 //
 
+import AdaCorePipelines
 import AdaECS
 @_spi(Internal) import AdaRender
-import AdaCorePipelines
 import Math
 
 struct Mesh2DUniform {
@@ -20,9 +20,9 @@ public struct Mesh2DDrawPass: DrawPass {
     public typealias Item = Transparent2DRenderItem
 
     public static let meshUniformBinding: Int = 3
-    
-    public init() { }
-    
+
+    public init() {}
+
     public func render(
         with renderEncoder: RenderCommandEncoder,
         world: World,
@@ -39,7 +39,7 @@ public struct Mesh2DDrawPass: DrawPass {
         guard let materialData = unsafe MaterialStorage.shared.getMaterialData(for: meshComponent.material) else {
             return
         }
-        
+
         renderEncoder.pushDebugName("Mesh 2D Render")
         defer {
             renderEncoder.popDebugName()
@@ -62,7 +62,6 @@ public struct Mesh2DDrawPass: DrawPass {
                 )
             }
 
-            
             for (_, sampler) in descriptorSet.sampledImages {
                 guard let materialTexture = materialData.textures[sampler.name] else {
                     continue

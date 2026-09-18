@@ -6,7 +6,7 @@
 //
 
 public struct PointInt: Codable, Equatable, Hashable, Comparable, Sendable {
-    public static let zero = PointInt(x: 0, y: 0)
+    public static let zero = Self(x: 0, y: 0)
     public var x: Int
     public var y: Int
 
@@ -14,14 +14,14 @@ public struct PointInt: Codable, Equatable, Hashable, Comparable, Sendable {
         self.x = x
         self.y = y
     }
-    
+
     public init(_ elements: [Int]) {
         assert(elements.count == 2)
         self.x = elements[0]
         self.y = elements[1]
     }
 
-    public static func < (lhs: PointInt, rhs: PointInt) -> Bool {
+    public static func < (lhs: Self, rhs: Self) -> Bool {
         lhs.x < rhs.x && lhs.y < rhs.y
     }
 }

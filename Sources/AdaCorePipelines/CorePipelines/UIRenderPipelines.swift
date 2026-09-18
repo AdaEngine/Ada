@@ -16,6 +16,10 @@ public enum CorePipelineShaders {
     public static func loadBundled(at path: String) throws -> AssetHandle<ShaderModule> {
         try ShaderModule.loadBundled(at: path, from: .module)
     }
+
+    public static func loadRequiredBundled(at path: String) -> AssetHandle<ShaderModule> {
+        ShaderModule.loadRequiredBundled(at: path, from: .module)
+    }
 }
 
 // MARK: - Quad Pipeline
@@ -25,13 +29,13 @@ public struct QuadPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = try! ShaderModule.loadBundled(at: "Shaders/quad.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/quad.glsl", from: .module)
     }
 
     public func configurate(
-        with configuration: RenderPipelineEmptyConfiguration
+        with _: RenderPipelineEmptyConfiguration
     ) -> RenderPipelineDescriptor {
-        var pipelineDesc = RenderPipelineDescriptor(vertex: shader.asset.getShader(for: .vertex)!)
+        var pipelineDesc = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex))
         pipelineDesc.fragment = shader.asset.getShader(for: .fragment)
         pipelineDesc.debugName = "Quad Pipeline"
         pipelineDesc.backfaceCulling = false
@@ -60,13 +64,13 @@ public struct LinearGradientPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = try! ShaderModule.loadBundled(at: "Shaders/gradient.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/gradient.glsl", from: .module)
     }
 
     public func configurate(
-        with configuration: RenderPipelineEmptyConfiguration
+        with _: RenderPipelineEmptyConfiguration
     ) -> RenderPipelineDescriptor {
-        var pipelineDesc = RenderPipelineDescriptor(vertex: shader.asset.getShader(for: .vertex)!)
+        var pipelineDesc = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex))
         pipelineDesc.fragment = shader.asset.getShader(for: .fragment)
         pipelineDesc.debugName = "Linear Gradient Pipeline"
         pipelineDesc.backfaceCulling = false
@@ -95,13 +99,13 @@ public struct CirclePipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = try! ShaderModule.loadBundled(at: "Shaders/circle.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/circle.glsl", from: .module)
     }
 
     public func configurate(
-        with configuration: RenderPipelineEmptyConfiguration
+        with _: RenderPipelineEmptyConfiguration
     ) -> RenderPipelineDescriptor {
-        var pipelineDesc = RenderPipelineDescriptor(vertex: shader.asset.getShader(for: .vertex)!)
+        var pipelineDesc = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex))
         pipelineDesc.fragment = shader.asset.getShader(for: .fragment)
         pipelineDesc.debugName = "Circle Pipeline"
         pipelineDesc.backfaceCulling = false
@@ -111,7 +115,7 @@ public struct CirclePipeline: RenderPipelineConfigurator {
             .attribute(.vector2, name: "a_LocalPosition"),
             .attribute(.float, name: "a_Thickness"),
             .attribute(.float, name: "a_Fade"),
-            .attribute(.vector4, name: "a_Color")
+            .attribute(.vector4, name: "a_Color"),
         ])
 
         pipelineDesc.vertexDescriptor.layouts[0].stride = MemoryLayout<CircleVertexData>.stride
@@ -132,13 +136,13 @@ public struct LinePipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = try! ShaderModule.loadBundled(at: "Shaders/line.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/line.glsl", from: .module)
     }
 
     public func configurate(
-        with configuration: RenderPipelineEmptyConfiguration
+        with _: RenderPipelineEmptyConfiguration
     ) -> RenderPipelineDescriptor {
-        var pipelineDesc = RenderPipelineDescriptor(vertex: shader.asset.getShader(for: .vertex)!)
+        var pipelineDesc = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex))
         pipelineDesc.fragment = shader.asset.getShader(for: .fragment)
         pipelineDesc.debugName = "Line Pipeline"
         pipelineDesc.backfaceCulling = false
@@ -147,7 +151,7 @@ public struct LinePipeline: RenderPipelineConfigurator {
         pipelineDesc.vertexDescriptor.attributes.append([
             .attribute(.vector3, name: "a_Position"),
             .attribute(.vector4, name: "a_Color"),
-            .attribute(.float, name: "a_LineWidth")
+            .attribute(.float, name: "a_LineWidth"),
         ])
 
         pipelineDesc.vertexDescriptor.layouts[0].stride = MemoryLayout<LineVertexData>.stride
@@ -160,7 +164,6 @@ public struct LinePipeline: RenderPipelineConfigurator {
         return pipelineDesc
     }
 }
-
 
 /// Vertex data for rendering quads (rectangles with optional textures).
 /// Matches the layout expected by quad.glsl shader.

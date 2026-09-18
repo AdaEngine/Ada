@@ -5,12 +5,12 @@
 //  Created by Vladislav Prusakov on 07.06.2024.
 //
 
-@_spi(Internal) import AdaUtils
-import Observation
-import Math
-import AdaInput
-import Logging
 import AdaAnimation
+import AdaInput
+@_spi(Internal) import AdaUtils
+import Logging
+import Math
+import Observation
 
 @MainActor
 enum UILayoutDebugCounters {
@@ -35,48 +35,66 @@ enum UILayoutDebugCounters {
     }
 
     static func finishFrame() {
-        guard isEnabled else { return }
+        guard isEnabled else {
+            return
+        }
         lastFrameSnapshot = snapshot
         snapshot = Snapshot()
     }
 
     static func recordContentInvalidation() {
-        guard isEnabled else { return }
+        guard isEnabled else {
+            return
+        }
         snapshot.contentInvalidations += 1
     }
 
     static func recordEnvironmentInvalidation() {
-        guard isEnabled else { return }
+        guard isEnabled else {
+            return
+        }
         snapshot.environmentInvalidations += 1
     }
 
     static func recordLayoutInvalidation() {
-        guard isEnabled else { return }
+        guard isEnabled else {
+            return
+        }
         snapshot.layoutInvalidations += 1
     }
 
     static func recordDisplayInvalidation() {
-        guard isEnabled else { return }
+        guard isEnabled else {
+            return
+        }
         snapshot.displayInvalidations += 1
     }
 
     static func recordRebuild() {
-        guard isEnabled else { return }
+        guard isEnabled else {
+            return
+        }
         snapshot.rebuilds += 1
     }
 
     static func recordPerformLayout() {
-        guard isEnabled else { return }
+        guard isEnabled else {
+            return
+        }
         snapshot.layoutPasses += 1
     }
 
     static func recordDrawPass() {
-        guard isEnabled else { return }
+        guard isEnabled else {
+            return
+        }
         snapshot.drawPasses += 1
     }
 
     static func recordSizeThatFits() {
-        guard isEnabled else { return }
+        guard isEnabled else {
+            return
+        }
         snapshot.sizeThatFitsCalls += 1
     }
 }
@@ -94,7 +112,7 @@ class ViewNode: Identifiable {
     nonisolated var id: ObjectIdentifier {
         ObjectIdentifier(self)
     }
-    
+
     /// Contains ref to parent view
     private weak var _parent: ViewNode?
     var parent: ViewNode? {
@@ -168,7 +186,7 @@ class ViewNode: Identifiable {
     }
 
     /// Search view recursevly by id. It usable only for ``IDViewNodeModifier``.
-    func findNodeById(_ id: AnyHashable) -> ViewNode? {
+    func findNodeById(_: AnyHashable) -> ViewNode? {
         return nil
     }
 
@@ -207,8 +225,7 @@ class ViewNode: Identifiable {
 
     // MARK: - Layout
 
-
-    func updatePreference<K: PreferenceKey>(key: K.Type, value: K.Value) {
+    func updatePreference<K: PreferenceKey>(key _: K.Type, value: K.Value) {
         self.parent?.updatePreference(key: K.self, value: value)
     }
 
@@ -222,19 +239,25 @@ class ViewNode: Identifiable {
         env.viewProxy = ViewProxy(target: self)
         let previousEnvironment = self.environment
         let didChangeEnvironment = !env.hasSameSnapshot(as: previousEnvironment)
-        guard didChangeEnvironment else { return }
+        guard didChangeEnvironment else {
+            return
+        }
         UILayoutDebugCounters.recordEnvironmentInvalidation()
         env.ensureVersionDiffers(from: previousEnvironment.version)
         self.environment = env
         self.markNeedsLayout(propagateToParent: false)
         var shouldInvalidateForEnvironmentChange = false
         storages.forEach { storage in
-            guard let viewContextStorage = storage as? ViewContextStorage else { return }
+            guard let viewContextStorage = storage as? ViewContextStorage else {
+                return
+            }
             let subscribedKeyIDs = viewContextStorage.subscribedKeyIDs
             // Compare subscribed key values between the storage's last-seen env and the new env.
             // If subscription set is empty the storage subscribes to everything.
-            guard subscribedKeyIDs.isEmpty
-                    || self.environment.hasChangedValues(forKeyIDs: subscribedKeyIDs, comparedTo: viewContextStorage.values) else {
+            guard
+                subscribedKeyIDs.isEmpty
+                    || self.environment.hasChangedValues(forKeyIDs: subscribedKeyIDs, comparedTo: viewContextStorage.values)
+            else {
                 // Subscribed keys unchanged — skip rebuild but keep values in sync.
                 viewContextStorage.values = self.environment
                 return
@@ -265,7 +288,9 @@ class ViewNode: Identifiable {
             self.markNeedsLayout(propagateToParent: false)
         }
         storages.forEach { storage in
-            guard let viewContextStorage = storage as? ViewContextStorage else { return }
+            guard let viewContextStorage = storage as? ViewContextStorage else {
+                return
+            }
             viewContextStorage.values = self.environment
         }
     }
@@ -302,7 +327,7 @@ class ViewNode: Identifiable {
         self.updateEnvironment(mergedEnvironment)
     }
 
-    /// Update layout properties for view. 
+    /// Update layout properties for view.
     /// Called each time, when parent container view did change layout direction.
     func updateLayoutProperties(_ props: LayoutProperties) {
         guard self.layoutProperties != props else {
@@ -340,17 +365,19 @@ class ViewNode: Identifiable {
         let canAnimateInNestedLayout = canAnimateNestedFrameChange(from: oldFrame, to: newFrame)
 
         if participatesInFrameAnimation,
-           let animationController = self.environment.animationController,
-           self.frame != .zero,
-           oldFrame != newFrame,
-           (!isNestedAnimatedLayout || canAnimateInNestedLayout) {
+            let animationController = self.environment.animationController,
+            self.frame != .zero,
+            oldFrame != newFrame,
+            !isNestedAnimatedLayout || canAnimateInNestedLayout {
             animationController.addTweenAnimation(
                 from: self.frame,
                 to: newFrame,
                 label: "frame-\(self.id)",
                 environment: self.environment,
                 updateBlock: { [weak self] value in
-                    guard let self else { return }
+                    guard let self else {
+                        return
+                    }
                     let previousFrame = self.frame
                     self.frame = value
                     self.isPerformingAnimatedLayout = true
@@ -381,7 +408,7 @@ class ViewNode: Identifiable {
     }
 
     /// Updates view layout. Called when needs update UI layout.
-    func performLayout() { 
+    func performLayout() {
         invalidateLayerIfNeeded()
     }
 
@@ -413,7 +440,7 @@ class ViewNode: Identifiable {
         var current: ViewNode? = self
         while let node = current {
             if let provider = node as? _AnimationControllerProvider,
-               let animationController = provider.providedAnimationController {
+                let animationController = provider.providedAnimationController {
                 return animationController
             }
             current = node.parent
@@ -450,8 +477,8 @@ class ViewNode: Identifiable {
         self.uiSceneNodeID = newNode.uiSceneNodeID
         var resolvedEnvironment = newNode.environment
         if !resolvedEnvironment.animationsDisabled,
-           resolvedEnvironment.animationController == nil,
-           let animationController = self.environment.animationController {
+            resolvedEnvironment.animationController == nil,
+            let animationController = self.environment.animationController {
             resolvedEnvironment.animationController = animationController
         }
         self.applyResolvedEnvironmentSilently(resolvedEnvironment)
@@ -465,7 +492,9 @@ class ViewNode: Identifiable {
 
     private func shouldInvalidateContent(forResolvedEnvironment environment: EnvironmentValues) -> Bool {
         storages.contains { storage in
-            guard let viewContextStorage = storage as? ViewContextStorage else { return false }
+            guard let viewContextStorage = storage as? ViewContextStorage else {
+                return false
+            }
             let subscribedKeyIDs = viewContextStorage.subscribedKeyIDs
             return subscribedKeyIDs.isEmpty
                 || environment.hasChangedValues(forKeyIDs: subscribedKeyIDs, comparedTo: viewContextStorage.values)
@@ -594,10 +623,10 @@ class ViewNode: Identifiable {
     }
 
     /// Notify view, that view will move to parent view.
-    func willMove(to parent: ViewNode?) { }
+    func willMove(to _: ViewNode?) {}
 
     /// Notify view, that view did move to parent view.
-    func didMove(to parent: ViewNode?) { 
+    func didMove(to parent: ViewNode?) {
         layer?.parent = parent?.layer
     }
 
@@ -605,18 +634,18 @@ class ViewNode: Identifiable {
         self.owner = owner
     }
 
-    func buildMenu(with builder: UIMenuBuilder) { }
+    func buildMenu(with _: UIMenuBuilder) {}
 
     // MARK: - Other
 
-    func update(_ deltaTime: TimeInterval) { }
+    func update(_: TimeInterval) {}
 
     /// Perform draw view on the screen.
     func draw(with context: UIGraphicsContext) {
         var context = context
         context.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
-        
-        if let layer = layer {
+
+        if let layer {
             layer.drawLayer(in: context)
         }
     }
@@ -687,19 +716,19 @@ class ViewNode: Identifiable {
         )
     }
 
-    func drawInspectionChildLayoutBounds(with context: UIGraphicsContext) { }
+    func drawInspectionChildLayoutBounds(with _: UIGraphicsContext) {}
 
     func drawInspectionChildRedrawFlashes(
-        with context: UIGraphicsContext,
-        baselineRevision: UInt64
-    ) { }
+        with _: UIGraphicsContext,
+        baselineRevision _: UInt64
+    ) {}
 
     func drawInspectionChildSelectionBounds(
-        with context: UIGraphicsContext,
-        mode: UIDebugOverlayMode,
-        focusedNode: ViewNode?,
-        hitTestNode: ViewNode?
-    ) { }
+        with _: UIGraphicsContext,
+        mode _: UIDebugOverlayMode,
+        focusedNode _: ViewNode?,
+        hitTestNode _: ViewNode?
+    ) {}
 
     func inspectionLocalContext(from context: UIGraphicsContext) -> UIGraphicsContext {
         var context = context
@@ -775,19 +804,19 @@ class ViewNode: Identifiable {
 
         context.drawDebugBorders(frame.size, lineWidth: lineWidth, color: color)
     }
-    
-    // MARK: - Interaction
-    
-    func onReceiveEvent(_ event: any InputEvent) { }
 
-    func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
+    // MARK: - Interaction
+
+    func onReceiveEvent(_: any InputEvent) {}
+
+    func hitTest(_: Point, with _: any InputEvent) -> ViewNode? {
         // Non-interactive by default.
         // Interactive nodes must override this method explicitly.
         return nil
     }
 
     /// - Returns: true if point is inside the receiver’s bounds; otherwise, false.
-    func point(inside point: Point, with event: any InputEvent) -> Bool {
+    func point(inside point: Point, with _: any InputEvent) -> Bool {
         return point.x >= 0 && point.y >= 0 && point.x <= frame.width && point.y <= frame.height
     }
 
@@ -797,7 +826,7 @@ class ViewNode: Identifiable {
         }
 
         if node.parent === self {
-            return (point - node.frame.origin)
+            return point - node.frame.origin
         } else if let parent = self.parent, parent === node {
             return point + frame.origin
         }
@@ -809,23 +838,23 @@ class ViewNode: Identifiable {
         return node?.convert(point, to: self) ?? point
     }
 
-    func onPinchEvent(_ event: PinchEvent) { }
+    func onPinchEvent(_: PinchEvent) {}
 
-    func onTouchesEvent(_ touches: Set<TouchEvent>) { }
+    func onTouchesEvent(_: Set<TouchEvent>) {}
 
-    func onMouseEvent(_ event: MouseEvent) { }
+    func onMouseEvent(_: MouseEvent) {}
 
     var canBecomeFocused: Bool {
         false
     }
 
-    func onFocusChanged(isFocused: Bool) { }
+    func onFocusChanged(isFocused _: Bool) {}
 
-    func onKeyEvent(_ event: KeyEvent) { }
+    func onKeyEvent(_: KeyEvent) {}
 
-    func onTextInputEvent(_ event: TextInputEvent) { }
+    func onTextInputEvent(_: TextInputEvent) {}
 
-    func onMouseLeave() { }
+    func onMouseLeave() {}
 
     func findFirstResponder(for event: any InputEvent) -> ViewNode? {
         let responder: ViewNode?
@@ -853,10 +882,10 @@ class ViewNode: Identifiable {
     func debugDescription(hierarchy: Int = 0, identation: Int = 2) -> String {
         let identation = String(repeating: " ", count: hierarchy * identation)
         return """
-        \(identation)>\(type(of: self)):
-        \(identation) > frame: \(frame)
-        \(identation) > content: \(type(of: self.content))
-        """
+            \(identation)>\(type(of: self)):
+            \(identation) > frame: \(frame)
+            \(identation) > content: \(type(of: self.content))
+            """
     }
 }
 
@@ -892,7 +921,6 @@ extension ViewNode: @preconcurrency Hashable {
 
 @MainActor
 protocol ViewOwner: AnyObject {
-
     var window: UIWindow? { get }
 
     var containerView: UIView? { get }
@@ -915,12 +943,12 @@ extension UIGraphicsContext {
     }
 }
 
-private extension ViewNode {
-    static let inspectionLayoutBoundsColor = Color.fromHex(0x00D9FF).opacity(0.72)
-    static let inspectionFocusedNodeColor = Color.fromHex(0x2D7EFF)
-    static let inspectionFocusedNodeFillColor = Color.fromHex(0x2D7EFF).opacity(0.12)
-    static let inspectionHitTestTargetColor = Color.fromHex(0xFF2D55)
-    static let inspectionHitTestTargetFillColor = Color.fromHex(0xFF2D55).opacity(0.12)
-    static let inspectionRedrawBorderColor = Color.fromHex(0xFF2D55).opacity(0.92)
-    static let inspectionRedrawFillColor = Color.fromHex(0xFF2D55).opacity(0.26)
+extension ViewNode {
+    private static let inspectionLayoutBoundsColor = Color.fromHex(0x00D9FF).opacity(0.72)
+    private static let inspectionFocusedNodeColor = Color.fromHex(0x2D7EFF)
+    private static let inspectionFocusedNodeFillColor = Color.fromHex(0x2D7EFF).opacity(0.12)
+    private static let inspectionHitTestTargetColor = Color.fromHex(0xFF2D55)
+    private static let inspectionHitTestTargetFillColor = Color.fromHex(0xFF2D55).opacity(0.12)
+    private static let inspectionRedrawBorderColor = Color.fromHex(0xFF2D55).opacity(0.92)
+    private static let inspectionRedrawFillColor = Color.fromHex(0xFF2D55).opacity(0.26)
 }

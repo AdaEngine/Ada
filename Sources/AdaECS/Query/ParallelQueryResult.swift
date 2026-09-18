@@ -31,15 +31,6 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
     let state: QueryState
     let batchSize: Int
 
-    /// Create a new parallel query processor.
-    /// - Parameters:
-    ///   - state: The query state containing archetype indices and world reference
-    ///   - batchSize: Number of chunks to process per task (default: 4)
-    init(state: QueryState, batchSize: Int) {
-        self.state = state
-        self.batchSize = batchSize
-    }
-
     /// Process each element in parallel using a TaskGroup.
     /// - Parameter operation: The operation to perform on each element
     @concurrent
@@ -56,7 +47,7 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
                 }
             }
 
-            for try await _ in group { }
+            for try await _ in group {}
         }
     }
 
@@ -102,18 +93,21 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
 
             let archetype = world.archetypes.archetypes[archetypeIndex]
             for chunkIndex in 0..<archetype.chunks.chunks.count {
-                allChunks.append(ChunkInfo(
-                    archetypeIndex: archetypeIndex,
-                    chunkIndex: chunkIndex
-                ))
+                allChunks.append(
+                    ChunkInfo(
+                        archetypeIndex: archetypeIndex,
+                        chunkIndex: chunkIndex
+                    )
+                )
             }
         }
 
         // Split chunks into batches
-        return stride(from: 0, to: allChunks.count, by: batchSize).map { startIndex in
-            let endIndex = min(startIndex + batchSize, allChunks.count)
-            return Array(allChunks[startIndex..<endIndex])
-        }
+        return stride(from: 0, to: allChunks.count, by: batchSize)
+            .map { startIndex in
+                let endIndex = min(startIndex + batchSize, allChunks.count)
+                return Array(allChunks[startIndex..<endIndex])
+            }
     }
 
     /// Process a batch of chunks with the given operation.
@@ -166,11 +160,13 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
             // Iterate over all entities in this chunk
             for row in 0..<chunk.count {
                 if requiresRowEvaluation {
-                    guard F.condition(
-                        state: filterState,
-                        fetch: filterFetch,
-                        at: row
-                    ) else {
+                    guard
+                        F.condition(
+                            state: filterState,
+                            fetch: filterFetch,
+                            at: row
+                        )
+                    else {
                         continue
                     }
                 }
@@ -252,11 +248,13 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
                 let entity = archetype.entities[location.archetypeRow]
 
                 if requiresRowEvaluation {
-                    guard F.condition(
-                        state: filterState,
-                        fetch: filterFetch,
-                        at: row
-                    ) else {
+                    guard
+                        F.condition(
+                            state: filterState,
+                            fetch: filterFetch,
+                            at: row
+                        )
+                    else {
                         continue
                     }
                 }

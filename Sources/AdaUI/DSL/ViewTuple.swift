@@ -9,12 +9,11 @@
 @MainActor
 @frozen @preconcurrency
 public struct ViewTuple<Content>: View {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     public let value: Content
-    
+
     public init(value: Content) {
         self.value = value
     }
@@ -23,11 +22,11 @@ public struct ViewTuple<Content>: View {
     public static func _makeView(_ view: _ViewGraphNode<Self>, inputs: _ViewInputs) -> _ViewOutputs {
         let listInputs = _ViewListInputs(input: inputs)
         let outputs = Self._makeListView(view, inputs: listInputs)
-        
+
         let node = LayoutViewContainerNode(
             layout: inputs.layout,
             content: view.value,
-            nodes: outputs.outputs.map { $0.node }
+            nodes: outputs.outputs.map(\.node)
         )
         node.isVirtual = true
         node.updateEnvironment(inputs.environment)
@@ -38,9 +37,10 @@ public struct ViewTuple<Content>: View {
     @MainActor
     public static func _makeListView(_ view: _ViewGraphNode<Self>, inputs: _ViewListInputs) -> _ViewListOutputs {
         // swiftlint:disable:next syntactic_sugar
-        let outputs = Array<any View>.fromTuple(view.value.value).map {
-            Self.makeView($0, inputs: inputs.input)
-        }
+        let outputs = Array<any View>.fromTuple(view.value.value)
+            .map {
+                Self.makeView($0, inputs: inputs.input)
+            }
         return _ViewListOutputs(outputs: outputs)
     }
 
@@ -52,9 +52,9 @@ public struct ViewTuple<Content>: View {
 }
 
 @MainActor
-protocol AnyViewTuple { }
+protocol AnyViewTuple {}
 
-extension ViewTuple: AnyViewTuple { }
+extension ViewTuple: AnyViewTuple {}
 
 extension Array {
     static func fromTuple<Tuple>(_ tuple: Tuple) -> [Element] {

@@ -37,10 +37,10 @@ public struct BlitPassDescriptor: Sendable {
 public struct Origin3D: Sendable {
     /// The x-coordinate of the origin.
     public var x: Int
-    
+
     /// The y-coordinate of the origin.
     public var y: Int
-    
+
     /// The z-coordinate of the origin (for 3D textures or texture arrays).
     public var z: Int
 
@@ -63,10 +63,10 @@ public struct Origin3D: Sendable {
 public struct Size3D: Sendable {
     /// The width of the region in pixels or elements.
     public var width: Int
-    
+
     /// The height of the region in pixels or elements.
     public var height: Int
-    
+
     /// The depth of the region (for 3D textures or texture arrays).
     public var depth: Int
 
@@ -119,7 +119,7 @@ public protocol CommandBuffer: AnyObject {
     ///
     /// - Returns: `true` when the upscale was encoded; otherwise `false` so the caller can use a fallback pass.
     func encodeSpatialUpscale(source: Texture, destination: Texture) -> Bool
-    
+
     /// Commits the command buffer for execution on the GPU.
     ///
     /// After calling this method, the command buffer is submitted to the GPU
@@ -130,8 +130,8 @@ public protocol CommandBuffer: AnyObject {
     func addCompletedHandler(_ handler: @escaping @Sendable () -> Void)
 }
 
-public extension CommandBuffer {
-    func encodeSpatialUpscale(source: Texture, destination: Texture) -> Bool {
+extension CommandBuffer {
+    public func encodeSpatialUpscale(source _: Texture, destination _: Texture) -> Bool {
         false
     }
 }
@@ -327,7 +327,6 @@ public struct RenderResourceSet {
 /// encoder.endRenderPass()
 /// ```
 public protocol RenderCommandEncoder: CommonCommandEncoder {
-
     /// Sets the render pipeline state for subsequent draw calls.
     ///
     /// The pipeline state defines the shaders, vertex layout, blending, and other
@@ -482,7 +481,7 @@ public protocol RenderCommandEncoder: CommonCommandEncoder {
 
 // MARK: - RenderCommandEncoder Extension
 
-public extension RenderCommandEncoder {
+extension RenderCommandEncoder {
     /// Convenience method to set a value directly as vertex buffer data.
     ///
     /// This method copies the value's bytes directly to the GPU, making it
@@ -492,9 +491,12 @@ public extension RenderCommandEncoder {
     ///   - value: The value to send to the vertex shader.
     ///   - index: The binding index in the vertex shader.
     @inlinable
-    func setVertexBuffer<T>(_ value: T, slot: Int) {
+    public func setVertexBuffer<T>(_ value: T, slot: Int) {
         unsafe withUnsafeBytes(of: value) { ptr in
-            unsafe self.setVertexBytes(ptr.baseAddress!, length: MemoryLayout<T>.stride, slot: slot)
+            guard let baseAddress = ptr.baseAddress else {
+                return
+            }
+            unsafe self.setVertexBytes(baseAddress, length: MemoryLayout<T>.stride, slot: slot)
         }
     }
 }

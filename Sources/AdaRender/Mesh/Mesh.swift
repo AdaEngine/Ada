@@ -12,33 +12,33 @@ import Math
 /// A high-level representation of a collection of vertices and edges that define a shape.
 public struct Mesh: Asset, Sendable {
     @_spi(Internal)
-    public let models: [Mesh.Model]
+    public let models: [Self.Model]
 
     @_spi(Internal)
     public init(models: [Model]) {
         self.models = models
         self.bounds = Self.computeAABB(models: models) ?? .empty
     }
-    
+
     enum CodingKeys: String, CodingKey {
         case vertexDescriptor
     }
-    
+
     /// A box that bounds the mesh.
     public let bounds: AABB
 
     // MARK: - Resource
-    
+
     public var assetMetaInfo: AssetMetaInfo?
 
-    public init(from decoder: AssetDecoder) throws {
+    public init(from _: AssetDecoder) throws {
         fatalErrorMethodNotImplemented()
     }
-    
-    public func encodeContents(with encoder: AssetEncoder) throws {
+
+    public func encodeContents(with _: AssetEncoder) throws {
         fatalErrorMethodNotImplemented()
     }
-    
+
     public static func extensions() -> [String] {
         ["mesh"]
     }
@@ -47,7 +47,6 @@ public struct Mesh: Asset, Sendable {
 extension Mesh {
     /// A part of a model consisting of a single material.
     public struct Part: Identifiable, Sendable {
-
         /// The stable identity of the entity associated with this instance.
         public let id: Int
 
@@ -110,12 +109,11 @@ extension Mesh {
     }
 }
 
-public extension Mesh {
-    
+extension Mesh {
     /// Create a mesh resource from a list of mesh descriptors.
-    static func generate(from meshDescriptors: [MeshDescriptor], renderDevice: RenderDevice) -> Mesh {
+    public static func generate(from meshDescriptors: [MeshDescriptor], renderDevice: RenderDevice) -> Mesh {
         var parts = [Part]()
-        
+
         for (index, meshDescriptor) in meshDescriptors.enumerated() {
             let part = Part(
                 id: index,
@@ -128,23 +126,23 @@ public extension Mesh {
                 indexCount: meshDescriptor.indicies.count,
                 vertexBuffer: meshDescriptor.getVertexBuffer(renderDevice: renderDevice)
             )
-            
+
             parts.append(part)
         }
-  
+
         let model = Model(name: "", parts: parts)
         return Mesh(models: [model])
     }
 }
 
-fileprivate extension Mesh {
+extension Mesh {
     /// Compute the Axis-Aligned Bounding Box of the mesh vertices in model space
-    static func computeAABB(models: [Mesh.Model]) -> AABB? {
+    private static func computeAABB(models: [Mesh.Model]) -> AABB? {
         let floatMin = -Float.greatestFiniteMagnitude
-        
+
         var minimum: Vector3 = Vector3(.greatestFiniteMagnitude)
         var maximum: Vector3 = Vector3(floatMin)
-        
+
         for model in models {
             for part in model.parts {
                 for position in part.meshDescriptor.positions {
@@ -153,7 +151,7 @@ fileprivate extension Mesh {
                 }
             }
         }
-        
+
         if minimum.x != .greatestFiniteMagnitude && minimum.y != .greatestFiniteMagnitude
             && minimum.z != .greatestFiniteMagnitude && maximum.x != floatMin
             && maximum.y != floatMin && maximum.z != floatMin {

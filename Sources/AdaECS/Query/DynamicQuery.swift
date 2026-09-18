@@ -26,8 +26,10 @@ public struct DynamicQuery: Sendable {
         self.declaredAccess = access
     }
 
-    public init(from world: World) {
-        fatalError("DynamicQuery must be initialized with a runtime query plan")
+    // SystemParameter requires this initializer, while DynamicQuery requires an explicit plan.
+    // swiftlint:disable:next unavailable_function
+    public init(from _: World) {
+        preconditionFailure("DynamicQuery must be initialized with a runtime query plan.")
     }
 }
 
@@ -36,7 +38,7 @@ extension DynamicQuery: SystemParameter {
         declaredAccess
     }
 
-    public func finish(_ world: World) {}
+    public func finish(_: World) {}
 
     public func update(from world: World) {
         state.updateArchetypes(in: world)
@@ -118,9 +120,11 @@ public final class DynamicQueryCursor: @unchecked Sendable {
 
             rowPosition += 1
             let candidateID = chunk.entities[rowPosition]
-            guard let location = state.entities.entities[candidateID],
-                  archetype.entities.indices.contains(location.archetypeRow),
-                  archetype.entities[location.archetypeRow].isActive else {
+            guard
+                let location = state.entities.entities[candidateID],
+                archetype.entities.indices.contains(location.archetypeRow),
+                archetype.entities[location.archetypeRow].isActive
+            else {
                 continue
             }
             entityID = candidateID
@@ -134,8 +138,10 @@ public final class DynamicQueryCursor: @unchecked Sendable {
         componentAt componentIndex: Int,
         field: EditorComponentFieldDescriptor
     ) -> EditorFieldValue? {
-        guard columns.indices.contains(componentIndex), rowPosition >= 0,
-              let readPointer = unsafe field.readPointer else {
+        guard
+            columns.indices.contains(componentIndex), rowPosition >= 0,
+            let readPointer = unsafe field.readPointer
+        else {
             return nil
         }
         let column = columns[componentIndex]
@@ -149,8 +155,10 @@ public final class DynamicQueryCursor: @unchecked Sendable {
         field: EditorComponentFieldDescriptor,
         value: EditorFieldValue
     ) -> Bool {
-        guard columns.indices.contains(componentIndex), rowPosition >= 0,
-              field.accepts(value), let writePointer = unsafe field.writePointer else {
+        guard
+            columns.indices.contains(componentIndex), rowPosition >= 0,
+            field.accepts(value), let writePointer = unsafe field.writePointer
+        else {
             return false
         }
         let column = columns[componentIndex]
@@ -172,10 +180,12 @@ public final class DynamicQueryCursor: @unchecked Sendable {
     private func bindColumns(in chunk: Chunk) -> Bool {
         columns.removeAll(keepingCapacity: true)
         for componentID in componentIDs {
-            guard let componentData = chunk.componentsData[componentID], chunk.count > 0,
-                  let data = unsafe componentData.data.buffer.pointer.baseAddress,
-                  let changedTicks = unsafe componentData.changeTicks.buffer.pointer.baseAddress?
-                    .assumingMemoryBound(to: Tick.self) else {
+            guard
+                let componentData = chunk.componentsData[componentID], !chunk.isEmpty,
+                let data = unsafe componentData.data.buffer.pointer.baseAddress,
+                let changedTicks = unsafe componentData.changeTicks.buffer.pointer.baseAddress?
+                    .assumingMemoryBound(to: Tick.self)
+            else {
                 return false
             }
             unsafe columns.append(

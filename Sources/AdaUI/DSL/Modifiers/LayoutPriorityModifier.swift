@@ -5,9 +5,9 @@
 //  Created by OpenAI on 29.04.2026.
 //
 
-public extension View {
+extension View {
     /// Sets the priority by which a parent layout apportions space to this view.
-    func layoutPriority(_ value: Double) -> some View {
+    public func layoutPriority(_ value: Double) -> some View {
         modifier(LayoutPriorityModifier(content: self, priority: value))
     }
 }

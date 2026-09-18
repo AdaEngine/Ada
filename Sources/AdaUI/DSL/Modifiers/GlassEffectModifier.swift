@@ -6,7 +6,7 @@
 import AdaInput
 import Math
 
-public extension View {
+extension View {
     /// Applies the Liquid Glass effect to this view using a predefined style.
     ///
     /// The glass element renders behind the view's content, sampling and blurring
@@ -21,7 +21,7 @@ public extension View {
     ///     .padding()
     ///     .glassEffect(.regular, in: .rect(cornerRadius: 16))
     /// ```
-    func glassEffect(_ style: Glass = .regular, in shape: some Shape = CapsuleShape()) -> some View {
+    public func glassEffect(_ style: Glass = .regular, in shape: some Shape = CapsuleShape()) -> some View {
         self.modifier(GlassEffectModifier(content: self, configuration: style, shape: shape))
     }
 }
@@ -77,7 +77,9 @@ final class GlassEffectViewNode: ViewModifierNode {
     }
 
     override func update(from newNode: ViewNode) {
-        guard let other = newNode as? GlassEffectViewNode else { return }
+        guard let other = newNode as? GlassEffectViewNode else {
+            return
+        }
         super.update(from: other)
         self.configuration = other.configuration
         self.shape = other.shape
@@ -113,7 +115,8 @@ final class GlassEffectViewNode: ViewModifierNode {
             setPressed(event.button == .left)
         case .changed:
             break
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             setPressed(false)
         }
     }
@@ -134,7 +137,8 @@ final class GlassEffectViewNode: ViewModifierNode {
             setPressed(true)
         case .moved:
             break
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             setPressed(false)
         }
     }
@@ -165,9 +169,9 @@ final class GlassEffectViewNode: ViewModifierNode {
 
         context.setTransform(
             context.transform
-            * anchorTranslation
-            * scale
-            * inverseAnchorTranslation
+                * anchorTranslation
+                * scale
+                * inverseAnchorTranslation
         )
     }
 
@@ -183,13 +187,13 @@ final class GlassEffectViewNode: ViewModifierNode {
     private func shouldDeferInteraction(to hitNode: ViewNode) -> Bool {
         switch hitNode {
         case is ButtonViewNode,
-             is GestureAreaViewNode,
-             is TextFieldViewNode:
+            is GestureAreaViewNode,
+            is TextFieldViewNode:
             return true
-#if canImport(AppKit) || canImport(UIKit)
-        case is NativeViewHostNode:
-            return true
-#endif
+        #if canImport(AppKit) || canImport(UIKit)
+            case is NativeViewHostNode:
+                return true
+        #endif
         default:
             return false
         }

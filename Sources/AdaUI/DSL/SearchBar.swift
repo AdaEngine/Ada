@@ -12,7 +12,6 @@ import AdaUtils
 /// Use ``View/searchable(text:placement:prompt:)`` when you want to attach the
 /// search control to an existing view in a SwiftUI-like way.
 public struct SearchBar: View {
-
     public var text: Binding<String>
     public var prompt: String
     public var width: Float?
@@ -58,16 +57,18 @@ private struct SearchBarStyledContent: View {
 
     var body: some View {
         let configuration = SearchBarStyleConfiguration(
-            label: SearchBarStyleConfiguration.Label(storage: .makeView({ inputs in
-                let view = AnyView(
-                    TextField(prompt, text: text)
-                        .font(.system(size: 13))
-                        .foregroundColor(foreground ?? .white)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .environment(\._isTextFieldPrimitive, false)
-                )
-                return AnyView._makeView(_ViewGraphNode(value: view), inputs: inputs)
-            })),
+            label: SearchBarStyleConfiguration.Label(
+                storage: .makeView({ inputs in
+                    let view = AnyView(
+                        TextField(prompt, text: text)
+                            .font(.system(size: 13))
+                            .foregroundColor(foreground ?? .white)
+                            .textFieldStyle(PlainTextFieldStyle())
+                            .environment(\._isTextFieldPrimitive, false)
+                    )
+                    return AnyView._makeView(_ViewGraphNode(value: view), inputs: inputs)
+                })
+            ),
             clear: {
                 text.wrappedValue = ""
             },

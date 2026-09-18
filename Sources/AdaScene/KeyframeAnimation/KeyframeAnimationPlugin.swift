@@ -9,7 +9,6 @@ import AdaECS
 
 /// Registers keyframe animation systems and a default ``AnimationClock`` resource.
 public struct KeyframeAnimationPlugin: Plugin, Sendable {
-
     public init() {}
 
     public func setup(in app: AppWorlds) {

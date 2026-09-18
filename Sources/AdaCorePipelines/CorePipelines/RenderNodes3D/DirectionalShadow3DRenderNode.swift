@@ -27,7 +27,8 @@ public enum DirectionalShadow3DMath {
         let centerUp = center.dot(viewUp)
         let snappedRight = (centerRight / worldUnitsPerTexel).rounded() * worldUnitsPerTexel
         let snappedUp = (centerUp / worldUnitsPerTexel).rounded() * worldUnitsPerTexel
-        let stabilizedCenter = center
+        let stabilizedCenter =
+            center
             + right * (snappedRight - centerRight)
             + viewUp * (snappedUp - centerUp)
         let eye = stabilizedCenter - rayDirection * distance
@@ -97,18 +98,20 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             guard entity == view else {
                 return
             }
-            guard let light = lighting.directionalLight,
-                  light.castsShadows,
-                  !renderItems.items.isEmpty,
-                  let instances = instanceBuffers.currentBuffer
+            guard
+                let light = lighting.directionalLight,
+                light.castsShadows,
+                !renderItems.items.isEmpty,
+                let instances = instanceBuffers.currentBuffer
             else {
                 shadow.isEnabled = false
                 return
             }
 
             prepareTexturesIfNeeded()
-            guard let colorTexture = shadow.colorTexture,
-                  let depthTexture = shadow.depthTexture
+            guard
+                let colorTexture = shadow.colorTexture,
+                let depthTexture = shadow.depthTexture
             else {
                 shadow.isEnabled = false
                 return

@@ -11,9 +11,9 @@ public enum ShaderEffectPlacement: Sendable {
     case overlay
 }
 
-public extension View {
+extension View {
     /// Renders a custom UI shader material in this view's bounds.
-    func shaderEffect<T: UIShaderMaterial>(
+    public func shaderEffect<T: UIShaderMaterial>(
         _ material: CustomMaterial<T>,
         placement: ShaderEffectPlacement = .overlay
     ) -> some View {
@@ -81,4 +81,3 @@ final class ShaderEffectViewNode: ViewModifierNode {
         context.drawShaderEffect(rect, material: material)
     }
 }
-

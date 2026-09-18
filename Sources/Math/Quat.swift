@@ -20,7 +20,7 @@ public struct Quat: Codable, Sendable {
         self.z = z
         self.w = w
     }
-    
+
     public init() {
         self.x = 0
         self.y = 0
@@ -37,32 +37,32 @@ extension Quat: CustomStringConvertible {
     }
 }
 
-public extension Quat {
-    static let identity = Quat(x: 0, y: 0, z: 0, w: 1)
-    
-    init(rotationMatrix matrix: Transform3D) {
-        var quat = Quat.identity
+extension Quat {
+    public static let identity = Quat(x: 0, y: 0, z: 0, w: 1)
+
+    public init(rotationMatrix matrix: Transform3D) {
+        var quat = Self.identity
         quat.w = sqrt(max(0, 1 + matrix[0, 0] + matrix[1, 1] + matrix[2, 2])) / 2
         quat.x = sqrt(max(0, 1 + matrix[0, 0] - matrix[1, 1] - matrix[2, 2])) / 2
         quat.y = sqrt(max(0, 1 - matrix[0, 0] + matrix[1, 1] - matrix[2, 2])) / 2
         quat.z = sqrt(max(0, 1 - matrix[0, 0] - matrix[1, 1] + matrix[2, 2])) / 2
-        
+
         quat.x *= sign(quat.x * (matrix[2, 1] - matrix[1, 2]))
         quat.y *= sign(quat.y * (matrix[0, 2] - matrix[2, 0]))
         quat.z *= sign(quat.z * (matrix[1, 0] - matrix[0, 1]))
-        
+
         self = quat
     }
-    
-    init(axis: Vector3, angle: Float) {
+
+    public init(axis: Vector3, angle: Float) {
         let d = axis.length
-        
+
         if d == 0 {
             self = Quat()
         } else {
             let sinAngle = sin(angle * 0.5)
             let cosAngle = cos(angle * 0.5)
-            
+
             let s = sinAngle / d
             self.x = axis.x * s
             self.y = axis.y * s
@@ -72,19 +72,18 @@ public extension Quat {
     }
 }
 
-public extension Quat {
-    
+extension Quat {
     /// Returns a rotation that rotates z degrees around the z axis,
     /// x degrees around the x axis, and y degrees around the y axis; applied in that order.
-    static func euler(_ vector: Vector3) -> Quat {
+    public static func euler(_ vector: Vector3) -> Quat {
         let c1 = cos(vector.y / 2)
         let c2 = cos(vector.x / 2)
         let c3 = cos(vector.z / 2)
-        
+
         let s1 = sin(vector.y / 2)
         let s2 = sin(vector.x / 2)
         let s3 = sin(vector.z / 2)
-        
+
         return Quat(
             x: s1 * c2 * c3 + c1 * s2 * s3,
             y: c1 * s2 * c3 - s1 * c2 * s3,
@@ -92,23 +91,25 @@ public extension Quat {
             w: c1 * c2 * c3 - s1 * s2 * s3
         )
     }
-    
-    func dot(_ quat: Quat) -> Float {
+
+    public func dot(_ quat: Quat) -> Float {
         return self.x * quat.x + self.y * quat.y + self.z * quat.z + self.w * quat.w
     }
-    
-    func angle(to quat: Quat) -> Float {
+
+    public func angle(to quat: Quat) -> Float {
         let dot = self.dot(quat)
         return acos(clamp(dot * dot * 2 - 1, -1, 1))
     }
-    
-    var squaredLength: Float {
+
+    public var squaredLength: Float {
         return x * x + y * y + z * z + w * w
     }
-    
-    var normalized: Quat {
+
+    public var normalized: Quat {
         let lengthSq = self.squaredLength
-        guard lengthSq > 0 else { return self }
+        guard lengthSq > 0 else {
+            return self
+        }
 
         let invLength = 1.0 / sqrt(lengthSq)
         return Quat(
@@ -120,8 +121,8 @@ public extension Quat {
     }
 }
 
-public extension Quat {
-    static func * (lhs: Quat, v: Vector3) -> Quat {
+extension Quat {
+    public static func * (lhs: Quat, v: Vector3) -> Quat {
         Quat(
             x: lhs.w * v.x + lhs.y * v.z - lhs.z * v.y,
             y: lhs.w * v.y + lhs.z * v.x - lhs.x * v.z,

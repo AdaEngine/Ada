@@ -27,12 +27,12 @@ public func withAnimation<Result>(
     try BindingAnimationTransaction.withAnimation(animation, body)
 }
 
-public extension View {
+extension View {
     /// Applies the given animation to this view when the specified value changes.
     /// - Parameter animation: The animation to apply. If animation is nil, the view doesn’t animate.
     /// - Parameter value: A value to monitor for changes.
     @MainActor
-    func animation<V: Equatable>(_ animation: Animation?, value: V) -> some View {
+    public func animation<V: Equatable>(_ animation: Animation?, value: V) -> some View {
         modifier(_AnimatedViewModifier(content: self, animation: animation, value: value))
     }
 
@@ -40,12 +40,12 @@ public extension View {
     /// - Parameter animation: The animation to apply.
     /// - Parameter value: A value to monitor for changes.
     @MainActor
-    func animation<V: Equatable>(_ animation: Animation, value: V) -> some View {
+    public func animation<V: Equatable>(_ animation: Animation, value: V) -> some View {
         self.animation(Optional(animation), value: value)
     }
 
     /// Disable any animation for view and their child.
-    func disableAnimation() -> some View {
+    public func disableAnimation() -> some View {
         self
             .environment(\.animationsDisabled, true)
             .environment(\.animationController, nil)
@@ -53,7 +53,6 @@ public extension View {
 }
 
 struct _AnimatedViewModifier<Content: View, Value: Equatable>: ViewModifier, ViewNodeBuilder {
-
     typealias Body = Never
 
     let content: Content
@@ -78,7 +77,6 @@ struct _AnimatedViewModifier<Content: View, Value: Equatable>: ViewModifier, Vie
 }
 
 class AnimatedViewNode<Value: Equatable>: ViewModifierNode {
-
     var currentValue: Value
     private var animation: Animation?
     private var animationController: UIAnimationController?
@@ -128,8 +126,8 @@ class AnimatedViewNode<Value: Equatable>: ViewModifierNode {
         if valueChanged {
             self.currentValue = node.currentValue
             if let nextAnimationController = node.animationController,
-               let animationController = self.animationController,
-               nextAnimationController !== animationController {
+                let animationController = self.animationController,
+                nextAnimationController !== animationController {
                 self.transientAnimationController = nextAnimationController
                 nextAnimationController.playAnimation()
             }

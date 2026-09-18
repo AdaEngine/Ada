@@ -35,9 +35,13 @@ extension TextEditorViewNode {
         }
         if let line = gutterTouchLine {
             if touch.phase == .ended {
-                if gutterLine(at: localPoint) == line { sourceInteraction?.onGutterClick?(line) }
+                if gutterLine(at: localPoint) == line {
+                    sourceInteraction?.onGutterClick?(line)
+                }
                 gutterTouchLine = nil
-            } else if touch.phase == .cancelled { gutterTouchLine = nil }
+            } else if touch.phase == .cancelled {
+                gutterTouchLine = nil
+            }
             return
         }
         let caretOffset = self.closestOffset(to: localPoint)
@@ -71,7 +75,8 @@ extension TextEditorViewNode {
                 return
             }
             self.selectionHead = caretOffset
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             self.finishTouchSelection(
                 phase: phase,
                 localPoint: localPoint,

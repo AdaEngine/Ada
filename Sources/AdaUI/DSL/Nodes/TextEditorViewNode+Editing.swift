@@ -9,7 +9,6 @@ import AdaInput
 import Math
 
 extension TextEditorViewNode {
-
     var hasSelection: Bool {
         self.selectionAnchor != self.selectionHead
     }
@@ -85,7 +84,8 @@ extension TextEditorViewNode {
             return
         }
 
-        let targetOffset = direction < 0
+        let targetOffset =
+            direction < 0
             ? self.wordBoundaryBefore(offset: self.caretOffset)
             : self.wordBoundaryAfter(offset: self.caretOffset)
 
@@ -173,9 +173,10 @@ extension TextEditorViewNode {
             lineText.startIndex,
             offsetBy: min(max(0, position.column), lineText.count)
         )
-        let indentation = lineText[..<prefixEnd].prefix { character in
-            character == " " || character == "\t"
-        }
+        let indentation = lineText[..<prefixEnd]
+            .prefix { character in
+                character == " " || character == "\t"
+            }
         self.replaceSelection(with: "\n" + String(indentation))
     }
 

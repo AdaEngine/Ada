@@ -56,8 +56,8 @@ public struct TimelineScheduleEntries: Sequence, IteratorProtocol, Sendable {
     private let interval: Double?
 
     /// Creates an empty entry sequence.
-    public static var empty: TimelineScheduleEntries {
-        TimelineScheduleEntries(firstDate: nil, interval: nil)
+    public static var empty: Self {
+        Self(firstDate: nil, interval: nil)
     }
 
     /// Creates a sequence beginning at `firstDate`.
@@ -103,7 +103,7 @@ public struct AnimationTimelineSchedule: TimelineSchedule, Sendable {
         )
     }
 
-    fileprivate func nextDate(after date: Date, mode: TimelineScheduleMode) -> Date? {
+    func nextDate(after date: Date, mode _: TimelineScheduleMode) -> Date? {
         guard !paused else {
             return nil
         }
@@ -116,7 +116,7 @@ public struct AnimationTimelineSchedule: TimelineSchedule, Sendable {
         return date.addingTimeInterval(interval)
     }
 
-    fileprivate func cadence(for mode: TimelineScheduleMode) -> TimelineCadence {
+    func cadence(for mode: TimelineScheduleMode) -> TimelineCadence {
         guard let minimumInterval else {
             return mode == .lowFrequency ? .seconds : .live
         }
@@ -143,19 +143,19 @@ public struct PeriodicTimelineSchedule: TimelineSchedule, Sendable {
         self.interval = max(interval, Double.ulpOfOne)
     }
 
-    public func entries(from startDate: Date, mode: TimelineScheduleMode) -> TimelineScheduleEntries {
+    public func entries(from startDate: Date, mode _: TimelineScheduleMode) -> TimelineScheduleEntries {
         TimelineScheduleEntries(
             firstDate: firstDate(onOrAfter: startDate),
             interval: interval
         )
     }
 
-    fileprivate func nextDate(after date: Date, mode: TimelineScheduleMode) -> Date? {
+    func nextDate(after date: Date, mode _: TimelineScheduleMode) -> Date? {
         let firstDate = firstDate(onOrAfter: date)
         return firstDate > date ? firstDate : firstDate.addingTimeInterval(interval)
     }
 
-    fileprivate var cadence: TimelineCadence {
+    var cadence: TimelineCadence {
         cadenceFromInterval(interval)
     }
 
@@ -174,14 +174,14 @@ public struct PeriodicTimelineSchedule: TimelineSchedule, Sendable {
 public struct EveryMinuteTimelineSchedule: TimelineSchedule, Sendable {
     public init() {}
 
-    public func entries(from startDate: Date, mode: TimelineScheduleMode) -> TimelineScheduleEntries {
+    public func entries(from startDate: Date, mode _: TimelineScheduleMode) -> TimelineScheduleEntries {
         TimelineScheduleEntries(
             firstDate: Self.minuteDate(onOrAfter: startDate),
             interval: 60
         )
     }
 
-    fileprivate func nextDate(after date: Date, mode: TimelineScheduleMode) -> Date? {
+    func nextDate(after date: Date, mode _: TimelineScheduleMode) -> Date? {
         let firstDate = Self.minuteDate(onOrAfter: date)
         return firstDate > date ? firstDate : firstDate.addingTimeInterval(60)
     }
@@ -194,28 +194,28 @@ public struct EveryMinuteTimelineSchedule: TimelineSchedule, Sendable {
     }
 }
 
-public extension TimelineSchedule where Self == AnimationTimelineSchedule {
+extension TimelineSchedule where Self == AnimationTimelineSchedule {
     /// A schedule that updates as often as the UI update loop allows.
-    static var animation: AnimationTimelineSchedule {
+    public static var animation: AnimationTimelineSchedule {
         AnimationTimelineSchedule()
     }
 
     /// A schedule that updates as often as the UI update loop allows, or at the given minimum interval.
-    static func animation(minimumInterval: Double? = nil, paused: Bool = false) -> AnimationTimelineSchedule {
+    public static func animation(minimumInterval: Double? = nil, paused: Bool = false) -> AnimationTimelineSchedule {
         AnimationTimelineSchedule(minimumInterval: minimumInterval, paused: paused)
     }
 }
 
-public extension TimelineSchedule where Self == PeriodicTimelineSchedule {
+extension TimelineSchedule where Self == PeriodicTimelineSchedule {
     /// A schedule that updates at a fixed interval.
-    static func periodic(from startDate: Date, by interval: Double) -> PeriodicTimelineSchedule {
+    public static func periodic(from startDate: Date, by interval: Double) -> PeriodicTimelineSchedule {
         PeriodicTimelineSchedule(from: startDate, by: interval)
     }
 }
 
-public extension TimelineSchedule where Self == EveryMinuteTimelineSchedule {
+extension TimelineSchedule where Self == EveryMinuteTimelineSchedule {
     /// A schedule that updates once per minute.
-    static var everyMinute: EveryMinuteTimelineSchedule {
+    public static var everyMinute: EveryMinuteTimelineSchedule {
         EveryMinuteTimelineSchedule()
     }
 }
@@ -226,7 +226,7 @@ public struct TimelineView<Schedule: TimelineSchedule, Content: View>: View, Vie
     public typealias Context = TimelineViewContext
 
     public var body: Never {
-        fatalError()
+        fatalError("Unreachable code")
     }
 
     let schedule: Schedule
@@ -298,15 +298,16 @@ private final class TimelineViewNode<Schedule: TimelineSchedule, Content: View>:
         self.state = state
         self.nextDate = schedule.timelineNextDate(after: now, mode: .normal)
 
-        super.init(
-            layout: AnyLayout(erased: layout),
-            content: content,
-            bypassSingleChildLayout: true,
-            buildImmediately: false,
-            body: { inputs in
-                state.makeListView(inputs: inputs)
-            }
-        )
+        super
+            .init(
+                layout: AnyLayout(erased: layout),
+                content: content,
+                bypassSingleChildLayout: true,
+                buildImmediately: false,
+                body: { inputs in
+                    state.makeListView(inputs: inputs)
+                }
+            )
     }
 
     override func updateEnvironment(_ environment: EnvironmentValues) {
@@ -362,7 +363,7 @@ private final class TimelineViewNode<Schedule: TimelineSchedule, Content: View>:
     }
 }
 
-private extension TimelineSchedule {
+extension TimelineSchedule {
     func timelineNextDate(after date: Date, mode: TimelineScheduleMode) -> Date? {
         if let schedule = self as? AnimationTimelineSchedule {
             return schedule.nextDate(after: date, mode: mode)

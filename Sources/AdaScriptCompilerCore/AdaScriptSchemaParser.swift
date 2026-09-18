@@ -110,7 +110,7 @@ struct Annotation {
         guard let literal = arguments["title"] ?? positionalArguments.first else {
             return nil
         }
-        guard case .string(let title) = literal else {
+        guard case let .string(title) = literal else {
             throw AdaScriptSchemaError.invalid(path: path, message: "@previewable title on \(viewName) must be a string")
         }
         return title

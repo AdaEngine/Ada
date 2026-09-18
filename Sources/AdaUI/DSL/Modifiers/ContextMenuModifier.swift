@@ -9,10 +9,10 @@ import AdaInput
 import AdaUtils
 import Math
 
-public extension View {
+extension View {
     /// Presents a context menu after a secondary click, or a long press on iOS and Android.
     /// Set `opensOnPrimaryAction` to also open below the view on a click, tap, Enter, or Space.
-    func contextMenu<MenuItems: View>(
+    public func contextMenu<MenuItems: View>(
         opensOnPrimaryAction: Bool = false,
         onPresent: (() -> Void)? = nil,
         onDismiss: (() -> Void)? = nil,
@@ -42,7 +42,7 @@ public struct ContextMenuPresentation {
         public let title: String
         public let role: Role?
         public let action: (() -> Void)?
-        public let submenu: [Item]
+        public let submenu: [Self]
         public let isSeparator: Bool
         public let isSelected: Bool
 
@@ -51,7 +51,7 @@ public struct ContextMenuPresentation {
             title: String,
             role: Role? = nil,
             action: (() -> Void)? = nil,
-            submenu: [Item] = [],
+            submenu: [Self] = [],
             isSeparator: Bool = false,
             isSelected: Bool = false
         ) {
@@ -90,7 +90,7 @@ public enum ContextMenuPresentationCenter {
 /// A submenu entry for ``View/contextMenu(menuItems:)``.
 public struct ContextMenuSubmenu<MenuItems: View>: View {
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let title: String
     let menuItems: () -> MenuItems
@@ -104,7 +104,7 @@ public struct ContextMenuSubmenu<MenuItems: View>: View {
 /// A selectable menu action with a checkmark independent of the label's font.
 public struct ContextMenuOption: View {
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let title: String
     let isSelected: Bool
@@ -173,7 +173,9 @@ private final class ContextMenuModifierNode<MenuItems: View>: ViewModifierNode {
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
 
         if let mouseEvent = event as? MouseEvent {
             if mouseEvent.button == .right || (opensOnPrimaryAction && mouseEvent.button == .left) {
@@ -181,22 +183,24 @@ private final class ContextMenuModifierNode<MenuItems: View>: ViewModifierNode {
             }
 
             #if IOS || ANDROID
-            if mouseEvent.button == .left, mouseEvent.phase == .began {
-                activeContentEventNode = super.hitTest(point, with: event)
-                return self
-            }
+                if mouseEvent.button == .left, mouseEvent.phase == .began {
+                    activeContentEventNode = super.hitTest(point, with: event)
+                    return self
+                }
             #endif
 
             return super.hitTest(point, with: event)
         }
 
-        if opensOnPrimaryAction, event is TouchEvent { return self }
-
-        #if IOS || ANDROID
-        if let touchEvent = event as? TouchEvent, touchEvent.phase == .began {
-            activeContentEventNode = super.hitTest(point, with: event)
+        if opensOnPrimaryAction, event is TouchEvent {
             return self
         }
+
+        #if IOS || ANDROID
+            if let touchEvent = event as? TouchEvent, touchEvent.phase == .began {
+                activeContentEventNode = super.hitTest(point, with: event)
+                return self
+            }
         #endif
         return super.hitTest(point, with: event)
     }
@@ -204,8 +208,12 @@ private final class ContextMenuModifierNode<MenuItems: View>: ViewModifierNode {
     override var canBecomeFocused: Bool { opensOnPrimaryAction && environment.isEnabled }
 
     override func onKeyEvent(_ event: KeyEvent) {
-        guard opensOnPrimaryAction, environment.isEnabled, event.status == .down, !event.isRepeated,
-              event.keyCode == .enter || event.keyCode == .space else { return }
+        guard
+            opensOnPrimaryAction, environment.isEnabled, event.status == .down, !event.isRepeated,
+            event.keyCode == .enter || event.keyCode == .space
+        else {
+            return
+        }
         presentBelowField()
     }
 
@@ -223,17 +231,18 @@ private final class ContextMenuModifierNode<MenuItems: View>: ViewModifierNode {
             }
 
             #if IOS || ANDROID
-            if event.button == .left {
-                lastPressMouseEvent = event
-                lastPressTouches = nil
-                startPressTracking(at: event.mousePosition)
-            }
+                if event.button == .left {
+                    lastPressMouseEvent = event
+                    lastPressTouches = nil
+                    startPressTracking(at: event.mousePosition)
+                }
             #endif
         case .changed:
             if pressStartLocation != nil {
                 pressLocation = event.mousePosition
             }
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             break
         }
 
@@ -257,43 +266,44 @@ private final class ContextMenuModifierNode<MenuItems: View>: ViewModifierNode {
             return
         }
         #if IOS || ANDROID
-        guard let touch = touches.first else {
-            contentNode.onTouchesEvent(touches)
-            return
-        }
+            guard let touch = touches.first else {
+                contentNode.onTouchesEvent(touches)
+                return
+            }
 
-        switch touch.phase {
-        case .began:
-            lastPressMouseEvent = nil
-            lastPressTouches = touches
-            startPressTracking(at: touch.location)
-        case .moved:
-            lastPressTouches = touches
-            pressLocation = touch.location
-        case .ended, .cancelled:
-            break
-        }
+            switch touch.phase {
+            case .began:
+                lastPressMouseEvent = nil
+                lastPressTouches = touches
+                startPressTracking(at: touch.location)
+            case .moved:
+                lastPressTouches = touches
+                pressLocation = touch.location
+            case .ended,
+                .cancelled:
+                break
+            }
 
-        activeContentEventNode?.onTouchesEvent(touches)
+            activeContentEventNode?.onTouchesEvent(touches)
 
-        if touch.phase == .ended || touch.phase == .cancelled {
-            resetPressTracking()
-        }
+            if touch.phase == .ended || touch.phase == .cancelled {
+                resetPressTracking()
+            }
         #else
-        contentNode.onTouchesEvent(touches)
+            contentNode.onTouchesEvent(touches)
         #endif
     }
 
     override func update(_ deltaTime: TimeInterval) {
         #if IOS || ANDROID
-        if pressStartLocation != nil, !didPresentForCurrentPress {
-            elapsedPressDuration += deltaTime
-            if elapsedPressDuration >= minimumPressDuration {
-                didPresentForCurrentPress = true
-                cancelContentPress()
-                present(at: pressLocation ?? pressStartLocation ?? .zero)
+            if pressStartLocation != nil, !didPresentForCurrentPress {
+                elapsedPressDuration += deltaTime
+                if elapsedPressDuration >= minimumPressDuration {
+                    didPresentForCurrentPress = true
+                    cancelContentPress()
+                    present(at: pressLocation ?? pressStartLocation ?? .zero)
+                }
             }
-        }
         #endif
 
         super.update(deltaTime)
@@ -306,7 +316,9 @@ private final class ContextMenuModifierNode<MenuItems: View>: ViewModifierNode {
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
-        guard let other = newNode as? ContextMenuModifierNode<MenuItems> else { return }
+        guard let other = newNode as? ContextMenuModifierNode<MenuItems> else {
+            return
+        }
         self.opensOnPrimaryAction = other.opensOnPrimaryAction
         self.onPresent = other.onPresent
         self.onDismiss = other.onDismiss
@@ -314,7 +326,9 @@ private final class ContextMenuModifierNode<MenuItems: View>: ViewModifierNode {
     }
 
     private func trackPrimaryPress(at location: Point, phase: MouseEvent.Phase) {
-        guard environment.isEnabled else { return }
+        guard environment.isEnabled else {
+            return
+        }
         switch phase {
         case .began:
             primaryPressLocation = location
@@ -360,16 +374,17 @@ private final class ContextMenuModifierNode<MenuItems: View>: ViewModifierNode {
 
     private func cancelContentPress() {
         if let event = lastPressMouseEvent {
-            activeContentEventNode?.onMouseEvent(
-                MouseEvent(
-                    window: event.window,
-                    button: .left,
-                    mousePosition: pressLocation ?? event.mousePosition,
-                    phase: .cancelled,
-                    modifierKeys: event.modifierKeys,
-                    time: event.time
+            activeContentEventNode?
+                .onMouseEvent(
+                    MouseEvent(
+                        window: event.window,
+                        button: .left,
+                        mousePosition: pressLocation ?? event.mousePosition,
+                        phase: .cancelled,
+                        modifierKeys: event.modifierKeys,
+                        time: event.time
+                    )
                 )
-            )
         }
 
         if let touches = lastPressTouches {
@@ -380,7 +395,7 @@ private final class ContextMenuModifierNode<MenuItems: View>: ViewModifierNode {
                         location: pressLocation ?? touch.location,
                         phase: .cancelled,
                         time: touch.time,
-                contactID: touch.contactID
+                        contactID: touch.contactID
                     )
                 }
             )
@@ -390,35 +405,38 @@ private final class ContextMenuModifierNode<MenuItems: View>: ViewModifierNode {
 
     private func present(at location: Point) {
         let items = menuItems().contextMenuItems
-        guard !items.isEmpty, !opensOnPrimaryAction || environment.isEnabled else { return }
+        guard !items.isEmpty, !opensOnPrimaryAction || environment.isEnabled else {
+            return
+        }
 
         onPresent?()
         ContextMenuPresentationCenter.present?(
             ContextMenuPresentation(
                 sourceWindow: owner?.window,
                 location: location,
-                items: items.enumerated().map { index, item in
-                    ContextMenuPresentation.Item(
-                        id: index,
-                        title: item.title,
-                        role: item.role,
-                        action: item.action,
-                        submenu: item.submenu.presentationItems(),
-                        isSeparator: item.isSeparator,
-                        isSelected: item.isSelected
-                    )
-                },
+                items: items.enumerated()
+                    .map { index, item in
+                        ContextMenuPresentation.Item(
+                            id: index,
+                            title: item.title,
+                            role: item.role,
+                            action: item.action,
+                            submenu: item.submenu.presentationItems(),
+                            isSeparator: item.isSeparator,
+                            isSelected: item.isSelected
+                        )
+                    },
                 onDismiss: onDismiss
             )
         )
     }
 }
 
-private struct ContextMenuItemDescription {
+struct ContextMenuItemDescription {
     let title: String
     let role: ContextMenuPresentation.Item.Role?
     let action: (() -> Void)?
-    let submenu: [ContextMenuItemDescription]
+    let submenu: [Self]
     let isSeparator: Bool
     let isSelected: Bool
 
@@ -426,7 +444,7 @@ private struct ContextMenuItemDescription {
         title: String,
         role: ContextMenuPresentation.Item.Role? = nil,
         action: (() -> Void)? = nil,
-        submenu: [ContextMenuItemDescription] = [],
+        submenu: [Self] = [],
         isSeparator: Bool = false,
         isSelected: Bool = false
     ) {
@@ -440,11 +458,11 @@ private struct ContextMenuItemDescription {
 }
 
 @MainActor
-private protocol ContextMenuItemsConvertible {
+protocol ContextMenuItemsConvertible {
     var contextMenuItems: [ContextMenuItemDescription] { get }
 }
 
-private extension View {
+extension View {
     var contextMenuItems: [ContextMenuItemDescription] {
         (self as? ContextMenuItemsConvertible)?.contextMenuItems ?? []
     }
@@ -452,7 +470,7 @@ private extension View {
 
 @MainActor
 extension Button: ContextMenuItemsConvertible {
-    fileprivate var contextMenuItems: [ContextMenuItemDescription] {
+    var contextMenuItems: [ContextMenuItemDescription] {
         guard let title = alertTitle else {
             return []
         }
@@ -469,14 +487,14 @@ extension Button: ContextMenuItemsConvertible {
 
 @MainActor
 extension ContextMenuOption: ContextMenuItemsConvertible {
-    fileprivate var contextMenuItems: [ContextMenuItemDescription] {
+    var contextMenuItems: [ContextMenuItemDescription] {
         [ContextMenuItemDescription(title: title, action: action, isSelected: isSelected)]
     }
 }
 
 @MainActor
 extension ContextMenuSubmenu: ContextMenuItemsConvertible {
-    fileprivate var contextMenuItems: [ContextMenuItemDescription] {
+    var contextMenuItems: [ContextMenuItemDescription] {
         [
             ContextMenuItemDescription(
                 title: title,
@@ -488,23 +506,23 @@ extension ContextMenuSubmenu: ContextMenuItemsConvertible {
 
 @MainActor
 extension EmptyView: ContextMenuItemsConvertible {
-    fileprivate var contextMenuItems: [ContextMenuItemDescription] {
+    var contextMenuItems: [ContextMenuItemDescription] {
         []
     }
 }
 
 @MainActor
 extension Divider: ContextMenuItemsConvertible {
-    fileprivate var contextMenuItems: [ContextMenuItemDescription] {
+    var contextMenuItems: [ContextMenuItemDescription] {
         [ContextMenuItemDescription(title: "", isSeparator: true)]
     }
 }
 
 @MainActor
 extension Optional: ContextMenuItemsConvertible where Wrapped: View {
-    fileprivate var contextMenuItems: [ContextMenuItemDescription] {
+    var contextMenuItems: [ContextMenuItemDescription] {
         switch self {
-        case .some(let wrapped):
+        case let .some(wrapped):
             return wrapped.contextMenuItems
         case .none:
             return []
@@ -514,20 +532,21 @@ extension Optional: ContextMenuItemsConvertible where Wrapped: View {
 
 @MainActor
 extension ViewTuple: ContextMenuItemsConvertible {
-    fileprivate var contextMenuItems: [ContextMenuItemDescription] {
-        Mirror(reflecting: value).children.flatMap { child in
-            (child.value as? ContextMenuItemsConvertible)?.contextMenuItems ?? []
-        }
+    var contextMenuItems: [ContextMenuItemDescription] {
+        Mirror(reflecting: value).children
+            .flatMap { child in
+                (child.value as? ContextMenuItemsConvertible)?.contextMenuItems ?? []
+            }
     }
 }
 
 @MainActor
 extension _ConditionalContent: ContextMenuItemsConvertible where TrueContent: View, FalseContent: View {
-    fileprivate var contextMenuItems: [ContextMenuItemDescription] {
+    var contextMenuItems: [ContextMenuItemDescription] {
         switch storage {
-        case .trueContent(let content):
+        case let .trueContent(content):
             return content.contextMenuItems
-        case .falseContent(let content):
+        case let .falseContent(content):
             return content.contextMenuItems
         }
     }
@@ -535,30 +554,31 @@ extension _ConditionalContent: ContextMenuItemsConvertible where TrueContent: Vi
 
 @MainActor
 extension ForEach: ContextMenuItemsConvertible {
-    fileprivate var contextMenuItems: [ContextMenuItemDescription] {
+    var contextMenuItems: [ContextMenuItemDescription] {
         data.flatMap { content($0).contextMenuItems }
     }
 }
 
 @MainActor
 extension AnyView: ContextMenuItemsConvertible {
-    fileprivate var contextMenuItems: [ContextMenuItemDescription] {
+    var contextMenuItems: [ContextMenuItemDescription] {
         content.contextMenuItems
     }
 }
 
-private extension [ContextMenuItemDescription] {
+extension [ContextMenuItemDescription] {
     func presentationItems() -> [ContextMenuPresentation.Item] {
-        self.enumerated().map { index, item in
-            ContextMenuPresentation.Item(
-                id: index,
-                title: item.title,
-                role: item.role,
-                action: item.action,
-                submenu: item.submenu.presentationItems(),
-                isSeparator: item.isSeparator,
-                isSelected: item.isSelected
-            )
-        }
+        self.enumerated()
+            .map { index, item in
+                ContextMenuPresentation.Item(
+                    id: index,
+                    title: item.title,
+                    role: item.role,
+                    action: item.action,
+                    submenu: item.submenu.presentationItems(),
+                    isSeparator: item.isSeparator,
+                    isSelected: item.isSelected
+                )
+            }
     }
 }

@@ -15,31 +15,39 @@ import SwiftSyntaxMacros
 public struct BundleMacro: MemberMacro {
     // Generate the 'components' property
     public static func expansion(
-        of node: AttributeSyntax,
+        of _: AttributeSyntax,
         providingMembersOf declaration: some DeclGroupSyntax,
-        conformingTo protocols: [TypeSyntax],
-        in context: some MacroExpansionContext
-      ) throws -> [DeclSyntax] {
+        conformingTo _: [TypeSyntax],
+        in _: some MacroExpansionContext
+    ) throws -> [DeclSyntax] {
         guard let structDecl = declaration.as(StructDeclSyntax.self) else {
             throw MacroError.macroUsage("Bundle macro can be applied only to structs.")
         }
         let availability = declaration.modifiers
         // Collect all stored property names
         let propertyNames: [String] = structDecl.memberBlock.members.compactMap { member in
-            guard let varDecl = member.decl.as(VariableDeclSyntax.self) else { return nil }
-            guard let binding = varDecl.bindings.first else { return nil }
-            guard let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text else { return nil }
+            guard let varDecl = member.decl.as(VariableDeclSyntax.self) else {
+                return nil
+            }
+            guard let binding = varDecl.bindings.first else {
+                return nil
+            }
+            guard let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text else {
+                return nil
+            }
             // Only stored properties (not computed)
-            if binding.accessorBlock != nil { return nil }
+            if binding.accessorBlock != nil {
+                return nil
+            }
             return identifier
         }
 
         // Generate the components property
         let componentsProperty: DeclSyntax = """
-        \(availability)var components: [any Component] {
-            [\(raw: propertyNames.joined(separator: ", "))]
-        }
-        """
+            \(availability)var components: [any Component] {
+                [\(raw: propertyNames.joined(separator: ", "))]
+            }
+            """
         return [componentsProperty]
     }
 }
@@ -51,24 +59,23 @@ extension BundleMacro: ExtensionMacro {
         T: TypeSyntaxProtocol,
         C: MacroExpansionContext
     >(
-        of node: AttributeSyntax,
+        of _: AttributeSyntax,
         attachedTo declaration: D,
         providingExtensionsOf type: T,
-        conformingTo protocols: [TypeSyntax],
-        in context: C
+        conformingTo _: [TypeSyntax],
+        in _: C
     ) throws -> [ExtensionDeclSyntax] {
         // Only add conformance if not already present
         if let inheritanceClause = declaration.inheritanceClause,
-           inheritanceClause.inheritedTypes.contains(where: {
-               ["ComponentsBundle", "AdaECS.ComponentsBundle"].contains($0.type.trimmedDescription)
-           }) {
+            inheritanceClause.inheritedTypes.contains(where: {
+                ["ComponentsBundle", "AdaECS.ComponentsBundle"].contains($0.type.trimmedDescription)
+            }) {
             return []
         }
 
         let ext: DeclSyntax = """
-        extension \(type.trimmed): AdaECS.ComponentsBundle { }
-        """
+            extension \(type.trimmed): AdaECS.ComponentsBundle { }
+            """
         return [ext.cast(ExtensionDeclSyntax.self)]
     }
 }
-

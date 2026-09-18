@@ -45,14 +45,14 @@ public struct State<Value>: UpdatableProperty, PropertyStoragable {
         self.handle = Handle(makeInitialValue: { initialValue })
     }
 
-    public func update() { }
+    public func update() {}
 
     public static func _makeStorage(_ makeInitialValue: @escaping @MainActor () -> Value) -> State<Value> {
-        State(makeInitialValue: makeInitialValue)
+        Self(makeInitialValue: makeInitialValue)
     }
 
     public static func _makeStorage(initialValue: Value) -> State<Value> {
-        State(initialValue: initialValue)
+        Self(initialValue: initialValue)
     }
 
     private init(makeInitialValue: (@MainActor () -> Value)?) {

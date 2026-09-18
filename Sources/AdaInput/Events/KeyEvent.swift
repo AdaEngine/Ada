@@ -9,7 +9,6 @@ import AdaUtils
 
 /// An object that contains information about keyboard event.
 public struct KeyEvent: InputEvent {
-
     public enum Status: UInt8, Hashable, Sendable {
         case up
         case down

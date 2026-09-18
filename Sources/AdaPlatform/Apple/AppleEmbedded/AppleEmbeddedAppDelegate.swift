@@ -6,41 +6,41 @@
 //
 
 #if os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-@_spi(Internal) import AdaUI
-import UIKit
+    @_spi(Internal) import AdaUI
+    import UIKit
 
-class AppleEmbeddedAppDelegate: NSObject, UIApplicationDelegate {
-    var window: UIKit.UIWindow?
+    class AppleEmbeddedAppDelegate: NSObject, UIApplicationDelegate {
+        var window: UIKit.UIWindow?
 
-    func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil
-    ) -> Bool {
-        return true
+        func application(
+            _: UIApplication,
+            didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil
+        ) -> Bool {
+            return true
+        }
+
+        #if os(iOS) || os(tvOS) || os(visionOS)
+            func application(
+                _: UIApplication,
+                configurationForConnecting connectingSceneSession: UIKit.UISceneSession,
+                options _: UIScene.ConnectionOptions
+            ) -> UISceneConfiguration {
+                let configuration = UISceneConfiguration(
+                    name: "Default Configuration",
+                    sessionRole: connectingSceneSession.role
+                )
+                configuration.delegateClass = AppleEmbeddedSceneDelegate.self
+                return configuration
+            }
+
+            func application(
+                _: UIApplication,
+                didDiscardSceneSessions sceneSessions: Set<UIKit.UISceneSession>
+            ) {
+                (UIWindowManager.shared as? AppleEmbeddedWindowManager)?
+                    .sceneSessionsDidDiscard(sceneSessions)
+            }
+        #endif
     }
-
-    #if os(iOS) || os(tvOS) || os(visionOS)
-    func application(
-        _ application: UIApplication,
-        configurationForConnecting connectingSceneSession: UIKit.UISceneSession,
-        options: UIScene.ConnectionOptions
-    ) -> UISceneConfiguration {
-        let configuration = UISceneConfiguration(
-            name: "Default Configuration",
-            sessionRole: connectingSceneSession.role
-        )
-        configuration.delegateClass = AppleEmbeddedSceneDelegate.self
-        return configuration
-    }
-
-    func application(
-        _ application: UIApplication,
-        didDiscardSceneSessions sceneSessions: Set<UIKit.UISceneSession>
-    ) {
-        (UIWindowManager.shared as? AppleEmbeddedWindowManager)?
-            .sceneSessionsDidDiscard(sceneSessions)
-    }
-    #endif
-}
 
 #endif

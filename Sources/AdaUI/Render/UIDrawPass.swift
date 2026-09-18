@@ -76,8 +76,8 @@ struct LinearGradientUniform: Sendable {
     }
 }
 
-private extension LinearGradientUniform {
-    static func makeColors(from stops: [Gradient.Stop]) -> [Vector4] {
+extension LinearGradientUniform {
+    private static func makeColors(from stops: [Gradient.Stop]) -> [Vector4] {
         var colors = Array(repeating: Color.clear.asVector, count: Gradient.maximumStops)
         for (index, stop) in stops.enumerated() where index < Gradient.maximumStops {
             colors[index] = stop.color.asVector
@@ -85,20 +85,21 @@ private extension LinearGradientUniform {
         return colors
     }
 
-    static func makeLocations(from stops: [Gradient.Stop]) -> [Vector4] {
+    private static func makeLocations(from stops: [Gradient.Stop]) -> [Vector4] {
         var flatLocations = Array(repeating: Float(1), count: Gradient.maximumStops)
         for (index, stop) in stops.enumerated() where index < Gradient.maximumStops {
             flatLocations[index] = stop.location
         }
 
-        return stride(from: 0, to: Gradient.maximumStops, by: 4).map { index in
-            Vector4(
-                flatLocations[index],
-                flatLocations[index + 1],
-                flatLocations[index + 2],
-                flatLocations[index + 3]
-            )
-        }
+        return stride(from: 0, to: Gradient.maximumStops, by: 4)
+            .map { index in
+                Vector4(
+                    flatLocations[index],
+                    flatLocations[index + 1],
+                    flatLocations[index + 2],
+                    flatLocations[index + 3]
+                )
+            }
     }
 }
 
@@ -267,12 +268,12 @@ public struct UIDrawData: Sendable {
 
     public var isEmpty: Bool {
         quadIndexBuffer.isEmpty
-        && gradientIndexBuffer.isEmpty
-        && shaderEffectIndexBuffer.isEmpty
-        && circleIndexBuffer.isEmpty
-        && lineIndexBuffer.isEmpty
-        && glyphIndexBuffer.isEmpty
-        && glassIndexBuffer.isEmpty
+            && gradientIndexBuffer.isEmpty
+            && shaderEffectIndexBuffer.isEmpty
+            && circleIndexBuffer.isEmpty
+            && lineIndexBuffer.isEmpty
+            && glyphIndexBuffer.isEmpty
+            && glassIndexBuffer.isEmpty
     }
 }
 
@@ -309,7 +310,7 @@ public struct UIDrawPass: DrawPass {
         ) {
         case .none:
             break
-        case .apply(let scissorRect):
+        case let .apply(scissorRect):
             renderEncoder.setScissorRect(scissorRect)
         case .skipDraw:
             return
@@ -418,7 +419,7 @@ public struct UIDrawPass: DrawPass {
                     binding: 1,
                     shaderStages: .fragment,
                     resource: .sampler(bgTexture.sampler)
-                )
+                ),
             ]
         )
         renderEncoder.setResourceSet(resourceSet, index: 0)
@@ -460,7 +461,7 @@ public struct UIDrawPass: DrawPass {
                         binding: 1,
                         shaderStages: .fragment,
                         resource: .sampler(texture.sampler)
-                    )
+                    ),
                 ]
             )
             renderEncoder.setResourceSet(resourceSet, index: 0)
@@ -516,8 +517,10 @@ public struct UIDrawPass: DrawPass {
         renderEncoder.setIndexBuffer(uiDrawData.shaderEffectIndexBuffer, indexFormat: .uInt32)
 
         for batch in uiDrawData.shaderEffectBatches {
-            guard let pipeline = batch.material.getOrCreateUIShaderEffectPipeline(device: renderDevice),
-                  let materialData = unsafe MaterialStorage.shared.getMaterialData(for: batch.material) else {
+            guard
+                let pipeline = batch.material.getOrCreateUIShaderEffectPipeline(device: renderDevice),
+                let materialData = unsafe MaterialStorage.shared.getMaterialData(for: batch.material)
+            else {
                 continue
             }
 
@@ -650,7 +653,7 @@ public struct UIDrawPass: DrawPass {
                         binding: 1,
                         shaderStages: .fragment,
                         resource: .sampler(texture.sampler)
-                    )
+                    ),
                 ]
             )
             renderEncoder.setResourceSet(resourceSet, index: 0)

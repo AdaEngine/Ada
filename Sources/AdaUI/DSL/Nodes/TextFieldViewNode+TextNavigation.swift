@@ -10,7 +10,6 @@ import Foundation
 import Math
 
 extension TextFieldViewNode {
-
     func isTap(at position: Point, start: Point?) -> Bool {
         guard let start else {
             return false
@@ -27,17 +26,17 @@ extension TextFieldViewNode {
             self.clearTapCandidate()
 
             #if canImport(UIKit)
-            self.showEditMenu(at: position)
+                self.showEditMenu(at: position)
             #endif
         } else {
             self.storeTapCandidate(at: position, time: time)
 
             #if canImport(UIKit)
-            if self.hasSelection {
-                self.showEditMenu(at: position)
-            } else {
-                self.hideEditMenu()
-            }
+                if self.hasSelection {
+                    self.showEditMenu(at: position)
+                } else {
+                    self.hideEditMenu()
+                }
             #endif
         }
     }

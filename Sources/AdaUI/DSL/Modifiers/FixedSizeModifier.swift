@@ -7,14 +7,14 @@
 
 import Math
 
-public extension View {
+extension View {
     /// Fixes this view at its ideal size.
-    func fixedSize() -> some View {
+    public func fixedSize() -> some View {
         fixedSize(horizontal: true, vertical: true)
     }
 
     /// Fixes this view at its ideal size in the specified dimensions.
-    func fixedSize(horizontal: Bool, vertical: Bool) -> some View {
+    public func fixedSize(horizontal: Bool, vertical: Bool) -> some View {
         modifier(
             FixedSizeModifier(
                 content: self,

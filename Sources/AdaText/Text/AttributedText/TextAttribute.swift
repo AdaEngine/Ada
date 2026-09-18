@@ -10,7 +10,7 @@ import AdaUtils
 /// A type that defines an attribute’s name and type.
 public protocol TextAttributeKey {
     associatedtype Value: Hashable
-    
+
     static var defaultValue: Value { get }
 }
 
@@ -68,9 +68,9 @@ public struct TextFontTraits: OptionSet, Hashable, Sendable {
         self.rawValue = rawValue
     }
 
-    public static let strong = TextFontTraits(rawValue: 1 << 0)
-    public static let emphasis = TextFontTraits(rawValue: 1 << 1)
-    public static let code = TextFontTraits(rawValue: 1 << 2)
+    public static let strong = Self(rawValue: 1 << 0)
+    public static let emphasis = Self(rawValue: 1 << 1)
+    public static let code = Self(rawValue: 1 << 2)
 }
 
 /// A text attribute key for semantic font traits.
@@ -87,43 +87,42 @@ public struct FontScaleTextAttribute: TextAttributeKey {
     public static let defaultValue: Double = 1
 }
 
-public extension TextAttributeContainer {
-    
+extension TextAttributeContainer {
     /// Set foreground color for text.
-    var foregroundColor: Color {
+    public var foregroundColor: Color {
         get {
             self[ForegroundColorTextAttribute.self] ?? ForegroundColorTextAttribute.defaultValue
         }
-        
+
         set {
             self[ForegroundColorTextAttribute.self] = newValue
         }
     }
-    
+
     /// Set font for text.
-    var font: Font {
+    public var font: Font {
         get {
             self[FontTextAttribute.self] ?? FontTextAttribute.defaultValue
         }
-        
+
         set {
             self[FontTextAttribute.self] = newValue
         }
     }
-    
+
     /// Set outline color for text.
-    var outlineColor: Color {
+    public var outlineColor: Color {
         get {
             self[OutlineColorTextAttribute.self] ?? OutlineColorTextAttribute.defaultValue
         }
-        
+
         set {
             self[OutlineColorTextAttribute.self] = newValue
         }
     }
 
     /// Set outline width for text, in screen pixels.
-    var outlineWidth: Float {
+    public var outlineWidth: Float {
         get {
             self[OutlineWidthTextAttribute.self] ?? OutlineWidthTextAttribute.defaultValue
         }
@@ -132,31 +131,31 @@ public extension TextAttributeContainer {
             self[OutlineWidthTextAttribute.self] = newValue
         }
     }
-    
+
     /// Set background color for text.
-    var backgroundColor: Color {
+    public var backgroundColor: Color {
         get {
             self[BackgroundColorTextAttribute.self] ?? BackgroundColorTextAttribute.defaultValue
         }
-        
+
         set {
             self[BackgroundColorTextAttribute.self] = newValue
         }
     }
-    
+
     /// Set kerning for text.
-    var kern: Float {
+    public var kern: Float {
         get {
             self[KernColorTextAttribute.self] ?? KernColorTextAttribute.defaultValue
         }
-        
+
         set {
             self[KernColorTextAttribute.self] = newValue
         }
     }
 
     /// Set semantic font traits for text.
-    var fontTraits: TextFontTraits {
+    public var fontTraits: TextFontTraits {
         get {
             self[FontTraitsTextAttribute.self] ?? FontTraitsTextAttribute.defaultValue
         }
@@ -167,7 +166,7 @@ public extension TextAttributeContainer {
     }
 
     /// Set relative font scale for text.
-    var fontScale: Double {
+    public var fontScale: Double {
         get {
             self[FontScaleTextAttribute.self] ?? FontScaleTextAttribute.defaultValue
         }
@@ -176,7 +175,6 @@ public extension TextAttributeContainer {
             self[FontScaleTextAttribute.self] = newValue
         }
     }
-    
 }
 
 /// A line break mode.

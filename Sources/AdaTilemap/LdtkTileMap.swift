@@ -5,21 +5,20 @@
 //  Created by v.prusakov on 5/11/24.
 //
 
-import AdaECS
 import AdaAssets
-import AdaUtils
-import AdaSprite
+import AdaECS
 import AdaRender
+import AdaSprite
+import AdaUtils
 import Foundation
 import Logging
 import Math
 import OrderedCollections
 
 /// Namespace for LDtk
-public enum LDtk { }
+public enum LDtk {}
 
 extension LDtk {
-
     /// Tile map that supports LDtk file formats (`ldtk` or `json`).
     /// - Note: We only support tilesets, layers and levels.
     ///
@@ -28,10 +27,9 @@ extension LDtk {
     /// let tileMap = try await AssetsManager.load("@res://Assets/TileMap.ldtk") as LDtkTileMap
     /// ```
     public final class TileMap: AdaTilemap.TileMap, @unchecked Sendable {
-
         public weak var delegate: TileMapDelegate? {
             didSet {
-                tileSet.sources.forEach { (_, value) in
+                tileSet.sources.forEach { _, value in
                     (value as? LDtk.EntityTileSource)?.delegate = self.delegate
                 }
             }
@@ -45,7 +43,7 @@ extension LDtk {
 
         private var fileWatcher: FileWatcher!
         private var fileWatcherObserver: Cancellable?
-        
+
         /// When is hot reloading enabled, TileMap will automatically update tiles when LDtk project changed.
         ///
         /// - Note: Use ``TileMap/resourcePath`` field to get runtime path to your LDtk file.
@@ -65,20 +63,15 @@ extension LDtk {
             let assetPath = try AbsolutePath(validating: decoder.assetMeta.filePath.path)
 
             self.fileWatcher = FileWatcher(paths: [assetPath]) { [weak self] paths in
-                self?.onLDtkFileMapChanged(paths: paths.map { $0.pathString })
+                self?.onLDtkFileMapChanged(paths: paths.map(\.pathString))
             }
 
             try await self.loadLdtkProject(from: decoder.assetData)
         }
-        
-        public override func encodeContents(with encoder: AssetEncoder) async throws {
-            try await super.encodeContents(with: encoder)
-        }
-        
+
         /// Load level from LDtk project at index.
         /// You can get information about levels count using ``levelsCount`` property.
         /// - Note: Each time when you call ``loadLevel(at:)`` method, then previous tiles will deleted.
-        // swiftlint:disable:next cyclomatic_complexity function_body_length
         public func loadLevel(at index: Int) {
             guard let project else {
                 logger.critical("LDtk Project is empty at path \(filePath)")
@@ -104,8 +97,15 @@ extension LDtk {
                 }
 
                 switch layerInstance.__type {
-                case .autoLayer, .intGrid:
-                    let source = tileSet.sources[projectLayer.tilesetDefUid!] as! TextureAtlasTileSource
+                case .autoLayer,
+                    .intGrid:
+                    guard
+                        let tileSetID = projectLayer.tilesetDefUid,
+                        let source = tileSet.sources[tileSetID] as? TextureAtlasTileSource
+                    else {
+                        logger.error("Could not resolve a texture-atlas tile source for layer \(projectLayer.uid).")
+                        return
+                    }
 
                     for tile in layerInstance.autoLayerTiles {
                         let atlasCoordinates = Utils.gridCoordinates(from: tile.source, gridSize: layerInstance.__gridSize)
@@ -115,7 +115,7 @@ extension LDtk {
 
                         layer.setCell(
                             at: Utils.pixelCoordsToGridCoords(from: tile.position, gridSize: layerInstance.__gridSize, gridHeight: layerInstance.__cHei),
-                            sourceId: projectLayer.tilesetDefUid!,
+                            sourceId: tileSetID,
                             atlasCoordinates: atlasCoordinates
                         )
                     }
@@ -123,7 +123,7 @@ extension LDtk {
                     let entityInstances = layerInstance.entityInstances ?? []
                     for entity in entityInstances {
                         let atlasCoordinates = Utils.gridCoordinates(from: entity.px, gridSize: layerInstance.__gridSize)
-                        
+
                         let source = tileSet.sources[entity.defUid] as! LDtk.EntityTileSource
 
                         source.createTile(at: atlasCoordinates, entityInstance: entity)
@@ -139,7 +139,13 @@ extension LDtk {
                         )
                     }
                 case .tiles:
-                    let source = tileSet.sources[projectLayer.tilesetDefUid!] as! TextureAtlasTileSource
+                    guard
+                        let tileSetID = projectLayer.tilesetDefUid,
+                        let source = tileSet.sources[tileSetID] as? TextureAtlasTileSource
+                    else {
+                        logger.error("Could not resolve a texture-atlas tile source for layer \(projectLayer.uid).")
+                        return
+                    }
 
                     for tile in layerInstance.gridTiles {
                         let atlasCoordinates = Utils.gridCoordinates(from: tile.source, gridSize: layerInstance.__gridSize)
@@ -150,7 +156,7 @@ extension LDtk {
 
                         layer.setCell(
                             at: Utils.pixelCoordsToGridCoords(from: tile.position, gridSize: layerInstance.__gridSize, gridHeight: layerInstance.__cHei),
-                            sourceId: projectLayer.tilesetDefUid!,
+                            sourceId: tileSetID,
                             atlasCoordinates: atlasCoordinates
                         )
                     }
@@ -206,7 +212,8 @@ extension LDtk {
                 }
 
                 for tileSource in project.defs.tilesets {
-                    let atlasPath = filePath
+                    let atlasPath =
+                        filePath
                         .deletingLastPathComponent()
                         .appending(path: tileSource.relPath ?? "")
 
@@ -253,7 +260,6 @@ extension LDtk {
             self.setNeedsUpdate()
         }
     }
-
 }
 
 // MARK: - Tile Source
@@ -261,28 +267,27 @@ extension LDtk {
 extension LDtk {
     /// A tile source for entities.
     public class EntityTileSource: TileEntityAtlasSource, @unchecked Sendable {
-
         /// The delegate of the entity tile source.
         weak var delegate: TileMapDelegate?
-        
+
         /// Initialize a new entity tile source.
-        public override init() {
+        override public init() {
             super.init()
         }
-        
+
         /// Initialize a new entity tile source from a decoder.
         ///
         /// - Parameter decoder: The decoder to initialize the entity tile source from.
         /// - Throws: An error if the entity tile source cannot be initialized from the decoder.
-        public required init(from decoder: any Decoder) throws {
+        public required init(from _: any Decoder) throws {
             fatalErrorMethodNotImplemented()
         }
-        
+
         /// Encode the entity tile source to an encoder.
         ///
         /// - Parameter encoder: The encoder to encode the entity tile source to.
         /// - Throws: An error if the entity tile source cannot be encoded to the encoder.
-        public override func encode(to encoder: any Encoder) throws {
+        override public func encode(to _: any Encoder) throws {
             fatalErrorMethodNotImplemented()
         }
 
@@ -293,7 +298,7 @@ extension LDtk {
         public func hasTile(at atlasCoordinates: PointInt) -> Bool {
             return self.tiles[atlasCoordinates] != nil
         }
-        
+
         /// Create a tile for the entity tile source.
         ///
         /// - Parameters:
@@ -314,7 +319,7 @@ extension LDtk {
                 if !source.hasTile(at: tileCoordinate) {
                     source.createTile(for: tileCoordinate)
                 }
-                
+
                 let data = source.getTileData(at: tileCoordinate)
                 let texture = source.getTexture(at: tileCoordinate)
                 entity.components += Sprite(
@@ -334,7 +339,6 @@ extension LDtk {
 
 /// Delegate that help configure LDtk TileMap.
 public protocol TileMapDelegate: AnyObject {
-    
     /// Configure entity from LDtk project. By default entity has ``Transform`` and ``Sprite``
     ///
     /// - Parameter tileMap: Instance of TileMap.
@@ -342,7 +346,7 @@ public protocol TileMapDelegate: AnyObject {
     /// - Parameter instance: Entity Instance from LDtk project. Use this object to get info about entity
     /// - Parameter tileSource: Instance of TileSource where entity will store.
     func tileMap(
-        _ tileMap: LDtk.TileMap, 
+        _ tileMap: LDtk.TileMap,
         needsUpdate entity: AdaECS.Entity,
         from instance: LDtk.EntityInstance,
         in tileSource: LDtk.EntityTileSource
@@ -352,7 +356,6 @@ public protocol TileMapDelegate: AnyObject {
 // MARK: - JSON Data
 
 extension LDtk {
-
     struct Project: Codable, Equatable {
         let iid: String
         let jsonVersion: Version
@@ -420,7 +423,6 @@ extension LDtk {
     }
 
     struct GridTileData: Codable, Equatable {
-
         /// Pixel coordinates of the tile in the layer (array format [x,y]). Don’t forget optional layer offsets, if they exist!
         let position: [Int]
 
@@ -495,7 +497,7 @@ extension LDtk {
         public let w: Int
         public let h: Int
     }
-    
+
     /// A field instance.
     public struct FieldInstance: Codable, Equatable {
         public let identifier: String
@@ -510,12 +512,12 @@ extension LDtk {
             case value = "__value"
             case defUid, readEditorValues
         }
-        
+
         public init(from decoder: any Decoder) throws {
             let container: KeyedDecodingContainer<LDtk.FieldInstance.CodingKeys> = try decoder.container(keyedBy: LDtk.FieldInstance.CodingKeys.self)
             self.identifier = try container.decode(String.self, forKey: LDtk.FieldInstance.CodingKeys.identifier)
             self.type = try container.decode(String.self, forKey: LDtk.FieldInstance.CodingKeys.type)
-            
+
             switch type {
             case "Int":
                 self.value = try Value.integer(container.decode(Int.self, forKey: LDtk.FieldInstance.CodingKeys.value))
@@ -524,33 +526,33 @@ extension LDtk {
             default:
                 self.value = .undefined
             }
-        
+
             self.defUid = try container.decode(Int.self, forKey: LDtk.FieldInstance.CodingKeys.defUid)
             self.readEditorValues = try container.decodeIfPresent([LDtk.EditorValue].self, forKey: LDtk.FieldInstance.CodingKeys.readEditorValues)
         }
     }
-    
+
     /// Contains information for ``FieldInstance``
     public enum Value: Codable, Equatable {
         case integer(Int)
         case string(String)
         case undefined
-        
+
         /// Return int value if value was an integer
         public var intValue: Int? {
-            guard case .integer(let int) = self else {
+            guard case let .integer(int) = self else {
                 return nil
             }
-            
+
             return int
         }
-        
+
         /// Return string value if value was a string.
         public var stringValue: String? {
-            guard case .string(let string) = self else {
+            guard case let .string(string) = self else {
                 return nil
             }
-            
+
             return string
         }
     }
@@ -564,7 +566,6 @@ extension LDtk {
 // MARK: - Utils
 
 extension LDtk {
-    
     enum Utils {
         static func pixelCoordsToGridCoords(from coords: [Int], gridSize: Int, gridHeight: Int) -> PointInt {
             return PointInt(x: coords[0] / gridSize, y: gridHeight - (coords[1] / gridSize))
@@ -584,5 +585,4 @@ extension LDtk {
             return PointInt(x: gridX, y: gridY)
         }
     }
-
 }

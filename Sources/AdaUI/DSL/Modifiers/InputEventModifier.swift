@@ -7,10 +7,10 @@
 
 import AdaInput
 
-public extension View {
+extension View {
     /// Runs an action when the view tree receives a matching input event.
-    func onInputEvent<E: InputEvent>(
-        _ event: E.Type,
+    public func onInputEvent<E: InputEvent>(
+        _: E.Type,
         perform action: @escaping @MainActor (E) -> Void
     ) -> some View {
         self.modifier(InputEventModifier(content: self, action: action))

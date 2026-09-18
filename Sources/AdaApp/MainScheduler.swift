@@ -10,7 +10,6 @@ import AdaUtils
 
 /// The plugin that sets up the main scheduler.
 package struct MainSchedulerPlugin: Plugin {
-
     package init() {}
 
     /// Setup the main scheduler.
@@ -50,7 +49,7 @@ package struct MainSchedulerPlugin: Plugin {
                     // Apply fixed-step writes before post-update systems derive
                     // render state such as GlobalTransform.
                     .fixed,
-                    .postUpdate
+                    .postUpdate,
                 ]
             )
         )
@@ -69,14 +68,15 @@ extension SchedulerName {
 func GameLoopBegan(
     _ deltaTime: Res<DeltaTime?>
 ) {
-    guard let deltaTime = deltaTime.wrappedValue else { return }
+    guard let deltaTime = deltaTime.wrappedValue else {
+        return
+    }
     EventManager.default.send(EngineEvents.MainLoopBegan(deltaTime: deltaTime.deltaTime))
 }
 
 /// The system that runs the fixed time scheduler.
 @PlainSystem
 public struct FixedTimeSchedulerSystem {
-
     @Local
     private var fixedTimestep: FixedTimestep
 
@@ -86,10 +86,10 @@ public struct FixedTimeSchedulerSystem {
         .physicsStep,
         .physicsWriteback,
         .fixedUpdate,
-        .fixedPostUpdate
+        .fixedPostUpdate,
     ]
 
-    public init(world: World) {
+    public init(world _: World) {
         self.fixedTimestep = FixedTimestep(stepsPerSecond: 60)
     }
 

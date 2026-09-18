@@ -13,13 +13,13 @@ public enum ColorScheme: Hashable, Sendable, CaseIterable {
     case dark
 }
 
-public extension View {
+extension View {
     /// Sets the preferred color scheme for this presentation.
-    func preferredColorScheme(_ scheme: ColorScheme) -> some View {
+    public func preferredColorScheme(_ scheme: ColorScheme) -> some View {
         self.environment(\.colorScheme, scheme)
     }
 }
 
-public extension EnvironmentValues {
-    @Entry var colorScheme: ColorScheme = .light
+extension EnvironmentValues {
+    @Entry public var colorScheme: ColorScheme = .light
 }

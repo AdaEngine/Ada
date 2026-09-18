@@ -22,7 +22,6 @@ public struct LayoutProperties: Equatable {
 @MainActor
 @preconcurrency
 public protocol Layout: Animatable {
-    
     /// The cache of the layout.
     associatedtype Cache = Void
 
@@ -65,14 +64,14 @@ public protocol Layout: Animatable {
     static var layoutProperties: LayoutProperties { get }
 }
 
-public extension Layout {
-    func updateCache(_ cache: inout Cache, subviews: Subviews) { }
+extension Layout {
+    public func updateCache(_: inout Cache, subviews _: Subviews) {}
 
-    static var layoutProperties: LayoutProperties { LayoutProperties() }
+    public static var layoutProperties: LayoutProperties { LayoutProperties() }
 }
 
-public extension Layout where Cache == Void {
-    func makeCache(subviews: Subviews) -> Cache {
+extension Layout where Cache == Void {
+    public func makeCache(subviews _: Subviews) -> Cache {
         return
     }
 }
@@ -90,7 +89,6 @@ extension Layout {
 // MARK: - Internal
 
 struct CustomLayoutContainer<T: Layout, Content: View>: View {
-
     typealias Body = Never
 
     let layout: T

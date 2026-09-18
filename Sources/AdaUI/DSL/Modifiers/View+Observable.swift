@@ -8,8 +8,7 @@
 import AdaUtils
 @unsafe @preconcurrency import Observation
 
-public extension View {
-
+extension View {
     /// Places an observable object in the view's environment.
     ///
     /// - Parameter object: The object to set for this object's type in the
@@ -17,7 +16,7 @@ public extension View {
     ///   environment.
     ///
     /// - Returns: A view that has the specified object in its environment.
-    func environment<T: Observable & AnyObject>(_ object: T?) -> some View {
+    public func environment<T: Observable & AnyObject>(_ object: T?) -> some View {
         self.transformEnvironment(\.observableStorage) { storage in
             storage.insertValue(object)
         }
@@ -48,8 +47,10 @@ struct ObservableStorageEnvironment: @unchecked Sendable, Hashable {
         }
 
         for (key, lhsValue) in lhs.storedValues {
-            guard let rhsValue = rhs.storedValues[key],
-                  ObjectIdentifier(lhsValue) == ObjectIdentifier(rhsValue) else {
+            guard
+                let rhsValue = rhs.storedValues[key],
+                ObjectIdentifier(lhsValue) == ObjectIdentifier(rhsValue)
+            else {
                 return false
             }
         }

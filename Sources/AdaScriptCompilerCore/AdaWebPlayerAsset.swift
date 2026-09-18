@@ -7,7 +7,9 @@ public struct AdaWebPlayerAsset: Codable, Equatable, Sendable {
     public var path: String
 
     public init(id: String, kind: Kind, path: String) {
-        self.id = id; self.kind = kind; self.path = path
+        self.id = id
+        self.kind = kind
+        self.path = path
     }
 }
 
@@ -17,17 +19,23 @@ public struct AdaWebPlayerMaterial: Codable, Equatable, Sendable {
     public var shader: String
     public var texture: String
     public init(id: String, shader: String, texture: String) {
-        self.id = id; self.shader = shader; self.texture = texture
+        self.id = id
+        self.shader = shader
+        self.texture = texture
     }
 }
 
 extension AdaWebPlayerProject {
     public func resourceURL(_ path: String, at directory: URL) throws -> URL {
-        guard Self.isResourcePath(path) else { throw AdaWebPlayerProjectError.invalid("Invalid resource path: \(path).") }
+        guard Self.isResourcePath(path) else {
+            throw AdaWebPlayerProjectError.invalid("Invalid resource path: \(path).")
+        }
         let root = directory.resolvingSymlinksInPath().standardizedFileURL
         let url = root.appendingPathComponent(path).resolvingSymlinksInPath().standardizedFileURL
-        guard url.path.hasPrefix(root.path + "/"),
-              (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
+        guard
+            url.path.hasPrefix(root.path + "/"),
+            (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        else {
             throw AdaWebPlayerProjectError.invalid("Missing resource or resource outside project: \(path).")
         }
         return url
@@ -39,8 +47,10 @@ extension AdaWebPlayerProject {
         guard assets.isEmpty && materials.isEmpty || runtimeAPI >= 2 else {
             throw AdaWebPlayerProjectError.invalid("Project resources require runtime API 2.")
         }
-        guard Set(assets.map(\.id)).count == assets.count,
-              Set(materials.map(\.id)).count == materials.count else {
+        guard
+            Set(assets.map(\.id)).count == assets.count,
+            Set(materials.map(\.id)).count == materials.count
+        else {
             throw AdaWebPlayerProjectError.invalid("Duplicate resource or material identifier.")
         }
         let paths = sources + assets.map(\.path) + ["project.json"]
@@ -60,12 +70,16 @@ extension AdaWebPlayerProject {
             case .audio: supported = ["wav", "mp3", "m4a"]
             case .license: supported = ["txt", "md"]
             }
-            guard supported.contains(ext) else { throw AdaWebPlayerProjectError.invalid("Unsupported format for \(asset.id): \(ext).") }
+            guard supported.contains(ext) else {
+                throw AdaWebPlayerProjectError.invalid("Unsupported format for \(asset.id): \(ext).")
+            }
         }
         for material in materials {
-            guard AdaScriptLibraryManifest.isIdentifier(material.id),
-                  assets.contains(where: { $0.id == material.shader && $0.kind == .shader }),
-                  assets.contains(where: { $0.id == material.texture && $0.kind == .texture }) else {
+            guard
+                AdaScriptLibraryManifest.isIdentifier(material.id),
+                assets.contains(where: { $0.id == material.shader && $0.kind == .shader }),
+                assets.contains(where: { $0.id == material.texture && $0.kind == .texture })
+            else {
                 throw AdaWebPlayerProjectError.invalid("Invalid shader or texture reference in material \(material.id).")
             }
         }
@@ -73,7 +87,7 @@ extension AdaWebPlayerProject {
 
     private static func isResourcePath(_ path: String) -> Bool {
         !path.isEmpty && path.count <= 220 && !path.contains("\\") && !path.contains(":")
-        && !path.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
-        && path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy { !$0.isEmpty && !$0.hasPrefix(".") && !$0.hasSuffix(" ") }
+            && !path.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
+            && path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy { !$0.isEmpty && !$0.hasPrefix(".") && !$0.hasSuffix(" ") }
     }
 }

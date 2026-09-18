@@ -37,9 +37,11 @@ public struct AdaScriptLibraryLock: Codable, Equatable, Sendable {
 
     /// Checks the complete graph and returns dependencies before their consumers.
     public func orderedLibraries() throws -> [AdaScriptLockedLibrary] {
-        guard schemaVersion == 1, libraries.count <= 128,
-              Set(libraries.map { $0.manifest.id }).count == libraries.count,
-              Set(roots).count == roots.count else {
+        guard
+            schemaVersion == 1, libraries.count <= 128,
+            Set(libraries.map(\.manifest.id)).count == libraries.count,
+            Set(roots).count == roots.count
+        else {
             throw AdaScriptLibraryError.invalid("Invalid AdaScript library lock.")
         }
         for library in libraries {
@@ -78,27 +80,31 @@ public struct AdaScriptLibraryLock: Codable, Equatable, Sendable {
     }
 
     public func loadSources(at projectURL: URL) throws -> [AdaScriptCompilerSource] {
-        try orderedLibraries().flatMap { library in
-            try library.manifest.sources.sorted().map { path in
-                let relativePath = ".ada/libraries/\(library.directory)/\(path)"
-                let url = try Self.containedURL(relativePath, in: projectURL)
-                guard FileManager.default.fileExists(atPath: url.path) else {
-                    throw AdaScriptLibraryError.invalid("Missing \(library.manifest.id)/\(path). Restore libraries in Project Settings.")
-                }
-                return try AdaScriptCompilerSource(
-                    path: "Libraries/\(library.manifest.id)/\(path)",
-                    source: String(contentsOf: url, encoding: .utf8)
-                )
+        try orderedLibraries()
+            .flatMap { library in
+                try library.manifest.sources.sorted()
+                    .map { path in
+                        let relativePath = ".ada/libraries/\(library.directory)/\(path)"
+                        let url = try Self.containedURL(relativePath, in: projectURL)
+                        guard FileManager.default.fileExists(atPath: url.path) else {
+                            throw AdaScriptLibraryError.invalid("Missing \(library.manifest.id)/\(path). Restore libraries in Project Settings.")
+                        }
+                        return try AdaScriptCompilerSource(
+                            path: "Libraries/\(library.manifest.id)/\(path)",
+                            source: String(contentsOf: url, encoding: .utf8)
+                        )
+                    }
             }
-        }
     }
 
     /// Library files and their parent directories must not be symbolic links.
     public static func containedURL(_ path: String, in root: URL) throws -> URL {
         let resolvedRoot = root.resolvingSymlinksInPath().standardizedFileURL
         let components = path.split(separator: "/", omittingEmptySubsequences: false)
-        guard !components.isEmpty, !path.contains("\\"),
-              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+        guard
+            !components.isEmpty, !path.contains("\\"),
+            components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." })
+        else {
             throw AdaScriptLibraryError.invalid("Library path escapes the project: \(path).")
         }
         var url = resolvedRoot

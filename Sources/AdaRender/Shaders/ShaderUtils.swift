@@ -13,7 +13,6 @@ import Foundation
 
 /// Collection of utils for works with shaders.
 enum ShaderUtils {
-    
     enum CommentState {
         case singleLineComment
         case multiLineComment
@@ -21,47 +20,45 @@ enum ShaderUtils {
         case slash
         case star
     }
-    
+
     enum ProcessingError: LocalizedError {
         case noMacroSymbols
         case invalidDeclaration(String)
         case noStageFound
-        
+
         var errorDescription: String? {
             switch self {
             case .noMacroSymbols:
                 return "[ShaderCompiler] Macro symbol `#` not found."
-            case .invalidDeclaration(let message):
+            case let .invalidDeclaration(message):
                 return "[ShaderCompiler] Invalid declaration: \(message)."
             case .noStageFound:
                 return "[ShaderCompiler] Stages not found."
             }
         }
     }
-    
-    // swiftlint:disable function_body_length cyclomatic_complexity
-    
+
     /// Split GLSL shader source code by available stages.
     /// - Throws: Error if missed pragmas: `#version` or `#pragma stage`. Also throw error if not stage found.
     static func processGLSLShader(source: String) throws -> [ShaderStage: String] {
-        let finalSource = ShaderUtils.removeComments(from: source)
-        
-        var shaderSources: [ShaderStage : String] = [:]
+        let finalSource = Self.removeComments(from: source)
+
+        var shaderSources: [ShaderStage: String] = [:]
         var stagePositions: [(ShaderStage, String.Index)] = []
-        
+
         guard var pointer = finalSource.firstIndex(of: "#") else {
             throw ProcessingError.noMacroSymbols
         }
-        
+
         var startStagePosition = pointer
-        
+
         while pointer < finalSource.endIndex {
             let newSource = finalSource[pointer..<finalSource.endIndex]
-            
+
             guard let endOfLine = newSource.firstIndex(where: { $0.isNewline }) else {
                 break
             }
-            
+
             let regular = try NSRegularExpression(pattern: "((^\\W|^\\w+)|(\\w+)|[:()])", options: [])
             let rangeLocation = finalSource.utf16.distance(from: finalSource.startIndex, to: pointer)
             let rangeLength = finalSource.utf16.distance(from: pointer, to: endOfLine)
@@ -70,9 +67,9 @@ enum ShaderUtils {
                 options: [],
                 range: NSRange(location: rangeLocation, length: rangeLength)
             )
-            
+
             let firstToken = finalSource.getSubstring(from: matches[1].range)
-            
+
             switch firstToken {
             case "version":
                 startStagePosition = finalSource.getSubstring(from: matches[0].range).startIndex
@@ -89,24 +86,24 @@ enum ShaderUtils {
             default:
                 break
             }
-            
+
             guard let newPosition = newSource[endOfLine...].firstIndex(of: "#") else {
                 break
             }
-            
+
             pointer = newPosition
         }
-        
+
         if stagePositions.isEmpty {
             throw ProcessingError.noStageFound
         }
-        
+
         for index in 0..<stagePositions.count {
             let (currentStage, currentStringIndex) = stagePositions[index]
-            
+
             if stagePositions.indices.contains(index + 1) {
                 let (_, nextStringIndex) = stagePositions[index + 1]
-                
+
                 let stageSource = finalSource[currentStringIndex..<nextStringIndex]
                 shaderSources[currentStage] = String(stageSource)
             } else {
@@ -114,20 +111,18 @@ enum ShaderUtils {
                 shaderSources[currentStage] = String(stageSource)
             }
         }
-        
+
         return shaderSources
     }
-    
-    // swiftlint:enable function_body_length
-    
+
     /// Remove comments from source code.
     /// Supports multi-line and single-line comments.
     static func removeComments(from string: String) -> String {
         var state: CommentState = .notAComment
-        
+
         var newString = ""
         newString.reserveCapacity(string.count)
-        
+
         for char in string {
             switch state {
             case .star:
@@ -165,16 +160,17 @@ enum ShaderUtils {
                 }
             }
         }
-        
+
         return newString
     }
-    
-    // swiftlint:enable cyclomatic_complexity
-    
+
     /// Return shader language from file extension.
     static func shaderLang(from fileExt: String) -> ShaderLanguage {
         switch fileExt {
-        case "vert", "frag", "glsl", "comp":
+        case "vert",
+            "frag",
+            "glsl",
+            "comp":
             return .glsl
         case "hlsl":
             return .hlsl
@@ -184,21 +180,24 @@ enum ShaderUtils {
             return .glsl
         }
     }
-    
+
     /// Return shader stage from string.
     static func shaderStage(from string: String) -> ShaderStage? {
         switch string {
-        case "vert", "vertex":
+        case "vert",
+            "vertex":
             return .vertex
-        case "frag", "fragment":
+        case "frag",
+            "fragment":
             return .fragment
-        case "comp", "compute":
+        case "comp",
+            "compute":
             return .compute
         default:
             return nil
         }
     }
-    
+
     /// Find entry point in double braces.
     /// Example:
     /// ```
@@ -206,10 +205,10 @@ enum ShaderUtils {
     /// void myShaderFunc() { ... }
     /// ```
     private static let entryPointRegex: String = #"\[\[(\w+)\]\]\s*(?:\[[^\]]+\])*\s*\w+\s([^\\(]+)"#
-    
+
     /// Drop user entry point annotated with `[[main]]` attribute and replace it to `main`.
     ///
-    /// We support custom entry points for GLSL shaders. GLSLang compiler can't supports custom entry points 
+    /// We support custom entry points for GLSL shaders. GLSLang compiler can't supports custom entry points
     /// and we change user entry point to `main` and return user entry point for SPIRV-Cross.
     /// That's because we want support user entry point name in final, GPU specific shader source.
     ///
@@ -217,40 +216,41 @@ enum ShaderUtils {
     static func dropEntryPoint(from string: String) throws -> (String, String) {
         var newString = string
         if let (attributeName, functionName) = self.getFirstFunctionAttribute(in: newString), attributeName == "main" {
-            
             newString.replaceSubrange(functionName.startIndex..<functionName.endIndex, with: attributeName)
-            
+
             // Remove it from source
             newString.removeSubrange(string.index(attributeName.startIndex, offsetBy: -2)..<string.index(attributeName.endIndex, offsetBy: 2))
-            
+
             return (String(functionName), newString)
         }
-        
+
         // We don't find any attributes
         return ("main", string)
     }
-    
+
     /// Get first matched attribute in string.
     /// - Returns: Attribute name and function name
     static func getFirstFunctionAttribute(in string: String) -> (Substring, Substring)? {
         guard let regex = try? NSRegularExpression(pattern: Self.entryPointRegex, options: []) else {
             return nil
         }
-        
-        guard let firstMatch = regex.firstMatch(
-            in: string,
-            options: [],
-            range: NSRange(location: 0, length: string.utf16.count)
-        ) else {
+
+        guard
+            let firstMatch = regex.firstMatch(
+                in: string,
+                options: [],
+                range: NSRange(location: 0, length: string.utf16.count)
+            )
+        else {
             // We don't find any attributes
             return nil
         }
-        
-        let attributeNameMatch = firstMatch.range(at: 1) // attribute name
-        let functionNameMatch = firstMatch.range(at: 2) // function name
+
+        let attributeNameMatch = firstMatch.range(at: 1)  // attribute name
+        let functionNameMatch = firstMatch.range(at: 2)  // function name
         let attribute = string.getSubstring(from: attributeNameMatch)
         let functionName = string.getSubstring(from: functionNameMatch)
-        
+
         return (attribute, functionName)
     }
 }
@@ -264,7 +264,7 @@ extension String {
     func getSubstring(from nsRange: NSRange) -> Substring {
         let start = self.index(self.startIndex, offsetBy: nsRange.lowerBound)
         let end = self.index(self.startIndex, offsetBy: nsRange.upperBound)
-        
+
         return self[start..<end]
     }
 }

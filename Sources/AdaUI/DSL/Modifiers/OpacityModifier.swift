@@ -7,14 +7,13 @@
 
 import Math
 
-public extension View {
-    func opacity(_ opacity: Float) -> some View {
+extension View {
+    public func opacity(_ opacity: Float) -> some View {
         modifier(_OpacityView(opacity: opacity, content: self))
     }
 }
 
 struct _OpacityView<Content: View>: ViewModifier, ViewNodeBuilder {
-
     typealias Body = Never
 
     let opacity: Float
@@ -38,7 +37,7 @@ final class OpacityViewNodeModifier: ViewModifierNode {
             return
         }
 
-        if let animationController = animationController {
+        if let animationController {
             animationController.addTweenAnimation(
                 from: TweenValue(animatableData: self.opacity),
                 to: TweenValue(animatableData: node.opacity),
@@ -56,7 +55,7 @@ final class OpacityViewNodeModifier: ViewModifierNode {
     }
 
     override func draw(with context: UIGraphicsContext) {
-        if let layer = layer {
+        if let layer {
             var context = context
             context.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
             layer.drawLayer(in: context)

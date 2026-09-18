@@ -7,13 +7,13 @@ import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 
-public struct StateMacro { }
+public struct StateMacro {}
 
 extension StateMacro: AccessorMacro {
     public static func expansion(
         of node: AttributeSyntax,
         providingAccessorsOf declaration: some DeclSyntaxProtocol,
-        in context: some MacroExpansionContext
+        in _: some MacroExpansionContext
     ) throws -> [AccessorDeclSyntax] {
         let property = try StateProperty(declaration: declaration, attribute: node)
         let storageName = property.initialValue == nil ? "_\(property.name)" : "__\(property.name)"
@@ -28,7 +28,7 @@ extension StateMacro: PeerMacro {
     public static func expansion(
         of node: AttributeSyntax,
         providingPeersOf declaration: some DeclSyntaxProtocol,
-        in context: some MacroExpansionContext
+        in _: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
         let property = try StateProperty(declaration: declaration, attribute: node)
         let access = property.accessModifier
@@ -39,28 +39,28 @@ extension StateMacro: PeerMacro {
         if let initialValue = property.initialValue {
             storageName = "__\(property.name)"
             backingStorage =
-            """
-            private let __\(raw: property.name) = \(raw: property.qualifier)State._makeStorage({
-                let value\(raw: typeAnnotation) = \(initialValue)
-                return value
-            })
-            """
+                """
+                private let __\(raw: property.name) = \(raw: property.qualifier)State._makeStorage({
+                    let value\(raw: typeAnnotation) = \(initialValue)
+                    return value
+                })
+                """
         } else {
             storageName = "_\(property.name)"
             backingStorage =
-            """
-            private var _\(raw: property.name): \(raw: property.qualifier)State<\(property.valueType)>
-            """
+                """
+                private var _\(raw: property.name): \(raw: property.qualifier)State<\(property.valueType)>
+                """
         }
 
         let projectedValue: DeclSyntax =
-        """
-        \(raw: access)var $\(raw: property.name): \(raw: property.qualifier)Binding<\(property.valueType)> {
-            get {
-                \(raw: storageName).projectedValue
+            """
+            \(raw: access)var $\(raw: property.name): \(raw: property.qualifier)Binding<\(property.valueType)> {
+                get {
+                    \(raw: storageName).projectedValue
+                }
             }
-        }
-        """
+            """
 
         return [backingStorage, projectedValue]
     }
@@ -75,9 +75,11 @@ private struct StateProperty {
     let qualifier: String
 
     init(declaration: some DeclSyntaxProtocol, attribute: AttributeSyntax) throws {
-        guard let variable = declaration.as(VariableDeclSyntax.self),
-              let binding = variable.bindings.first,
-              variable.bindings.count == 1 else {
+        guard
+            let variable = declaration.as(VariableDeclSyntax.self),
+            let binding = variable.bindings.first,
+            variable.bindings.count == 1
+        else {
             throw MacroError.macroUsage("State macro can be applied only to a single stored property.")
         }
 
@@ -112,7 +114,7 @@ private struct StateProperty {
     }
 }
 
-private extension VariableDeclSyntax {
+extension VariableDeclSyntax {
     var stateAccessModifier: String {
         if modifiers.contains(where: { $0.name.tokenKind == .keyword(.public) }) {
             return "public "
@@ -120,8 +122,8 @@ private extension VariableDeclSyntax {
         if modifiers.contains(where: { $0.name.tokenKind == .keyword(.package) }) {
             return "package "
         }
-        if modifiers.contains(where: { $0.name.tokenKind == .keyword(.fileprivate) }) {
-            return "fileprivate "
+        if modifiers.contains(where: { $0.name.tokenKind == .keyword(.private) }) {
+            return "private "
         }
         if modifiers.contains(where: { $0.name.tokenKind == .keyword(.private) }) {
             return "private "
@@ -130,7 +132,7 @@ private extension VariableDeclSyntax {
     }
 }
 
-private extension ExprSyntax {
+extension ExprSyntax {
     var inferredStateValueType: TypeSyntax? {
         if self.is(IntegerLiteralExprSyntax.self) {
             return "Int"
@@ -145,23 +147,25 @@ private extension ExprSyntax {
             return "Double"
         }
         if let memberAccess = self.as(MemberAccessExprSyntax.self),
-           let base = memberAccess.base?.trimmedDescription,
-           !base.isEmpty {
+            let base = memberAccess.base?.trimmedDescription,
+            !base.isEmpty {
             return "\(raw: base)"
         }
         if let call = self.as(FunctionCallExprSyntax.self),
-           let calledType = call.calledExpression.constructorTypeName {
+            let calledType = call.calledExpression.constructorTypeName {
             return calledType
         }
         return nil
     }
 }
 
-private extension ExprSyntax {
-    var constructorTypeName: TypeSyntax? {
+extension ExprSyntax {
+    private var constructorTypeName: TypeSyntax? {
         let typeName = trimmedDescription
-        guard !typeName.isEmpty,
-              typeName.split(separator: ".").last?.first?.isUppercase == true else {
+        guard
+            !typeName.isEmpty,
+            typeName.split(separator: ".").last?.first?.isUppercase == true
+        else {
             return nil
         }
 
@@ -169,11 +173,13 @@ private extension ExprSyntax {
     }
 }
 
-private extension AttributeSyntax {
+extension AttributeSyntax {
     var stateQualifier: String {
         let name = attributeName.trimmedDescription
-        guard name.hasSuffix(".State"),
-              let dotIndex = name.lastIndex(of: ".") else {
+        guard
+            name.hasSuffix(".State"),
+            let dotIndex = name.lastIndex(of: ".")
+        else {
             return ""
         }
 

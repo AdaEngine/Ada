@@ -67,7 +67,7 @@ class UpdatablePropertyStorage {
     /// The name of the property.
     var propertyName: String = ""
 
-    nonisolated init() { }
+    nonisolated init() {}
 
     /// Update the property.
     ///
@@ -77,8 +77,8 @@ class UpdatablePropertyStorage {
 
         nodes.forEach { node in
             if node.shouldNotifyAboutChanges {
-                 Logger(label: "org.adaengine.AdaUI")
-                     .info("\(type(of: node.content)): \(propertyName) changed.")
+                Logger(label: "org.adaengine.AdaUI")
+                    .info("\(type(of: node.content)): \(propertyName) changed.")
             }
 
             let isStateUpdate = self is AnyStateStorage
@@ -117,4 +117,4 @@ class UpdatablePropertyStorage {
 }
 
 @MainActor
-protocol AnyStateStorage: AnyObject { }
+protocol AnyStateStorage: AnyObject {}

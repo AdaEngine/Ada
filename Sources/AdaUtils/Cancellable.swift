@@ -11,24 +11,22 @@ import Foundation
 ///
 /// Calling cancel() frees up any allocated resources. It also stops side effects such as timers, network access, or disk I/O.
 public protocol Cancellable: Sendable {
-
     /// Cancel the activity.
     func cancel()
 }
 
-public extension Cancellable {
-    
+extension Cancellable {
     /// Stores this type-erasing cancellable instance in the specified set.
-    func store(in set: inout Set<AnyCancellable>) {
+    public func store(in set: inout Set<AnyCancellable>) {
         if let anyCancellable = self as? AnyCancellable {
             set.insert(anyCancellable)
         } else {
             set.insert(AnyCancellable(self))
         }
     }
-    
+
     /// Stores this type-erasing cancellable instance in the specified collection.
-    func store<C: RangeReplaceableCollection>(in collection: inout C) where C.Element == AnyCancellable {
+    public func store<C: RangeReplaceableCollection>(in collection: inout C) where C.Element == AnyCancellable {
         if let anyCancellable = self as? AnyCancellable {
             collection.append(anyCancellable)
         } else {
@@ -45,11 +43,10 @@ public extension Cancellable {
 /// An AnyCancellable instance automatically calls cancel() when deinitialized.
 ///
 public final class AnyCancellable: Cancellable, Hashable, Equatable {
-    
     let id: UUID
-    
+
     let cancellable: Cancellable
-    
+
     /// Initializes the cancellable object with the given cancallable object.
     public init<T: Cancellable>(_ cancellable: T) {
         self.id = UUID()
@@ -64,15 +61,15 @@ public final class AnyCancellable: Cancellable, Hashable, Equatable {
     deinit {
         self.cancellable.cancel()
     }
-    
+
     public func cancel() {
         self.cancellable.cancel()
     }
-    
+
     public static func == (lhs: AnyCancellable, rhs: AnyCancellable) -> Bool {
         lhs.id == rhs.id
     }
-    
+
     public func hash(into hasher: inout Hasher) {
         hasher.combine(self.id)
     }

@@ -9,9 +9,8 @@ import Foundation
 import Math
 
 public struct NativeGLTFLoader: GLTFLoader {
-    
     public init() {}
-    
+
     public func load(url: URL) async throws -> GLTFImportResult {
         let data = try Data(contentsOf: url)
         return try load(data: data, baseURL: url.deletingLastPathComponent())
@@ -20,10 +19,10 @@ public struct NativeGLTFLoader: GLTFLoader {
     /// Loads a glTF or GLB document from memory.
     public func load(data: Data, baseURL: URL? = nil) throws -> GLTFImportResult {
         let resourceBaseURL = baseURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        
+
         let gltf: GLTF
         let binaryBuffer: Data?
-        
+
         if data.prefix(4) == Data("glTF".utf8) {
             let (parsedGltf, parsedBinaryBuffer) = try parseGLB(data)
             gltf = parsedGltf
@@ -37,12 +36,12 @@ public struct NativeGLTFLoader: GLTFLoader {
         if let unsupportedExtension = gltf.extensionsRequired?.first(where: { !supportedExtensions.contains($0) }) {
             throw GLTFError.unsupportedRequiredExtension(unsupportedExtension)
         }
-        
+
         let buffers = try loadBuffers(gltf.buffers ?? [], baseURL: resourceBaseURL, binaryBuffer: binaryBuffer)
-        
+
         return try convertToImportResult(gltf, buffers: buffers, baseURL: resourceBaseURL)
     }
-    
+
     private func parseGLB(_ data: Data) throws -> (GLTF, Data?) {
         guard data.count >= 12 else {
             throw GLTFError.invalidGLB
@@ -50,15 +49,15 @@ public struct NativeGLTFLoader: GLTFLoader {
         let magic = data.subdata(in: 0..<4)
         let version = readUInt32(data, at: 4)
         let declaredLength = Int(readUInt32(data, at: 8))
-        
+
         if magic != Data("glTF".utf8) || version != 2 || declaredLength != data.count {
             throw GLTFError.invalidGLB
         }
-        
+
         var offset = 12
         var gltf: GLTF?
         var binaryBuffer: Data?
-        
+
         while offset < data.count {
             guard offset + 8 <= data.count else {
                 throw GLTFError.invalidGLB
@@ -69,39 +68,39 @@ public struct NativeGLTFLoader: GLTFLoader {
                 throw GLTFError.invalidGLB
             }
             let chunkData = data.subdata(in: offset + 8..<offset + 8 + chunkLength)
-            
-            if chunkType == 0x4E4F534A { // JSON
+
+            if chunkType == 0x4E4F_534A {  // JSON
                 gltf = try JSONDecoder().decode(GLTF.self, from: chunkData)
-            } else if chunkType == 0x004E4942 { // BIN
+            } else if chunkType == 0x004E_4942 {  // BIN
                 binaryBuffer = chunkData
             }
-            
+
             offset += 8 + chunkLength
         }
-        
+
         guard let resultGltf = gltf else {
             throw GLTFError.missingJSONChunk
         }
-        
+
         return (resultGltf, binaryBuffer)
     }
-    
+
     private func loadBuffers(_ gltfBuffers: [GLTF.Buffer], baseURL: URL, binaryBuffer: Data?) throws -> [Data] {
         var buffers = [Data]()
-        
+
         for (index, buffer) in gltfBuffers.enumerated() {
-            if index == 0, let binaryBuffer = binaryBuffer {
+            if index == 0, let binaryBuffer {
                 guard binaryBuffer.count >= buffer.byteLength else {
                     throw GLTFError.bufferTooShort
                 }
                 buffers.append(binaryBuffer)
                 continue
             }
-            
+
             guard let uri = buffer.uri else {
                 throw GLTFError.missingBufferURI
             }
-            
+
             if uri.starts(with: "data:") {
                 buffers.append(try decodeDataURI(uri))
             } else {
@@ -114,118 +113,123 @@ public struct NativeGLTFLoader: GLTFLoader {
                 throw GLTFError.bufferTooShort
             }
         }
-        
+
         return buffers
     }
-    
+
     private func convertToImportResult(_ gltf: GLTF, buffers: [Data], baseURL: URL) throws -> GLTFImportResult {
-        let images = try (gltf.images ?? []).map { image -> GLTFImportResult.Image in
-            if let uri = image.uri {
-                if uri.starts(with: "data:") {
-                    return GLTFImportResult.Image(uri: nil, data: try decodeDataURI(uri), mimeType: image.mimeType)
-                }
-                let imageURL = baseURL.appendingPathComponent(uri.removingPercentEncoding ?? uri)
-                return GLTFImportResult.Image(uri: imageURL, data: try Data(contentsOf: imageURL), mimeType: image.mimeType)
-            } else if let bufferViewIndex = image.bufferView {
-                let data = try getBufferViewData(bufferViewIndex, gltf: gltf, buffers: buffers)
-                return GLTFImportResult.Image(uri: nil, data: data, mimeType: image.mimeType)
-            }
-            return GLTFImportResult.Image(uri: nil, data: nil, mimeType: image.mimeType)
-        }
-        
-        let textures = (gltf.textures ?? []).map { texture in
-            GLTFImportResult.Texture(source: texture.source ?? 0, sampler: texture.sampler)
-        }
-        
-        let materials = (gltf.materials ?? []).map { material -> GLTFImportResult.Material in
-            let pbr = material.pbrMetallicRoughness
-            let baseColorFactor = pbr?.baseColorFactor ?? [1, 1, 1, 1]
-            let baseColor = Vector4(x: baseColorFactor[0], y: baseColorFactor[1], z: baseColorFactor[2], w: baseColorFactor[3])
-            
-            return GLTFImportResult.Material(
-                name: material.name,
-                baseColorFactor: baseColor,
-                baseColorTextureIndex: pbr?.baseColorTexture?.index,
-                metallicFactor: pbr?.metallicFactor ?? 1.0,
-                roughnessFactor: pbr?.roughnessFactor ?? 1.0,
-                metallicRoughnessTextureIndex: pbr?.metallicRoughnessTexture?.index,
-                normalTextureIndex: material.normalTexture?.index
-            )
-        }
-        
-        let meshes = try (gltf.meshes ?? []).map { mesh -> GLTFImportResult.Mesh in
-            let primitives = try mesh.primitives.map { primitive -> GLTFImportResult.Primitive in
-                var attributes = [GLTFImportResult.Attribute: GLTFImportResult.Accessor]()
-                
-                for (key, accessorIndex) in primitive.attributes {
-                    let attribute = try mapAttribute(key)
-                    let decoded = try decodeAccessor(accessorIndex, gltf: gltf, buffers: buffers)
-                    attributes[attribute] = GLTFImportResult.Accessor(
-                        values: decoded.values.map(Float.init),
-                        componentCount: decoded.componentCount
-                    )
-                }
-                
-                let indices: [UInt32]?
-                if let indicesIndex = primitive.indices {
-                    let decoded = try decodeAccessor(indicesIndex, gltf: gltf, buffers: buffers)
-                    guard decoded.componentCount == 1 else {
-                        throw GLTFError.invalidIndices
+        let images = try (gltf.images ?? [])
+            .map { image -> GLTFImportResult.Image in
+                if let uri = image.uri {
+                    if uri.starts(with: "data:") {
+                        return GLTFImportResult.Image(uri: nil, data: try decodeDataURI(uri), mimeType: image.mimeType)
                     }
-                    indices = try decoded.values.map { value in
-                        guard value >= 0, value <= Double(UInt32.max), value.rounded() == value else {
+                    let imageURL = baseURL.appendingPathComponent(uri.removingPercentEncoding ?? uri)
+                    return GLTFImportResult.Image(uri: imageURL, data: try Data(contentsOf: imageURL), mimeType: image.mimeType)
+                } else if let bufferViewIndex = image.bufferView {
+                    let data = try getBufferViewData(bufferViewIndex, gltf: gltf, buffers: buffers)
+                    return GLTFImportResult.Image(uri: nil, data: data, mimeType: image.mimeType)
+                }
+                return GLTFImportResult.Image(uri: nil, data: nil, mimeType: image.mimeType)
+            }
+
+        let textures = (gltf.textures ?? [])
+            .map { texture in
+                GLTFImportResult.Texture(source: texture.source ?? 0, sampler: texture.sampler)
+            }
+
+        let materials = (gltf.materials ?? [])
+            .map { material -> GLTFImportResult.Material in
+                let pbr = material.pbrMetallicRoughness
+                let baseColorFactor = pbr?.baseColorFactor ?? [1, 1, 1, 1]
+                let baseColor = Vector4(x: baseColorFactor[0], y: baseColorFactor[1], z: baseColorFactor[2], w: baseColorFactor[3])
+
+                return GLTFImportResult.Material(
+                    name: material.name,
+                    baseColorFactor: baseColor,
+                    baseColorTextureIndex: pbr?.baseColorTexture?.index,
+                    metallicFactor: pbr?.metallicFactor ?? 1.0,
+                    roughnessFactor: pbr?.roughnessFactor ?? 1.0,
+                    metallicRoughnessTextureIndex: pbr?.metallicRoughnessTexture?.index,
+                    normalTextureIndex: material.normalTexture?.index
+                )
+            }
+
+        let meshes = try (gltf.meshes ?? [])
+            .map { mesh -> GLTFImportResult.Mesh in
+                let primitives = try mesh.primitives.map { primitive -> GLTFImportResult.Primitive in
+                    var attributes = [GLTFImportResult.Attribute: GLTFImportResult.Accessor]()
+
+                    for (key, accessorIndex) in primitive.attributes {
+                        let attribute = try mapAttribute(key)
+                        let decoded = try decodeAccessor(accessorIndex, gltf: gltf, buffers: buffers)
+                        attributes[attribute] = GLTFImportResult.Accessor(
+                            values: decoded.values.map(Float.init),
+                            componentCount: decoded.componentCount
+                        )
+                    }
+
+                    let indices: [UInt32]?
+                    if let indicesIndex = primitive.indices {
+                        let decoded = try decodeAccessor(indicesIndex, gltf: gltf, buffers: buffers)
+                        guard decoded.componentCount == 1 else {
                             throw GLTFError.invalidIndices
                         }
-                        return UInt32(value)
+                        indices = try decoded.values.map { value in
+                            guard value >= 0, value <= Double(UInt32.max), value.rounded() == value else {
+                                throw GLTFError.invalidIndices
+                            }
+                            return UInt32(value)
+                        }
+                    } else {
+                        indices = nil
                     }
-                } else {
-                    indices = nil
+
+                    return GLTFImportResult.Primitive(
+                        attributes: attributes,
+                        indices: indices,
+                        materialIndex: primitive.material,
+                        mode: GLTFImportResult.PrimitiveMode(rawValue: primitive.mode ?? 4) ?? .triangles
+                    )
                 }
-                
-                return GLTFImportResult.Primitive(
-                    attributes: attributes,
-                    indices: indices,
-                    materialIndex: primitive.material,
-                    mode: GLTFImportResult.PrimitiveMode(rawValue: primitive.mode ?? 4) ?? .triangles
+
+                return GLTFImportResult.Mesh(name: mesh.name, primitives: primitives)
+            }
+
+        let nodes = (gltf.nodes ?? [])
+            .map { node -> GLTFImportResult.Node in
+                let transform: Transform3D
+
+                if let matrix = node.matrix {
+                    // glTF uses column-major matrices
+                    transform = Transform3D(
+                        Vector4(x: matrix[0], y: matrix[1], z: matrix[2], w: matrix[3]),
+                        Vector4(x: matrix[4], y: matrix[5], z: matrix[6], w: matrix[7]),
+                        Vector4(x: matrix[8], y: matrix[9], z: matrix[10], w: matrix[11]),
+                        Vector4(x: matrix[12], y: matrix[13], z: matrix[14], w: matrix[15])
+                    )
+                } else {
+                    let translation = node.translation ?? [0, 0, 0]
+                    let rotation = node.rotation ?? [0, 0, 0, 1]
+                    let scale = node.scale ?? [1, 1, 1]
+
+                    let t = Transform3D(translation: Vector3(x: translation[0], y: translation[1], z: translation[2]))
+                    let r = Transform3D(quat: Quat(x: rotation[0], y: rotation[1], z: rotation[2], w: rotation[3]))
+                    let s = Transform3D(scale: Vector3(x: scale[0], y: scale[1], z: scale[2]))
+
+                    transform = t * r * s
+                }
+
+                return GLTFImportResult.Node(
+                    name: node.name,
+                    transform: transform,
+                    children: node.children ?? [],
+                    meshIndex: node.mesh
                 )
             }
-            
-            return GLTFImportResult.Mesh(name: mesh.name, primitives: primitives)
-        }
-        
-        let nodes = (gltf.nodes ?? []).map { node -> GLTFImportResult.Node in
-            let transform: Transform3D
-            
-            if let matrix = node.matrix {
-                // glTF uses column-major matrices
-                transform = Transform3D(
-                    Vector4(x: matrix[0], y: matrix[1], z: matrix[2], w: matrix[3]),
-                    Vector4(x: matrix[4], y: matrix[5], z: matrix[6], w: matrix[7]),
-                    Vector4(x: matrix[8], y: matrix[9], z: matrix[10], w: matrix[11]),
-                    Vector4(x: matrix[12], y: matrix[13], z: matrix[14], w: matrix[15])
-                )
-            } else {
-                let translation = node.translation ?? [0, 0, 0]
-                let rotation = node.rotation ?? [0, 0, 0, 1]
-                let scale = node.scale ?? [1, 1, 1]
-                
-                let t = Transform3D(translation: Vector3(x: translation[0], y: translation[1], z: translation[2]))
-                let r = Transform3D(quat: Quat(x: rotation[0], y: rotation[1], z: rotation[2], w: rotation[3]))
-                let s = Transform3D(scale: Vector3(x: scale[0], y: scale[1], z: scale[2]))
-                
-                transform = t * r * s
-            }
-            
-            return GLTFImportResult.Node(
-                name: node.name,
-                transform: transform,
-                children: node.children ?? [],
-                meshIndex: node.mesh
-            )
-        }
-        
+
         let scenes = (gltf.scenes ?? []).map { $0.nodes ?? [] }
-        
+
         return GLTFImportResult(
             nodes: nodes,
             meshes: meshes,
@@ -236,7 +240,7 @@ public struct NativeGLTFLoader: GLTFLoader {
             defaultScene: gltf.scene
         )
     }
-    
+
     private func mapAttribute(_ key: String) throws -> GLTFImportResult.Attribute {
         switch key {
         case "POSITION": return .position
@@ -290,9 +294,11 @@ public struct NativeGLTFLoader: GLTFLoader {
 
             for elementIndex in 0..<accessor.count {
                 let elementOffset = startOffset + elementIndex * byteStride
-                guard elementOffset >= bufferViewOffset,
-                      elementOffset + elementSize <= bufferViewEnd,
-                      elementOffset + elementSize <= buffer.count else {
+                guard
+                    elementOffset >= bufferViewOffset,
+                    elementOffset + elementSize <= bufferViewEnd,
+                    elementOffset + elementSize <= buffer.count
+                else {
                     throw GLTFError.bufferOutOfBounds
                 }
                 for componentIndex in 0..<componentCount {
@@ -346,9 +352,10 @@ public struct NativeGLTFLoader: GLTFLoader {
         guard offset >= 0, offset + count * size <= data.count else {
             throw GLTFError.bufferOutOfBounds
         }
-        return try (0..<count).map {
-            Int(try readComponent(data, at: offset + $0 * size, componentType: indices.componentType, normalized: false))
-        }
+        return try (0..<count)
+            .map {
+                Int(try readComponent(data, at: offset + $0 * size, componentType: indices.componentType, normalized: false))
+            }
     }
 
     private func decodeSparseValues(
@@ -367,9 +374,10 @@ public struct NativeGLTFLoader: GLTFLoader {
         guard offset >= 0, offset + valueCount * size <= data.count else {
             throw GLTFError.bufferOutOfBounds
         }
-        return try (0..<valueCount).map {
-            try readComponent(data, at: offset + $0 * size, componentType: componentType, normalized: normalized)
-        }
+        return try (0..<valueCount)
+            .map {
+                try readComponent(data, at: offset + $0 * size, componentType: componentType, normalized: normalized)
+            }
     }
 
     private func getBufferViewData(_ index: Int, gltf: GLTF, buffers: [Data]) throws -> Data {
@@ -390,9 +398,15 @@ public struct NativeGLTFLoader: GLTFLoader {
 
     private func componentSize(for componentType: Int) throws -> Int {
         switch componentType {
-        case 5120, 5121: return 1
-        case 5122, 5123: return 2
-        case 5125, 5126: return 4
+        case 5120,
+            5121:
+            return 1
+        case 5122,
+            5123:
+            return 2
+        case 5125,
+            5126:
+            return 4
         default: throw GLTFError.invalidComponentType(componentType)
         }
     }
@@ -402,7 +416,9 @@ public struct NativeGLTFLoader: GLTFLoader {
         case "SCALAR": return 1
         case "VEC2": return 2
         case "VEC3": return 3
-        case "VEC4", "MAT2": return 4
+        case "VEC4",
+            "MAT2":
+            return 4
         case "MAT3": return 9
         case "MAT4": return 16
         default: throw GLTFError.invalidAccessorType(accessorType)
@@ -473,9 +489,9 @@ public struct NativeGLTFLoader: GLTFLoader {
         let values: [Double]
         let componentCount: Int
     }
-    
+
     // MARK: - Internal GLTF Schema
-    
+
     private enum GLTFError: Error {
         case invalidGLB
         case missingJSONChunk
@@ -494,13 +510,13 @@ public struct NativeGLTFLoader: GLTFLoader {
         case invalidAccessorType(String)
         case unsupportedRequiredExtension(String)
     }
-    
+
     private struct GLTF: Codable {
         struct Buffer: Codable {
             let uri: String?
             let byteLength: Int
         }
-        
+
         struct BufferView: Codable {
             let buffer: Int
             let byteOffset: Int?
@@ -508,7 +524,7 @@ public struct NativeGLTFLoader: GLTFLoader {
             let byteStride: Int?
             let target: Int?
         }
-        
+
         struct Accessor: Codable {
             struct Sparse: Codable {
                 struct Indices: Codable {
@@ -537,7 +553,7 @@ public struct NativeGLTFLoader: GLTFLoader {
             let max: [Float]?
             let sparse: Sparse?
         }
-        
+
         struct Mesh: Codable {
             struct Primitive: Codable {
                 let attributes: [String: Int]
@@ -545,47 +561,47 @@ public struct NativeGLTFLoader: GLTFLoader {
                 let material: Int?
                 let mode: Int?
             }
-            
+
             let name: String?
             let primitives: [Primitive]
         }
-        
+
         struct Material: Codable {
             struct PBR: Codable {
                 struct TextureInfo: Codable {
                     let index: Int
                     let texCoord: Int?
                 }
-                
+
                 let baseColorFactor: [Float]?
                 let baseColorTexture: TextureInfo?
                 let metallicFactor: Float?
                 let roughnessFactor: Float?
                 let metallicRoughnessTexture: TextureInfo?
             }
-            
+
             struct NormalTextureInfo: Codable {
                 let index: Int
                 let texCoord: Int?
                 let scale: Float?
             }
-            
+
             let name: String?
             let pbrMetallicRoughness: PBR?
             let normalTexture: NormalTextureInfo?
         }
-        
+
         struct Texture: Codable {
             let sampler: Int?
             let source: Int?
         }
-        
+
         struct Image: Codable {
             let uri: String?
             let mimeType: String?
             let bufferView: Int?
         }
-        
+
         struct Node: Codable {
             let name: String?
             let children: [Int]?
@@ -596,12 +612,12 @@ public struct NativeGLTFLoader: GLTFLoader {
             let mesh: Int?
             let camera: Int?
         }
-        
+
         struct Scene: Codable {
             let nodes: [Int]?
             let name: String?
         }
-        
+
         let asset: Asset
         let scene: Int?
         let scenes: [Scene]?
@@ -615,7 +631,7 @@ public struct NativeGLTFLoader: GLTFLoader {
         let images: [Image]?
         let extensionsUsed: [String]?
         let extensionsRequired: [String]?
-        
+
         struct Asset: Codable {
             let version: String
         }

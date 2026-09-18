@@ -6,18 +6,18 @@
 //
 
 #if WEBGPU_ENABLED && canImport(WebGPU)
-@unsafe @preconcurrency import WebGPU
+    @unsafe @preconcurrency import WebGPU
 
-@_spi(Internal)
-public final class WGPUCommandQueue: CommandQueue {
-    let device: WebGPU.GPUDevice
+    @_spi(Internal)
+    public final class WGPUCommandQueue: CommandQueue {
+        let device: WebGPU.GPUDevice
 
-    public init(device: WebGPU.GPUDevice) {
-        self.device = device
+        public init(device: WebGPU.GPUDevice) {
+            self.device = device
+        }
+
+        public func makeCommandBuffer() -> CommandBuffer {
+            WGPUCommandEncoder(device: device)
+        }
     }
-
-    public func makeCommandBuffer() -> CommandBuffer {
-        WGPUCommandEncoder(device: device)
-    }
-}
 #endif

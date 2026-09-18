@@ -14,18 +14,17 @@ import Math
 // FIXME: Fix TextRun, that should equals AttributedString.Run
 /// A region where text layout occurs.
 public struct TextContainer: Hashable {
-    
     /// The text for rendering.
     public var text: AttributedText
 
     /// The alignment of text in the box.
     /// - Warning: Under development.
     public var textAlignment: TextAlignment
-    
+
     /// The wrapping behavior inside the text container.
     /// - Warning: Under development.
     public var lineBreakMode: LineBreakMode
-    
+
     /// The spacing between lines.
     public var lineSpacing: Float
 
@@ -81,7 +80,6 @@ public struct TextContainer: Hashable {
         self.allowsShaping = true
         self.writingDirection = .natural
     }
-
 }
 
 struct TextLineBreakRules {
@@ -137,12 +135,12 @@ struct TextLineBreakRules {
 
     private static func isJapaneseScalar(_ scalar: UnicodeScalar) -> Bool {
         switch scalar.value {
-        case 0x3040...0x309F, // Hiragana
-             0x30A0...0x30FF, // Katakana
-             0x31F0...0x31FF, // Katakana Phonetic Extensions
-             0x3400...0x4DBF, // CJK Unified Ideographs Extension A
-             0x4E00...0x9FFF, // CJK Unified Ideographs
-             0xF900...0xFAFF: // CJK Compatibility Ideographs
+        case 0x3040...0x309F,  // Hiragana
+            0x30A0...0x30FF,  // Katakana
+            0x31F0...0x31FF,  // Katakana Phonetic Extensions
+            0x3400...0x4DBF,  // CJK Unified Ideographs Extension A
+            0x4E00...0x9FFF,  // CJK Unified Ideographs
+            0xF900...0xFAFF:  // CJK Compatibility Ideographs
             return true
         default:
             return false
@@ -151,7 +149,8 @@ struct TextLineBreakRules {
 
     private static func isJapanesePunctuationScalar(_ scalar: UnicodeScalar) -> Bool {
         switch scalar.value {
-        case 0x3000...0x303F, 0xFE30...0xFE4F:
+        case 0x3000...0x303F,
+            0xFE30...0xFE4F:
             return true
         default:
             return false
@@ -161,50 +160,68 @@ struct TextLineBreakRules {
     private static func isProhibitedLineStart(_ character: Character) -> Bool {
         character.unicodeScalars.contains { scalar in
             switch scalar.value {
-            case 0x3001, // 、
-                 0x3002, // 。
-                 0x3009, // 〉
-                 0x300B, // 》
-                 0x300D, // 」
-                 0x300F, // 』
-                 0x3011, // 】
-                 0x3015, // 〕
-                 0x3017, // 〗
-                 0x3019, // 〙
-                 0x301B, // 〛
-                 0x30FB, // ・
-                 0x30FC, // ー
-                 0xFF09, // ）
-                 0xFF0C, // ，
-                 0xFF0E, // ．
-                 0xFF1A, // ：
-                 0xFF1B, // ；
-                 0xFF1F, // ？
-                 0xFF3D, // ］
-                 0xFF5D, // ｝
-                 0xFF60, // ｣
-                 0xFF61: // ｡
+            case 0x3001,  // 、
+                0x3002,  // 。
+                0x3009,  // 〉
+                0x300B,  // 》
+                0x300D,  // 」
+                0x300F,  // 』
+                0x3011,  // 】
+                0x3015,  // 〕
+                0x3017,  // 〗
+                0x3019,  // 〙
+                0x301B,  // 〛
+                0x30FB,  // ・
+                0x30FC,  // ー
+                0xFF09,  // ）
+                0xFF0C,  // ，
+                0xFF0E,  // ．
+                0xFF1A,  // ：
+                0xFF1B,  // ；
+                0xFF1F,  // ？
+                0xFF3D,  // ］
+                0xFF5D,  // ｝
+                0xFF60,  // ｣
+                0xFF61:  // ｡
                 return true
-            case 0x3041, 0x3043, 0x3045, 0x3047, 0x3049,
-                 0x3063, 0x3083, 0x3085, 0x3087, 0x308E,
-                 0x3095, 0x3096,
-                 0x30A1, 0x30A3, 0x30A5, 0x30A7, 0x30A9,
-                 0x30C3, 0x30E3, 0x30E5, 0x30E7, 0x30EE,
-                 0x30F5, 0x30F6:
+            case 0x3041,
+                0x3043,
+                0x3045,
+                0x3047,
+                0x3049,
+                0x3063,
+                0x3083,
+                0x3085,
+                0x3087,
+                0x308E,
+                0x3095,
+                0x3096,
+                0x30A1,
+                0x30A3,
+                0x30A5,
+                0x30A7,
+                0x30A9,
+                0x30C3,
+                0x30E3,
+                0x30E5,
+                0x30E7,
+                0x30EE,
+                0x30F5,
+                0x30F6:
                 return true
-            case 0x3008, // 〈
-                 0x300A, // 《
-                 0x300C, // 「
-                 0x300E, // 『
-                 0x3010, // 【
-                 0x3014, // 〔
-                 0x3016, // 〖
-                 0x3018, // 〘
-                 0x301A, // 〚
-                 0xFF08, // （
-                 0xFF3B, // ［
-                 0xFF5B, // ｛
-                 0xFF5F: // ｟
+            case 0x3008,  // 〈
+                0x300A,  // 《
+                0x300C,  // 「
+                0x300E,  // 『
+                0x3010,  // 【
+                0x3014,  // 〔
+                0x3016,  // 〖
+                0x3018,  // 〘
+                0x301A,  // 〚
+                0xFF08,  // （
+                0xFF3B,  // ［
+                0xFF5B,  // ｛
+                0xFF5F:  // ｟
                 return true
             default:
                 return false
@@ -215,19 +232,19 @@ struct TextLineBreakRules {
     private static func isProhibitedLineEnd(_ character: Character) -> Bool {
         character.unicodeScalars.contains { scalar in
             switch scalar.value {
-            case 0x3008, // 〈
-                 0x300A, // 《
-                 0x300C, // 「
-                 0x300E, // 『
-                 0x3010, // 【
-                 0x3014, // 〔
-                 0x3016, // 〖
-                 0x3018, // 〘
-                 0x301A, // 〚
-                 0xFF08, // （
-                 0xFF3B, // ［
-                 0xFF5B, // ｛
-                 0xFF5F: // ｟
+            case 0x3008,  // 〈
+                0x300A,  // 《
+                0x300C,  // 「
+                0x300E,  // 『
+                0x3010,  // 【
+                0x3014,  // 〔
+                0x3016,  // 〖
+                0x3018,  // 〘
+                0x301A,  // 〚
+                0xFF08,  // （
+                0xFF3B,  // ［
+                0xFF5B,  // ｛
+                0xFF5F:  // ｟
                 return true
             default:
                 return false
@@ -239,10 +256,9 @@ struct TextLineBreakRules {
 /// An object that coordinates the layout and display of text characters.
 /// TextLayoutManager maps unicods characters codes to glyphs.
 public final class TextLayoutManager: @unchecked Sendable {
-    
     enum Constants {
-        static let questionMark = Character("?").unicodeScalars.first!
-        static let dots = Character("…").unicodeScalars.first!
+        static let questionMark = Character("?").unicodeScalars.first.unwrap(message: "Question mark has no Unicode scalar.")
+        static let dots = Character("…").unicodeScalars.first.unwrap(message: "Ellipsis has no Unicode scalar.")
         static let maxTexturesPerBatch = 16
     }
 
@@ -258,7 +274,7 @@ public final class TextLayoutManager: @unchecked Sendable {
     /// and the unused width of a finite text container.
     public private(set) var size: Size = .zero
     public private(set) var textLines: [TextLine] = []
-    
+
     /// The text alignment of the text container.
     public var textAlignment: TextAlignment {
         textContainer.textAlignment
@@ -303,10 +319,8 @@ public final class TextLayoutManager: @unchecked Sendable {
             return ResolvedGlyph(glyph: glyph, fontResource: primaryFontResource, scalar: scalar)
         }
 
-        if
-            let fallbackFontResource = FontResource.fallback(for: scalar, baseFont: primaryFontResource),
-            let glyph = fallbackFontResource.handle.getGlyph(for: scalar.value)
-        {
+        if let fallbackFontResource = FontResource.fallback(for: scalar, baseFont: primaryFontResource),
+            let glyph = fallbackFontResource.handle.getGlyph(for: scalar.value) {
             return ResolvedGlyph(glyph: glyph, fontResource: fallbackFontResource, scalar: scalar)
         }
 
@@ -391,7 +405,7 @@ public final class TextLayoutManager: @unchecked Sendable {
                 var advance = glyph.advance
                 let nextIndex = attributedText.text.index(after: index)
                 if nextIndex < range.upperBound,
-                   let nextScalar = attributedText.text[nextIndex].unicodeScalars.first {
+                    let nextScalar = attributedText.text[nextIndex].unicodeScalars.first {
                     glyphFontHandle.getAdvance(&advance, resolvedGlyph.scalar.value, nextScalar.value)
                 }
                 x += glyphFontScale * advance + kern
@@ -417,7 +431,7 @@ public final class TextLayoutManager: @unchecked Sendable {
                 glyph.position.x + offset,
                 glyph.position.y,
                 glyph.position.z + offset,
-                glyph.position.w
+                glyph.position.w,
             ],
             advanceX: glyph.advanceX + offset,
             origin: glyph.origin,
@@ -495,14 +509,14 @@ public final class TextLayoutManager: @unchecked Sendable {
             // Find the range of this line in the original attributed text
             let lineStartIndex = currentTextIndex
             let lineEndIndex = attributedText.text.index(lineStartIndex, offsetBy: lineString.count, limitedBy: attributedText.text.endIndex) ?? attributedText.text.endIndex
-            
+
             // Handle newline character if not at the end
             if lineEndIndex < attributedText.text.endIndex && attributedText.text[lineEndIndex] == "\n" {
                 currentTextIndex = attributedText.text.index(after: lineEndIndex)
             } else {
                 currentTextIndex = lineEndIndex
             }
-            
+
             let lineRange = lineStartIndex..<lineEndIndex
             let initialFont = attributedText.attributes(at: lineStartIndex).font
             let initialLineHeight = initialFont.lineHeight + lineHeightOffset
@@ -512,10 +526,10 @@ public final class TextLayoutManager: @unchecked Sendable {
             visualRowCount += 1
             var textLine = TextLine(attributedText: attributedText, range: lineRange)
             var textRun = TextRun()
-            
+
             // Reset x for each new line, but keep accumulating y
             x = 0
-            
+
             // Calculate the starting y position for this line's bounding box
             let lineStartY = y
 
@@ -560,8 +574,10 @@ public final class TextLayoutManager: @unchecked Sendable {
             }
 
             func startVisualRow(at textIndex: String.Index) -> Bool {
-                guard visualRowCount < numberOfLines,
-                      Float(-y + 2 * maxLineHeight) <= availableSize.height else {
+                guard
+                    visualRowCount < numberOfLines,
+                    Float(-y + 2 * maxLineHeight) <= availableSize.height
+                else {
                     reachedLimit = true
                     return false
                 }
@@ -600,10 +616,16 @@ public final class TextLayoutManager: @unchecked Sendable {
                 let glyphFontScale = pointSize / glyphMetrics.emSize
                 let glyphFontSize = fontResource.getFontScale(for: pointSize)
 
-                var l: Double = 0, b: Double = 0, r: Double = 0, t: Double = 0
+                var l: Double = 0
+                var b: Double = 0
+                var r: Double = 0
+                var t: Double = 0
                 glyph.getQuadAtlasBounds(&l, &b, &r, &t)
 
-                var pl: Double = 0, pb: Double = 0, pr: Double = 0, pt: Double = 0
+                var pl: Double = 0
+                var pb: Double = 0
+                var pr: Double = 0
+                var pt: Double = 0
                 glyph.getQuadPlaneBounds(&pl, &pb, &pr, &pt)
 
                 pl = (pl + xOffset) * glyphFontScale + baselineX
@@ -674,9 +696,10 @@ public final class TextLayoutManager: @unchecked Sendable {
                 let kern = Double(attributes.kern)
 
                 func advance(from lowerBound: Int, to upperBound: Int) -> Double {
-                    renderGlyphs[lowerBound..<upperBound].reduce(0) { partialResult, item in
-                        partialResult + (item.shaped.xAdvance * glyphFontScale) + kern
-                    }
+                    renderGlyphs[lowerBound..<upperBound]
+                        .reduce(0) { partialResult, item in
+                            partialResult + (item.shaped.xAdvance * glyphFontScale) + kern
+                        }
                 }
 
                 var renderIndex = 0
@@ -740,8 +763,10 @@ public final class TextLayoutManager: @unchecked Sendable {
             }
 
             func wrapBeforeWord(at index: inout String.Index) {
-                guard textContainer.lineBreakMode == .byWordWrapping,
-                      availableSize.width.isFinite, x > 0 else {
+                guard
+                    textContainer.lineBreakMode == .byWordWrapping,
+                    availableSize.width.isFinite, x > 0
+                else {
                     return
                 }
                 let wordStartIndex: String.Index
@@ -821,14 +846,20 @@ public final class TextLayoutManager: @unchecked Sendable {
                     var advance = glyph.advance
                     let nextIndex = attributedText.text.index(after: index)
                     if nextIndex < lineEndIndex,
-                       let nextScalar = attributedText.text[nextIndex].unicodeScalars.first {
+                        let nextScalar = attributedText.text[nextIndex].unicodeScalars.first {
                         glyphFontHandle.getAdvance(&advance, resolvedGlyph.scalar.value, nextScalar.value)
                     }
 
-                    var l: Double = 0, b: Double = 0, r: Double = 0, t: Double = 0
+                    var l: Double = 0
+                    var b: Double = 0
+                    var r: Double = 0
+                    var t: Double = 0
                     glyph.getQuadAtlasBounds(&l, &b, &r, &t)
 
-                    var pl: Double = 0, pb: Double = 0, pr: Double = 0, pt: Double = 0
+                    var pl: Double = 0
+                    var pb: Double = 0
+                    var pr: Double = 0
+                    var pt: Double = 0
                     glyph.getQuadPlaneBounds(&pl, &pb, &pr, &pt)
 
                     let shouldWrapBeforeGlyph = Float(x + glyphFontScale * advance + kern) > availableSize.width
@@ -837,7 +868,8 @@ public final class TextLayoutManager: @unchecked Sendable {
                         in: attributedText.text,
                         rowStartIndex: visualRowStartTextIndex
                     )
-                    let canWrapBeforeGlyph = self.textContainer.lineBreakMode != .byWordWrapping
+                    let canWrapBeforeGlyph =
+                        self.textContainer.lineBreakMode != .byWordWrapping
                         || !isJapaneseWrappingContext
                         || TextLineBreakRules.canBreakJapaneseLine(
                             before: index,
@@ -879,7 +911,7 @@ public final class TextLayoutManager: @unchecked Sendable {
 
                     x = nextCaretX
                 }
-                
+
                 if index < lineEndIndex {
                     index = attributedText.text.index(after: index)
                 } else {
@@ -894,7 +926,8 @@ public final class TextLayoutManager: @unchecked Sendable {
             // Soft-wrapped visual rows share the same source line, so include
             // every row in the measured height instead of only the first row.
             let visualHeight = maxLineHeight > 0 ? (lineStartY - y) + maxLineHeight : 0
-            let boundingWidth = self.availableSize.width.isFinite && !textRun.glyphs.isEmpty
+            let boundingWidth =
+                self.availableSize.width.isFinite && !textRun.glyphs.isEmpty
                 ? Double(self.availableSize.width)
                 : maxWidth
 
@@ -903,12 +936,12 @@ public final class TextLayoutManager: @unchecked Sendable {
                 origin: Point(x: 0, y: Float(lineStartY)),
                 size: Size(width: Float(boundingWidth), height: Float(visualHeight))
             )
-            
+
             textLine.typographicBounds.ascent = maxAscent
             textLine.typographicBounds.descent = maxDescent
             textLine.typographicBounds.rect = boundingBox
             self.textLines.append(textLine)
-            
+
             self.size.height += Float(visualHeight)
 
             // Move y down for the next line
@@ -925,10 +958,10 @@ public final class TextLayoutManager: @unchecked Sendable {
         ignoreCache: Bool = false
     ) -> GlyphRenderData {
         var textures: [Texture2D] = .init(repeating: .whiteTexture, count: 16)
-        if let glyphsToRender = glyphsToRender, glyphsToRender.transform == transform, !ignoreCache {
+        if let glyphsToRender, glyphsToRender.transform == transform, !ignoreCache {
             return glyphsToRender
         }
-        
+
         // Use actual visible glyph extents for alignment so short labels stay
         // optically centered even when typographic width includes side bearings.
         var offsetY: Float = 0
@@ -939,23 +972,24 @@ public final class TextLayoutManager: @unchecked Sendable {
             let bottomY = topY - textSize.height
             offsetY = -(topY + bottomY) / 2
         }
-        
+
         var verticies: [GlyphVertexData] = []
         var indeciesCount: Int = 0
-        
+
         var textureIndex: Int = -1
 
         for textLine in textLines {
             let lineBounds = self.visualBounds(for: textLine)
-            let lineOffsetX: Float = switch self.resolvedTextAlignment {
-            case .center:
-                -((lineBounds.minX + lineBounds.maxX) / 2)
-            case .leading:
-                -lineBounds.minX
-            case .trailing:
-                -lineBounds.maxX
-            }
-            
+            let lineOffsetX: Float =
+                switch self.resolvedTextAlignment {
+                case .center:
+                    -((lineBounds.minX + lineBounds.maxX) / 2)
+                case .leading:
+                    -lineBounds.minX
+                case .trailing:
+                    -lineBounds.maxX
+                }
+
             for run in textLine {
                 for glyph in run {
                     let texture = glyph.textureAtlas
@@ -982,7 +1016,7 @@ public final class TextLayoutManager: @unchecked Sendable {
                             foregroundColor: foregroundColor,
                             outlineColor: outlineColor,
                             outlineWidth: glyph.attributes.outlineWidth,
-                            textureCoordinate: [ textureCoordinate.z, textureCoordinate.y ],
+                            textureCoordinate: [textureCoordinate.z, textureCoordinate.y],
                             textureIndex: textureIndex
                         )
                     )
@@ -993,7 +1027,7 @@ public final class TextLayoutManager: @unchecked Sendable {
                             foregroundColor: foregroundColor,
                             outlineColor: outlineColor,
                             outlineWidth: glyph.attributes.outlineWidth,
-                            textureCoordinate: [ textureCoordinate.z, textureCoordinate.w ],
+                            textureCoordinate: [textureCoordinate.z, textureCoordinate.w],
                             textureIndex: textureIndex
                         )
                     )
@@ -1004,7 +1038,7 @@ public final class TextLayoutManager: @unchecked Sendable {
                             foregroundColor: foregroundColor,
                             outlineColor: outlineColor,
                             outlineWidth: glyph.attributes.outlineWidth,
-                            textureCoordinate: [ textureCoordinate.x, textureCoordinate.w ],
+                            textureCoordinate: [textureCoordinate.x, textureCoordinate.w],
                             textureIndex: textureIndex
                         )
                     )
@@ -1015,7 +1049,7 @@ public final class TextLayoutManager: @unchecked Sendable {
                             foregroundColor: foregroundColor,
                             outlineColor: outlineColor,
                             outlineWidth: glyph.attributes.outlineWidth,
-                            textureCoordinate: [ textureCoordinate.x, textureCoordinate.y ],
+                            textureCoordinate: [textureCoordinate.x, textureCoordinate.y],
                             textureIndex: textureIndex
                         )
                     )
@@ -1024,16 +1058,16 @@ public final class TextLayoutManager: @unchecked Sendable {
                 }
             }
         }
-        
+
         let render = GlyphRenderData(
             transform: transform,
             verticies: verticies,
             indeciesCount: indeciesCount,
             textures: textures
         )
-        
+
         self.glyphsToRender = render
-        
+
         return render
     }
 
@@ -1097,7 +1131,7 @@ public struct Glyph: Sendable, Equatable {
     /// Size of glyph.
     public let size: Size
 
-    public static func == (lhs: Glyph, rhs: Glyph) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.size == rhs.size
             && lhs.position == rhs.position
             && lhs.advanceX == rhs.advanceX
@@ -1112,10 +1146,9 @@ public struct GlyphRenderData {
     public var textures: [Texture2D?] = []
 }
 
-public extension String {
-    
+extension String {
     /// Calculates and returns the size.
-    func boundingSize(width: Float, height: Float, attributes: TextAttributeContainer? = nil) -> Size {
+    public func boundingSize(width: Float, height: Float, attributes: TextAttributeContainer? = nil) -> Size {
         let attributes = attributes ?? TextAttributeContainer()
         let manager = TextLayoutManager()
         manager.setTextContainer(
@@ -1127,16 +1160,15 @@ public extension String {
 
         return manager.boundingSize()
     }
-    
+
     /// Returns the bounding box size the receiver occupies when drawn with the given attributes.
-    func size(with attributes: TextAttributeContainer? = nil) -> Size {
+    public func size(with attributes: TextAttributeContainer? = nil) -> Size {
         self.boundingSize(width: .infinity, height: .infinity, attributes: attributes)
     }
 }
 
 /// A single line in a text layout: a collection of runs of placed glyphs.
 public struct TextLine: Equatable {
-
     let attributedText: Slice<AttributedText>
     let characterRange: Range<String.Index>
 
@@ -1149,7 +1181,7 @@ public struct TextLine: Equatable {
         self.characterRange = range
     }
 
-    public static func == (lhs: TextLine, rhs: TextLine) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.runs == rhs.runs && lhs.typographicBounds == rhs.typographicBounds && lhs.characterRange == rhs.characterRange
     }
 }
@@ -1176,7 +1208,6 @@ public struct TypographicBounds: Equatable {
 }
 
 extension TextLine: Collection, Sequence {
-
     public typealias Element = TextRun
     public typealias Index = Int
 
@@ -1214,7 +1245,7 @@ extension TextRun: Collection, Sequence {
     public var startIndex: Int {
         self.glyphs.startIndex
     }
-    
+
     public var endIndex: Int {
         self.glyphs.endIndex
     }

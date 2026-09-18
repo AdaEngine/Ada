@@ -10,9 +10,9 @@ import AdaECS
 import AdaUtils
 import Math
 
-public extension AppScene {
+extension AppScene {
     /// Configure the primary native platform window using a single configuration value.
-    func window(with configuration: UIWindow.Configuration) -> some AppScene {
+    public func window(with configuration: UIWindow.Configuration) -> some AppScene {
         self.modifier(WindowConfigurationSceneModifier(configuration: configuration))
     }
 }
@@ -29,7 +29,7 @@ struct WindowConfigurationSceneModifier: SceneModifier {
     }
 }
 
-private extension WindowSettings {
+extension WindowSettings {
     mutating func apply(_ configuration: UIWindow.Configuration) {
         self.title = configuration.title
         self.frame = configuration.frame
@@ -49,7 +49,7 @@ private extension WindowSettings {
     }
 }
 
-private extension WindowMode {
+extension WindowMode {
     init(_ mode: UIWindow.Mode) {
         switch mode {
         case .windowed:
@@ -62,7 +62,7 @@ private extension WindowMode {
     }
 }
 
-private extension WindowChrome {
+extension WindowChrome {
     init(_ chrome: UIWindow.Chrome) {
         switch chrome {
         case .standard:
@@ -73,10 +73,10 @@ private extension WindowChrome {
     }
 }
 
-private extension WindowBackground {
+extension WindowBackground {
     init(_ background: UIWindow.Background) {
         switch background {
-        case .opaque(let color):
+        case let .opaque(color):
             self = .opaque(color)
         case .transparent:
             self = .transparent
@@ -84,18 +84,18 @@ private extension WindowBackground {
     }
 }
 
-private extension WindowBackgroundEffect {
+extension WindowBackgroundEffect {
     init(_ effect: UIWindow.BackgroundEffect) {
         switch effect {
         case .none:
             self = .none
-        case .blur(let material):
-            self = .blur(WindowBackgroundEffect.BlurMaterial(material))
+        case let .blur(material):
+            self = .blur(Self.BlurMaterial(material))
         }
     }
 }
 
-private extension WindowBackgroundEffect.BlurMaterial {
+extension WindowBackgroundEffect.BlurMaterial {
     init(_ material: UIWindow.BackgroundEffect.BlurMaterial) {
         switch material {
         case .windowBackground:
@@ -111,14 +111,14 @@ private extension WindowBackgroundEffect.BlurMaterial {
         case .underWindowBackground:
             self = .underWindowBackground
         #if os(macOS)
-        case .glass:
-            self = .glass
+            case .glass:
+                self = .glass
         #endif
         }
     }
 }
 
-private extension WindowLevel {
+extension WindowLevel {
     init(_ level: UIWindow.Level) {
         switch level {
         case .normal:
@@ -131,7 +131,7 @@ private extension WindowLevel {
     }
 }
 
-private extension WindowCollectionBehavior {
+extension WindowCollectionBehavior {
     init(_ behavior: UIWindow.CollectionBehavior) {
         switch behavior {
         case .standard:
@@ -142,7 +142,7 @@ private extension WindowCollectionBehavior {
     }
 }
 
-private extension WindowTitleBar {
+extension WindowTitleBar {
     init(_ titleBar: UIWindow.TitleBar) {
         switch titleBar.background {
         case .system:

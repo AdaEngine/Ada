@@ -57,17 +57,44 @@ extension AnyCodable: Equatable {
         case let (lhs as [AnyCodable], rhs as [AnyCodable]):
             return lhs == rhs
         #if canImport(Darwin)
-        case let (lhs as [String: Any], rhs as [String: Any]):
-            return NSDictionary(dictionary: lhs) == NSDictionary(dictionary: rhs)
-        case let (lhs as [Any], rhs as [Any]):
-            return NSArray(array: lhs) == NSArray(array: rhs)
-        case is (NSNull, NSNull):
-            return true
+            case let (lhs as [String: Any], rhs as [String: Any]):
+                return lhs.count == rhs.count && lhs.allSatisfy { key, value in
+                    guard let other = rhs[key] else {
+                        return false
+                    }
+                    return foundationValuesEqual(value, other)
+                }
+            case let (lhs as [Any], rhs as [Any]):
+                return lhs.count == rhs.count && zip(lhs, rhs).allSatisfy { foundationValuesEqual($0.0, $0.1) }
+            case is (NSNull, NSNull):
+                return true
         #endif
         default:
             return false
         }
     }
+
+    #if canImport(Darwin)
+        private static func foundationValuesEqual(_ lhs: Any, _ rhs: Any) -> Bool {
+            switch (lhs, rhs) {
+            case let (lhs as [String: Any], rhs as [String: Any]):
+                return lhs.count == rhs.count && lhs.allSatisfy { key, value in
+                    guard let other = rhs[key] else {
+                        return false
+                    }
+                    return foundationValuesEqual(value, other)
+                }
+            case let (lhs as [Any], rhs as [Any]):
+                return lhs.count == rhs.count && zip(lhs, rhs).allSatisfy { foundationValuesEqual($0.0, $0.1) }
+            case let (lhs as AnyHashable, rhs as AnyHashable):
+                return lhs == rhs
+            case is (NSNull, NSNull):
+                return true
+            default:
+                return false
+            }
+        }
+    #endif
 }
 
 extension AnyCodable: CustomStringConvertible {
@@ -102,7 +129,6 @@ extension AnyCodable: ExpressibleByStringLiteral {}
 extension AnyCodable: ExpressibleByStringInterpolation {}
 extension AnyCodable: ExpressibleByArrayLiteral {}
 extension AnyCodable: ExpressibleByDictionaryLiteral {}
-
 
 extension AnyCodable: Hashable {
     public func hash(into hasher: inout Hasher) {

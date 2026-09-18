@@ -11,7 +11,6 @@ import Foundation
 @propertyWrapper
 @dynamicMemberLookup
 public final class LocalIsolated<Value> {
-
     /// The lock-isolated value.
     public var wrappedValue: Value {
         get {

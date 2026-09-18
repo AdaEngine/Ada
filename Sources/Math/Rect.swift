@@ -8,80 +8,77 @@
 public struct Rect: Equatable, Codable, Hashable, Sendable {
     public var origin: Point
     public var size: Size
-    
+
     public init(origin: Point, size: Size) {
         self.origin = origin
         self.size = size
     }
 }
 
-public extension Rect {
+extension Rect {
     @inline(__always)
-    static let zero = Rect(origin: .zero, size: .zero)
-    
-    init(x: Float, y: Float, width: Float, height: Float) {
+    public static let zero = Rect(origin: .zero, size: .zero)
+
+    public init(x: Float, y: Float, width: Float, height: Float) {
         self.origin = [x, y]
         self.size = Size(width: width, height: height)
     }
 }
 
 #if canImport(CoreGraphics)
-import CoreGraphics
-public extension Rect {
-    @inline(__always)
-    var toCGRect: CGRect {
-        return CGRect(origin: self.origin.toCGPoint, size: self.size.toCGSize)
+    import CoreGraphics
+    extension Rect {
+        @inline(__always)
+        public var toCGRect: CGRect {
+            return CGRect(origin: self.origin.toCGPoint, size: self.size.toCGSize)
+        }
     }
-}
 #endif
 
-public extension Rect {
-    
+extension Rect {
     @inline(__always)
-    var minX: Float {
+    public var minX: Float {
         return self.origin.x
     }
-    
+
     @inline(__always)
-    var midX: Float {
+    public var midX: Float {
         return self.minX + self.width / 2
     }
-    
+
     @inline(__always)
-    var maxX: Float {
+    public var maxX: Float {
         return self.minX + self.width
     }
-    
+
     @inline(__always)
-    var minY: Float {
+    public var minY: Float {
         return self.origin.y
     }
-    
+
     @inline(__always)
-    var midY: Float {
+    public var midY: Float {
         return self.minY + self.height / 2
     }
-    
+
     @inline(__always)
-    var maxY: Float {
+    public var maxY: Float {
         return self.minY + self.height
     }
-    
+
     @inline(__always)
-    var width: Float {
+    public var width: Float {
         return self.size.width
     }
-    
+
     @inline(__always)
-    var height: Float {
+    public var height: Float {
         return self.size.height
     }
-
 }
 
-public extension Rect {
-    
-    func applying(_ transform: Transform2D) -> Rect {
+extension Rect {
+    public func applying(_ transform: Transform2D) -> Rect {
         if transform == .identity {
             return self
         }
@@ -100,18 +97,17 @@ public extension Rect {
         return Rect(
             x: minX,
             y: minY,
-            width: maxX - minX, 
+            width: maxX - minX,
             height: maxY - minY
         )
     }
 
-    func contains(point: Point) -> Bool {
-        point.x >= self.minX && point.x < self.maxX &&
-        point.y >= self.minY && point.y < self.maxY
+    public func contains(point: Point) -> Bool {
+        point.x >= self.minX && point.x < self.maxX && point.y >= self.minY && point.y < self.maxY
     }
 
     /// Returns the intersection of two rectangles.
-    func intersection(_ other: Rect) -> Rect {
+    public func intersection(_ other: Rect) -> Rect {
         let minX = max(self.minX, other.minX)
         let minY = max(self.minY, other.minY)
         let maxX = min(self.maxX, other.maxX)
@@ -123,14 +119,14 @@ public extension Rect {
         return Rect(x: minX, y: minY, width: width, height: height)
     }
 
-    func intersects(_ other: Rect) -> Bool {
-      return self.minX <= other.maxX
-              && other.minX <= self.maxX
-              && self.minY <= other.maxY
-              && other.minY <= self.maxY
+    public func intersects(_ other: Rect) -> Bool {
+        return self.minX <= other.maxX
+            && other.minX <= self.maxX
+            && self.minY <= other.maxY
+            && other.minY <= self.maxY
     }
 
-    func union(_ other: Rect) -> Rect {
+    public func union(_ other: Rect) -> Rect {
         let minX = min(self.minX, other.minX)
         let minY = min(self.minY, other.minY)
         let maxX = max(self.maxX, other.maxX)

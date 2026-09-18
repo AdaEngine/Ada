@@ -21,7 +21,7 @@ public struct SystemAccessSet: Sendable, Equatable {
     public init() {}
 
     /// Adds shared component access.
-    public mutating func addComponentRead<T: Component>(_ component: T.Type) {
+    public mutating func addComponentRead<T: Component>(_: T.Type) {
         componentReads.insert(T.identifier)
     }
 
@@ -31,7 +31,7 @@ public struct SystemAccessSet: Sendable, Equatable {
     }
 
     /// Adds exclusive component access.
-    public mutating func addComponentWrite<T: Component>(_ component: T.Type) {
+    public mutating func addComponentWrite<T: Component>(_: T.Type) {
         componentReads.insert(T.identifier)
         componentWrites.insert(T.identifier)
     }
@@ -43,7 +43,7 @@ public struct SystemAccessSet: Sendable, Equatable {
     }
 
     /// Adds shared resource access.
-    public mutating func addResourceRead<T: Resource>(_ resource: T.Type) {
+    public mutating func addResourceRead<T: Resource>(_: T.Type) {
         resourceReads.insert(T.resourceIdentifier)
     }
 
@@ -53,7 +53,7 @@ public struct SystemAccessSet: Sendable, Equatable {
     }
 
     /// Adds exclusive resource access.
-    public mutating func addResourceWrite<T: Resource>(_ resource: T.Type) {
+    public mutating func addResourceWrite<T: Resource>(_: T.Type) {
         resourceReads.insert(T.resourceIdentifier)
         resourceWrites.insert(T.resourceIdentifier)
     }
@@ -70,7 +70,7 @@ public struct SystemAccessSet: Sendable, Equatable {
     }
 
     /// Merges another access set into this one.
-    public mutating func formUnion(_ other: SystemAccessSet) {
+    public mutating func formUnion(_ other: Self) {
         componentReads.formUnion(other.componentReads)
         componentWrites.formUnion(other.componentWrites)
         resourceReads.formUnion(other.resourceReads)
@@ -79,14 +79,14 @@ public struct SystemAccessSet: Sendable, Equatable {
     }
 
     /// Returns a new access set containing accesses from both inputs.
-    public func union(_ other: SystemAccessSet) -> SystemAccessSet {
+    public func union(_ other: Self) -> Self {
         var result = self
         result.formUnion(other)
         return result
     }
 
     /// Returns true when both access sets can run at the same time.
-    public func isCompatible(with other: SystemAccessSet) -> Bool {
+    public func isCompatible(with other: Self) -> Bool {
         if hasDeferredWorldAccess || other.hasDeferredWorldAccess {
             return false
         }

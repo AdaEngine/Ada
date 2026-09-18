@@ -6,9 +6,8 @@
 //
 
 public struct _ModifiedScene<Content: SceneModifier>: AppScene {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     enum Storage {
         case makeScene((_SceneInputs) -> _SceneOutputs)
@@ -19,7 +18,7 @@ public struct _ModifiedScene<Content: SceneModifier>: AppScene {
     public static func _makeView(_ view: _AppSceneNode<Self>, inputs: _SceneInputs) -> _SceneOutputs {
         let storage = view[\.storage].value
         switch storage {
-        case .makeScene(let block):
+        case let .makeScene(block):
             return block(inputs)
         }
     }

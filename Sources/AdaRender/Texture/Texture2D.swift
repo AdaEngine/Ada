@@ -7,28 +7,27 @@
 
 import AdaAssets
 import AdaUtils
-import Math
 import Foundation
+import Math
 
 /// The base class represents a 2D texture.
 /// If the texture isn't held by any object, then the GPU resource will freed immediately.
 open class Texture2D: Texture, @unchecked Sendable {
-    
     /// The width of the texture.
     public private(set) var width: Int
     /// The height of the texture.
     public private(set) var height: Int
-    
+
     /// The size of the texture.
     public var size: SizeInt {
         return SizeInt(width: self.width, height: self.height)
     }
 
-    public override var description: String {
+    override public var description: String {
         let typeName = String(reflecting: Swift.type(of: self))
         return "\(typeName)(size=\(self.width)x\(self.height), \(self.assetDescription), \(self.samplerDescription), \(self.memoryAddressDescription))"
     }
-    
+
     /// Initialize a new texture from an image.
     ///
     /// - Parameters:
@@ -51,11 +50,11 @@ open class Texture2D: Texture, @unchecked Sendable {
 
         self.width = descriptor.width
         self.height = descriptor.height
-        
+
         super.init(gpuTexture: gpuTexture, sampler: sampler, textureType: descriptor.textureType)
         self.assetMetaInfo = image.assetMetaInfo
     }
-    
+
     /// Initialize a new texture from a descriptor.
     ///
     /// - Parameter descriptor: The descriptor to initialize the texture from.
@@ -66,20 +65,20 @@ open class Texture2D: Texture, @unchecked Sendable {
 
         self.width = descriptor.width
         self.height = descriptor.height
-        
+
         super.init(gpuTexture: gpuTexture, sampler: sampler, textureType: descriptor.textureType)
     }
-    
+
     // FIXME: (Vlad) Should remove it from Texture2D.
     /// The texture coordinates.
     open internal(set) var textureCoordinates: [Vector2] = [
-        [0, 1], [1, 1], [1, 0], [0, 0]
+        [0, 1], [1, 1], [1, 0], [0, 0],
     ]
-    
+
     internal init(gpuTexture: GPUTexture, sampler: Sampler, size: SizeInt) {
         self.width = size.width
         self.height = size.height
-        
+
         super.init(gpuTexture: gpuTexture, sampler: sampler, textureType: .texture2D)
     }
 
@@ -91,22 +90,22 @@ open class Texture2D: Texture, @unchecked Sendable {
     ///   - bytes: The data to replace the region with.
     ///   - bytesPerRow: The number of bytes per row of the data.
     public func replaceRegion(_ region: RectInt, mipmapLevel: Int = 0, withBytes bytes: UnsafeRawPointer, bytesPerRow: Int) {
-        self.gpuTexture.replaceRegion(region, mipmapLevel: mipmapLevel, withBytes: bytes, bytesPerRow: bytesPerRow)
+        unsafe self.gpuTexture.replaceRegion(region, mipmapLevel: mipmapLevel, withBytes: bytes, bytesPerRow: bytesPerRow)
     }
-    
+
     // MARK: - Resource & Codable
-    
+
     /// Initialize a new texture from a decoder.
     ///
     /// - Parameter decoder: The decoder to initialize the texture from.
     /// - Throws: An error if the texture cannot be initialized from the decoder.
-    public convenience required init(from decoder: any AssetDecoder) async throws {
+    public required convenience init(from decoder: any AssetDecoder) async throws {
         if Self.extensions().contains(where: { $0 == decoder.assetMeta.filePath.pathExtension }) {
             let dto = try decoder.decode(TextureSerializable.self)
 
             let filePath = dto.info?.assetAbsolutePath.path() ?? decoder.assetMeta.filePath.path()
             let samplerDesc = dto.sampler
-            
+
             let image = try decoder.getOrLoadResource(
                 Image.self,
                 at: filePath
@@ -117,12 +116,12 @@ open class Texture2D: Texture, @unchecked Sendable {
             self.init(image: image, samplerDescription: image.samplerDescription)
         }
     }
-    
+
     /// Encode the texture to an encoder.
     ///
     /// - Parameter encoder: The encoder to encode the texture to.
     /// - Throws: An error if the texture cannot be encoded to the encoder.
-    public override func encodeContents(with encoder: any AssetEncoder) async throws {
+    override public func encodeContents(with encoder: any AssetEncoder) async throws {
         try encoder.encode(
             TextureSerializable(
                 info: self.assetMetaInfo,
@@ -132,9 +131,9 @@ open class Texture2D: Texture, @unchecked Sendable {
     }
 }
 
-public extension Texture2D {
+extension Texture2D {
     /// A white texture.
-    static let whiteTexture = Texture2D(image: Image(width: 1, height: 1, color: .white))
+    public static let whiteTexture = Texture2D(image: Image(width: 1, height: 1, color: .white))
 }
 
 extension Texture2D {

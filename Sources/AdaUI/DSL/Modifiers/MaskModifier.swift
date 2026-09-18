@@ -8,11 +8,11 @@
 import AdaAnimation
 import Math
 
-public extension View {
+extension View {
     /// Masks this view using the provided shape.
     ///
     /// The shape is resolved in the modified view's local bounds.
-    func mask<S: Shape>(_ shape: S) -> some View {
+    public func mask<S: Shape>(_ shape: S) -> some View {
         self.modifier(MaskShapeModifier(content: self, shape: shape))
     }
 }
@@ -55,7 +55,8 @@ private final class MaskShapeViewNode<S: Shape>: ViewModifierNode {
 
         let startData = self.shape.animatableData
         let endData = otherNode.shape.animatableData
-        let animationController = self.environment.animationController
+        let animationController =
+            self.environment.animationController
             ?? otherNode.environment.animationController
             ?? nearestAnimationController()
 
@@ -72,7 +73,9 @@ private final class MaskShapeViewNode<S: Shape>: ViewModifierNode {
                 label: "mask-shape-\(self.id)",
                 environment: self.environment,
                 updateBlock: { [weak self] value in
-                    guard let self else { return }
+                    guard let self else {
+                        return
+                    }
                     self.shape.animatableData = value.animatableData
                     self.updatePath()
                     self.invalidateNearestLayer()
@@ -92,7 +95,7 @@ private final class MaskShapeViewNode<S: Shape>: ViewModifierNode {
 
         context.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
         if shape is RectangleShape,
-           context.pushTransformedClipRect(Rect(origin: .zero, size: frame.size)) {
+            context.pushTransformedClipRect(Rect(origin: .zero, size: frame.size)) {
             contentNode.draw(with: context)
             context.popClipRect()
             return

@@ -145,9 +145,11 @@ public final class AdaUIDebug3DResource: Resource, @unchecked Sendable {
 
     @MainActor
     func synchronizeOverlayFrame() {
-        guard let overlayView,
-              let appWorlds = AppWorldsSession.current,
-              let primaryWindow = appWorlds.getResource(PrimaryWindow.self)?.window else {
+        guard
+            let overlayView,
+            let appWorlds = AppWorldsSession.current,
+            let primaryWindow = appWorlds.getResource(PrimaryWindow.self)?.window
+        else {
             return
         }
 
@@ -189,16 +191,18 @@ public final class AdaUIDebug3DResource: Resource, @unchecked Sendable {
         }
         didCreateWindow = true
 
-        let window = UIWindow(configuration: UIWindow.Configuration(
-            title: title,
-            frame: Rect(x: 80, y: 80, width: size.width, height: size.height),
-            minimumSize: Size(width: 900, height: 580),
-            mode: .windowed,
-            background: .opaque(Color.fromHex(0x202327)),
-            level: .floating,
-            showsImmediately: false,
-            makeKey: false
-        ))
+        let window = UIWindow(
+            configuration: UIWindow.Configuration(
+                title: title,
+                frame: Rect(x: 80, y: 80, width: size.width, height: size.height),
+                minimumSize: Size(width: 900, height: 580),
+                mode: .windowed,
+                background: .opaque(Color.fromHex(0x202327)),
+                level: .floating,
+                showsImmediately: false,
+                makeKey: false
+            )
+        )
         model.debugWindowId = window.id
 
         let container = UIContainerView(rootView: AdaUIDebug3DView(model: model))
@@ -217,8 +221,10 @@ public final class AdaUIDebug3DResource: Resource, @unchecked Sendable {
         guard !didCreateOverlay, overlayView == nil else {
             return
         }
-        guard let appWorlds = AppWorldsSession.current,
-              let primaryWindow = appWorlds.getResource(PrimaryWindow.self)?.window else {
+        guard
+            let appWorlds = AppWorldsSession.current,
+            let primaryWindow = appWorlds.getResource(PrimaryWindow.self)?.window
+        else {
             return
         }
 
@@ -324,7 +330,7 @@ final class AdaUIDebug3DModel {
             "Absolute: \(format(node.absoluteFrame))",
             "Focused: \(node.isFocused ? "yes" : "no")",
             "Focusable: \(node.canBecomeFocused ? "yes" : "no")",
-            "Interactable: \(node.isInteractable ? "yes" : "no")"
+            "Interactable: \(node.isInteractable ? "yes" : "no")",
         ]
 
         if let hidden = node.isHidden {
@@ -355,11 +361,13 @@ final class AdaUIDebug3DModel {
                 return nil
             }
 
-            let roots = window.uiInspectableContainers().filter { container in
-                !ignoredContainerIds.contains(ObjectIdentifier(container))
-            }.flatMap { container in
-                container.uiTreeRoots()
-            }
+            let roots = window.uiInspectableContainers()
+                .filter { container in
+                    !ignoredContainerIds.contains(ObjectIdentifier(container))
+                }
+                .flatMap { container in
+                    container.uiTreeRoots()
+                }
 
             guard !roots.isEmpty else {
                 return nil
@@ -422,7 +430,9 @@ final class AdaUIDebug3DModel {
     }
 
     func setViewportSize(_ size: Size) {
-        guard size.width > 0, size.height > 0, viewportSize != size else { return }
+        guard size.width > 0, size.height > 0, viewportSize != size else {
+            return
+        }
         viewportSize = size
         invalidateProjection()
     }
@@ -520,20 +530,26 @@ final class AdaUIDebug3DModel {
     }
 
     func syncScene() {
-        let _ = project(size: viewportSize)
-        guard let cachedProjectionKey else { return }
+        _ = project(size: viewportSize)
+        guard let cachedProjectionKey else {
+            return
+        }
         syncSceneIfNeeded(items: cachedProjectedItems, viewportSize: viewportSize, key: cachedProjectionKey)
     }
     private func syncSceneIfNeeded(items: [AdaUIDebug3DLayout.Item], viewportSize: Size, key: ProjectionCacheKey) {
-        guard sceneKey != key else { return }
+        guard sceneKey != key else {
+            return
+        }
         sceneKey = key
         rebuildScene(items: items, viewportSize: viewportSize)
     }
 
     private func applySceneTransform() {
-        guard let world = sceneWorld,
-              let sceneEntityId,
-              let entity = world.getEntityByID(sceneEntityId) else {
+        guard
+            let world = sceneWorld,
+            let sceneEntityId,
+            let entity = world.getEntityByID(sceneEntityId)
+        else {
             return
         }
 
@@ -554,8 +570,10 @@ final class AdaUIDebug3DModel {
     }
 
     private func rebuildScene(items: [AdaUIDebug3DLayout.Item], viewportSize: Size) {
-        guard let world = sceneWorld,
-              let device = world.getResource(RenderDeviceHandler.self) else {
+        guard
+            let world = sceneWorld,
+            let device = world.getResource(RenderDeviceHandler.self)
+        else {
             return
         }
 
@@ -642,7 +660,7 @@ final class AdaUIDebug3DModel {
                 Vector3(-1, -1, 1),
                 Vector3(1, -1, 1),
                 Vector3(1, 1, 1),
-                Vector3(-1, 1, 1)
+                Vector3(-1, 1, 1),
             ]
             colors = Array(repeating: Color.clear, count: 4)
             indices = [0, 1, 2, 2, 3, 0]
@@ -664,8 +682,10 @@ final class AdaUIDebug3DModel {
         let distance = max(safeWidth, safeHeight) * max(1.0, 1.28 / max(0.2, zoom))
 
         for entity in world.getEntities() {
-            guard var camera = entity.components[Camera.self],
-                  var transform = entity.components[Transform.self] else {
+            guard
+                var camera = entity.components[Camera.self],
+                var transform = entity.components[Transform.self]
+            else {
                 continue
             }
 
@@ -701,7 +721,7 @@ final class AdaUIDebug3DModel {
             for root in window.roots {
                 if let path = root.path(toRuntimeId: selectedRuntimeId) {
                     selectedNode = path.last
-                    selectedPath = path.map { $0.summary }
+                    selectedPath = path.map(\.summary)
                     return
                 }
             }
@@ -751,7 +771,7 @@ private func appendOutline(
         (minX, maxX, minY, minY + thickness),
         (minX, maxX, maxY - thickness, maxY),
         (minX, minX + thickness, minY, maxY),
-        (maxX - thickness, maxX, minY, maxY)
+        (maxX - thickness, maxX, minY, maxY),
     ]
     for edge in edges {
         appendQuad(minX: edge.0, maxX: edge.1, minY: edge.2, maxY: edge.3, z: z, color: color, positions: &positions, colors: &colors, indices: &indices)
@@ -778,12 +798,12 @@ private func appendQuad(
         Vector3(minX, minY, z),
         Vector3(maxX, minY, z),
         Vector3(maxX, maxY, z),
-        Vector3(minX, maxY, z)
+        Vector3(minX, maxY, z),
     ])
     colors.append(contentsOf: [color, color, color, color])
     indices.append(contentsOf: [
         vertexStart, vertexStart + 1, vertexStart + 2,
-        vertexStart + 2, vertexStart + 3, vertexStart
+        vertexStart + 2, vertexStart + 3, vertexStart,
     ])
 }
 
@@ -864,13 +884,12 @@ enum AdaUIDebug3DLayout {
     static func pick(_ point: Point, in items: [Item]) -> Item? {
         items
             .filter { $0.rect.contains(point: point) }
-            .sorted { lhs, rhs in
+            .min { lhs, rhs in
                 if lhs.depth == rhs.depth {
                     return lhs.rect.area < rhs.rect.area
                 }
                 return lhs.depth > rhs.depth
             }
-            .first
     }
 
     private static func append(
@@ -903,18 +922,20 @@ enum AdaUIDebug3DLayout {
                 height: projection.viewportSize.height + 640
             )
             if rect.intersects(viewport) {
-                items.append(Item(
-                    id: "\(window.id.id)-\(node.runtimeId)",
-                    windowId: window.id,
-                    runtimeId: node.runtimeId,
-                    label: shortType(node.viewType),
-                    rect: rect,
-                    sourceFrame: source,
-                    depth: depth,
-                    color: color(for: node),
-                    isSelected: node.runtimeId == selectedRuntimeId,
-                    isInteractable: node.isInteractable
-                ))
+                items.append(
+                    Item(
+                        id: "\(window.id.id)-\(node.runtimeId)",
+                        windowId: window.id,
+                        runtimeId: node.runtimeId,
+                        label: shortType(node.viewType),
+                        rect: rect,
+                        sourceFrame: source,
+                        depth: depth,
+                        color: color(for: node),
+                        isSelected: node.runtimeId == selectedRuntimeId,
+                        isInteractable: node.isInteractable
+                    )
+                )
             }
         }
 
@@ -933,12 +954,12 @@ enum AdaUIDebug3DLayout {
 
     private static func color(for node: UINodeSnapshot) -> Color {
         let hash = node.accessibilityIdentifier ?? node.viewType
-        var value: UInt64 = 0xcbf29ce484222325
+        var value: UInt64 = 0xcbf2_9ce4_8422_2325
         for byte in hash.utf8 {
             value ^= UInt64(byte)
-            value &*= 0x100000001b3
+            value &*= 0x100_0000_01b3
         }
-        let hue = Int(value & 0x00FFFFFF)
+        let hue = Int(value & 0x00FF_FFFF)
         return Color.fromHex(hue)
     }
 }
@@ -1068,10 +1089,10 @@ struct AdaUIDebug3DView: View {
         }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
     }
-    
+
     private func viewportOverlay(size: Size) -> some View {
-        let _ = revision
-        let _ = model.setViewportSize(size)
+        _ = revision
+        model.setViewportSize(size)
         return Color.clear
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -1092,7 +1113,7 @@ struct AdaUIDebug3DView: View {
                         }
                     }
             )
-        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
     }
 
     private var inspector: some View {
@@ -1141,7 +1162,8 @@ struct AdaUIDebug3DView: View {
         }
 
         switch event.keyCode {
-        case .equals, .plus:
+        case .equals,
+            .plus:
             model.zoomBy(0.1)
         case .minus:
             model.zoomBy(-0.1)
@@ -1154,7 +1176,7 @@ struct AdaUIDebug3DView: View {
 
 private struct AdaUIDebugVertexColorMaterial: CanvasMaterial {}
 
-private extension UINodeSnapshot {
+extension UINodeSnapshot {
     var summary: UINodeSummary {
         UINodeSummary(
             runtimeId: runtimeId,
@@ -1185,7 +1207,7 @@ private extension UINodeSnapshot {
     }
 }
 
-private extension Rect {
+extension Rect {
     var center: Point { Point(midX, midY) }
     var area: Float { width * height }
 }

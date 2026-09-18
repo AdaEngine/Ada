@@ -20,13 +20,13 @@ public struct QueryFilter: OptionSet, Sendable {
     }
 
     /// Returns entities which added to world.
-    public static let added = QueryFilter(rawValue: 1 << 0)
+    public static let added = Self(rawValue: 1 << 0)
 
     /// Returns entities which stored in world.
-    public static let stored = QueryFilter(rawValue: 1 << 1)
+    public static let stored = Self(rawValue: 1 << 1)
 
     /// Returns entities which wait removing from world.
-    public static let removed = QueryFilter(rawValue: 1 << 2)
+    public static let removed = Self(rawValue: 1 << 2)
 
     /// Filter that include all values.
     public static let all: QueryFilter = [.added, .stored, .removed]
@@ -54,14 +54,14 @@ public protocol Filter: Sendable, WorldQueryTarget {
     ) -> Bool
 }
 
-public extension Filter {
+extension Filter {
     @inlinable
-    static func predicate(in archetype: borrowing Archetype) -> Bool {
+    public static func predicate(in _: borrowing Archetype) -> Bool {
         true
     }
 
     @inlinable
-    static var requiresRowEvaluation: Bool {
+    public static var requiresRowEvaluation: Bool {
         true
     }
 }
@@ -82,18 +82,18 @@ public struct With<T: Component>: Filter {
     }
 
     @inlinable
-    public static func _initState(world: World) -> Void { }
+    public static func _initState(world _: World) {}
 
     @inlinable
-    public static func _initFetch(world: World, state: Void, lastTick: Tick, currentTick: Tick) -> ComponentMaskSet {
+    public static func _initFetch(world _: World, state _: Void, lastTick _: Tick, currentTick _: Tick) -> ComponentMaskSet {
         ComponentMaskSet()
     }
 
     @inlinable
     public static func _setData(
-        state: Void,
-        fetch: ComponentMaskSet,
-        chunk: Chunk,
+        state _: Void,
+        fetch _: ComponentMaskSet,
+        chunk _: Chunk,
         archetype: Archetype
     ) -> ComponentMaskSet {
         archetype.componentLayout.maskSet
@@ -102,9 +102,9 @@ public struct With<T: Component>: Filter {
     @inlinable
     @inline(__always)
     public static func condition(
-        state: State,
+        state _: State,
         fetch: ComponentMaskSet,
-        at row: Int
+        at _: Int
     ) -> Bool {
         return fetch.contains(T.self)
     }
@@ -126,18 +126,18 @@ public struct Without<T: Component>: Filter {
     }
 
     @inlinable
-    public static func _initState(world: World) -> Void { }
+    public static func _initState(world _: World) {}
 
     @inlinable
-    public static func _initFetch(world: World, state: Void, lastTick: Tick, currentTick: Tick) -> ComponentMaskSet {
+    public static func _initFetch(world _: World, state _: Void, lastTick _: Tick, currentTick _: Tick) -> ComponentMaskSet {
         ComponentMaskSet()
     }
 
     @inlinable
     public static func _setData(
-        state: Void,
-        fetch: ComponentMaskSet,
-        chunk: Chunk,
+        state _: Void,
+        fetch _: ComponentMaskSet,
+        chunk _: Chunk,
         archetype: Archetype
     ) -> ComponentMaskSet {
         archetype.componentLayout.maskSet
@@ -145,7 +145,7 @@ public struct Without<T: Component>: Filter {
 
     @inlinable
     @inline(__always)
-    public static func condition(state: Void, fetch: ComponentMaskSet, at row: Int) -> Bool {
+    public static func condition(state _: Void, fetch: ComponentMaskSet, at _: Int) -> Bool {
         return !fetch.contains(T.self)
     }
 }
@@ -186,7 +186,7 @@ public struct And<each T: Filter>: Filter {
     @inlinable
     public static var requiresRowEvaluation: Bool {
         for filter in repeat (each T).self {
-            if filter.requiresRowEvaluation {
+            if filter.requiresRowEvaluation { // swiftlint:disable:this for_where
                 return true
             }
         }
@@ -196,7 +196,7 @@ public struct And<each T: Filter>: Filter {
     @inlinable
     public static func predicate(in archetype: borrowing Archetype) -> Bool {
         for filter in repeat (each T).self {
-            if !filter.predicate(in: archetype) {
+            if !filter.predicate(in: archetype) { // swiftlint:disable:this for_where
                 return false
             }
         }
@@ -214,11 +214,11 @@ public struct And<each T: Filter>: Filter {
     public static func _initFetch(world: World, state: _State, lastTick: Tick, currentTick: Tick) -> _Fetch {
         _Fetch(
             fetches: (repeat (each T)._initFetch(
-                world: world,
-                state: each state.states,
-                lastTick: lastTick,
-                currentTick: currentTick)
-            )
+                    world: world,
+                    state: each state.states,
+                    lastTick: lastTick,
+                    currentTick: currentTick
+                ))
         )
     }
 
@@ -230,12 +230,14 @@ public struct And<each T: Filter>: Filter {
         archetype: Archetype
     ) -> _Fetch {
         var newFetch = fetch
-        newFetch.fetches = (repeat (each T)._setData(
-            state: each state.states,
-            fetch: each fetch.fetches,
-            chunk: chunk,
-            archetype: archetype)
-        )
+        newFetch.fetches =
+            (repeat (each T)
+                ._setData(
+                    state: each state.states,
+                    fetch: each fetch.fetches,
+                    chunk: chunk,
+                    archetype: archetype
+                ))
         return newFetch
     }
 
@@ -247,7 +249,7 @@ public struct And<each T: Filter>: Filter {
         at row: Int
     ) -> Bool {
         for (filter, state, fetch) in repeat ((each T).self, each state.states, each fetch.fetches) {
-            if !filter.condition(state: state, fetch: fetch, at: row) {
+            if !filter.condition(state: state, fetch: fetch, at: row) { // swiftlint:disable:this for_where
                 return false
             }
         }
@@ -321,7 +323,7 @@ public struct Or<each T: Filter>: Filter {
     @inlinable
     public static var requiresRowEvaluation: Bool {
         for filter in repeat (each T).self {
-            if filter.requiresRowEvaluation {
+            if filter.requiresRowEvaluation { // swiftlint:disable:this for_where
                 return true
             }
         }
@@ -331,7 +333,7 @@ public struct Or<each T: Filter>: Filter {
     @inlinable
     public static func predicate(in archetype: borrowing Archetype) -> Bool {
         for filter in repeat (each T).self {
-            if filter.predicate(in: archetype) {
+            if filter.predicate(in: archetype) { // swiftlint:disable:this for_where
                 return true
             }
         }
@@ -349,23 +351,25 @@ public struct Or<each T: Filter>: Filter {
     public static func _initFetch(world: World, state: _State, lastTick: Tick, currentTick: Tick) -> _Fetch {
         _Fetch(
             fetches: (repeat (each T)._initFetch(
-                world: world,
-                state: each state.states,
-                lastTick: lastTick,
-                currentTick: currentTick)
-            )
+                    world: world,
+                    state: each state.states,
+                    lastTick: lastTick,
+                    currentTick: currentTick
+                ))
         )
     }
 
     @inlinable
     public static func _setData(state: _State, fetch: _Fetch, chunk: Chunk, archetype: Archetype) -> _Fetch {
         var newFetch = fetch
-        newFetch.fetches = (repeat (each T)._setData(
-            state: each state.states,
-            fetch: each fetch.fetches,
-            chunk: chunk,
-            archetype: archetype)
-        )
+        newFetch.fetches =
+            (repeat (each T)
+                ._setData(
+                    state: each state.states,
+                    fetch: each fetch.fetches,
+                    chunk: chunk,
+                    archetype: archetype
+                ))
         return newFetch
     }
 
@@ -377,7 +381,7 @@ public struct Or<each T: Filter>: Filter {
         at row: Int
     ) -> Bool {
         for (filter, state, fetch) in repeat ((each T).self, each state.states, each fetch.fetches) {
-            if filter.condition(state: state, fetch: fetch, at: row) {
+            if filter.condition(state: state, fetch: fetch, at: row) { // swiftlint:disable:this for_where
                 return true
             }
         }
@@ -422,12 +426,12 @@ public struct Changed<T: Component>: Filter {
     }
 
     @inlinable
-    public static func _initState(world: World) -> Void { }
+    public static func _initState(world _: World) {}
 
     @inlinable
     public static func _initFetch(
-        world: World,
-        state: Void,
+        world _: World,
+        state _: Void,
         lastTick: Tick,
         currentTick: Tick
     ) -> ChangedFetch {
@@ -436,10 +440,10 @@ public struct Changed<T: Component>: Filter {
 
     @inlinable
     public static func _setData(
-        state: Void,
+        state _: Void,
         fetch: ChangedFetch,
         chunk: Chunk,
-        archetype: Archetype
+        archetype _: Archetype
     ) -> ChangedFetch {
         var newFetch = fetch
         guard let slice = chunk.getMutableComponentTicksSlice(for: T.self) else {
@@ -451,7 +455,7 @@ public struct Changed<T: Component>: Filter {
 
     @inlinable
     @inline(__always)
-    public static func condition(state: Void, fetch: ChangedFetch, at row: Int) -> Bool {
+    public static func condition(state _: Void, fetch: ChangedFetch, at row: Int) -> Bool {
         guard let tick = unsafe fetch.ticks?.advanced(by: row).pointee else {
             return false
         }
@@ -496,12 +500,12 @@ public struct Added<T: Component>: Filter {
     }
 
     @inlinable
-    public static func _initState(world: World) -> Void { }
+    public static func _initState(world _: World) {}
 
     @inlinable
     public static func _initFetch(
-        world: World,
-        state: Void,
+        world _: World,
+        state _: Void,
         lastTick: Tick,
         currentTick: Tick
     ) -> AddedFetch {
@@ -510,10 +514,10 @@ public struct Added<T: Component>: Filter {
 
     @inlinable
     public static func _setData(
-        state: Void,
+        state _: Void,
         fetch: AddedFetch,
         chunk: Chunk,
-        archetype: Archetype
+        archetype _: Archetype
     ) -> AddedFetch {
         var newFetch = fetch
         guard let slice = chunk.getMutableComponentTicksSlice(for: T.self) else {
@@ -525,7 +529,7 @@ public struct Added<T: Component>: Filter {
 
     @inlinable
     @inline(__always)
-    public static func condition(state: Void, fetch: AddedFetch, at row: Int) -> Bool {
+    public static func condition(state _: Void, fetch: AddedFetch, at row: Int) -> Bool {
         guard let tick = unsafe fetch.ticks?.advanced(by: row).pointee else {
             return false
         }
@@ -544,17 +548,17 @@ public struct NoFilter: Filter {
     }
 
     @inlinable
-    public static func _initState(world: World) -> Void { }
+    public static func _initState(world _: World) {}
 
     @inlinable
-    public static func _initFetch(world: World, state: Void, lastTick: Tick, currentTick: Tick) -> Void { }
+    public static func _initFetch(world _: World, state _: Void, lastTick _: Tick, currentTick _: Tick) {}
 
     @inlinable
-    public static func _setData(state: Void, fetch: Void, chunk: Chunk, archetype: Archetype) -> Void { }
+    public static func _setData(state _: Void, fetch _: Void, chunk _: Chunk, archetype _: Archetype) {}
 
     @inlinable
     @inline(__always)
-    public static func condition(state: Void, fetch: Void, at row: Int) -> Bool {
+    public static func condition(state _: Void, fetch _: Void, at _: Int) -> Bool {
         true
     }
 }

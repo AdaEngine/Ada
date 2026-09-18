@@ -26,7 +26,6 @@ import AdaUtils
 /// ```
 @Component
 public struct KeyframeAnimator: @unchecked Sendable {
-
     public enum PlaybackState: Sendable, Hashable {
         case playing
         case stopped
@@ -78,7 +77,7 @@ public struct KeyframeAnimator: @unchecked Sendable {
     public init(
         clips: [AnyAnimatorClip],
         initialClipName: String? = nil,
-        speed: Double = 1,
+        speed _: Double = 1,
         isPlaying: Bool = true
     ) {
         var map: [String: AnyAnimatorClip] = [:]
@@ -130,13 +129,12 @@ public struct KeyframeAnimatorRunDidFinish: Event {
 
 // MARK: - Ref extensions (ECS live reference)
 
-public extension Ref where T == KeyframeAnimator {
-
-    mutating func playClip(by name: String) {
+extension Ref where T == KeyframeAnimator {
+    public mutating func playClip(by name: String) {
         wrappedValue.playClip(by: name)
     }
 
-    mutating func stopPlayback() {
+    public mutating func stopPlayback() {
         wrappedValue.stop()
     }
 
@@ -145,11 +143,12 @@ public extension Ref where T == KeyframeAnimator {
     /// Implementation note: this does not poll the ECS world. It subscribes to
     /// ``KeyframeAnimatorRunDidFinish`` on ``EventManager/default`` and awaits a
     /// matching event emitted by ``KeyframeAnimationApplySystem``.
-    mutating func waitUntilFinished(for entityID: Entity.ID) async {
+    public mutating func waitUntilFinished(for entityID: Entity.ID) async {
         let token = wrappedValue.runToken
-        guard wrappedValue.playbackState == .playing else { return }
+        guard wrappedValue.playbackState == .playing else {
+            return
+        }
 
         await KeyframeAnimatorWaitOnce.wait(entityID: entityID, runToken: token)
     }
 }
-

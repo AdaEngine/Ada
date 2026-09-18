@@ -19,13 +19,13 @@ public struct ComponentMacro: ExtensionMacro {
         of node: SwiftSyntax.AttributeSyntax,
         attachedTo declaration: D,
         providingExtensionsOf type: T,
-        conformingTo protocols: [SwiftSyntax.TypeSyntax],
-        in context: C
+        conformingTo _: [SwiftSyntax.TypeSyntax],
+        in _: C
     ) throws -> [SwiftSyntax.ExtensionDeclSyntax] {
         if let inheritanceClause = declaration.inheritanceClause,
-           inheritanceClause.inheritedTypes.contains(where: {
-               ["Component"].withQualified.contains($0.type.trimmedDescription)
-           }) {
+            inheritanceClause.inheritedTypes.contains(where: {
+                ["Component"].withQualified.contains($0.type.trimmedDescription)
+            }) {
             return []
         }
 
@@ -58,7 +58,7 @@ public struct ComponentMacro: ExtensionMacro {
     }
 }
 
-private extension ComponentMacro {
+extension ComponentMacro {
     /// Extracts type name from expression like Transform.self or AdaTransform.Transform.self
     private static func extractTypeName(from expression: ExprSyntax) -> String? {
         // Handle cases like Transform.self or AdaTransform.Transform.self
@@ -68,7 +68,7 @@ private extension ComponentMacro {
                 // Recursively build the full type name
                 var typeParts: [String] = []
                 var current: ExprSyntax? = memberAccess.base
-                
+
                 while let expr = current {
                     if let declRef = expr.as(DeclReferenceExprSyntax.self) {
                         typeParts.insert(declRef.baseName.text, at: 0)
@@ -80,7 +80,7 @@ private extension ComponentMacro {
                         break
                     }
                 }
-                
+
                 if !typeParts.isEmpty {
                     let fullTypeName = typeParts.joined(separator: ".")
                     return "\(fullTypeName).self"
@@ -91,7 +91,7 @@ private extension ComponentMacro {
         else if let declRef = expression.as(DeclReferenceExprSyntax.self) {
             return "\(declRef.baseName.text).self"
         }
-        
+
         return nil
     }
     private static func componentMacroForStruct<T: TypeSyntaxProtocol>(
@@ -100,12 +100,22 @@ private extension ComponentMacro {
         requiredComponents: [String]
     ) -> [SwiftSyntax.ExtensionDeclSyntax] {
         let properties = structDecl.memberBlock.members.compactMap { member -> (String, TypeSyntax, String)? in
-            guard let varDecl = member.decl.as(VariableDeclSyntax.self) else { return nil }
-            guard let binding = varDecl.bindings.first else { return nil }
-            guard let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text else { return nil }
-            guard let type = binding.typeAnnotation?.type else { return nil }
-            if varDecl.bindingSpecifier.tokenKind == .keyword(.let) { return nil }
-            
+            guard let varDecl = member.decl.as(VariableDeclSyntax.self) else {
+                return nil
+            }
+            guard let binding = varDecl.bindings.first else {
+                return nil
+            }
+            guard let identifier = binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text else {
+                return nil
+            }
+            guard let type = binding.typeAnnotation?.type else {
+                return nil
+            }
+            if varDecl.bindingSpecifier.tokenKind == .keyword(.let) {
+                return nil
+            }
+
             // Ignore computed properties that only have a getter
             if let accessors = binding.accessorBlock?.accessors {
                 switch accessors {
@@ -115,61 +125,61 @@ private extension ComponentMacro {
                     break
                 }
             }
-            
+
             let accessModifier = varDecl.modifiers.first?.name.text ?? "internal"
             return (identifier, type, accessModifier)
         }
-        
+
         let functions = properties.map { propertyName, propertyType, accessModifier in
-        """
-        \(accessModifier) func set\(propertyName.capitalizingFirstLetter())(_ value: \(propertyType)) -> Self {
-            var newValue = self
-            newValue.\(propertyName) = value
-            return newValue
-        }
-        """
+            """
+            \(accessModifier) func set\(propertyName.capitalizingFirstLetter())(_ value: \(propertyType)) -> Self {
+                var newValue = self
+                newValue.\(propertyName) = value
+                return newValue
+            }
+            """
         }
 
         let editorFields = properties.map { propertyName, propertyType, _ in
-        """
-        unsafe AdaECS.EditorComponentFieldDescriptor(
-            key: "\(propertyName)",
-            label: "\(propertyName.editorFieldLabel)",
-            kind: AdaECS.EditorComponentReflection.kind(for: \(propertyType).self),
-            isEditable: AdaECS.EditorComponentReflection.isEditable(\(propertyType).self),
-            accepts: { fieldValue in
-                AdaECS.EditorComponentReflection.accepts(fieldValue, for: \(propertyType).self)
-            },
-            read: { component in
-                guard let typedComponent = component as? Self else {
-                    return nil
+            """
+            unsafe AdaECS.EditorComponentFieldDescriptor(
+                key: "\(propertyName)",
+                label: "\(propertyName.editorFieldLabel)",
+                kind: AdaECS.EditorComponentReflection.kind(for: \(propertyType).self),
+                isEditable: AdaECS.EditorComponentReflection.isEditable(\(propertyType).self),
+                accepts: { fieldValue in
+                    AdaECS.EditorComponentReflection.accepts(fieldValue, for: \(propertyType).self)
+                },
+                read: { component in
+                    guard let typedComponent = component as? Self else {
+                        return nil
+                    }
+                    return AdaECS.EditorComponentReflection.read(typedComponent.\(propertyName))
+                },
+                write: { component, fieldValue in
+                    guard var typedComponent = component as? Self else {
+                        return nil
+                    }
+                    guard AdaECS.EditorComponentReflection.write(fieldValue, to: &typedComponent.\(propertyName)) else {
+                        return nil
+                    }
+                    return typedComponent
+                },
+                readPointer: { pointer in
+                    let typedComponent = unsafe pointer.assumingMemoryBound(to: Self.self)
+                    return AdaECS.EditorComponentReflection.read(unsafe typedComponent.pointee.\(propertyName))
+                },
+                writePointer: { pointer, fieldValue in
+                    let typedComponent = unsafe pointer.assumingMemoryBound(to: Self.self)
+                    return unsafe AdaECS.EditorComponentReflection.write(
+                        fieldValue,
+                        to: &typedComponent.pointee.\(propertyName)
+                    )
                 }
-                return AdaECS.EditorComponentReflection.read(typedComponent.\(propertyName))
-            },
-            write: { component, fieldValue in
-                guard var typedComponent = component as? Self else {
-                    return nil
-                }
-                guard AdaECS.EditorComponentReflection.write(fieldValue, to: &typedComponent.\(propertyName)) else {
-                    return nil
-                }
-                return typedComponent
-            },
-            readPointer: { pointer in
-                let typedComponent = unsafe pointer.assumingMemoryBound(to: Self.self)
-                return AdaECS.EditorComponentReflection.read(unsafe typedComponent.pointee.\(propertyName))
-            },
-            writePointer: { pointer, fieldValue in
-                let typedComponent = unsafe pointer.assumingMemoryBound(to: Self.self)
-                return unsafe AdaECS.EditorComponentReflection.write(
-                    fieldValue,
-                    to: &typedComponent.pointee.\(propertyName)
-                )
-            }
-        )
-        """
+            )
+            """
         }
-        
+
         return generateDeclaration(
             type: type,
             availability: structDecl.modifiers,
@@ -178,7 +188,7 @@ private extension ComponentMacro {
             editorFields: editorFields
         )
     }
-    
+
     private static func generateDeclaration<T: TypeSyntaxProtocol>(
         type: T,
         availability: DeclModifierListSyntax?,
@@ -186,54 +196,54 @@ private extension ComponentMacro {
         requiredComponents: [String] = [],
         editorFields: [String] = []
     ) -> [SwiftSyntax.ExtensionDeclSyntax] {
-        // Process modifiers: if private or fileprivate, change to internal
+        // Process modifiers: if private or private, change to internal
         let processedAvailability = processModifiers(availability)
         let requiredComponentTypeNames = requiredComponents.map { "String(reflecting: \($0))" }.joined(separator: ", ")
-        
+
         let proto = "AdaECS.Component, AdaECS.EditorInspectableComponent"
         let ext: DeclSyntax =
-        """
-        extension \(type.trimmed): \(raw: proto) { 
-            \(raw: functions.joined(separator: "\n"))
-            \(processedAvailability) static var requiredComponents: RequiredComponents {
-                RequiredComponents(components: [\(raw: requiredComponents.joined(separator: ", "))])
+            """
+            extension \(type.trimmed): \(raw: proto) {
+                \(raw: functions.joined(separator: "\n"))
+                \(processedAvailability) static var requiredComponents: RequiredComponents {
+                    RequiredComponents(components: [\(raw: requiredComponents.joined(separator: ", "))])
+                }
+                \(processedAvailability) static var editorComponentDescriptor: AdaECS.EditorComponentDescriptor {
+                    AdaECS.EditorComponentDescriptor(
+                        type: Self.self,
+                        displayName: String(describing: Self.self),
+                        requiredComponentTypeNames: [\(raw: requiredComponentTypeNames)],
+                        fields: [
+                            \(raw: editorFields.joined(separator: ",\n"))
+                        ]
+                    )
+                }
             }
-            \(processedAvailability) static var editorComponentDescriptor: AdaECS.EditorComponentDescriptor {
-                AdaECS.EditorComponentDescriptor(
-                    type: Self.self,
-                    displayName: String(describing: Self.self),
-                    requiredComponentTypeNames: [\(raw: requiredComponentTypeNames)],
-                    fields: [
-                        \(raw: editorFields.joined(separator: ",\n"))
-                    ]
-                )
-            }
-        }
-        """
+            """
         return [ext.cast(ExtensionDeclSyntax.self)]
     }
-    
+
     private static func processModifiers(_ modifiers: DeclModifierListSyntax?) -> DeclModifierListSyntax? {
-        guard let modifiers = modifiers, !modifiers.isEmpty else {
+        guard let modifiers, !modifiers.isEmpty else {
             return nil
         }
-        
-        // Check if we have private or fileprivate modifiers that need to be changed to internal
+
+        // Check if we have private or private modifiers that need to be changed to internal
         var needsReplacement = false
         for modifier in modifiers {
             let name = modifier.name.text
-            if name == "private" || name == "fileprivate" {
+            if name == "private" || name == "private" {
                 needsReplacement = true
                 break
             }
         }
-        
-        // If we found private or fileprivate, replace it with internal
+
+        // If we found private or private, replace it with internal
         if needsReplacement {
             var newModifiers: [DeclModifierSyntax] = []
             for modifier in modifiers {
                 let name = modifier.name.text
-                if name == "private" || name == "fileprivate" {
+                if name == "private" || name == "private" {
                     // Replace with internal modifier using with method
                     let internalModifier = modifier.with(\.name, .keyword(.internal))
                     newModifiers.append(internalModifier)
@@ -243,7 +253,7 @@ private extension ComponentMacro {
             }
             return DeclModifierListSyntax(newModifiers)
         }
-        
+
         // Otherwise return original modifiers
         return modifiers
     }
@@ -251,11 +261,11 @@ private extension ComponentMacro {
 
 extension ComponentMacro: MemberMacro {
     public static func expansion(
-        of node: AttributeSyntax,
-        providingMembersOf declaration: some DeclGroupSyntax,
-        conformingTo protocols: [TypeSyntax],
-        in context: some MacroExpansionContext
-      ) throws -> [DeclSyntax] {
+        of _: AttributeSyntax,
+        providingMembersOf _: some DeclGroupSyntax,
+        conformingTo _: [TypeSyntax],
+        in _: some MacroExpansionContext
+    ) throws -> [DeclSyntax] {
         return []
     }
 }

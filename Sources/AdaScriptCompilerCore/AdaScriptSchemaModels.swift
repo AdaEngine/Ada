@@ -219,11 +219,11 @@ func humanizedAdaScriptViewTitle(_ name: String) -> String {
             let previous = index > characters.startIndex ? characters[index - 1] : nil
             let nextIndex = characters.index(after: index)
             let next = nextIndex < characters.endIndex ? characters[nextIndex] : nil
-            let startsWord = character.isUppercase && (
-                previous?.isLowercase == true
+            let startsWord =
+                character.isUppercase
+                && (previous?.isLowercase == true
                     || previous?.isNumber == true
-                    || (previous?.isUppercase == true && next?.isLowercase == true)
-            )
+                    || (previous?.isUppercase == true && next?.isLowercase == true))
             if startsWord, result.last != " " {
                 result.append(" ")
             }
@@ -241,11 +241,11 @@ public enum AdaScriptSchemaError: Error, Equatable, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .duplicateID(let id):
+        case let .duplicateID(id):
             "Duplicate Ada Script data id '\(id)'"
-        case .duplicateName(let name):
+        case let .duplicateName(name):
             "Duplicate Ada Script data declaration '\(name)'"
-        case .duplicateToolID(let id):
+        case let .duplicateToolID(id):
             "Duplicate AdaEditor tool id '\(id)'"
         case let .invalid(path, message):
             "Invalid Ada Script schema in '\(path)': \(message)"

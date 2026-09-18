@@ -8,15 +8,14 @@
 /// A structure that computes Views on demand from an underlying collection of
 /// identified data.
 public struct ForEach<Data: RandomAccessCollection, ID: Hashable, Content: View>: View {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
-    
+    public var body: Never { fatalError("Unreachable code") }
+
     let data: Data
     var content: (Data.Element) -> Content
     let idProvider: ((Data.Element) -> AnyHashable)?
 
-    @MainActor @preconcurrency 
+    @MainActor @preconcurrency
     public static func _makeView(_ view: _ViewGraphNode<Self>, inputs: _ViewInputs) -> _ViewOutputs {
         let data = view[\.data].value
         let contentBlock = view[\.content].value
@@ -63,8 +62,7 @@ public struct ForEach<Data: RandomAccessCollection, ID: Hashable, Content: View>
     }
 }
 
-extension ForEach where ID == Data.Element.ID, Data.Element : Identifiable {
-
+extension ForEach where ID == Data.Element.ID, Data.Element: Identifiable {
     /// Creates an instance that uniquely identifies and creates views across
     /// updates based on the identity of the underlying data.
     ///
@@ -85,7 +83,6 @@ extension ForEach where ID == Data.Element.ID, Data.Element : Identifiable {
 }
 
 extension ForEach {
-
     /// Creates an instance that uniquely identifies and creates widegts across
     /// updates based on the provided key path to the underlying data's
     /// identifier.
@@ -109,7 +106,6 @@ extension ForEach {
 }
 
 extension ForEach where Data == Range<Int>, ID == Int {
-
     /// Creates an instance that computes Views on demand over a given constant
     /// range.
     ///

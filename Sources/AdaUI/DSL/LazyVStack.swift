@@ -12,9 +12,8 @@ import Math
 /// A vertical stack that builds only rows near the visible scroll viewport.
 @MainActor @preconcurrency
 public struct LazyVStack<Data: RandomAccessCollection, ID: Hashable, Row: View>: View, ViewNodeBuilder {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let items: [Data.Element]
     let idProvider: (Data.Element) -> AnyHashable
@@ -189,8 +188,10 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
 
         var didMeasureNewHeight = false
         for node in nodes {
-            guard let id = nodeIdentity(node),
-                  let index = indexForID(id) else {
+            guard
+                let id = nodeIdentity(node),
+                let index = indexForID(id)
+            else {
                 continue
             }
 

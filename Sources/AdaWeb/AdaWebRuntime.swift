@@ -6,8 +6,8 @@
 import Foundation
 
 #if WASM && canImport(JavaScriptKit)
-import JavaScriptEventLoop
-import JavaScriptKit
+    import JavaScriptEventLoop
+    import JavaScriptKit
 #endif
 
 /// Browser runtime helpers for AdaEngine Web exports.
@@ -20,9 +20,9 @@ public enum AdaWebRuntime {
     /// Returns true when the process is running in a browser-hosted WebAssembly environment.
     public static var isBrowserHosted: Bool {
         #if WASM && canImport(JavaScriptKit)
-        JSObject.global.window.object != nil && JSObject.global.document.object != nil
+            JSObject.global.window.object != nil && JSObject.global.document.object != nil
         #else
-        false
+            false
         #endif
     }
 
@@ -32,7 +32,7 @@ public enum AdaWebRuntime {
     /// async main loop. This method is public for tests and custom entrypoints.
     public static func installConcurrencyExecutor() {
         #if WASM && canImport(JavaScriptEventLoop)
-        JavaScriptEventLoop.installGlobalExecutor()
+            JavaScriptEventLoop.installGlobalExecutor()
         #endif
     }
 

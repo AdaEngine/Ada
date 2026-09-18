@@ -23,7 +23,6 @@ public actor WorldActor {
 /// component type. Entity components can be created, updated, removed, and queried using a given World.
 /// - Warning: Still work in progress.
 public final class World: @unchecked Sendable, Codable {
-
     /// The unique identifier of the world.
     public typealias ID = RID
 
@@ -106,11 +105,12 @@ public final class World: @unchecked Sendable, Codable {
     /// - Parameter encoder: The encoder to encode the world to.
     public func encode(to encoder: Encoder) throws {
         self.flush()
-        
+
         var container = encoder.container(keyedBy: CodingKeys.self)
-        let entities = self.getEntities().sorted(by: {
-            $0.id < $1.id
-        })
+        let entities = self.getEntities()
+            .sorted(by: {
+                $0.id < $1.id
+            })
         try container.encode(entities, forKey: .entities)
         var unkeyedContainer = container.nestedContainer(keyedBy: CodingName.self, forKey: .resources)
         for resource in self.resources.getResources() {
@@ -125,38 +125,37 @@ public final class World: @unchecked Sendable, Codable {
 
 // MARK: - Scheduler API
 
-public extension World {
-
+extension World {
     /// Set the order of schedulers for this world.
     /// - Parameter schedulers: The schedulers to set.
-    func setSchedulers(_ schedulers: [SchedulerName]) {
+    public func setSchedulers(_ schedulers: [SchedulerName]) {
         self.schedulers.setSchedulers(schedulers)
     }
 
     /// Insert a scheduler before or after another scheduler.
     /// - Parameter scheduler: The scheduler to insert.
     /// - Parameter after: The scheduler after which to insert the new scheduler.
-    func insertScheduler(_ scheduler: Scheduler, after: SchedulerName) {
+    public func insertScheduler(_ scheduler: Scheduler, after: SchedulerName) {
         schedulers.insert(scheduler, after: after)
     }
 
     /// Insert a scheduler before or before another scheduler.
     /// - Parameter scheduler: The scheduler to insert.
     /// - Parameter before: The scheduler before which to insert the new scheduler.
-    func insertScheduler(_ scheduler: Scheduler, before: SchedulerName) {
+    public func insertScheduler(_ scheduler: Scheduler, before: SchedulerName) {
         schedulers.insert(scheduler, before: before)
     }
 
     /// Contains scheduler
     /// - Parameter scheduler: The scheduler to check.
     /// - Returns: True if the scheduler exists, otherwise false.
-    func containsScheduler(_ scheduler: SchedulerName) -> Bool {
+    public func containsScheduler(_ scheduler: SchedulerName) -> Bool {
         self.schedulers.contains(scheduler)
     }
 
     /// Add schedulers.
     /// - Parameter schedulers: The schedulers to add.
-    func addSchedulers(_ schedulers: SchedulerName...) {
+    public func addSchedulers(_ schedulers: SchedulerName...) {
         schedulers.forEach {
             self.schedulers.append(Scheduler(name: $0))
         }
@@ -164,19 +163,22 @@ public extension World {
 
     /// Add scheduler
     /// - Parameter scheduler: The scheduler to add.
-    func addScheduler(_ scheduler: Scheduler) {
+    public func addScheduler(_ scheduler: Scheduler) {
         self.schedulers.append(scheduler)
     }
 
     /// Run a specific scheduler.
     /// - Parameter scheduler: Scheduler name.
     /// - Parameter deltaTime: Time interval since last update.
-    func runScheduler(_ schedulerName: SchedulerName) async {
-        await AdaTrace.span(lazyName: "World.runScheduler.\(schedulerName.rawValue)", attributes: [
-            "ada.profile.category": "scheduler",
-            "ada.scheduler.name": .string(schedulerName.rawValue),
-            "ada.world.name": .string(self.name ?? "UnknownWorld")
-        ]) {
+    public func runScheduler(_ schedulerName: SchedulerName) async {
+        await AdaTrace.span(
+            lazyName: "World.runScheduler.\(schedulerName.rawValue)",
+            attributes: [
+                "ada.profile.category": "scheduler",
+                "ada.scheduler.name": .string(schedulerName.rawValue),
+                "ada.world.name": .string(self.name ?? "UnknownWorld"),
+            ]
+        ) {
             await self.schedulers.getScope(for: schedulerName) {
                 await $0.run(world: self)
             }
@@ -186,12 +188,12 @@ public extension World {
 
 // MARK: - Systems API
 
-public extension World {
+extension World {
     /// Add new system to the world.
     /// - Parameter systemType: System type.
     /// Add a system to a specific scheduler.
     @discardableResult
-    func addSystem<T: System>(_ systemType: T.Type, on scheduler: SchedulerName = .update) -> Self {
+    public func addSystem<T: System>(_ systemType: T.Type, on scheduler: SchedulerName = .update) -> Self {
         let system = systemType.init(world: self)
         self.schedulers.addSystem(
             system,
@@ -204,7 +206,7 @@ public extension World {
     /// - Parameter systemType: System type.
     /// - Parameter scheduler: The scheduler to remove the system from.
     @discardableResult
-    func removeSystem<T: System>(_ systemType: T.Type, on scheduler: SchedulerName = .update) -> Self {
+    public func removeSystem<T: System>(_ systemType: T.Type, on scheduler: SchedulerName = .update) -> Self {
         self.schedulers.removeSystem(systemType, for: scheduler)
         return self
     }
@@ -212,11 +214,11 @@ public extension World {
 
 // MARK: - Entities managment
 
-public extension World {
+extension World {
     /// Get all entities in world.
     /// - Complexity: O(n)
     /// - Returns: All entities in world.
-    func getEntities() -> [Entity] {
+    public func getEntities() -> [Entity] {
         return self.entities.entities
             .compactMap { location in
                 let archetype = self.archetypes.archetypes[location.archetypeId]
@@ -228,7 +230,7 @@ public extension World {
     /// - Parameter id: Entity identifier.
     /// - Complexity: O(1)
     /// - Returns: Returns nil if entity not registed in scene world.
-    func getEntityByID(_ entityID: Entity.ID) -> Entity? {
+    public func getEntityByID(_ entityID: Entity.ID) -> Entity? {
         guard let location = self.entities.entities[entityID] else {
             return nil
         }
@@ -242,7 +244,7 @@ public extension World {
     /// - Note: Not efficient way to find an entity.
     /// - Complexity: O(n)
     /// - Returns: An entity with matched name or nil if entity with given name not exists.
-    func getEntityByName(_ name: String) -> Entity? {
+    public func getEntityByName(_ name: String) -> Entity? {
         for arch in archetypes.archetypes {
             if let ent = arch.entities.first(where: { $0.name == name }) {
                 return ent
@@ -256,7 +258,7 @@ public extension World {
     /// - Parameter entity: The entity to add.
     /// - Returns: A world instance.
     @discardableResult
-    func addEntity(_ entity: consuming Entity) -> Self {
+    public func addEntity(_ entity: consuming Entity) -> Self {
         self.flush()
 
         if entity.id == Entity.notAllocatedId {
@@ -274,7 +276,7 @@ public extension World {
     /// - Parameter recursively: also remove entity child.
     /// - Returns: A world instance.
     @discardableResult
-    func removeEntity(_ entity: borrowing Entity, recursively: Bool = false) -> Self {
+    public func removeEntity(_ entity: borrowing Entity, recursively: Bool = false) -> Self {
         // Read the hierarchy while its component storage still exists.
         let children = recursively ? entity.children : []
         self.removeEntityRecord(entity.id)
@@ -290,7 +292,7 @@ public extension World {
     /// - Parameter recursively: also remove entity child.
     /// - Returns: A world instance.
     @discardableResult
-    func removeEntity(_ entity: borrowing Entity.ID, recursively: Bool = false) -> Self {
+    public func removeEntity(_ entity: borrowing Entity.ID, recursively: Bool = false) -> Self {
         guard let entity = self.getEntityByID(entity) else {
             return self
         }
@@ -301,7 +303,7 @@ public extension World {
     /// Remove entity from world.
     /// - Note: Entity will removed on next `update` call.
     /// - Parameter recursively: also remove entity child.
-    func removeEntityOnNextTick(_ entity: consuming Entity, recursively: Bool = false) {
+    public func removeEntityOnNextTick(_ entity: consuming Entity, recursively: Bool = false) {
         guard self.entities.entities[entity.id] != nil else {
             return
         }
@@ -322,12 +324,12 @@ public extension World {
 
 // MARK: - World utils
 
-public extension World {
-    func makeCommands() -> Commands {
+extension World {
+    public func makeCommands() -> Commands {
         Commands(entities: entities, commandsQueue: self.commandQueue.copy())
     }
 
-    func flushCommands() {
+    public func flushCommands() {
         guard !commandQueue.isEmpty else {
             return
         }
@@ -336,7 +338,7 @@ public extension World {
 
     /// Update all data in world.
     /// In this step we move entities to matched archetypes and remove pending in delition entities.
-    func flush() {
+    public func flush() {
         self.flushCommands()
 
         for entityId in self.removedEntities {
@@ -346,7 +348,7 @@ public extension World {
 
     /// Clear trackers for entities, components and resources.
     /// - Complexity: O(1)
-    func clearTrackers() {
+    public func clearTrackers() {
         self.removedEntities.removeAll(keepingCapacity: true)
         self.addedEntities.removeAll(keepingCapacity: true)
         self.lastTick = self.incrementChangeTick()
@@ -354,7 +356,7 @@ public extension World {
 
     /// Remove all data from world exclude resources.
     /// - Complexity: O(n)
-    func clear() {
+    public func clear() {
         self.entities.clear()
         self.archetypes.clear()
         self.removedEntities.removeAll(keepingCapacity: true)
@@ -362,7 +364,7 @@ public extension World {
         self.commandQueue = WorldCommandQueue()
     }
 
-    func incrementChangeTick() -> Tick {
+    public func incrementChangeTick() -> Tick {
         let lastValue = self.changeTick.loadThenWrappingIncrement(
             ordering: .relaxed
         )
@@ -372,12 +374,12 @@ public extension World {
 
 // MARK: - Resource API
 
-public extension World {
+extension World {
     /// Insert a resource into the world.
     /// - Parameter resource: The resource to insert.
     /// - Returns: A world instance.
     @discardableResult
-    func insertResource<T: Resource>(_ resource: consuming T) -> Self {
+    public func insertResource<T: Resource>(_ resource: consuming T) -> Self {
         self.resources.insertResource(resource, tick: currentTick)
         return self
     }
@@ -394,7 +396,7 @@ public extension World {
     /// Create a resource from world.
     /// - Parameter type: The resource type.
     /// - Returns: A resource instance.
-    func createResource<T: Resource & WorldInitable>(of type: T.Type) -> T {
+    public func createResource<T: Resource & WorldInitable>(of type: T.Type) -> T {
         let resource = type.init(from: self)
         self.resources.insertResource(resource, tick: currentTick)
         return resource
@@ -405,14 +407,14 @@ public extension World {
     /// - Returns: A resource instance.
     @inlinable
     @discardableResult
-    func initResource<T: Resource & WorldInitable>(_ type: T.Type) -> Self {
+    public func initResource<T: Resource & WorldInitable>(_ type: T.Type) -> Self {
         _ = self.createResource(of: type)
         return self
     }
 
     /// Remove a resource from the world.
     /// - Parameter resource: The resource to remove.
-    consuming func removeResource<T: Resource>(_ resource: T.Type) {
+    public consuming func removeResource<T: Resource>(_ resource: T.Type) {
         self.resources.removeResource(resource)
     }
 
@@ -420,7 +422,7 @@ public extension World {
     /// - Parameter resource: The resource to get.
     /// - Complexity: O(1)
     /// - Returns: The resource if it exists, otherwise nil.
-    borrowing func getResource<T: Resource>(_ resource: T.Type) -> T? {
+    public borrowing func getResource<T: Resource>(_ resource: T.Type) -> T? {
         return self.resources.getResource(resource)
     }
 
@@ -428,7 +430,7 @@ public extension World {
     /// - Parameter type: The type of the resource to get or initialize.
     /// - Complexity: O(1)
     /// - Returns: The resource if it exists, otherwise the initialized resource.
-    func getOrInitResource<T: Resource & WorldInitable>(of type: T.Type) -> T {
+    public func getOrInitResource<T: Resource & WorldInitable>(of type: T.Type) -> T {
         if let resource = self.getResource(T.self) {
             return resource
         }
@@ -441,7 +443,7 @@ public extension World {
     /// - Parameter resource: The resource to get.
     /// - Complexity: O(1)
     /// - Returns: The resource if it exists, otherwise nil.
-    func getOrInitRefResource<T: Resource>(_ resource: T.Type, constructor: () -> T) -> Ref<T> {
+    public func getOrInitRefResource<T: Resource>(_: T.Type, constructor: () -> T) -> Ref<T> {
         if !self.resources.contains(T.self) {
             self.insertResource(constructor())
         }
@@ -461,7 +463,7 @@ public extension World {
     /// - Parameter resource: The resource to get.
     /// - Complexity: O(1)
     /// - Returns: The resource if it exists, otherwise nil.
-    func getRefResource<T: Resource>(_ resource: T.Type) -> Ref<T> {
+    public func getRefResource<T: Resource>(_: T.Type) -> Ref<T> {
         let resource = unsafe self.resources.getResourceData(T.self)?.getWithTick(T.self)
         return unsafe Ref(
             pointer: resource?.pointer,
@@ -473,25 +475,25 @@ public extension World {
             )
         )
     }
-    
+
     /// Get all resources from the world.
     /// - Returns: All resources in world.
-    func getResources() -> [any Resource] {
+    public func getResources() -> [any Resource] {
         return self.resources.getResources()
     }
 
     /// Clear all resources from the world.
     /// - Complexity: O(1)
-    func clearResources() {
+    public func clearResources() {
         self.resources.clear()
     }
 }
 
 // MARK: - Entities and Components
 
-public extension World {
+extension World {
     @discardableResult
-    func spawn(
+    public func spawn(
         _ name: String = "",
         @ComponentsBuilder components: () -> ComponentsBundle
     ) -> Entity {
@@ -499,7 +501,7 @@ public extension World {
     }
 
     @discardableResult
-    func spawn<T: ComponentsBundle>(
+    public func spawn<T: ComponentsBundle>(
         _ name: String = "",
         bundle: consuming T
     ) -> Entity {
@@ -510,13 +512,13 @@ public extension World {
 
     @discardableResult
     @inline(__always)
-    func spawn(_ name: String = "") -> Entity {
+    public func spawn(_ name: String = "") -> Entity {
         let entity = entities.allocate(with: name)
         insertNewEntity(entity, components: [])
         return entity
     }
 
-    func get<T: Component>(from entity: Entity.ID) -> T? {
+    public func get<T: Component>(from entity: Entity.ID) -> T? {
         guard let location = self.entities.entities[entity] else {
             return nil
         }
@@ -528,11 +530,11 @@ public extension World {
     }
 
     @inline(__always)
-    func get<T: Component>(_ type: T.Type, from entity: Entity.ID) -> T? {
+    public func get<T: Component>(_: T.Type, from entity: Entity.ID) -> T? {
         return self.get(from: entity)
     }
 
-    func insert<T: Component>(_ component: T, for entityId: Entity.ID) {
+    public func insert<T: Component>(_ component: T, for entityId: Entity.ID) {
         guard let location = self.entities.entities[entityId] else {
             return
         }
@@ -608,7 +610,7 @@ public extension World {
     }
 
     @inline(__always)
-    func remove<T: Component>(_ component: consuming T, for entity: Entity.ID) {
+    public func remove<T: Component>(_: consuming T, for entity: Entity.ID) {
         self.remove(T.identifier, from: entity)
     }
 
@@ -616,7 +618,7 @@ public extension World {
     /// - Parameter componentType: The type of component to remove.
     /// - Parameter entity: The entity ID to remove the component from.
     @inline(__always)
-    func remove<T: Component>(_ componentType: T.Type, from entityId: Entity.ID) {
+    public func remove<T: Component>(_: T.Type, from entityId: Entity.ID) {
         guard let location = entities.entities[entityId] else {
             return
         }
@@ -625,10 +627,10 @@ public extension World {
         self.remove(T.identifier, from: entityId)
     }
 
-    func remove(_ componentId: ComponentId, from entityId: Entity.ID) {
+    public func remove(_ componentId: ComponentId, from entityId: Entity.ID) {
         // Get the entity's current location
         guard let location = self.entities.entities[entityId] else {
-            return // Entity doesn't exist in the world
+            return  // Entity doesn't exist in the world
         }
 
         // Get the entity from the archetype
@@ -656,7 +658,7 @@ public extension World {
 
     @inline(__always)
     @discardableResult
-    func registerRequiredComponent<T: Component, R: Component & DefaultValue>(
+    public func registerRequiredComponent<T: Component, R: Component & DefaultValue>(
         _ requiredComponent: R.Type,
         for component: T.Type
     ) -> Self {
@@ -666,7 +668,7 @@ public extension World {
     }
 
     @discardableResult
-    func registerRequiredComponent<T: Component, R: Component>(
+    public func registerRequiredComponent<T: Component, R: Component>(
         _ requiredComponent: R.Type,
         for component: T.Type,
         constructor: @Sendable @escaping () -> R
@@ -683,11 +685,11 @@ public extension World {
     }
 
     @inline(__always)
-    func has<T: Component>(_ type: T.Type, in entity: Entity.ID) -> Bool {
+    public func has<T: Component>(_: T.Type, in entity: Entity.ID) -> Bool {
         self.has(T.identifier, in: entity)
     }
 
-    func has(_ identifier: ComponentId, in entity: Entity.ID) -> Bool {
+    public func has(_ identifier: ComponentId, in entity: Entity.ID) -> Bool {
         guard let location = self.entities.entities[entity] else {
             return false
         }
@@ -850,10 +852,8 @@ extension World {
         var currentArchetype = self.archetypes.archetypes[record.archetypeId]
         let removeResult = currentArchetype.swapRemove(at: record.archetypeRow)
 
-        if
-            let swappedEntity = removeResult.swappedEntity,
-            let swappedLocation = entities.entities[swappedEntity]
-        {
+        if let swappedEntity = removeResult.swappedEntity,
+            let swappedLocation = entities.entities[swappedEntity] {
             entities.insert(
                 EntityLocation(
                     archetypeId: swappedLocation.archetypeId,
@@ -874,7 +874,8 @@ extension World {
                         archetypeRow: swappedLocation.archetypeRow,
                         chunkIndex: removeChunkResult.newLocation.chunkIndex,
                         chunkRow: removeChunkResult.newLocation.entityRow
-                    ), for: swappedEntity
+                    ),
+                    for: swappedEntity
                 )
             }
         }
@@ -896,8 +897,8 @@ public enum WorldEvents {
     }
 }
 
-private extension World {
-    enum CodingKeys: String, CodingKey {
+extension World {
+    private enum CodingKeys: String, CodingKey {
         case name
         case entities
         case resources
@@ -927,11 +928,11 @@ public struct Tick: Sendable, Comparable {
         self.value = value
     }
 
-    public static func < (lhs: Tick, rhs: Tick) -> Bool {
+    public static func < (lhs: Self, rhs: Self) -> Bool {
         lhs.value < rhs.value
     }
 
-    public func isNewerThan(lastTick: Tick, currentTick: Tick) -> Bool {
+    public func isNewerThan(lastTick: Self, currentTick: Self) -> Bool {
         let changeTickSince = currentTick.value &- self.value
         let lastTickSince = currentTick.value &- lastTick.value
         return lastTickSince > changeTickSince

@@ -5,8 +5,8 @@
 //  Created by v.prusakov on 3/5/23.
 //
 
-import AdaAssets
 import AdaApp
+import AdaAssets
 import AdaECS
 import AdaRender
 import AdaUtils
@@ -14,7 +14,6 @@ import Math
 
 /// Append text rendering systems to the scene.
 public struct TextPlugin: Plugin {
-
     public init() {}
 
     public func setup(in app: AppWorlds) {
@@ -40,13 +39,16 @@ public struct TextPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = try! ShaderModule.loadBundled(at: "Assets/text.glsl", from: .module)
+        self.shader = (try? ShaderModule.loadBundled(at: "Assets/text.glsl", from: .module))
+            .unwrap(message: "Bundled text shader is missing.")
     }
 
     public func configurate(
-        with configuration: RenderPipelineEmptyConfiguration
+        with _: RenderPipelineEmptyConfiguration
     ) -> RenderPipelineDescriptor {
-        var piplineDesc = RenderPipelineDescriptor(vertex: shader.asset.getShader(for: .vertex)!)
+        let vertexShader = shader.asset.getShader(for: .vertex)
+            .unwrap(message: "Bundled text shader has no vertex stage.")
+        var piplineDesc = RenderPipelineDescriptor(vertex: vertexShader)
         piplineDesc.fragment = shader.asset.getShader(for: .fragment)
         piplineDesc.debugName = "Text Pipeline"
         piplineDesc.backfaceCulling = false
@@ -57,7 +59,7 @@ public struct TextPipeline: RenderPipelineConfigurator {
             .attribute(.vector4, name: "a_OutlineColor"),
             .attribute(.float, name: "a_OutlineWidth"),
             .attribute(.vector2, name: "a_TexCoordinate"),
-            .attribute(.int, name: "a_TextureIndex")
+            .attribute(.int, name: "a_TextureIndex"),
         ])
 
         piplineDesc.vertexDescriptor.layouts[0].stride = MemoryLayout<GlyphVertexData>.stride

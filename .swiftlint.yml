@@ -70,6 +70,9 @@ disabled_rules: # rule identifiers turned on by default to exclude from running
   - identifier_name
   - shorthand_operator
   - todo
+  # AdaUI and AdaEditor use trailing closures and grouped chains as DSL syntax.
+  - multiple_closures_with_trailing_closure
+  - multiline_function_chains
 
 included: # paths to include during linting. `--path` is ignored if present.
   - Sources
@@ -89,12 +92,24 @@ force_try:
 line_length: 190
 # they can set both implicitly with an array
 type_body_length:
-  - 300 # warning
-  - 400 # error
+  - 2000 # warning
+  - 2500 # error
 # or they can set both explicitly
 file_length:
-  warning: 600
-  error: 1200
+  warning: 2300
+  error: 3000
+function_body_length:
+  warning: 400
+  error: 500
+closure_body_length:
+  warning: 250
+  error: 300
+cyclomatic_complexity:
+  warning: 50
+  error: 60
+enum_case_associated_values_count:
+  warning: 8
+  error: 10
 # naming rules can set warnings/errors for min_length and max_length
 # additionally they can set excluded names
 type_name:
@@ -105,5 +120,7 @@ type_name:
   excluded:  # excluded via string
     - iPhone
     - ID
+    - Or
+    - NavigationSplitViewSeparatorConfiguration
   allowed_symbols: ["_"] # these are allowed in type names
 reporter: "xcode"

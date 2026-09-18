@@ -7,7 +7,9 @@
 
 // swiftlint:disable unused_setter_value
 
-/// Get required component from entity. 
+import AdaUtils
+
+/// Get required component from entity.
 /// If components not exists returns fatal error.
 ///
 /// - Note: Only works in objects that inheritance from ``ScriptableObject`` class.
@@ -33,25 +35,24 @@
 /// ```
 @propertyWrapper
 public struct RequiredComponent<T: Component> {
-    
     @available(*, unavailable, message: "RequiredComponents should call only inside `ScriptableObject` classes.")
     public var wrappedValue: T {
-        get { fatalError() }
-        set { fatalError() }
+        get { fatalError("Unreachable code") }
+        set { fatalError("Unreachable code") }
     }
-    
-    public init() { }
-    
+
+    public init() {}
+
     // Currently private method to get parent component
     public static subscript<EnclosingSelf: ScriptableObject>(
         _enclosingInstance object: EnclosingSelf,
-        wrapped wrappedKeyPath: KeyPath<EnclosingSelf, T>,
-        storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, RequiredComponent>
+        wrapped _: KeyPath<EnclosingSelf, T>,
+        storage _: ReferenceWritableKeyPath<EnclosingSelf, Self>
     ) -> T {
         get {
-            return object.components[T.self]!
+            return object.components[T.self].unwrap(message: "Required component \(T.self) is missing.")
         }
-        
+
         set {
             object.components[T.self] = newValue
         }

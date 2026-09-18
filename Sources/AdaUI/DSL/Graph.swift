@@ -7,22 +7,22 @@
 
 import AdaUtils
 import Foundation
+
 #if canImport(Glibc)
-import Glibc
+    import Glibc
 #endif
 #if canImport(Darwin)
-import Darwin.C
+    import Darwin.C
 #endif
 #if os(Windows)
-import WinSDK
+    import WinSDK
 #endif
 
 @MainActor
 final class ViewGraph {
-
     private static var viewsTypeToDebug: Set<ObjectIdentifier> = []
 
-    static func registerViewToDebugUpdate<V: View>(_ type: V.Type) {
+    static func registerViewToDebugUpdate<V: View>(_: V.Type) {
         viewsTypeToDebug.insert(ObjectIdentifier(V.self))
     }
 
@@ -50,7 +50,7 @@ public struct _ViewInputs {
 
     /// Method can find and register ``State``, ``Binding``, ``Environment`` property wrappers
     /// in new _ViewInputs value.
-    func resolveStorages<T>(in content: T, stateContainer: ViewStateContainer? = nil) -> _ViewInputs {
+    func resolveStorages<T>(in content: T, stateContainer: ViewStateContainer? = nil) -> Self {
         var newSelf = self
         let mirror = Mirror(reflecting: content)
         var stateOrdinal = 0
@@ -122,12 +122,7 @@ public struct _ViewListOutputs {
 }
 
 public struct _ViewGraphNode<Value>: Equatable {
-
     let value: Value
-
-    init(value: Value) {
-        self.value = value
-    }
 
     subscript<U>(keyPath: KeyPath<Value, U>) -> _ViewGraphNode<U> {
         _ViewGraphNode<U>(value: self.value[keyPath: keyPath])

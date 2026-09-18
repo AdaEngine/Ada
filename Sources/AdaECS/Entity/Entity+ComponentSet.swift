@@ -9,9 +9,9 @@ import AdaUtils
 import Collections
 import Logging
 
-public extension Entity {
+extension Entity {
     /// Hold entity components specific for entity.
-    struct ComponentSet: Codable, Sendable {
+    public struct ComponentSet: Codable, Sendable {
         @_spi(Internal)
         public var entity: Entity.ID
 
@@ -26,7 +26,7 @@ public extension Entity {
         var notFlushedComponents: SparseSet<ComponentId, any Component> = [:]
 
         // MARK: - Codable
-        
+
         /// Create an empty component set.
         init(entity: Entity.ID) {
             self.entity = entity
@@ -38,7 +38,7 @@ public extension Entity {
             self.entity = other.entity
             self.notFlushedComponents = other.notFlushedComponents
             if let world = other.world,
-               let location = world.entities.entities[other.entity] {
+                let location = world.entities.entities[other.entity] {
                 let chunk = world.archetypes
                     .archetypes[location.archetypeId]
                     .chunks.chunks[location.chunkIndex]
@@ -47,7 +47,7 @@ public extension Entity {
                 }
             }
         }
-        
+
         /// Create component set from decoder.
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingName.self)
@@ -65,7 +65,7 @@ public extension Entity {
                 }
             }
         }
-        
+
         /// Encode the component set to an encoder.
         /// - Parameter encoder: The encoder to encode the component set to.
         public func encode(to encoder: Encoder) throws {
@@ -95,7 +95,7 @@ public extension Entity {
 
         /// Gets or sets the component of the specified type.
         @inlinable
-        public subscript<T>(componentType: T.Type) -> T? where T : Component {
+        public subscript<T>(_: T.Type) -> T? where T: Component {
             get {
                 return get(for: T.self)
             }
@@ -110,11 +110,11 @@ public extension Entity {
 
         /// Get any count of component types from set.
         @inline(__always)
-        public func get<each T: Component>(_ type: repeat (each T).Type) -> (repeat each T) {
-            return (repeat get(for: (each T).self)!)
+        public func get<each T: Component>(_: repeat (each T).Type) -> (repeat each T) {
+            return (repeat get(for: (each T).self).unwrap(message: "Required component is not attached to entity \(entity)."))
         }
 
-        public func get<T: Component>(for type: T.Type) -> T? {
+        public func get<T: Component>(for _: T.Type) -> T? {
             if let world {
                 world.get(from: entity)
             } else {
@@ -123,7 +123,7 @@ public extension Entity {
         }
 
         public func getOrCreate<T: Component>(
-            for type: T.Type,
+            for _: T.Type,
             default: T
         ) -> T {
             if let world {
@@ -140,7 +140,7 @@ public extension Entity {
 
         /// Set the component of the specified type.
         @inline(__always)
-        public mutating func insert<T>(_ component: consuming T) where T : Component {
+        public mutating func insert<T>(_ component: consuming T) where T: Component {
             guard let world else {
                 self.notFlushedComponents[T.identifier] = component
                 return
@@ -187,7 +187,7 @@ public extension Entity {
             }
             world.remove(componentType.identifier, from: entity)
         }
-        
+
         /// The number of components in the set.
         public var count: Int {
             guard
@@ -202,9 +202,10 @@ public extension Entity {
                 .getComponents(for: entity)
                 .count
         }
-        
+
         /// A Boolean value indicating whether the set is empty.
         public var isEmpty: Bool {
+            // swiftlint:disable:next empty_count
             return count == 0
         }
 
@@ -218,37 +219,37 @@ public extension Entity {
 
 // swiftlint:disable identifier_name
 
-public extension Entity.ComponentSet {
+extension Entity.ComponentSet {
     /// Gets the components of the specified types.
     /// - Parameter a: The type of the first component.
     /// - Parameter b: The type of the second component.
     /// - Returns: The components of the specified types.
     @inline(__always)
-    subscript<A, B>(_ a: A.Type, _ b: B.Type) -> (A, B) where A : Component, B: Component {
+    public subscript<A, B>(_: A.Type, _: B.Type) -> (A, B) where A: Component, B: Component {
         (
-            get(for: A.self)!,
-            get(for: B.self)!
+            get(for: A.self).unwrap(message: "Component \(A.self) is not attached to entity \(entity)."),
+            get(for: B.self).unwrap(message: "Component \(B.self) is not attached to entity \(entity).")
         )
     }
-    
+
     /// Gets the components of the specified types.
     /// - Parameter a: The type of the first component.
     /// - Parameter b: The type of the second component.
     /// - Parameter c: The type of the third component.
     /// - Returns: The components of the specified types.
     @inline(__always)
-    subscript<A, B, C>(
-        _ a: A.Type,
-        _ b: B.Type,
-        _ c: C.Type
-    ) -> (A, B, C) where A : Component, B: Component, C: Component {
+    public subscript<A, B, C>(
+        _: A.Type,
+        _: B.Type,
+        _: C.Type
+    ) -> (A, B, C) where A: Component, B: Component, C: Component {
         (
-            get(for: A.self)!,
-            get(for: B.self)!,
-            get(for: C.self)!
+            get(for: A.self).unwrap(message: "Component \(A.self) is not attached to entity \(entity)."),
+            get(for: B.self).unwrap(message: "Component \(B.self) is not attached to entity \(entity)."),
+            get(for: C.self).unwrap(message: "Component \(C.self) is not attached to entity \(entity).")
         )
     }
-    
+
     /// Gets the components of the specified types.
     /// - Parameter a: The type of the first component.
     /// - Parameter b: The type of the second component.
@@ -256,25 +257,25 @@ public extension Entity.ComponentSet {
     /// - Parameter d: The type of the fourth component.
     /// - Returns: The components of the specified types.
     @inline(__always)
-    subscript<A, B, C, D>(
-        _ a: A.Type,
-        _ b: B.Type,
-        _ c: C.Type,
-        _ d: D.Type
-    ) -> (A, B, C, D) where A : Component, B: Component, C: Component, D: Component {
+    public subscript<A, B, C, D>(
+        _: A.Type,
+        _: B.Type,
+        _: C.Type,
+        _: D.Type
+    ) -> (A, B, C, D) where A: Component, B: Component, C: Component, D: Component {
         (
-            get(for: A.self)!,
-            get(for: B.self)!,
-            get(for: C.self)!,
-            get(for: D.self)!
+            get(for: A.self).unwrap(message: "Component \(A.self) is not attached to entity \(entity)."),
+            get(for: B.self).unwrap(message: "Component \(B.self) is not attached to entity \(entity)."),
+            get(for: C.self).unwrap(message: "Component \(C.self) is not attached to entity \(entity)."),
+            get(for: D.self).unwrap(message: "Component \(D.self) is not attached to entity \(entity).")
         )
     }
 }
 
-public extension Entity.ComponentSet {
+extension Entity.ComponentSet {
     /// Add new component to component set.
     @inline(__always)
-    static func += <T: Component>(lhs: inout Self, rhs: consuming T) {
+    public static func += <T: Component>(lhs: inout Self, rhs: consuming T) {
         lhs[T.self] = rhs
     }
 }
@@ -292,11 +293,11 @@ extension Entity.ComponentSet: CustomStringConvertible {
             .archetypes[location.archetypeId]
             .chunks.chunks[location.chunkIndex]
         let components = chunk.getComponents(for: entity)
-        let result = components.reduce("") { partialResult, value in
+        let result = components.reduce(into: "") { partialResult, value in
             let name = type(of: value.1)
-            return partialResult + "\n   ⟐ \(name)"
+            partialResult += "\n   ⟐ \(name)"
         }
-        
+
         return "ComponentSet(\(result)\n)"
     }
 }
@@ -312,11 +313,11 @@ extension Entity.ComponentSet {
             notFlushedComponents[identifier] as? T
         }
     }
-    
+
     /// Get a component by its identifier.
     /// - Parameter componentId: The identifier of the component.
     /// - Returns: The component if it exists, otherwise nil.
-    subscript<T: Component>(by componentId: ComponentId) -> T? {
+    subscript<T: Component>(by _: ComponentId) -> T? {
         _read {
             yield get(T.self)
         }
@@ -330,8 +331,8 @@ extension Entity.ComponentSet {
     }
 }
 
-private extension Entity {
-    enum CodableError: Error {
+extension Entity {
+    private enum CodableError: Error {
         case worldIsNil
         case entityNotFoundInWorld
     }

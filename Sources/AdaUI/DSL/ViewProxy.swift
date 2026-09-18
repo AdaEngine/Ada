@@ -54,7 +54,7 @@ public struct ViewProxy: Hashable, @unchecked Sendable {
         target?.setNeedsDisplay()
     }
 
-    public static func == (lhs: ViewProxy, rhs: ViewProxy) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.targetID == rhs.targetID
     }
 
@@ -63,9 +63,9 @@ public struct ViewProxy: Hashable, @unchecked Sendable {
     }
 }
 
-public extension EnvironmentValues {
+extension EnvironmentValues {
     /// A proxy for requesting layout and redraw work from the current view node.
-    @Entry var viewProxy: ViewProxy = ViewProxy()
+    @Entry public var viewProxy: ViewProxy = ViewProxy()
 }
 
 extension ViewNode: ViewProxyTarget {

@@ -32,7 +32,7 @@ public enum KeyframeRepeatMode: Sendable, Hashable, Codable {
     public init(from decoder: any Decoder) throws {
         // Backward-compat: old payload may be a plain string.
         if let single = try? decoder.singleValueContainer(),
-           let value = try? single.decode(String.self) {
+            let value = try? single.decode(String.self) {
             switch value {
             case "once": self = .once
             case "loop": self = .loop()
@@ -57,18 +57,21 @@ public enum KeyframeRepeatMode: Sendable, Hashable, Codable {
     public func encode(to encoder: any Encoder) throws {
         switch self {
         case .once:
-            var s = encoder.singleValueContainer(); try s.encode("once")
-        case .loop(let reversed):
+            var s = encoder.singleValueContainer()
+            try s.encode("once")
+        case let .loop(reversed):
             if !reversed {
-                var s = encoder.singleValueContainer(); try s.encode("loop")
+                var s = encoder.singleValueContainer()
+                try s.encode("loop")
             } else {
                 var c = encoder.container(keyedBy: CodingKeys.self)
                 try c.encode(Kind.loop, forKey: .kind)
                 try c.encode(true, forKey: .reversed)
             }
         case .pingPong:
-            var s = encoder.singleValueContainer(); try s.encode("pingPong")
-        case .repeatCount(let count):
+            var s = encoder.singleValueContainer()
+            try s.encode("pingPong")
+        case let .repeatCount(count):
             var c = encoder.container(keyedBy: CodingKeys.self)
             try c.encode(Kind.repeatCount, forKey: .kind)
             try c.encode(max(0, count), forKey: .count)

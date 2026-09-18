@@ -18,16 +18,16 @@ final class GenericUniformBufferSet: UniformBufferSet, @unchecked Sendable {
     typealias Set = Int
     typealias Binding = Int
 
-    private var uniformBuffers: [FrameIndex : [Set : [ Binding : UniformBuffer] ] ] = [:]
-    
+    private var uniformBuffers: [FrameIndex: [Set: [Binding: UniformBuffer]]] = [:]
+
     init(frames: Int, device: RenderDevice) {
         self.frames = frames
         self.device = device
     }
 
     func initBuffers(length: Int, binding: Int, set: Int) {
-        for frame in 0 ..< frames {
-            var buffer = self.device.createUniformBuffer(length: length, binding: binding)
+        for frame in 0..<frames {
+            let buffer = self.device.createUniformBuffer(length: length, binding: binding)
             buffer.label = self.label
             self.setBuffer(buffer, set: set, frameIndex: frame)
         }
@@ -39,9 +39,9 @@ final class GenericUniformBufferSet: UniformBufferSet, @unchecked Sendable {
     }
 
     func getBuffer(binding: Int, set: Int, frameIndex: Int) -> UniformBuffer {
-        assert(self.uniformBuffers[frameIndex] != nil)
-        assert(self.uniformBuffers[frameIndex]?[set] != nil)
-        assert(self.uniformBuffers[frameIndex]?[set]?[binding] != nil)
-        return self.uniformBuffers[frameIndex]![set]![binding]!
+        guard let buffer = self.uniformBuffers[frameIndex]?[set]?[binding] else {
+            preconditionFailure("Uniform buffer \(binding) is missing from set \(set), frame \(frameIndex).")
+        }
+        return buffer
     }
 }

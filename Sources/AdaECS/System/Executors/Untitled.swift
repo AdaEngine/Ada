@@ -9,17 +9,15 @@ import Collections
 
 struct MultithreadedGraphExecutor: SystemsGraphExecutor {
     func initialize(
-        _ graph: borrowing SystemsGraph
+        _: borrowing SystemsGraph
     ) {
-
     }
-    
-    func execute(
-        _ graph: borrowing SystemsGraph,
-        world: World,
-        scheduler: SchedulerName
-    ) async {
 
+    func execute(
+        _: borrowing SystemsGraph,
+        world _: World,
+        scheduler _: SchedulerName
+    ) async {
     }
 }
 

@@ -9,25 +9,24 @@ import Math
 
 /// An object that you use to configure new texture objects.
 public struct TextureDescriptor {
-    
     /// The width of the texture image for the base level mipmap, in pixels.
     public var width: Int
-    
+
     /// The height of the texture image for the base level mipmap, in pixels.
     public var height: Int
-    
+
     /// The size and bit layout of all pixels in the texture.
     public var pixelFormat: PixelFormat
-    
+
     /// Options that determine how you can use the texture.
     public var textureUsage: Texture.Usage
-    
+
     /// The dimension and arrangement of texture image data.
     public var textureType: Texture.TextureType
-    
+
     /// The number of mipmap levels for this texture.
     public var mipmapLevel: Int
-    
+
     /// The data from we can create a texture.
     public var image: Image?
 
@@ -36,7 +35,7 @@ public struct TextureDescriptor {
 
     /// The sampler that describe how to render a texture.
     public var samplerDescription: SamplerDescriptor
-    
+
     /// Initialize a new texture descriptor.
     ///
     /// - Parameter width: The width of the texture image for the base level mipmap, in pixels.

@@ -14,7 +14,6 @@ import Math
 
 /// The plugin that sets up the render world.
 public struct RenderWorldPlugin: Plugin {
-
     public init() {}
 
     /// Setup the render world.
@@ -31,14 +30,16 @@ public struct RenderWorldPlugin: Plugin {
         renderWorld
             .insertResource(RenderGraph(label: "RenderWorld_Root"))
             .insertResource(RenderGraphDiagnostics())
-            .insertResource(DefaultSchedulerOrder(order: [
-                .preUpdate,
-                .prepare,
-                .batching,
-                .update,
-                .render,
-                .postUpdate
-            ]))
+            .insertResource(
+                DefaultSchedulerOrder(order: [
+                    .preUpdate,
+                    .prepare,
+                    .batching,
+                    .update,
+                    .render,
+                    .postUpdate,
+                ])
+            )
         renderWorld.setExctractor(RenderWorldExctractor())
         renderWorld.main.setSchedulers([
             .startup,
@@ -48,7 +49,7 @@ public struct RenderWorldPlugin: Plugin {
             .batching,
             .update,
             .render,
-            .postUpdate
+            .postUpdate,
         ])
 
         do {
@@ -63,10 +64,12 @@ public struct RenderWorldPlugin: Plugin {
         unsafe renderWorld
             .insertResource(renderDevice)
             .insertResource(RenderEngineHandler(renderEngine: RenderEngine.shared))
-            .insertResource(WindowSurfaces(
-                windows: [:],
-                allowsWindowRendering: app.main.getResource(OffscreenRenderWorld.self) == nil
-            ))
+            .insertResource(
+                WindowSurfaces(
+                    windows: [:],
+                    allowsWindowRendering: app.main.getResource(OffscreenRenderWorld.self) == nil
+                )
+            )
             .addSystem(CreateWindowSurfacesSystem.self, on: .prepare)
             .addSystem(DefaultSchedulerRunner.self, on: .renderRunner)
             .addSystem(RenderSystem.self, on: .render)
@@ -94,7 +97,6 @@ public struct RenderEngineHandler: Resource {
 @PlainSystem
 @_spi(Internal)
 public struct RenderSystem {
-
     @Res<RenderGraph?>
     private var renderGraph
 
@@ -107,7 +109,7 @@ public struct RenderSystem {
     @Res<RenderGraphDiagnostics?>
     private var renderGraphDiagnostics
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
     public func update(context: UpdateContext) async {
         renderGraph?.update(from: context.world)
@@ -145,7 +147,6 @@ public struct RenderSystem {
         )
     }
 }
-
 
 /// The extractor that extracts the main world to the render world.
 struct RenderWorldExctractor: WorldExctractor {
@@ -207,7 +208,8 @@ public func CreateWindowSurfaces(
                 continue
             }
 
-            let ref: WindowRef = if primaryWindow.wrappedValue.windowId == windowId {
+            let ref: WindowRef =
+                if primaryWindow.wrappedValue.windowId == windowId {
                     .primary
                 } else {
                     .windowId(windowId)
@@ -270,17 +272,17 @@ public struct RenderWindow: Sendable, Hashable {
     }
 }
 
-public extension SchedulerName {
+extension SchedulerName {
     /// The render scheduler.
-    static let renderRunner = SchedulerName(rawValue: "RenderWorld_RenderRunner")
+    public static let renderRunner = SchedulerName(rawValue: "RenderWorld_RenderRunner")
 
-    static let prepare = SchedulerName(rawValue: "RenderWorld_Prepare")
-    static let batching = SchedulerName(rawValue: "RenderWorld_Batching")
-    static let render = SchedulerName(rawValue: "RenderWorld_Render")
-    static let extract = SchedulerName(rawValue: "RenderWorld_Extract")
+    public static let prepare = SchedulerName(rawValue: "RenderWorld_Prepare")
+    public static let batching = SchedulerName(rawValue: "RenderWorld_Batching")
+    public static let render = SchedulerName(rawValue: "RenderWorld_Render")
+    public static let extract = SchedulerName(rawValue: "RenderWorld_Extract")
 }
 
-public extension AppWorldName {
+extension AppWorldName {
     /// The render world that will render the scene.
-    static let renderWorld = AppWorldName(rawValue: "RenderWorld")
+    public static let renderWorld = AppWorldName(rawValue: "RenderWorld")
 }

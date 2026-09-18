@@ -9,9 +9,9 @@ import Math
 
 // MARK: - KeyModifier alias (SwiftUI-style naming)
 
-public extension KeyModifier {
+extension KeyModifier {
     /// Command (⌘) on Apple platforms; maps to ``KeyModifier/main``.
-    static let command = KeyModifier.main
+    public static let command = KeyModifier.main
 }
 
 // MARK: - Character → KeyCode
@@ -49,7 +49,7 @@ enum KeyboardShortcutKeyParsing {
         }
         if required.isEmpty {
             let blockers: KeyModifier = [.main, .control, .alt]
-            return event.modifiers.intersection(blockers).isEmpty
+            return event.modifiers.isDisjoint(with: blockers)
         }
         return true
     }
@@ -102,7 +102,6 @@ protocol KeyboardShortcutRegistering: AnyObject {
 
 @MainActor
 final class KeyboardShortcutModifierNode: ViewModifierNode, KeyboardShortcutHandling {
-
     private(set) var keyCode: KeyCode
     private(set) var requiredModifiers: KeyModifier
     private var explicitAction: (() -> Void)?
@@ -300,7 +299,7 @@ struct KeyboardShortcutsViewModifier<Content: View>: ViewModifier, ViewNodeBuild
     }
 }
 
-public extension View {
+extension View {
     /// Associates a keyboard shortcut with this view.
     ///
     /// If `action` is `nil`, the shortcut triggers the first enabled ``Button`` in the modified subtree (depth-first),
@@ -308,7 +307,7 @@ public extension View {
     ///
     /// Shortcuts are dispatched from ``UIContainerView`` before focused key handling (see plan: global slide navigation).
     @ViewBuilder
-    func keyboardShortcut(
+    public func keyboardShortcut(
         _ key: Character,
         modifiers: KeyModifier = [],
         action: (() -> Void)? = nil
@@ -328,7 +327,7 @@ public extension View {
     }
 
     /// Associates a keyboard shortcut using a ``KeyCode`` (e.g. arrow keys).
-    func keyboardShortcut(
+    public func keyboardShortcut(
         _ keyCode: KeyCode,
         modifiers: KeyModifier = [],
         action: (() -> Void)? = nil
@@ -344,7 +343,7 @@ public extension View {
     }
 
     /// Associates multiple explicit keyboard shortcut actions with this view using a single modifier node.
-    func keyboardShortcuts(_ shortcuts: [KeyboardShortcutAction]) -> some View {
+    public func keyboardShortcuts(_ shortcuts: [KeyboardShortcutAction]) -> some View {
         modifier(
             KeyboardShortcutsViewModifier(
                 content: self,

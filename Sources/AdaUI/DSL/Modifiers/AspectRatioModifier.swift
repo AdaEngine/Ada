@@ -15,14 +15,14 @@ public enum ContentMode: Equatable, Hashable, Sendable {
     case fill
 }
 
-public extension View {
+extension View {
     /// Constrains this view's dimensions to the specified aspect ratio.
     ///
     /// - Parameters:
     ///   - aspectRatio: The width-to-height ratio to use. Pass `nil` to use the view's ideal aspect ratio.
     ///   - contentMode: The scaling behavior used to fit or fill the parent proposal.
     /// - Returns: A view that constrains this view's dimensions to the aspect ratio.
-    func aspectRatio(_ aspectRatio: Float? = nil, contentMode: ContentMode) -> some View {
+    public func aspectRatio(_ aspectRatio: Float? = nil, contentMode: ContentMode) -> some View {
         modifier(
             AspectRatioViewModifier(
                 aspectRatio: aspectRatio,
@@ -35,14 +35,14 @@ public extension View {
     /// Scales this view to fit its parent.
     ///
     /// This is equivalent to calling `aspectRatio(nil, contentMode: .fit)`.
-    func scaledToFit() -> some View {
+    public func scaledToFit() -> some View {
         aspectRatio(contentMode: .fit)
     }
 
     /// Scales this view to fill its parent.
     ///
     /// This is equivalent to calling `aspectRatio(nil, contentMode: .fill)`.
-    func scaledToFill() -> some View {
+    public func scaledToFill() -> some View {
         aspectRatio(contentMode: .fill)
     }
 }
@@ -125,12 +125,14 @@ final class AspectRatioViewNode: ViewModifierNode {
             return nil
         }
 
-        guard let constrainedSize = Self.constrainedSize(
-            for: proposal,
-            fallback: idealSize,
-            aspectRatio: ratio,
-            contentMode: contentMode
-        ) else {
+        guard
+            let constrainedSize = Self.constrainedSize(
+                for: proposal,
+                fallback: idealSize,
+                aspectRatio: ratio,
+                contentMode: contentMode
+            )
+        else {
             return .unspecified
         }
 
@@ -159,7 +161,7 @@ final class AspectRatioViewNode: ViewModifierNode {
         let height = finiteDimension(proposal.height)
 
         switch (width, height) {
-        case (.some(let width), .some(let height)):
+        case let (.some(width), .some(height)):
             let widthFromHeight = height * aspectRatio
 
             switch contentMode {
@@ -179,7 +181,7 @@ final class AspectRatioViewNode: ViewModifierNode {
         case (.some(let width), nil):
             return Size(width: width, height: width / aspectRatio)
 
-        case (nil, .some(let height)):
+        case (nil, let .some(height)):
             return Size(width: height * aspectRatio, height: height)
 
         case (nil, nil):

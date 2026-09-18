@@ -17,7 +17,6 @@ import AdaUtils
 /// awaiters suspend without polling the ECS world from another actor.
 @PlainSystem
 public struct KeyframeAnimationApplySystem: Sendable {
-
     @Query<Entity, Ref<KeyframeAnimator>>
     private var animators
 
@@ -30,7 +29,7 @@ public struct KeyframeAnimationApplySystem: Sendable {
     @Local
     private var lastSeenTokens: [Entity.ID: UInt64] = [:]
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
     public func update(context: UpdateContext) async {
         let world = context.world
@@ -67,8 +66,10 @@ public struct KeyframeAnimationApplySystem: Sendable {
                 anim.requestedClipName = nil
             }
 
-            guard let clipName = anim.currentClipName,
-                  let clip = anim.clipsByName[clipName] else {
+            guard
+                let clipName = anim.currentClipName,
+                let clip = anim.clipsByName[clipName]
+            else {
                 let finishedToken = anim.runToken
                 anim.playbackState = .stopped
                 anim.runToken &+= 1

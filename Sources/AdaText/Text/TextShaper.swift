@@ -88,17 +88,18 @@ enum TextShaper {
             return []
         }
 
-        return (0..<Int(shapedTextValue.glyphCount)).map { index in
-            let glyph = unsafe glyphs[index]
-            return ShapedGlyph(
-                glyphIndex: Int32(glyph.glyphIndex),
-                cluster: Int(glyph.cluster) + clusterOffset,
-                xAdvance: glyph.xAdvance,
-                yAdvance: glyph.yAdvance,
-                xOffset: glyph.xOffset,
-                yOffset: glyph.yOffset
-            )
-        }
+        return (0..<Int(shapedTextValue.glyphCount))
+            .map { index in
+                let glyph = unsafe glyphs[index]
+                return ShapedGlyph(
+                    glyphIndex: Int32(glyph.glyphIndex),
+                    cluster: Int(glyph.cluster) + clusterOffset,
+                    xAdvance: glyph.xAdvance,
+                    yAdvance: glyph.yAdvance,
+                    xOffset: glyph.xOffset,
+                    yOffset: glyph.yOffset
+                )
+            }
     }
 
     private static func directionalRuns(
@@ -112,13 +113,14 @@ enum TextShaper {
             return []
         }
 
-        let baseDirection: Direction = switch writingDirection {
-        case .leftToRight: .leftToRight
-        case .rightToLeft: .rightToLeft
-        case .natural: characters.lazy.compactMap(\.direction).first ?? .leftToRight
-        }
+        let baseDirection: Direction =
+            switch writingDirection {
+            case .leftToRight: .leftToRight
+            case .rightToLeft: .rightToLeft
+            case .natural: characters.lazy.compactMap(\.direction).first ?? .leftToRight
+            }
 
-        var nextStrongDirections = Array<Direction?>(repeating: nil, count: characters.count)
+        var nextStrongDirections = [Direction?](repeating: nil, count: characters.count)
         var nextStrongDirection: Direction?
         for index in characters.indices.reversed() {
             nextStrongDirections[index] = nextStrongDirection
@@ -163,7 +165,9 @@ enum TextShaper {
     private static func strongDirection(of character: Character) -> Direction? {
         for scalar in character.unicodeScalars {
             switch scalar.properties.generalCategory {
-            case .decimalNumber, .letterNumber, .otherNumber:
+            case .decimalNumber,
+                .letterNumber,
+                .otherNumber:
                 return .leftToRight
             default:
                 break
@@ -174,8 +178,11 @@ enum TextShaper {
             }
 
             switch scalar.properties.generalCategory {
-            case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter,
-                 .otherLetter:
+            case .uppercaseLetter,
+                .lowercaseLetter,
+                .titlecaseLetter,
+                .modifierLetter,
+                .otherLetter:
                 return .leftToRight
             default:
                 continue

@@ -1,7 +1,7 @@
 import AdaEngine
 
 struct EventListenerPlugin: Plugin {
-    func setup(in app: borrowing AppWorlds) {
-        
+    func setup(in _: borrowing AppWorlds) {
+
     }
 }

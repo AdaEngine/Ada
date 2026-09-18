@@ -12,7 +12,6 @@ import Math
 
 /// An object that contains inputs from keyboards, mouse, touch screens and etc.
 public struct Input: Resource, Sendable {
-
     @_spi(Internal)
     public var mousePosition: Point = .zero
 
@@ -61,7 +60,7 @@ public struct Input: Resource, Sendable {
     }
 
     /// Returns a set of input events.
-    public func getInputEvents() -> Array<any InputEvent> {
+    public func getInputEvents() -> [any InputEvent] {
         return self.eventsPool
     }
 
@@ -107,28 +106,28 @@ public struct Input: Resource, Sendable {
     /// Get mouse mode for active window.
     @MainActor
     public func getMouseMode() -> MouseMode {
-//        Application.shared.windowManager.getMouseMode()
+        //        Application.shared.windowManager.getMouseMode()
         return .visible
     }
 
     /// Set mouse mode for active window.
     @MainActor
-    public mutating func setMouseMode(_ mode: MouseMode) {
-//        Application.shared.windowManager.setMouseMode(mode)
+    public mutating func setMouseMode(_: MouseMode) {
+        //        Application.shared.windowManager.setMouseMode(mode)
     }
 
     /// Set current cursor shape.
     @MainActor
     public mutating func setCursorShape(_ shape: CursorShape) {
         self.cursorStates = [shape]
-//        Application.shared.windowManager.setCursorShape(shape)
+        //        Application.shared.windowManager.setCursorShape(shape)
     }
 
     /// Pushes a new cursor shape onto the stack and sets it as the current cursor shape.
     @MainActor
     public mutating func pushCursorShape(_ shape: CursorShape) {
         self.cursorStates.append(shape)
-//        Application.shared.windowManager.setCursorShape(shape)
+        //        Application.shared.windowManager.setCursorShape(shape)
     }
 
     /// Pops the last cursor shape from the stack and sets it as the current cursor shape.
@@ -138,24 +137,22 @@ public struct Input: Resource, Sendable {
             self.cursorStates.removeLast()
         }
 
-//        let shape = self.cursorStates.last!
-//        Application.shared.windowManager.setCursorShape(shape)
+        //        let shape = self.cursorStates.last!
+        //        Application.shared.windowManager.setCursorShape(shape)
     }
 
-    /// Set custom image for cursor.
-    /// - Parameter shape: What cursor shape will update the texture.
-    /// - Parameter texture: Texture for cursor, also available ``TextureAtlas``. If you pass nil, then we remove saved image.
-    /// - Parameter hotSpot: The point to set as the cursor's hot spot.
-//    @MainActor
-//    public static func setCursorImage(for shape: Input.CursorShape, texture: Texture2D?, hotSpot: Vector2 = .zero) {
-//        Application.shared.windowManager.setCursorImage(for: shape, texture: texture, hotspot: hotSpot)
-//    }
+    // Set custom image for cursor.
+    // Parameters: cursor shape, optional texture, and hotspot.
+    //    @MainActor
+    //    public static func setCursorImage(for shape: Input.CursorShape, texture: Texture2D?, hotSpot: Vector2 = .zero) {
+    //        Application.shared.windowManager.setCursorImage(for: shape, texture: texture, hotspot: hotSpot)
+    //    }
 
-    /// Get current cursor shape.
-//    @MainActor
-//    public static func getCurrentCursorShape() -> CursorShape {
-//        Application.shared.windowManager.getCursorShape()
-//    }
+    // Get current cursor shape.
+    //    @MainActor
+    //    public static func getCurrentCursorShape() -> CursorShape {
+    //        Application.shared.windowManager.getCursorShape()
+    //    }
 
     // MARK: Internal
 
@@ -195,13 +192,12 @@ public struct Input: Resource, Sendable {
     }
 }
 
-public extension Input {
+extension Input {
     // GamepadInfo is now defined inside the Input class.
     // No need to redefine it here.
 
     /// Available list of mouse modes.
-    enum MouseMode {
-
+    public enum MouseMode {
         /// Captures the mouse. The mouse will be hidden and its position locked at the center of the window manager's window.
         /// - WARNING: Not supported.
         case captured
@@ -222,8 +218,7 @@ public extension Input {
     }
 
     /// Available list of cursor shapes.
-    enum CursorShape: Sendable {
-
+    public enum CursorShape: Sendable {
         /// Standard cursor.
         case arrow
 
@@ -298,9 +293,9 @@ extension Input {
     }
 }
 
-public extension Input {
+extension Input {
     /// The latest known software keyboard geometry for the active window.
-    struct KeyboardState: Hashable, Sendable {
+    public struct KeyboardState: Hashable, Sendable {
         public var isVisible: Bool
         public var frame: Rect
         public var occludedFrame: Rect
@@ -352,7 +347,6 @@ public struct GamepadInfo: Hashable, Sendable {
 
 /// Represents a connected gamepad.
 public struct Gamepad: Sendable {
-
     /// The type alias for the gamepad ID.
     public typealias ID = Int
 
@@ -370,7 +364,7 @@ public struct Gamepad: Sendable {
     /// Gamepad IDs are typically assigned by the system.
     /// - Parameter gamepadId: The unique identifier of the gamepad.
     /// - Returns: A `GamepadInfo` struct containing details about the gamepad, or `nil` if the gamepad is not connected.
-    public internal(set) var info: GamepadInfo? // TODO: Populate this later
+    public internal(set) var info: GamepadInfo?  // TODO: Populate this later
 
     private let gameControllerEngine: GameControllerEngine?
 
@@ -422,19 +416,18 @@ public struct Gamepad: Sendable {
         highFrequency: Float,
         duration: Float
     ) {
-        gameControllerEngine?.rumbleGamepad(
-            gamepadId: gamepadId,
-            lowFrequency: lowFrequency,
-            highFrequency: highFrequency,
-            duration: duration
-        )
+        gameControllerEngine?
+            .rumbleGamepad(
+                gamepadId: gamepadId,
+                lowFrequency: lowFrequency,
+                highFrequency: highFrequency,
+                duration: duration
+            )
     }
 }
 
-
 /// A protocol that defines the interface for a game controller engine.
 public protocol GameControllerEngine: AnyObject, Sendable {
-
     func startMonitoring()
 
     func stopMonitoring()

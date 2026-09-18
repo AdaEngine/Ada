@@ -49,7 +49,7 @@ package struct WindowGroupPlugin<Content: View>: Plugin, @unchecked Sendable {
             }
         )
         app.addSystem(WindowGroupUpdateSystem.self, on: .startup)
-        
+
         var camera = Camera()
         camera.backgroundColor = .clear
         app.spawn(bundle: Camera2D(camera: camera))
@@ -81,9 +81,10 @@ func WindowGroupUpdate(
         containerView.wrappedValue.view = view
     }
 
-    guard let currentPrimaryWindow = context.world.getResource(PrimaryWindow.self)?.window,
-          currentPrimaryWindow === targetWindow,
-          targetWindow.windowManager.windows[targetWindow.id] != nil
+    guard
+        let currentPrimaryWindow = context.world.getResource(PrimaryWindow.self)?.window,
+        currentPrimaryWindow === targetWindow,
+        targetWindow.windowManager.windows[targetWindow.id] != nil
     else {
         return
     }

@@ -24,7 +24,6 @@ protocol _AnimationTransaction {
 
 @MainActor
 final class UIAnimationController {
-
     private(set) var isPlaying: Bool = false
 
     struct TweenAnimation<T: Animatable>: _AnimationTransaction {
@@ -91,7 +90,7 @@ final class UIAnimationController {
         from beginValue: T,
         to endValue: T,
         label: AnyHashable,
-        environment: EnvironmentValues,
+        environment _: EnvironmentValues,
         updateBlock: @escaping (T) -> Void
     ) {
         let tween = TweenAnimation(

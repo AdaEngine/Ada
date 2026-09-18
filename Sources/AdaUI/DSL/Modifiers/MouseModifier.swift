@@ -8,22 +8,22 @@
 import AdaInput
 import Math
 
-public extension View {
-    func onHover(perform action: @escaping (Bool) -> Void) -> some View {
+extension View {
+    public func onHover(perform action: @escaping (Bool) -> Void) -> some View {
         self.modifier(HoverViewModifier(action: action, content: self))
     }
 
-    func cursorShape(_ shape: Input.CursorShape) -> some View {
+    public func cursorShape(_ shape: Input.CursorShape) -> some View {
         CursorShapeModifier(shape: shape, content: self)
     }
 
     /// Controls whether this view participates in hit testing.
-    func allowsHitTesting(_ enabled: Bool) -> some View {
+    public func allowsHitTesting(_ enabled: Bool) -> some View {
         self.modifier(HitTestingModifier(enabled: enabled, content: self))
     }
 
     /// Invokes an action when the view receives a completed middle mouse click.
-    func onMiddleClick(perform action: @escaping () -> Void) -> some View {
+    public func onMiddleClick(perform action: @escaping () -> Void) -> some View {
         self.modifier(MiddleClickModifier(action: action, content: self))
     }
 }
@@ -122,7 +122,6 @@ struct HoverViewModifier<Content: View>: ViewModifier, ViewNodeBuilder {
 // MARK: - HoverViewModifierNode
 
 final class HoverViewModifierNode: ViewModifierNode {
-
     override var allowsNestedFrameAnimation: Bool {
         true
     }
@@ -136,7 +135,9 @@ final class HoverViewModifierNode: ViewModifierNode {
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
         // Observe pointer movement without becoming the target of clicks on nested controls.
         if let mouseEvent = event as? MouseEvent, mouseEvent.button != .none {
             return super.hitTest(point, with: event)
@@ -261,10 +262,12 @@ class CursorShapeModifierNode: ViewModifierNode {
 
     override func onMouseEvent(_ event: MouseEvent) {
         switch event.phase {
-        case .began, .changed:
+        case .began,
+            .changed:
             isCursorActive = true
             setCursorShape(shape)
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             if absoluteFrame().contains(point: event.mousePosition) {
                 isCursorActive = true
                 setCursorShape(shape)

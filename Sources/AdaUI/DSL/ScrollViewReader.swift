@@ -6,8 +6,8 @@
 //
 
 import AdaUtils
-import Observation
 import Math
+import Observation
 
 /// A proxy value that supports programmatic scrolling of the scrollable views within a view hierarchy.
 ///
@@ -17,7 +17,6 @@ import Math
 /// method, to call the proxy’s ``ScrollViewProxy/scrollTo(_:anchor:)`` method.
 @MainActor
 public struct ScrollViewProxy {
-
     private let _proxy: _ScrollViewProxy
 
     init(proxy: _ScrollViewProxy) {
@@ -38,7 +37,8 @@ public struct ScrollViewProxy {
     func scrollOffset(in coordinateSpace: NamedViewCoordinateSpace? = nil) -> Point {
         _proxy.subscribedScrollViewNodes.first(where: {
             $0.environment.coordinateSpaces.containers[coordinateSpace?.name ?? AnyHashable(ViewCoordinateSpace.scrollViewId)] != nil
-        })?.contentOffset ?? .zero
+        })?
+        .contentOffset ?? .zero
     }
 }
 
@@ -48,7 +48,6 @@ public struct ScrollViewProxy {
 /// you use the proxy’s ``ScrollViewProxy/scrollTo(_:anchor:)`` to perform scrolling.
 @MainActor @preconcurrency
 public struct ScrollViewReader<Content: View>: View {
-
     @State private var proxy: _ScrollViewProxy
     let content: (ScrollViewProxy) -> Content
 

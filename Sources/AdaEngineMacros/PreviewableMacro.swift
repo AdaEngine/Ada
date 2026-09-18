@@ -12,34 +12,37 @@ public struct PreviewableMacro: ExtensionMacro {
         of node: AttributeSyntax,
         attachedTo declaration: D,
         providingExtensionsOf type: T,
-        conformingTo protocols: [TypeSyntax],
-        in context: C
+        conformingTo _: [TypeSyntax],
+        in _: C
     ) throws -> [ExtensionDeclSyntax] {
         guard declaration.is(StructDeclSyntax.self) || declaration.is(ClassDeclSyntax.self) || declaration.is(EnumDeclSyntax.self) else {
             throw MacroError.macroUsage("Previewable macro can be applied only to nominal View types.")
         }
 
-        guard declaration.inheritanceClause?.inheritedTypes.contains(where: { inheritedType in
-            ["View", "AdaUI.View", "AdaEngine.View"].contains(inheritedType.type.trimmedDescription)
-        }) == true else {
+        guard
+            declaration.inheritanceClause?.inheritedTypes
+                .contains(where: { inheritedType in
+                    ["View", "AdaUI.View", "AdaEngine.View"].contains(inheritedType.type.trimmedDescription)
+                }) == true
+        else {
             throw MacroError.macroUsage("Previewable macro can be applied only to types that conform to View.")
         }
 
         let access = declaration.previewableAccessModifier
         let titleExpression: ExprSyntax = "\(raw: previewTitleExpression(from: node) ?? "nil")"
         let extensionDecl: DeclSyntax =
-        """
-        extension \(type.trimmed): AdaUI.AdaPreviewable {
-            \(raw: access)static var adaPreviewTitle: Swift.String? {
-                \(titleExpression)
-            }
+            """
+            extension \(type.trimmed): AdaUI.AdaPreviewable {
+                \(raw: access)static var adaPreviewTitle: Swift.String? {
+                    \(titleExpression)
+                }
 
-            @MainActor
-            \(raw: access)static func makeAdaPreview() -> AdaUI.AnyView {
-                AdaUI.AnyView(Self())
+                @MainActor
+                \(raw: access)static func makeAdaPreview() -> AdaUI.AnyView {
+                    AdaUI.AnyView(Self())
+                }
             }
-        }
-        """
+            """
 
         return [extensionDecl.cast(ExtensionDeclSyntax.self)]
     }
@@ -60,9 +63,9 @@ public struct PreviewableMacro: ExtensionMacro {
 
 extension PreviewableMacro: PeerMacro {
     public static func expansion(
-        of node: AttributeSyntax,
+        of _: AttributeSyntax,
         providingPeersOf declaration: some DeclSyntaxProtocol,
-        in context: some MacroExpansionContext
+        in _: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
         guard let typeName = declaration.previewableTypeName else {
             throw MacroError.macroUsage("Previewable macro can be applied only to nominal View types.")
@@ -70,27 +73,29 @@ extension PreviewableMacro: PeerMacro {
 
         let symbolName = "ada_editor_preview_make_\(symbolComponent(for: typeName))"
         let peer: DeclSyntax =
-        """
-        @_cdecl("\(raw: symbolName)")
-        @MainActor
-        public func \(raw: symbolName)() -> UnsafeMutableRawPointer {
-            Swift.Unmanaged.passRetained(
-                AdaUI.UIContainerView(rootView: \(raw: typeName).makeAdaPreview())
-            ).toOpaque()
-        }
-        """
+            """
+            @_cdecl("\(raw: symbolName)")
+            @MainActor
+            public func \(raw: symbolName)() -> UnsafeMutableRawPointer {
+                Swift.Unmanaged.passRetained(
+                    AdaUI.UIContainerView(rootView: \(raw: typeName).makeAdaPreview())
+                ).toOpaque()
+            }
+            """
 
         return [peer]
     }
 
     private static func symbolComponent(for typeName: String) -> String {
-        String(typeName.map { character in
-            character.isLetter || character.isNumber || character == "_" ? character : "_"
-        })
+        String(
+            typeName.map { character in
+                character.isLetter || character.isNumber || character == "_" ? character : "_"
+            }
+        )
     }
 }
 
-private extension DeclSyntaxProtocol {
+extension DeclSyntaxProtocol {
     var previewableTypeName: String? {
         if let structDecl = self.as(StructDeclSyntax.self) {
             return structDecl.name.text

@@ -10,7 +10,6 @@ import AdaUtils
 ///
 /// Created automatically from ``KeyframeClip`` by the `@KeyframeAnimatorBuilder` via `buildExpression`.
 public struct AnyAnimatorClip: @unchecked Sendable {
-
     public let name: String
     public let duration: TimeInterval
     public let repeatMode: KeyframeRepeatMode

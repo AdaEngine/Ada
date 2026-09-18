@@ -7,9 +7,8 @@
 
 /// A view that arranges its subviews in a vertical line.
 public struct VStack<Content: View>: View {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let alignment: HorizontalAlignment
     let spacing: Float?

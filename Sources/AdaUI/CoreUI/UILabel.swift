@@ -12,7 +12,6 @@ import Math
 /// A view that displays one or more lines of informational text.
 @MainActor
 open class UILabel: UIView {
-
     /// The text that the label displays.
     public var text: String = "" {
         didSet {
@@ -44,11 +43,11 @@ open class UILabel: UIView {
     private var textContainer = TextContainer()
     private var textLayout = TextLayoutManager()
 
-    open override func draw(in rect: Rect, with context: UIGraphicsContext) {
+    override open func draw(in rect: Rect, with context: UIGraphicsContext) {
         context.drawText(in: rect, from: self.textLayout)
     }
 
-    open override func layoutSubviews() {
+    override open func layoutSubviews() {
         super.layoutSubviews()
 
         self.textLayout.setTextContainer(self.textContainer)
@@ -56,7 +55,7 @@ open class UILabel: UIView {
     }
 
     private func updateTextLayoutManager() {
-        if let attributedString = attributedString {
+        if let attributedString {
             self.textContainer.text = attributedString
         } else {
             var container = TextAttributeContainer()
@@ -71,5 +70,4 @@ open class UILabel: UIView {
         self.setNeedsLayout()
         self.setNeedsDisplay()
     }
-
 }

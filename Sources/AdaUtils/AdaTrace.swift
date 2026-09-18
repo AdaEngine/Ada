@@ -148,7 +148,9 @@ public enum AdaTrace {
             return try body()
         }
         return try Tracing.withSpan(name(), function: function, file: fileID, line: line) { span in
-            if span.isRecording { mergeAttributes(attributes(), into: span) }
+            if span.isRecording {
+                mergeAttributes(attributes(), into: span)
+            }
             return try body()
         }
     }
@@ -183,7 +185,9 @@ public enum AdaTrace {
             return nonRecordingSpan()
         }
         let span = InstrumentationSystem.tracer.startSpan(name(), function: function, file: fileID, line: line)
-        if span.isRecording { mergeAttributes(attributes(), into: span) }
+        if span.isRecording {
+            mergeAttributes(attributes(), into: span)
+        }
         return span
     }
 
@@ -198,7 +202,7 @@ public enum AdaTrace {
         function: String = #function,
         file fileID: String = #fileID,
         line: UInt = #line,
-        isolation: isolated (any Actor)? = #isolation,
+        isolation _: isolated (any Actor)? = #isolation,
         attributes: @autoclosure () -> SpanAttributes = [:],
         _ body: @Sendable () async throws -> T
     ) async rethrows -> T {
@@ -208,7 +212,9 @@ public enum AdaTrace {
         // Evaluate metadata before entering the SDK's async context.
         let spanAttributes = attributes()
         return try await Tracing.withSpan(name(), function: function, file: fileID, line: line) { span in
-            if span.isRecording { mergeAttributes(spanAttributes, into: span) }
+            if span.isRecording {
+                mergeAttributes(spanAttributes, into: span)
+            }
             return try await body()
         }
     }
@@ -220,7 +226,7 @@ public enum AdaTrace {
         function: String = #function,
         file fileID: String = #fileID,
         line: UInt = #line,
-        isolation: isolated (any Actor)? = #isolation,
+        isolation _: isolated (any Actor)? = #isolation,
         _ body: @Sendable (any Span) async throws -> T
     ) async rethrows -> T {
         guard recordingEnabled.load(ordering: .acquiring) else {

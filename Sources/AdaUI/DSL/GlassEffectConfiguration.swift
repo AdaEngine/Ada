@@ -55,7 +55,6 @@ public struct Glass: Sendable {
 }
 
 extension Glass {
-
     /// Standard frosted glass: full blur and tinting. Mirrors Apple's `.regular`.
     public static var regular: Glass {
         var glass = Glass()
@@ -82,7 +81,7 @@ extension Glass {
 
     /// Brighter glass for pressed interactive controls.
     public static var interaction: Glass {
-        var glass = Glass.regular
+        var glass = Self.regular
         glass.blurRadius = 15.5
         glass.glassTintStrength = 1.0
         glass.edgeShadowStrength = 0.02

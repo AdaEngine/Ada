@@ -43,7 +43,7 @@ public struct DismissAction: Sendable, Hashable {
         storage.action()
     }
 
-    public static func == (lhs: DismissAction, rhs: DismissAction) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         ObjectIdentifier(lhs.storage) == ObjectIdentifier(rhs.storage)
     }
 
@@ -52,7 +52,7 @@ public struct DismissAction: Sendable, Hashable {
     }
 }
 
-public extension EnvironmentValues {
+extension EnvironmentValues {
     /// An action that dismisses the current presentation.
-    @Entry var dismiss: DismissAction = DismissAction { }
+    @Entry public var dismiss: DismissAction = DismissAction {}
 }

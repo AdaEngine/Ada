@@ -8,7 +8,6 @@ import Math
 
 /// A layout that places subviews into a fixed number of equal-width columns.
 public struct GridLayout: Layout {
-
     public typealias AnimatableData = EmptyAnimatableData
 
     private let columns: Int
@@ -28,7 +27,7 @@ public struct GridLayout: Layout {
         self.alignment = alignment
     }
 
-    public func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> Size {
+    public func sizeThatFits(_ proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) -> Size {
         guard !subviews.isEmpty else {
             return .zero
         }
@@ -41,7 +40,7 @@ public struct GridLayout: Layout {
         )
     }
 
-    public func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+    public func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) {
         guard !subviews.isEmpty else {
             return
         }
@@ -51,7 +50,8 @@ public struct GridLayout: Layout {
         for index in subviews.indices {
             let row = index / columns
             let logicalColumn = index % columns
-            let column = subviews.layoutDirection == .rightToLeft
+            let column =
+                subviews.layoutDirection == .rightToLeft
                 ? columns - logicalColumn - 1
                 : logicalColumn
             let cellOrigin = Point(
@@ -66,11 +66,12 @@ public struct GridLayout: Layout {
             )
 
             let resolvedAlignment = alignment.resolved(for: subviews.layoutDirection)
-            subviews[index].place(
-                at: placementPoint(in: cellRect, layoutDirection: subviews.layoutDirection),
-                anchor: resolvedAlignment.anchorPoint,
-                proposal: ProposedViewSize(width: metrics.cellWidth, height: metrics.rowHeights[row])
-            )
+            subviews[index]
+                .place(
+                    at: placementPoint(in: cellRect, layoutDirection: subviews.layoutDirection),
+                    anchor: resolvedAlignment.anchorPoint,
+                    proposal: ProposedViewSize(width: metrics.cellWidth, height: metrics.rowHeights[row])
+                )
         }
     }
 

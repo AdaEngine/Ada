@@ -7,9 +7,9 @@ import Math
 
 /// A type that can serve as the animatable data of an animatable type.
 ///
-/// VectorArithmetic extends the AdditiveArithmetic protocol with scalar multiplication and a way to query the vector magnitude of the value. Use this type as the animatableData associated type of a type that conforms to the Animatable protocol.
+/// VectorArithmetic extends AdditiveArithmetic with scalar multiplication and a way to query a
+/// value's vector magnitude. Use this type as the animatableData associated type of an Animatable type.
 public protocol VectorArithmetic: AdditiveArithmetic {
-
     /// The magnitude squared of the vector.
     var magnitudeSquared: Double { get }
 
@@ -19,10 +19,10 @@ public protocol VectorArithmetic: AdditiveArithmetic {
     mutating func scale(by rhs: Double)
 }
 
-public extension VectorArithmetic {
+extension VectorArithmetic {
     /// Returns a value with each component of this value multiplied by the
     /// given value.
-    func scaled(by rhs: Double) -> Self {
+    public func scaled(by rhs: Double) -> Self {
         var value = self
         value.scale(by: rhs)
         return value
@@ -31,14 +31,14 @@ public extension VectorArithmetic {
     /// Interpolates this value with `other` by the specified `amount`.
     ///
     /// This is equivalent to `self = self + (other - self) * amount`.
-    mutating func interpolate(towards other: Self, amount: Double) {
+    public mutating func interpolate(towards other: Self, amount: Double) {
         self = self.interpolated(towards: other, amount: amount)
     }
 
     /// Returns this value interpolated with `other` by the specified `amount`.
     ///
     /// This result is equivalent to `self + (other - self) * amount`.
-    func interpolated(towards other: Self, amount: Double) -> Self {
+    public func interpolated(towards other: Self, amount: Double) -> Self {
         return self + (other - self).scaled(by: amount)
     }
 }

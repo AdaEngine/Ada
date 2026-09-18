@@ -31,7 +31,7 @@ public struct ScriptComponentUpdateSystem {
     @Local
     private var activeScripts: [ObjectIdentifier: ActiveScript] = [:]
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
     @MainActor
     public func update(context: UpdateContext) {
@@ -55,13 +55,15 @@ public struct ScriptComponentUpdateSystem {
             guard let active = activeScripts.removeValue(forKey: identity) else {
                 continue
             }
-            active.object.detach(context: ScriptableObjectContext(
-                entity: active.entity,
-                world: context.world,
-                commands: commands,
-                input: input,
-                deltaTime: 0
-            ))
+            active.object.detach(
+                context: ScriptableObjectContext(
+                    entity: active.entity,
+                    world: context.world,
+                    commands: commands,
+                    input: input,
+                    deltaTime: 0
+                )
+            )
         }
     }
 
@@ -75,7 +77,7 @@ public struct ScriptComponentUpdateSystem {
     ) {
         let identity = ObjectIdentifier(script)
         if let descriptor = ScriptableObjectRegistry.descriptor(for: script),
-           !descriptor.requiredComponents.allSatisfy({ world.has($0, in: entity.id) }) {
+            !descriptor.requiredComponents.allSatisfy({ world.has($0, in: entity.id) }) {
             return
         }
         guard script.attach(to: entity) else {
@@ -91,11 +93,13 @@ public struct ScriptComponentUpdateSystem {
         }
         script.update(context: updateContext)
         if fixedResult.isFixedTick {
-            script.fixedUpdate(context: makeContext(
-                entity: entity,
-                world: world,
-                deltaTime: fixedResult.fixedTime
-            ))
+            script.fixedUpdate(
+                context: makeContext(
+                    entity: entity,
+                    world: world,
+                    deltaTime: fixedResult.fixedTime
+                )
+            )
         }
     }
 

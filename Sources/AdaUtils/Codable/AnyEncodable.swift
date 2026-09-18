@@ -31,8 +31,8 @@ extension _AnyEncodable {
 
         switch value {
         #if canImport(Darwin)
-        case is NSNull:
-            try container.encodeNil()
+            case is NSNull:
+                try container.encodeNil()
         #endif
         case is Void:
             try container.encodeNil()
@@ -65,12 +65,10 @@ extension _AnyEncodable {
         case let string as String:
             try container.encode(string)
         #if canImport(Darwin)
-        case let number as NSNumber:
-            try encode(nsnumber: number, into: &container)
-        case let date as Date:
-            try container.encode(date)
-        case let url as URL:
-            try container.encode(url)
+            case let date as Date:
+                try container.encode(date)
+            case let url as URL:
+                try container.encode(url)
         #endif
         case let array as [Any?]:
             try container.encode(array.map { AnyEncodable($0) })
@@ -83,38 +81,6 @@ extension _AnyEncodable {
             throw EncodingError.invalidValue(value, context)
         }
     }
-
-    #if canImport(Darwin)
-    private func encode(nsnumber: NSNumber, into container: inout SingleValueEncodingContainer) throws {
-        switch unsafe Character(Unicode.Scalar(UInt8(nsnumber.objCType.pointee)))  {
-        case "B":
-            try container.encode(nsnumber.boolValue)
-        case "c":
-            try container.encode(nsnumber.int8Value)
-        case "s":
-            try container.encode(nsnumber.int16Value)
-        case "i", "l":
-            try container.encode(nsnumber.int32Value)
-        case "q":
-            try container.encode(nsnumber.int64Value)
-        case "C":
-            try container.encode(nsnumber.uint8Value)
-        case "S":
-            try container.encode(nsnumber.uint16Value)
-        case "I", "L":
-            try container.encode(nsnumber.uint32Value)
-        case "Q":
-            try container.encode(nsnumber.uint64Value)
-        case "f":
-            try container.encode(nsnumber.floatValue)
-        case "d":
-            try container.encode(nsnumber.doubleValue)
-        default:
-            let context = EncodingError.Context(codingPath: container.codingPath, debugDescription: "NSNumber cannot be encoded because its type is not handled")
-            throw EncodingError.invalidValue(nsnumber, context)
-        }
-    }
-    #endif
 }
 
 extension AnyEncodable: Equatable {

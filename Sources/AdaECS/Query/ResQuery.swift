@@ -11,14 +11,16 @@ import AdaUtils
 @dynamicMemberLookup
 @propertyWrapper
 public final class Res<T: Resource>: @unchecked Sendable {
-
     /// The value of the query.
     private var _value: T?
 
     /// The wrapped value of the query.
     public var wrappedValue: T {
         _read {
-            yield _value!
+            guard let value = _value else {
+                preconditionFailure("Resource \(T.self) has not been initialized.")
+            }
+            yield value
         }
     }
 
@@ -37,13 +39,15 @@ public final class Res<T: Resource>: @unchecked Sendable {
     /// Get the value of the query.
     /// - Returns: The value of the query.
     public func callAsFunction() -> T {
-        _value!
+        guard let value = _value else {
+            preconditionFailure("Resource \(T.self) has not been initialized.")
+        }
+        return value
     }
 
     public subscript<U>(dynamicMember dynamicMember: KeyPath<T, U>) -> U {
         self.wrappedValue[keyPath: dynamicMember]
     }
-    
 }
 
 extension Res: SystemParameter {
@@ -55,7 +59,7 @@ extension Res: SystemParameter {
 
     public func update(from world: World) {
         guard let resource = T.getFromWorld(world) else {
-            fatalError("Resource \(T.self) not found in world. Make sure to call world.insertResource(_:) before using Res.")
+            preconditionFailure("Resource \(T.self) not found in world. Make sure to call world.insertResource(_:) before using Res.")
         }
 
         self._value = resource
@@ -67,7 +71,7 @@ extension Optional: Resource where Wrapped: Resource {
         Wrapped.resourceIdentifier
     }
 
-    public static func getFromWorld(_ world: borrowing World) -> Optional<Wrapped>? {
+    public static func getFromWorld(_ world: borrowing World) -> Wrapped?? {
         world.getResource(Wrapped.self)
     }
 }
@@ -76,17 +80,22 @@ extension Optional: Resource where Wrapped: Resource {
 @dynamicMemberLookup
 @propertyWrapper
 public final class ResMut<T: Resource>: @unchecked Sendable {
-
     /// The value of the query.
     private var _value: Ref<T>?
 
     /// The wrapped value of the query.
     public var wrappedValue: T {
         _read {
-            yield self._value!.wrappedValue
+            guard let value = self._value else {
+                preconditionFailure("Mutable resource \(T.self) has not been initialized.")
+            }
+            yield value.wrappedValue
         }
         _modify {
-            yield &self._value!.wrappedValue
+            guard let value = self._value else {
+                preconditionFailure("Mutable resource \(T.self) has not been initialized.")
+            }
+            yield &value.wrappedValue
         }
     }
 

@@ -14,9 +14,9 @@ public struct ScreenSpaceReflectionPipeline: Resource {
     public let sampler: Sampler
 
     public init(device: RenderDevice) {
-        let shader = try! CorePipelineShaders.loadBundled(at: "Shaders/screen_space_reflection.glsl")
+        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/screen_space_reflection.glsl")
         var descriptor = RenderPipelineDescriptor(
-            vertex: shader.asset.getShader(for: .vertex)!,
+            vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),
             debugName: "Screen Space Reflection Composite",
             backfaceCulling: false,

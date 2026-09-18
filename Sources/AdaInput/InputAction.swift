@@ -14,12 +14,14 @@ public struct InputAction: Codable, Equatable, Sendable {
     }
 
     /// Validates names, duplicate bindings and analog thresholds before installing or saving a map.
-    public static func validate(_ actions: [InputAction]) throws {
+    public static func validate(_ actions: [Self]) throws {
         var names = Set<String>()
         for action in actions {
-            guard !action.name.isEmpty,
-                  action.name == action.name.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !action.name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
+            guard
+                !action.name.isEmpty,
+                action.name == action.name.trimmingCharacters(in: .whitespacesAndNewlines),
+                !action.name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+            else {
                 throw InputActionError.invalid("Action names must be nonempty and have no surrounding whitespace or control characters.")
             }
             guard names.insert(action.name).inserted else {
@@ -33,8 +35,11 @@ public struct InputAction: Codable, Equatable, Sendable {
             }
             for binding in action.bindings {
                 switch binding {
-                case .key(.none), .mouseButton(.none), .mouseButton(.scrollWheel),
-                     .gamepadButton(.unknown), .gamepadAxis(.unknown, _):
+                case .key(.none),
+                    .mouseButton(.none),
+                    .mouseButton(.scrollWheel),
+                    .gamepadButton(.unknown),
+                    .gamepadAxis(.unknown, _):
                     throw InputActionError.invalid("Action '\(action.name)' contains an unsupported input.")
                 default: break
                 }
@@ -47,7 +52,9 @@ public enum InputActionError: Error, LocalizedError {
     case invalid(String)
 
     public var errorDescription: String? {
-        switch self { case .invalid(let message): message }
+        switch self {
+        case let .invalid(message): message
+        }
     }
 }
 
@@ -115,21 +122,25 @@ extension Input {
                 strength = max(strength, bindingStrength(binding, deadZone: action.deadZone))
             }
             let wasPressed = actionStrengths[action.name, default: 0] > 0
-            if !wasPressed, strength > 0 { justPressedActions.insert(action.name) }
-            if wasPressed, strength == 0 { justReleasedActions.insert(action.name) }
+            if !wasPressed, strength > 0 {
+                justPressedActions.insert(action.name)
+            }
+            if wasPressed, strength == 0 {
+                justReleasedActions.insert(action.name)
+            }
             actionStrengths[action.name] = strength
         }
     }
 
     private func bindingStrength(_ binding: InputBinding, deadZone: Float) -> Float {
         switch binding {
-        case .key(let key): return isKeyPressed(key) ? 1 : 0
-        case .mouseButton(let button): return isMouseButtonPressed(button) ? 1 : 0
-        case .mouseScroll(let direction): return actionScrollDirections.contains(direction) ? 1 : 0
+        case let .key(key): return isKeyPressed(key) ? 1 : 0
+        case let .mouseButton(button): return isMouseButtonPressed(button) ? 1 : 0
+        case let .mouseScroll(direction): return actionScrollDirections.contains(direction) ? 1 : 0
         case .mouseMotion: return actionMouseMoved ? 1 : 0
         case .touch: return touches.isEmpty ? 0 : 1
-        case .touchEvent(let phase): return actionTouchPhases.contains(phase) ? 1 : 0
-        case .gamepadButton(let button):
+        case let .touchEvent(phase): return actionTouchPhases.contains(phase) ? 1 : 0
+        case let .gamepadButton(button):
             return gamepads.values.contains { $0.isGamepadButtonPressed(button) } ? 1 : 0
         case let .gamepadAxis(axis, direction):
             var strength: Float = 0

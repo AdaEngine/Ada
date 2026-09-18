@@ -11,8 +11,8 @@ public struct UIFactoryContext {
     public let actions: [String: String]
     public let context: UIBindingContext
     public let children: [UIRenderedChild]
-    public var resources: UISceneResources? = nil
-    public var sourceURL: URL? = nil
+    public var resources: UISceneResources?
+    public var sourceURL: URL?
     public var actionSignatures: [UIActionSignature] = []
 
     public func string(_ name: String, _ fallback: String = "") -> String { arguments[name]?.string ?? fallback }
@@ -27,11 +27,14 @@ public struct UIFactoryContext {
     }
 
     public func perform(_ event: String, arguments: [String: UIValue] = [:]) {
-        guard let name = actions[event] else { return }
+        guard let name = actions[event] else {
+            return
+        }
         if let signature = actionSignatures.first(where: { $0.name == event }) {
             for parameter in signature.parameters {
                 guard let value = arguments[parameter.name], parameter.type.accepts(value) else {
-                    context.report(UIDiagnostic("Invalid '\(parameter.name)' argument for event '\(event)'.")); return
+                    context.report(UIDiagnostic("Invalid '\(parameter.name)' argument for event '\(event)'."))
+                    return
                 }
             }
         }
@@ -39,7 +42,9 @@ public struct UIFactoryContext {
     }
 
     public func color(_ name: String, fallback: Color = .white) throws -> Color {
-        guard let text = arguments[name]?.string else { return fallback }
+        guard let text = arguments[name]?.string else {
+            return fallback
+        }
         return try Self.color(from: text)
     }
 
@@ -53,16 +58,24 @@ public struct UIFactoryContext {
         case "green": return .green
         case "blue": return .blue
         case "yellow": return .yellow
-        case "gray", "grey": return .gray
+        case "gray",
+            "grey":
+            return .gray
         case "orange": return .orange
         case "purple": return .purple
         default: break
         }
         let hex = text.hasPrefix("#") ? String(text.dropFirst()) : text
-        guard [6, 8].contains(hex.count), let value = UInt32(hex, radix: 16) else { throw UIDiagnostic("Invalid color '\(text)'.") }
+        guard [6, 8].contains(hex.count), let value = UInt32(hex, radix: 16) else {
+            throw UIDiagnostic("Invalid color '\(text)'.")
+        }
         let rgba = hex.count == 6 ? (value << 8) | 255 : value
-        return Color(red: Float((rgba >> 24) & 255) / 255, green: Float((rgba >> 16) & 255) / 255,
-                     blue: Float((rgba >> 8) & 255) / 255, alpha: Float(rgba & 255) / 255)
+        return Color(
+            red: Float((rgba >> 24) & 255) / 255,
+            green: Float((rgba >> 16) & 255) / 255,
+            blue: Float((rgba >> 8) & 255) / 255,
+            alpha: Float(rgba & 255) / 255
+        )
     }
 }
 
@@ -71,7 +84,10 @@ public struct UIRenderedChild: Identifiable {
     public let id: String
     public let view: AnyView
 
-    public init(id: String, view: AnyView) { self.id = id; self.view = view }
+    public init(id: String, view: AnyView) {
+        self.id = id
+        self.view = view
+    }
 }
 
 @MainActor
@@ -80,7 +96,8 @@ public struct UINativeViewDescriptor {
     public let makeView: @MainActor (UIFactoryContext) throws -> AnyView
 
     public init(signature: UIDescriptorSignature, makeView: @escaping @MainActor (UIFactoryContext) throws -> AnyView) {
-        self.signature = signature; self.makeView = makeView
+        self.signature = signature
+        self.makeView = makeView
     }
 }
 
@@ -90,7 +107,8 @@ public struct UINativeModifierDescriptor {
     public let apply: @MainActor (AnyView, UIFactoryContext) throws -> AnyView
 
     public init(signature: UIDescriptorSignature, apply: @escaping @MainActor (AnyView, UIFactoryContext) throws -> AnyView) {
-        self.signature = signature; self.apply = apply
+        self.signature = signature
+        self.apply = apply
     }
 }
 
@@ -102,8 +120,12 @@ public struct UICatalog {
     public let modifiers: [String: UINativeModifierDescriptor]
 
     public init(views: [UINativeViewDescriptor], modifiers: [UINativeModifierDescriptor]) throws {
-        guard Set(views.map { $0.signature.id }).count == views.count,
-              Set(modifiers.map { $0.signature.id }).count == modifiers.count else { throw UIDiagnostic("Duplicate UI descriptor ID.") }
+        guard
+            Set(views.map(\.signature.id)).count == views.count,
+            Set(modifiers.map(\.signature.id)).count == modifiers.count
+        else {
+            throw UIDiagnostic("Duplicate UI descriptor ID.")
+        }
         self.views = Dictionary(uniqueKeysWithValues: views.map { ($0.signature.id, $0) })
         self.modifiers = Dictionary(uniqueKeysWithValues: modifiers.map { ($0.signature.id, $0) })
     }

@@ -22,19 +22,19 @@ public class PBRMaterial: Material, @unchecked Sendable {
     /// A negative value emits everywhere. Non-negative values fade emission
     /// out as direct illumination rises above this threshold.
     public var emissiveLightThreshold: Float = -1
-    
+
     public init() {
         // FIXME: (Vlad) We need a way to specify the shader for PBR material.
         // For now we use a dummy shader source.
         super.init(shaderSource: ShaderSource())
     }
-    
+
     public required init(from assetDecoder: AssetDecoder) throws {
         let shaderSource = try ShaderSource(from: assetDecoder)
         super.init(shaderSource: shaderSource)
     }
-    
-    public override func collectDefines(for vertexDescriptor: VertexDescriptor, keys: Set<String>) -> [ShaderDefine] {
+
+    override public func collectDefines(for _: VertexDescriptor, keys _: Set<String>) -> [ShaderDefine] {
         var defines: [ShaderDefine] = []
         if self.baseColorTexture != nil {
             defines.append(ShaderDefine(name: "HAS_BASE_COLOR_TEXTURE", value: "1"))

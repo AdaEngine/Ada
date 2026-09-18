@@ -10,7 +10,6 @@ import AdaUtils
 ///
 /// Insert this resource in your world and run a small system early in ``SchedulerName/update`` so tweens and keyframes share the same clock if you wire consumers to it.
 public struct AnimationClock: Resource, Sendable {
-
     /// Monotonic elapsed time in seconds (scaled, after pause handling).
     public var elapsed: TimeInterval
 

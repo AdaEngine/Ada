@@ -7,19 +7,19 @@
 
 import Math
 
-public extension View {
+extension View {
     /// Offset this view by the specified horizontal and vertical distances.
     /// - Parameter x: The horizontal distance to offset this view.
     /// - Parameter y: The vertical distance to offset this view.
     /// - Returns: A view that offsets this view by x and y.
-    func offset(x: Float = 0, y: Float = 0) -> some View {
+    public func offset(x: Float = 0, y: Float = 0) -> some View {
         modifier(OffsetViewModifier(x: x, y: y, content: self))
     }
 
     /// Offset this view by the specified horizontal and vertical distances.
     /// - Parameter point: The distance to offset this view by vertical and horizontal.
     /// - Returns: A view that offsets this view by x and y.
-    func offset(_ point: Point) -> some View {
+    public func offset(_ point: Point) -> some View {
         modifier(OffsetViewModifier(x: point.x, y: point.y, content: self))
     }
 }
@@ -44,7 +44,6 @@ struct OffsetViewModifier<Content: View>: ViewModifier, ViewNodeBuilder {
 }
 
 final class OffsetViewNodeModifier: ViewModifierNode {
-
     var offsetByX: Float = 0
     var offsetByY: Float = 0
 
@@ -58,7 +57,7 @@ final class OffsetViewNodeModifier: ViewModifierNode {
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
-        
+
         guard let node = newNode as? OffsetViewNodeModifier else {
             return
         }

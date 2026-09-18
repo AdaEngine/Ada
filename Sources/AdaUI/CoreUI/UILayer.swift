@@ -75,11 +75,11 @@ open class UILayer {
         allowsLayerCaching: Bool
     ) -> (commands: [UIGraphicsContext.DrawCommand], version: UInt64, cacheable: Bool) {
         if allowsLayerCaching, let cachedCommands,
-           cachedCommandsVersion == commandVersion,
-           cachedCommandsTransform == transform,
-           cachedCommandsOpacity == opacity,
-           let cachedCommandsEnvironment,
-           environment.hasSameSnapshot(as: cachedCommandsEnvironment) {
+            cachedCommandsVersion == commandVersion,
+            cachedCommandsTransform == transform,
+            cachedCommandsOpacity == opacity,
+            let cachedCommandsEnvironment,
+            environment.hasSameSnapshot(as: cachedCommandsEnvironment) {
             return (cachedCommands, commandVersion, true)
         }
 

@@ -8,13 +8,13 @@
 import Foundation
 
 enum TypeNameCache {
-    nonisolated(unsafe) private static let lock = NSLock()
+    private static let lock = NSLock()
     nonisolated(unsafe) private static var cache: [ObjectIdentifier: String] = [:]
 
     static func name(for type: Any.Type) -> String {
         let id = ObjectIdentifier(type)
-        unsafe lock.lock()
-        defer { unsafe lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
 
         if let cached = unsafe cache[id] {
             return cached

@@ -18,14 +18,14 @@ struct RenderUpscalingSceneModifier: SceneModifier {
     }
 }
 
-public extension AppScene {
+extension AppScene {
     /// Set the preferred render backend for the scene.
-    func preferredRenderBackend(_ backend: RenderBackendType) -> some AppScene {
+    public func preferredRenderBackend(_ backend: RenderBackendType) -> some AppScene {
         self.modifier(PreferredRenderBackendSceneModifier(backend: backend))
     }
 
     /// Configures spatial upscaling for window render targets.
-    func renderUpscaling(_ mode: RenderUpscalingMode) -> some AppScene {
+    public func renderUpscaling(_ mode: RenderUpscalingMode) -> some AppScene {
         self.modifier(RenderUpscalingSceneModifier(mode: mode))
     }
 }

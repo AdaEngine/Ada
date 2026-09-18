@@ -10,29 +10,27 @@ import Math
 
 /// An object that contains graphics functions and configuration state to use in a render command.
 public protocol RenderPipeline: AnyObject, Sendable {
-
     /// /// Contains information about render pipeline descriptor.
     var descriptor: RenderPipelineDescriptor { get }
 }
 
 /// An object that defines the front-facing or back-facing stencil operations of a depth and stencil state object.
 public struct StencilOperationDescriptor: Sendable {
-    
     /// The operation that is performed to update the values in the stencil attachment when the stencil test fails.
     public var fail: StencilOperation
-    
+
     /// The operation that is performed to update the values in the stencil attachment when both the stencil test and the depth test pass.
     public var pass: StencilOperation
-    
+
     /// The operation that is performed to update the values in the stencil attachment when the stencil test passes, but the depth test fails.
     public var depthFail: StencilOperation
-    
+
     /// The comparison that is performed between the masked reference value and a masked value in the stencil attachment.
     public var compare: CompareOperation
-    
+
     /// A bitmask that determines to which bits that stencil operations can write.
     public var writeMask: UInt32
-    
+
     /// Initialize a new stencil operation descriptor.
     ///
     /// - Parameter fail: The operation that is performed to update the values in the stencil attachment when the stencil test fails.
@@ -57,13 +55,12 @@ public struct StencilOperationDescriptor: Sendable {
 
 /// An object that configures new depth and stencil operation.
 public struct DepthStencilDescriptor: Sendable {
-    
     /// A Boolean value that indicates whether depth testing is enabled.
     public var isDepthTestEnabled: Bool
-    
+
     /// A Boolean value that indicates whether depth values can be written to the depth attachment.
     public var isDepthWriteEnabled: Bool
-    
+
     /// The comparison that is performed between a fragment’s depth value and the depth value in the attachment, which determines whether to discard the fragment.
     ///
     /// - SeeAlso: ``CompareOperation``
@@ -83,12 +80,13 @@ public struct DepthStencilDescriptor: Sendable {
 
     /// The stencil operation descriptor.
     public var stencilOperationDescriptor: StencilOperationDescriptor?
-    
+
     /// Initialize a new depth stencil descriptor.
     ///
     /// - Parameter isDepthTestEnabled: A Boolean value that indicates whether depth testing is enabled.
     /// - Parameter isDepthWriteEnabled: A Boolean value that indicates whether depth values can be written to the depth attachment.
-    /// - Parameter depthCompareOperator: The comparison that is performed between a fragment’s depth value and the depth value in the attachment, which determines whether to discard the fragment.
+    /// - Parameter depthCompareOperator: The comparison between a fragment’s depth value and the
+    ///   attachment depth value that determines whether to discard the fragment.
     /// - Parameter isDepthRangeEnabled: A Boolean value that indicates whether depth range is enabled.
     /// - Parameter depthRangeMin: The minimum depth value.
     /// - Parameter depthRangeMax: The maximum depth value.
@@ -115,13 +113,12 @@ public struct DepthStencilDescriptor: Sendable {
 
 /// An object that specifies the format and properties of a color attachment.
 public struct RenderPipelineColorAttachmentDescriptor: Sendable {
-
     /// The format of the color attachment.
     public var format: PixelFormat
-    
+
     /// A Boolean value that indicates whether blending is enabled.
     public var isBlendingEnabled: Bool = false
-    
+
     /// The source RGB blend factor.
     public var sourceRGBBlendFactor: BlendFactor
 
@@ -139,7 +136,7 @@ public struct RenderPipelineColorAttachmentDescriptor: Sendable {
 
     /// The destination RGB blend factor.
     public var destinationRGBBlendFactor: BlendFactor
-    
+
     /// Initialize a new color attachment descriptor.
     ///
     /// - Parameter format: The format of the color attachment.
@@ -169,7 +166,6 @@ public struct RenderPipelineColorAttachmentDescriptor: Sendable {
 
 /// An object that describes the depth and stencil attachment configuration for a render pass.
 public struct DepthStencilAttachmentDescriptor: Sendable {
-
     /// The texture to use as the depth and stencil attachment target.
     public var texture: Texture
 
@@ -197,7 +193,6 @@ public struct DepthStencilAttachmentDescriptor: Sendable {
 
 /// An object that describes the load and store operations for an attachment.
 public struct OperationDescriptor: Sendable {
-
     /// The load action for the operation.
     public var loadAction: AttachmentLoadAction
 
@@ -222,31 +217,30 @@ public struct OperationDescriptor: Sendable {
 ///
 /// To specify the vertex or fragment function in the rendering pipeline descriptor, set the vertex or fragment property.
 public struct RenderPipelineDescriptor: Sendable {
-
     /// The vertex shader the pipeline run to process vertices.
     public var vertex: Shader
-    
+
     /// The fragment shader the pipeline run to process fragments.
     public var fragment: Shader?
 
     /// A string that identifies the render pipeline descriptor.
     public var debugName: String = ""
-    
+
     /// A Boolean value that indicates whether backface culling is enabled.
     public var backfaceCulling: Bool = true
 
     /// The primitive type.
     public var primitive: IndexPrimitive = .triangle
-    
+
     /// The organization of vertex data in an attribute’s argument table.
     public var vertexDescriptor: VertexDescriptor = VertexDescriptor()
-    
+
     /// The depth stencil descriptor.
     public var depthStencilDescriptor: DepthStencilDescriptor?
 
     /// The depth pixel format.
     public var depthPixelFormat: PixelFormat = .depth_32f_stencil8
-    
+
     /// The color attachments.
     public var colorAttachments: [RenderPipelineColorAttachmentDescriptor] = []
 

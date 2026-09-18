@@ -9,11 +9,8 @@ import AdaInput
 
 /// A UI event action.
 public final class UIEventAction: Hashable, Identifiable {
-
     /// The id of the UI event action.
-    public lazy var id: ObjectIdentifier = {
-        ObjectIdentifier(self)
-    }()
+    public lazy var id: ObjectIdentifier = ObjectIdentifier(self)
 
     /// The callback of the UI event action.
     let callback: () -> Void
@@ -52,7 +49,6 @@ public final class UIEventAction: Hashable, Identifiable {
 
 /// The base class for controls, which are visual elements that convey a specific action or intention in response to user interactions.
 open class UIControl: UIView {
-
     /// Constants describing the state of a control.
     public struct State: OptionSet, Hashable, Sendable {
         /// The raw value of the UI control state.
@@ -81,15 +77,15 @@ open class UIControl: UIView {
         }
 
         /// The normal state.
-        public static let normal = State(rawValue: 1 << 0)
+        public static let normal = Self(rawValue: 1 << 0)
         /// The disabled state.
-        public static let disabled = State(rawValue: 1 << 1)
+        public static let disabled = Self(rawValue: 1 << 1)
         /// The highlighted state.
-        public static let highlighted = State(rawValue: 1 << 2)
+        public static let highlighted = Self(rawValue: 1 << 2)
         /// The focused state.
-        public static let focused = State(rawValue: 1 << 3)
+        public static let focused = Self(rawValue: 1 << 3)
         /// The selected state.
-        public static let selected = State(rawValue: 1 << 4)
+        public static let selected = Self(rawValue: 1 << 4)
     }
 
     /// Constants describing the types of events possible for controls.
@@ -105,14 +101,14 @@ open class UIControl: UIView {
         }
 
         /// The value changed event.
-        public static let valueChanged = Event(rawValue: 1 << 0)
+        public static let valueChanged = Self(rawValue: 1 << 0)
         /// The touch down event.
-        public static let touchDown = Event(rawValue: 1 << 1)
+        public static let touchDown = Self(rawValue: 1 << 1)
         /// The touch up event.
-        public static let touchUp = Event(rawValue: 1 << 2)
+        public static let touchUp = Self(rawValue: 1 << 2)
         /// The touch drag inside event.
-        public static let touchDragInside = Event(rawValue: 1 << 3)
-        public static let touchCancel = Event(rawValue: 1 << 4)
+        public static let touchDragInside = Self(rawValue: 1 << 3)
+        public static let touchCancel = Self(rawValue: 1 << 4)
     }
 
     /// The state of the UI control.
@@ -151,17 +147,19 @@ open class UIControl: UIView {
     ///
     /// - Parameter event: The event to trigger the actions for.
     public func triggerActions(for event: Event) {
-        self.actions[event]?.forEach {
-            $0.callback()
-        }
+        self.actions[event]?
+            .forEach {
+                $0.callback()
+            }
     }
 
     /// Handle the mouse event.
     ///
     /// - Parameter event: The mouse event to handle.
-    open override func onMouseEvent(_ event: MouseEvent) {
+    override open func onMouseEvent(_ event: MouseEvent) {
         switch event.phase {
-        case .began, .changed:
+        case .began,
+            .changed:
             switch event.button {
             case .none:
                 state.insert(.highlighted)
@@ -170,7 +168,8 @@ open class UIControl: UIView {
             default:
                 return
             }
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             state.remove(.selected)
             state.remove(.focused)
             state.remove(.highlighted)

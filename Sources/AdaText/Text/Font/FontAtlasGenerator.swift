@@ -22,14 +22,13 @@ public struct FontDescriptor {
 
 /// Generate MTSDF atlas texture from font.
 final class FontAtlasGenerator: Sendable {
-
     static let shared = FontAtlasGenerator()
 
     /// Distance range encoded in both generated and cached MTSDF atlases.
     /// Keep the text shader's ScreenPxRange in sync with this value.
     static let atlasPixelRange: Double = 4
 
-    private static let cacheMagic: UInt32 = 0x35424641
+    private static let cacheMagic: UInt32 = 0x3542_4641
     private static let cacheVersion = 6
 
     private let logger = Logger(label: "org.adaengine.Font")
@@ -67,7 +66,7 @@ final class FontAtlasGenerator: Sendable {
         let fileName = Self.cacheFileName(fontName: fontName, fontDescriptor: fontDescriptor)
         return self.getPrebuiltCachedAtlas(by: fileName) != nil
     }
-    
+
     /// Generate and save to the disk info about font atlas.
     ///
     /// - Parameter fontPath: The path to the font.
@@ -84,13 +83,13 @@ final class FontAtlasGenerator: Sendable {
         atlasFontDescriptor.atlasImageType = AFG_IMAGE_TYPE_MTSDF
         atlasFontDescriptor.miterLimit = 1.0
         atlasFontDescriptor.includeDefaultCharset = fontDescriptor.includeDefaultCharset ? 1 : 0
-        
+
         let fontPathString = fontPath.path
         let fontName = fontPath.lastPathComponent
         let fileName = Self.cacheFileName(fontName: fontName, fontDescriptor: fontDescriptor)
 
         if let cachedAtlas = self.getCachedAtlas(by: fileName),
-           let fontData = self.makeCachedFontHandle(from: cachedAtlas) {
+            let fontData = self.makeCachedFontHandle(from: cachedAtlas) {
             let texture = self.makeTextureAtlas(
                 from: cachedAtlas.data,
                 width: cachedAtlas.width,
@@ -105,7 +104,7 @@ final class FontAtlasGenerator: Sendable {
         }
 
         if let cachedAtlas = self.getPrebuiltCachedAtlas(by: fileName),
-           let fontData = self.makeCachedFontHandle(from: cachedAtlas) {
+            let fontData = self.makeCachedFontHandle(from: cachedAtlas) {
             let texture = self.makeTextureAtlas(
                 from: cachedAtlas.data,
                 width: cachedAtlas.width,
@@ -121,30 +120,32 @@ final class FontAtlasGenerator: Sendable {
 
         let variationTags = fontDescriptor.variationAxes.map(\.tag)
         let variationValues = fontDescriptor.variationAxes.map(\.value)
-        guard let generator = unsafe fontDescriptor.additionalCodepoints.withUnsafeBufferPointer({ codepoints in
-            unsafe variationTags.withUnsafeBufferPointer { tags in
-                unsafe variationValues.withUnsafeBufferPointer { values in
-                    atlasFontDescriptor.additionalCodepoints = codepoints.baseAddress
-                    atlasFontDescriptor.additionalCodepointsCount = Int32(codepoints.count)
-                    atlasFontDescriptor.variationAxisTags = tags.baseAddress
-                    atlasFontDescriptor.variationAxisValues = values.baseAddress
-                    atlasFontDescriptor.variationAxesCount = Int32(tags.count)
+        guard
+            let generator = unsafe fontDescriptor.additionalCodepoints.withUnsafeBufferPointer({ codepoints in
+                unsafe variationTags.withUnsafeBufferPointer { tags in
+                    unsafe variationValues.withUnsafeBufferPointer { values in
+                        atlasFontDescriptor.additionalCodepoints = codepoints.baseAddress
+                        atlasFontDescriptor.additionalCodepointsCount = Int32(codepoints.count)
+                        atlasFontDescriptor.variationAxisTags = tags.baseAddress
+                        atlasFontDescriptor.variationAxisValues = values.baseAddress
+                        atlasFontDescriptor.variationAxesCount = Int32(tags.count)
 
-                    return unsafe fontPathString.withCString { fontPathPtr in
-                        unsafe fontName.withCString { fontNamePtr in
-                            unsafe font_atlas_generator_create(fontPathPtr, fontNamePtr, atlasFontDescriptor)
+                        return unsafe fontPathString.withCString { fontPathPtr in
+                            unsafe fontName.withCString { fontNamePtr in
+                                unsafe font_atlas_generator_create(fontPathPtr, fontNamePtr, atlasFontDescriptor)
+                            }
                         }
                     }
                 }
-            }
-        }) else {
+            })
+        else {
             return nil
         }
-        
+
         defer {
             unsafe font_atlas_generator_destroy(generator)
         }
-        
+
         guard let fontData = unsafe font_atlas_generator_get_font_data(generator) else {
             return nil
         }
@@ -156,9 +157,12 @@ final class FontAtlasGenerator: Sendable {
         defer {
             unsafe font_atlas_bitmap_destroy(bitmap)
         }
-        
+
         let bitmapValue = unsafe bitmap.pointee
-        let data = unsafe Data(bytes: bitmapValue.pixels!, count: Int(bitmapValue.pixelsCount))
+        guard let pixels = unsafe bitmapValue.pixels else {
+            return nil
+        }
+        let data = unsafe Data(bytes: pixels, count: Int(bitmapValue.pixelsCount))
 
         let width = unsafe Int(bitmapValue.bitmapWidth)
         let height = unsafe Int(bitmapValue.bitmapHeight)
@@ -183,21 +187,21 @@ final class FontAtlasGenerator: Sendable {
             variationAxes: fontDescriptor.variationAxes
         )
     }
-    
+
     // MARK: - Private
-    
+
     private func makeTextureAtlas(from data: Data, width: Int, height: Int) -> Texture2D {
         let image = Image(
             width: width,
             height: height,
             data: data
         )
-        
+
         var textSamplerDesc = SamplerDescriptor()
         textSamplerDesc.magFilter = .linear
         textSamplerDesc.mipFilter = .notMipmapped
         textSamplerDesc.minFilter = .linear
-        
+
         let descriptor = TextureDescriptor(
             width: width,
             height: height,
@@ -208,7 +212,7 @@ final class FontAtlasGenerator: Sendable {
             image: image,
             samplerDescription: textSamplerDesc
         )
-        
+
         return Texture2D(descriptor: descriptor)
     }
 
@@ -233,23 +237,25 @@ final class FontAtlasGenerator: Sendable {
 
         let variationTags = fontDescriptor.variationAxes.map(\.tag)
         let variationValues = fontDescriptor.variationAxes.map(\.value)
-        guard let generator = unsafe fontDescriptor.additionalCodepoints.withUnsafeBufferPointer({ codepoints in
-            unsafe variationTags.withUnsafeBufferPointer { tags in
-                unsafe variationValues.withUnsafeBufferPointer { values in
-                    atlasFontDescriptor.additionalCodepoints = codepoints.baseAddress
-                    atlasFontDescriptor.additionalCodepointsCount = Int32(codepoints.count)
-                    atlasFontDescriptor.variationAxisTags = tags.baseAddress
-                    atlasFontDescriptor.variationAxisValues = values.baseAddress
-                    atlasFontDescriptor.variationAxesCount = Int32(tags.count)
+        guard
+            let generator = unsafe fontDescriptor.additionalCodepoints.withUnsafeBufferPointer({ codepoints in
+                unsafe variationTags.withUnsafeBufferPointer { tags in
+                    unsafe variationValues.withUnsafeBufferPointer { values in
+                        atlasFontDescriptor.additionalCodepoints = codepoints.baseAddress
+                        atlasFontDescriptor.additionalCodepointsCount = Int32(codepoints.count)
+                        atlasFontDescriptor.variationAxisTags = tags.baseAddress
+                        atlasFontDescriptor.variationAxisValues = values.baseAddress
+                        atlasFontDescriptor.variationAxesCount = Int32(tags.count)
 
-                    return unsafe fontPathString.withCString { fontPathPtr in
-                        unsafe fontName.withCString { fontNamePtr in
-                            unsafe font_atlas_generator_create(fontPathPtr, fontNamePtr, atlasFontDescriptor)
+                        return unsafe fontPathString.withCString { fontPathPtr in
+                            unsafe fontName.withCString { fontNamePtr in
+                                unsafe font_atlas_generator_create(fontPathPtr, fontNamePtr, atlasFontDescriptor)
+                            }
                         }
                     }
                 }
-            }
-        }) else {
+            })
+        else {
             return nil
         }
 
@@ -257,8 +263,10 @@ final class FontAtlasGenerator: Sendable {
             unsafe font_atlas_generator_destroy(generator)
         }
 
-        guard let fontData = unsafe font_atlas_generator_get_font_data(generator),
-              let bitmap = unsafe font_atlas_generator_generate_bitmap(generator) else {
+        guard
+            let fontData = unsafe font_atlas_generator_get_font_data(generator),
+            let bitmap = unsafe font_atlas_generator_generate_bitmap(generator)
+        else {
             return nil
         }
 
@@ -267,7 +275,10 @@ final class FontAtlasGenerator: Sendable {
         }
 
         let bitmapValue = unsafe bitmap.pointee
-        let data = unsafe Data(bytes: bitmapValue.pixels!, count: Int(bitmapValue.pixelsCount))
+        guard let pixels = unsafe bitmapValue.pixels else {
+            return nil
+        }
+        let data = unsafe Data(bytes: pixels, count: Int(bitmapValue.pixelsCount))
         let width = unsafe Int(bitmapValue.bitmapWidth)
         let height = unsafe Int(bitmapValue.bitmapHeight)
 
@@ -293,13 +304,13 @@ final class FontAtlasGenerator: Sendable {
             return "default"
         }
 
-        var hash: UInt64 = 0xcbf29ce484222325
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         for axis in descriptor.variationAxes {
             var tag = axis.tag.littleEndian
             unsafe withUnsafeBytes(of: &tag) { bytes in
                 for byte in bytes {
                     hash ^= UInt64(byte)
-                    hash &*= 0x100000001b3
+                    hash &*= 0x100_0000_01b3
                 }
             }
 
@@ -307,7 +318,7 @@ final class FontAtlasGenerator: Sendable {
             unsafe withUnsafeBytes(of: &value) { bytes in
                 for byte in bytes {
                     hash ^= UInt64(byte)
-                    hash &*= 0x100000001b3
+                    hash &*= 0x100_0000_01b3
                 }
             }
         }
@@ -316,39 +327,39 @@ final class FontAtlasGenerator: Sendable {
     }
 
     private static func fnv1a64Hex(for values: [UInt32]) -> String {
-        var hash: UInt64 = 0xcbf29ce484222325
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         for value in values {
             var littleEndianValue = value.littleEndian
             unsafe withUnsafeBytes(of: &littleEndianValue) { bytes in
                 for byte in bytes {
                     hash ^= UInt64(byte)
-                    hash &*= 0x100000001b3
+                    hash &*= 0x100_0000_01b3
                 }
             }
         }
         return String(format: "%016llx", hash)
     }
-    
+
     private func getCacheDirectory() throws -> URL {
         return try FileSystem.current.url(for: .cachesDirectory)
             .appendingPathComponent("AdaEngine")
             .appendingPathComponent("FontGeneratedAtlases")
     }
-    
+
     private func createCacheDirectoryIfNeeded() {
         do {
             let cacheDir = try getCacheDirectory()
-            
+
             if FileSystem.current.itemExists(at: cacheDir) {
                 return
             }
-            
+
             return try FileSystem.current.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         } catch {
             fatalError("[FontAtlasGenerator] \(error)")
         }
     }
-    
+
     private func makeCachedAtlas(data: Data, width: Int, height: Int, fontData: OpaquePointer) -> CachedFontAtlas? {
         let glyphsCount = unsafe Int(font_handle_get_glyphs_count(fontData))
         guard glyphsCount > 0 else {
@@ -378,13 +389,16 @@ final class FontAtlasGenerator: Sendable {
             }
         }
 
+        guard let fontName = unsafe font_geometry_get_name(fontData) else {
+            return nil
+        }
         return CachedFontAtlas(
             width: width,
             height: height,
             data: data,
             metrics: unsafe font_geometry_get_metrics(fontData),
             geometryScale: unsafe font_geometry_get_scale(fontData),
-            fontName: unsafe String(cString: font_geometry_get_name(fontData)!),
+            fontName: unsafe String(cString: fontName),
             glyphs: glyphs,
             kernings: kernings
         )
@@ -410,7 +424,7 @@ final class FontAtlasGenerator: Sendable {
 
     private func saveCachedAtlas(_ atlas: CachedFontAtlas, fileName: String) {
         self.createCacheDirectoryIfNeeded()
-        
+
         do {
             let file = try self.getCacheDirectory().appendingPathComponent(fileName)
             guard !FileSystem.current.itemExists(at: file) else {
@@ -418,21 +432,21 @@ final class FontAtlasGenerator: Sendable {
             }
 
             #if WASM
-            try self.encodeCachedAtlas(atlas).write(to: file)
+                try self.encodeCachedAtlas(atlas).write(to: file)
             #else
-            try self.encodeCachedAtlas(atlas).write(to: file, options: .atomic)
+                try self.encodeCachedAtlas(atlas).write(to: file, options: .atomic)
             #endif
         } catch {
             logger.error("\(error)")
         }
     }
-    
+
     private func getCachedAtlas(by fileName: String) -> CachedFontAtlas? {
         self.createCacheDirectoryIfNeeded()
-        
+
         do {
             let file = try self.getCacheDirectory().appendingPathComponent(fileName)
-            
+
             guard FileSystem.current.itemExists(at: file) else {
                 return nil
             }
@@ -446,15 +460,18 @@ final class FontAtlasGenerator: Sendable {
     }
 
     private func getPrebuiltCachedAtlas(by fileName: String) -> CachedFontAtlas? {
-        let resourceName = (fileName as NSString).deletingPathExtension
-        let resourceExtension = (fileName as NSString).pathExtension
+        let resourceURL = URL(fileURLWithPath: fileName)
+        let resourceName = resourceURL.deletingPathExtension().lastPathComponent
+        let resourceExtension = resourceURL.pathExtension
 
         for location in prebuiltAtlasLocations.values() {
-            guard let file = location.bundle.url(
-                forResource: resourceName,
-                withExtension: resourceExtension,
-                subdirectory: location.subdirectory
-            ) else {
+            guard
+                let file = location.bundle.url(
+                    forResource: resourceName,
+                    withExtension: resourceExtension,
+                    subdirectory: location.subdirectory
+                )
+            else {
                 continue
             }
 
@@ -476,10 +493,10 @@ final class FontAtlasGenerator: Sendable {
         var result = Data()
         result.reserveCapacity(
             128
-            + fontNameData.count
-            + atlas.glyphs.count * 92
-            + atlas.kernings.count * 16
-            + atlas.data.count
+                + fontNameData.count
+                + atlas.glyphs.count * 92
+                + atlas.kernings.count * 16
+                + atlas.data.count
         )
 
         result.appendUInt32(Self.cacheMagic)
@@ -526,25 +543,29 @@ final class FontAtlasGenerator: Sendable {
     private func decodeCachedAtlas(_ data: Data) -> CachedFontAtlas? {
         var reader = FontCacheBinaryReader(data: data)
 
-        guard reader.readUInt32() == Self.cacheMagic,
-              reader.readUInt32() == UInt32(Self.cacheVersion),
-              let width = reader.readUInt32(),
-              let height = reader.readUInt32(),
-              let atlasDataSize = reader.readUInt64() else {
+        guard
+            reader.readUInt32() == Self.cacheMagic,
+            reader.readUInt32() == UInt32(Self.cacheVersion),
+            let width = reader.readUInt32(),
+            let height = reader.readUInt32(),
+            let atlasDataSize = reader.readUInt64()
+        else {
             return nil
         }
 
         var metrics = FontMetrics()
-        guard let emSize = reader.readDouble(),
-              let ascenderY = reader.readDouble(),
-              let descenderY = reader.readDouble(),
-              let lineHeight = reader.readDouble(),
-              let underlineY = reader.readDouble(),
-              let underlineThickness = reader.readDouble(),
-              let geometryScale = reader.readDouble(),
-              let fontNameLength = reader.readUInt32(),
-              let glyphsCount = reader.readUInt32(),
-              let kerningsCount = reader.readUInt32() else {
+        guard
+            let emSize = reader.readDouble(),
+            let ascenderY = reader.readDouble(),
+            let descenderY = reader.readDouble(),
+            let lineHeight = reader.readDouble(),
+            let underlineY = reader.readDouble(),
+            let underlineThickness = reader.readDouble(),
+            let geometryScale = reader.readDouble(),
+            let fontNameLength = reader.readUInt32(),
+            let glyphsCount = reader.readUInt32(),
+            let kerningsCount = reader.readUInt32()
+        else {
             return nil
         }
 
@@ -555,8 +576,10 @@ final class FontAtlasGenerator: Sendable {
         metrics.underlineY = underlineY
         metrics.underlineThickness = underlineThickness
 
-        guard let fontNameData = reader.readData(count: Int(fontNameLength)),
-              let fontName = String(data: fontNameData, encoding: .utf8) else {
+        guard
+            let fontNameData = reader.readData(count: Int(fontNameLength)),
+            let fontName = String(bytes: fontNameData, encoding: .utf8)
+        else {
             return nil
         }
 
@@ -564,17 +587,19 @@ final class FontAtlasGenerator: Sendable {
         glyphs.reserveCapacity(Int(glyphsCount))
         for _ in 0..<glyphsCount {
             var glyph = FontCachedGlyph()
-            guard let codepoint = reader.readUInt32(),
-                  let glyphIndex = reader.readInt32(),
-                  let advance = reader.readDouble(),
-                  let atlasLeft = reader.readDouble(),
-                  let atlasBottom = reader.readDouble(),
-                  let atlasRight = reader.readDouble(),
-                  let atlasTop = reader.readDouble(),
-                  let planeLeft = reader.readDouble(),
-                  let planeBottom = reader.readDouble(),
-                  let planeRight = reader.readDouble(),
-                  let planeTop = reader.readDouble() else {
+            guard
+                let codepoint = reader.readUInt32(),
+                let glyphIndex = reader.readInt32(),
+                let advance = reader.readDouble(),
+                let atlasLeft = reader.readDouble(),
+                let atlasBottom = reader.readDouble(),
+                let atlasRight = reader.readDouble(),
+                let atlasTop = reader.readDouble(),
+                let planeLeft = reader.readDouble(),
+                let planeBottom = reader.readDouble(),
+                let planeRight = reader.readDouble(),
+                let planeTop = reader.readDouble()
+            else {
                 return nil
             }
             glyph.codepoint = codepoint
@@ -595,9 +620,11 @@ final class FontAtlasGenerator: Sendable {
         kernings.reserveCapacity(Int(kerningsCount))
         for _ in 0..<kerningsCount {
             var kerning = FontCachedKerning()
-            guard let currentUnicode = reader.readUInt32(),
-                  let nextUnicode = reader.readUInt32(),
-                  let advanceDelta = reader.readDouble() else {
+            guard
+                let currentUnicode = reader.readUInt32(),
+                let nextUnicode = reader.readUInt32(),
+                let advanceDelta = reader.readDouble()
+            else {
                 return nil
             }
             kerning.currentUnicode = currentUnicode
@@ -606,11 +633,13 @@ final class FontAtlasGenerator: Sendable {
             kernings.append(kerning)
         }
 
-        guard let atlasData = reader.readData(count: Int(atlasDataSize)),
-              reader.isAtEnd,
-              width > 0,
-              height > 0,
-              !glyphs.isEmpty else {
+        guard
+            let atlasData = reader.readData(count: Int(atlasDataSize)),
+            reader.isAtEnd,
+            width > 0,
+            height > 0,
+            !glyphs.isEmpty
+        else {
             return nil
         }
 
@@ -673,7 +702,7 @@ private final class PrebuiltAtlasLocationStore: @unchecked Sendable {
     }
 }
 
-private extension Data {
+extension Data {
     mutating func appendUInt32(_ value: UInt32) {
         var value = value.littleEndian
         unsafe Swift.withUnsafeBytes(of: &value) { bytes in
@@ -737,7 +766,7 @@ private struct FontCacheBinaryReader {
         return data.subdata(in: offset..<(offset + count))
     }
 
-    private mutating func readFixedWidthInteger<T: FixedWidthInteger>(_ type: T.Type) -> T? {
+    private mutating func readFixedWidthInteger<T: FixedWidthInteger>(_: T.Type) -> T? {
         let size = MemoryLayout<T>.size
         guard offset + size <= data.count else {
             return nil

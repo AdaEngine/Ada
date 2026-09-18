@@ -6,16 +6,15 @@
 //
 
 import AdaApp
+import AdaCorePipelines
 import AdaECS
 import AdaRender
-import AdaCorePipelines
 import AdaText
 
 /// Plugin for extracting sprites from scene to RenderWorld.
 public struct SpritePlugin: Plugin {
-
     public init() {}
-    
+
     public func setup(in app: AppWorlds) {
         Sprite.registerComponent()
 

@@ -11,7 +11,7 @@ public final class ScriptableObjectAccess: SystemParameter, @unchecked Sendable 
 
     public init() {}
 
-    public init(from world: World) {}
+    public init(from _: World) {}
 
-    public func update(from world: World) {}
+    public func update(from _: World) {}
 }

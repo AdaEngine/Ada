@@ -10,7 +10,6 @@ import AdaText
 import Math
 
 extension TextEditorViewNode {
-
     func handleSourceInteractionMouseEvent(_ event: MouseEvent) -> Bool {
         guard let sourceInteraction else {
             return false
@@ -18,8 +17,12 @@ extension TextEditorViewNode {
 
         let localPoint = self.convertPointFromRoot(event.mousePosition)
         if let line = gutterLine(at: localPoint), let action = sourceInteraction.onGutterClick {
-            if event.phase == .began, event.button == .left { action(line) }
-            if event.button == .left { return true }
+            if event.phase == .began, event.button == .left {
+                action(line)
+            }
+            if event.button == .left {
+                return true
+            }
         }
         let sourcePosition = self.sourcePosition(at: localPoint)
 
@@ -38,7 +41,8 @@ extension TextEditorViewNode {
                 sourceInteraction.onPrimaryClick?(sourcePosition)
                 self.notifySourceHover(sourcePosition)
                 return true
-            case .ended, .cancelled:
+            case .ended,
+                .cancelled:
                 return true
             default:
                 break
@@ -52,9 +56,13 @@ extension TextEditorViewNode {
     }
 
     func gutterLine(at point: Point) -> Int? {
-        guard showsLineNumbers, sourceInteraction?.onGutterClick != nil else { return nil }
+        guard showsLineNumbers, sourceInteraction?.onGutterClick != nil else {
+            return nil
+        }
         let content = textContentRect()
-        guard point.x >= content.minX, point.x < textRect().minX, point.y >= content.minY else { return nil }
+        guard point.x >= content.minX, point.x < textRect().minX, point.y >= content.minY else {
+            return nil
+        }
         let line = Int((point.y - content.minY) / lineHeight(for: resolvedFontPointSize()))
         return lines().indices.contains(line) ? line : nil
     }
@@ -122,40 +130,46 @@ extension TextEditorViewNode {
             ContextMenuPresentation(
                 sourceWindow: owner?.window,
                 location: location,
-                items: items.enumerated().map { index, item in
-                    ContextMenuPresentation.Item(
-                        id: index,
-                        title: item.title,
-                        action: item.action,
-                        submenu: item.submenu.presentationItems()
-                    )
-                }
+                items: items.enumerated()
+                    .map { index, item in
+                        ContextMenuPresentation.Item(
+                            id: index,
+                            title: item.title,
+                            action: item.action,
+                            submenu: item.submenu.presentationItems()
+                        )
+                    }
             )
         )
     }
 }
 
-private extension [TextEditorContextMenuItem] {
+extension [TextEditorContextMenuItem] {
     func presentationItems() -> [ContextMenuPresentation.Item] {
-        self.enumerated().map { index, item in
-            ContextMenuPresentation.Item(
-                id: index,
-                title: item.title,
-                action: item.action,
-                submenu: item.submenu.presentationItems()
-            )
-        }
+        self.enumerated()
+            .map { index, item in
+                ContextMenuPresentation.Item(
+                    id: index,
+                    title: item.title,
+                    action: item.action,
+                    submenu: item.submenu.presentationItems()
+                )
+            }
     }
 }
 
 extension TextEditorViewNode {
     /// Frame in the scrolling text node's coordinates, with horizontal placement fixed to the viewport.
     func selectionHintFrame() -> Rect? {
-        guard isFocused, hasSelection, sourceInteraction?.selectionHint != nil else { return nil }
+        guard isFocused, hasSelection, sourceInteraction?.selectionHint != nil else {
+            return nil
+        }
         let viewport = viewportChromeRect()
         let width: Float = 166
         let height: Float = 26
-        guard viewport.width >= width + 24, viewport.height >= height + 8 else { return nil }
+        guard viewport.width >= width + 24, viewport.height >= height + 8 else {
+            return nil
+        }
         let content = textContentRect()
         let lineHeight = lineHeight(for: resolvedFontPointSize())
         let lines = lines()
@@ -163,7 +177,9 @@ extension TextEditorViewNode {
         let last = position(forOffset: selectionRange.upperBound - 1, lines: lines).line
         let firstVisible = max(first, Int(((viewport.minY - content.minY) / lineHeight).rounded(.down)))
         let lastVisible = min(last, Int(((viewport.maxY - content.minY - 1) / lineHeight).rounded(.down)))
-        guard firstVisible <= lastVisible else { return nil }
+        guard firstVisible <= lastVisible else {
+            return nil
+        }
         let activeLine = selectionHead < selectionAnchor ? firstVisible : lastVisible
         let rowCenter = content.minY + (Float(activeLine) + 0.5) * lineHeight
         return Rect(
@@ -175,7 +191,9 @@ extension TextEditorViewNode {
     }
 
     func drawSelectionHint(in context: inout UIGraphicsContext) {
-        guard let hint = sourceInteraction?.selectionHint, let frame = selectionHintFrame() else { return }
+        guard let hint = sourceInteraction?.selectionHint, let frame = selectionHintFrame() else {
+            return
+        }
         let path = RoundedRectangleShape(cornerRadius: 5).path(in: frame)
         context.fill(path, with: hint.background)
         context.stroke(path, with: hint.border, style: StrokeStyle(lineWidth: 1))

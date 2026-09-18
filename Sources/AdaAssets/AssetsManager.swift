@@ -14,9 +14,9 @@ import Synchronization
 import Tracing
 
 #if WASM && canImport(JavaScriptFoundationCompat) && canImport(JavaScriptKit)
-import JavaScriptFoundationCompat
-import JavaScriptEventLoop
-import JavaScriptKit
+    import JavaScriptEventLoop
+    import JavaScriptFoundationCompat
+    import JavaScriptKit
 #endif
 
 public enum AssetError: LocalizedError {
@@ -25,9 +25,9 @@ public enum AssetError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .notExistAtPath(let path):
+        case let .notExistAtPath(path):
             return "Asset not exists at path: \(path)"
-        case .message(let message):
+        case let .message(message):
             return message
         }
     }
@@ -40,7 +40,6 @@ public enum AssetError: LocalizedError {
 /// Each asset loaded from manager stored in memory cache.
 /// If asset was loaded to memory, you recive reference to this resource.
 public struct AssetsManager: Resource {
-
     public struct CachedAssetInfo: Sendable, Hashable {
         public let assetPath: String
         public let assetName: String
@@ -98,7 +97,7 @@ public struct AssetsManager: Resource {
     /// - Returns: Instance of resource.
     @AssetActor
     public static func load<A: Asset>(
-        _ type: A.Type,
+        _: A.Type,
         at path: String,
         handleChanges: Bool = false
     ) async throws -> AssetHandle<A> {
@@ -113,36 +112,37 @@ public struct AssetsManager: Resource {
         let processedPath = self.processPath(path)
 
         let hasFileExt = !processedPath.url.pathExtension.isEmpty
-        
+
         if !hasFileExt {
             throw AssetError.notExistAtPath(processedPath.url.path)
         }
-        
+
         if shouldCheckAssetFileExistence {
             guard FileSystem.current.itemExists(at: processedPath.url) else {
                 throw AssetError.notExistAtPath(processedPath.url.path)
             }
         }
-        
+
         if handleChanges {
-            self.scopeState.storage.hotReloadingAssets[path, default: []].insert(
-                HotReloadingAsset(
-                    path: processedPath,
-                    resource: A.self,
-                    needsUpdate: false
+            self.scopeState.storage.hotReloadingAssets[path, default: []]
+                .insert(
+                    HotReloadingAsset(
+                        path: processedPath,
+                        resource: A.self,
+                        needsUpdate: false
+                    )
                 )
-            )
 
             self.updateFileWatcher()
         }
-        
+
         let resource: A = try await self.load(from: processedPath, originalPath: path, bundle: nil)
         let handle = AssetHandle(resource)
         self.scopeState.storage.loadedAssets[path, default: []].insert(WeakBox(handle))
 
         return handle
     }
-    
+
     /// Load a resource with block current thread and saving it to memory cache.
     /// It may be useful to load resource without concurrent context.
     ///
@@ -156,27 +156,27 @@ public struct AssetsManager: Resource {
     /// - Parameter path: Path to the resource.
     /// - Returns: Instance of resource.
     #if WASM
-    @available(*, unavailable, message: "AssetsManager.loadSync is unavailable on WebAssembly. Use AssetsManager.load(_:at:) instead.")
-    public static func loadSync<R: Asset>(
-        _ type: R.Type,
-        at path: String
-    ) throws -> AssetHandle<R> {
-        throw AssetError.message("AssetsManager.loadSync is unavailable on WebAssembly. Use AssetsManager.load(_:at:) instead.")
-    }
-    #else
-    public static func loadSync<R: Asset>(
-        _ type: R.Type,
-        at path: String
-    ) throws -> AssetHandle<R> {
-        let scopeID = AppWorldsExecutionContext.currentID
-        let task = UnsafeTask<AssetHandle<R>> {
-            try await AppWorldsExecutionContext.$currentID.withValue(scopeID) {
-                try await load(type, at: path)
-            }
+        @available(*, unavailable, message: "AssetsManager.loadSync is unavailable on WebAssembly. Use AssetsManager.load(_:at:) instead.")
+        public static func loadSync<R: Asset>(
+            _: R.Type,
+            at _: String
+        ) throws -> AssetHandle<R> {
+            throw AssetError.message("AssetsManager.loadSync is unavailable on WebAssembly. Use AssetsManager.load(_:at:) instead.")
         }
+    #else
+        public static func loadSync<R: Asset>(
+            _ type: R.Type,
+            at path: String
+        ) throws -> AssetHandle<R> {
+            let scopeID = AppWorldsExecutionContext.currentID
+            let task = UnsafeTask<AssetHandle<R>> {
+                try await AppWorldsExecutionContext.$currentID.withValue(scopeID) {
+                    try await load(type, at: path)
+                }
+            }
 
-        return try task.get()
-    }
+            return try task.get()
+        }
     #endif
 
     /// Load a resource and saving it to memory cache
@@ -193,18 +193,17 @@ public struct AssetsManager: Resource {
     /// - Returns: Instance of resource.
     @AssetActor
     public static func load<A: Asset>(
-        _ type: A.Type,
+        _: A.Type,
         at path: String,
         from bundle: Bundle,
-        handleChanges: Bool = false
+        handleChanges _: Bool = false
     ) async throws -> AssetHandle<A> {
         let span = AdaTrace.startSpan(lazyName: "Assets.load.\(String(reflecting: A.self))")
         defer {
             span.end()
         }
         if let cachedAsset = self.getHandlingResource(path: path, resourceType: A.self)?.value
-            as? AssetHandle<A>
-        {
+            as? AssetHandle<A> {
             return cachedAsset
         }
 
@@ -241,29 +240,29 @@ public struct AssetsManager: Resource {
     /// - Parameter bundle: Bundle where we search our resources
     /// - Returns: Instance of resource.
     #if WASM
-    @available(*, unavailable, message: "AssetsManager.loadSync is unavailable on WebAssembly. Use AssetsManager.load(_:at:from:) instead.")
-    public static func loadSync<R: Asset>(
-        _ type: R.Type,
-        at path: String,
-        from bundle: Bundle
-    ) throws -> AssetHandle<R> {
-        throw AssetError.message("AssetsManager.loadSync is unavailable on WebAssembly. Use AssetsManager.load(_:at:from:) instead.")
-    }
-    #else
-    public static func loadSync<R: Asset>(
-        _ type: R.Type,
-        at path: String,
-        from bundle: Bundle
-    ) throws -> AssetHandle<R> {
-        let scopeID = AppWorldsExecutionContext.currentID
-        let task = UnsafeTask<AssetHandle<R>> {
-            try await AppWorldsExecutionContext.$currentID.withValue(scopeID) {
-                try await load(type, at: path, from: bundle)
-            }
+        @available(*, unavailable, message: "AssetsManager.loadSync is unavailable on WebAssembly. Use AssetsManager.load(_:at:from:) instead.")
+        public static func loadSync<R: Asset>(
+            _: R.Type,
+            at _: String,
+            from _: Bundle
+        ) throws -> AssetHandle<R> {
+            throw AssetError.message("AssetsManager.loadSync is unavailable on WebAssembly. Use AssetsManager.load(_:at:from:) instead.")
         }
+    #else
+        public static func loadSync<R: Asset>(
+            _ type: R.Type,
+            at path: String,
+            from bundle: Bundle
+        ) throws -> AssetHandle<R> {
+            let scopeID = AppWorldsExecutionContext.currentID
+            let task = UnsafeTask<AssetHandle<R>> {
+                try await AppWorldsExecutionContext.$currentID.withValue(scopeID) {
+                    try await load(type, at: path, from: bundle)
+                }
+            }
 
-        return try task.get()
-    }
+            return try task.get()
+        }
     #endif
 
     /// Load resource in background and save it to the memory.
@@ -311,7 +310,9 @@ public struct AssetsManager: Resource {
 
             if !fileSystem.itemExists(at: intermediateDirs) {
                 try fileSystem.createDirectory(
-                    at: intermediateDirs, withIntermediateDirectories: true)
+                    at: intermediateDirs,
+                    withIntermediateDirectories: true
+                )
             }
 
             if fileSystem.itemExists(at: processedPath.url) {
@@ -324,7 +325,8 @@ public struct AssetsManager: Resource {
 
             if !FileSystem.current.createFile(at: processedPath.url, contents: encodedData) {
                 throw AssetError.message(
-                    "Can't create file at path \(processedPath.url.absoluteString)")
+                    "Can't create file at path \(processedPath.url.absoluteString)"
+                )
             }
         }
     }
@@ -333,10 +335,11 @@ public struct AssetsManager: Resource {
 
     /// Unload specific resource type from memory.
     @AssetActor
-    public static func unload<R: Asset>(_ res: R.Type, at path: String) {
-        let loadedAssetIndex = self.scopeState.storage.loadedAssets[path, default: []].firstIndex(where: {
-            $0.value is AssetHandle<R>
-        })
+    public static func unload<R: Asset>(_: R.Type, at path: String) {
+        let loadedAssetIndex = self.scopeState.storage.loadedAssets[path, default: []]
+            .firstIndex(where: {
+                $0.value is AssetHandle<R>
+            })
         if let loadedAssetIndex {
             self.scopeState.storage.loadedAssets[path]?.remove(at: loadedAssetIndex)
         }
@@ -362,29 +365,30 @@ public struct AssetsManager: Resource {
 
     @AssetActor
     public static func cachedAssets() -> [CachedAssetInfo] {
-        scopeState.storage.loadedAssets.flatMap { path, handles in
-            let grouped = Dictionary(grouping: handles.compactMap { $0.value as? AnyAssetHandleInfo }) {
-                $0.assetTypeName
-            }
+        scopeState.storage.loadedAssets
+            .flatMap { path, handles in
+                let grouped = Dictionary(grouping: handles.compactMap { $0.value as? AnyAssetHandleInfo }) {
+                    $0.assetTypeName
+                }
 
-            return grouped.map { typeName, typedHandles in
-                let first = typedHandles[0]
-                return CachedAssetInfo(
-                    assetPath: path,
-                    assetName: first.assetMetaInfo?.assetName ?? URL(fileURLWithPath: path).lastPathComponent,
-                    typeName: typeName,
-                    isLoaded: typedHandles.contains(where: \.isLoaded),
-                    handleCount: typedHandles.count,
-                    assetID: first.assetMetaInfo.map { String($0.assetId.id) }
-                )
+                return grouped.map { typeName, typedHandles in
+                    let first = typedHandles[0]
+                    return CachedAssetInfo(
+                        assetPath: path,
+                        assetName: first.assetMetaInfo?.assetName ?? URL(fileURLWithPath: path).lastPathComponent,
+                        typeName: typeName,
+                        isLoaded: typedHandles.contains(where: \.isLoaded),
+                        handleCount: typedHandles.count,
+                        assetID: first.assetMetaInfo.map { String($0.assetId.id) }
+                    )
+                }
             }
-        }
-        .sorted {
-            if $0.assetPath == $1.assetPath {
-                return $0.typeName < $1.typeName
+            .sorted {
+                if $0.assetPath == $1.assetPath {
+                    return $0.typeName < $1.typeName
+                }
+                return $0.assetPath < $1.assetPath
             }
-            return $0.assetPath < $1.assetPath
-        }
     }
 
     /// Set the root folder of all resources and remove all cached items.
@@ -439,29 +443,29 @@ public struct AssetsManager: Resource {
         }
 
         #if WASM
-        let resources = URL(string: "Assets")!
-        setProjectDirectories(
-            ProjectDirectories(
-                source: URL(string: ".")!,
-                assetsDirectory: resources
-            ),
-            scopeID: scopeID
-        )
+            let resources = URL(string: "Assets")!
+            setProjectDirectories(
+                ProjectDirectories(
+                    source: URL(string: ".")!,
+                    assetsDirectory: resources
+                ),
+                scopeID: scopeID
+            )
         #else
-        let projectDirectories = try resolveProjectDirectories(filePath: filePath)
+            let projectDirectories = try resolveProjectDirectories(filePath: filePath)
 
-        #if DEBUG
-            setProjectDirectories(projectDirectories, scopeID: scopeID)
-        #else
-            let fileSystem = FileSystem.current
-            let resources = projectDirectories.assetsDirectory
+            #if DEBUG
+                setProjectDirectories(projectDirectories, scopeID: scopeID)
+            #else
+                let fileSystem = FileSystem.current
+                let resources = projectDirectories.assetsDirectory
 
-            if !fileSystem.itemExists(at: resources) {
-                try fileSystem.createDirectory(at: resources, withIntermediateDirectories: true)
-            }
+                if !fileSystem.itemExists(at: resources) {
+                    try fileSystem.createDirectory(at: resources, withIntermediateDirectories: true)
+                }
 
-            setProjectDirectories(projectDirectories, scopeID: scopeID)
-        #endif
+                setProjectDirectories(projectDirectories, scopeID: scopeID)
+            #endif
         #endif
     }
 
@@ -504,7 +508,7 @@ public struct AssetsManager: Resource {
     private static func process(
         loadedAssets: Set<WeakBox<AnyObject>>,
         at path: String,
-        asset: AssetsManager.HotReloadingAsset
+        asset: Self.HotReloadingAsset
     ) async {
         for oldResources in loadedAssets {
             guard let oldResource = oldResources.value as? AnyAssetHandle else {
@@ -553,7 +557,7 @@ public struct AssetsManager: Resource {
         assetType: any Asset.Type,
         oldResource: any AnyAssetHandle,
         from path: Path,
-        originalPath: String
+        originalPath _: String
     ) async throws {
         let data = try await self.readData(from: path)
         let meta = AssetMeta(filePath: path.url, queryParams: path.query)
@@ -563,13 +567,12 @@ public struct AssetsManager: Resource {
 
     @AssetActor
     private static func load<A: Asset>(from path: Path, originalPath: String, bundle: Bundle?)
-        async throws -> A
-    {
+        async throws -> A {
         let data = try await self.readData(from: path)
 
         let meta = AssetMeta(filePath: path.url, queryParams: path.query)
         let decoder = TextAssetDecoder(meta: meta, data: data)
-        var resource = try await A.init(from: decoder)
+        var resource = try await A(from: decoder)
 
         resource.assetMetaInfo = AssetMetaInfo(
             assetId: RID(),
@@ -583,77 +586,77 @@ public struct AssetsManager: Resource {
 
     private static func readData(from path: Path) async throws -> Data {
         #if WASM && canImport(JavaScriptFoundationCompat) && canImport(JavaScriptKit)
-        let fetchURL = self.browserFetchURL(for: path.url)
-        let responseValue: JSValue
-        do {
-            guard let fetch = JSObject.global.fetch.function else {
-                throw AssetError.message("Browser fetch is unavailable")
+            let fetchURL = self.browserFetchURL(for: path.url)
+            let responseValue: JSValue
+            do {
+                guard let fetch = JSObject.global.fetch.function else {
+                    throw AssetError.message("Browser fetch is unavailable")
+                }
+                guard let fetchPromise = JSPromise.construct(from: fetch(fetchURL)) else {
+                    throw AssetError.message("Browser fetch did not return a promise for \(fetchURL)")
+                }
+                responseValue = try await fetchPromise.value
+            } catch {
+                throw AssetError.message("Browser fetch failed for \(fetchURL): \(error)")
             }
-            guard let fetchPromise = JSPromise.construct(from: fetch(fetchURL)) else {
-                throw AssetError.message("Browser fetch did not return a promise for \(fetchURL)")
-            }
-            responseValue = try await fetchPromise.value
-        } catch {
-            throw AssetError.message("Browser fetch failed for \(fetchURL): \(error)")
-        }
 
-        guard let response = responseValue.object else {
-            throw AssetError.message("Browser fetch returned an invalid response for \(fetchURL)")
-        }
-        guard response.ok.boolean == true else {
-            throw AssetError.notExistAtPath(fetchURL)
-        }
+            guard let response = responseValue.object else {
+                throw AssetError.message("Browser fetch returned an invalid response for \(fetchURL)")
+            }
+            guard response.ok.boolean == true else {
+                throw AssetError.notExistAtPath(fetchURL)
+            }
 
-        do {
-            guard let arrayBufferValue = response.arrayBuffer?() else {
-                throw AssetError.message("Browser response arrayBuffer is unavailable for \(fetchURL)")
+            do {
+                guard let arrayBufferValue = response.arrayBuffer?() else {
+                    throw AssetError.message("Browser response arrayBuffer is unavailable for \(fetchURL)")
+                }
+                guard let arrayBufferPromise = JSPromise.construct(from: arrayBufferValue) else {
+                    throw AssetError.message("Browser response did not return an ArrayBuffer promise for \(fetchURL)")
+                }
+                let arrayBuffer = try await arrayBufferPromise.value
+                guard let uint8ArrayConstructor = JSObject.global.Uint8Array.function else {
+                    throw AssetError.message("Browser Uint8Array constructor is unavailable")
+                }
+                let uint8Array = uint8ArrayConstructor.new(arrayBuffer)
+                guard let data = Data.construct(from: .object(uint8Array)) else {
+                    throw AssetError.message("Browser response could not be converted to Data for \(fetchURL)")
+                }
+                return data
+            } catch {
+                throw AssetError.message("Browser response read failed for \(fetchURL): \(error)")
             }
-            guard let arrayBufferPromise = JSPromise.construct(from: arrayBufferValue) else {
-                throw AssetError.message("Browser response did not return an ArrayBuffer promise for \(fetchURL)")
-            }
-            let arrayBuffer = try await arrayBufferPromise.value
-            guard let uint8ArrayConstructor = JSObject.global.Uint8Array.function else {
-                throw AssetError.message("Browser Uint8Array constructor is unavailable")
-            }
-            let uint8Array = uint8ArrayConstructor.new(arrayBuffer)
-            guard let data = Data.construct(from: .object(uint8Array)) else {
-                throw AssetError.message("Browser response could not be converted to Data for \(fetchURL)")
+        #else
+            guard let data = FileSystem.current.readFile(at: path.url) else {
+                throw AssetError.notExistAtPath(path.url.path)
             }
             return data
-        } catch {
-            throw AssetError.message("Browser response read failed for \(fetchURL): \(error)")
-        }
-        #else
-        guard let data = FileSystem.current.readFile(at: path.url) else {
-            throw AssetError.notExistAtPath(path.url.path)
-        }
-        return data
         #endif
     }
 
     #if WASM && canImport(JavaScriptFoundationCompat) && canImport(JavaScriptKit)
-    private static func browserFetchURL(for url: URL) -> String {
-        guard url.isFileURL else {
-            return url.relativeString
-        }
-
-        let allowedCharacters = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "?#"))
-        let relativePath = url.pathComponents
-            .filter { $0 != "/" }
-            .map { component in
-                component.addingPercentEncoding(withAllowedCharacters: allowedCharacters) ?? component
+        private static func browserFetchURL(for url: URL) -> String {
+            guard url.isFileURL else {
+                return url.relativeString
             }
-            .joined(separator: "/")
 
-        return "./\(relativePath)"
-    }
+            let allowedCharacters = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "?#"))
+            let relativePath = url.pathComponents
+                .filter { $0 != "/" }
+                .map { component in
+                    component.addingPercentEncoding(withAllowedCharacters: allowedCharacters) ?? component
+                }
+                .joined(separator: "/")
+
+            return "./\(relativePath)"
+        }
     #endif
 
     private static var shouldCheckAssetFileExistence: Bool {
         #if WASM && canImport(JavaScriptKit)
-        false
+            false
         #else
-        true
+            true
         #endif
     }
 
@@ -704,8 +707,9 @@ extension AssetsManager {
         let processedPath = self.processPath(meta.assetPath)
         if let bundlePath = meta.bundlePath, let bundle = Bundle(path: bundlePath) {
             if let uri = bundle.url(
-                forResource: processedPath.url.relativeString, withExtension: nil)
-            {
+                forResource: processedPath.url.relativeString,
+                withExtension: nil
+            ) {
                 return Path(url: uri, query: processedPath.query)
             }
         }
@@ -725,11 +729,10 @@ extension AssetsManager {
 }
 
 extension AssetsManager {
-
     @AssetActor
     private static func getHandlingResource<A: Asset>(
         path: String,
-        resourceType: A.Type
+        resourceType _: A.Type
     ) -> WeakBox<AnyObject>? {
         self.scopeState.storage.loadedAssets[path]?.first(where: { $0.value is AssetHandle<A> })
     }
@@ -741,21 +744,24 @@ extension AssetsManager {
 
         if path.hasPrefix(self.resKeyWord) && !path.hasPrefix("file://") {
             path.removeFirst(self.resKeyWord.count)
-            let resourceDirectory = currentProjectDirectories?.assetsDirectory
+            let resourceDirectory =
+                currentProjectDirectories?.assetsDirectory
                 ?? URL(fileURLWithPath: ".", isDirectory: true)
             url = resourceDirectory.appendingPathComponent(path)
         } else {
-            url = path.hasPrefix("file://") ? URL(string: path)! : URL(fileURLWithPath: path)
+            url = path.hasPrefix("file://")
+                ? URL(string: path).unwrap(message: "Invalid file URL: \(path)")
+                : URL(fileURLWithPath: path)
         }
 
         let splitComponents = url.lastPathComponent.split(separator: "#")
 
         var query = [AssetQuery]()
 
-        if !splitComponents.isEmpty {
-            query = Self.fetchQuery(from: String(splitComponents.last!))
+        if let firstComponent = splitComponents.first, let lastComponent = splitComponents.last {
+            query = Self.fetchQuery(from: String(lastComponent))
             url.deleteLastPathComponent()
-            url.appendPathComponent(String(splitComponents.first!))
+            url.appendPathComponent(String(firstComponent))
         }
 
         return Path(url: url, query: query)
@@ -792,9 +798,10 @@ extension AssetsManager {
             return
         }
 
-        let watchedPaths = Array(watchedDirectories).compactMap {
-            try? AbsolutePath(validating: $0)
-        }
+        let watchedPaths = Array(watchedDirectories)
+            .compactMap {
+                try? AbsolutePath(validating: $0)
+            }
         guard !watchedPaths.isEmpty else {
             logger.warning("No valid absolute paths to watch")
             return
@@ -876,8 +883,7 @@ extension AssetsManager {
         var needsUpdate: Bool = false
 
         static func == (lhs: AssetsManager.HotReloadingAsset, rhs: AssetsManager.HotReloadingAsset)
-            -> Bool
-        {
+            -> Bool {
             lhs.path == rhs.path
                 && ObjectIdentifier(lhs.resource) == ObjectIdentifier(rhs.resource)
                 && lhs.needsUpdate == rhs.needsUpdate
@@ -910,17 +916,17 @@ public actor AssetActor {
 
 extension Asset {
     @AssetActor
-    fileprivate static func loadAndUpdateInternal(
+    static func loadAndUpdateInternal(
         from asset: any AssetDecoder,
         oldResource: any AnyAssetHandle
     ) async throws {
-        let resource = try await Self.init(from: asset)
+        let resource = try await Self(from: asset)
         try oldResource.update(resource)
     }
 }
 
 extension URL {
-    fileprivate static func findProjectDirectories(
+    static func findProjectDirectories(
         from file: StaticString,
         for name: String
     ) -> ProjectDirectories? {

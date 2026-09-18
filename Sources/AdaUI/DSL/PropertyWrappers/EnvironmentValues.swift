@@ -12,7 +12,6 @@ import Observation
 @MainActor
 @propertyWrapper
 public struct Environment<Value>: PropertyStoragable, UpdatableProperty {
-
     let container: ViewContextStorage
     var storage: UpdatablePropertyStorage {
         return self.container
@@ -38,7 +37,7 @@ public struct Environment<Value>: PropertyStoragable, UpdatableProperty {
         self.readValue = { $0.values[keyPath: keyPath] }
     }
 
-    public func update() { }
+    public func update() {}
 }
 
 extension Environment where Value: Observable & AnyObject {

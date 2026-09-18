@@ -5,8 +5,8 @@
 //  Created by OpenAI on 29.04.2026.
 //
 
-import AdaInput
 import AdaAnimation
+import AdaInput
 import AdaText
 import AdaUtils
 import Math
@@ -30,7 +30,7 @@ public enum NavigationSplitViewColumn: Sendable, Hashable {
 @MainActor @preconcurrency
 public struct NavigationSplitView<Sidebar: View, Content: View, Detail: View>: View, ViewNodeBuilder {
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     private let columnVisibility: Binding<NavigationSplitViewVisibility>?
     private let preferredCompactColumn: Binding<NavigationSplitViewColumn>?
@@ -145,8 +145,8 @@ public struct NavigationSplitView<Sidebar: View, Content: View, Detail: View>: V
 }
 
 @MainActor
-public extension NavigationSplitView where Content == EmptyView {
-    init(
+extension NavigationSplitView where Content == EmptyView {
+    public init(
         columnVisibility: Binding<NavigationSplitViewVisibility>,
         preferredCompactColumn: Binding<NavigationSplitViewColumn>,
         @ViewBuilder sidebar: @escaping () -> Sidebar,
@@ -159,7 +159,7 @@ public extension NavigationSplitView where Content == EmptyView {
         self.detail = detail
     }
 
-    init(
+    public init(
         columnVisibility: Binding<NavigationSplitViewVisibility>,
         @ViewBuilder sidebar: @escaping () -> Sidebar,
         @ViewBuilder detail: @escaping () -> Detail
@@ -171,7 +171,7 @@ public extension NavigationSplitView where Content == EmptyView {
         self.detail = detail
     }
 
-    init(
+    public init(
         preferredCompactColumn: Binding<NavigationSplitViewColumn>,
         @ViewBuilder sidebar: @escaping () -> Sidebar,
         @ViewBuilder detail: @escaping () -> Detail
@@ -183,7 +183,7 @@ public extension NavigationSplitView where Content == EmptyView {
         self.detail = detail
     }
 
-    init(
+    public init(
         @ViewBuilder sidebar: @escaping () -> Sidebar,
         @ViewBuilder detail: @escaping () -> Detail
     ) {
@@ -233,32 +233,32 @@ public struct NavigationSplitViewSeparatorConfiguration: Sendable, Equatable {
     }
 }
 
-public extension View {
+extension View {
     /// Sets a fixed, preferred width for the column containing this view.
-    func navigationSplitViewColumnWidth(_ width: Float) -> some View {
+    public func navigationSplitViewColumnWidth(_ width: Float) -> some View {
         navigationSplitViewColumnWidth(min: width, ideal: width, max: width)
     }
 
     /// Sets minimum, ideal, and maximum preferred widths for the column containing this view.
-    func navigationSplitViewColumnWidth(min: Float? = nil, ideal: Float, max: Float? = nil) -> some View {
+    public func navigationSplitViewColumnWidth(min: Float? = nil, ideal: Float, max: Float? = nil) -> some View {
         preference(
-            key: NavigationSplitViewColumnWidthPreferenceKey.self,
+            key: SplitColumnWidthPreferenceKey.self,
             value: NavigationSplitViewColumnWidth(min: min, ideal: ideal, max: max)
         )
     }
 
     /// Sets the style for navigation split views within this view.
-    func navigationSplitViewStyle<S: NavigationSplitViewStyle>(_ style: S) -> some View {
+    public func navigationSplitViewStyle<S: NavigationSplitViewStyle>(_: S) -> some View {
         self
     }
 
     /// Sets the separator configuration for navigation split views within this view.
-    func navigationSplitViewSeparators(_ configuration: NavigationSplitViewSeparatorConfiguration) -> some View {
+    public func navigationSplitViewSeparators(_ configuration: NavigationSplitViewSeparatorConfiguration) -> some View {
         self.environment(\.navigationSplitViewSeparators, configuration)
     }
 
     /// Sets separator visibility, color, and drag behavior for navigation split views within this view.
-    func navigationSplitViewSeparators(
+    public func navigationSplitViewSeparators(
         _ visibility: NavigationSplitViewSeparatorVisibility = .visible,
         color: Color = .gray,
         allowsDragging: Bool = true,
@@ -275,8 +275,8 @@ public extension View {
     }
 }
 
-public extension EnvironmentValues {
-    @Entry var navigationSplitViewSeparators: NavigationSplitViewSeparatorConfiguration = NavigationSplitViewSeparatorConfiguration()
+extension EnvironmentValues {
+    @Entry public var navigationSplitViewSeparators: NavigationSplitViewSeparatorConfiguration = NavigationSplitViewSeparatorConfiguration()
 }
 
 public protocol NavigationSplitViewStyle {}
@@ -293,19 +293,19 @@ public struct ProminentDetailNavigationSplitViewStyle: NavigationSplitViewStyle,
     public init() {}
 }
 
-public extension NavigationSplitViewStyle where Self == AutomaticNavigationSplitViewStyle {
-    static var automatic: AutomaticNavigationSplitViewStyle { AutomaticNavigationSplitViewStyle() }
+extension NavigationSplitViewStyle where Self == AutomaticNavigationSplitViewStyle {
+    public static var automatic: AutomaticNavigationSplitViewStyle { AutomaticNavigationSplitViewStyle() }
 }
 
-public extension NavigationSplitViewStyle where Self == BalancedNavigationSplitViewStyle {
-    static var balanced: BalancedNavigationSplitViewStyle { BalancedNavigationSplitViewStyle() }
+extension NavigationSplitViewStyle where Self == BalancedNavigationSplitViewStyle {
+    public static var balanced: BalancedNavigationSplitViewStyle { BalancedNavigationSplitViewStyle() }
 }
 
-public extension NavigationSplitViewStyle where Self == ProminentDetailNavigationSplitViewStyle {
-    static var prominentDetail: ProminentDetailNavigationSplitViewStyle { ProminentDetailNavigationSplitViewStyle() }
+extension NavigationSplitViewStyle where Self == ProminentDetailNavigationSplitViewStyle {
+    public static var prominentDetail: ProminentDetailNavigationSplitViewStyle { ProminentDetailNavigationSplitViewStyle() }
 }
 
-private struct NavigationSplitViewColumnWidthPreferenceKey: PreferenceKey {
+private struct SplitColumnWidthPreferenceKey: PreferenceKey {
     static let defaultValue: NavigationSplitViewColumnWidth? = nil
 
     static func reduce(
@@ -350,8 +350,8 @@ private final class NavigationSplitColumnNode: ViewModifierNode {
     }
 
     override func updatePreference<K: PreferenceKey>(key: K.Type, value: K.Value) {
-        if K.self == NavigationSplitViewColumnWidthPreferenceKey.self,
-           let preference = value as? NavigationSplitViewColumnWidth? {
+        if K.self == SplitColumnWidthPreferenceKey.self,
+            let preference = value as? NavigationSplitViewColumnWidth? {
             widthPreference = preference
             (parent as? NavigationSplitViewNode)?.setWidthPreference(preference, for: column)
             return
@@ -384,10 +384,14 @@ private final class NavigationSplitDividerNode: ViewNode {
     }
 
     override func draw(with context: UIGraphicsContext) {
-        guard frame.width > 0, frame.height > 0 else { return }
+        guard frame.width > 0, frame.height > 0 else {
+            return
+        }
 
         let separators = environment.navigationSplitViewSeparators
-        guard separators.visibility == .visible, separators.color.alpha > 0 else { return }
+        guard separators.visibility == .visible, separators.color.alpha > 0 else {
+            return
+        }
 
         var context = context
         context.environment = environment
@@ -398,9 +402,11 @@ private final class NavigationSplitDividerNode: ViewNode {
         )
     }
 
-    override func point(inside point: Point, with event: any InputEvent) -> Bool {
+    override func point(inside point: Point, with _: any InputEvent) -> Bool {
         let separators = environment.navigationSplitViewSeparators
-        guard separators.allowsDragging else { return false }
+        guard separators.allowsDragging else {
+            return false
+        }
 
         return localHitBounds.contains(point: point)
     }
@@ -410,20 +416,27 @@ private final class NavigationSplitDividerNode: ViewNode {
     }
 
     override func onMouseEvent(_ event: MouseEvent) {
-        guard environment.navigationSplitViewSeparators.allowsDragging else { return }
+        guard environment.navigationSplitViewSeparators.allowsDragging else {
+            return
+        }
 
         switch event.phase {
         case .began:
-            guard event.button == .left else { return }
+            guard event.button == .left else {
+                return
+            }
             setResizeCursor()
             lastDragX = event.mousePosition.x
         case .changed:
             setResizeCursor()
-            guard event.button == .left || event.button == .none, let lastDragX else { return }
+            guard event.button == .left || event.button == .none, let lastDragX else {
+                return
+            }
             let delta = event.mousePosition.x - lastDragX
             self.lastDragX = event.mousePosition.x
             resizeLeadingColumn(by: delta)
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             lastDragX = nil
             if absoluteHitBounds.contains(point: event.mousePosition) {
                 setResizeCursor()
@@ -438,24 +451,33 @@ private final class NavigationSplitDividerNode: ViewNode {
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
-        guard environment.navigationSplitViewSeparators.allowsDragging else { return }
-        guard let first = touches.first else { return }
+        guard environment.navigationSplitViewSeparators.allowsDragging else {
+            return
+        }
+        guard let first = touches.first else {
+            return
+        }
 
         switch first.phase {
         case .began:
             lastTouchX = first.location.x
         case .moved:
-            guard let lastTouchX else { return }
+            guard let lastTouchX else {
+                return
+            }
             let delta = first.location.x - lastTouchX
             self.lastTouchX = first.location.x
             resizeLeadingColumn(by: delta)
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             lastTouchX = nil
         }
     }
 
     private func resizeLeadingColumn(by delta: Float) {
-        guard delta != 0 else { return }
+        guard delta != 0 else {
+            return
+        }
         (parent as? NavigationSplitViewNode)?.resizeColumn(leadingColumn, by: delta)
     }
 
@@ -572,7 +594,9 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
 
         var x = bounds.minX
         for (index, column) in columns.enumerated() {
-            guard let node = columnNode(for: column) else { continue }
+            guard let node = columnNode(for: column) else {
+                continue
+            }
             let width = widths[column] ?? 0
             node.place(
                 in: Point(x: x, y: bounds.minY),
@@ -581,8 +605,10 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
             )
             x += width
 
-            guard index < columns.count - 1,
-                  let divider = dividerNode(after: column) else {
+            guard
+                index < columns.count - 1,
+                let divider = dividerNode(after: column)
+            else {
                 continue
             }
 
@@ -598,7 +624,9 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
 
         if shouldCaptureCompactBackSwipe(at: point) {
             return self
@@ -629,13 +657,13 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
         let drawableDividers = drawableDividerNodes(for: frame.width)
         for node in nodes {
             if let columnNode = node as? NavigationSplitColumnNode,
-               shouldDrawColumnNode(columnNode, width: frame.width) {
+                shouldDrawColumnNode(columnNode, width: frame.width) {
                 columnNode.draw(with: context)
                 continue
             }
 
             if let dividerNode = node as? NavigationSplitDividerNode,
-               drawableDividers.contains(where: { $0 === dividerNode }) {
+                drawableDividers.contains(where: { $0 === dividerNode }) {
                 dividerNode.draw(with: context)
             }
         }
@@ -655,7 +683,9 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
-        guard let touch = touches.first else { return }
+        guard let touch = touches.first else {
+            return
+        }
         handleCompactBackSwipe(
             point: localPoint(fromWindowPoint: touch.location),
             phase: touch.phase
@@ -679,10 +709,14 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
 
     func resizeColumn(_ column: NavigationSplitViewColumn, by delta: Float) {
         let columns = visibleColumns(for: frame.width)
-        guard columns.contains(column), columns.last != column else { return }
+        guard columns.contains(column), columns.last != column else {
+            return
+        }
 
         let currentWidths = resolvedWidths(for: columns, totalWidth: frame.width)
-        guard let currentWidth = currentWidths[column] else { return }
+        guard let currentWidth = currentWidths[column] else {
+            return
+        }
 
         let spec = self.spec(for: column)
         let nextWidth = clamp(currentWidth + delta, min: spec.min, max: spec.max)
@@ -694,8 +728,10 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
     }
 
     func navigate(_ value: AnyHashable, from column: NavigationSplitViewColumn) -> Bool {
-        guard let targetColumn = navigationTarget(after: column),
-              let targetContext = columnNode(for: targetColumn)?.navigationStackNode?.navigationContext else {
+        guard
+            let targetColumn = navigationTarget(after: column),
+            let targetContext = columnNode(for: targetColumn)?.navigationStackNode?.navigationContext
+        else {
             return false
         }
 
@@ -765,7 +801,8 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
         }
 
         switch columnVisibility?.wrappedValue ?? .automatic {
-        case .automatic, .all:
+        case .automatic,
+            .all:
             return hasContentColumn ? [.sidebar, .content, .detail] : [.sidebar, .detail]
         case .doubleColumn:
             return hasContentColumn ? [.content, .detail] : [.sidebar, .detail]
@@ -783,7 +820,9 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
     }
 
     private func setCompactColumn(_ column: NavigationSplitViewColumn) {
-        guard currentCompactColumn != column else { return }
+        guard currentCompactColumn != column else {
+            return
+        }
 
         let animationController = UIAnimationController(animation: Self.compactTransitionAnimation)
         performWithTransientAnimationController(animationController) {
@@ -801,7 +840,9 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
 
     private func visibleDividerNodes(for width: Float) -> [NavigationSplitDividerNode] {
         let columns = visibleColumns(for: width)
-        guard columns.count > 1 else { return [] }
+        guard columns.count > 1 else {
+            return []
+        }
 
         return columns.dropLast().compactMap { dividerNode(after: $0) }
     }
@@ -810,8 +851,12 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
         for columns: [NavigationSplitViewColumn],
         totalWidth: Float
     ) -> [NavigationSplitViewColumn: Float] {
-        guard !columns.isEmpty else { return [:] }
-        guard columns.count > 1 else { return [columns[0]: totalWidth] }
+        guard !columns.isEmpty else {
+            return [:]
+        }
+        guard columns.count > 1 else {
+            return [columns[0]: totalWidth]
+        }
 
         let dividerTotal = Float(columns.count - 1) * Self.dividerWidth
         let available = max(totalWidth - dividerTotal, 0)
@@ -835,7 +880,9 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
         if detailWidth < detailSpec.min {
             var deficit = detailSpec.min - detailWidth
             for column in leadingColumns.reversed() {
-                guard deficit > 0, let width = widths[column] else { break }
+                guard deficit > 0, let width = widths[column] else {
+                    break
+                }
                 let minWidth = spec(for: column).min
                 let reduction = min(width - minWidth, deficit)
                 widths[column] = width - reduction
@@ -879,12 +926,12 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
 
         for node in nodes {
             if let columnNode = node as? NavigationSplitColumnNode,
-               visibleColumnSet.contains(columnNode.column) {
+                visibleColumnSet.contains(columnNode.column) {
                 continue
             }
 
             if let dividerNode = node as? NavigationSplitDividerNode,
-               visibleDividerSet.contains(dividerNode.leadingColumn) {
+                visibleDividerSet.contains(dividerNode.leadingColumn) {
                 continue
             }
 
@@ -927,7 +974,8 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
 
     private func hiddenDividerFrame(after column: NavigationSplitViewColumn, in bounds: Rect) -> Rect {
         switch column {
-        case .sidebar, .content:
+        case .sidebar,
+            .content:
             return Rect(
                 x: bounds.minX - Self.dividerWidth,
                 y: bounds.minY,
@@ -957,7 +1005,9 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
     private func drawableDividerNodes(for width: Float) -> [NavigationSplitDividerNode] {
         let visibleDividers = visibleDividerNodes(for: width)
         return nodes.compactMap { node -> NavigationSplitDividerNode? in
-            guard let divider = node as? NavigationSplitDividerNode else { return nil }
+            guard let divider = node as? NavigationSplitDividerNode else {
+                return nil
+            }
             if visibleDividers.contains(where: { $0 === divider }) {
                 return divider
             }
@@ -1004,7 +1054,8 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
         let shouldInstallBackAction = shouldShowCompactBackButton()
         for columnNode in columnNodes() {
             var columnEnvironment = environment
-            let installsBackAction = shouldInstallBackAction
+            let installsBackAction =
+                shouldInstallBackAction
                 && columnNode.column == currentCompactColumn
                 && columnNode.column != .sidebar
             columnEnvironment.navigationSplitCompactBackAction = installsBackAction ? compactBackAction : nil
@@ -1036,7 +1087,8 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
             compactSwipeDidTrigger = false
         case .changed:
             updateCompactBackSwipe(to: point)
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             updateCompactBackSwipe(to: point)
             compactSwipeStartPoint = nil
             compactSwipeDidTrigger = false
@@ -1050,7 +1102,8 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
             compactSwipeDidTrigger = false
         case .moved:
             updateCompactBackSwipe(to: point)
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             updateCompactBackSwipe(to: point)
             compactSwipeStartPoint = nil
             compactSwipeDidTrigger = false
@@ -1058,12 +1111,16 @@ private final class NavigationSplitViewNode: ViewContainerNode, NavigationSplitD
     }
 
     private func updateCompactBackSwipe(to point: Point) {
-        guard !compactSwipeDidTrigger, let start = compactSwipeStartPoint else { return }
+        guard !compactSwipeDidTrigger, let start = compactSwipeStartPoint else {
+            return
+        }
 
         let translationX = point.x - start.x
         let translationY = abs(point.y - start.y)
-        guard translationX >= Self.compactSwipeThreshold,
-              translationY <= Self.compactSwipeMaximumVerticalDrift else {
+        guard
+            translationX >= Self.compactSwipeThreshold,
+            translationY <= Self.compactSwipeMaximumVerticalDrift
+        else {
             return
         }
 

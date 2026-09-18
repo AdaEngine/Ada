@@ -7,13 +7,12 @@
 
 /// This protocol describe buffer created for GPU usage.
 public protocol Buffer: AnyObject, Sendable {
-    
     /// A string that identifies the resource.
     var label: String? { get set }
-    
+
     /// The logical size of the buffer, in bytes.
     var length: Int { get }
-    
+
     /// Set data to the buffer's storage.
     /// - Parameter bytes: A pointer to the data which will be copied.
     /// - Parameter byteCount: Count of bytes which will be copied.
@@ -45,29 +44,28 @@ public struct BufferMapMode: OptionSet, Sendable {
     }
 
     /// The buffer is mapped for reading.
-    public static let read = BufferMapMode(rawValue: 1 << 0)
+    public static let read = Self(rawValue: 1 << 0)
     /// The buffer is mapped for writing.
-    public static let write = BufferMapMode(rawValue: 1 << 1)
+    public static let write = Self(rawValue: 1 << 1)
 }
 
-public extension Buffer {
-    
+extension Buffer {
     // func map(mode: BufferMapMode = [.write, .read], offset: Int = 0, size: Int = Int.max, block: @escaping @Sendable (Result<UnsafeMutableRawPointer, Error>) -> Void) {
     //     unsafe self.map(mode: mode, offset: offset, size: size, block: block)
     // }
-    
+
     /// Set data to the buffer's storage.
     /// - Parameter bytes: A pointer to the data which will be copied.
     /// - Parameter byteCount: Count of bytes which will be copied.
-    func setData(_ bytes: UnsafeMutableRawPointer, byteCount: Int) {
+    public func setData(_ bytes: UnsafeMutableRawPointer, byteCount: Int) {
         unsafe self.setData(bytes, byteCount: byteCount, offset: 0)
     }
-    
+
     /// Set data to the buffer's storage.
     /// - Parameter value: A value which will be copied.
-    func setData<T>(_ value: T) {
+    public func setData<T>(_ value: T) {
         let size = MemoryLayout<T>.stride
-        
+
         unsafe withUnsafePointer(to: value) { ptr in
             unsafe self.setData(UnsafeMutableRawPointer(mutating: ptr), byteCount: size)
         }
@@ -75,9 +73,12 @@ public extension Buffer {
 
     /// Set elements to the buffer's storage.
     /// - Parameter value: A value which will be copied.
-    func setElements<T>(_ elements: inout [T]) {
+    public func setElements<T>(_ elements: inout [T]) {
         unsafe elements.withUnsafeMutableBytes { ptr in
-            unsafe self.setData(ptr.baseAddress!, byteCount: ptr.count)
+            guard let baseAddress = ptr.baseAddress else {
+                return
+            }
+            unsafe self.setData(baseAddress, byteCount: ptr.count)
         }
     }
 }
@@ -85,17 +86,17 @@ public extension Buffer {
 /// Options for the memory location and access permissions for a resource.
 public struct ResourceOptions: OptionSet, Sendable {
     public let rawValue: UInt
-    
+
     public init(rawValue: UInt) {
         self.rawValue = rawValue
     }
-    
+
     /// The resource can be accessed only by the GPU.
-    public static let storagePrivate = ResourceOptions(rawValue: 1 << 0)
-    
+    public static let storagePrivate = Self(rawValue: 1 << 0)
+
     /// The resource is stored in system memory and is accessible to both the CPU and the GPU.
-    public static let storageShared = ResourceOptions(rawValue: 1 << 1)
-    
+    public static let storageShared = Self(rawValue: 1 << 1)
+
     /// The CPU and GPU may maintain separate copies of the resource, which you need to explicitly synchronize.
-    public static let storageManaged = ResourceOptions(rawValue: 1 << 2)
+    public static let storageManaged = Self(rawValue: 1 << 2)
 }

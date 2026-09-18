@@ -7,13 +7,12 @@
 
 import AdaInput
 import AdaRender
-import AdaUtils
 import AdaText
+import AdaUtils
 import Math
 
 /// A button UI element.
 open class UIButton: UIControl {
-
     /// A button style.
     private struct ButtonStyle {
         /// The icon of the button style.
@@ -70,7 +69,7 @@ open class UIButton: UIControl {
     /// - Parameters:
     ///   - rect: The rect to draw the button in.
     ///   - context: The context to draw the button in.
-    open override func draw(in rect: Rect, with context: UIGraphicsContext) {
+    override open func draw(in rect: Rect, with context: UIGraphicsContext) {
         let style = self.styles[self.state]
         let color = style?.backgroundColor ?? self.backgroundColor
         context.drawRect(rect, color: color)
@@ -87,7 +86,7 @@ open class UIButton: UIControl {
     /// Handle the mouse event.
     ///
     /// - Parameter event: The mouse event to handle.
-    open override func onMouseEvent(_ event: MouseEvent) {
+    override open func onMouseEvent(_ event: MouseEvent) {
         if !self.state.isEnabled {
             return
         }

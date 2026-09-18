@@ -1,8 +1,8 @@
 import AdaUtils
 import Foundation
 
-public extension World {
-    func getComponents(for entity: Entity.ID) -> [(typeName: String, component: any Component)] {
+extension World {
+    public func getComponents(for entity: Entity.ID) -> [(typeName: String, component: any Component)] {
         guard let location = self.entities.entities[entity] else {
             return []
         }
@@ -12,12 +12,13 @@ public extension World {
             .chunks
             .chunks[location.chunkIndex]
 
-        return chunk.getComponents(for: entity).map { _, component in
-            (String(reflecting: type(of: component)), component)
-        }
+        return chunk.getComponents(for: entity)
+            .map { _, component in
+                (String(reflecting: type(of: component)), component)
+            }
     }
 
-    func getComponent(named typeName: String, from entity: Entity.ID) -> (any Component)? {
+    public func getComponent(named typeName: String, from entity: Entity.ID) -> (any Component)? {
         guard let componentType = RuntimeTypeRegistry.componentType(named: typeName) else {
             return getComponents(for: entity).first { $0.typeName == typeName }?.component
         }
@@ -30,12 +31,14 @@ public extension World {
             .chunks
             .chunks[location.chunkIndex]
 
-        return chunk.getComponents(for: entity).first { id, _ in
-            id == componentType.identifier
-        }?.1
+        return chunk.getComponents(for: entity)
+            .first { id, _ in
+                id == componentType.identifier
+            }?
+            .1
     }
 
-    func hasComponent(named typeName: String, in entity: Entity.ID) -> Bool {
+    public func hasComponent(named typeName: String, in entity: Entity.ID) -> Bool {
         guard let componentType = RuntimeTypeRegistry.componentType(named: typeName) else {
             return false
         }
@@ -43,7 +46,7 @@ public extension World {
     }
 
     @discardableResult
-    func insertDefaultComponent(named typeName: String, into entity: Entity.ID) -> Bool {
+    public func insertDefaultComponent(named typeName: String, into entity: Entity.ID) -> Bool {
         guard let component = RuntimeTypeRegistry.makeDefaultComponent(named: typeName) else {
             return false
         }
@@ -51,7 +54,7 @@ public extension World {
         return true
     }
 
-    func getResource(named typeName: String) -> (any Resource)? {
+    public func getResource(named typeName: String) -> (any Resource)? {
         guard let resourceType = RuntimeTypeRegistry.resourceType(named: typeName) else {
             return nil
         }
@@ -59,13 +62,15 @@ public extension World {
     }
 
     @_spi(Scripting)
-    func readResourceField(
+    public func readResourceField(
         type: any Resource.Type,
         field: EditorComponentFieldDescriptor
     ) -> EditorFieldValue? {
-        guard let data = resources.getResourceData(for: type),
-              let pointer = unsafe data.pointer.buffer.pointer.baseAddress,
-              let readPointer = unsafe field.readPointer else {
+        guard
+            let data = resources.getResourceData(for: type),
+            let pointer = unsafe data.pointer.buffer.pointer.baseAddress,
+            let readPointer = unsafe field.readPointer
+        else {
             return nil
         }
         return unsafe readPointer(UnsafeRawPointer(pointer))
@@ -73,16 +78,18 @@ public extension World {
 
     @_spi(Scripting)
     @discardableResult
-    func writeResourceField(
+    public func writeResourceField(
         type: any Resource.Type,
         field: EditorComponentFieldDescriptor,
         value: EditorFieldValue
     ) -> Bool {
-        guard field.accepts(value),
-              let data = resources.getResourceData(for: type),
-              let pointer = unsafe data.pointer.buffer.pointer.baseAddress,
-              let writePointer = unsafe field.writePointer,
-              unsafe writePointer(pointer, value) else {
+        guard
+            field.accepts(value),
+            let data = resources.getResourceData(for: type),
+            let pointer = unsafe data.pointer.buffer.pointer.baseAddress,
+            let writePointer = unsafe field.writePointer,
+            unsafe writePointer(pointer, value)
+        else {
             return false
         }
         var changedTick = data.changedTick

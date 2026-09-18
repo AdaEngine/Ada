@@ -6,45 +6,45 @@
 //
 
 import AdaUtils
-import OrderedCollections
 import Math
+import OrderedCollections
+
 #if canImport(Metal) && METAL
-import Metal
+    import Metal
 #endif
 
 /// An object that defines a mesh.
 /// This struct contains all the mesh data.
 public struct MeshDescriptor: Sendable {
-    
     /// Descriptors for the buffers.
     public internal(set) var buffers: OrderedDictionary<MeshDescriptor.Identifier, AnyMeshBuffer> = [:]
-    
+
     /// Name of the mesh.
     public var name: String
-    
+
     public enum Materials: Sendable {
         case allFaces(UInt32)
         case perFace([UInt32])
     }
-    
+
     /// Material assignments.
     public var materials: Materials = .allFaces(0)
-    
+
     /// The primitives that make up the mesh.
     public var primitiveTopology: Mesh.PrimitiveTopology = .triangleList
-    
+
     /// The indices of the mesh.
     public var indicies: [UInt32] = []
-    
+
     /// Create an empty mesh descriptor.
     @_spi(Internal)
     public init(name: String) {
         self.name = name
         self.buffers[.positions] = AnyMeshBuffer(MeshBuffer<Vector3>([]))
     }
-    
+
     /// Get the buffer for a given semantic. There can only be one buffer for any given ID.
-    public subscript<S>(semantic: S) -> MeshBuffer<S.Element>? where S : MeshArraySemantic {
+    public subscript<S>(semantic: S) -> MeshBuffer<S.Element>? where S: MeshArraySemantic {
         get {
             return self.buffers[semantic.id]?.get(as: S.Element.self)
         }
@@ -63,14 +63,14 @@ extension Mesh {
         case uint16
         case int32
         case uint32
-        
+
         case float
-        
+
         case vector2
         case vector3
         case vector4
     }
-    
+
     /// The type of the array in the mesh.
     public enum ArrayType: UInt8, Sendable {
         case vertex
@@ -80,7 +80,7 @@ extension Mesh {
         case tangent
         case index
     }
-    
+
     /// The primitive topology of the mesh.
     public enum PrimitiveTopology: UInt8, Sendable {
         case points
@@ -95,7 +95,7 @@ extension Mesh {
 public protocol MeshArraySemantic: Identifiable, Sendable {
     /// The type of the elements in the mesh array.
     associatedtype Element
-    
+
     /// The identifier of the mesh array semantic.
 
     var id: MeshDescriptor.Identifier { get }
@@ -108,7 +108,7 @@ extension MeshDescriptor {
             return self.name
         }
 
-        /// The name of the identifier. 
+        /// The name of the identifier.
         public let name: String
 
         /// Whether the identifier is custom.
@@ -131,8 +131,7 @@ extension MeshDescriptor {
     }
 
     /// A semantic of a mesh array.
-    public struct Semantic<Element> : MeshArraySemantic {
-
+    public struct Semantic<Element>: MeshArraySemantic {
         /// The stable identity of the entity associated with this instance.
         public let id: MeshDescriptor.Identifier
 
@@ -157,8 +156,8 @@ extension MeshDescriptor {
     public static let colors: MeshDescriptor.Semantic<Color> = MeshDescriptor.Semantic<Color>(id: .colors)
 
     /// Create a custom semantic of a mesh array.
-    public static func custom<Value>(_ name: String, type: Value.Type) -> MeshDescriptor.Semantic<Value> {
-        return MeshDescriptor.Semantic<Value>(id: Identifier(name: name, isCustom: true))
+    public static func custom<Value>(_ name: String, type _: Value.Type) -> MeshDescriptor.Semantic<Value> {
+        return Self.Semantic<Value>(id: Identifier(name: name, isCustom: true))
     }
 }
 
@@ -181,118 +180,120 @@ extension MeshDescriptor {
     /// The buffer for positions.
     public var positions: MeshDescriptor.Positions {
         get {
-            self[MeshDescriptor.positions]!
+            self[Self.positions].unwrap(message: "A mesh descriptor must contain a positions buffer.")
         }
 
         set {
-            self[MeshDescriptor.positions] = newValue
+            self[Self.positions] = newValue
         }
     }
 
     /// The buffer for normals.
     public var normals: MeshDescriptor.Normals? {
         _read {
-            yield self[MeshDescriptor.normals]
+            yield self[Self.normals]
         }
         _modify {
-            yield &self[MeshDescriptor.normals]
+            yield &self[Self.normals]
         }
     }
 
     /// The buffer for texture coordinates.
     public var textureCoordinates: MeshDescriptor.TextureCoordinates? {
         _read {
-            yield self[MeshDescriptor.textureCoordinates]
+            yield self[Self.textureCoordinates]
         }
 
         _modify {
-            yield &self[MeshDescriptor.textureCoordinates]
+            yield &self[Self.textureCoordinates]
         }
     }
 
     /// The buffer for tangent vectors and their handedness.
     public var tangents: MeshDescriptor.Tangents? {
         _read {
-            yield self[MeshDescriptor.tangents]
+            yield self[Self.tangents]
         }
         _modify {
-            yield &self[MeshDescriptor.tangents]
+            yield &self[Self.tangents]
         }
     }
 
     /// The buffer for colors.
     public var colors: MeshDescriptor.Colors? {
         _read {
-            yield self[MeshDescriptor.colors]
+            yield self[Self.colors]
         }
         _modify {
-            yield &self[MeshDescriptor.colors]
+            yield &self[Self.colors]
         }
     }
 }
 
-public extension MeshDescriptor {
+extension MeshDescriptor {
     /// Get the vertex buffer descriptor for the mesh.
-    func getMeshVertexBufferDescriptor() -> VertexDescriptor {
+    public func getMeshVertexBufferDescriptor() -> VertexDescriptor {
         var vertexDescriptor = VertexDescriptor()
-        
+
         var offset: Int = 0
-        var usedLocations = Set(buffers.elements.compactMap { $0.key.vertexShaderLocation })
+        var usedLocations = Set(buffers.elements.compactMap(\.key.vertexShaderLocation))
         var nextCustomLocation = 0
         for value in buffers.elements {
             let buffer = value.value.buffer
             let attribute = value.key
-            let location = attribute.vertexShaderLocation ?? {
-                while usedLocations.contains(nextCustomLocation) {
-                    nextCustomLocation += 1
-                }
-                return nextCustomLocation
-            }()
-            
+            let location =
+                attribute.vertexShaderLocation
+                ?? {
+                    while usedLocations.contains(nextCustomLocation) {
+                        nextCustomLocation += 1
+                    }
+                    return nextCustomLocation
+                }()
+
             vertexDescriptor.attributes[location].name = attribute.name
             vertexDescriptor.attributes[location].format = buffer.elementType.vertexFormat
             vertexDescriptor.attributes[location].offset = offset
-            
+
             usedLocations.insert(location)
             offset += buffer.elementSize
         }
-        
+
         vertexDescriptor.layouts[0].stride = offset
-        
+
         return vertexDescriptor
     }
-    
+
     /// Get the size of the vertex buffer.
-    func getVertexBufferSize() -> Int {
+    public func getVertexBufferSize() -> Int {
         buffers.elements.values.reduce(into: 0) { partialResult, buffer in
             partialResult += buffer.buffer.elementSize * buffer.count
         }
     }
-    
+
     /// Get the index buffer for the mesh.
-    func getIndexBuffer(renderDevice: RenderDevice) -> IndexBuffer {
+    public func getIndexBuffer(renderDevice: RenderDevice) -> IndexBuffer {
         var indicies = self.indicies
         let indexBuffer = unsafe renderDevice.createIndexBuffer(
             format: .uInt32,
             bytes: &indicies,
             length: indicies.count * MemoryLayout<UInt32>.stride
         )
-        
+
         return indexBuffer
     }
-    
+
     /// Get the vertex buffer for the mesh.
-    func getVertexBuffer(renderDevice: RenderDevice, binding: Int = 0) -> VertexBuffer {
+    public func getVertexBuffer(renderDevice: RenderDevice, binding: Int = 0) -> VertexBuffer {
         let vertexBufferSize = self.getVertexBufferSize()
         let vertexBuffer = renderDevice.createVertexBuffer(
-            length: vertexBufferSize, 
+            length: vertexBufferSize,
             binding: binding
         )
         var vertexBufferBytes = [UInt8](repeating: 0, count: vertexBufferSize)
-        
+
         // Calculate stride (per-vertex size) as the sum of all attribute element sizes
         let stride = buffers.elements.values.reduce(0) { $0 + $1.buffer.elementSize }
-        
+
         unsafe vertexBufferBytes.withUnsafeMutableBytes { vertexBufferContents in
             guard let baseAddress = vertexBufferContents.baseAddress else {
                 return
@@ -319,12 +320,12 @@ public extension MeshDescriptor {
             }
             unsafe vertexBuffer.setData(baseAddress, byteCount: vertexBufferSize)
         }
-        
+
         return vertexBuffer
     }
 }
 
-private extension MeshDescriptor.Identifier {
+extension MeshDescriptor.Identifier {
     var vertexShaderLocation: Int? {
         switch self {
         case .positions:
@@ -371,18 +372,17 @@ extension Mesh.ElementType {
     }
 }
 
-
 #if canImport(Metal) && METAL
-extension Mesh.PrimitiveTopology {
-    /// Get the Metal primitive type for the primitive topology.
-    var metal: MTLPrimitiveType {
-        switch self {
-        case .lineList: return .line
-        case .lineStrip: return .lineStrip
-        case .points: return .point
-        case .triangleStrip: return .triangleStrip
-        case .triangleList: return .triangle
+    extension Mesh.PrimitiveTopology {
+        /// Get the Metal primitive type for the primitive topology.
+        var metal: MTLPrimitiveType {
+            switch self {
+            case .lineList: return .line
+            case .lineStrip: return .lineStrip
+            case .points: return .point
+            case .triangleStrip: return .triangleStrip
+            case .triangleList: return .triangle
+            }
         }
     }
-}
 #endif

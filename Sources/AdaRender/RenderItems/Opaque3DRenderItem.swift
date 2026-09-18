@@ -13,7 +13,7 @@ public struct Opaque3DRenderItem: RenderItem {
     public let drawPass: any DrawPass
     public let sortKey: Float
     public var batchRange: Range<Int32>?
-    
+
     public let modelIndex: Int
     public let partIndex: Int
     public let mesh: Mesh
@@ -21,7 +21,7 @@ public struct Opaque3DRenderItem: RenderItem {
     public let worldTransform: Transform3D
     public let castShadows: Bool
     public let receiveShadows: Bool
-    
+
     public init(
         entity: Entity.ID,
         drawPass: any DrawPass,

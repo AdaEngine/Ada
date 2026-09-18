@@ -5,8 +5,8 @@
 //  Created by v.prusakov on 1/26/23.
 //
 
-import Math
 import Foundation
+import Math
 
 /// An object represents user physical display.
 ///
@@ -14,24 +14,23 @@ import Foundation
 /// manager reference is installed during app bootstrap and platform managers own
 /// their native synchronization/main-thread requirements.
 public final class Screen: @unchecked Sendable {
-
     private unowned let screenManager: any ScreenManager
 
     /// Returns scale factor of the screen.
     public var scale: Float {
         return screenManager.getScreenScale(for: self)
     }
-    
+
     /// Returns physical size of the screen.
     public var size: Size {
         screenManager.getSize(for: self)
     }
-    
+
     /// Return current brightness of the screen.
     public var brightness: Float {
         return screenManager.getBrightness(for: self)
     }
-    
+
     /// Contains reference to native screen.
     public private(set) weak var systemScreen: SystemScreen?
 

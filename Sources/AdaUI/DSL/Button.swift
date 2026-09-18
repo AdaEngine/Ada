@@ -38,24 +38,24 @@ public struct Button: View, ViewNodeBuilder {
         }
 
         /// The normal state.
-        public static let normal = State(rawValue: 1 << 0)
+        public static let normal = Self(rawValue: 1 << 0)
 
         /// The disabled state.
-        public static let disabled = State(rawValue: 1 << 1)
+        public static let disabled = Self(rawValue: 1 << 1)
 
         /// The highlighted state.
-        public static let highlighted = State(rawValue: 1 << 2)
+        public static let highlighted = Self(rawValue: 1 << 2)
 
         /// The focused state.
-        public static let focused = State(rawValue: 1 << 3)
+        public static let focused = Self(rawValue: 1 << 3)
 
         /// The selected state.
-        public static let selected = State(rawValue: 1 << 4)
+        public static let selected = Self(rawValue: 1 << 4)
     }
 
     /// The body of the button.
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     /// The action of the button.
     let action: () -> Void
@@ -109,7 +109,7 @@ public struct Button: View, ViewNodeBuilder {
     }
 
     // MARK: - ViewNodeBuilder
-    
+
     func buildViewNode(in context: BuildContext) -> ViewNode {
         ButtonViewNode(
             content: self,
@@ -130,14 +130,13 @@ public struct ButtonRole: Equatable, Hashable, Sendable {
     let storage: Storage
 
     /// A role that indicates the button cancels the current operation.
-    public static let cancel = ButtonRole(storage: .cancel)
+    public static let cancel = Self(storage: .cancel)
 
     /// A role that indicates the button performs a destructive action.
-    public static let destructive = ButtonRole(storage: .destructive)
+    public static let destructive = Self(storage: .destructive)
 }
 
 final class ButtonViewNode: ViewModifierNode {
-
     private(set) var action: () -> Void
     private var body: (Button.State, EnvironmentValues) -> StyledButtonContent
 
@@ -224,7 +223,8 @@ final class ButtonViewNode: ViewModifierNode {
 
         let previousState = state
         switch event.phase {
-        case .began, .changed:
+        case .began,
+            .changed:
             state.insert(.highlighted)
 
             switch event.button {
@@ -258,8 +258,12 @@ final class ButtonViewNode: ViewModifierNode {
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
-        guard self.state.isEnabled && self.environment.isEnabled else { return }
-        guard let touch = touches.first else { return }
+        guard self.state.isEnabled && self.environment.isEnabled else {
+            return
+        }
+        guard let touch = touches.first else {
+            return
+        }
 
         let previousState = state
         switch touch.phase {
@@ -281,7 +285,6 @@ final class ButtonViewNode: ViewModifierNode {
                     state.remove(.highlighted)
                 }
             }
-            break
         case .ended:
             activeTouchScrollView?.onTouchesEvent(touches)
             let shouldInvokeAction = state.contains(.selected) && !didMoveOutsideTapSlop

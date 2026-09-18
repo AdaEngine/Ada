@@ -6,17 +6,17 @@
 //
 
 import AdaApp
+import AdaCorePipelines
 import AdaECS
 @_spi(Internal) import AdaInput
 import AdaRender
-import AdaCorePipelines
 import AdaText
 import AdaUtils
-import Math
 import Logging
+import Math
 
 public struct UIPlugin: Plugin {
-    public init() { }
+    public init() {}
 
     public func setup(in app: AppWorlds) {
         UIComponent.registerComponent()
@@ -80,7 +80,7 @@ public struct WindowPlugin: Plugin {
 
     public func setup(in app: AppWorlds) {
         #if WASM
-        print("AdaEngine WindowPlugin setup")
+            print("AdaEngine WindowPlugin setup")
         #endif
         guard let windowSettings = app.getResource(WindowSettings.self) else {
             return
@@ -93,46 +93,46 @@ public struct WindowPlugin: Plugin {
                 .insertResource(PrimaryWindowId(windowId: primaryWindow.id))
         } else {
             #if os(iOS) || os(tvOS) || os(watchOS)
-            let embeddedWindowSize = Screen.main?.size ?? windowSettings.minimumSize
-            let configuration = UIWindow.Configuration(
-                title: windowSettings.title ?? "App",
-                frame: windowSettings.frame,
-                minimumSize: embeddedWindowSize,
-                mode: .fullscreen,
-                chrome: UIWindow.Chrome(windowSettings.chrome),
-                titleBar: UIWindow.TitleBar(windowSettings.titleBar),
-                background: UIWindow.Background(windowSettings.background),
-                backgroundEffect: UIWindow.BackgroundEffect(windowSettings.backgroundEffect),
-                level: UIWindow.Level(windowSettings.level),
-                collectionBehavior: UIWindow.CollectionBehavior(windowSettings.collectionBehavior),
-                screenPreference: windowSettings.screenPreference,
-                showsImmediately: windowSettings.showsImmediately,
-                makeKey: windowSettings.makeKey,
-                hasShadow: windowSettings.hasShadow,
-                isResizable: windowSettings.isResizable
-            )
+                let embeddedWindowSize = Screen.main?.size ?? windowSettings.minimumSize
+                let configuration = UIWindow.Configuration(
+                    title: windowSettings.title ?? "App",
+                    frame: windowSettings.frame,
+                    minimumSize: embeddedWindowSize,
+                    mode: .fullscreen,
+                    chrome: UIWindow.Chrome(windowSettings.chrome),
+                    titleBar: UIWindow.TitleBar(windowSettings.titleBar),
+                    background: UIWindow.Background(windowSettings.background),
+                    backgroundEffect: UIWindow.BackgroundEffect(windowSettings.backgroundEffect),
+                    level: UIWindow.Level(windowSettings.level),
+                    collectionBehavior: UIWindow.CollectionBehavior(windowSettings.collectionBehavior),
+                    screenPreference: windowSettings.screenPreference,
+                    showsImmediately: windowSettings.showsImmediately,
+                    makeKey: windowSettings.makeKey,
+                    hasShadow: windowSettings.hasShadow,
+                    isResizable: windowSettings.isResizable
+                )
             #else
-            let configuration = UIWindow.Configuration(
-                title: windowSettings.title ?? "App",
-                frame: windowSettings.frame,
-                minimumSize: windowSettings.minimumSize,
-                mode: UIWindow.Mode(windowSettings.windowMode),
-                chrome: UIWindow.Chrome(windowSettings.chrome),
-                titleBar: UIWindow.TitleBar(windowSettings.titleBar),
-                background: UIWindow.Background(windowSettings.background),
-                backgroundEffect: UIWindow.BackgroundEffect(windowSettings.backgroundEffect),
-                level: UIWindow.Level(windowSettings.level),
-                collectionBehavior: UIWindow.CollectionBehavior(windowSettings.collectionBehavior),
-                screenPreference: windowSettings.screenPreference,
-                showsImmediately: windowSettings.showsImmediately,
-                makeKey: windowSettings.makeKey,
-                hasShadow: windowSettings.hasShadow,
-                isResizable: windowSettings.isResizable
-            )
+                let configuration = UIWindow.Configuration(
+                    title: windowSettings.title ?? "App",
+                    frame: windowSettings.frame,
+                    minimumSize: windowSettings.minimumSize,
+                    mode: UIWindow.Mode(windowSettings.windowMode),
+                    chrome: UIWindow.Chrome(windowSettings.chrome),
+                    titleBar: UIWindow.TitleBar(windowSettings.titleBar),
+                    background: UIWindow.Background(windowSettings.background),
+                    backgroundEffect: UIWindow.BackgroundEffect(windowSettings.backgroundEffect),
+                    level: UIWindow.Level(windowSettings.level),
+                    collectionBehavior: UIWindow.CollectionBehavior(windowSettings.collectionBehavior),
+                    screenPreference: windowSettings.screenPreference,
+                    showsImmediately: windowSettings.showsImmediately,
+                    makeKey: windowSettings.makeKey,
+                    hasShadow: windowSettings.hasShadow,
+                    isResizable: windowSettings.isResizable
+                )
             #endif
             let window = UIWindow(configuration: configuration)
             #if WASM
-            print("AdaEngine WindowPlugin created window")
+                print("AdaEngine WindowPlugin created window")
             #endif
             if configuration.showsImmediately {
                 window.showWindow(makeFocused: configuration.makeKey)
@@ -160,7 +160,7 @@ public struct WindowManagerResource: Resource {
     }
 }
 
-private extension UIWindow.Mode {
+extension UIWindow.Mode {
     init(_ mode: WindowMode) {
         switch mode {
         case .windowed:
@@ -173,7 +173,7 @@ private extension UIWindow.Mode {
     }
 }
 
-private extension UIWindow.Chrome {
+extension UIWindow.Chrome {
     init(_ chrome: WindowChrome) {
         switch chrome {
         case .standard:
@@ -184,10 +184,10 @@ private extension UIWindow.Chrome {
     }
 }
 
-private extension UIWindow.Background {
+extension UIWindow.Background {
     init(_ background: WindowBackground) {
         switch background {
-        case .opaque(let color):
+        case let .opaque(color):
             self = .opaque(color)
         case .transparent:
             self = .transparent
@@ -195,18 +195,18 @@ private extension UIWindow.Background {
     }
 }
 
-private extension UIWindow.BackgroundEffect {
+extension UIWindow.BackgroundEffect {
     init(_ effect: WindowBackgroundEffect) {
         switch effect {
         case .none:
             self = .none
-        case .blur(let material):
-            self = .blur(UIWindow.BackgroundEffect.BlurMaterial(material))
+        case let .blur(material):
+            self = .blur(Self.BlurMaterial(material))
         }
     }
 }
 
-private extension UIWindow.BackgroundEffect.BlurMaterial {
+extension UIWindow.BackgroundEffect.BlurMaterial {
     init(_ material: WindowBackgroundEffect.BlurMaterial) {
         switch material {
         case .windowBackground:
@@ -222,14 +222,14 @@ private extension UIWindow.BackgroundEffect.BlurMaterial {
         case .underWindowBackground:
             self = .underWindowBackground
         #if os(macOS)
-        case .glass:
-            self = .glass
+            case .glass:
+                self = .glass
         #endif
         }
     }
 }
 
-private extension UIWindow.Level {
+extension UIWindow.Level {
     init(_ level: WindowLevel) {
         switch level {
         case .normal:
@@ -242,7 +242,7 @@ private extension UIWindow.Level {
     }
 }
 
-private extension UIWindow.CollectionBehavior {
+extension UIWindow.CollectionBehavior {
     init(_ behavior: WindowCollectionBehavior) {
         switch behavior {
         case .standard:
@@ -253,7 +253,7 @@ private extension UIWindow.CollectionBehavior {
     }
 }
 
-private extension UIWindow.TitleBar {
+extension UIWindow.TitleBar {
     init(_ titleBar: WindowTitleBar) {
         switch titleBar.background {
         case .system:
@@ -280,7 +280,7 @@ private extension UIWindow.TitleBar {
 @inline(__always)
 @MainActor
 public func UpdateWindowManager(
-    _ context: WorldUpdateContext,
+    _: WorldUpdateContext,
     _ windowManager: Res<WindowManagerResource>,
     _ pendingViews: ResMut<UIWindowPendingDrawViews>,
     _ contexts: ResMut<UIContextPendingDraw>,

@@ -30,7 +30,7 @@ extension Component {
     static var swiftName: String {
         TypeNameCache.name(for: self)
     }
-    
+
     /// Return identifier of component based on Component.Type
     @inline(__always) public static var identifier: ComponentId {
         ComponentId(id: Int(bitPattern: ObjectIdentifier(self)))
@@ -47,7 +47,7 @@ enum ComponentStorage {
         let registered = lock.withLock { unsafe registeredComponents[name] }
         return registered ?? (NSClassFromString(name) as? (any Component.Type))
     }
-    
+
     static func addComponent<T: Component>(_ type: T.Type) {
         let name = T.swiftName
         lock.withLock { unsafe registeredComponents[name] = type }

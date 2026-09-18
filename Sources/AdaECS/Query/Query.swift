@@ -83,8 +83,7 @@ public struct FilterQuery<each T: QueryTarget, F: Filter>: Sequence, Sendable {
 }
 
 /// Contains array of entities matched for the given EntityQuery request.
-extension FilterQuery  {
-
+extension FilterQuery {
     /// Returns first element of collection.
     public var first: Element? {
         return self.first { _ in return true }
@@ -96,7 +95,7 @@ extension FilterQuery  {
         return self.count { _ in return true }
     }
 
-        /// A Boolean value indicating whether the collection is empty.
+    /// A Boolean value indicating whether the collection is empty.
     public var isEmpty: Bool {
         return self.state.archetypeIndecies.isEmpty
     }
@@ -321,11 +320,13 @@ public struct FilterQueryIterator<
             }
 
             if requiresRowEvaluation {
-                guard F.condition(
-                    state: filterState,
-                    fetch: filterFetch,
-                    at: cursor.currentRow
-                ) else {
+                guard
+                    F.condition(
+                        state: filterState,
+                        fetch: filterFetch,
+                        at: cursor.currentRow
+                    )
+                else {
                     continue
                 }
             }
@@ -334,7 +335,7 @@ public struct FilterQueryIterator<
                 continue
             }
             let entity = archetype.entities[location.archetypeRow]
-            
+
             if let value = B.getQueryTargets(
                 for: entity,
                 states: states,

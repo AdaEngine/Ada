@@ -19,9 +19,8 @@ import Math
 @available(*, deprecated, renamed: "TabView")
 @MainActor @preconcurrency
 public struct TabContainer<Selection: Hashable, Content: View>: View, ViewNodeBuilder {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let labels: [String]
     let values: [Selection]
@@ -45,8 +44,8 @@ public struct TabContainer<Selection: Hashable, Content: View>: View, ViewNodeBu
 }
 
 @available(*, deprecated)
-public extension TabContainer where Selection == Int {
-    init(
+extension TabContainer where Selection == Int {
+    public init(
         _ labels: [String],
         selection: Binding<Int>,
         @ViewBuilder content: @escaping (Int) -> Content
@@ -62,7 +61,6 @@ public extension TabContainer where Selection == Int {
 
 @available(*, deprecated)
 private final class TabContainerNode<Selection: Hashable, Content: View>: ViewNode {
-
     private var labels: [String]
     private var values: [Selection]
     private var selectionBinding: Binding<Selection>
@@ -93,9 +91,15 @@ private final class TabContainerNode<Selection: Hashable, Content: View>: ViewNo
         self.contentNode.parent = self
 
         let weakSelf = WeakBox(self)
-        self.tabBarNode = Self.buildTabBar(labels: container.labels, values: container.values, selected: selected, inputs: inputs, onSelect: { value in
-            weakSelf.value?.selectTab(value)
-        })
+        self.tabBarNode = Self.buildTabBar(
+            labels: container.labels,
+            values: container.values,
+            selected: selected,
+            inputs: inputs,
+            onSelect: { value in
+                weakSelf.value?.selectTab(value)
+            }
+        )
         self.tabBarNode.parent = self
     }
 
@@ -124,7 +128,9 @@ private final class TabContainerNode<Selection: Hashable, Content: View>: ViewNo
     }
 
     override func update(from newNode: ViewNode) {
-        guard let other = newNode as? TabContainerNode<Selection, Content> else { return }
+        guard let other = newNode as? TabContainerNode<Selection, Content> else {
+            return
+        }
         self.labels = other.labels
         self.values = other.values
         self.selectionBinding = other.selectionBinding
@@ -140,7 +146,9 @@ private final class TabContainerNode<Selection: Hashable, Content: View>: ViewNo
     override func updateEnvironment(_ environment: EnvironmentValues) {
         let prevVersion = self.environment.version
         super.updateEnvironment(environment)
-        guard self.environment.version != prevVersion else { return }
+        guard self.environment.version != prevVersion else {
+            return
+        }
         viewInputs.environment = self.environment
         tabBarNode.updateEnvironment(self.environment)
         contentNode.updateEnvironment(self.environment)
@@ -153,9 +161,13 @@ private final class TabContainerNode<Selection: Hashable, Content: View>: ViewNo
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
         let tabBarPoint = tabBarNode.convert(point, from: self)
-        if let hit = tabBarNode.hitTest(tabBarPoint, with: event) { return hit }
+        if let hit = tabBarNode.hitTest(tabBarPoint, with: event) {
+            return hit
+        }
         let contentPoint = contentNode.convert(point, from: self)
         return contentNode.hitTest(contentPoint, with: event)
     }
@@ -184,13 +196,17 @@ private final class TabContainerNode<Selection: Hashable, Content: View>: ViewNo
     }
 
     override func findNodyByAccessibilityIdentifier(_ identifier: String) -> ViewNode? {
-        if let r = super.findNodyByAccessibilityIdentifier(identifier) { return r }
+        if let r = super.findNodyByAccessibilityIdentifier(identifier) {
+            return r
+        }
         return tabBarNode.findNodyByAccessibilityIdentifier(identifier)
             ?? contentNode.findNodyByAccessibilityIdentifier(identifier)
     }
 
     private func selectTab(_ value: Selection) {
-        guard selectionBinding.wrappedValue != value else { return }
+        guard selectionBinding.wrappedValue != value else {
+            return
+        }
         selectionBinding.wrappedValue = value
         rebuildAll()
     }
@@ -198,18 +214,28 @@ private final class TabContainerNode<Selection: Hashable, Content: View>: ViewNo
     private func rebuildAll() {
         let selected = selectionBinding.wrappedValue
         let weakSelf = WeakBox(self)
-        let newTabBar = Self.buildTabBar(labels: labels, values: values, selected: selected, inputs: viewInputs, onSelect: { value in
-            weakSelf.value?.selectTab(value)
-        })
+        let newTabBar = Self.buildTabBar(
+            labels: labels,
+            values: values,
+            selected: selected,
+            inputs: viewInputs,
+            onSelect: { value in
+                weakSelf.value?.selectTab(value)
+            }
+        )
         tabBarNode.update(from: newTabBar)
         tabBarNode.parent = self
-        if let owner { tabBarNode.updateViewOwner(owner) }
+        if let owner {
+            tabBarNode.updateViewOwner(owner)
+        }
         tabBarNode.updateEnvironment(environment)
 
         contentNode.parent = nil
         contentNode = Self.buildContent(for: selected, builder: contentBuilder, inputs: viewInputs)
         contentNode.parent = self
-        if let owner { contentNode.updateViewOwner(owner) }
+        if let owner {
+            contentNode.updateViewOwner(owner)
+        }
         contentNode.updateEnvironment(environment)
 
         self.invalidateNearestLayer()
@@ -226,10 +252,11 @@ private final class TabContainerNode<Selection: Hashable, Content: View>: ViewNo
         inputs: _ViewInputs,
         onSelect: @escaping (Selection) -> Void
     ) -> LayoutViewContainerNode {
-        let nodes: [ViewNode] = (0..<labels.count).map { index in
-            let btn = LegacyTabButton(label: labels[index], isSelected: values[index] == selected, action: { onSelect(values[index]) })
-            return LegacyTabButtonNode(content: btn, inputs: inputs)
-        }
+        let nodes: [ViewNode] = (0..<labels.count)
+            .map { index in
+                let btn = LegacyTabButton(label: labels[index], isSelected: values[index] == selected, action: { onSelect(values[index]) })
+                return LegacyTabButtonNode(content: btn, inputs: inputs)
+            }
         return LayoutViewContainerNode(layout: HStackLayout(alignment: .center, spacing: 0), content: EmptyView(), nodes: nodes)
     }
 
@@ -247,7 +274,7 @@ private final class TabContainerNode<Selection: Hashable, Content: View>: ViewNo
 
 private struct LegacyTabButton: View, ViewNodeBuilder {
     typealias Body = Never
-    var body: Never { fatalError() }
+    var body: Never { fatalError("Unreachable code") }
     let label: String
     let isSelected: Bool
     let action: () -> Void
@@ -257,7 +284,6 @@ private struct LegacyTabButton: View, ViewNodeBuilder {
 }
 
 private final class LegacyTabButtonNode: ViewNode {
-
     private static var textColor: Color { .fromHex(0x666666) }
     private static var selectedTextColor: Color { .fromHex(0xF0F0F0) }
     private static var indicatorColor: Color { .fromHex(0xFF2D6F) }
@@ -282,18 +308,23 @@ private final class LegacyTabButtonNode: ViewNode {
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
         return self
     }
 
     override func onMouseEvent(_ event: MouseEvent) {
         switch event.phase {
-        case .began, .changed:
+        case .began,
+            .changed:
             isHighlighted = true
         case .ended:
             let was = isHighlighted
             isHighlighted = false
-            if was { action() }
+            if was {
+                action()
+            }
         case .cancelled:
             isHighlighted = false
         }
@@ -344,7 +375,9 @@ private final class LegacyTabButtonNode: ViewNode {
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
-        guard let other = newNode as? LegacyTabButtonNode else { return }
+        guard let other = newNode as? LegacyTabButtonNode else {
+            return
+        }
         self.label = other.label
         self.isSelected = other.isSelected
         self.action = other.action
@@ -355,8 +388,12 @@ private final class LegacyTabButtonNode: ViewNode {
     }
 
     private func resolvedFont() -> Font? {
-        if let font = environment.font { return font }
-        if unsafe RenderEngine.shared != nil { return .system(size: 14) }
+        if let font = environment.font {
+            return font
+        }
+        if unsafe RenderEngine.shared != nil {
+            return .system(size: 14)
+        }
         return nil
     }
 

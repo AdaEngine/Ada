@@ -11,10 +11,9 @@ import AdaUtils
 /// Contains information about all visible entities on the camera.
 @Component
 public struct VisibleEntities: Sendable {
-    
     /// Contains visible entities.
     public var entities: [Entity]
-    
+
     /// Contains visible entity ids.
     public var entityIds: Set<Entity.ID>
 

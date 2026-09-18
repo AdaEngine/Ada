@@ -27,8 +27,14 @@ extension TextWritingDirection {
             }
 
             switch scalar.properties.generalCategory {
-            case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter,
-                 .otherLetter, .decimalNumber, .letterNumber, .otherNumber:
+            case .uppercaseLetter,
+                .lowercaseLetter,
+                .titlecaseLetter,
+                .modifierLetter,
+                .otherLetter,
+                .decimalNumber,
+                .letterNumber,
+                .otherNumber:
                 return .leftToRight
             default:
                 continue

@@ -9,7 +9,6 @@ import Math
 
 /// A view that arranges its subviews in a horizontal or vertical stack.
 public class UIStackView: UIView {
-
     /// The axis along which the stack view lays out its subviews.
     public enum Axis {
         case horizontal
@@ -56,7 +55,7 @@ public class UIStackView: UIView {
             self.addSubview($0)
         }
     }
-    
+
     /// Initialize a new stack view.
     ///
     /// - Parameter frame: The frame of the stack view.
@@ -65,7 +64,7 @@ public class UIStackView: UIView {
     }
 
     /// Layout the subviews of the stack view.
-    public override func layoutSubviews() {
+    override public func layoutSubviews() {
         if frame == .zero {
             super.layoutSubviews()
             return
@@ -99,8 +98,7 @@ public class UIStackView: UIView {
                 origin.x += spacing + size.width
             }
         }
-        
+
         super.layoutSubviews()
     }
-
 }

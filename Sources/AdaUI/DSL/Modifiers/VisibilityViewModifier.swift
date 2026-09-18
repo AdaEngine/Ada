@@ -7,16 +7,16 @@
 
 import Math
 
-public extension View {
+extension View {
     /// Adds an action to perform before this view appears.
     /// - Parameter action: The action to perform. If action is nil, the call has no effect.
-    func onAppear(perform action: (() -> Void)? = nil) -> some View {
+    public func onAppear(perform action: (() -> Void)? = nil) -> some View {
         self.modifier(OnAppearView(content: self, onAppear: action))
     }
 
     /// Adds an action to perform after this view disappears.
     /// - Parameter action: The action to perform. If action is nil, the call has no effect.
-    func onDisappear(perform action: (() -> Void)? = nil) -> some View {
+    public func onDisappear(perform action: (() -> Void)? = nil) -> some View {
         self.modifier(OnDisappearView(content: self, onDisappear: action))
     }
 
@@ -24,7 +24,7 @@ public extension View {
     ///
     /// AdaUI starts the task after the view is attached to the view tree and cancels it
     /// when the view disappears.
-    func task(
+    public func task(
         priority: TaskPriority = .userInitiated,
         _ action: @escaping @Sendable () async -> Void
     ) -> some View {
@@ -33,7 +33,6 @@ public extension View {
 }
 
 struct OnAppearView<Content: View>: ViewModifier, ViewNodeBuilder {
-
     typealias Body = Never
 
     let content: Content
@@ -55,16 +54,10 @@ struct OnAppearView<Content: View>: ViewModifier, ViewNodeBuilder {
 }
 
 struct OnDisappearView<Content: View>: ViewModifier, ViewNodeBuilder {
-
     typealias Body = Never
 
     let content: Content
     let onDisappear: (() -> Void)?
-
-    init(content: Content, onDisappear: (() -> Void)?) {
-        self.content = content
-        self.onDisappear = onDisappear
-    }
 
     func buildViewNode(in context: BuildContext) -> ViewNode {
         let node = VisibilityViewNode(
@@ -141,16 +134,19 @@ final class VisibilityViewNode: ViewModifierNode {
             isAppeared = false
             cancelTask()
             let onDisappear = onDisappear
-            owner?.enqueueLifecycleAction {
-                onDisappear?()
-            }
+            owner?
+                .enqueueLifecycleAction {
+                    onDisappear?()
+                }
         }
         super.didMove(to: parent)
     }
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
-        guard let other = newNode as? VisibilityViewNode else { return }
+        guard let other = newNode as? VisibilityViewNode else {
+            return
+        }
         self.onAppear = other.onAppear
         self.onDisappear = other.onDisappear
         self.taskPriority = other.taskPriority

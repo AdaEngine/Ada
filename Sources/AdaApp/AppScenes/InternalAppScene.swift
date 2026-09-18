@@ -75,9 +75,9 @@ public enum WindowBackgroundEffect: Sendable, Equatable {
         case popover
         case contentBackground
         case underWindowBackground
-        
+
         #if os(macOS)
-        case glass
+            case glass
         #endif
     }
 }
@@ -119,13 +119,13 @@ public struct WindowTitleBar: Sendable, Equatable {
     public var trafficLightOffset: Point?
 
     /// Use the platform default title bar.
-    public static let standard = WindowTitleBar(background: .system, reservesSafeArea: true, dragRegionHeight: nil, trafficLightOffset: nil)
+    public static let standard = Self(background: .system, reservesSafeArea: true, dragRegionHeight: nil, trafficLightOffset: nil)
 
     /// Make the title bar background transparent while keeping its safe area reserved.
-    public static let transparent = WindowTitleBar(background: .transparent, reservesSafeArea: true, dragRegionHeight: nil, trafficLightOffset: nil)
+    public static let transparent = Self(background: .transparent, reservesSafeArea: true, dragRegionHeight: nil, trafficLightOffset: nil)
 
     /// Make the title bar transparent and let content extend into its safe area.
-    public static let overlay = WindowTitleBar(background: .transparent, reservesSafeArea: false, dragRegionHeight: 52, trafficLightOffset: nil)
+    public static let overlay = Self(background: .transparent, reservesSafeArea: false, dragRegionHeight: 52, trafficLightOffset: nil)
 
     public init(
         background: WindowTitleBarBackground,

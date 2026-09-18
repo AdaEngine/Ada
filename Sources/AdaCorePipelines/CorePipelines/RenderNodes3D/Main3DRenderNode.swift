@@ -12,7 +12,6 @@ import Math
 
 /// This render node is responsible for rendering opaque 3D meshes.
 public struct Main3DRenderNode: RenderNode {
-
     /// Input slots of render node.
     public enum InputNode {
         public static let view: RenderSlot.Label = "view"
@@ -67,23 +66,24 @@ public struct Main3DRenderNode: RenderNode {
                 return
             }
 
-            guard target.rendering3DUsesEnvironmentTargets,
-                  let sceneColor = target.sceneColor3DTexture,
-                  let normalRoughness = target.normalRoughness3DTexture,
-                  let viewPositionMetallic = target.viewPositionMetallic3DTexture
+            guard
+                target.rendering3DUsesEnvironmentTargets,
+                let sceneColor = target.sceneColor3DTexture,
+                let normalRoughness = target.normalRoughness3DTexture,
+                let viewPositionMetallic = target.viewPositionMetallic3DTexture
             else {
                 return
             }
 
             let clearColor = camera.clearFlags.contains(.solid) ? camera.backgroundColor : .surfaceClearColor
-            let directionalLight = lighting.directionalLight ?? ExtractedDirectionalLight3D(
-                directionToLight: Vector3(0.35, 0.7, 0.45).normalized,
-                radiance: .one,
-                intensity: 3.2
-            )
-            let viewDirectionToLight = (
-                uniform.viewMatrix * Vector4(directionalLight.directionToLight, 0)
-            ).xyz.normalized
+            let directionalLight =
+                lighting.directionalLight
+                ?? ExtractedDirectionalLight3D(
+                    directionToLight: Vector3(0.35, 0.7, 0.45).normalized,
+                    radiance: .one,
+                    intensity: 3.2
+                )
+            let viewDirectionToLight = (uniform.viewMatrix * Vector4(directionalLight.directionToLight, 0)).xyz.normalized
             let shadowsEnabled = shadow.isEnabled && directionalLight.castsShadows && shadow.colorTexture != nil
             lightingScratch.directionalLight.elements = [
                 DirectionalLight3DUniform(
@@ -129,7 +129,7 @@ public struct Main3DRenderNode: RenderNode {
                             texture: viewPositionMetallic,
                             operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
                             clearColor: .black
-                        )
+                        ),
                     ],
                     depthStencilAttachment: depthAttachment
                 )
@@ -143,7 +143,7 @@ public struct Main3DRenderNode: RenderNode {
                 RenderResourceSet(
                     bindings: [
                         .init(binding: 10, shaderStages: .fragment, resource: .texture(shadowTexture)),
-                        .init(binding: 11, shaderStages: .fragment, resource: .sampler(shadowTexture.sampler))
+                        .init(binding: 11, shaderStages: .fragment, resource: .sampler(shadowTexture.sampler)),
                     ]
                 ),
                 index: 0

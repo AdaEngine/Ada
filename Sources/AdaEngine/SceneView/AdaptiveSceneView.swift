@@ -51,8 +51,12 @@ final class AdaptiveSceneSession {
         make: @escaping @MainActor (inout AppWorlds) -> Void,
         updateContent: @escaping @MainActor (World, AdaUtils.TimeInterval) -> Void
     ) -> UIView {
-        if self.layout != layout { self.layout = layout }
-        if let surface { return surface }
+        if self.layout != layout {
+            self.layout = layout
+        }
+        if let surface {
+            return surface
+        }
         let container = UIContainerView(rootView: AdaptiveSceneContent(session: self, make: make, updateContent: updateContent))
         container.backgroundColor = .clear
         surface = container
@@ -60,10 +64,14 @@ final class AdaptiveSceneSession {
     }
 
     func prepare(_ world: World) {
-        if world.getResource(DisplayLayout.self) != layout { world.insertResource(layout) }
+        if world.getResource(DisplayLayout.self) != layout {
+            world.insertResource(layout)
+        }
         var panel: (Entity, CompanionPanel)?
         for entity in world.getEntities() {
-            guard let component = entity.components[CompanionPanel.self] else { continue }
+            guard let component = entity.components[CompanionPanel.self] else {
+                continue
+            }
             if panel != nil {
                 diagnostic = "Only one Companion Panel can be presented per scene."
                 companionView = nil
@@ -72,10 +80,15 @@ final class AdaptiveSceneSession {
             panel = (entity, component)
         }
         guard let (entity, component) = panel else {
-            companionView = nil; panelEntityID = nil; panelSource = nil; diagnostic = nil
+            companionView = nil
+            panelEntityID = nil
+            panelSource = nil
+            diagnostic = nil
             return
         }
-        guard entity.id != panelEntityID || component.ui.source != panelSource else { return }
+        guard entity.id != panelEntityID || component.ui.source != panelSource else {
+            return
+        }
         panelEntityID = entity.id
         panelSource = component.ui.source
         do {
@@ -95,14 +108,17 @@ private struct AdaptiveSceneContent: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            SceneView(make: { app in
-                app.main.insertResource(EmbeddedDisplayLayout())
-                app.main.insertResource(session.layout)
-                make(&app)
-            }, updateContent: { world, delta in
-                session.prepare(world)
-                updateContent(world, delta)
-            })
+            SceneView(
+                make: { app in
+                    app.main.insertResource(EmbeddedDisplayLayout())
+                    app.main.insertResource(session.layout)
+                    make(&app)
+                },
+                updateContent: { world, delta in
+                    session.prepare(world)
+                    updateContent(world, delta)
+                }
+            )
             .frame(width: session.layout.primary.width, height: session.layout.primary.height)
             .accessibilityIdentifier("AdaEngine.Adaptive.Primary")
 
@@ -130,9 +146,9 @@ private struct AdaptiveSceneContent: View {
 
 private struct CompanionSurface: UIViewRepresentable {
     let content: UIView
-    func makeUIView(in context: Context) -> UIView { content }
-    func updateUIView(_ view: UIView, in context: Context) {}
-    func sizeThatFits(_ proposal: ProposedViewSize, view: UIView, context: Context) -> Size {
+    func makeUIView(in _: Context) -> UIView { content }
+    func updateUIView(_: UIView, in _: Context) {}
+    func sizeThatFits(_ proposal: ProposedViewSize, view _: UIView, context _: Context) -> Size {
         proposal.replacingUnspecifiedDimensions()
     }
 }

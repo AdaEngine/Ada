@@ -31,8 +31,8 @@ public protocol UIWindowDragRegionResolving: AnyObject {
 }
 
 /// A container view that contains a view tree.
-public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInputContainer, UIInspectionOverlayStateProviding, UIMousePassthroughEventReceiving, UIWindowDragRegionResolving {
-
+public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInputContainer, UIInspectionOverlayStateProviding, UIMousePassthroughEventReceiving,
+    UIWindowDragRegionResolving {
     /// The container view of the container view.
     var containerView: UIView? {
         return self
@@ -67,7 +67,7 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
     /// Layout the subviews.
     ///
     /// - Note: This method is called when the container view is laid out.
-    public override func layoutSubviews() {
+    override public func layoutSubviews() {
         super.layoutSubviews()
 
         var env = rootEnvironmentValues()
@@ -91,9 +91,11 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
     }
 
     private func navigationBarChromeInsets() -> EdgeInsets {
-        guard let titleBar = window?.configuration.titleBar,
-              titleBar.background == .transparent,
-              !titleBar.reservesSafeArea else {
+        guard
+            let titleBar = window?.configuration.titleBar,
+            titleBar.background == .transparent,
+            !titleBar.reservesSafeArea
+        else {
             return EdgeInsets()
         }
 
@@ -101,8 +103,8 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
         insets.top = titleBar.dragRegionHeight ?? 0
 
         #if os(macOS)
-        let trafficLightOffset = titleBar.trafficLightOffset?.x ?? 0
-        insets.leading = 92 + max(trafficLightOffset, 0)
+            let trafficLightOffset = titleBar.trafficLightOffset?.x ?? 0
+            insets.leading = 92 + max(trafficLightOffset, 0)
         #endif
 
         return insets
@@ -111,15 +113,16 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
     /// Build the menu.
     ///
     /// - Parameter builder: The builder to build the menu with.
-    public override func buildMenu(with builder: any UIMenuBuilder) {
+    override public func buildMenu(with builder: any UIMenuBuilder) {
         viewTree.rootNode.buildMenu(with: builder)
     }
 
     /// Initialize a new container view.
     ///
     /// - Parameter frame: The frame of the container view.
-    public required init(frame: Rect) {
-        fatalError("init(frame:) has not been implemented")
+    @available(*, unavailable, message: "Use init(rootView:) instead.")
+    public required init(frame _: Rect) {
+        preconditionFailure("Use init(rootView:) instead.")
     }
 
     /// Hit test the container view.
@@ -128,7 +131,7 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
     ///   - point: The point to hit test.
     ///   - event: The event to hit test with.
     /// - Returns: The view that was hit.
-    public override func hitTest(_ point: Point, with event: any InputEvent) -> UIView? {
+    override public func hitTest(_ point: Point, with event: any InputEvent) -> UIView? {
         if self.viewTree.rootNode.hitTest(point, with: event) != nil {
             return self
         }
@@ -171,7 +174,7 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
     /// Handle the mouse event.
     ///
     /// - Parameter event: The mouse event to handle.
-    public override func onMouseEvent(_ event: MouseEvent) {
+    override public func onMouseEvent(_ event: MouseEvent) {
         if event.phase == .began {
             ContextMenuPresentationCenter.dismissForInteraction?(self.window)
         }
@@ -195,7 +198,8 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
             } else if lastOnMouseEventNode != nil {
                 self.routeMouseEvent(event, to: nil)
             }
-        case .ended, .cancelled:
+        case .ended,
+            .cancelled:
             if let activeMouseEventNode {
                 self.routeMouseEvent(event, to: activeMouseEventNode)
             } else if let viewNode = self.viewTree.rootNode.hitTest(localPoint, with: event) {
@@ -233,7 +237,7 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
         return !node.blocksWindowDrag
     }
 
-    public override func onKeyEvent(_ event: KeyEvent) {
+    override public func onKeyEvent(_ event: KeyEvent) {
         if event.status == .down, event.keyCode == .escape {
             if ContextMenuPresentationCenter.dismissAll?() == true {
                 return
@@ -274,7 +278,7 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
         }
     }
 
-    public override func onTextInputEvent(_ event: TextInputEvent) {
+    override public func onTextInputEvent(_ event: TextInputEvent) {
         if let focusedNode = focusManager.focusedNode {
             focusedNode.onTextInputEvent(event)
         } else {
@@ -282,7 +286,7 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
         }
     }
 
-    public override func onReceiveEvent(_ event: any InputEvent) {
+    override public func onReceiveEvent(_ event: any InputEvent) {
         if let pinch = event as? PinchEvent {
             if pinch.phase == .began {
                 let point = convert(pinch.location, from: window)
@@ -328,16 +332,19 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
     /// Handle the touches event.
     ///
     /// - Parameter touches: The touches event to handle.
-    public override func onTouchesEvent(_ touches: Set<TouchEvent>) {
+    override public func onTouchesEvent(_ touches: Set<TouchEvent>) {
         for touch in touches {
             let localPoint = convert(touch.location, from: window)
             let node: ViewNode?
             if touch.phase == .began {
                 node = viewTree.rootNode.hitTest(localPoint, with: touch)
-                if let node { activeTouchEventNodes[touch.contactID] = WeakBox(node) }
+                if let node {
+                    activeTouchEventNodes[touch.contactID] = WeakBox(node)
+                }
                 updateFocusedNode(with: node)
             } else {
-                node = activeTouchEventNodes[touch.contactID]?.value
+                node =
+                    activeTouchEventNodes[touch.contactID]?.value
                     ?? viewTree.rootNode.hitTest(localPoint, with: touch)
             }
             inspectionLastHitTestNode = node
@@ -355,16 +362,16 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
     ///   - point: The point to check.
     ///   - event: The event to check with.
     /// - Returns: A Boolean value indicating whether the container view is point inside.
-    public override func point(inside point: Point, with event: any InputEvent) -> Bool {
+    override public func point(inside point: Point, with event: any InputEvent) -> Bool {
         return self.viewTree.rootNode.point(inside: point, with: event)
     }
-    
+
     /// Draw the container view.
     ///
     /// - Parameters:
     ///   - rect: The rect to draw the container view in.
     ///   - context: The context to draw the container view in.
-    override public func draw(in rect: Rect, with context: UIGraphicsContext) {
+    override public func draw(in _: Rect, with context: UIGraphicsContext) {
         var context = context
         context.dirtyRect = window?.consumeDirtyRect()
         UILayoutDebugCounters.recordDrawPass()
@@ -376,7 +383,7 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
     /// Update the container view.
     ///
     /// - Parameter deltaTime: The delta time to update the container view with.
-    public override func update(_ deltaTime: TimeInterval) {
+    override public func update(_ deltaTime: TimeInterval) {
         super.update(deltaTime)
         self.viewTree.rootNode.update(deltaTime)
         self.updateTransientAnimationControllers(deltaTime)
@@ -479,25 +486,25 @@ extension UIView {
     private func rootSafeAreaInsets() -> EdgeInsets {
         var insets = effectiveSafeAreaInsets
         if let titleBar = window?.configuration.titleBar,
-           titleBar.background == .transparent,
-           !titleBar.reservesSafeArea {
+            titleBar.background == .transparent,
+            !titleBar.reservesSafeArea {
             insets.top = 0
         }
         return insets
     }
 }
 
-private extension ViewNode {
+extension ViewNode {
     var blocksWindowDrag: Bool {
         switch self {
         case is ButtonViewNode,
-             is GestureAreaViewNode,
-             is TextFieldViewNode:
+            is GestureAreaViewNode,
+            is TextFieldViewNode:
             return true
-#if canImport(AppKit) || canImport(UIKit)
-        case is NativeViewHostNode:
-            return true
-#endif
+        #if canImport(AppKit) || canImport(UIKit)
+            case is NativeViewHostNode:
+                return true
+        #endif
         default:
             return false
         }

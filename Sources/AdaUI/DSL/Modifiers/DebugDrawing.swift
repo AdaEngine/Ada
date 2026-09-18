@@ -8,8 +8,8 @@
 import AdaUtils
 import Math
 
-public extension View {
-    func debugOverlay(_ mode: UIDebugOverlayMode = .layoutBounds) -> some View {
+extension View {
+    public func debugOverlay(_ mode: UIDebugOverlayMode = .layoutBounds) -> some View {
         self.modifier(DebugOverlayModifier(mode: mode, content: self))
     }
 }

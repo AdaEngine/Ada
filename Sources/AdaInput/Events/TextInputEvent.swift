@@ -10,7 +10,6 @@ import AdaUtils
 /// An object that contains information about text input event.
 /// This event is generated from software keyboard input (iOS) or IME input.
 public struct TextInputEvent: InputEvent {
-
     public enum Action: UInt8, Hashable, Sendable {
         /// Text was inserted
         case insert

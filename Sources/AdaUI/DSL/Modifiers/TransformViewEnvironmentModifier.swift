@@ -7,12 +7,12 @@
 
 import AdaUtils
 
-public extension View {
+extension View {
     /// Transforms the environment value of the specified key path with the given function.
     /// - Parameter keyPath: A key path that indicates the property of the EnvironmentValues structure to update.
     /// - Parameter transform: The transform block witch update value to set for the item specified by keyPath.
     /// - Returns: A view that has the given value set in its environment.
-    func transformEnvironment<Value>(
+    public func transformEnvironment<Value>(
         _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
         transform: @escaping (inout Value) -> Void
     ) -> some View {
@@ -29,7 +29,7 @@ public extension View {
     /// - Parameter keyPath: A key path that indicates the property of the EnvironmentValues structure to update.
     /// - Parameter value: The new value to set for the item specified by keyPath.
     /// - Returns: A view that has the given value set in its environment.
-    func environment<Value>(
+    public func environment<Value>(
         _ keyPath: WritableKeyPath<EnvironmentValues, Value>,
         _ newValue: Value
     ) -> some View {
@@ -46,7 +46,6 @@ public extension View {
 }
 
 struct TransformViewEnvironmentModifier<WrappedView: View, Value>: ViewModifier, _ViewInputsViewModifier {
-
     let content: WrappedView
     let keyPath: WritableKeyPath<EnvironmentValues, Value>
     let block: (inout Value) -> Void

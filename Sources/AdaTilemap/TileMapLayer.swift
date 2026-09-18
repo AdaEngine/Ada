@@ -6,12 +6,11 @@
 //
 
 import AdaUtils
-import OrderedCollections
 import Math
+import OrderedCollections
 
 /// A layer of a tile map.
 public class TileMapLayer: Identifiable, @unchecked Sendable {
-    
     /// The name of the tile map layer.
     public var name: String = ""
 

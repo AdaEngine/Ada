@@ -13,7 +13,6 @@ import Math
 
 @MainActor
 final class TapGestureRecognizer: GestureRecognizer {
-
     private let requiredCount: Int
     private var tapCount: Int = 0
     private let onEnded: () -> Void
@@ -24,12 +23,16 @@ final class TapGestureRecognizer: GestureRecognizer {
     }
 
     override func mouseEventBegan(_ event: MouseEvent) {
-        guard event.button == .left else { return }
+        guard event.button == .left else {
+            return
+        }
         setState(.began)
     }
 
     override func mouseEventEnded(_ event: MouseEvent) {
-        guard event.button == .left else { return }
+        guard event.button == .left else {
+            return
+        }
         tapCount += 1
         if tapCount >= requiredCount {
             onEnded()
@@ -38,16 +41,16 @@ final class TapGestureRecognizer: GestureRecognizer {
         }
     }
 
-    override func mouseEventCancelled(_ event: MouseEvent) {
+    override func mouseEventCancelled(_: MouseEvent) {
         tapCount = 0
         reset()
     }
 
-    override func touchesBegan(_ touches: Set<TouchEvent>) {
+    override func touchesBegan(_: Set<TouchEvent>) {
         setState(.began)
     }
 
-    override func touchesEnded(_ touches: Set<TouchEvent>) {
+    override func touchesEnded(_: Set<TouchEvent>) {
         tapCount += 1
         if tapCount >= requiredCount {
             onEnded()
@@ -56,7 +59,7 @@ final class TapGestureRecognizer: GestureRecognizer {
         }
     }
 
-    override func touchesCancelled(_ touches: Set<TouchEvent>) {
+    override func touchesCancelled(_: Set<TouchEvent>) {
         tapCount = 0
         reset()
     }
@@ -70,7 +73,6 @@ final class TapGestureRecognizer: GestureRecognizer {
 
 @MainActor
 final class LongPressGestureRecognizer: GestureRecognizer {
-
     private let minimumDuration: TimeInterval
     private let onEnded: () -> Void
 
@@ -84,47 +86,53 @@ final class LongPressGestureRecognizer: GestureRecognizer {
     }
 
     override func mouseEventBegan(_ event: MouseEvent) {
-        guard event.button == .left else { return }
+        guard event.button == .left else {
+            return
+        }
         pressStartTime = event.time
         elapsed = 0
         fired = false
         setState(.began)
     }
 
-    override func mouseEventEnded(_ event: MouseEvent) {
+    override func mouseEventEnded(_: MouseEvent) {
         pressStartTime = nil
         elapsed = 0
         reset()
     }
 
-    override func mouseEventCancelled(_ event: MouseEvent) {
+    override func mouseEventCancelled(_: MouseEvent) {
         pressStartTime = nil
         elapsed = 0
         reset()
     }
 
     override func touchesBegan(_ touches: Set<TouchEvent>) {
-        guard let first = touches.first else { return }
+        guard let first = touches.first else {
+            return
+        }
         pressStartTime = first.time
         elapsed = 0
         fired = false
         setState(.began)
     }
 
-    override func touchesEnded(_ touches: Set<TouchEvent>) {
+    override func touchesEnded(_: Set<TouchEvent>) {
         pressStartTime = nil
         elapsed = 0
         reset()
     }
 
-    override func touchesCancelled(_ touches: Set<TouchEvent>) {
+    override func touchesCancelled(_: Set<TouchEvent>) {
         pressStartTime = nil
         elapsed = 0
         reset()
     }
 
     override func update(_ deltaTime: TimeInterval) {
-        guard state == .began || state == .changed, !fired else { return }
+        guard state == .began || state == .changed, !fired else {
+            return
+        }
         elapsed += deltaTime
         if elapsed >= minimumDuration {
             fired = true
@@ -145,7 +153,6 @@ final class LongPressGestureRecognizer: GestureRecognizer {
 
 @MainActor
 final class DragGestureRecognizer: GestureRecognizer {
-
     private let minimumDistance: Float
     private let onChanged: ((DragGesture.Value) -> Void)?
     private let onEnded: ((DragGesture.Value) -> Void)?
@@ -164,7 +171,9 @@ final class DragGestureRecognizer: GestureRecognizer {
     }
 
     override func mouseEventBegan(_ event: MouseEvent) {
-        guard event.button == .left else { return }
+        guard event.button == .left else {
+            return
+        }
         startLocation = event.mousePosition
         lastLocation = event.mousePosition
         setState(.began)
@@ -178,8 +187,12 @@ final class DragGestureRecognizer: GestureRecognizer {
             finishMouseDrag()
             return
         }
-        guard event.button == .left else { return }
-        guard let start = startLocation else { return }
+        guard event.button == .left else {
+            return
+        }
+        guard let start = startLocation else {
+            return
+        }
 
         let current = event.mousePosition
         lastLocation = current
@@ -189,15 +202,21 @@ final class DragGestureRecognizer: GestureRecognizer {
         let distance = (dx * dx + dy * dy).squareRoot()
 
         // The threshold only starts a drag; returning near its origin must still update it.
-        guard state == .changed || distance >= minimumDistance else { return }
+        guard state == .changed || distance >= minimumDistance else {
+            return
+        }
 
-        if state == .began { setState(.changed) }
+        if state == .began {
+            setState(.changed)
+        }
         let value = DragGesture.Value(startLocation: start, location: current)
         onChanged?(value)
     }
 
     override func mouseEventEnded(_ event: MouseEvent) {
-        guard event.button == .left else { return }
+        guard event.button == .left else {
+            return
+        }
         finishMouseDrag()
     }
 
@@ -207,26 +226,32 @@ final class DragGestureRecognizer: GestureRecognizer {
             lastLocation = nil
             reset()
         }
-        guard let start = startLocation, let current = lastLocation else { return }
+        guard let start = startLocation, let current = lastLocation else {
+            return
+        }
         let value = DragGesture.Value(startLocation: start, location: current)
         onEnded?(value)
     }
 
-    override func mouseEventCancelled(_ event: MouseEvent) {
+    override func mouseEventCancelled(_: MouseEvent) {
         startLocation = nil
         lastLocation = nil
         reset()
     }
 
     override func touchesBegan(_ touches: Set<TouchEvent>) {
-        guard let first = touches.first else { return }
+        guard let first = touches.first else {
+            return
+        }
         startLocation = first.location
         lastLocation = first.location
         setState(.began)
     }
 
     override func touchesMoved(_ touches: Set<TouchEvent>) {
-        guard let first = touches.first, let start = startLocation else { return }
+        guard let first = touches.first, let start = startLocation else {
+            return
+        }
         let current = first.location
         lastLocation = current
 
@@ -234,25 +259,31 @@ final class DragGestureRecognizer: GestureRecognizer {
         let dy = current.y - start.y
         let distance = (dx * dx + dy * dy).squareRoot()
         // The threshold only starts a drag; returning near its origin must still update it.
-        guard state == .changed || distance >= minimumDistance else { return }
+        guard state == .changed || distance >= minimumDistance else {
+            return
+        }
 
-        if state == .began { setState(.changed) }
+        if state == .began {
+            setState(.changed)
+        }
         let value = DragGesture.Value(startLocation: start, location: current)
         onChanged?(value)
     }
 
-    override func touchesEnded(_ touches: Set<TouchEvent>) {
+    override func touchesEnded(_: Set<TouchEvent>) {
         defer {
             startLocation = nil
             lastLocation = nil
             reset()
         }
-        guard let start = startLocation, let current = lastLocation else { return }
+        guard let start = startLocation, let current = lastLocation else {
+            return
+        }
         let value = DragGesture.Value(startLocation: start, location: current)
         onEnded?(value)
     }
 
-    override func touchesCancelled(_ touches: Set<TouchEvent>) {
+    override func touchesCancelled(_: Set<TouchEvent>) {
         startLocation = nil
         lastLocation = nil
         reset()

@@ -26,8 +26,10 @@ public struct AdaWebPlayerProject: Codable, Equatable, Sendable {
             throw AdaWebPlayerProjectError.invalid("Unsupported Web Player schema or runtime API; expected API 1 or 2.")
         }
         try validateResources()
-        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !entryView.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard
+            !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            !entryView.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
             throw AdaWebPlayerProjectError.invalid("Web Player requires a title and an entry view.")
         }
         guard !sources.isEmpty, Set(sources.map { $0.lowercased() }).count == sources.count else {
@@ -68,7 +70,7 @@ public enum AdaWebPlayerProjectError: Error, Equatable, Sendable, CustomStringCo
 
     public var description: String {
         switch self {
-        case .invalid(let message): message
+        case let .invalid(message): message
         }
     }
 }

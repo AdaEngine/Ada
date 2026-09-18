@@ -131,7 +131,6 @@ public struct Lighting2DGPUScratch: Resource, Sendable {
 
 /// Composites ``RenderViewTarget/sceneColorTexture`` + lights into ``mainTexture``.
 public struct Light2DCompositeRenderNode: RenderNode {
-
     @Query<
         Entity,
         Camera,
@@ -372,7 +371,7 @@ public struct Light2DCompositeRenderNode: RenderNode {
 
             let mod = extracted.modulate
             scratch.compositeModulate.elements = [
-                Vector4(mod.red, mod.green, mod.blue, mod.alpha),
+                Vector4(mod.red, mod.green, mod.blue, mod.alpha)
             ]
             scratch.compositeModulate.write(to: device)
 
@@ -416,7 +415,7 @@ public struct Light2DCompositeRenderNode: RenderNode {
             compositePass.endRenderPass()
 
             if let outputTexture = target.outputTexture,
-               mainTexture === outputTexture {
+                mainTexture === outputTexture {
                 commandBuffer.addCompletedHandler { [outputTexture] in
                     outputTexture.notifyRenderCompleted()
                 }

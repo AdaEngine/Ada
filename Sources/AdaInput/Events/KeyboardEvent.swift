@@ -10,7 +10,6 @@ import Math
 
 /// An event emitted when the platform software keyboard changes visibility or frame.
 public struct KeyboardEvent: InputEvent {
-
     public enum Phase: UInt8, Hashable, Sendable {
         case willShow
         case didShow
@@ -51,9 +50,13 @@ public struct KeyboardEvent: InputEvent {
 
     public var isVisible: Bool {
         switch phase {
-        case .willHide, .didHide:
+        case .willHide,
+            .didHide:
             return false
-        case .willShow, .didShow, .willChangeFrame, .didChangeFrame:
+        case .willShow,
+            .didShow,
+            .willChangeFrame,
+            .didChangeFrame:
             return occludedHeight > 0
         }
     }

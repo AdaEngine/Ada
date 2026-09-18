@@ -16,6 +16,7 @@ public final class UIExportLibrary {
     public let modifiers: [UINativeModifierDescriptor]
 
     public init<Provider: UIExportProvider>(_ provider: Provider.Type) {
-        views = provider.views; modifiers = provider.modifiers
+        views = provider.views
+        modifiers = provider.modifiers
     }
 }

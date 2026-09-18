@@ -9,9 +9,8 @@
 ///
 /// - Warning: Works currently with environment modifiers.
 public struct Group<Content: View>: View {
-
     public let content: Content
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     @inlinable
     public init(@ViewBuilder content: () -> Content) {

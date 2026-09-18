@@ -27,7 +27,6 @@ private struct SchemaEntry<Value>: @unchecked Sendable {
 /// let clip = try KeyframeClip(jsonData: data, schema: schema)
 /// ```
 public struct KeyframeClipSchema<Value: Sendable>: @unchecked Sendable {
-
     private var entries: [String: SchemaEntry<Value>] = [:]
 
     public init() {}
@@ -38,12 +37,14 @@ public struct KeyframeClipSchema<Value: Sendable>: @unchecked Sendable {
     public mutating func register<T: VectorArithmetic & Sendable>(
         _ id: String,
         keyPath: WritableKeyPath<Value, T>,
-        type: T.Type = T.self
+        type _: T.Type = T.self
     ) {
         entries[id] = SchemaEntry(identifier: id) { keyframes in
             var tuples: [(time: AdaUtils.TimeInterval, value: T, curveToNext: KeyframeCurveKind)] = []
             for kf in keyframes {
-                guard let value = convertFloats(kf.value, to: T.self) else { continue }
+                guard let value = convertFloats(kf.value, to: T.self) else {
+                    continue
+                }
                 tuples.append((AdaUtils.TimeInterval(kf.time), value, kf.curveToNext))
             }
             let serialized = keyframes
@@ -67,9 +68,14 @@ public struct KeyframeClipSchema<Value: Sendable>: @unchecked Sendable {
     ) {
         entries[id] = SchemaEntry(identifier: id) { keyframes in
             let qkfs = keyframes.compactMap { kf -> QuaternionKeyframe? in
-                guard kf.value.count == 4 else { return nil }
+                guard kf.value.count == 4 else {
+                    return nil
+                }
                 var q = Quat.identity
-                q.x = kf.value[0]; q.y = kf.value[1]; q.z = kf.value[2]; q.w = kf.value[3]
+                q.x = kf.value[0]
+                q.y = kf.value[1]
+                q.z = kf.value[2]
+                q.w = kf.value[3]
                 return QuaternionKeyframe(time: TimeInterval(kf.time), value: q, curveToNext: kf.curveToNext)
             }
             let serialized = keyframes
@@ -126,10 +132,9 @@ private struct SerializedKeyframeDTO: Codable {
 
 // MARK: - Encode
 
-public extension KeyframeClip where Value: Codable {
-
+extension KeyframeClip where Value: Codable {
     /// Encode the clip as JSON (version 2). `initialValues` included because `Value: Codable`.
-    func encodeToJSONData(prettyPrinted: Bool = false) throws -> Data {
+    public func encodeToJSONData(prettyPrinted: Bool = false) throws -> Data {
         let dto = KeyframeClipDTO<Value>(
             version: 2,
             name: name,
@@ -155,10 +160,9 @@ public extension KeyframeClip where Value: Codable {
 
 // MARK: - Decode
 
-public extension KeyframeClip where Value: Codable {
-
+extension KeyframeClip where Value: Codable {
     /// Decode a clip from JSON (version 2) using a ``KeyframeClipSchema`` for track reconstruction.
-    init(jsonData: Data, schema: KeyframeClipSchema<Value>) throws {
+    public init(jsonData: Data, schema: KeyframeClipSchema<Value>) throws {
         let decoder = JSONDecoder()
         let dto = try decoder.decode(KeyframeClipDTO<Value>.self, from: jsonData)
         guard dto.version == 2 else {
@@ -189,37 +193,47 @@ public extension KeyframeClip where Value: Codable {
         )
     }
 
-    private static func makeDefaultInitialValues(from data: Data) throws -> Value {
+    private static func makeDefaultInitialValues(from _: Data) throws -> Value {
         throw KeyframeClipDecodeError.malformedJSON("initialValues is required when decoding but was missing from JSON.")
     }
 }
 
 // MARK: - Float conversion helpers
 
-private func convertFloats<T: VectorArithmetic>(_ floats: [Float], to type: T.Type) -> T? {
+private func convertFloats<T: VectorArithmetic>(_ floats: [Float], to _: T.Type) -> T? {
     if T.self == Vector3.self {
-        guard floats.count >= 3 else { return nil }
+        guard floats.count >= 3 else {
+            return nil
+        }
         return Vector3(floats[0], floats[1], floats[2]) as? T
     }
     if T.self == Vector2.self {
-        guard floats.count >= 2 else { return nil }
+        guard floats.count >= 2 else {
+            return nil
+        }
         return Vector2(floats[0], floats[1]) as? T
     }
     if T.self == Vector4.self {
-        guard floats.count >= 4 else { return nil }
+        guard floats.count >= 4 else {
+            return nil
+        }
         return Vector4(floats[0], floats[1], floats[2], floats[3]) as? T
     }
     if T.self == Float.self {
-        guard let f = floats.first else { return nil }
+        guard let f = floats.first else {
+            return nil
+        }
         return f as? T
     }
     if T.self == Double.self {
-        guard let f = floats.first else { return nil }
+        guard let f = floats.first else {
+            return nil
+        }
         return Double(f) as? T
     }
     return nil
 }
 
-private extension SerializedKeyframeDTO {
+extension SerializedKeyframeDTO {
     var curveToNext: KeyframeCurveKind { curve }
 }

@@ -8,13 +8,13 @@
 import AdaAssets
 import AdaRender
 import AdaUtils
-import struct Foundation.URL
 import Math
 import OrderedCollections
 
+import struct Foundation.URL
+
 /// A tile source that uses a texture atlas.
 public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
-
     /// The tiles of the texture atlas tile source.
     private var tiles: OrderedDictionary<PointInt, AtlasTileData> = [:]
 
@@ -41,24 +41,23 @@ public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
         self.textureAtlas = atlas
         super.init()
     }
-    
+
     // MARK: - Codable
-    
+
     enum CodingKeys: CodingKey {
         case id, name, tiles, textureAtlas, image
     }
-    
+
     struct TileCellData: Codable {
-        
         enum CodingKeys: String, CodingKey {
             case position = "xy"
             case data = "ad"
         }
-        
+
         let position: [Int]
         let data: AtlasTileData
     }
-    
+
     /// Initialize a new texture atlas tile source from a decoder.
     ///
     /// - Parameter decoder: The decoder to initialize the texture atlas tile source from.
@@ -70,21 +69,22 @@ public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
         if self.imageDescriptor == nil {
             self.atlasReference = try container.decode(AssetHandle<TextureAtlas>.self, forKey: .textureAtlas)
         }
-        
+
         super.init()
-        
+
         self.name = try container.decode(String.self, forKey: .name)
         self.id = try container.decode(TileSource.ID.self, forKey: .id)
-        try container.decode([TileCellData].self, forKey: .tiles).forEach { data in
-            self.tiles[PointInt(data.position)] = data.data
-        }
+        try container.decode([TileCellData].self, forKey: .tiles)
+            .forEach { data in
+                self.tiles[PointInt(data.position)] = data.data
+            }
     }
-    
+
     /// Encode the texture atlas tile source to an encoder.
     ///
     /// - Parameter encoder: The encoder to encode the texture atlas tile source to.
     /// - Throws: An error if the texture atlas tile source cannot be encoded to the encoder.
-    public override func encode(to encoder: any Encoder) throws {
+    override public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(self.name, forKey: .name)
         try container.encode(self.id, forKey: .id)
@@ -95,14 +95,14 @@ public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
         } else if let atlasReference {
             try container.encode(atlasReference, forKey: .textureAtlas)
         }
-        
-        let tiles = self.tiles.elements.map { (position, data) in
+
+        let tiles = self.tiles.elements.map { position, data in
             TileCellData(position: [position.x, position.y], data: data)
         }
-        
+
         try container.encode(tiles, forKey: .tiles)
     }
-    
+
     /// Resolve referenced images asynchronously before TileSet exposes its sources.
     func loadTextureAtlas(relativeTo directory: URL) async throws {
         if let imageDescriptor {
@@ -205,7 +205,6 @@ public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
 extension TextureAtlasTileSource {
     /// A tile data for a texture atlas tile source.
     public class AtlasTileData: Codable {
-        
         enum CodingKeys: String, CodingKey {
             case animationFrameDuration = "anim_dur"
             case animationFrameColumns = "anim_fr_clm"

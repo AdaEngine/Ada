@@ -8,7 +8,7 @@
 import AdaUtils
 import Math
 
-public extension View {
+extension View {
     /// Associates a destination view with a presented data type for use within
     /// a navigation stack.
     ///
@@ -23,7 +23,7 @@ public extension View {
     ///         }
     /// }
     /// ```
-    func navigate<D: Hashable, Destination: View>(
+    public func navigate<D: Hashable, Destination: View>(
         for type: D.Type,
         @ViewBuilder destination: @escaping (D) -> Destination
     ) -> some View {
@@ -52,7 +52,6 @@ struct NavigationDestinationModifier<WrappedContent: View, D: Hashable, Destinat
 }
 
 final class NavigationDestinationNode<D: Hashable, Destination: View>: ViewModifierNode {
-
     private let type: D.Type
     private let destination: (D) -> Destination
     private var viewInputs: _ViewInputs
@@ -86,7 +85,9 @@ final class NavigationDestinationNode<D: Hashable, Destination: View>: ViewModif
         environment.navigationSplitColumnContext?.registerDestination(for: type, builder: builder)
         registerDestinationInAncestorSplit(builder: builder)
 
-        guard let context = environment.navigationContext else { return }
+        guard let context = environment.navigationContext else {
+            return
+        }
         context.registerDestination(for: type, builder: builder)
     }
 
@@ -95,7 +96,9 @@ final class NavigationDestinationNode<D: Hashable, Destination: View>: ViewModif
         while let node = current {
             if let registrar = node as? NavigationSplitDestinationRegistering {
                 registrar.registerDestinationBuilder(for: ObjectIdentifier(type)) { anyValue, inputs in
-                    guard let typedValue = anyValue.base as? D else { return nil }
+                    guard let typedValue = anyValue.base as? D else {
+                        return nil
+                    }
                     return builder(typedValue, inputs)
                 }
                 return

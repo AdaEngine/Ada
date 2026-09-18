@@ -7,8 +7,8 @@
 
 import AdaECS
 import AdaTransform
-import Math
 import AdaUtils
+import Math
 
 // TODO: (Vlad) add sphere supports
 
@@ -20,16 +20,15 @@ import AdaUtils
     .after(CameraSystem.self)
 ])
 public struct VisibilitySystem {
-
     @Query<Camera, Ref<VisibleEntities>>
     private var cameras
 
     @Query<Entity, Visibility, BoundingComponent, GlobalTransform>
     private var entities
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         self.cameras.forEach { camera, visibleEntities in
             if !camera.isActive {
                 return
@@ -48,7 +47,7 @@ public struct VisibilitySystem {
                     return
                 }
                 switch bounding.bounds {
-                case .aabb(let aabb):
+                case let .aabb(aabb):
                     if !frustum.intersectsAABB(aabb.transformed(by: globalTransform.matrix)) {
                         return
                     }
@@ -62,7 +61,7 @@ public struct VisibilitySystem {
     }
 }
 
-private extension AABB {
+extension AABB {
     func transformed(by transform: Transform3D) -> AABB {
         let min = self.min
         let max = self.max
@@ -76,7 +75,7 @@ private extension AABB {
             Vector3(max.x, min.y, min.z),
             Vector3(max.x, min.y, max.z),
             Vector3(max.x, max.y, min.z),
-            max
+            max,
         ] {
             let transformedCorner = (transform * Vector4(corner, 1)).xyz
             transformedMin = Vector3(

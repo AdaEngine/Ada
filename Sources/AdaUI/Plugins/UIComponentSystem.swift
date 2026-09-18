@@ -7,14 +7,13 @@
 
 import AdaECS
 import AdaInput
-import AdaTransform
 import AdaRender
+import AdaTransform
 import AdaUtils
 import Math
 
 @PlainSystem
 public struct UIComponentSystem: Sendable {
-    
     @Query<Entity, UIComponent, GlobalTransform>
     private var uiComponents
 
@@ -39,10 +38,10 @@ public struct UIComponentSystem: Sendable {
     @Res<PrimaryWindowId>
     private var primaryWindowId
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
     @MainActor
-    public func update(context: UpdateContext) async {
+    public func update(context _: UpdateContext) async {
         self.uiComponents.forEach { entity, component, transform in
             update(
                 entity: entity,
@@ -54,10 +53,10 @@ public struct UIComponentSystem: Sendable {
     }
 }
 
-private extension UIComponentSystem {
+extension UIComponentSystem {
     @MainActor
     @inline(__always)
-    func update(
+    private func update(
         entity: Entity,
         component: UIComponent,
         globalTransform: GlobalTransform,
@@ -126,16 +125,15 @@ private extension UIComponentSystem {
     }
 }
 
-public extension EnvironmentValues {
-
+extension EnvironmentValues {
     /// The world where view attached.
-    @Entry internal(set) var world: World?
+    @_spi(Internal) @Entry public internal(set) var world: World?
 
     /// The game scene where view attached.
-    @Entry internal(set) var entity: Entity?
+    @Entry internal var entity: Entity?
 
-    @Entry internal(set) var input: Ref<Input>?
-    
+    @Entry internal var input: Ref<Input>?
+
     /// The windowManager where view attached.
-    @Entry internal(set) var windowManager: UIWindowManager?
+    @_spi(Internal) @Entry public internal(set) var windowManager: UIWindowManager?
 }

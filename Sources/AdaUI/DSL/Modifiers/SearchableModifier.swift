@@ -18,7 +18,7 @@ public enum SearchFieldPlacement: Sendable, Equatable {
     case overlay(alignment: AnchorPoint = .topTrailing)
 }
 
-public extension View {
+extension View {
     /// Adds an Ada-styled search field to this view.
     ///
     /// This mirrors SwiftUI's `searchable` modifier shape while using AdaUI's layout
@@ -28,7 +28,7 @@ public extension View {
     ///   - text: Two-way binding for the search query.
     ///   - placement: Where the search field should be placed relative to this view.
     ///   - prompt: Placeholder shown inside the search field.
-    func searchable(
+    public func searchable(
         text: Binding<String>,
         placement: SearchFieldPlacement = .top,
         prompt: String = "Search"

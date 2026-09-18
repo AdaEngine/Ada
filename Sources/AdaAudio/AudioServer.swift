@@ -17,11 +17,10 @@ enum AudioError: Error {
 
 /// An instance that managed audio in the AdaEngine.
 public final class AudioServer: Resource {
-
     nonisolated(unsafe) public internal(set) static var shared: AudioServer!
-    
+
     let engine: AudioEngine
-    
+
     init(engine: AudioEngine) {
         self.engine = engine
     }
@@ -32,21 +31,21 @@ public final class AudioServer: Resource {
         let engine = try MiniAudioEngine()
         unsafe self.shared = AudioServer(engine: engine)
     }
-    
+
     func update(_ deltaTime: AdaUtils.TimeInterval) {
         self.engine.update(deltaTime)
     }
-    
+
     public func start() throws {
         try self.engine.start()
     }
-    
+
     public func stop() throws {
         try self.engine.stop()
     }
-    
+
     // MARK: - Public
-    
+
     /// Create an ``AudioPlaybackController`` instance which can be play in any time.
     /// - Note: You managed audio playback controller by yourself and be careful about memory leaks.
     public func prepareAudio(_ resource: AudioResource) -> AudioPlaybackController {
@@ -67,16 +66,15 @@ public final class AudioServer: Resource {
 
 /// Interface describes audio listener entity in spatial audio scene.
 protocol AudioEngineListener: AnyObject, Sendable {
-    
     var position: Vector3 { get set }
     var direction: Vector3 { get set }
     var velocity: Vector3 { get set }
     var worldUp: Vector3 { get set }
-    
+
     var isEnabled: Bool { get set }
-    
+
     func setCone(innerAngle: Angle, outerAngle: Angle, outerGain: Float)
-    
+
     var innerAngle: Angle { get }
     var outerAngle: Angle { get }
     var outerGain: Float { get }
@@ -84,10 +82,8 @@ protocol AudioEngineListener: AnyObject, Sendable {
 
 /// Events associated with audio playback.
 public enum AudioEvents {
-    
     /// Audio playback completed.
     public struct PlaybackCompleted: Event {
-        
         /// The audio playback controller that triggered the event.
         public let playbackController: AudioPlaybackController
     }

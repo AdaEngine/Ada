@@ -12,9 +12,9 @@ struct GamepadInputSystem {
     @Res<DeltaTime>
     private var deltaTime
 
-    init(world: World) { }
+    init(world _: World) {}
 
-    func update(context: UpdateContext) {
+    func update(context _: UpdateContext) {
         let gamepads = input.getConnectedGamepads()
 
         if gamepads.isEmpty {

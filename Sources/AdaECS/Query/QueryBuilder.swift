@@ -7,7 +7,6 @@
 
 /// A protocol for building queries.
 public protocol QueryBuilder: Sendable {
-
     /// The components of the query builder.
     associatedtype Components
 
@@ -38,8 +37,8 @@ public protocol QueryBuilder: Sendable {
     ) -> ComponentsFetches
 }
 
-public extension QueryBuilder {
-    static var access: SystemAccessSet {
+extension QueryBuilder {
+    public static var access: SystemAccessSet {
         SystemAccessSet()
     }
 }
@@ -108,11 +107,11 @@ public struct QueryBuilderTargets<each T>: QueryBuilder where repeat each T: Wor
         lastTick: Tick
     ) -> ComponentsFetches {
         return (repeat (each T)._initFetch(
-            world: world,
-            state: each states,
-            lastTick: lastTick,
-            currentTick: world.currentTick
-        ))
+                world: world,
+                state: each states,
+                lastTick: lastTick,
+                currentTick: world.currentTick
+            ))
     }
 
     @inlinable
@@ -123,12 +122,14 @@ public struct QueryBuilderTargets<each T>: QueryBuilder where repeat each T: Wor
         chunk: borrowing Chunk,
         archetype: borrowing Archetype
     ) {
-        fetches = (repeat (each T)._setData(
-            state: each states,
-            fetch: each fetches,
-            chunk: chunk,
-            archetype: archetype
-        ))
+        fetches =
+            (repeat (each T)
+                ._setData(
+                    state: each states,
+                    fetch: each fetches,
+                    chunk: chunk,
+                    archetype: archetype
+                ))
     }
 }
 
@@ -137,7 +138,7 @@ extension QueryBuilderTargets: QuertyTargetBuilder where repeat each T: QueryTar
     @inline(__always)
     public static func predicate(in archetype: Archetype) -> Bool {
         for element in repeat (each T).self {
-            if !element._queryContains(in: archetype) {
+            if !element._queryContains(in: archetype) { // swiftlint:disable:this for_where
                 return false
             }
         }
@@ -154,7 +155,7 @@ extension QueryBuilderTargets: QuertyTargetBuilder where repeat each T: QueryTar
         at row: Int
     ) -> Components? {
         @inline(__always)
-        func fetch<Q: QueryTarget>(_ type: Q.Type, state: Q.State, fetch: Q.Fetch) throws -> Q {
+        func fetch<Q: QueryTarget>(_: Q.Type, state: Q.State, fetch: Q.Fetch) throws -> Q {
             guard let value = Q._queryFetch(for: entity, state: state, fetch: fetch, at: row) else {
                 throw QueryBuilderTargetsError.failedToFetch
             }
@@ -173,7 +174,7 @@ extension QueryBuilderTargets: FilterTargetBuilder where repeat each T: Filter {
     @inline(__always)
     public static var requiresRowEvaluation: Bool {
         for filter in repeat (each T).self {
-            if filter.requiresRowEvaluation {
+            if filter.requiresRowEvaluation { // swiftlint:disable:this for_where
                 return true
             }
         }
@@ -184,7 +185,7 @@ extension QueryBuilderTargets: FilterTargetBuilder where repeat each T: Filter {
     @inline(__always)
     public static func predicate(in archetype: borrowing Archetype) -> Bool {
         for filter in repeat (each T).self {
-            if !filter.predicate(in: archetype) {
+            if !filter.predicate(in: archetype) { // swiftlint:disable:this for_where
                 return false
             }
         }
@@ -199,7 +200,7 @@ extension QueryBuilderTargets: FilterTargetBuilder where repeat each T: Filter {
         at row: Int
     ) -> Bool {
         for (filter, state, fetch) in repeat ((each T).self, each states, each fetches) {
-            if !filter.condition(state: state, fetch: fetch, at: row) {
+            if !filter.condition(state: state, fetch: fetch, at: row) { // swiftlint:disable:this for_where
                 return false
             }
         }

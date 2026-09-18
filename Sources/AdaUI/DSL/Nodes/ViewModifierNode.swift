@@ -11,7 +11,6 @@ import AdaUtils
 import Math
 
 class ViewModifierNode: ViewNode {
-
     var contentNode: ViewNode
 
     override var layoutPriority: Double {
@@ -91,7 +90,7 @@ class ViewModifierNode: ViewNode {
     }
 
     override func buildMenu(with builder: any UIMenuBuilder) {
-       contentNode.buildMenu(with: builder)
+        contentNode.buildMenu(with: builder)
     }
 
     override func update(_ deltaTime: TimeInterval) {
@@ -105,7 +104,9 @@ class ViewModifierNode: ViewNode {
     override func updateEnvironment(_ environment: EnvironmentValues) {
         let prevVersion = self.environment.version
         super.updateEnvironment(environment)
-        guard self.environment.version != prevVersion else { return }
+        guard self.environment.version != prevVersion else {
+            return
+        }
         // Pass self.environment (post-transform) so content node inherits correctly.
         contentNode.updateEnvironment(self.environment)
     }
@@ -192,9 +193,9 @@ class ViewModifierNode: ViewNode {
         let identationStr = String(repeating: " ", count: hierarchy * identation)
         let value = super.debugDescription(hierarchy: hierarchy, identation: identation)
         return """
-        \(identationStr)-\(value)
-        \(identationStr)\(identationStr) - contentNode:
-        \(identationStr)\(identationStr) - \(contentNode.debugDescription(hierarchy: hierarchy, identation: identation + 1))
-        """
+            \(identationStr)-\(value)
+            \(identationStr)\(identationStr) - contentNode:
+            \(identationStr)\(identationStr) - \(contentNode.debugDescription(hierarchy: hierarchy, identation: identation + 1))
+            """
     }
 }

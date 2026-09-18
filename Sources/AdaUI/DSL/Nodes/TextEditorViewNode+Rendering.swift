@@ -13,7 +13,6 @@ import Foundation
 import Math
 
 extension TextEditorViewNode {
-
     func drawSelectionIfNeeded(
         in context: inout UIGraphicsContext,
         line: LineInfo,
@@ -45,13 +44,15 @@ extension TextEditorViewNode {
         let startColumn = max(0, min(start - lineStart, line.text.count))
         let endColumn = end > lineEnd ? line.text.count + 1 : max(0, min(end - lineStart, line.text.count))
         let startX = textRect.minX + self.caretXOffset(forColumn: startColumn, in: line.text, font: font, pointSize: pointSize)
-        let endX = textRect.minX + {
-            if end > lineEnd {
-                return self.caretXOffset(forColumn: line.text.count, in: line.text, font: font, pointSize: pointSize) + characterAdvance
-            }
+        let endX =
+            textRect.minX
+            + {
+                if end > lineEnd {
+                    return self.caretXOffset(forColumn: line.text.count, in: line.text, font: font, pointSize: pointSize) + characterAdvance
+                }
 
-            return self.caretXOffset(forColumn: endColumn, in: line.text, font: font, pointSize: pointSize)
-        }()
+                return self.caretXOffset(forColumn: endColumn, in: line.text, font: font, pointSize: pointSize)
+            }()
 
         context.drawRect(
             Rect(x: startX, y: rowY, width: max(characterAdvance, endX - startX), height: lineHeight),
@@ -88,7 +89,7 @@ extension TextEditorViewNode {
         }
 
         if let hoveredRange = sourceInteraction.hoveredRange,
-           !sourceInteraction.highlightedRanges.contains(hoveredRange) {
+            !sourceInteraction.highlightedRanges.contains(hoveredRange) {
             drawSourceUnderline(
                 hoveredRange,
                 color: accentColor,
@@ -128,11 +129,13 @@ extension TextEditorViewNode {
         pointSize: Float,
         font: Font?
     ) {
-        guard let columns = Self.sourceUnderlineColumns(
-            for: sourceRange,
-            lineIndex: lineIndex,
-            lineLength: line.text.count
-        ) else {
+        guard
+            let columns = Self.sourceUnderlineColumns(
+                for: sourceRange,
+                lineIndex: lineIndex,
+                lineLength: line.text.count
+            )
+        else {
             return
         }
 
@@ -252,7 +255,8 @@ extension TextEditorViewNode {
         in context: inout UIGraphicsContext,
         at point: Point
     ) {
-        let lineSpans = tokenSpans
+        let lineSpans =
+            tokenSpans
             .filter { $0.line == lineIndex && $0.length > 0 }
             .sorted { lhs, rhs in
                 if lhs.startColumn == rhs.startColumn {
@@ -313,9 +317,9 @@ extension TextEditorViewNode {
         }
 
         if let hoveredRange,
-           let hoverColor,
-           lineIndex >= hoveredRange.start.line,
-           lineIndex <= hoveredRange.end.line {
+            let hoverColor,
+            lineIndex >= hoveredRange.start.line,
+            lineIndex <= hoveredRange.end.line {
             let startColumn = lineIndex == hoveredRange.start.line ? hoveredRange.start.column : 0
             let endColumn = lineIndex == hoveredRange.end.line ? hoveredRange.end.column : lineText.count
             let start = max(0, min(startColumn, lineText.count))

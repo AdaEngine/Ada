@@ -7,7 +7,7 @@ public struct DirectionalShadow3DPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = try! ShaderModule.loadBundled(at: "Shaders/directional_shadow_3d.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/directional_shadow_3d.glsl", from: .module)
     }
 
     public func configurate(with configuration: VertexDescriptor) -> RenderPipelineDescriptor {
@@ -21,7 +21,7 @@ public struct DirectionalShadow3DPipeline: RenderPipelineConfigurator {
             stepFunction: .perInstance
         )
 
-        var descriptor = RenderPipelineDescriptor(vertex: shader.asset.getShader(for: .vertex)!)
+        var descriptor = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex))
         descriptor.fragment = shader.asset.getShader(for: .fragment)
         descriptor.debugName = "Directional Shadow 3D Pipeline"
         descriptor.vertexDescriptor = configuration

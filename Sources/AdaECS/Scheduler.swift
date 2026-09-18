@@ -1,6 +1,6 @@
 import AdaUtils
-import Tracing
 import Logging
+import Tracing
 
 /// Represents a scheduler stage in the ECS update loop.
 public struct SchedulerName: Hashable, Equatable, RawRepresentable, CustomStringConvertible, Sendable {
@@ -24,25 +24,25 @@ extension SchedulerName: ExpressibleByStringLiteral {
 }
 
 /// Default schedulers.
-public extension SchedulerName {
+extension SchedulerName {
     /// The startup scheduler that will run once per world.
-    static let startup = SchedulerName(rawValue: "startup")
+    public static let startup = SchedulerName(rawValue: "startup")
 
     /// The pre-update scheduler.
-    static let preUpdate = SchedulerName(rawValue: "preUpdate")
+    public static let preUpdate = SchedulerName(rawValue: "preUpdate")
 
     /// The update scheduler.
-    static let update = SchedulerName(rawValue: "update")
+    public static let update = SchedulerName(rawValue: "update")
 
     /// The post-update scheduler.
-    static let postUpdate = SchedulerName(rawValue: "postUpdate")
+    public static let postUpdate = SchedulerName(rawValue: "postUpdate")
 
     /// The default scheduler order.
-    static var `default`: [SchedulerName] {
+    public static var `default`: [SchedulerName] {
         return [
             .preUpdate,
             .update,
-            .postUpdate
+            .postUpdate,
         ]
     }
 }
@@ -67,7 +67,7 @@ public final class Schedulers: @unchecked Sendable {
     public func setSchedulers(_ schedulers: [SchedulerName]) {
         self.schedulerLabels = schedulers
         self.schedulers = Dictionary(
-            uniqueKeysWithValues: schedulerLabels.enumerated().map { ($1, Scheduler(name: $1)) }
+            uniqueKeysWithValues: schedulerLabels.map { ($0, Scheduler(name: $0)) }
         )
     }
 
@@ -203,7 +203,6 @@ public struct DefaultSchedulerOrder: Resource {
 /// A system that runs the default scheduler.
 @PlainSystem
 public struct DefaultSchedulerRunner: Sendable {
-
     @Res
     private var order: DefaultSchedulerOrder?
 
@@ -213,7 +212,7 @@ public struct DefaultSchedulerRunner: Sendable {
     @Local
     private var isFirstRun = true
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
     public func update(context: UpdateContext) async {
         let world = context.world
@@ -235,9 +234,9 @@ public struct Scheduler: Sendable {
 
     private static func defaultGraphExecutor() -> any SystemsGraphExecutor {
         #if WASI || SINGLE_THREAD_SCHEDULER
-        return SingleThreadedSystemsGraphExecutor()
+            return SingleThreadedSystemsGraphExecutor()
         #else
-        return MultiThreadedSystemsGraphExecutor()
+            return MultiThreadedSystemsGraphExecutor()
         #endif
     }
 
@@ -280,11 +279,14 @@ public struct Scheduler: Sendable {
         var executor = self.graphExecutor
         let graph = self.systemGraph
 
-        let span = AdaTrace.startSpan(lazyName: "Scheduler.run.\(name.rawValue)", attributes: [
-            "ada.profile.category": "scheduler",
-            "ada.scheduler.name": .string(name.rawValue),
-            "ada.world.name": .string(world.name ?? "UnknownWorld")
-        ])
+        let span = AdaTrace.startSpan(
+            lazyName: "Scheduler.run.\(name.rawValue)",
+            attributes: [
+                "ada.profile.category": "scheduler",
+                "ada.scheduler.name": .string(name.rawValue),
+                "ada.world.name": .string(world.name ?? "UnknownWorld"),
+            ]
+        )
         defer {
             span.end()
         }

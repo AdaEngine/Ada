@@ -58,9 +58,9 @@ public struct AdaColorPaletteThemeKey: ThemeKey {
     public static let defaultValue = AdaColorPalette.self
 }
 
-public extension Theme {
+extension Theme {
     /// Shared Ada UI color palette available through the theme container.
-    var adaColors: AdaColorPalette.Type {
+    public var adaColors: AdaColorPalette.Type {
         get { self[AdaColorPaletteThemeKey.self] }
         set { self[AdaColorPaletteThemeKey.self] = newValue }
     }

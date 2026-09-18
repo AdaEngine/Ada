@@ -16,15 +16,15 @@ public protocol Resource: Sendable {
     static func getFromWorld(_ world: borrowing World) -> Self?
 }
 
-public extension Resource {
-    static var resourceIdentifier: ObjectIdentifier {
+extension Resource {
+    public static var resourceIdentifier: ObjectIdentifier {
         ObjectIdentifier(Self.self)
     }
 
     /// Get a resource from the world.
     /// - Parameter world: The world to get the resource from.
     /// - Returns: The resource if it exists, otherwise nil.
-    static func getFromWorld(_ world: borrowing World) -> Self? {
+    public static func getFromWorld(_ world: borrowing World) -> Self? {
         world.getResource(Self.self)
     }
 }
@@ -57,7 +57,7 @@ extension Resource {
     static var swiftName: String {
         TypeNameCache.name(for: self)
     }
-    
+
     /// Return identifier of resource based on Resource.Type
     @inline(__always) static var identifier: ObjectIdentifier {
         ObjectIdentifier(self)
@@ -67,13 +67,13 @@ extension Resource {
 enum ResourceStorage {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var registeredResources: [String: Resource.Type] = [:]
-    
+
     /// Return registered resource or try to find it by NSClassFromString (works only for objc runtime)
     static func getRegisteredResource(for name: String) -> Resource.Type? {
         let registered = lock.withLock { unsafe registeredResources[name] }
         return registered ?? (NSClassFromString(name) as? Resource.Type)
     }
-    
+
     static func addResource<T: Resource>(_ type: T.Type) {
         let name = T.swiftName
         lock.withLock { unsafe registeredResources[name] = type }

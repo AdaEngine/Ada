@@ -8,14 +8,15 @@
 import AdaUtils
 import Foundation
 import Math
+
 #if canImport(Glibc)
-import Glibc
+    import Glibc
 #endif
 #if canImport(Darwin)
-import Darwin.C
+    import Darwin.C
 #endif
 #if os(Windows)
-import WinSDK
+    import WinSDK
 #endif
 
 /// Describe which kind of scene will present on start.
@@ -39,9 +40,9 @@ public struct _SceneOutputs {
     var appWorlds: AppWorlds
 }
 
-public extension AppScene {
+extension AppScene {
     @MainActor @preconcurrency
-    static func _makeView(
+    public static func _makeView(
         _ scene: _AppSceneNode<Self>,
         inputs: _SceneInputs
     ) -> _SceneOutputs {
@@ -55,89 +56,88 @@ public extension AppScene {
 
 // MARK: - Modifiers
 
-public extension AppScene {
+extension AppScene {
     /// Set the minimum size of the window.
-    func minimumSize(width: Float, height: Float) -> some AppScene {
+    public func minimumSize(width: Float, height: Float) -> some AppScene {
         return self.modifier(MinimumWindowSizeSceneModifier(size: Size(width: width, height: height)))
     }
 
     /// Set the window presentation mode.
-    func windowMode(_ mode: WindowMode) -> some AppScene {
+    public func windowMode(_ mode: WindowMode) -> some AppScene {
         return self.modifier(WindowModeSceneModifier(windowMode: mode))
     }
 
     /// Set the flag which describe can we create more than one window.
-    func singleWindow(_ isSingleWindow: Bool) -> some AppScene {
+    public func singleWindow(_ isSingleWindow: Bool) -> some AppScene {
         return self.modifier(IsSingleWindowSceneModifier(isSingleWindow: isSingleWindow))
     }
 
     /// Set whether the native platform window should draw a drop shadow.
-    func windowShadow(_ hasShadow: Bool) -> some AppScene {
+    public func windowShadow(_ hasShadow: Bool) -> some AppScene {
         self.modifier(WindowShadowSceneModifier(hasShadow: hasShadow))
     }
 
     /// Set whether the native platform window can be resized by the user.
-    func windowResizable(_ isResizable: Bool) -> some AppScene {
+    public func windowResizable(_ isResizable: Bool) -> some AppScene {
         self.modifier(WindowResizableSceneModifier(isResizable: isResizable))
     }
 
     /// Set the window title.
-    func windowTitle(_ title: String) -> some AppScene {
+    public func windowTitle(_ title: String) -> some AppScene {
         self.modifier(WindowTitleSceneModifier(title: title))
     }
 
     /// Set the preferred display for the window.
-    func windowScreen(_ preference: WindowScreenPreference) -> some AppScene {
+    public func windowScreen(_ preference: WindowScreenPreference) -> some AppScene {
         self.modifier(WindowScreenSceneModifier(preference: preference))
     }
 
     /// Set the platform title bar presentation.
-    func windowTitleBar(_ titleBar: WindowTitleBar) -> some AppScene {
+    public func windowTitleBar(_ titleBar: WindowTitleBar) -> some AppScene {
         self.modifier(WindowTitleBarSceneModifier(titleBar: titleBar))
     }
 
     /// Set the native platform window chrome style.
-    func windowChrome(_ chrome: WindowChrome) -> some AppScene {
+    public func windowChrome(_ chrome: WindowChrome) -> some AppScene {
         self.modifier(WindowChromeSceneModifier(chrome: chrome))
     }
 
     /// Set the native platform window background style.
-    func windowBackground(_ background: WindowBackground) -> some AppScene {
+    public func windowBackground(_ background: WindowBackground) -> some AppScene {
         self.modifier(WindowBackgroundSceneModifier(background: background))
     }
 
     /// Set whether the native platform window background should be transparent.
-    func windowTransparentBackground(_ isTransparent: Bool = true) -> some AppScene {
+    public func windowTransparentBackground(_ isTransparent: Bool = true) -> some AppScene {
         self.windowBackground(isTransparent ? .transparent : .opaque(.black))
     }
 
     /// Offset macOS traffic light buttons. Positive `x` moves right, positive `y` moves down.
-    func windowTrafficLightOffset(x: Float, y: Float) -> some AppScene {
+    public func windowTrafficLightOffset(x: Float, y: Float) -> some AppScene {
         self.modifier(WindowTrafficLightOffsetSceneModifier(offset: Point(x: x, y: y)))
     }
 
     /// Add new plugin for app
-    func addPlugins<each T: Plugin>(_ plugin: repeat each T) -> some AppScene {
+    public func addPlugins<each T: Plugin>(_ plugin: repeat each T) -> some AppScene {
         return modifier(AddPluginsModifier(plugins: (repeat (each plugin))))
     }
 }
 
-public extension AppScene {
+extension AppScene {
     /// Applies a modifier to a view and returns a new view.
     /// - Parameter modifier: The modifier to apply to this view.
-    func modifier<T>(_ modifier: T) -> SceneModifiedContent<Self, T> {
+    public func modifier<T>(_ modifier: T) -> SceneModifiedContent<Self, T> {
         return SceneModifiedContent(content: self, modifier: modifier)
     }
 }
 
-public extension SceneModifier where Body == Never {
-    func body(content: Self.Content) -> Never {
+extension SceneModifier where Body == Never {
+    public func body(content _: Self.Content) -> Never {
         fatalError("We should call body when Body is Never type.")
     }
 }
 
 public struct SceneModifiedContent<Content, Modifier> {
-
     public var content: Content
     public var modifier: Modifier
 
@@ -170,9 +170,9 @@ public protocol SceneModifier {
     ) -> _SceneOutputs
 }
 
-public extension SceneModifier {
+extension SceneModifier {
     @MainActor
-    static func _makeView(
+    public static func _makeView(
         for modifier: _AppSceneNode<Self>,
         inputs: _SceneInputs,
         body: @escaping (_SceneInputs) -> _SceneOutputs
@@ -184,10 +184,6 @@ public extension SceneModifier {
 
 public struct _AppSceneNode<Value>: Equatable {
     let value: Value
-
-    init(value: Value) {
-        self.value = value
-    }
 
     subscript<U>(keyPath: KeyPath<Value, U>) -> _AppSceneNode<U> {
         _AppSceneNode<U>(value: self.value[keyPath: keyPath])
@@ -214,9 +210,8 @@ public struct _AppSceneNode<Value>: Equatable {
 }
 
 extension SceneModifiedContent: AppScene where Modifier: SceneModifier, Content: AppScene {
-
     public var body: Never {
-        fatalError()
+        fatalError("Unreachable code")
     }
 
     @MainActor
@@ -225,10 +220,9 @@ extension SceneModifiedContent: AppScene where Modifier: SceneModifier, Content:
             return Content._makeView(view[\.content], inputs: inputs)
         }
     }
-
 }
 
-extension SceneModifiedContent : SceneModifier where Content : SceneModifier, Modifier : SceneModifier {
+extension SceneModifiedContent: SceneModifier where Content: SceneModifier, Modifier: SceneModifier {
     @MainActor
     public static func _makeView(
         for modifier: _AppSceneNode<Self>,

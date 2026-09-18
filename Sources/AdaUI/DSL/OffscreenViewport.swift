@@ -35,7 +35,7 @@ package struct OffscreenViewportView: View, ViewNodeBuilder {
         self.delegate = delegate
     }
 
-    func buildViewNode(in context: BuildContext) -> ViewNode {
+    func buildViewNode(in _: BuildContext) -> ViewNode {
         OffscreenViewportNode(delegate: delegate, content: self)
     }
 }
@@ -56,7 +56,7 @@ package struct OffscreenViewportContainer<Content: View>: View, ViewNodeBuilder 
         self.contentBuilder = contentBuilder
     }
 
-    func buildViewNode(in context: BuildContext) -> ViewNode {
+    func buildViewNode(in _: BuildContext) -> ViewNode {
         OffscreenViewportContainerNode(
             delegateFactory: delegateFactory,
             contentBuilder: contentBuilder,
@@ -69,8 +69,7 @@ package struct OffscreenViewportContainer<Content: View>: View, ViewNodeBuilder 
 
 @MainActor
 private final class OffscreenViewportNode: ViewNode {
-
-    private let delegate: any OffscreenViewportDelegate
+    private let viewportRenderer: any OffscreenViewportDelegate
     private var lastReportedSize: SizeInt = .zero
     private var isActive = false
     private var didBootstrap = false
@@ -82,7 +81,7 @@ private final class OffscreenViewportNode: ViewNode {
     }
 
     init<C: View>(delegate: any OffscreenViewportDelegate, content: C) {
-        self.delegate = delegate
+        self.viewportRenderer = delegate
         super.init(content: content)
     }
 
@@ -93,26 +92,30 @@ private final class OffscreenViewportNode: ViewNode {
 
         if !didBootstrap {
             didBootstrap = true
-            delegate.bootstrapIfNeeded()
+            viewportRenderer.bootstrapIfNeeded()
         }
 
         let size = frame.size
         let environmentScale = environment.scaleFactor
-        guard size.width.isFinite,
-              size.height.isFinite,
-              environmentScale.isFinite else {
+        guard
+            size.width.isFinite,
+            size.height.isFinite,
+            environmentScale.isFinite
+        else {
             return
         }
 
         let scale = max(environmentScale, 1)
         let pixelWidth = size.width * scale
         let pixelHeight = size.height * scale
-        guard pixelWidth.isFinite,
-              pixelHeight.isFinite,
-              pixelWidth > 0,
-              pixelHeight > 0,
-              pixelWidth <= Float(Int32.max),
-              pixelHeight <= Float(Int32.max) else {
+        guard
+            pixelWidth.isFinite,
+            pixelHeight.isFinite,
+            pixelWidth > 0,
+            pixelHeight > 0,
+            pixelWidth <= Float(Int32.max),
+            pixelHeight <= Float(Int32.max)
+        else {
             return
         }
 
@@ -121,11 +124,13 @@ private final class OffscreenViewportNode: ViewNode {
             height: Int(pixelHeight.rounded())
         )
 
-        guard pixelSize.width > 0 && pixelSize.height > 0 else { return }
+        guard pixelSize.width > 0 && pixelSize.height > 0 else {
+            return
+        }
 
         if pixelSize != lastReportedSize {
             lastReportedSize = pixelSize
-            delegate.updateSize(pixelSize, scaleFactor: scale)
+            viewportRenderer.updateSize(pixelSize, scaleFactor: scale)
         }
     }
 
@@ -136,13 +141,13 @@ private final class OffscreenViewportNode: ViewNode {
     // MARK: Tick
 
     override func update(_ deltaTime: AdaUtils.TimeInterval) {
-        delegate.tick(deltaTime)
+        viewportRenderer.tick(deltaTime)
     }
 
     // MARK: Draw
 
     override func draw(with context: UIGraphicsContext) {
-        guard let texture = delegate.renderTexture else {
+        guard let texture = viewportRenderer.renderTexture else {
             super.draw(with: context)
             return
         }
@@ -159,21 +164,30 @@ private final class OffscreenViewportNode: ViewNode {
     // MARK: Input
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else { return nil }
+        guard self.point(inside: point, with: event) else {
+            return nil
+        }
         return self
     }
 
-    override func point(inside point: Point, with event: any InputEvent) -> Bool {
+    override func point(inside point: Point, with _: any InputEvent) -> Bool {
         let size = frame.size
         return point.x >= 0 && point.y >= 0 && point.x <= size.width && point.y <= size.height
     }
 
     override func onPinchEvent(_ event: PinchEvent) {
-        if event.phase == .began { activateViewport() }
-        delegate.receiveInputEvent(PinchEvent(
-            window: event.window, location: viewportLocalPosition(event.location),
-            scale: event.scale, phase: event.phase, time: event.time
-        ))
+        if event.phase == .began {
+            activateViewport()
+        }
+        viewportRenderer.receiveInputEvent(
+            PinchEvent(
+                window: event.window,
+                location: viewportLocalPosition(event.location),
+                scale: event.scale,
+                phase: event.phase,
+                time: event.time
+            )
+        )
     }
 
     override func onMouseEvent(_ event: MouseEvent) {
@@ -192,8 +206,8 @@ private final class OffscreenViewportNode: ViewNode {
             activateViewport()
         }
 
-        delegate.updateMousePosition(localPosition)
-        delegate.receiveInputEvent(localEvent)
+        viewportRenderer.updateMousePosition(localPosition)
+        viewportRenderer.receiveInputEvent(localEvent)
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
@@ -210,18 +224,22 @@ private final class OffscreenViewportNode: ViewNode {
                 time: touch.time,
                 contactID: touch.contactID
             )
-            delegate.receiveInputEvent(localTouch)
+            viewportRenderer.receiveInputEvent(localTouch)
         }
     }
 
     override func onKeyEvent(_ event: KeyEvent) {
-        guard isActive else { return }
-        delegate.receiveInputEvent(event)
+        guard isActive else {
+            return
+        }
+        viewportRenderer.receiveInputEvent(event)
     }
 
     override func onTextInputEvent(_ event: TextInputEvent) {
-        guard isActive else { return }
-        delegate.receiveInputEvent(event)
+        guard isActive else {
+            return
+        }
+        viewportRenderer.receiveInputEvent(event)
     }
 
     override var canBecomeFocused: Bool { true }
@@ -263,8 +281,7 @@ private final class OffscreenViewportNode: ViewNode {
 
 @MainActor
 private final class OffscreenViewportContainerNode<Content: View>: ViewContainerNode {
-
-    private var delegate: (any OffscreenViewportDelegate)?
+    private var viewportRenderer: (any OffscreenViewportDelegate)?
     private var delegateFactory: @MainActor () -> any OffscreenViewportDelegate
     private var contentBuilder: @MainActor (any OffscreenViewportDelegate) -> Content
 
@@ -283,7 +300,7 @@ private final class OffscreenViewportContainerNode<Content: View>: ViewContainer
     }
 
     override func performLayout() {
-        if delegate == nil {
+        if viewportRenderer == nil {
             invalidateContent()
         }
 
@@ -291,9 +308,9 @@ private final class OffscreenViewportContainerNode<Content: View>: ViewContainer
     }
 
     override func invalidateContent() {
-        if delegate == nil {
-            delegate = delegateFactory()
-            delegate?.renderTextureDidChange = { [weak self] in
+        if viewportRenderer == nil {
+            viewportRenderer = delegateFactory()
+            viewportRenderer?.renderTextureDidChange = { [weak self] in
                 guard let self else {
                     return
                 }
@@ -302,13 +319,18 @@ private final class OffscreenViewportContainerNode<Content: View>: ViewContainer
             }
         }
 
-        let view = contentBuilder(delegate!)
+        guard let viewportRenderer else {
+            return
+        }
+        let view = contentBuilder(viewportRenderer)
         let inputs = _ViewInputs(parentNode: self, environment: self.environment)
-        let outputs = Content._makeListView(
-            _ViewGraphNode(value: view),
-            inputs: _ViewListInputs(input: inputs)
-        ).outputs
-        let nodes = outputs.map { $0.node }
+        let outputs =
+            Content._makeListView(
+                _ViewGraphNode(value: view),
+                inputs: _ViewListInputs(input: inputs)
+            )
+            .outputs
+        let nodes = outputs.map(\.node)
 
         reconcileChildNodes(from: nodes)
     }
@@ -335,7 +357,7 @@ private final class OffscreenViewportContainerNode<Content: View>: ViewContainer
     }
 
     private func shutdownDelegate() {
-        delegate?.shutdown()
-        delegate = nil
+        viewportRenderer?.shutdown()
+        viewportRenderer = nil
     }
 }

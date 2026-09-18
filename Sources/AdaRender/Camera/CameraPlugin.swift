@@ -68,7 +68,7 @@ public struct RenderViewTarget: @unchecked Sendable {
 
     public init() {}
 
-    fileprivate var cacheableCopy: Self {
+    var cacheableCopy: Self {
         var copy = self
         copy.outputTexture = nil
         return copy
@@ -104,7 +104,7 @@ func ConfigurateRenderViewTarget(
     _ cachedViewTargets: ResMut<ExtractedCameraRenderViewTargets>
 ) {
     let logger = Logger(label: "org.adaengine.AdaRender.ConfigurateRenderViewTarget")
-    query.forEach { entity, camera, renderViewTarget, source in
+    query.forEach { _, camera, renderViewTarget, source in
         let outputViewport = camera.viewport.rect
         let outputSize = outputViewport.size.toSizeInt()
 
@@ -115,7 +115,7 @@ func ConfigurateRenderViewTarget(
         let scale = camera.computedData.targetScaleFactor
         ageRetiredFrameTextures(renderViewTarget)
 
-        if case .texture(let asset) = camera.renderTarget {
+        if case let .texture(asset) = camera.renderTarget {
             let outputTexture = asset.asset
             renderViewTarget.outputTexture = outputTexture
             renderViewTarget.mainTexture = outputTexture
@@ -152,7 +152,8 @@ func ConfigurateRenderViewTarget(
                 renderViewTarget.sceneColor3DTexture,
                 renderViewTarget.normalRoughness3DTexture,
                 renderViewTarget.viewPositionMetallic3DTexture,
-            ].compactMap { $0 }
+            ]
+            .compactMap { $0 }
             renderViewTarget.retiredFrameTextures.append(contentsOf: retireFrameTextures(retiredTextures))
             let maxRetainedTextures = unsafe RenderEngine.configurations.maxFramesInFlight * max(1, retiredTextures.count)
             if renderViewTarget.retiredFrameTextures.count > maxRetainedTextures {
@@ -179,7 +180,7 @@ func ConfigurateRenderViewTarget(
         switch camera.renderTarget {
         case .texture:
             break
-        case .window(let ref):
+        case let .window(ref):
             renderViewTarget.outputTexture = nil
             guard let surface = resolveWindowSurface(for: ref, in: surfaces.wrappedValue, primaryWindow: primaryWindow.wrappedValue) else {
                 logger.error("Failed to configurate render view target for window \(ref). No surface.")
@@ -208,7 +209,7 @@ func resolveRenderSize(
     mode: RenderUpscalingMode,
     supportsSpatialUpscaling: Bool
 ) -> SizeInt {
-    guard supportsSpatialUpscaling, case .spatial(let requestedScale) = mode else {
+    guard supportsSpatialUpscaling, case let .spatial(requestedScale) = mode else {
         return outputSize
     }
 
@@ -249,8 +250,9 @@ func resolveWindowSurface(
         return surface
     }
 
-    guard case .windowId(let windowId) = ref,
-          primaryWindow?.windowId == windowId
+    guard
+        case let .windowId(windowId) = ref,
+        primaryWindow?.windowId == windowId
     else {
         return nil
     }
@@ -266,15 +268,19 @@ struct CameraRenderNode: RenderNode {
         query.update(from: world)
     }
 
-    func execute(context: inout Context, renderContext: RenderContext) async -> [RenderSlotValue] {
-        query.forEach { (entity, camera, renderSubGraph) in
+    func execute(context: inout Context, renderContext _: RenderContext) async -> [RenderSlotValue] {
+        query.forEach { entity, camera, renderSubGraph in
             guard camera.isActive else {
                 return
             }
 
-            context.runSubgraph(renderSubGraph.subgraphLabel, inputs: [
-                RenderSlotValue(name: renderSubGraph.inputSlot, value: .entity(entity))
-            ], viewEntity: entity)
+            context.runSubgraph(
+                renderSubGraph.subgraphLabel,
+                inputs: [
+                    RenderSlotValue(name: renderSubGraph.inputSlot, value: .entity(entity))
+                ],
+                viewEntity: entity
+            )
         }
         return []
     }
@@ -294,26 +300,24 @@ public struct CameraRenderGraph {
 @System
 @inline(__always)
 public func ExtractCamera(
-    _ world: World,
+    _: World,
     _ commands: Commands,
     _ surfaces: Res<WindowSurfaces>,
     _ cachedViewTargets: ResMut<ExtractedCameraRenderViewTargets>,
     _ query: Extract<
         Query<
-        Entity,
-        Camera,
-        Transform,
-        VisibleEntities,
-        GlobalViewUniform,
-        CameraRenderGraph
+            Entity,
+            Camera,
+            Transform,
+            VisibleEntities,
+            GlobalViewUniform,
+            CameraRenderGraph
         >
     >
 ) {
     var activeCameraIds = Set<Entity.ID>()
 
-    query.wrappedValue.forEach {
-        entity, camera, transform,
-        visibleEntities, uniform, graph in
+    query.wrappedValue.forEach { entity, camera, transform, visibleEntities, uniform, graph in
         // Embedded scenes render into textures. Authored window cameras belong
         // to the game and have no native surface in this render world.
         if case .window = camera.renderTarget, !surfaces.allowsWindowRendering {

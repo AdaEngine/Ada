@@ -9,7 +9,6 @@ import AdaAnimation
 import Math
 
 public struct AnyLayout: Layout {
-
     public typealias Cache = AnyCache
     public typealias AnimatableData = EmptyAnimatableData
 

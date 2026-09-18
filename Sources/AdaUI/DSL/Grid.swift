@@ -5,9 +5,8 @@
 
 /// A view that arranges its subviews in a two-dimensional grid.
 public struct Grid<Content: View>: View {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     private let columns: Int
     private let horizontalSpacing: Float?

@@ -65,7 +65,7 @@ public final class NamedTextureAtlas: Asset, @unchecked Sendable {
     }
 
     /// Builds a CPU ``Image`` for the logical sprite pixels (same dimensions as the original PNG).
-    public func image(for key: String, atlasRGBA: Data, atlasWidth: Int, atlasHeight: Int) -> Image? {
+    public func image(for key: String, atlasRGBA: Data, atlasWidth: Int, atlasHeight _: Int) -> Image? {
         guard let region = entriesByKey[key] else {
             return nil
         }
@@ -78,12 +78,12 @@ public final class NamedTextureAtlas: Asset, @unchecked Sendable {
         let srcStride = atlasWidth * 4
         let ox = region.contentOriginInAtlas.x
         let oy = region.contentOriginInAtlas.y
-        for row in 0 ..< h {
+        for row in 0..<h {
             let srcStart = (oy + row) * srcStride + ox * 4
             let dstStart = row * w * 4
             out.replaceSubrange(
-                dstStart ..< dstStart + w * 4,
-                with: atlasRGBA.subdata(in: srcStart ..< srcStart + w * 4)
+                dstStart..<dstStart + w * 4,
+                with: atlasRGBA.subdata(in: srcStart..<srcStart + w * 4)
             )
         }
         return Image(width: w, height: h, data: out, format: .rgba8)
@@ -151,9 +151,9 @@ public final class NamedTextureAtlas: Asset, @unchecked Sendable {
 
 // MARK: - Slice
 
-public extension NamedTextureAtlas {
+extension NamedTextureAtlas {
     /// A ``Texture2D`` view into one named region of the atlas.
-    final class Slice: Texture2D, @unchecked Sendable {
+    public final class Slice: Texture2D, @unchecked Sendable {
         public private(set) var namedAtlas: NamedTextureAtlas
 
         private let uvMin: Vector2
@@ -167,20 +167,21 @@ public extension NamedTextureAtlas {
             self.uvMax = region.uvMax
             self.position = [
                 region.uvMin.x * Float(namedAtlas.texture.width),
-                region.uvMin.y * Float(namedAtlas.texture.height)
+                region.uvMin.y * Float(namedAtlas.texture.height),
             ]
 
-            super.init(
-                gpuTexture: namedAtlas.texture.gpuTexture,
-                sampler: namedAtlas.texture.sampler,
-                size: region.originalSize
-            )
+            super
+                .init(
+                    gpuTexture: namedAtlas.texture.gpuTexture,
+                    sampler: namedAtlas.texture.sampler,
+                    size: region.originalSize
+                )
             self.assetMetaInfo = namedAtlas.texture.assetMetaInfo
             self.textureCoordinates = [
                 [uvMin.x, uvMax.y],
                 [uvMax.x, uvMax.y],
                 [uvMax.x, uvMin.y],
-                [uvMin.x, uvMin.y]
+                [uvMin.x, uvMin.y],
             ]
         }
 
@@ -220,7 +221,7 @@ public extension NamedTextureAtlas {
             self.init(namedAtlas: namedAtlas, region: region)
         }
 
-        override public func encodeContents(with encoder: any AssetEncoder) async throws {
+        override public func encodeContents(with _: any AssetEncoder) async throws {
             throw AssetDecodingError.decodingProblem("NamedTextureAtlas.Slice: encoding not supported.")
         }
     }

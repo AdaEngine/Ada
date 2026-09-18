@@ -7,7 +7,6 @@
 
 /// Contains collection of components.
 private struct ComponentBuilderTuple: Component {
-
     /// The components of the component builder tuple.
     let components: [any Component]
 }
@@ -19,13 +18,12 @@ private struct ComponentBuilderTuple: Component {
 /// - Note: More profitable for performance use solutions like ``Entity/ComponentSet/+=(lhs:rhs:)`` or ``Entity/ComponentSet/set(_:)-2oz15`` in ``Entity/ComponentSet`` object.
 @resultBuilder
 public enum ComponentsBuilder {
-
     public static func buildBlock(_ components: any Component...) -> any Component {
         ComponentBuilderTuple(components: components)
     }
 
     public static func buildOptional(_ component: (any Component)?) -> any Component {
-        ComponentBuilderTuple(components: component == nil ? [] : [component!])
+        ComponentBuilderTuple(components: component.map { [$0] } ?? [])
     }
 
     public static func buildArray(_ components: [any Component]) -> any Component {

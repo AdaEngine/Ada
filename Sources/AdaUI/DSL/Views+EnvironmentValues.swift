@@ -9,42 +9,42 @@ import AdaApp
 import AdaText
 import AdaUtils
 
-public extension EnvironmentValues {
+extension EnvironmentValues {
     /// The default font of this environment.
-    @Entry var font: Font?
+    @Entry public var font: Font?
 
     /// The default foreground color of this environment.
-    @Entry var foregroundColor: Color?
+    @Entry public var foregroundColor: Color?
 
     /// Current scale factor of the screen.
-    @Entry var scaleFactor: Float = Screen.main?.scale ?? 1
+    @Entry public var scaleFactor: Float = Screen.main?.scale ?? 1
 
     /// The maximum number of lines that text can occupy in a view.
-    @Entry var lineLimit: Int?
+    @Entry public var lineLimit: Int?
 
     /// The line break mode that text uses when it reaches the available width.
-    @Entry var lineBreakMode: LineBreakMode = .byWordWrapping
+    @Entry public var lineBreakMode: LineBreakMode = .byWordWrapping
 
     /// The alignment of wrapped text lines.
-    @Entry var multilineTextAlignment: TextAlignment = .leading
+    @Entry public var multilineTextAlignment: TextAlignment = .leading
 
     /// The direction in which horizontal layout and text flow.
-    @Entry var layoutDirection: LayoutDirection = .leftToRight
+    @Entry public var layoutDirection: LayoutDirection = .leftToRight
 
     /// Returns accent color of the system.
     /// `Color.accentColor` is process-global platform state updated during app startup.
-    @Entry var accentColor: Color = unsafe Color.accentColor
+    @Entry public var accentColor: Color = unsafe Color.accentColor
 
     /// The safe area insets of the nearest container or screen.
-    @Entry var safeAreaInsets: EdgeInsets = EdgeInsets()
+    @Entry public var safeAreaInsets: EdgeInsets = EdgeInsets()
 
     /// Insets reserved by platform window chrome that overlays app content.
     @Entry internal var navigationBarChromeInsets: EdgeInsets = EdgeInsets()
 }
 
-public extension View {
+extension View {
     /// Apply accent color to all child views.
-    func accentColor(_ color: Color) -> some View {
+    public func accentColor(_ color: Color) -> some View {
         self.environment(\.accentColor, color)
     }
 }

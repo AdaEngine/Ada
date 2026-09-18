@@ -17,9 +17,9 @@ public enum UINodeSelector: Hashable, Sendable {
 
     public var externalValue: String {
         switch self {
-        case .accessibilityIdentifier(let value):
+        case let .accessibilityIdentifier(value):
             return "accessibility:\(value)"
-        case .runtimeID(let value):
+        case let .runtimeID(value):
             return "runtime:\(value)"
         }
     }
@@ -75,7 +75,7 @@ public struct UINodeSnapshot: Codable, Hashable, Sendable {
     public let isHidden: Bool?
     public let isInteractable: Bool
     public let parent: UINodeSummary?
-    public let children: [UINodeSnapshot]
+    public let children: [Self]
 
     public init(
         runtimeId: String,
@@ -89,7 +89,7 @@ public struct UINodeSnapshot: Codable, Hashable, Sendable {
         isHidden: Bool?,
         isInteractable: Bool,
         parent: UINodeSummary?,
-        children: [UINodeSnapshot],
+        children: [Self],
         sceneNodeID: String? = nil
     ) {
         self.sceneNodeID = sceneNodeID
@@ -227,13 +227,13 @@ public enum UIInspectionError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .nodeNotFound(let selector):
+        case let .nodeNotFound(selector):
             return "UI node was not found for selector '\(selector)'."
-        case .ambiguousSelector(let selector, _):
+        case let .ambiguousSelector(selector, _):
             return "UI selector '\(selector)' matched multiple nodes."
-        case .scrollContainerNotFound(let selector):
+        case let .scrollContainerNotFound(selector):
             return "No scroll container ancestor was found for selector '\(selector)'."
-        case .noFocusableNode(let selector):
+        case let .noFocusableNode(selector):
             return "Selector '\(selector)' did not resolve to a focusable node."
         }
     }
@@ -258,8 +258,8 @@ public protocol UIInspectableViewContainer: AnyObject {
     func uiTapNode(matching selector: UINodeSelector) throws -> UIActionResult
 }
 
-public extension UIWindow {
-    func uiInspectableContainers() -> [any UIInspectableViewContainer] {
+extension UIWindow {
+    public func uiInspectableContainers() -> [any UIInspectableViewContainer] {
         var result: [any UIInspectableViewContainer] = []
 
         func walk(view: UIView) {
@@ -418,9 +418,9 @@ extension UIContainerView: UIInspectableViewContainer {
 
     private func resolveNodes(matching selector: UINodeSelector) -> [ViewNode] {
         switch selector {
-        case .accessibilityIdentifier(let identifier):
+        case let .accessibilityIdentifier(identifier):
             self.viewTree.rootNode.contentNode.uiCollectNodes { $0.accessibilityIdentifier == identifier }
-        case .runtimeID(let runtimeID):
+        case let .runtimeID(runtimeID):
             self.viewTree.rootNode.contentNode.uiCollectNodes { $0.uiRuntimeID == runtimeID }
         }
     }
@@ -463,7 +463,7 @@ extension UIContainerView: UIInspectableViewContainer {
     }
 }
 
-private extension ViewNode {
+extension ViewNode {
     var uiRuntimeID: String {
         let rawValue = UInt(bitPattern: self.id)
         return String(rawValue, radix: 16, uppercase: false)

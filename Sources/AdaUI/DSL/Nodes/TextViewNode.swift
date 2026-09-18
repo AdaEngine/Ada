@@ -11,7 +11,6 @@ import AdaUtils
 import Math
 
 final class TextViewNode: ViewNode {
-
     var layoutManager: TextLayoutManager
     private var drawLayoutManager: TextLayoutManager
     private var textContainer: TextContainer {
@@ -84,7 +83,7 @@ final class TextViewNode: ViewNode {
             var maxX: Float = -.infinity
             var maxTopY: Float = -Float.infinity
             var minBottomY: Float = Float.infinity
-            
+
             for line in self.drawLayoutManager.textLines {
                 for run in line {
                     for glyph in run {

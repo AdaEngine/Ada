@@ -6,19 +6,17 @@
 //
 
 #if WEBGPU_ENABLED && canImport(WebGPU)
-@unsafe @preconcurrency import WebGPU
+    @unsafe @preconcurrency import WebGPU
 
-@_spi(Internal)
-public final class WGPUIndexBuffer: WGPUBuffer, IndexBuffer, @unchecked Sendable {
+    @_spi(Internal)
+    public final class WGPUIndexBuffer: WGPUBuffer, IndexBuffer, @unchecked Sendable {
+        public let indexFormat: IndexBufferFormat
 
-    public let indexFormat: IndexBufferFormat
+        init(buffer: WebGPU.GPUBuffer, device: WebGPU.GPUDevice, indexFormat: IndexBufferFormat) {
+            self.indexFormat = indexFormat
 
-    init(buffer: WebGPU.GPUBuffer, device: WebGPU.GPUDevice, indexFormat: IndexBufferFormat) {
-        self.indexFormat = indexFormat
-
-        super.init(buffer: buffer, device: device)
+            super.init(buffer: buffer, device: device)
+        }
     }
-
-}
 
 #endif

@@ -5,36 +5,35 @@
 //  Created by Vladislav Prusakov on 02.07.2024.
 //
 
-public extension Gesture {
-
-    func updating<State>(
-        _ state: GestureState<State>,
+extension Gesture {
+    public func updating<State>(
+        _: GestureState<State>,
         body: @escaping (Self.Value, inout State) -> Void
     ) -> GestureStateGesture<Self, State> {
         GestureStateGesture(action: body, gesture: self)
     }
 
-    func onChanged(_ action: @escaping (Value) -> Void) -> _OnChangedGesture<Self> {
+    public func onChanged(_ action: @escaping (Value) -> Void) -> _OnChangedGesture<Self> {
         _OnChangedGesture(action: action, gesture: self)
     }
 
-    func onEnded(_ action: @escaping (Value) -> Void) -> _OnEndedGesture<Self> {
+    public func onEnded(_ action: @escaping (Value) -> Void) -> _OnEndedGesture<Self> {
         _OnEndedGesture(action: action, gesture: self)
     }
 
-    func map<T>(_ block: @escaping (Value) -> T) -> _MapGesture<Self, T> {
+    public func map<T>(_ block: @escaping (Value) -> T) -> _MapGesture<Self, T> {
         _MapGesture(gesture: self, map: block)
     }
 
-    func simultaneously<Other: Gesture>(with other: Other) -> SimultaneousGesture<Self, Other> {
+    public func simultaneously<Other: Gesture>(with other: Other) -> SimultaneousGesture<Self, Other> {
         SimultaneousGesture(first: self, second: other)
     }
 
-    func sequenced<Other: Gesture>(before other: Other) -> SequenceGesture<Self, Other> {
+    public func sequenced<Other: Gesture>(before other: Other) -> SequenceGesture<Self, Other> {
         SequenceGesture(first: self, second: other)
     }
 
-    func exclusively<Other: Gesture>(before other: Other) -> ExclusiveGesture<Self, Other> {
+    public func exclusively<Other: Gesture>(before other: Other) -> ExclusiveGesture<Self, Other> {
         ExclusiveGesture(first: self, second: other)
     }
 }
@@ -50,7 +49,7 @@ public struct _OnChangedGesture<G: Gesture>: Gesture {
 }
 
 extension _OnChangedGesture: _RecognizableGesture where G: _RecognizableGesture {
-    func _makeRecognizer(onChanged: ((Value) -> Void)?, onEnded: ((Value) -> Void)?) -> GestureRecognizer {
+    func _makeRecognizer(onChanged _: ((Value) -> Void)?, onEnded: ((Value) -> Void)?) -> GestureRecognizer {
         gesture._makeRecognizer(onChanged: self.action, onEnded: onEnded)
     }
 }
@@ -72,7 +71,7 @@ public struct _OnEndedGesture<G: Gesture>: Gesture {
 }
 
 extension _OnEndedGesture: _RecognizableGesture where G: _RecognizableGesture {
-    func _makeRecognizer(onChanged: ((Value) -> Void)?, onEnded: ((Value) -> Void)?) -> GestureRecognizer {
+    func _makeRecognizer(onChanged: ((Value) -> Void)?, onEnded _: ((Value) -> Void)?) -> GestureRecognizer {
         gesture._makeRecognizer(onChanged: onChanged, onEnded: self.action)
     }
 }

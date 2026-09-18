@@ -19,17 +19,17 @@ public struct UnitPoint: Hashable, Sendable {
     }
 }
 
-public extension UnitPoint {
-    static let zero = UnitPoint(x: 0, y: 0)
-    static let center = UnitPoint(x: 0.5, y: 0.5)
-    static let leading = UnitPoint(x: 0, y: 0.5)
-    static let trailing = UnitPoint(x: 1, y: 0.5)
-    static let top = UnitPoint(x: 0.5, y: 0)
-    static let bottom = UnitPoint(x: 0.5, y: 1)
-    static let topLeading = UnitPoint(x: 0, y: 0)
-    static let topTrailing = UnitPoint(x: 1, y: 0)
-    static let bottomLeading = UnitPoint(x: 0, y: 1)
-    static let bottomTrailing = UnitPoint(x: 1, y: 1)
+extension UnitPoint {
+    public static let zero = UnitPoint(x: 0, y: 0)
+    public static let center = UnitPoint(x: 0.5, y: 0.5)
+    public static let leading = UnitPoint(x: 0, y: 0.5)
+    public static let trailing = UnitPoint(x: 1, y: 0.5)
+    public static let top = UnitPoint(x: 0.5, y: 0)
+    public static let bottom = UnitPoint(x: 0.5, y: 1)
+    public static let topLeading = UnitPoint(x: 0, y: 0)
+    public static let topTrailing = UnitPoint(x: 1, y: 0)
+    public static let bottomLeading = UnitPoint(x: 0, y: 1)
+    public static let bottomTrailing = UnitPoint(x: 1, y: 1)
 }
 
 extension UnitPoint {
@@ -73,17 +73,19 @@ extension Gradient {
             return [.init(color: colors[0], location: 0), .init(color: colors[0], location: 1)]
         default:
             let lastIndex = max(colors.count - 1, 1)
-            return colors.enumerated().map { index, color in
-                Stop(
-                    color: color,
-                    location: Float(index) / Float(lastIndex)
-                )
-            }
+            return colors.enumerated()
+                .map { index, color in
+                    Stop(
+                        color: color,
+                        location: Float(index) / Float(lastIndex)
+                    )
+                }
         }
     }
 
     static func normalizeStops(_ stops: [Stop]) -> [Stop] {
-        var normalized = stops
+        var normalized =
+            stops
             .map { Stop(color: $0.color, location: min(max($0.location, 0), 1)) }
             .sorted { lhs, rhs in
                 if lhs.location == rhs.location {
@@ -93,7 +95,9 @@ extension Gradient {
             }
 
         if normalized.count > maximumStops {
-            let last = normalized.last!
+            guard let last = normalized.last else {
+                return []
+            }
             normalized = Array(normalized.prefix(maximumStops))
             normalized[maximumStops - 1] = last
         }
@@ -102,13 +106,13 @@ extension Gradient {
         case 0:
             return [
                 Stop(color: .clear, location: 0),
-                Stop(color: .clear, location: 1)
+                Stop(color: .clear, location: 1),
             ]
         case 1:
             let stop = normalized[0]
             return [
                 Stop(color: stop.color, location: 0),
-                Stop(color: stop.color, location: 1)
+                Stop(color: stop.color, location: 1),
             ]
         default:
             return normalized
@@ -131,12 +135,12 @@ struct ResolvedLinearGradient: Hashable, Sendable {
         self.stops = Gradient.normalizeStops(stops)
     }
 
-    func applyingOpacity(_ opacity: Float) -> ResolvedLinearGradient {
+    func applyingOpacity(_ opacity: Float) -> Self {
         guard opacity != 1 else {
             return self
         }
 
-        return ResolvedLinearGradient(
+        return Self(
             startPoint: UnitPoint(x: startPoint.x, y: startPoint.y),
             endPoint: UnitPoint(x: endPoint.x, y: endPoint.y),
             stops: stops.map { stop in
@@ -152,7 +156,7 @@ struct ResolvedLinearGradient: Hashable, Sendable {
 /// A view that fills its bounds with a linear gradient.
 public struct LinearGradient: View, ViewNodeBuilder {
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     public let gradient: Gradient
     public let startPoint: UnitPoint
@@ -180,17 +184,20 @@ public struct LinearGradient: View, ViewNodeBuilder {
         )
     }
 
-    func buildViewNode(in context: BuildContext) -> ViewNode {
+    func buildViewNode(in _: BuildContext) -> ViewNode {
         let resolvedGradient = ResolvedLinearGradient(
             startPoint: self.startPoint,
             endPoint: self.endPoint,
             stops: self.gradient.stops
         )
-        return CanvasViewNode(content: self, drawBlock: { graphicsContext, size in
-            graphicsContext.drawLinearGradient(
-                resolvedGradient,
-                in: Rect(origin: .zero, size: size)
-            )
-        })
+        return CanvasViewNode(
+            content: self,
+            drawBlock: { graphicsContext, size in
+                graphicsContext.drawLinearGradient(
+                    resolvedGradient,
+                    in: Rect(origin: .zero, size: size)
+                )
+            }
+        )
     }
 }

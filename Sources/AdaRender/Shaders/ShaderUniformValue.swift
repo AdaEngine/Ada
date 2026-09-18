@@ -21,8 +21,8 @@ public protocol ShaderBindable {
     static func layout() -> Int
 }
 
-public extension ShaderBindable {
-    static func layout() -> Int {
+extension ShaderBindable {
+    public static func layout() -> Int {
         return MemoryLayout<Self>.stride
     }
 }
@@ -77,10 +77,10 @@ public enum ShaderValueType: String, Codable, Sendable {
     case vec2
     case vec3
     case vec4
-    
+
     case mat4
     case mat3
-    
+
     case float
     case half
     case int
@@ -88,8 +88,8 @@ public enum ShaderValueType: String, Codable, Sendable {
     case short
     case char
     case bool
-    
+
     case structure
-    
+
     case none
 }

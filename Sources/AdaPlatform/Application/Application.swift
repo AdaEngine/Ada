@@ -8,25 +8,25 @@
 import AdaApp
 import AdaECS
 @_spi(Internal) import AdaRender
-import Foundation
 @_spi(Internal) import AdaUI
+import Foundation
 
-public extension Notification.Name {
-    static let adaEngineOpenURL = Notification.Name("AdaEngine.OpenURL")
+extension Notification.Name {
+    public static let adaEngineOpenURL = Notification.Name("AdaEngine.OpenURL")
 }
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
-import Darwin
+    import Darwin
 #elseif os(Linux) || os(Android)
-import Glibc
+    import Glibc
 #elseif os(Windows)
-import WinSDK
+    import WinSDK
 #endif
 
 #if os(Windows)
-@_silgen_name("exit")
-func exit(_ code: Int32) -> Never
+    @_silgen_name("exit")
+    func exit(_ code: Int32) -> Never
 
-let EXIT_SUCCESS: Int32 = 0
+    let EXIT_SUCCESS: Int32 = 0
 #endif
 
 /// The main class represents application instance.
@@ -34,33 +34,32 @@ let EXIT_SUCCESS: Int32 = 0
 /// To get access to the application instance, use static property `shared`
 @MainActor
 open class Application: Resource {
-    
     /// Contains application instance if application created from ``App``.
     @MainActor public internal(set) static var shared: Application!
 
     /// Current runtime platform.
     public var platform: RuntimePlatform {
         #if os(macOS)
-        return .macOS
+            return .macOS
         #elseif os(iOS)
-        return .iOS
+            return .iOS
         #elseif os(watchOS)
-        return .watchOS
+            return .watchOS
         #elseif os(tvOS)
-        return .tvOS
+            return .tvOS
         #elseif os(visionOS)
-        return .visionOS
+            return .visionOS
         #elseif os(Windows)
-        return .windows
+            return .windows
         #elseif os(Linux)
-        return .linux
+            return .linux
         #elseif os(Android)
-        return .android
+            return .android
         #elseif WASM
-        return .web
+            return .web
         #endif
     }
-    
+
     @_spi(Internal)
     @MainActor @preconcurrency
     public var windowManager: UIWindowManager = UIWindowManager()
@@ -68,10 +67,10 @@ open class Application: Resource {
     public var lastWindowCloseBehavior: LastWindowCloseBehavior = .terminateApplication
 
     // MARK: - Internal
-    
+
     public init(
-        argc: Int32,
-        argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
+        argc _: Int32,
+        argv _: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
     ) throws {
         AlertPresentationCenter.showAlert = { [weak self] presentation in
             let alert = Alert(
@@ -83,7 +82,8 @@ open class Application: Resource {
                     switch button.role {
                     case .cancel:
                         return .cancel(button.title, action: action)
-                    case .destructive, .none:
+                    case .destructive,
+                        .none:
                         return .button(button.title, action: action)
                     }
                 }
@@ -93,42 +93,42 @@ open class Application: Resource {
     }
 
     #if ENABLE_RUN_IN_CONCURRENCY
-    /// Call this method to start main loop.
-    func run(_ appWorlds: AppWorlds) async throws {
-        assertionFailure("Not implemented")
-    }
+        /// Call this method to start main loop.
+        func run(_: AppWorlds) async throws {
+            assertionFailure("Not implemented")
+        }
     #else
-    /// Call this method to start main loop.
-    func run(_ appWorlds: AppWorlds) throws {
-        assertionFailure("Not implemented")
-    }
+        /// Call this method to start main loop.
+        func run(_: AppWorlds) throws {
+            assertionFailure("Not implemented")
+        }
     #endif
-    
+
     // MARK: - Public methods
-    
+
     /// Call this method to terminate app execution with 0 status code.
-    @MainActor 
+    @MainActor
     open func terminate() {
         #if WASM
-        return
+            return
         #elseif os(Windows)
-        exit(0)
+            exit(0)
         #else
-        exit(EXIT_SUCCESS)
+            exit(EXIT_SUCCESS)
         #endif
     }
-    
+
     /// Method to open url.
     @MainActor
     @discardableResult
-    open func openURL(_ url: URL) -> Bool {
+    open func openURL(_: URL) -> Bool {
         assertionFailure("Not implemented")
         return false
     }
-    
+
     /// Call this method to show specific alert.
     @MainActor
-    open func showAlert(_ alert: Alert) {
+    open func showAlert(_: Alert) {
         assertionFailure("Not implemented")
     }
 
@@ -138,23 +138,23 @@ open class Application: Resource {
     }
 }
 
-public extension Application {
-    enum LastWindowCloseBehavior: Hashable, Sendable {
+extension Application {
+    public enum LastWindowCloseBehavior: Hashable, Sendable {
         case terminateApplication
         case keepApplicationRunning
     }
-    
+
     /// The collection of available Application States.
-    enum State: Hashable, Sendable {
+    public enum State: Hashable, Sendable {
         case active
         case inactive
         case background
     }
 }
 
-public extension Application {
+extension Application {
     @_spi(Internal)
-    static func setApplication(_ app: Application) {
+    public static func setApplication(_ app: Application) {
         self.shared = app
     }
 }
