@@ -185,6 +185,49 @@ struct EditorNotificationTests {
         #expect(received == action)
         #expect(center.notifications.first?.isRead == true)
     }
+
+    @Test("A failed activity can replace its generic action with a remediation")
+    func failedActivityUsesRemediationAction() {
+        let center = EditorNotificationCenter()
+        let id = center.activities.begin(
+            .init(
+                source: .build,
+                title: "Prepare AdaScript Workspace",
+                action: .init(title: "Open build", destination: .build)
+            )
+        )
+        let remediation = EditorNotificationAction(
+            title: "Open Runtime Entry",
+            destination: .projectSettings,
+            projectID: "project",
+            settingsPage: EditorSettingsPage.runtimeEntry
+        )
+
+        center.activities.setAction(remediation, for: id)
+        center.activities.finish(id, state: .failed, detail: "Missing entry view")
+
+        #expect(center.notifications.first?.actions == [remediation])
+    }
+
+    @Test("Runtime entry remediation routes to the nested project settings page")
+    func runtimeEntryRemediationRouting() {
+        let model = EditorViewModel()
+        let router = EditorNotificationRouter()
+        router.attach(model)
+        defer { router.detach(model) }
+
+        router.receive(
+            EditorNotificationAction(
+                title: "Open Runtime Entry",
+                destination: .projectSettings,
+                settingsPage: EditorSettingsPage.runtimeEntry
+            )
+        )
+
+        #expect(model.requestedSettingsSection == .project)
+        #expect(model.requestedSettingsPage == EditorSettingsPage.runtimeEntry)
+        #expect(model.settingsPresentationToken == 1)
+    }
 }
 
 @MainActor

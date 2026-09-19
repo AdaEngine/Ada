@@ -339,8 +339,9 @@ extension EditorViewModel {
         showRightPanel = true
     }
 
-    func presentSettings(_ section: EditorSettingsSection) {
+    func presentSettings(_ section: EditorSettingsSection, page: String? = nil) {
         requestedSettingsSection = section
+        requestedSettingsPage = page
         settingsPresentationToken += 1
         showRightPanel = false
     }
@@ -348,7 +349,12 @@ extension EditorViewModel {
     var settingsPresentationBinding: Binding<EditorSettingsSection?> {
         Binding(
             get: { self.requestedSettingsSection },
-            set: { self.requestedSettingsSection = $0 }
+            set: {
+                self.requestedSettingsSection = $0
+                if $0 == nil {
+                    self.requestedSettingsPage = nil
+                }
+            }
         )
     }
 

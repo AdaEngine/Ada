@@ -327,6 +327,15 @@ extension EditorViewModel {
             case let .projectFailure(error):
                 self.finishAdaScriptProjectBuildFailure(message: error.message)
                 self.finishWorkspaceActivity(notificationRunID, succeeded: false, detail: error.message)
+            case let .adaScriptFailure(error):
+                let message = error.errorDescription ?? error.localizedDescription
+                self.finishAdaScriptProjectBuildFailure(message: message)
+                self.finishWorkspaceActivity(
+                    notificationRunID,
+                    succeeded: false,
+                    detail: message,
+                    action: Self.notificationAction(for: error, projectID: self.project?.id)
+                )
             case let .failure(message):
                 self.finishAdaScriptProjectBuildFailure(message: message)
                 self.finishWorkspaceActivity(notificationRunID, succeeded: false, detail: message)
@@ -356,8 +365,27 @@ extension EditorViewModel {
             )
         } catch let error as ProjectSystemError {
             return .projectFailure(error)
+        } catch let error as EditorAdaScriptProjectBuildError {
+            return .adaScriptFailure(error)
         } catch {
             return .failure(error.localizedDescription)
+        }
+    }
+
+    static func notificationAction(
+        for error: EditorAdaScriptProjectBuildError,
+        projectID: String?
+    ) -> EditorNotificationAction? {
+        switch error {
+        case .entryViewMissing:
+            EditorNotificationAction(
+                title: "Open Runtime Entry",
+                destination: .projectSettings,
+                projectID: projectID,
+                settingsPage: EditorSettingsPage.runtimeEntry
+            )
+        default:
+            nil
         }
     }
 

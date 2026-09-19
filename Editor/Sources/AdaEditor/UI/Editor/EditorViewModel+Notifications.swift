@@ -28,7 +28,15 @@ extension EditorViewModel {
         return id
     }
 
-    func finishWorkspaceActivity(_ id: String, succeeded: Bool, detail: String = "") {
+    func finishWorkspaceActivity(
+        _ id: String,
+        succeeded: Bool,
+        detail: String = "",
+        action: EditorNotificationAction? = nil
+    ) {
+        if let action {
+            EditorNotificationCenter.shared.activities.setAction(action, for: id)
+        }
         EditorNotificationCenter.shared.activities.finish(id, state: succeeded ? .completed : .failed, detail: detail)
         if notificationWorkspaceRunID == id {
             notificationWorkspaceRunID = nil

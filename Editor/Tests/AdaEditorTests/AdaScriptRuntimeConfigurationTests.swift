@@ -122,6 +122,24 @@ struct AdaScriptRuntimeConfigurationTests {
         #expect(artifact.report.entryDescription == "scene Assets/Scenes/Main.ascn")
     }
 
+    @Test("missing entry view offers the runtime entry settings page")
+    func missingEntryViewOffersRuntimeSettings() {
+        let action = EditorViewModel.notificationAction(
+            for: .entryViewMissing(identifier: "game.main"),
+            projectID: "mobius"
+        )
+
+        #expect(
+            action
+                == EditorNotificationAction(
+                    title: "Open Runtime Entry",
+                    destination: .projectSettings,
+                    projectID: "mobius",
+                    settingsPage: EditorSettingsPage.runtimeEntry
+                )
+        )
+    }
+
     @Test("settings draft persists entry plugins physics and window")
     @MainActor
     func settingsDraftPersistsRuntime() throws {

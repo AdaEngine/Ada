@@ -79,7 +79,11 @@ final class EditorSettingsWindowViewModel {
     var runtimeSettings: AdaProjectRuntime
     var runtimeSettingsStatusMessage = ""
 
-    init(editorViewModel: EditorViewModel?, selectedSection: EditorSettingsSection) {
+    init(
+        editorViewModel: EditorViewModel?,
+        selectedSection: EditorSettingsSection,
+        selectedPage: String? = nil
+    ) {
         let runtimeSettings = Self.loadRuntimeSettings(from: editorViewModel)
         self.editorViewModel = editorViewModel
         self.selectedSection = selectedSection
@@ -91,7 +95,9 @@ final class EditorSettingsWindowViewModel {
         self.inputBindingsDraft = Self.loadInputBindings(from: editorViewModel)
         self.runtimeSettings = runtimeSettings
         self.runtimeDraft = EditorRuntimeSettingsDraft(runtime: runtimeSettings)
-        self.selectedPage = pages(in: selectedSection).first
+        self.selectedPage = nil
+        let availablePages = pages(in: selectedSection)
+        self.selectedPage = selectedPage.flatMap { availablePages.contains($0) ? $0 : nil } ?? availablePages.first
     }
 
     var searchTextBinding: Binding<String> {
@@ -110,10 +116,15 @@ final class EditorSettingsWindowViewModel {
         editorViewModel?.project?.name ?? "No Project"
     }
 
-    func update(editorViewModel: EditorViewModel?, selectedSection: EditorSettingsSection) {
+    func update(
+        editorViewModel: EditorViewModel?,
+        selectedSection: EditorSettingsSection,
+        selectedPage: String? = nil
+    ) {
         self.editorViewModel = editorViewModel
         self.selectedSection = selectedSection
-        selectedPage = pages(in: selectedSection).first
+        let availablePages = pages(in: selectedSection)
+        self.selectedPage = selectedPage.flatMap { availablePages.contains($0) ? $0 : nil } ?? availablePages.first
         if let workbench = editorViewModel?.workbench {
             codeFontSize = workbench.codeFontSize
             codeFontFamily = workbench.codeFontFamily
@@ -309,7 +320,8 @@ enum EditorSettingsWindowController {
         static func open(
             editorViewModel: EditorViewModel? = nil,
             project: EditorProjectReference? = nil,
-            selectedSection: EditorSettingsSection = .general
+            selectedSection: EditorSettingsSection = .general,
+            selectedPage: String? = nil
         ) {
             guard let windowManager = UIWindowManager.shared else {
                 return
@@ -329,14 +341,19 @@ enum EditorSettingsWindowController {
             if let settingsWindow,
                 windowManager.windows[settingsWindow.id] != nil,
                 let settingsViewModel {
-                settingsViewModel.update(editorViewModel: resolvedEditorViewModel, selectedSection: selectedSection)
+                settingsViewModel.update(
+                    editorViewModel: resolvedEditorViewModel,
+                    selectedSection: selectedSection,
+                    selectedPage: selectedPage
+                )
                 settingsWindow.showWindow(makeFocused: true)
                 return
             }
 
             let viewModel = EditorSettingsWindowViewModel(
                 editorViewModel: resolvedEditorViewModel,
-                selectedSection: selectedSection
+                selectedSection: selectedSection,
+                selectedPage: selectedPage
             )
             let window = windowManager.spawnWindow(configuration: windowConfiguration) {
                 EditorSettingsWindowView(viewModel: viewModel)

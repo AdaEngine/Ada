@@ -251,7 +251,11 @@ struct EditorView: View {
             #if os(iOS)
                 .fullScreenCover(item: viewModel.settingsPresentationBinding) { section in
                     EditorSettingsWindowView(
-                        viewModel: EditorSettingsWindowViewModel(editorViewModel: viewModel, selectedSection: section),
+                        viewModel: EditorSettingsWindowViewModel(
+                            editorViewModel: viewModel,
+                            selectedSection: section,
+                            selectedPage: viewModel.requestedSettingsPage
+                        ),
                         showsCloseButton: true
                     )
                     .theme(.adaEditor)
@@ -278,7 +282,11 @@ struct EditorView: View {
                     guard let section = viewModel.requestedSettingsSection else {
                         return
                     }
-                    EditorSettingsWindowController.open(editorViewModel: viewModel, selectedSection: section)
+                    EditorSettingsWindowController.open(
+                        editorViewModel: viewModel,
+                        selectedSection: section,
+                        selectedPage: viewModel.requestedSettingsPage
+                    )
                 }
             #endif
             .task {

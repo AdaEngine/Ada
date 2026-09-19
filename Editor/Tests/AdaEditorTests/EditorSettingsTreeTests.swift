@@ -56,6 +56,27 @@ struct EditorSettingsTreeTests {
         #expect(model.selectedPage == "CLOUD ACCOUNT")
         #expect(model.codeFontSize == 19)
     }
+
+    @Test("Settings presentation can target the runtime entry page")
+    func targetsRuntimeEntryPage() throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RuntimeEntrySettings-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        let project = try EditorProjectStore(storageURL: rootURL.appendingPathComponent("projects.json"))
+            .createProject(named: "RuntimeEntry", at: rootURL, template: .adaScript)
+        let editor = EditorViewModel(project: project)
+        let model = EditorSettingsWindowViewModel(
+            editorViewModel: editor,
+            selectedSection: .project,
+            selectedPage: EditorSettingsPage.runtimeEntry
+        )
+
+        #expect(model.selectedSection == .project)
+        #expect(model.selectedPage == EditorSettingsPage.runtimeEntry)
+        #expect(model.showsPage(EditorSettingsPage.runtimeEntry))
+    }
+
     @Test("Collapsible headers only change expansion, including during search")
     func headersDoNotNavigate() {
         let model = EditorSettingsWindowViewModel(editorViewModel: nil, selectedSection: .general)

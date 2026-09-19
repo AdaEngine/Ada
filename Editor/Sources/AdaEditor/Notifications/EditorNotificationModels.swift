@@ -20,6 +20,7 @@ struct EditorNotificationAction: Codable, Equatable, Sendable {
     var destination: Destination
     var projectID: String?
     var sessionID: String?
+    var settingsPage: String?
 }
 
 struct EditorNotification: Codable, Equatable, Identifiable, Sendable {

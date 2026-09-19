@@ -73,6 +73,15 @@ final class EditorActivityCoordinator {
         center?.persist()
     }
 
+    func setAction(_ action: EditorNotificationAction, for id: String) {
+        guard let index = all.firstIndex(where: { $0.id == id }), !all[index].state.isTerminal else {
+            return
+        }
+        all[index].action = action
+        backgrounds[id]?.update(all[index])
+        center?.persist()
+    }
+
     func needsAttention(_ id: String, detail: String, eventID: String) {
         guard let index = all.firstIndex(where: { $0.id == id }), !all[index].state.isTerminal else {
             return

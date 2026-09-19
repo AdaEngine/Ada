@@ -1,6 +1,10 @@
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 
+enum EditorSettingsPage {
+    static let runtimeEntry = "RUNTIME ENTRY"
+}
+
 extension EditorSettingsWindowViewModel {
     func pages(in section: EditorSettingsSection) -> [String] {
         switch section {
@@ -12,7 +16,7 @@ extension EditorSettingsWindowViewModel {
             }
             var pages = ["PROJECT"]
             if isAdaScriptProject {
-                pages += ["RUNTIME ENTRY", "RUNTIME PROFILE", "FEATURE PLUGINS"]
+                pages += [EditorSettingsPage.runtimeEntry, "RUNTIME PROFILE", "FEATURE PLUGINS"]
                 if isRuntimePluginEnabled(.physics2D) {
                     pages.append("PHYSICS 2D")
                 }

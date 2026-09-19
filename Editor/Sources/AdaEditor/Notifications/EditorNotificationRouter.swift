@@ -77,7 +77,7 @@ final class EditorNotificationRouter {
             model.selectOutputTab(action.destination == .tests ? "Tests" : "Build")
             model.showBottomPanel = true
             model.toolStrip.activeLeftBottomTool = "build"
-        case .projectSettings: model.presentSettings(.project)
+        case .projectSettings: model.presentSettings(.project, page: action.settingsPage)
         case .agentSettings: model.presentSettings(.agent)
         case .sourceControl:
             model.toolStrip.activeLeftTopTool = "sourceControl"

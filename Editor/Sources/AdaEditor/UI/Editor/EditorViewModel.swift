@@ -6,6 +6,7 @@ import Observation
 enum EditorAdaScriptProjectBuildOutcome: Sendable {
     case success(EditorAdaScriptProjectBuildArtifact)
     case projectFailure(ProjectSystemError)
+    case adaScriptFailure(EditorAdaScriptProjectBuildError)
     case failure(String)
 }
 
@@ -72,6 +73,7 @@ final class EditorViewModel {
     var newFileDestinationRelativePath = ""
     var newFileErrorMessage: String?
     var requestedSettingsSection: EditorSettingsSection?
+    var requestedSettingsPage: String?
     var settingsPresentationToken = 0
     var scenePlayRuntime: EditorScenePlayRuntime?
 
