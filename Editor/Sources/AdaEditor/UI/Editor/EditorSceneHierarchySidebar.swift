@@ -223,39 +223,41 @@ struct EditorSceneHierarchySidebar: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .onHover { updateHover($0, entityID: item.id) }
             } else {
-                HStack(spacing: 8) {
-                    Text(EditorSceneHierarchyIcon.symbol(for: item))
-                        .font(AdaEditorMaterialSymbolFont.font(size: 16))
-                        .foregroundColor(item.isSelected ? theme.editorColors.blue : theme.editorColors.muted)
-                        .frame(width: 18, height: 18)
-                        .accessibilityIdentifier("AdaEditor.SceneHierarchy.Icon.\(item.id)")
-                    Text(item.name)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(item.isEnabled ? theme.editorColors.text : theme.editorColors.muted)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .layoutPriority(1)
+                HStack(spacing: 0) {
+                    HStack(spacing: 8) {
+                        Text(EditorSceneHierarchyIcon.symbol(for: item))
+                            .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                            .foregroundColor(item.isSelected ? theme.editorColors.blue : theme.editorColors.muted)
+                            .frame(width: 18, height: 18)
+                            .accessibilityIdentifier("AdaEditor.SceneHierarchy.Icon.\(item.id)")
+                        Text(item.name)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(item.isEnabled ? theme.editorColors.text : theme.editorColors.muted)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .layoutPriority(1)
+                    }
+                    .frame(height: 34)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .mask(RectangleShape())
+                    .gesture(
+                        TapGesture()
+                            .onEnded { onSelectEntity(item.id) }
+                            .simultaneously(with: hierarchyDragGesture(for: item, items: items, sceneModel: sceneModel))
+                    )
+                    .accessibilityIdentifier("AdaEditor.SceneHierarchy.Select.\(item.id)")
+
+                    Button(action: { onSetEntityEnabled(item.id, !item.isEnabled) }) {
+                        Text(item.isEnabled ? "\u{E8F4}" : "\u{E8F5}")
+                            .font(AdaEditorMaterialSymbolFont.font(size: 15))
+                            .foregroundColor(item.isEnabled ? theme.editorColors.muted : theme.editorColors.blue)
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(DefaultButtonStyle())
+                    .accessibilityIdentifier("AdaEditor.SceneHierarchy.Visibility.\(item.id)")
                 }
-                .padding(.trailing, 30)
                 .frame(height: 34)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .mask(RectangleShape())
-                .overlay(anchor: .trailing) {
-                    if item.isSelected {
-                        Text("\u{E86C}")
-                            .font(AdaEditorMaterialSymbolFont.font(size: 15))
-                            .foregroundColor(theme.editorColors.blue)
-                            .frame(width: 18, height: 18)
-                            .allowsHitTesting(false)
-                            .accessibilityIdentifier("AdaEditor.SceneHierarchy.Selected.\(item.id)")
-                    }
-                }
-                .gesture(
-                    TapGesture()
-                        .onEnded { onSelectEntity(item.id) }
-                        .simultaneously(with: hierarchyDragGesture(for: item, items: items, sceneModel: sceneModel))
-                )
-                .accessibilityIdentifier("AdaEditor.SceneHierarchy.Select.\(item.id)")
                 .onHover { updateHover($0, entityID: item.id) }
             }
         }

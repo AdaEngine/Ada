@@ -469,6 +469,7 @@ struct AdaEngineStyleUITests {
         )
         var selectedEntityID: String?
         var addedChildParentID: String?
+        var visibilityChange: (entityID: String, isEnabled: Bool)?
         var reparentedEntityIDs: (entity: String, parent: String)?
         var contextMenu: ContextMenuPresentation?
         ContextMenuPresentationCenter.present = { contextMenu = $0 }
@@ -479,6 +480,7 @@ struct AdaEngineStyleUITests {
                 onSelectEntity: { selectedEntityID = $0 },
                 onToggleEntityExpanded: { _ in },
                 onAddEntity: { addedChildParentID = $0 },
+                onSetEntityEnabled: { entityID, isEnabled in visibilityChange = (entityID, isEnabled) },
                 onReparentEntity: { entityID, parentID in
                     reparentedEntityIDs = (entityID, parentID)
                 }
@@ -491,7 +493,9 @@ struct AdaEngineStyleUITests {
         let selectedRow = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneHierarchy.Row.\(selectedEntity.id)"))
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneHierarchy.Icon.\(selectedEntity.id)"))
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneHierarchy.Separator.\(selectedEntity.id)"))
-        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneHierarchy.Selected.\(selectedEntity.id)"))
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.SceneHierarchy.Visibility.\(selectedEntity.id)"))
+        #expect(visibilityChange?.entityID == selectedEntity.id)
+        #expect(visibilityChange?.isEnabled == false)
 
         #expect(selectedRow.absoluteFrame.height <= 36)
 

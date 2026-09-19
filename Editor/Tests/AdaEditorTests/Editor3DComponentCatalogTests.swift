@@ -12,7 +12,41 @@ import Testing
 @Suite(.serialized)
 struct Editor3DComponentCatalogTests {
     private var types: [String] {
-        [EditorBuiltInComponentType.physicsBody3D, EditorBuiltInComponentType.directionalLight3D, EditorBuiltInComponentType.mesh3D]
+        [
+            EditorBuiltInComponentType.physicsBody3D,
+            EditorBuiltInComponentType.directionalLight3D,
+            EditorBuiltInComponentType.mesh3D,
+            EditorBuiltInComponentType.environment3D,
+        ]
+    }
+
+    @Test("Environment 3D uses explicit controls and decodes legacy empty payloads")
+    func environment3DControlsAndDefaults() throws {
+        EditorComponentRegistry.registerBuiltIns()
+        let descriptor = try #require(EditorComponentRegistry.descriptor(named: EditorBuiltInComponentType.environment3D))
+        #expect(descriptor.fields.first { $0.key == "skybox.texture" }?.kind == .assetReference)
+        #expect(descriptor.fields.first { $0.key == "skybox.isEnabled" }?.kind == .bool)
+        #expect(descriptor.fields.first { $0.key == "screenSpaceReflection.isEnabled" }?.kind == .bool)
+
+        let legacy = try #require(EditorComponentRegistry.decode(typeName: EditorBuiltInComponentType.environment3D, payload: [:]) as? Environment3D)
+        #expect(legacy.skybox.isEnabled)
+        #expect(legacy.screenSpaceReflection.isEnabled)
+
+        var payload = descriptor.makeDefaultPayload()
+        let skyboxEnabled = try #require(descriptor.fields.first { $0.key == "skybox.isEnabled" })
+        let reflectionEnabled = try #require(descriptor.fields.first { $0.key == "screenSpaceReflection.isEnabled" })
+        skyboxEnabled.write("false", to: &payload)
+        reflectionEnabled.write("false", to: &payload)
+        let edited = try #require(EditorComponentRegistry.decode(typeName: EditorBuiltInComponentType.environment3D, payload: payload) as? Environment3D)
+        #expect(!edited.skybox.isEnabled)
+        #expect(!edited.screenSpaceReflection.isEnabled)
+
+        var scene = EditorSceneModel.default(projectName: "Legacy Environment")
+        let rootID = try #require(scene.rootEntityID)
+        let rootIndex = try #require(scene.entities.firstIndex { $0.id == rootID })
+        scene.entities[rootIndex].components[EditorBuiltInComponentType.environment3D] = [:]
+        let result = EditorSceneFileLoader.load(model: scene, into: World(), loadsScriptableObjects: false)
+        #expect(result.warnings.isEmpty, Comment(rawValue: result.warnings.joined(separator: "\n")))
     }
 
     @Test("3D components are available before scene plugins start")

@@ -20,15 +20,6 @@ struct EditorInspectorSidebar: View {
                 adaEditorInspectorTitle(theme: theme)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        inspectorSection("CREATE") {
-                            HStack(spacing: 5) {
-                                ForEach(EditorSceneEntityPreset.allCases, id: \.rawValue) { preset in
-                                    compactActionButton(preset.title) {
-                                        viewModel.addEntityRequested(preset)
-                                    }
-                                }
-                            }
-                        }
                         if let selectedEntity = viewModel.selectedEntity {
                             inspectorSection(selectedEntity.name.uppercased()) {
                                 Text(selectedEntity.editorID)

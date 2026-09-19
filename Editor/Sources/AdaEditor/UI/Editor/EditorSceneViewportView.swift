@@ -9,6 +9,7 @@ struct EditorSceneViewportView: View {
     let playModeState: EditorPlayModeState
     let playRuntime: EditorScenePlayRuntime?
     let onEntitySelected: (() -> Void)?
+    let onCreateEntity: (() -> Void)?
     let onPlay: (() -> Void)?
     let onStop: (() -> Void)?
     let onDocumentChanged: (EditorSceneDocument) -> Void
@@ -103,6 +104,12 @@ struct EditorSceneViewportView: View {
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
                 .mask(RectangleShape())
+                .contextMenu {
+                    Button("Create Entity…") {
+                        onCreateEntity?()
+                    }
+                }
+                .accessibilityIdentifier("AdaEditor.SceneViewport.ContextSurface")
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }
@@ -116,7 +123,10 @@ struct EditorSceneViewportView: View {
                     AdaptiveSceneView(
                         layout: displayPreview.settings.layout,
                         fitsAvailableSpace: displayPreview.fitsAvailableSpace,
-                        make: configurePlayWorld
+                        make: configurePlayWorld,
+                        updateContent: { world, _ in
+                            Self.synchronizePlayCamera(in: world)
+                        }
                     )
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     sceneControls(size: geometry.size)
@@ -195,6 +205,7 @@ struct EditorSceneViewportView: View {
         app.addPlugin(VisibilityPlugin())
         app.addPlugin(SpritePlugin())
         app.addPlugin(Mesh2DPlugin())
+        app.addPlugin(Model3DPlugin())
         app.addPlugin(TextPlugin())
         app.addPlugin(ScenePlugin())
         Self.configureSimulation(in: app, isPlaying: isPlayingThisDocument)
@@ -265,11 +276,6 @@ struct EditorSceneViewportView: View {
             displayMode: displayMode,
             isPlaying: isPlayingThisDocument,
             size: size,
-            onCreate: { preset in
-                inspectorViewModel.addEntityRequested(preset)
-                onEntitySelected?()
-                redrawViewport()
-            },
             onPlay: { onPlay?() },
             onSelectDisplayMode: selectViewportMode,
             onSelectTool: selectTool,
@@ -357,6 +363,58 @@ struct EditorSceneViewportView: View {
         displayMode = mode
         viewportModel.setDisplayMode(mode)
         redrawViewport()
+    }
+
+    @MainActor
+    @discardableResult
+    static func synchronizePlayCamera(in world: World) -> Bool {
+        guard let displayCameraEntity = world.getEntities().first(where: {
+            $0.name == "SceneView_Camera" && $0.components[Camera.self] != nil && $0.components[Transform.self] != nil
+        }) else {
+            return false
+        }
+        let authoredCameraEntity = world.getEntities()
+            .filter {
+                $0.id != displayCameraEntity.id
+                    && $0.name != "SceneView_Camera"
+                    && $0.components[Camera.self]?.isActive == true
+                    && $0.components[Transform.self] != nil
+            }
+            .max(by: { ($0.components[Camera.self]?.renderOrder ?? 0) < ($1.components[Camera.self]?.renderOrder ?? 0) })
+        guard
+            let authoredCameraEntity,
+            let authoredCamera = authoredCameraEntity.components[Camera.self],
+            let authoredTransform = authoredCameraEntity.components[Transform.self],
+            var displayCamera = displayCameraEntity.components[Camera.self]
+        else {
+            return false
+        }
+
+        displayCamera.projection = authoredCamera.projection
+        displayCamera.isActive = true
+        displayCamera.backgroundColor = authoredCamera.backgroundColor
+        displayCamera.clearFlags = authoredCamera.clearFlags
+        displayCamera.renderOrder = authoredCamera.renderOrder
+        displayCameraEntity.components += displayCamera
+        displayCameraEntity.components += authoredTransform
+
+        let defaultGraphLabel: RenderGraph.Label =
+            switch authoredCamera.projection {
+            case .perspective:
+                .main3D
+            case .orthographic,
+                .custom:
+                .main2D
+            }
+        let renderGraph = authoredCameraEntity.components[CameraRenderGraph.self]
+            ?? CameraRenderGraph(subgraphLabel: defaultGraphLabel, inputSlot: "view")
+        displayCameraEntity.components += renderGraph
+        if let environment = authoredCameraEntity.components[Environment3D.self] {
+            displayCameraEntity.components += environment
+        } else {
+            world.remove(Environment3D.self, from: displayCameraEntity.id)
+        }
+        return true
     }
 
     private func selectTool(_ tool: EditorSceneViewportTool) {

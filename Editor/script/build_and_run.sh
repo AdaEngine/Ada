@@ -2,17 +2,17 @@
 set -euo pipefail
 
 MODE="${1:-run}"
-APP_NAME="AdaEditor"
+PRODUCT_NAME="AdaEngine"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PATH="$ROOT_DIR/AdaEditor.xcodeproj"
 DERIVED_DATA="${ADA_EDITOR_DERIVED_DATA:-$ROOT_DIR/.build/xcode}"
 BUILD_PRODUCTS="$DERIVED_DATA/Build/Products/Debug"
-APP_BUNDLE="$ROOT_DIR/dist/$APP_NAME.app"
-BUILT_APP="$BUILD_PRODUCTS/$APP_NAME.app"
-APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+APP_BUNDLE="$ROOT_DIR/dist/$PRODUCT_NAME.app"
+BUILT_APP="$BUILD_PRODUCTS/$PRODUCT_NAME.app"
+APP_BINARY="$APP_BUNDLE/Contents/MacOS/$PRODUCT_NAME"
 
-pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+pkill -x "$PRODUCT_NAME" >/dev/null 2>&1 || true
 
 xcodegen generate --spec "$ROOT_DIR/project.yml"
 xcodebuild \
@@ -41,7 +41,7 @@ case "$MODE" in
     ;;
   --logs|logs)
     open_app
-    /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
+    /usr/bin/log stream --info --style compact --predicate "process == \"$PRODUCT_NAME\""
     ;;
   --telemetry|telemetry)
     open_app
@@ -50,7 +50,7 @@ case "$MODE" in
   --verify|verify)
     open_app
     sleep 1
-    pgrep -x "$APP_NAME" >/dev/null
+    pgrep -x "$PRODUCT_NAME" >/dev/null
     ;;
   *)
     echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2

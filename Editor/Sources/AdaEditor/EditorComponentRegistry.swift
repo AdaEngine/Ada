@@ -22,6 +22,7 @@ enum EditorBuiltInComponentType {
     static let directionalLight3D = String(reflecting: DirectionalLightComponent.self)
     static let pointLight3D = String(reflecting: PointLightComponent.self)
     static let spotLight3D = String(reflecting: SpotLightComponent.self)
+    static let environment3D = String(reflecting: Environment3D.self)
     static let tileMap = String(reflecting: TileMapComponent.self)
 }
 
@@ -241,6 +242,7 @@ enum EditorComponentRegistry {
         directionalLight3DDescriptor,
         pointLight3DDescriptor,
         spotLight3DDescriptor,
+        environment3DDescriptor,
         tileMapDescriptor,
         sceneInstanceDescriptor,
         uiComponentDescriptor,
@@ -273,6 +275,7 @@ enum EditorComponentRegistry {
         RuntimeTypeRegistry.registerComponent(DirectionalLightComponent.self, names: ["DirectionalLightComponent"])
         RuntimeTypeRegistry.registerComponent(PointLightComponent.self, names: ["PointLightComponent"])
         RuntimeTypeRegistry.registerComponent(SpotLightComponent.self, names: ["SpotLightComponent"])
+        RuntimeTypeRegistry.registerComponent(Environment3D.self, names: ["Environment3D"])
         RuntimeTypeRegistry.registerComponent(TileMapComponent.self, names: ["TileMapComponent"])
 
         EditorComponentReflectionRegistry.register(Transform.editorComponentDescriptor)

@@ -5,7 +5,6 @@ struct EditorSceneViewportControls: View {
     let displayMode: EditorSceneViewportDisplayMode
     let isPlaying: Bool
     let size: Size
-    let onCreate: (EditorSceneEntityPreset) -> Void
     let onPlay: () -> Void
     let onSelectDisplayMode: (EditorSceneViewportDisplayMode) -> Void
     let onSelectTool: (EditorSceneViewportTool) -> Void
@@ -41,8 +40,6 @@ struct EditorSceneViewportControls: View {
                     action: onStop
                 )
             } else {
-                createEntityButton
-                divider
                 ForEach(EditorSceneViewportTool.allCases, id: \.rawValue) { tool in
                     pillButton(tool.rawValue, symbol: tool.symbol, active: activeTool == tool) {
                         onSelectTool(tool)
@@ -67,21 +64,6 @@ struct EditorSceneViewportControls: View {
             CapsuleShape().stroke(theme.editorColors.border.opacity(0.9), lineWidth: 1)
         }
         .accessibilityIdentifier("AdaEditor.SceneViewport.Controls")
-    }
-
-    private var createEntityButton: some View {
-        Button(action: { onCreate(.empty) }) {
-            pillLabel("Create", symbol: "\u{E145}", active: false, color: theme.editorColors.blue)
-        }
-        .buttonStyle(DefaultButtonStyle())
-        .contextMenu {
-            ForEach(EditorSceneEntityPreset.allCases, id: \.rawValue) { preset in
-                Button(preset.title) {
-                    onCreate(preset)
-                }
-            }
-        }
-        .accessibilityIdentifier("AdaEditor.SceneViewport.Create")
     }
 
     private var divider: some View {

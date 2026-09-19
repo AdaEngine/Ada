@@ -382,7 +382,7 @@ struct EditorSceneEditingTests {
         #expect(cursorSelection == entityID)
     }
 
-    @Test("scene viewport pill creates entities and starts Play Mode")
+    @Test("scene viewport context menu creates entities and the pill starts Play Mode")
     @MainActor
     func sceneViewportPillControls() throws {
         if unsafe RenderEngine.shared == nil {
@@ -405,8 +405,12 @@ struct EditorSceneEditingTests {
             statusMessage: nil,
             loadSummary: EditorSceneFileLoader.summary(from: content)
         )
-        var updatedDocument: EditorSceneDocument?
+        var didRequestEntityPicker = false
         var didRequestPlay = false
+        var contextMenu: ContextMenuPresentation?
+        let previousPresenter = ContextMenuPresentationCenter.present
+        ContextMenuPresentationCenter.present = { contextMenu = $0 }
+        defer { ContextMenuPresentationCenter.present = previousPresenter }
         let container = UIContainerView(
             rootView: EditorSceneViewportView(
                 document: document,
@@ -415,9 +419,10 @@ struct EditorSceneEditingTests {
                 playModeState: .editing,
                 playRuntime: nil,
                 onEntitySelected: nil,
+                onCreateEntity: { didRequestEntityPicker = true },
                 onPlay: { didRequestPlay = true },
                 onStop: nil,
-                onDocumentChanged: { updatedDocument = $0 }
+                onDocumentChanged: { _ in }
             )
         )
         container.frame = Rect(x: 0, y: 0, width: 900, height: 600)
@@ -425,11 +430,68 @@ struct EditorSceneEditingTests {
         container.layoutIfNeeded()
 
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneViewport.Controls"))
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.SceneViewport.Create"))
+        #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.SceneViewport.Create")).isEmpty)
+        let contextSurface = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneViewport.ContextSurface"))
+        container.onMouseEvent(
+            MouseEvent(
+                window: RID(),
+                button: .right,
+                mousePosition: Point(contextSurface.absoluteFrame.midX, contextSurface.absoluteFrame.midY),
+                phase: .began,
+                modifierKeys: [],
+                time: 0
+            )
+        )
+        contextMenu?.items.first(where: { $0.title == "Create Entity…" })?.action?()
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.SceneViewport.Control.Play"))
 
-        #expect(updatedDocument?.sceneModel?.entities.count == 2)
+        #expect(didRequestEntityPicker)
         #expect(didRequestPlay)
+    }
+
+    @Test("Play viewport mirrors the highest-order active authored camera")
+    @MainActor
+    func playViewportUsesAuthoredCamera() throws {
+        let world = World()
+        let displayCamera = world.spawn("SceneView_Camera") {
+            Camera()
+            Transform()
+        }
+        var inactiveCamera = Camera()
+        inactiveCamera.isActive = false
+        inactiveCamera.renderOrder = 100
+        world.spawn("Inactive Camera") {
+            inactiveCamera
+            Transform(position: Vector3(100, 100, 100))
+        }
+        var authoredCamera = Camera()
+        authoredCamera.projection = .perspective(PerspectiveProjection(fieldOfView: .degrees(72)))
+        authoredCamera.backgroundColor = .blue
+        authoredCamera.renderOrder = 5
+        let authoredTransform = Transform(position: Vector3(2, 3, 7))
+        let authoredEnvironment = Environment3D(
+            skybox: Skybox3D(intensity: 1.75),
+            screenSpaceReflection: ScreenSpaceReflection(isEnabled: false)
+        )
+        world.spawn("Gameplay Camera") {
+            authoredCamera
+            authoredTransform
+            CameraRenderGraph(subgraphLabel: .main3D, inputSlot: Core3DPlugin.InputNode.view)
+            authoredEnvironment
+        }
+
+        #expect(EditorSceneViewportView.synchronizePlayCamera(in: world))
+        let mirroredCamera = try #require(displayCamera.components[Camera.self])
+        guard case let .perspective(projection) = mirroredCamera.projection else {
+            Issue.record("Play viewport did not use the authored perspective camera")
+            return
+        }
+        #expect(projection.fieldOfView == .degrees(72))
+        #expect(mirroredCamera.backgroundColor == .blue)
+        #expect(displayCamera.components[Transform.self] == authoredTransform)
+        #expect(displayCamera.components[CameraRenderGraph.self]?.subgraphLabel == .main3D)
+        #expect(displayCamera.components[Environment3D.self]?.skybox.intensity == 1.75)
+        #expect(displayCamera.components[Environment3D.self]?.screenSpaceReflection.isEnabled == false)
     }
 
     @Test("scene editor embeds hierarchy beside the viewport")
