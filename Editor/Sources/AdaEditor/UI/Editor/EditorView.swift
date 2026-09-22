@@ -331,17 +331,8 @@ struct EditorView: View {
 
     private var editorKeyboardShortcuts: [KeyboardShortcutAction] {
         EditorHistoryShortcuts.actions { EditorMenuCommandRouter.shared.perform($0) } + [
-            KeyboardShortcutAction(.r, modifiers: .command) {
-                viewModel.toggleDebugOverlay(.redraw)
-            },
-            KeyboardShortcutAction(.d, modifiers: .command) {
-                viewModel.toggleDebugOverlay(.layoutBounds)
-            },
-            KeyboardShortcutAction(.h, modifiers: .command) {
-                viewModel.toggleDebugOverlay(.hitTestTarget)
-            },
             KeyboardShortcutAction(.f, modifiers: .command) {
-                viewModel.toggleDebugOverlay(.focusedNode)
+                _ = viewModel.handleMenuCommand(.findInFile)
             },
             KeyboardShortcutAction(.s, modifiers: .command) {
                 viewModel.saveActiveDocument()

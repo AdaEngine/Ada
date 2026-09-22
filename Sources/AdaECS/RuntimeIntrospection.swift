@@ -13,6 +13,16 @@ public enum RuntimeTypeRegistry {
             if let makeDefault {
                 ComponentStorage.addDefaultFactory(makeDefault, named: name)
             }
+            if let constructibleType = type as? any RuntimeConstructibleComponent.Type {
+                let descriptor = constructibleType.runtimeComponentConstructor
+                if makeDefault != nil || !descriptor.requiresDefaultComponent {
+                    ComponentStorage.addRuntimeConstructor(
+                        descriptor,
+                        named: name,
+                        makeDefault: makeDefault
+                    )
+                }
+            }
         }
     }
 
@@ -42,5 +52,9 @@ public enum RuntimeTypeRegistry {
 
     public static func makeDefaultComponent(named name: String) -> (any Component)? {
         ComponentStorage.makeDefaultComponent(named: name)
+    }
+
+    public static func registeredRuntimeComponentConstructors() -> [RegisteredRuntimeComponentConstructor] {
+        ComponentStorage.allRuntimeConstructors().values.sorted { $0.name < $1.name }
     }
 }

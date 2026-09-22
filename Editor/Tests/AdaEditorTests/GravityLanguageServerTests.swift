@@ -5,6 +5,45 @@ import Testing
 
 @Suite("AdaScript language server")
 struct GravityLanguageServerTests {
+    @Test("Initialization options publish host component constructors")
+    func hostConstructorInitialization() throws {
+        let session = GravityLanguageServerSession()
+        _ = session.handle([
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": "initialize",
+            "params": [
+                "initializationOptions": [
+                    "hostConstructors": [
+                        ["name": "Health", "parameters": ["current", "maximum"]]
+                    ]
+                ],
+                "rootUri": NSNull(),
+            ],
+        ])
+        let uri = "file:///tmp/HostCatalog.ada"
+        _ = session.handle([
+            "jsonrpc": "2.0",
+            "method": "textDocument/didOpen",
+            "params": [
+                "textDocument": ["languageId": "adascript", "text": "Heal", "uri": uri, "version": 1]
+            ],
+        ])
+        let completion = session.handle([
+            "id": 2,
+            "jsonrpc": "2.0",
+            "method": "textDocument/completion",
+            "params": [
+                "position": ["character": 4, "line": 0],
+                "textDocument": ["uri": uri],
+            ],
+        ])
+        let message = try #require(completion.outgoingMessages.first)
+        let result = try #require(message["result"] as? [String: Any])
+        let items = try #require(result["items"] as? [[String: Any]])
+        #expect(items.contains { $0["label"] as? String == "Health" })
+    }
+
     @Test("Completion offers @view and AdaUI builders")
     func adaUIViewCompletion() {
         let service = GravityLanguageService()

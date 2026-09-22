@@ -14,6 +14,10 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable {
         self.commands = commands
     }
 
+    func spawn(_ components: GSValue) -> Int {
+        commands.spawn(components)
+    }
+
     func invalidate() {
         commands.invalidate()
     }
@@ -44,29 +48,41 @@ final class AnnotatedGravityCommandsBridge: @unchecked Sendable {
         self.reportDiagnostic = reportDiagnostic
     }
 
-    func spawn(_ componentNamesValue: GSValue) -> Int {
+    func spawn(_ componentValues: GSValue) -> Int {
         guard validateAccess() else {
             return -1
         }
-        guard componentNamesValue.isList else {
-            reportDiagnostic("commands.spawn expects a list of component names")
+        guard componentValues.isList else {
+            reportDiagnostic("world.spawn expects a list of components")
             return -1
         }
 
         var componentIDs = Set<ComponentId>()
         var components: [any Component] = []
-        for nameValue in componentNamesValue.toList {
-            guard nameValue.isString else {
-                reportDiagnostic("commands.spawn component names must be strings")
-                return -1
-            }
-            let name = nameValue.toString
-            guard let component = RuntimeTypeRegistry.makeDefaultComponent(named: name) else {
-                reportDiagnostic("Component '\(name)' does not have a registered default")
+        for componentValue in componentValues.toList {
+            let component: any Component
+            let diagnosticName: String
+            if componentValue.isString {
+                let name = componentValue.toString
+                guard let defaultComponent = RuntimeTypeRegistry.makeDefaultComponent(named: name) else {
+                    reportDiagnostic("Component '\(name)' does not have a registered default")
+                    return -1
+                }
+                component = defaultComponent
+                diagnosticName = name
+            } else if let componentValue = componentValue.toObjectOf(AnnotatedGravityComponentValue.self) {
+                guard let draftedComponent = componentValue.takeComponent() else {
+                    reportDiagnostic("world.spawn received an invalid or already consumed component")
+                    return -1
+                }
+                component = draftedComponent
+                diagnosticName = String(describing: type(of: draftedComponent))
+            } else {
+                reportDiagnostic("world.spawn values must be component constructors")
                 return -1
             }
             guard componentIDs.insert(type(of: component).identifier).inserted else {
-                reportDiagnostic("commands.spawn contains duplicate component '\(name)'")
+                reportDiagnostic("world.spawn contains duplicate component '\(diagnosticName)'")
                 return -1
             }
             components.append(component)

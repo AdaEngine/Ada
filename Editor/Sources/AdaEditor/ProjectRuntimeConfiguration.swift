@@ -26,6 +26,7 @@ public struct AdaProjectRuntimePluginID: Codable, Equatable, Hashable, RawRepres
     public static let core3D = Self(rawValue: "core3d")
     public static let light2D = Self(rawValue: "light2d")
     public static let mesh2D = Self(rawValue: "mesh2d")
+    public static let multiplayer = Self(rawValue: "multiplayer")
     public static let model3D = Self(rawValue: "model3d")
     public static let physics2D = Self(rawValue: "physics2d")
     public static let physics3D = Self(rawValue: "physics3d")
@@ -35,7 +36,7 @@ public struct AdaProjectRuntimePluginID: Codable, Equatable, Hashable, RawRepres
 
     public static let knownValues: Set<Self> = [
         .audio, .core2D, .core3D, .light2D, .mesh2D, .model3D,
-        .physics2D, .physics3D, .sprite, .tilemap, .upscale,
+        .multiplayer, .physics2D, .physics3D, .sprite, .tilemap, .upscale,
     ]
 }
 
@@ -61,25 +62,72 @@ public struct AdaProjectPhysics2DSettings: Codable, Equatable, Sendable {
     }
 }
 
-public struct AdaProjectRuntimePluginSettings: Codable, Equatable, Sendable {
-    public var physics2D: AdaProjectPhysics2DSettings
+public struct AdaProjectMultiplayerSettings: Codable, Equatable, Sendable {
+    public var buildIdentifier: String
+    public var gameIdentifier: String
+    public var host: String
+    public var peerIndex: Int
+    public var port: Int
+    public var role: String
 
-    public init(physics2D: AdaProjectPhysics2DSettings = AdaProjectPhysics2DSettings()) {
-        self.physics2D = physics2D
+    public init(
+        role: String = "host",
+        host: String = "::1",
+        port: Int = 37_777,
+        peerIndex: Int = 1,
+        gameIdentifier: String = "org.adaengine.adascript-game",
+        buildIdentifier: String = "1"
+    ) {
+        self.buildIdentifier = buildIdentifier
+        self.gameIdentifier = gameIdentifier
+        self.role = role
+        self.host = host
+        self.port = port
+        self.peerIndex = peerIndex
     }
 
     private enum CodingKeys: String, CodingKey {
+        case buildIdentifier, gameIdentifier, host, peerIndex, port, role
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        buildIdentifier = try container.decodeIfPresent(String.self, forKey: .buildIdentifier) ?? "1"
+        gameIdentifier = try container.decodeIfPresent(String.self, forKey: .gameIdentifier) ?? "org.adaengine.adascript-game"
+        host = try container.decodeIfPresent(String.self, forKey: .host) ?? "::1"
+        peerIndex = try container.decodeIfPresent(Int.self, forKey: .peerIndex) ?? 1
+        port = try container.decodeIfPresent(Int.self, forKey: .port) ?? 37_777
+        role = try container.decodeIfPresent(String.self, forKey: .role) ?? "host"
+    }
+}
+
+public struct AdaProjectRuntimePluginSettings: Codable, Equatable, Sendable {
+    public var multiplayer: AdaProjectMultiplayerSettings
+    public var physics2D: AdaProjectPhysics2DSettings
+
+    public init(
+        physics2D: AdaProjectPhysics2DSettings = AdaProjectPhysics2DSettings(),
+        multiplayer: AdaProjectMultiplayerSettings = AdaProjectMultiplayerSettings()
+    ) {
+        self.physics2D = physics2D
+        self.multiplayer = multiplayer
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case multiplayer
         case physics2D = "physics2d"
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         physics2D = try container.decodeIfPresent(AdaProjectPhysics2DSettings.self, forKey: .physics2D) ?? AdaProjectPhysics2DSettings()
+        multiplayer = try container.decodeIfPresent(AdaProjectMultiplayerSettings.self, forKey: .multiplayer) ?? AdaProjectMultiplayerSettings()
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(physics2D, forKey: .physics2D)
+        try container.encode(multiplayer, forKey: .multiplayer)
     }
 }
 

@@ -59,6 +59,7 @@ enum ProjectOpeningAccessibility {
     static let projectName = "AdaEditor.Launcher.ProjectName"
     static let location = "AdaEditor.Launcher.Location"
     static let landingContent = "AdaEditor.Launcher.LandingContent"
+    static let operationError = "AdaEditor.Launcher.OperationError"
     static let packageToggle = "AdaEditor.Launcher.PackageToggle"
     static let gitToggle = "AdaEditor.Launcher.GitToggle"
     static let createActions = "AdaEditor.Launcher.CreateActions"
@@ -745,7 +746,28 @@ struct ProjectOpeningView: View {
                     .font(.system(size: 12))
                     .foregroundColor(LauncherColor.muted)
                     .padding(.top, 6)
-                    .padding(.bottom, 26)
+                    .padding(.bottom, viewModel.operationErrorMessage == nil ? 26 : 16)
+
+                if let errorMessage = viewModel.operationErrorMessage {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("UNABLE TO OPEN PROJECT")
+                            .font(.system(size: 10))
+                            .foregroundColor(LauncherColor.accentOrange)
+                        Text(errorMessage)
+                            .font(.system(size: 12))
+                            .foregroundColor(.white)
+                            .lineLimit(4)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: 460, alignment: .leading)
+                    .background(RoundedRectangleShape(cornerRadius: 10).fill(LauncherColor.input))
+                    .overlay {
+                        RoundedRectangleShape(cornerRadius: 10)
+                            .stroke(LauncherColor.accentOrange.opacity(0.45), lineWidth: 1)
+                    }
+                    .accessibilityIdentifier(ProjectOpeningAccessibility.operationError)
+                    .padding(.bottom, 20)
+                }
 
                 VStack(alignment: .center, spacing: 14) {
                     Button {

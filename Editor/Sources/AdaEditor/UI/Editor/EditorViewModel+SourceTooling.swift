@@ -341,19 +341,27 @@ extension EditorViewModel {
             guard let self else {
                 return
             }
-            let targets = await self.workspaceService.definition(
+            async let targetsRequest = self.workspaceService.definition(
                 fileURL: fileURL,
                 language: document.language,
                 text: document.content,
                 position: position
             )
+            async let hoverRequest = self.workspaceService.hover(
+                fileURL: fileURL,
+                language: document.language,
+                text: document.content,
+                position: position
+            )
+            let (targets, hover) = await (targetsRequest, hoverRequest)
 
             await MainActor.run {
-                guard let target = targets.first else {
+                guard var target = targets.first else {
                     self.appendOutput("No definition found at \(document.relativePath):\(position.line + 1):\(position.character + 1)")
                     return
                 }
 
+                target.documentation = hover?.contents
                 self.openSourceTarget(target)
             }
         }
@@ -486,48 +494,77 @@ extension EditorViewModel {
         let filePath = target.filePath
         if case let .text(document)? = workbench.openDocuments.first(where: { document in
             if case let .text(textDocument) = document {
-                return textDocument.absolutePath == filePath
+                return textDocument.sourceURI == target.uri || textDocument.absolutePath == filePath
             }
             return false
         }) {
             workbench.updateTextDocument(id: document.id) { document in
                 document.focusedRange = target.selectionRange
                 document.symbolHighlights = [target.selectionRange]
+                document.symbolDocumentation = target.documentation
             }
             workbench.selectDocument(id: document.id)
             return
         }
 
         let fileURL = URL(fileURLWithPath: filePath, isDirectory: false)
+        let isReferenceDocument = isGeneratedSwiftInterface(target: target, fileURL: fileURL)
         let content: String
         let errorMessage: String?
-        do {
-            content = try String(contentsOf: fileURL, encoding: .utf8)
+        if let referenceContent = target.content {
+            content = referenceContent
             errorMessage = nil
-        } catch {
-            content = ""
-            errorMessage = error.localizedDescription
+        } else {
+            do {
+                content = try String(contentsOf: fileURL, encoding: .utf8)
+                errorMessage = nil
+            } catch {
+                content = ""
+                errorMessage = error.localizedDescription
+            }
         }
 
-        let relativePath = relativeProjectPath(for: filePath)
-        let isSymbolicLink = Self.isSymbolicLink(at: fileURL)
+        let relativePath = isReferenceDocument ? generatedInterfacePath(for: target.uri) : relativeProjectPath(for: filePath)
+        let isSymbolicLink = !isReferenceDocument && Self.isSymbolicLink(at: fileURL)
         let textDocument = EditorTextDocument(
-            id: "text:\(relativePath)",
-            title: fileURL.lastPathComponent,
+            id: isReferenceDocument ? "interface:\(target.uri)" : "text:\(relativePath)",
+            title: isReferenceDocument ? generatedInterfaceTitle(for: target.uri) : fileURL.lastPathComponent,
             relativePath: relativePath,
-            absolutePath: filePath,
-            language: EditorSourceLanguage.detect(fileName: fileURL.lastPathComponent),
+            absolutePath: isReferenceDocument ? nil : filePath,
+            sourceURI: target.uri,
+            language: isReferenceDocument ? .swift : EditorSourceLanguage.detect(fileName: fileURL.lastPathComponent),
             content: content,
             lastSavedContent: errorMessage == nil ? content : nil,
-            isReadOnly: isSymbolicLink || errorMessage != nil,
+            isReadOnly: isReferenceDocument || isSymbolicLink || errorMessage != nil,
             errorMessage: errorMessage,
-            statusMessage: isSymbolicLink ? "Read-only: symbolic link" : errorMessage == nil ? nil : "Read-only: unable to read as UTF-8",
+            statusMessage: isReferenceDocument
+                ? "Read-only: generated Swift interface"
+                : isSymbolicLink ? "Read-only: symbolic link" : errorMessage == nil ? nil : "Read-only: unable to read as UTF-8",
             symbolHighlights: [target.selectionRange],
-            focusedRange: target.selectionRange
+            focusedRange: target.selectionRange,
+            symbolDocumentation: target.documentation
         )
         let workbenchDocument = EditorWorkbenchDocument.text(textDocument)
         workbench.open(workbenchDocument)
-        refreshSemanticTokens(for: workbenchDocument)
+        if !isReferenceDocument {
+            refreshSemanticTokens(for: workbenchDocument)
+        }
+    }
+
+    func generatedInterfaceTitle(for uri: String) -> String {
+        let name = URL(string: uri)?.lastPathComponent.removingPercentEncoding
+        return name?.isEmpty == false ? name ?? "Swift Interface" : "Swift Interface"
+    }
+
+    func generatedInterfacePath(for uri: String) -> String {
+        "Generated Interfaces/\(generatedInterfaceTitle(for: uri))"
+    }
+
+    func isGeneratedSwiftInterface(target: EditorSourceSymbolTarget, fileURL: URL) -> Bool {
+        let scheme = URL(string: target.uri)?.scheme?.lowercased()
+        return scheme == "sourcekit-lsp"
+            || fileURL.pathExtension.lowercased() == "swiftinterface"
+            || fileURL.path.contains("/sourcekit-lsp/GeneratedInterfaces/")
     }
 
     func relativeProjectPath(for filePath: String) -> String {

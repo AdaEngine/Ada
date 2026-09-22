@@ -121,6 +121,8 @@ struct EditorSourceSymbolTarget: Equatable, Hashable, Sendable {
     var filePath: String
     var range: EditorSourceRange
     var selectionRange: EditorSourceRange
+    var content: String?
+    var documentation: String?
 }
 
 struct EditorSourceReference: Equatable, Hashable, Sendable {
@@ -289,6 +291,11 @@ actor SourceKitLSPClient {
                     ])
                 ]),
                 "capabilities": .object([
+                    "experimental": .object([
+                        "sourcekit/workspace/getReferenceDocument": .object([
+                            "supported": .bool(true)
+                        ])
+                    ]),
                     "workspace": .object([
                         "workspaceFolders": .bool(true)
                     ]),
@@ -440,7 +447,27 @@ actor SourceKitLSPClient {
             method: "textDocument/definition",
             params: textDocumentPositionParams(fileURL: fileURL, position: position)
         )
-        return Self.decodeDefinitionTargets(from: response)
+        var targets = Self.decodeDefinitionTargets(from: response)
+        for index in targets.indices where !Self.isFileURI(targets[index].uri) {
+            guard let content = try? await referenceDocument(uri: targets[index].uri) else {
+                continue
+            }
+            targets[index].content = content
+            targets[index].range = Self.editorRange(fromLSPRange: targets[index].range, in: content)
+            targets[index].selectionRange = Self.editorRange(fromLSPRange: targets[index].selectionRange, in: content)
+        }
+        return targets
+    }
+
+    private func referenceDocument(uri: String) async throws -> String? {
+        let response = try await connection.request(
+            method: "sourcekit/workspace/getReferenceDocument",
+            params: .object(["uri": .string(uri)])
+        )
+        guard case let .object(object)? = response, case let .string(content)? = object["content"] else {
+            return nil
+        }
+        return content
     }
 
     func references(fileURL: URL, position: EditorSourceLocation, includeDeclaration: Bool = true) async throws -> [EditorSourceReference] {
@@ -912,6 +939,10 @@ actor SourceKitLSPClient {
         }
 
         return url.path.removingPercentEncoding ?? url.path
+    }
+
+    private static func isFileURI(_ uri: String) -> Bool {
+        URL(string: uri)?.scheme?.lowercased() == "file"
     }
 
     private static let semanticTokenTypes = [

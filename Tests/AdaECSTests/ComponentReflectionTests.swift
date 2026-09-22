@@ -3,7 +3,7 @@ import AdaUtils
 import Math
 import Testing
 
-private enum ReflectionMode: String, CaseIterable, EditorEnumReflectable, Codable, Sendable {
+private enum ReflectionMode: String, CaseIterable, ReflectedEnum, Codable, Sendable {
     case idle
     case active
 }
@@ -37,11 +37,11 @@ private struct ReflectedEditableComponent: Codable, Sendable {
     }
 }
 
-@Suite("Editor component reflection")
-struct EditorComponentReflectionTests {
-    @Test("component macro exposes editable field descriptors")
+@Suite("Component reflection")
+struct ComponentReflectionTests {
+    @Test("component macro exposes reflected field descriptors")
     func generatedDescriptorContainsExpectedFieldKinds() throws {
-        let descriptor = ReflectedEditableComponent.editorComponentDescriptor
+        let descriptor = ReflectedEditableComponent.componentDescriptor
 
         #expect(descriptor.typeName == String(reflecting: ReflectedEditableComponent.self))
         #expect(descriptor.fields.map(\.key) == ["isEnabled", "count", "speed", "title", "position", "tint", "mode"])
@@ -50,33 +50,33 @@ struct EditorComponentReflectionTests {
         #expect(descriptor.fields.first { $0.key == "speed" }?.kind == .float)
         #expect(descriptor.fields.first { $0.key == "title" }?.kind == .string)
         #expect(descriptor.fields.first { $0.key == "position" }?.kind == .vector3)
-        #expect(descriptor.fields.first { $0.key == "position" }?.isEditable == true)
+        #expect(descriptor.fields.first { $0.key == "position" }?.isWritable == true)
         #expect(descriptor.fields.first { $0.key == "tint" }?.kind == .color)
         #expect(descriptor.fields.first { $0.key == "mode" }?.kind == .enumeration(["idle", "active"]))
     }
 
     @Test("reflection registry stores descriptors by type name")
     func registryLookup() throws {
-        let descriptor = ReflectedEditableComponent.editorComponentDescriptor
-        EditorComponentReflectionRegistry.register(descriptor)
+        let descriptor = ReflectedEditableComponent.componentDescriptor
+        ComponentReflectionRegistry.register(descriptor)
 
-        let registered = try #require(EditorComponentReflectionRegistry.descriptor(named: descriptor.typeName))
+        let registered = try #require(ComponentReflectionRegistry.descriptor(named: descriptor.typeName))
         #expect(registered.displayName == "ReflectedEditableComponent")
         #expect(registered.fields.map(\.key).contains("tint"))
     }
 
-    @Test("component registration stores generated editor descriptor")
+    @Test("component registration stores generated reflection descriptor")
     @MainActor
-    func componentRegistrationStoresGeneratedEditorDescriptor() throws {
+    func componentRegistrationStoresGeneratedReflectionDescriptor() throws {
         ReflectedEditableComponent.registerComponent()
 
-        let registered = try #require(EditorComponentReflectionRegistry.descriptor(named: String(reflecting: ReflectedEditableComponent.self)))
+        let registered = try #require(ComponentReflectionRegistry.descriptor(named: String(reflecting: ReflectedEditableComponent.self)))
         #expect(registered.fields.map(\.key).contains("mode"))
     }
 
     @Test("descriptor reads and writes component values")
     func descriptorReadWrite() throws {
-        let descriptor = ReflectedEditableComponent.editorComponentDescriptor
+        let descriptor = ReflectedEditableComponent.componentDescriptor
         let component = ReflectedEditableComponent()
 
         let payload = descriptor.readPayload(from: component)
@@ -92,7 +92,7 @@ struct EditorComponentReflectionTests {
 
     @Test("descriptor writes component field back to world")
     func descriptorWritesToWorld() throws {
-        let descriptor = ReflectedEditableComponent.editorComponentDescriptor
+        let descriptor = ReflectedEditableComponent.componentDescriptor
         let world = World()
         let entity = world.spawn {
             ReflectedEditableComponent()
@@ -107,12 +107,12 @@ struct EditorComponentReflectionTests {
 
     @Test("integer conversion rejects non-finite and out-of-range doubles")
     func integerConversionRejectsInvalidDoubles() {
-        #expect(EditorFieldValue.double(.nan).intValue == nil)
-        #expect(EditorFieldValue.double(.infinity).intValue == nil)
-        #expect(EditorFieldValue.double(-.infinity).intValue == nil)
-        #expect(EditorFieldValue.double(Double(Int.max) + 1).intValue == nil)
-        #expect(EditorFieldValue.double(Double(Int.min)).intValue == Int.min)
-        #expect(EditorFieldValue.double(42.75).intValue == 42)
+        #expect(ReflectedFieldValue.double(.nan).intValue == nil)
+        #expect(ReflectedFieldValue.double(.infinity).intValue == nil)
+        #expect(ReflectedFieldValue.double(-.infinity).intValue == nil)
+        #expect(ReflectedFieldValue.double(Double(Int.max) + 1).intValue == nil)
+        #expect(ReflectedFieldValue.double(Double(Int.min)).intValue == Int.min)
+        #expect(ReflectedFieldValue.double(42.75).intValue == 42)
     }
 
     @Test("floating-point conversion rejects non-finite and out-of-range values")
@@ -122,14 +122,14 @@ struct EditorComponentReflectionTests {
         var vector = Vector3(1, 2, 3)
         var color = Color.white
 
-        #expect(!EditorComponentReflection.write(.double(.nan), to: &float))
-        #expect(!EditorComponentReflection.write(.double(.infinity), to: &float))
-        #expect(!EditorComponentReflection.write(.double(Double(Float.greatestFiniteMagnitude) * 2), to: &float))
-        #expect(EditorComponentReflection.write(.double(Double(Float.greatestFiniteMagnitude)), to: &float))
-        #expect(!EditorComponentReflection.write(.double(.infinity), to: &double))
-        #expect(EditorComponentReflection.write(.double(Double(Float.greatestFiniteMagnitude) * 2), to: &double))
-        #expect(!EditorComponentReflection.write(.array([.double(1), .double(.nan), .double(3)]), to: &vector))
-        #expect(!EditorComponentReflection.write(.array([.double(1), .double(1), .double(1), .double(.infinity)]), to: &color))
+        #expect(!ComponentReflection.write(.double(.nan), to: &float))
+        #expect(!ComponentReflection.write(.double(.infinity), to: &float))
+        #expect(!ComponentReflection.write(.double(Double(Float.greatestFiniteMagnitude) * 2), to: &float))
+        #expect(ComponentReflection.write(.double(Double(Float.greatestFiniteMagnitude)), to: &float))
+        #expect(!ComponentReflection.write(.double(.infinity), to: &double))
+        #expect(ComponentReflection.write(.double(Double(Float.greatestFiniteMagnitude) * 2), to: &double))
+        #expect(!ComponentReflection.write(.array([.double(1), .double(.nan), .double(3)]), to: &vector))
+        #expect(!ComponentReflection.write(.array([.double(1), .double(1), .double(1), .double(.infinity)]), to: &color))
         #expect(float.isFinite)
         #expect(double.isFinite)
         #expect(vector == Vector3(1, 2, 3))

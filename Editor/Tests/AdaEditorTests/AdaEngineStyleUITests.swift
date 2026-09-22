@@ -578,8 +578,7 @@ struct AdaEngineStyleUITests {
         let viewport = Size(width: 640, height: 320)
         let frame = EditorCompletionPopupLayout.frame(
             viewportSize: viewport,
-            caretPosition: EditorSourceLocation(line: 200, character: 120),
-            fontSize: 12,
+            caretRect: Rect(x: 1_200, y: 2_000, width: 1.5, height: 18),
             itemCount: 8
         )
 
@@ -595,13 +594,12 @@ struct AdaEngineStyleUITests {
     func codeCompletionPopupTracksCaret() {
         let frame = EditorCompletionPopupLayout.frame(
             viewportSize: Size(width: 900, height: 700),
-            caretPosition: EditorSourceLocation(line: 3, character: 8),
-            fontSize: 12,
+            caretRect: Rect(x: 128, y: 72, width: 1.5, height: 18),
             itemCount: 3
         )
 
-        #expect(frame.minX > 82)
-        #expect(frame.minY > 18)
+        #expect(frame.minX == 128)
+        #expect(frame.minY == 90)
     }
 
     @Test("source hover popup stays inside the editor and prefers the space above the symbol")
@@ -668,8 +666,7 @@ struct AdaEngineStyleUITests {
         let detail = EditorCompletionPresentation.detail(for: item)
         let frame = EditorCompletionPopupLayout.frame(
             viewportSize: Size(width: 900, height: 700),
-            caretPosition: EditorSourceLocation(line: 1, character: 8),
-            fontSize: 12,
+            caretRect: Rect(x: 128, y: 36, width: 1.5, height: 18),
             itemCount: 40
         )
 

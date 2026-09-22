@@ -26,6 +26,7 @@ enum AdaApplicationEntry {
 
 struct AdaEditorApp: App {
     init() {
+        EditorComponentRegistry.registerBuiltIns()
         _ = EditorProjectOpenURLRouter.shared
         EditorAchievementBootstrap.install()
         EditorCloudSettingsView.installSync()

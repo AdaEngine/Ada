@@ -78,6 +78,10 @@ var products: [Product] = [
         targets: ["AdaECS"]
     ),
     .library(
+        name: "AdaMultiplayer",
+        targets: ["AdaMultiplayer"]
+    ),
+    .library(
         name: "AdaScripting",
         targets: ["AdaScripting"]
     ),
@@ -329,6 +333,27 @@ var targets: [Target] = [
             ),
             .product(
                 name: "JavaScriptEventLoop",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            )
+        ],
+        swiftSettings: swiftSettings
+    ),
+    .adaTarget(
+        name: "AdaMultiplayer",
+        dependencies: [
+            "AdaApp",
+            "AdaECS",
+            "AdaTransform",
+            "AdaUtils",
+            "Math",
+            .product(
+                name: "JavaScriptKit",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            ),
+            .product(
+                name: "JavaScriptFoundationCompat",
                 package: "JavaScriptKit",
                 condition: .when(platforms: [.wasi])
             )
@@ -1136,8 +1161,15 @@ targets += [
         dependencies: ["AdaECS", "Math"],
     ),
     .testTarget(
+        name: "AdaMultiplayerTests",
+        dependencies: ["AdaApp", "AdaECS", "AdaMultiplayer", "AdaTransform", "Math"],
+    ),
+    .testTarget(
         name: "AdaScriptingTests",
-        dependencies: ["AdaScriptCompilerCore", "AdaScripting", "AdaApp", "AdaECS", "AdaInput", "AdaRender", "AdaScene", "AdaTransform", "AdaUI", "Math"],
+        dependencies: [
+            "AdaScriptCompilerCore", "AdaScripting", "AdaApp", "AdaECS", "AdaInput", "AdaMultiplayer", "AdaRender", "AdaScene", "AdaSprite", "AdaTransform", "AdaUI", "Math",
+            .product(name: "Yams", package: "Yams"),
+        ],
     ),
     .testTarget(
         name: "AdaAssetsTests",
@@ -1261,7 +1293,7 @@ let package = Package(
 package.dependencies += [
     .package(
         url: "https://github.com/AdaEngine/gravity-lang.git",
-        revision: "664dfb05430be6303dc5da05210476d8b91de7f4"
+        exact: "0.9.9"
     ),
     .package(url: "https://github.com/apple/swift-collections", from: "1.3.0"),
     .package(url: "https://github.com/apple/swift-log", from: "1.8.0"),

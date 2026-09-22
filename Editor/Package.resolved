@@ -1,12 +1,13 @@
 {
-  "originHash" : "d97edbf3643673a5cca3062d60d9a795952df0433b04227430bf4fc0d910bd43",
+  "originHash" : "939640b6db05051a19f55a093cc1a3c3472c136454dd84a76438e3ac713e71c1",
   "pins" : [
     {
       "identity" : "gravity-lang",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/AdaEngine/gravity-lang.git",
       "state" : {
-        "revision" : "664dfb05430be6303dc5da05210476d8b91de7f4"
+        "revision" : "ecfb4a53d719163ff84f84bc245315140c075229",
+        "version" : "0.9.9"
       }
     },
     {
@@ -50,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-cmark.git",
       "state" : {
-        "revision" : "924936d0427cb25a61169739a7660230bffa6ea6",
-        "version" : "0.8.0"
+        "revision" : "08ddb528923cc1a6527e02b7a1aee9e516ca749a",
+        "version" : "0.9.0"
       }
     },
     {
@@ -86,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-markdown.git",
       "state" : {
-        "revision" : "3c6f9523da3a1ec2fd829673e472d95b8097a3b8",
-        "version" : "0.8.0"
+        "revision" : "25cb61d3482054b09ae76ca4f281b1bfe7fe5a43",
+        "version" : "0.9.0"
       }
     },
     {

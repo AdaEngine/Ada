@@ -181,7 +181,7 @@ final class AnnotatedGravityComponentView: @unchecked Sendable {
             return false
         }
         guard
-            let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
+            let fieldValue = AnnotatedGravityValueBridge.makeReflectedFieldValue(value),
             cursor.write(componentAt: access.componentIndex, field: field, value: fieldValue)
         else {
             reportDiagnostic("Invalid value for '\(access.alias).\(fieldName)'")

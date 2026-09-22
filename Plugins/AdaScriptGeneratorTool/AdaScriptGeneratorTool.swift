@@ -162,7 +162,7 @@ struct AdaScriptGeneratorTool {
             .joined(separator: ", ")
         let fields = schema.fields
             .map { field in
-                "\(swiftStringLiteral(field.name)): \(editorFieldValue(field.defaultValue))"
+                "\(swiftStringLiteral(field.name)): \(reflectedFieldValue(field.defaultValue))"
             }
             .joined(separator: ", ")
         return """
@@ -194,7 +194,7 @@ struct AdaScriptGeneratorTool {
         """
     }
 
-    private static func editorFieldValue(_ value: AdaScriptSchemaField.Value) -> String {
+    private static func reflectedFieldValue(_ value: AdaScriptSchemaField.Value) -> String {
         switch value {
         case .bool(let value): ".bool(\(value))"
         case .double(let value): ".double(\(value))"
@@ -250,21 +250,21 @@ struct AdaScriptGeneratorTool {
             .map { field in
                 let fieldType = swiftType(field.defaultValue)
                 return """
-                    unsafe EditorComponentFieldDescriptor(
+                    unsafe ReflectedComponentField(
                         key: \(swiftStringLiteral(field.name)),
                         label: \(swiftStringLiteral(field.name)),
-                        kind: EditorComponentReflection.kind(for: \(fieldType).self),
-                        isEditable: EditorComponentReflection.isEditable(\(fieldType).self),
-                        accepts: { EditorComponentReflection.accepts($0, for: \(fieldType).self) },
+                        kind: ComponentReflection.kind(for: \(fieldType).self),
+                        isWritable: ComponentReflection.isWritable(\(fieldType).self),
+                        accepts: { ComponentReflection.accepts($0, for: \(fieldType).self) },
                         read: { _ in nil },
                         write: { _, _ in nil },
                         readPointer: { pointer in
                             let resource = unsafe pointer.assumingMemoryBound(to: \(typeName).self)
-                            return EditorComponentReflection.read(unsafe resource.pointee.\(field.name))
+                            return ComponentReflection.read(unsafe resource.pointee.\(field.name))
                         },
                         writePointer: { pointer, value in
                             let resource = unsafe pointer.assumingMemoryBound(to: \(typeName).self)
-                            return unsafe EditorComponentReflection.write(value, to: &resource.pointee.\(field.name))
+                            return unsafe ComponentReflection.write(value, to: &resource.pointee.\(field.name))
                         }
                     )
                 """

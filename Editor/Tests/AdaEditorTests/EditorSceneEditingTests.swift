@@ -8,7 +8,7 @@ import Testing
 @testable import AdaCorePipelines
 @testable import AdaEditor
 
-private enum EditorReflectionMode: String, CaseIterable, EditorEnumReflectable, Codable, Sendable {
+private enum EditorReflectionMode: String, CaseIterable, ReflectedEnum, Codable, Sendable {
     case idle
     case active
 }
@@ -54,7 +54,7 @@ struct EditorSceneEditingTests {
 
     @Test("component registry adapts reflected component descriptors")
     func componentRegistryReflectsGeneratedDescriptors() throws {
-        EditorComponentReflectionRegistry.register(EditorReflectedComponent.editorComponentDescriptor)
+        ComponentReflectionRegistry.register(EditorReflectedComponent.componentDescriptor)
 
         let descriptor = try #require(EditorComponentRegistry.descriptor(named: String(reflecting: EditorReflectedComponent.self)))
 

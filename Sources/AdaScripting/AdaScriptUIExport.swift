@@ -81,7 +81,7 @@ private struct AdaScriptExportedView: View {
 }
 
 extension UIValue {
-    var scriptFieldValue: EditorFieldValue {
+    var scriptFieldValue: ReflectedFieldValue {
         switch self {
         case .null: .null
         case let .bool(value): .bool(value)
@@ -92,7 +92,7 @@ extension UIValue {
         }
     }
 
-    init(field: EditorFieldValue) {
+    init(field: ReflectedFieldValue) {
         switch field {
         case .null: self = .null
         case let .bool(value): self = .bool(value)

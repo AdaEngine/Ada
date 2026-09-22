@@ -383,6 +383,15 @@ extension EditorCenterWorkbench {
             onTextSelection: onTextSelection,
             onChatSelection: onChatSelection,
             sourceContextMenuItems: sourceContextMenuItems,
+            onFileSearchQueryChange: { documentID, query in
+                viewModel.updateFileSearchQuery(documentID: documentID, query: query)
+            },
+            onMoveFileSearchSelection: { documentID, delta in
+                viewModel.moveFileSearchSelection(documentID: documentID, delta: delta)
+            },
+            onDismissFileSearch: { documentID in
+                viewModel.dismissFileSearch(documentID: documentID)
+            },
             debugger: debugger
         )
     }

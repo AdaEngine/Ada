@@ -336,7 +336,7 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
     func evaluate(
         instance: GSValue,
         identifier: String,
-        environment: [String: EditorFieldValue]
+        environment: [String: ReflectedFieldValue]
     ) throws -> AdaScriptViewModel {
         try AdaScriptRuntimeCoordinator.lock.withLock {
             guard let metadata = viewsByIdentifier[identifier] else {
@@ -390,7 +390,7 @@ final class AdaScriptViewStorage {
     private let identifier: String
     private let instance: GSValue
     private let runtime: AdaScriptViewModuleRuntime
-    private var environment: [String: EditorFieldValue] = [:]
+    private var environment: [String: ReflectedFieldValue] = [:]
 
     init(runtime: AdaScriptViewModuleRuntime, identifier: String) throws {
         self.identifier = identifier
@@ -413,7 +413,7 @@ final class AdaScriptViewStorage {
 
     func readInput(_ name: String) throws -> UIValue { try runtime.readInput(name, instance: instance) }
 
-    func updateEnvironment(_ environment: [String: EditorFieldValue]) throws {
+    func updateEnvironment(_ environment: [String: ReflectedFieldValue]) throws {
         guard model == nil || self.environment != environment else {
             return
         }
@@ -440,7 +440,7 @@ extension UserInterfaceIdiom {
     }
 }
 
-private func defaultAdaScriptViewEnvironment() -> [String: EditorFieldValue] {
+private func defaultAdaScriptViewEnvironment() -> [String: ReflectedFieldValue] {
     [
         "colorScheme": .string("light"),
         "isEnabled": .bool(true),

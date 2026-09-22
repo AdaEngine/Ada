@@ -51,11 +51,11 @@ public struct DisplayLayout: Resource, Codable, Equatable, Sendable {
             Self.self,
             fields: keys.map { key in
                 // ECS supplies this pointer only for the duration of a declared resource access.
-                unsafe EditorComponentFieldDescriptor(
+                unsafe ReflectedComponentField(
                     key: key,
                     label: key,
                     kind: .readOnly,
-                    isEditable: false,
+                    isWritable: false,
                     accepts: { _ in false },
                     read: { _ in nil },
                     write: { _, _ in nil },
@@ -75,7 +75,7 @@ public struct DisplayLayout: Resource, Codable, Equatable, Sendable {
         )
     }
 
-    private static func rectangleValue(_ rect: Rect) -> EditorFieldValue {
+    private static func rectangleValue(_ rect: Rect) -> ReflectedFieldValue {
         .object([
             "x": .double(Double(rect.minX)),
             "y": .double(Double(rect.minY)),

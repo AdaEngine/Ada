@@ -5,6 +5,8 @@ import Synchronization
 import TreeSitterSwift
 
 struct EditorCodeFileView: View {
+    static let fileSearchFieldIdentifier = "AdaEditor.FileSearch.Query"
+
     let document: EditorTextDocument
     let text: Binding<String>
     let fontSize: Double
@@ -22,13 +24,23 @@ struct EditorCodeFileView: View {
     let onTextSelection: ((EditorTextDocument, EditorSourceRange?, String?) -> Void)?
     let onChatSelection: ((EditorTextDocument, EditorSourceRange, String) -> Void)?
     let sourceContextMenuItems: ((EditorTextDocument, EditorSourceLocation) -> [TextEditorContextMenuItem])?
+    var onFileSearchQueryChange: ((String, String) -> Void)?
+    var onMoveFileSearchSelection: ((String, Int) -> Void)?
+    var onDismissFileSearch: ((String) -> Void)?
     var debugger: EditorDebugger?
 
+    @State private var caretViewportRect: Rect?
     @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             codeHeader
+            if let documentation = document.symbolDocumentation, !documentation.isEmpty {
+                symbolDocumentation(documentation)
+            }
+            if document.fileSearch.isPresented {
+                fileSearchBar
+            }
             if let path = document.absolutePath, debugger?.modifiedSources.contains(path) == true {
                 Text("Source changed after launch. Restart debugging to use this version.")
                     .font(.system(size: 11))
@@ -96,6 +108,82 @@ extension EditorCodeFileView {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    private func symbolDocumentation(_ documentation: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Documentation")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(theme.editorColors.blue)
+            Text(
+                EditorSourceHoverPresentation.attributedText(
+                    EditorSourceHoverPresentation.displayText(from: documentation),
+                    language: document.language,
+                    palette: colorPalette,
+                    font: AdaEditorCodeFont.font(family: fontFamily, weight: fontWeight, size: 11),
+                    keywordFont: AdaEditorCodeFont.font(family: fontFamily, weight: keywordFontWeight, size: 11)
+                )
+            )
+            .lineLimit(5)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.editorColors.surface)
+        .overlay(anchor: .bottomLeading) {
+            RectangleShape().fill(theme.editorColors.border.opacity(0.65)).frame(height: 1)
+        }
+        .accessibilityIdentifier("AdaEditor.SymbolDocumentation")
+    }
+
+    private var fileSearchBar: some View {
+        let matches = EditorFileSearch.matches(in: document.content, query: document.fileSearch.query)
+        let selectedNumber = matches.isEmpty ? 0 : document.fileSearch.selectedIndex + 1
+
+        return HStack(spacing: 8) {
+            TextField(
+                "Find in file",
+                text: Binding(
+                    get: { document.fileSearch.query },
+                    set: { onFileSearchQueryChange?(document.id, $0) }
+                ),
+                onSubmit: { onMoveFileSearchSelection?(document.id, 1) }
+            )
+            .textFieldStyle(PlainTextFieldStyle())
+            .font(AdaEditorCodeFont.font(size: 12))
+            .foregroundColor(theme.editorColors.text)
+            .frame(minWidth: 160, maxWidth: 320)
+            .accessibilityIdentifier(Self.fileSearchFieldIdentifier)
+
+            Text("\(selectedNumber) / \(matches.count)")
+                .font(.system(size: 11))
+                .foregroundColor(theme.editorColors.muted)
+                .frame(width: 58, alignment: .trailing)
+
+            Button("↑") { onMoveFileSearchSelection?(document.id, -1) }
+                .buttonStyle(DefaultButtonStyle())
+                .disabled(matches.isEmpty)
+                .accessibilityIdentifier("AdaEditor.FileSearch.Previous")
+            Button("↓") { onMoveFileSearchSelection?(document.id, 1) }
+                .buttonStyle(DefaultButtonStyle())
+                .disabled(matches.isEmpty)
+                .accessibilityIdentifier("AdaEditor.FileSearch.Next")
+            Button("×") { onDismissFileSearch?(document.id) }
+                .buttonStyle(DefaultButtonStyle())
+                .accessibilityIdentifier("AdaEditor.FileSearch.Close")
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 34)
+        .background(theme.editorColors.surface)
+        .overlay(anchor: .bottomLeading) {
+            RectangleShape().fill(theme.editorColors.border.opacity(0.65)).frame(height: 1)
+        }
+        .keyboardShortcuts([
+            KeyboardShortcutAction(.escape) { onDismissFileSearch?(document.id) },
+            KeyboardShortcutAction(.enter, modifiers: .shift) { onMoveFileSearchSelection?(document.id, -1) },
+        ])
+        .accessibilityIdentifier("AdaEditor.FileSearch.Bar")
+    }
+
     private func completionList(width: Float, height: Float) -> some View {
         let rowWidth = Swift.max(Float.zero, width - EditorCompletionPopupLayout.horizontalPadding * 2)
         let listHeight = Swift.max(Float.zero, height - EditorCompletionPopupLayout.verticalPadding * 2)
@@ -148,8 +236,7 @@ extension EditorCodeFileView {
         GeometryReader { geometry in
             let popupFrame = EditorCompletionPopupLayout.frame(
                 viewportSize: geometry.size,
-                caretPosition: document.completionPosition,
-                fontSize: fontSize,
+                caretRect: caretViewportRect,
                 itemCount: document.completionItems.count
             )
 
@@ -197,19 +284,12 @@ extension EditorCodeFileView {
 
         return TextEditorSourceInteraction(
             lineMarkers: debugLineMarkers,
+            gutterHoverColor: supportsBreakpoints ? Color.red.opacity(0.38) : nil,
             executionLine: debugExecutionLine,
-            onGutterClick: { line in
-                guard let path = document.absolutePath, document.language == .swift || document.language == .ada else {
-                    return
-                }
-                debugger?.toggleBreakpoint(path: path, line: line + 1)
-            },
+            onGutterClick: gutterClickAction,
             highlightedRanges: document.symbolHighlights.map(\.textEditorRange),
-            sourceHighlights: document.diagnostics.map { diagnostic in
-                TextEditorSourceHighlight(
-                    range: diagnostic.range.textEditorRange,
-                    color: diagnosticColor(for: diagnostic.severity)
-                )
+            sourceHighlights: fileSearchHighlights + document.diagnostics.map { diagnostic in
+                TextEditorSourceHighlight(range: diagnostic.range.textEditorRange, color: diagnosticColor(for: diagnostic.severity))
             },
             hoveredRange: document.sourceHoverRange?.textEditorRange,
             focusedRange: document.focusedRange?.textEditorRange,
@@ -224,6 +304,9 @@ extension EditorCodeFileView {
                     return
                 }
                 onGoToDefinition?(document, EditorSourceLocation(textEditorPosition: position))
+            },
+            onCaretViewportRectChange: { _, rect in
+                caretViewportRect = rect
             },
             onCaretChange: { position, currentText in
                 guard supportsLanguageTooling else {
@@ -283,6 +366,25 @@ extension EditorCodeFileView {
                     isFilled: breakpoint.enabled && (!session.state.isActive || session.verifiedBreakpoints[breakpoint.id] == true)
                 )
             }
+    }
+
+    private var supportsBreakpoints: Bool {
+        document.absolutePath != nil && (document.language == .swift || document.language == .ada)
+    }
+
+    private var gutterClickAction: ((Int) -> Void)? {
+        guard supportsBreakpoints, let path = document.absolutePath else {
+            return nil
+        }
+        return { line in debugger?.toggleBreakpoint(path: path, line: line + 1) }
+    }
+
+    private var fileSearchHighlights: [TextEditorSourceHighlight] {
+        guard document.fileSearch.isPresented else {
+            return []
+        }
+        return EditorFileSearch.matches(in: document.content, query: document.fileSearch.query)
+            .map { TextEditorSourceHighlight(range: $0.textEditorRange, color: Color.yellow.opacity(0.22)) }
     }
 
     private var debugExecutionLine: Int? {
@@ -589,8 +691,7 @@ struct EditorCompletionPopupLayout {
 
     static func frame(
         viewportSize: Size,
-        caretPosition: EditorSourceLocation?,
-        fontSize: Double,
+        caretRect: Rect?,
         itemCount: Int
     ) -> Rect {
         let availableWidth = max(0, viewportSize.width - viewportInset * 2)
@@ -599,13 +700,10 @@ struct EditorCompletionPopupLayout {
         let availableRowCount = max(1, Int((availableHeight - verticalPadding * 2) / rowHeight))
         let rowCount = min(maximumVisibleRowCount, availableRowCount, max(1, itemCount))
         let height = min(availableHeight, Float(rowCount) * rowHeight + verticalPadding * 2)
-        let lineHeight = max(18, Float(fontSize) * 1.45)
-        let characterAdvance = max(6, Float(fontSize) * 0.58)
-        let position = caretPosition ?? EditorSourceLocation(line: 0, character: 0)
-        let desiredX = Float(82) + Float(max(0, position.character)) * characterAdvance
-        let caretTop = Float(18) + Float(max(0, position.line)) * lineHeight
-        let desiredYBelow = caretTop + lineHeight
-        let desiredYAbove = caretTop - height
+        let caretRect = caretRect ?? Rect(x: viewportInset, y: viewportInset, width: 0, height: 18)
+        let desiredX = caretRect.minX
+        let desiredYBelow = caretRect.maxY
+        let desiredYAbove = caretRect.minY - height
         let desiredY =
             if desiredYBelow + height <= viewportSize.height - viewportInset {
                 desiredYBelow

@@ -42,6 +42,7 @@ extension EditorWorkbenchViewModel {
                     document.isDirty = true
                     document.statusMessage = "Edited"
                 }
+                self.refreshFileSearchSelection(documentID: documentID)
             }
         )
     }

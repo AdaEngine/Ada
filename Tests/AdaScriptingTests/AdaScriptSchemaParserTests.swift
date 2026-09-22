@@ -118,7 +118,7 @@ struct AdaScriptSchemaParserTests {
                 @system
                 class CleanupSystem {
                     func update(context) {
-                        context.world.commands.despawn(42);
+                        context.world.spawn([]);
                     }
                 }
 

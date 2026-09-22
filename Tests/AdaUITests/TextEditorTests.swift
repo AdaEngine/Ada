@@ -283,6 +283,53 @@ struct TextEditorTests {
     }
 
     @Test
+    func textEditor_reportsCaretRectInScrolledViewportCoordinates() throws {
+        final class Model {
+            var text = (1...60).map { "line \($0)" }.joined(separator: "\n")
+        }
+
+        let model = Model()
+        var reportedPosition: TextEditorSourcePosition?
+        var reportedRect: Rect?
+        let tester = ViewTester {
+            TextEditor(
+                text: Binding(
+                    get: { model.text },
+                    set: { model.text = $0 }
+                ),
+                sourceInteraction: TextEditorSourceInteraction(
+                    onCaretViewportRectChange: { position, rect in
+                        reportedPosition = position
+                        reportedRect = rect
+                    }
+                )
+            )
+            .font(.system(size: 12))
+            .frame(width: 360, height: 160)
+        }
+        .setSize(Size(width: 380, height: 180))
+        .performLayout()
+
+        let node = try #require(tester.sendMouseEvent(at: Point(100, 28), phase: .began, time: 0) as? TextEditorViewNode)
+        let lines = node.lines()
+        let offset = node.offset(line: 50, column: 4, lines: lines)
+        node.selectionAnchor = offset
+        node.selectionHead = offset
+        node.ensureCaretVisibleIfNeeded()
+        node.notifyCaretChange(requestsCompletion: false)
+
+        let scrollOffset = try #require(node.nearestScrollView()?.contentOffset)
+        let contentRect = node.caretRect()
+        let viewportRect = try #require(reportedRect)
+        #expect(scrollOffset.y > 0)
+        #expect(reportedPosition == TextEditorSourcePosition(line: 50, column: 4))
+        #expect(abs(viewportRect.minX - (contentRect.minX - scrollOffset.x)) < 0.01)
+        #expect(abs(viewportRect.minY - (contentRect.minY - scrollOffset.y)) < 0.01)
+        #expect(viewportRect.minY >= 0)
+        #expect(viewportRect.maxY <= 160)
+    }
+
+    @Test
     func textEditor_reusesVisibleGlyphLayoutsAcrossScrollFrames() throws {
         final class Model {
             var text = (1...20).map { "line \($0) has source text" }.joined(separator: "\n")

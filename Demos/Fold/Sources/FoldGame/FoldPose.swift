@@ -48,8 +48,8 @@ public struct FoldPose: Resource, Codable, Equatable, Sendable {
     @MainActor public static func registerRuntimeType() {
         RuntimeTypeRegistry.registerResource(Self.self, names: ["FoldPose"])
         RuntimeResourceReflectionRegistry.register(Self.self, fields: ["angle", "showsOuter"].map { key in
-            unsafe EditorComponentFieldDescriptor(
-                key: key, label: key, kind: .readOnly, isEditable: false, accepts: { _ in false },
+            unsafe ReflectedComponentField(
+                key: key, label: key, kind: .readOnly, isWritable: false, accepts: { _ in false },
                 read: { _ in nil }, write: { _, _ in nil }, readPointer: { pointer in
                     let pose = unsafe pointer.assumingMemoryBound(to: Self.self).pointee
                     return key == "angle" ? .double(Double(pose.playableAngle)) : .bool(pose.showsOuter)

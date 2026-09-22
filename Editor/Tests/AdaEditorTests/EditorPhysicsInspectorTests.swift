@@ -24,7 +24,7 @@ struct EditorPhysicsInspectorTests {
         #expect(body.shapes.count == 1)
         #expect(body.filter.collisionBitMask == .all)
         #expect(!descriptor.fields.contains { $0.key == "runtimeBody" })
-        #expect(descriptor.fields.allSatisfy(\.isEditable))
+        #expect(descriptor.fields.allSatisfy { $0.isEditable })
         #expect(descriptor.fields.first { $0.key == "mode" }?.displayValue(in: payload) == "dynamic")
 
         let legacy = payload.filter { !["fixedRotation", "gravityScale", "linearVelocity", "angularVelocity", "debugColor"].contains($0.key) }

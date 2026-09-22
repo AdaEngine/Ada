@@ -1,0 +1,4 @@
+/.build-codex/
+/dist/
+/.ada/workspace/
+.DS_Store

@@ -70,21 +70,21 @@ struct GravityResourceBindingTests {
     }
 
     @safe
-    private static let gravityField = unsafe EditorComponentFieldDescriptor(
+    private static let gravityField = unsafe ReflectedComponentField(
         key: "gravity",
         label: "gravity",
         kind: .float,
-        isEditable: true,
-        accepts: { EditorComponentReflection.accepts($0, for: Double.self) },
+        isWritable: true,
+        accepts: { ComponentReflection.accepts($0, for: Double.self) },
         read: { _ in nil },
         write: { _, _ in nil },
         readPointer: { pointer in
             let resource = unsafe pointer.assumingMemoryBound(to: ScriptBalance.self)
-            return EditorComponentReflection.read(unsafe resource.pointee.gravity)
+            return ComponentReflection.read(unsafe resource.pointee.gravity)
         },
         writePointer: { pointer, value in
             let resource = unsafe pointer.assumingMemoryBound(to: ScriptBalance.self)
-            return unsafe EditorComponentReflection.write(value, to: &resource.pointee.gravity)
+            return unsafe ComponentReflection.write(value, to: &resource.pointee.gravity)
         }
     )
 }

@@ -7,10 +7,9 @@
 
 import AdaUtils
 
-// TODO: Add reflrection support
-
-public protocol EditorInspectableComponent: Component {
-    static var editorComponentDescriptor: EditorComponentDescriptor { get }
+/// A component that exposes generated, runtime-agnostic field metadata.
+public protocol ReflectableComponent: Component {
+    static var componentDescriptor: ReflectedComponentDescriptor { get }
 }
 
 /// A macro for creating a component.
@@ -29,10 +28,22 @@ public protocol EditorInspectableComponent: Component {
 ///                     .setPosition(Vector3(0, 0, 0))
 /// ```
 @attached(member)
-@attached(extension, conformances: Component, EditorInspectableComponent, names: arbitrary)
+@attached(
+    extension,
+    conformances: Component, ReflectableComponent, RuntimeConstructibleComponent,
+    names: arbitrary
+)
 public macro Component(
     required: [any (Component & DefaultValue).Type] = []
 ) = #externalMacro(module: "AdaEngineMacros", type: "ComponentMacro")
+
+/// Selects the Swift initializer used by AdaScript host construction.
+/// ``Component()`` consumes this marker and generates the direct bridge.
+@attached(peer)
+public macro AdaScriptInit() = #externalMacro(
+    module: "AdaEngineMacros",
+    type: "AdaScriptInitMacro"
+)
 
 /// A macro for creating a bundle.
 /// A bundle macro is more preffered way to create a bundle.

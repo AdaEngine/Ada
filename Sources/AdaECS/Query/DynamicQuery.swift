@@ -136,8 +136,8 @@ public final class DynamicQueryCursor: @unchecked Sendable {
 
     public func read(
         componentAt componentIndex: Int,
-        field: EditorComponentFieldDescriptor
-    ) -> EditorFieldValue? {
+        field: ReflectedComponentField
+    ) -> ReflectedFieldValue? {
         guard
             columns.indices.contains(componentIndex), rowPosition >= 0,
             let readPointer = unsafe field.readPointer
@@ -152,8 +152,8 @@ public final class DynamicQueryCursor: @unchecked Sendable {
     @discardableResult
     public func write(
         componentAt componentIndex: Int,
-        field: EditorComponentFieldDescriptor,
-        value: EditorFieldValue
+        field: ReflectedComponentField,
+        value: ReflectedFieldValue
     ) -> Bool {
         guard
             columns.indices.contains(componentIndex), rowPosition >= 0,

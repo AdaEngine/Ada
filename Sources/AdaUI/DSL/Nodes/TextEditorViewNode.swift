@@ -68,6 +68,7 @@ final class TextEditorViewNode: ViewNode {
     var isSelectingWithMouse = false
     var isSelectingWithTouch = false
     var gutterTouchLine: Int?
+    var hoveredGutterLine: Int?
     var mousePressStartPoint: Point?
     var touchPressStartPoint: Point?
     var lastTapTime: AdaUtils.TimeInterval?
@@ -421,6 +422,14 @@ final class TextEditorViewNode: ViewNode {
                         in: Rect(x: contentRect.minX, y: rowY + (lineHeight - 10) * 0.5, width: 10, height: 10),
                         color: marker.color,
                         thickness: marker.isFilled ? 1 : 0.22
+                    )
+                } else if self.showsLineNumbers,
+                    self.hoveredGutterLine == lineIndex,
+                    let color = self.sourceInteraction?.gutterHoverColor {
+                    clippedContext.drawEllipse(
+                        in: Rect(x: contentRect.minX, y: rowY + (lineHeight - 10) * 0.5, width: 10, height: 10),
+                        color: color,
+                        thickness: 0.22
                     )
                 }
 

@@ -22,6 +22,7 @@ public struct Transform: Codable, Hashable, Sendable {
     public var position: Vector3
 
     /// Create a new transform component from rotation, scale and position.
+    @AdaScriptInit
     public init(
         rotation: Quat = .identity,
         scale: Vector3 = [1, 1, 1],

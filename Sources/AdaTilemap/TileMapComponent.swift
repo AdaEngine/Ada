@@ -6,10 +6,13 @@
 //
 
 import AdaECS
+import AdaRender
+import AdaTransform
+import AdaUtils
 import Math
 
 /// Component that responsible to display ``TileMap`` instance on screen.
-@Component
+@Component(required: [Visibility.self, BoundingComponent.self])
 public struct TileMapComponent {
     /// Contains ``TileMap`` instance that will display on screen.
     public var tileMap: TileMap
@@ -34,8 +37,17 @@ public struct TileMapComponent {
     /// The tile display size used for this component's last render.
     internal var lastRenderedTileDisplaySize: Size?
 
+    /// Static atlas tiles extracted directly into the render world without child ECS entities.
+    internal var renderedAtlasTiles: [TileMapLayer.ID: [TileMapRenderedAtlasTile]] = [:]
+
     public init(tileMap: TileMap, tileDisplaySize: Size) {
         self.tileMap = tileMap
         self.tileDisplaySize = tileDisplaySize
     }
+}
+
+struct TileMapRenderedAtlasTile: Sendable {
+    var texture: Texture2D
+    var tintColor: Color
+    var transform: Transform
 }

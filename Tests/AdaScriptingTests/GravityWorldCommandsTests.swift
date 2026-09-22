@@ -1,6 +1,7 @@
 @testable import AdaApp
 import AdaECS
 import AdaScripting
+import Math
 import Testing
 
 @Suite("Gravity world commands", .serialized)
@@ -63,6 +64,60 @@ struct GravityWorldCommandsTests {
         #expect(plugin.diagnostics.isEmpty)
         #expect(world.get(CommandSpawned.self, from: spawned.id) != nil)
         #expect(world.get(CommandExtra.self, from: spawned.id) == nil)
+    }
+
+    @Test("Spawns initialized component values through the world facade")
+    @MainActor
+    func spawnsInitializedComponents() async throws {
+        registerComponents()
+        let plugin = try AdaScriptPlugin(
+            source: """
+            @system(id: "typed.spawn.system")
+            class TypedSpawnSystem {
+                func update(context) {
+                    context.world.spawn([
+                        CommandConfigured(position: Vector3(4, 5, 6), count: 7)
+                    ]);
+                }
+            }
+            """,
+            name: "TypedDeferredSpawn"
+        )
+        let world = World(name: "Typed deferred spawn")
+
+        plugin.setup(in: AppWorlds(main: world))
+        await world.runScheduler(.update)
+
+        let spawned = try #require(world.getEntities().first)
+        let component = try #require(world.get(CommandConfigured.self, from: spawned.id))
+        #expect(plugin.diagnostics.isEmpty)
+        #expect(component.position == Vector3(4, 5, 6))
+        #expect(component.count == 7)
+    }
+
+    @Test("Supports Vector3.ZERO in component constructors")
+    @MainActor
+    func supportsVectorZero() async throws {
+        registerComponents()
+        let plugin = try AdaScriptPlugin(
+            source: """
+            @system(id: "zero.spawn.system")
+            class ZeroSpawnSystem {
+                func update(context) {
+                    context.world.spawn([CommandConfigured(position: Vector3.ZERO)]);
+                }
+            }
+            """,
+            name: "ZeroDeferredSpawn"
+        )
+        let world = World(name: "Zero deferred spawn")
+
+        plugin.setup(in: AppWorlds(main: world))
+        await world.runScheduler(.update)
+
+        let spawned = try #require(world.getEntities().first)
+        #expect(plugin.diagnostics.isEmpty)
+        #expect(world.get(CommandConfigured.self, from: spawned.id)?.position == .zero)
     }
 
     @Test("Rejects a retained commands capability after its callback")
@@ -140,6 +195,12 @@ struct GravityWorldCommandsTests {
             names: ["CommandExtra", "test.extra"],
             makeDefault: { CommandExtra() }
         )
+        RuntimeTypeRegistry.registerComponent(
+            CommandConfigured.self,
+            names: ["CommandConfigured"],
+            makeDefault: { CommandConfigured() }
+        )
+        ComponentReflectionRegistry.register(CommandConfigured.componentDescriptor)
     }
 }
 
@@ -151,3 +212,9 @@ private struct CommandSpawned {}
 
 @Component
 private struct CommandExtra {}
+
+@Component
+private struct CommandConfigured {
+    var position: Vector3 = .zero
+    var count: Int = 0
+}

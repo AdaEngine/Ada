@@ -7,7 +7,10 @@ import Testing
 struct GravityLanguageSemanticTests {
     @Test("Annotated lifecycle parameters expose typed host APIs")
     func annotatedLifecycleCompletion() {
-        let service = GravityLanguageService()
+        let service = GravityLanguageService(hostConstructors: [
+            GravityHostConstructor(name: "Health", parameters: ["current", "maximum"]),
+            GravityHostConstructor(name: "Transform", parameters: ["rotation", "scale", "position"]),
+        ])
         let systemSource = """
             @system(id: "movement")
             class MovementSystem {
@@ -36,6 +39,43 @@ struct GravityLanguageSemanticTests {
             position: GravitySourcePosition(line: 3, utf16Column: 33)
         )
         #expect(commandItems.contains { $0.label == "spawn" })
+
+        let worldSource = """
+            @system(id: "world")
+            class WorldSystem {
+                func update(context) {
+                    context.world.sp
+                }
+            }
+            """
+        let worldItems = service.completions(
+            text: worldSource,
+            position: GravitySourcePosition(line: 3, utf16Column: 24)
+        )
+        #expect(worldItems.contains { $0.label == "spawn" })
+
+        let constructorItems = service.completions(
+            text: "Tran",
+            position: GravitySourcePosition(line: 0, utf16Column: 4)
+        )
+        #expect(constructorItems.contains { $0.label == "Transform" })
+        let healthItems = service.completions(
+            text: "Heal",
+            position: GravitySourcePosition(line: 0, utf16Column: 4)
+        )
+        #expect(healthItems.contains { $0.label == "Health" })
+
+        let constructorHover = service.hover(
+            text: "Transform(position: Vector3.ZERO)",
+            position: GravitySourcePosition(line: 0, utf16Column: 2)
+        )
+        #expect(constructorHover?.contents == "Transform(rotation:, scale:, position:) -> Component")
+
+        let vectorItems = service.completions(
+            text: "Vector3.Z",
+            position: GravitySourcePosition(line: 0, utf16Column: 9)
+        )
+        #expect(vectorItems.contains { $0.label == "ZERO" })
 
         let toolSource = """
             @tool(id: "com.example.tool", permissions: [])
@@ -89,7 +129,7 @@ struct GravityLanguageSemanticTests {
             }
         )
         let hover = service.hover(text: source, position: GravitySourcePosition(line: 3, utf16Column: 32))
-        #expect(hover?.contents.contains("spawn(componentNames)") == true)
+        #expect(hover?.contents.contains("spawn(components)") == true)
         let signature = service.signatureHelp(text: source, position: GravitySourcePosition(line: 3, utf16Column: 37))
         #expect(signature?.activeParameter == 0)
 
@@ -134,7 +174,7 @@ struct GravityLanguageSemanticTests {
         let hoverMessage = try #require(hoverResponse.outgoingMessages.first)
         let hoverResult = try #require(hoverMessage["result"] as? [String: Any])
         let hoverContents = try #require(hoverResult["contents"] as? [String: String])
-        #expect(hoverContents["value"]?.contains("spawn(componentNames)") == true)
+        #expect(hoverContents["value"]?.contains("spawn(components)") == true)
     }
 
     private func validateInitialization(of session: GravityLanguageServerSession) throws {

@@ -30,8 +30,8 @@ public struct Core2DPlugin: Plugin {
         app
             .insertResource(RenderItems<Transparent2DRenderItem>())
             .insertResource(SortedRenderItems<Transparent2DRenderItem>())
+            .addSystem(ClearTransparent2dRenderItemsSystem.self, on: .extract)
             .addSystem(Transparent2DBatchingSystem.self, on: .batching)
-            .addSystem(ClearTransparent2dRenderItemsSystem.self, on: .preUpdate)
             .insertResource(RenderPipelines(configurator: QuadPipeline()))
             .insertResource(RenderPipelines(configurator: CirclePipeline()))
             .insertResource(RenderPipelines(configurator: LinePipeline()))

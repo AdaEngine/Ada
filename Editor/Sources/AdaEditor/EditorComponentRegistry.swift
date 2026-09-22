@@ -42,7 +42,7 @@ enum EditorComponentFieldKind: Equatable, Sendable {
 }
 
 extension EditorComponentFieldKind {
-    init(reflectedKind: EditorFieldKind) {
+    init(reflectedKind: ReflectedFieldKind) {
         switch reflectedKind {
         case .bool:
             self = .bool
@@ -220,7 +220,7 @@ enum EditorComponentRegistry {
     static var descriptors: [EditorComponentDescriptor] {
         let overrideNames = Set(overrideDescriptors.map(\.typeName))
         let reflectedDescriptors =
-            EditorComponentReflectionRegistry
+            ComponentReflectionRegistry
             .allDescriptors()
             .filter { !overrideNames.contains($0.typeName) }
             .map(editorDescriptor(from:))
@@ -257,10 +257,23 @@ enum EditorComponentRegistry {
     static func registerBuiltIns() {
         DisplayLayout.registerRuntimeType()
         RuntimeTypeRegistry.registerComponent(CompanionPanel.self, names: ["CompanionPanel"])
-        RuntimeTypeRegistry.registerComponent(Transform.self, names: ["Transform"])
+        RuntimeTypeRegistry.registerComponent(
+            Transform.self,
+            names: ["Transform"],
+            makeDefault: { Transform() }
+        )
         RuntimeTypeRegistry.registerComponent(GlobalTransform.self, names: ["GlobalTransform"])
         RuntimeTypeRegistry.registerComponent(Camera.self, names: ["Camera"])
-        RuntimeTypeRegistry.registerComponent(Sprite.self, names: ["Sprite"])
+        RuntimeTypeRegistry.registerComponent(
+            Sprite.self,
+            names: ["Sprite"],
+            makeDefault: { Sprite(texture: Texture2D.whiteTexture) }
+        )
+        RuntimeTypeRegistry.registerComponent(
+            NoFrustumCulling.self,
+            names: ["NoFrustumCulling", String(reflecting: NoFrustumCulling.self)],
+            makeDefault: { NoFrustumCulling() }
+        )
         RuntimeTypeRegistry.registerComponent(Visibility.self, names: ["Visibility"])
         RuntimeTypeRegistry.registerComponent(BoundingComponent.self, names: ["BoundingComponent"])
         RuntimeTypeRegistry.registerComponent(Light2D.self, names: ["Light2D"])
@@ -278,20 +291,20 @@ enum EditorComponentRegistry {
         RuntimeTypeRegistry.registerComponent(Environment3D.self, names: ["Environment3D"])
         RuntimeTypeRegistry.registerComponent(TileMapComponent.self, names: ["TileMapComponent"])
 
-        EditorComponentReflectionRegistry.register(Transform.editorComponentDescriptor)
-        EditorComponentReflectionRegistry.register(GlobalTransform.editorComponentDescriptor)
-        EditorComponentReflectionRegistry.register(Camera.editorComponentDescriptor)
-        EditorComponentReflectionRegistry.register(Sprite.editorComponentDescriptor)
-        EditorComponentReflectionRegistry.register(Visibility.editorComponentDescriptor)
-        EditorComponentReflectionRegistry.register(BoundingComponent.editorComponentDescriptor)
-        EditorComponentReflectionRegistry.register(Light2D.editorComponentDescriptor)
-        EditorComponentReflectionRegistry.register(LightOccluder2D.editorComponentDescriptor)
-        EditorComponentReflectionRegistry.register(LightModulate2D.editorComponentDescriptor)
-        EditorComponentReflectionRegistry.register(SceneInstance.editorComponentDescriptor)
+        ComponentReflectionRegistry.register(Transform.componentDescriptor)
+        ComponentReflectionRegistry.register(GlobalTransform.componentDescriptor)
+        ComponentReflectionRegistry.register(Camera.componentDescriptor)
+        ComponentReflectionRegistry.register(Sprite.componentDescriptor)
+        ComponentReflectionRegistry.register(Visibility.componentDescriptor)
+        ComponentReflectionRegistry.register(BoundingComponent.componentDescriptor)
+        ComponentReflectionRegistry.register(Light2D.componentDescriptor)
+        ComponentReflectionRegistry.register(LightOccluder2D.componentDescriptor)
+        ComponentReflectionRegistry.register(LightModulate2D.componentDescriptor)
+        ComponentReflectionRegistry.register(SceneInstance.componentDescriptor)
     }
 
     static func descriptor(named typeName: String) -> EditorComponentDescriptor? {
-        overrideDescriptorsByName[typeName] ?? EditorComponentReflectionRegistry.descriptor(named: typeName).map(editorDescriptor(from:))
+        overrideDescriptorsByName[typeName] ?? ComponentReflectionRegistry.descriptor(named: typeName).map(editorDescriptor(from:))
     }
 
     static func addableDescriptors(for entity: EditorSceneEntity?) -> [EditorComponentDescriptor] {
@@ -322,7 +335,7 @@ enum EditorComponentRegistry {
         return value as? any Component
     }
 
-    private static func editorDescriptor(from descriptor: AdaECS.EditorComponentDescriptor) -> EditorComponentDescriptor {
+    private static func editorDescriptor(from descriptor: AdaECS.ReflectedComponentDescriptor) -> EditorComponentDescriptor {
         EditorComponentDescriptor(
             typeName: descriptor.typeName,
             displayName: descriptor.displayName,
@@ -334,7 +347,7 @@ enum EditorComponentRegistry {
                     key: $0.key,
                     label: $0.label,
                     kind: EditorComponentFieldKind(reflectedKind: $0.kind),
-                    isEditable: $0.isEditable
+                    isEditable: $0.isWritable
                 )
             },
             makeDefaultPayload: { [:] },

@@ -120,6 +120,24 @@ public struct GravityCompletion: Equatable, Hashable, Sendable {
     }
 }
 
+/// One runtime-provided host constructor shared by completion, hover and
+/// signature help. The language core stays independent from AdaEngine runtime
+/// types; AdaEditor supplies this catalog from registered components.
+public struct GravityHostConstructor: Equatable, Hashable, Sendable {
+    public var name: String
+    public var parameters: [String]
+
+    public init(name: String, parameters: [String]) {
+        self.name = name
+        self.parameters = parameters
+    }
+
+    public var signature: String {
+        let arguments = parameters.map { "\($0):" }.joined(separator: ", ")
+        return "\(name)(\(arguments)) -> Component"
+    }
+}
+
 public enum GravitySemanticTokenKind: String, CaseIterable, Equatable, Hashable, Sendable {
     case type
     case `class`

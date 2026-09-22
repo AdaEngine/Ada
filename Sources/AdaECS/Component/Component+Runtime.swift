@@ -20,8 +20,8 @@ extension Component {
     @MainActor
     public static func registerComponent() {
         ComponentStorage.addComponent(self)
-        if let inspectableType = self as? any EditorInspectableComponent.Type {
-            EditorComponentReflectionRegistry.register(inspectableType.editorComponentDescriptor)
+        if let inspectableType = self as? any ReflectableComponent.Type {
+            ComponentReflectionRegistry.register(inspectableType.componentDescriptor)
         }
     }
 }
@@ -41,6 +41,7 @@ enum ComponentStorage {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var registeredComponents: [String: any Component.Type] = [:]
     nonisolated(unsafe) private static var defaultFactories: [String: @Sendable () -> any Component] = [:]
+    nonisolated(unsafe) private static var runtimeConstructors: [String: RegisteredRuntimeComponentConstructor] = [:]
 
     /// Return registered component or try to find it by NSClassFromString (works only for objc runtime)
     static func getRegisteredComponent(for name: String) -> (any Component.Type)? {
@@ -61,6 +62,19 @@ enum ComponentStorage {
         lock.withLock { unsafe defaultFactories[name] = factory }
     }
 
+    static func addRuntimeConstructor(
+        _ descriptor: RuntimeComponentConstructorDescriptor,
+        named name: String,
+        makeDefault: (@Sendable () -> any Component)?
+    ) {
+        let constructor = RegisteredRuntimeComponentConstructor(
+            name: name,
+            descriptor: descriptor,
+            makeDefault: makeDefault
+        )
+        lock.withLock { unsafe runtimeConstructors[name] = constructor }
+    }
+
     static func makeDefaultComponent(named name: String) -> (any Component)? {
         let factory = lock.withLock { unsafe defaultFactories[name] }
         return factory?()
@@ -68,6 +82,10 @@ enum ComponentStorage {
 
     static func allRegisteredComponents() -> [String: any Component.Type] {
         lock.withLock { unsafe registeredComponents }
+    }
+
+    static func allRuntimeConstructors() -> [String: RegisteredRuntimeComponentConstructor] {
+        lock.withLock { unsafe runtimeConstructors }
     }
 }
 

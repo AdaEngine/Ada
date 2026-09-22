@@ -4,7 +4,7 @@ import Gravity
 @GSExportable("AdaAttachedComponent")
 final class GravityAttachedComponentView: @unchecked Sendable {
     private let componentType: any Component.Type
-    private let descriptor: EditorComponentDescriptor?
+    private let descriptor: ReflectedComponentDescriptor?
     private let entityID: Entity.ID
     private let reportDiagnostic: @Sendable (String) -> Void
     private let virtualMachine: GravityVirtualMachine
@@ -17,7 +17,7 @@ final class GravityAttachedComponentView: @unchecked Sendable {
         world: World,
         entityID: Entity.ID,
         componentType: any Component.Type,
-        descriptor: EditorComponentDescriptor?,
+        descriptor: ReflectedComponentDescriptor?,
         reportDiagnostic: @escaping @Sendable (String) -> Void,
         virtualMachine: GravityVirtualMachine
     ) -> GravityAttachedComponentView {
@@ -35,7 +35,7 @@ final class GravityAttachedComponentView: @unchecked Sendable {
         world: World,
         entityID: Entity.ID,
         componentType: any Component.Type,
-        descriptor: EditorComponentDescriptor?,
+        descriptor: ReflectedComponentDescriptor?,
         reportDiagnostic: @escaping @Sendable (String) -> Void,
         virtualMachine: GravityVirtualMachine
     ) {
@@ -68,7 +68,7 @@ final class GravityAttachedComponentView: @unchecked Sendable {
     func set(_ fieldName: String, _ value: GSValue) -> Bool {
         guard
             let world, let descriptor,
-            let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
+            let fieldValue = AnnotatedGravityValueBridge.makeReflectedFieldValue(value),
             descriptor.write(fieldValue, toField: fieldName, in: world, entity: entityID)
         else {
             reportDiagnostic("Invalid attached component field '\(fieldName)'")
@@ -80,7 +80,7 @@ final class GravityAttachedComponentView: @unchecked Sendable {
 
 @GSExportable("AdaAttachedResource")
 final class GravityAttachedResourceView: @unchecked Sendable {
-    private let fields: [String: EditorComponentFieldDescriptor]
+    private let fields: [String: ReflectedComponentField]
     private let optional: Bool
     private let reportDiagnostic: @Sendable (String) -> Void
     private let resourceType: any Resource.Type
@@ -93,7 +93,7 @@ final class GravityAttachedResourceView: @unchecked Sendable {
     static func make(
         world: World,
         resourceType: any Resource.Type,
-        fields: [String: EditorComponentFieldDescriptor],
+        fields: [String: ReflectedComponentField],
         optional: Bool,
         reportDiagnostic: @escaping @Sendable (String) -> Void,
         virtualMachine: GravityVirtualMachine
@@ -111,7 +111,7 @@ final class GravityAttachedResourceView: @unchecked Sendable {
     private init(
         world: World,
         resourceType: any Resource.Type,
-        fields: [String: EditorComponentFieldDescriptor],
+        fields: [String: ReflectedComponentField],
         optional: Bool,
         reportDiagnostic: @escaping @Sendable (String) -> Void,
         virtualMachine: GravityVirtualMachine
@@ -145,7 +145,7 @@ final class GravityAttachedResourceView: @unchecked Sendable {
     func set(_ fieldName: String, _ value: GSValue) -> Bool {
         guard
             let world, let field = fields[fieldName],
-            let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
+            let fieldValue = AnnotatedGravityValueBridge.makeReflectedFieldValue(value),
             world.writeResourceField(type: resourceType, field: field, value: fieldValue)
         else {
             reportDiagnostic("Invalid attached resource field '\(fieldName)'")

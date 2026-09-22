@@ -44,7 +44,7 @@ public struct ComponentMacro: ExtensionMacro {
         }
 
         return if let structDecl = declaration.as(StructDeclSyntax.self) {
-            componentMacroForStruct(structDecl, type: type, requiredComponents: dependencies)
+            try componentMacroForStruct(structDecl, type: type, requiredComponents: dependencies)
         } else if let enumDecl = declaration.as(EnumDeclSyntax.self) {
             generateDeclaration(
                 type: type,
@@ -59,6 +59,18 @@ public struct ComponentMacro: ExtensionMacro {
 }
 
 extension ComponentMacro {
+    private struct ExplicitRuntimeConstructor {
+        let body: String
+        let parameters: [String]
+    }
+
+    private struct RuntimeConstructorParameter {
+        let defaultExpression: String?
+        let externalName: String
+        let localName: String
+        let typeName: String
+    }
+
     /// Extracts type name from expression like Transform.self or AdaTransform.Transform.self
     private static func extractTypeName(from expression: ExprSyntax) -> String? {
         // Handle cases like Transform.self or AdaTransform.Transform.self
@@ -98,7 +110,7 @@ extension ComponentMacro {
         _ structDecl: StructDeclSyntax,
         type: T,
         requiredComponents: [String]
-    ) -> [SwiftSyntax.ExtensionDeclSyntax] {
+    ) throws -> [SwiftSyntax.ExtensionDeclSyntax] {
         let properties = structDecl.memberBlock.members.compactMap { member -> (String, TypeSyntax, String)? in
             guard let varDecl = member.decl.as(VariableDeclSyntax.self) else {
                 return nil
@@ -140,38 +152,38 @@ extension ComponentMacro {
             """
         }
 
-        let editorFields = properties.map { propertyName, propertyType, _ in
+        let reflectedFields = properties.map { propertyName, propertyType, _ in
             """
-            unsafe AdaECS.EditorComponentFieldDescriptor(
+            unsafe AdaECS.ReflectedComponentField(
                 key: "\(propertyName)",
-                label: "\(propertyName.editorFieldLabel)",
-                kind: AdaECS.EditorComponentReflection.kind(for: \(propertyType).self),
-                isEditable: AdaECS.EditorComponentReflection.isEditable(\(propertyType).self),
+                label: "\(propertyName.reflectedFieldLabel)",
+                kind: AdaECS.ComponentReflection.kind(for: \(propertyType).self),
+                isWritable: AdaECS.ComponentReflection.isWritable(\(propertyType).self),
                 accepts: { fieldValue in
-                    AdaECS.EditorComponentReflection.accepts(fieldValue, for: \(propertyType).self)
+                    AdaECS.ComponentReflection.accepts(fieldValue, for: \(propertyType).self)
                 },
                 read: { component in
                     guard let typedComponent = component as? Self else {
                         return nil
                     }
-                    return AdaECS.EditorComponentReflection.read(typedComponent.\(propertyName))
+                    return AdaECS.ComponentReflection.read(typedComponent.\(propertyName))
                 },
                 write: { component, fieldValue in
                     guard var typedComponent = component as? Self else {
                         return nil
                     }
-                    guard AdaECS.EditorComponentReflection.write(fieldValue, to: &typedComponent.\(propertyName)) else {
+                    guard AdaECS.ComponentReflection.write(fieldValue, to: &typedComponent.\(propertyName)) else {
                         return nil
                     }
                     return typedComponent
                 },
                 readPointer: { pointer in
                     let typedComponent = unsafe pointer.assumingMemoryBound(to: Self.self)
-                    return AdaECS.EditorComponentReflection.read(unsafe typedComponent.pointee.\(propertyName))
+                    return AdaECS.ComponentReflection.read(unsafe typedComponent.pointee.\(propertyName))
                 },
                 writePointer: { pointer, fieldValue in
                     let typedComponent = unsafe pointer.assumingMemoryBound(to: Self.self)
-                    return unsafe AdaECS.EditorComponentReflection.write(
+                    return unsafe AdaECS.ComponentReflection.write(
                         fieldValue,
                         to: &typedComponent.pointee.\(propertyName)
                     )
@@ -180,13 +192,168 @@ extension ComponentMacro {
             """
         }
 
+        let runtimeConstructorParameters = properties.map { propertyName, propertyType, _ in
+            """
+            AdaECS.RuntimeComponentConstructorParameter(
+                name: "\(propertyName)",
+                kind: AdaECS.ComponentReflection.kind(for: \(propertyType).self)
+            )
+            """
+        }
+        let runtimeConstructorAssignments = properties.map { propertyName, propertyType, _ in
+            """
+            if AdaECS.ComponentReflection.isWritable(\(propertyType).self) {
+                if let fieldValue = arguments[argumentIndex],
+                    !AdaECS.ComponentReflection.write(fieldValue, to: &typedComponent.\(propertyName)) {
+                    throw AdaECS.RuntimeComponentConstructorError.invalidArgument(
+                        component: String(reflecting: Self.self),
+                        parameter: "\(propertyName)"
+                    )
+                }
+                argumentIndex += 1
+            }
+            """
+        }
+
+        let explicitConstructor = try adaScriptConstructor(in: structDecl)
         return generateDeclaration(
             type: type,
             availability: structDecl.modifiers,
             functions: functions,
             requiredComponents: requiredComponents,
-            editorFields: editorFields
+            reflectedFields: reflectedFields,
+            runtimeConstructorParameters: explicitConstructor?.parameters ?? runtimeConstructorParameters,
+            runtimeConstructorAssignments: explicitConstructor == nil ? runtimeConstructorAssignments : [],
+            runtimeConstructorBody: explicitConstructor?.body
         )
+    }
+
+    private static func adaScriptConstructor(
+        in structDecl: StructDeclSyntax
+    ) throws -> ExplicitRuntimeConstructor? {
+        let markedInitializers = structDecl.memberBlock.members.compactMap { member -> InitializerDeclSyntax? in
+            guard let initializer = member.decl.as(InitializerDeclSyntax.self) else {
+                return nil
+            }
+            let isMarked = initializer.attributes.contains { element in
+                guard let attribute = element.as(AttributeSyntax.self) else {
+                    return false
+                }
+                let name = attribute.attributeName.trimmedDescription
+                return name == "AdaScriptInit" || name.hasSuffix(".AdaScriptInit")
+            }
+            return isMarked ? initializer : nil
+        }
+
+        guard !markedInitializers.isEmpty else {
+            return nil
+        }
+        guard markedInitializers.count == 1, let initializer = markedInitializers.first else {
+            throw MacroError.macroUsage("A component can declare only one @AdaScriptInit initializer.")
+        }
+
+        let parameters = try initializer.signature.parameterClause.parameters.map { parameter in
+            let externalName = parameter.firstName.text
+            let localName: String
+            if let secondName = parameter.secondName {
+                localName = secondName.text
+            } else if externalName != "_" {
+                localName = externalName
+            } else {
+                throw MacroError.macroUsage("An unnamed @AdaScriptInit parameter requires a local name.")
+            }
+            return RuntimeConstructorParameter(
+                defaultExpression: parameter.defaultValue?.value.trimmedDescription,
+                externalName: externalName,
+                localName: localName,
+                typeName: parameter.type.trimmedDescription
+            )
+        }
+
+        var exposedParameters: [String] = []
+        var argumentDecoders: [String] = []
+        var initializerArguments: [String] = []
+        var argumentIndex = 0
+
+        for parameter in parameters {
+            let callArgument = parameter.externalName == "_"
+                ? parameter.localName
+                : "\(parameter.externalName): \(parameter.localName)"
+            initializerArguments.append(callArgument)
+
+            guard isSupportedRuntimeConstructorType(parameter.typeName) else {
+                guard let defaultExpression = parameter.defaultExpression else {
+                    throw MacroError.macroUsage(
+                        "@AdaScriptInit parameter '\(parameter.externalName)' has unsupported type "
+                            + "'\(parameter.typeName)' and must provide a default value."
+                    )
+                }
+                argumentDecoders.append(
+                    "let \(parameter.localName): \(parameter.typeName) = \(defaultExpression)"
+                )
+                continue
+            }
+
+            let scriptName = parameter.externalName == "_" ? parameter.localName : parameter.externalName
+            exposedParameters.append(
+                """
+                AdaECS.RuntimeComponentConstructorParameter(
+                    name: "\(scriptName)",
+                    kind: AdaECS.ComponentReflection.kind(for: \(parameter.typeName).self)
+                )
+                """
+            )
+
+            let missingValue: String
+            if let defaultExpression = parameter.defaultExpression {
+                missingValue = "\(parameter.localName) = \(defaultExpression)"
+            } else {
+                missingValue =
+                    """
+                    throw AdaECS.RuntimeComponentConstructorError.missingArgument(
+                        component: String(reflecting: Self.self),
+                        parameter: "\(scriptName)"
+                    )
+                    """
+            }
+            argumentDecoders.append(
+                """
+                let \(parameter.localName): \(parameter.typeName)
+                if let fieldValue = arguments[\(argumentIndex)] {
+                    guard let decoded = AdaECS.ComponentReflection.value(
+                        fieldValue,
+                        as: \(parameter.typeName).self
+                    ) else {
+                        throw AdaECS.RuntimeComponentConstructorError.invalidArgument(
+                            component: String(reflecting: Self.self),
+                            parameter: "\(scriptName)"
+                        )
+                    }
+                    \(parameter.localName) = decoded
+                } else {
+                    \(missingValue)
+                }
+                """
+            )
+            argumentIndex += 1
+        }
+
+        return ExplicitRuntimeConstructor(
+            body:
+                """
+                \(argumentDecoders.joined(separator: "\n"))
+                return Self(\(initializerArguments.joined(separator: ", ")))
+                """,
+            parameters: exposedParameters
+        )
+    }
+
+    private static func isSupportedRuntimeConstructorType(_ typeName: String) -> Bool {
+        let supportedTypes = [
+            "Bool", "Int", "Float", "Double", "String",
+            "Vector2", "Vector3", "Vector4", "Quat", "Color",
+        ]
+        return supportedTypes.contains { typeName == $0 || typeName.hasSuffix(".\($0)") }
     }
 
     private static func generateDeclaration<T: TypeSyntaxProtocol>(
@@ -194,13 +361,52 @@ extension ComponentMacro {
         availability: DeclModifierListSyntax?,
         functions: [String],
         requiredComponents: [String] = [],
-        editorFields: [String] = []
+        reflectedFields: [String] = [],
+        runtimeConstructorParameters: [String] = [],
+        runtimeConstructorAssignments: [String] = [],
+        runtimeConstructorBody: String? = nil
     ) -> [SwiftSyntax.ExtensionDeclSyntax] {
         // Process modifiers: if private or private, change to internal
         let processedAvailability = processModifiers(availability)
         let requiredComponentTypeNames = requiredComponents.map { "String(reflecting: \($0))" }.joined(separator: ", ")
+        let generatedRuntimeConstructorBody = if let runtimeConstructorBody {
+            runtimeConstructorBody
+        } else if runtimeConstructorAssignments.isEmpty {
+            """
+            guard let typedComponent = component as? Self else {
+                throw AdaECS.RuntimeComponentConstructorError.invalidBase(
+                    component: String(reflecting: Self.self)
+                )
+            }
+            return typedComponent
+            """
+        } else {
+            """
+            guard var typedComponent = component as? Self else {
+                throw AdaECS.RuntimeComponentConstructorError.invalidBase(
+                    component: String(reflecting: Self.self)
+                )
+            }
+            var argumentIndex = 0
+            \(runtimeConstructorAssignments.joined(separator: "\n"))
+            return typedComponent
+            """
+        }
+        let runtimeConstructorImplementation = if runtimeConstructorBody == nil {
+            """
+            applyArguments: { component, arguments in
+                \(generatedRuntimeConstructorBody)
+            }
+            """
+        } else {
+            """
+            constructArguments: { arguments in
+                \(generatedRuntimeConstructorBody)
+            }
+            """
+        }
 
-        let proto = "AdaECS.Component, AdaECS.EditorInspectableComponent"
+        let proto = "AdaECS.Component, AdaECS.ReflectableComponent, AdaECS.RuntimeConstructibleComponent"
         let ext: DeclSyntax =
             """
             extension \(type.trimmed): \(raw: proto) {
@@ -208,14 +414,23 @@ extension ComponentMacro {
                 \(processedAvailability) static var requiredComponents: RequiredComponents {
                     RequiredComponents(components: [\(raw: requiredComponents.joined(separator: ", "))])
                 }
-                \(processedAvailability) static var editorComponentDescriptor: AdaECS.EditorComponentDescriptor {
-                    AdaECS.EditorComponentDescriptor(
+                \(processedAvailability) static var componentDescriptor: AdaECS.ReflectedComponentDescriptor {
+                    AdaECS.ReflectedComponentDescriptor(
                         type: Self.self,
                         displayName: String(describing: Self.self),
                         requiredComponentTypeNames: [\(raw: requiredComponentTypeNames)],
                         fields: [
-                            \(raw: editorFields.joined(separator: ",\n"))
+                            \(raw: reflectedFields.joined(separator: ",\n"))
                         ]
+                    )
+                }
+                \(processedAvailability) static var runtimeComponentConstructor: AdaECS.RuntimeComponentConstructorDescriptor {
+                    AdaECS.RuntimeComponentConstructorDescriptor(
+                        typeName: String(reflecting: Self.self),
+                        parameters: [
+                            \(raw: runtimeConstructorParameters.joined(separator: ",\n"))
+                        ].filter { $0.kind != .readOnly },
+                        \(raw: runtimeConstructorImplementation)
                     )
                 }
             }
@@ -275,7 +490,7 @@ extension String {
         return prefix(1).capitalized + dropFirst()
     }
 
-    var editorFieldLabel: String {
+    var reflectedFieldLabel: String {
         guard !isEmpty else {
             return self
         }

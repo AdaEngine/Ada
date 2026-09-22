@@ -64,8 +64,8 @@ extension World {
     @_spi(Scripting)
     public func readResourceField(
         type: any Resource.Type,
-        field: EditorComponentFieldDescriptor
-    ) -> EditorFieldValue? {
+        field: ReflectedComponentField
+    ) -> ReflectedFieldValue? {
         guard
             let data = resources.getResourceData(for: type),
             let pointer = unsafe data.pointer.buffer.pointer.baseAddress,
@@ -80,8 +80,8 @@ extension World {
     @discardableResult
     public func writeResourceField(
         type: any Resource.Type,
-        field: EditorComponentFieldDescriptor,
-        value: EditorFieldValue
+        field: ReflectedComponentField,
+        value: ReflectedFieldValue
     ) -> Bool {
         guard
             field.accepts(value),

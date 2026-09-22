@@ -58,11 +58,11 @@ open class ScriptableObject: Codable, @unchecked Sendable {
     /// Returns detached exported state for UI binding. Override alongside `writeExportedField` in native scripts.
     /// AdaScript provides these accessors automatically for `@export` properties.
     @MainActor
-    open func readExportedField(_: String) -> EditorFieldValue? { nil }
+    open func readExportedField(_: String) -> ReflectedFieldValue? { nil }
 
     /// Applies a queued UI edit outside view construction. Return false for unknown or incompatible values.
     @MainActor
-    open func writeExportedField(_: String, value _: EditorFieldValue) -> Bool { false }
+    open func writeExportedField(_: String, value _: ReflectedFieldValue) -> Bool { false }
 
     /// Called exactly once after successful attachment.
     @MainActor

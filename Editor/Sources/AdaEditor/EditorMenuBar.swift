@@ -13,8 +13,9 @@ import AdaEngine
 enum EditorMenuCommand: CaseIterable {
     case checkForUpdates
     case showSettings
+    case debugOverlayOff, debugOverlayRedraw, debugOverlayLayoutBounds, debugOverlayHitTestTarget, debugOverlayFocusedNode
     case newFile, newProject, openProject, importAssets, save, saveAll, closeEditor
-    case undo, redo, cut, copy, paste, selectAll, findInProject
+    case undo, redo, cut, copy, paste, selectAll, findInFile, findInProject
     case navigateBack, navigateForward, showProjectNavigator, showInspector, showBuildOutput, showProblems, enterFullScreen
     case refreshProjectFiles, revealProject, openProjectInTerminal, showProjectSettings, showProjectDependencies, showPackageTasks
     case build, run, runTests, stop, clean, updateDependencies
@@ -126,6 +127,12 @@ enum EditorMenuBar {
         if EditorDistribution.current == .standalone {
             menu.add(item("Check for Updates…", command: .checkForUpdates))
         }
+        menu.add(MenuItem.separator)
+        menu.add(item("Disable Debug Overlay", command: .debugOverlayOff))
+        menu.add(item("Debug Overlay: Redraw", command: .debugOverlayRedraw))
+        menu.add(item("Debug Overlay: Layout Bounds", command: .debugOverlayLayoutBounds))
+        menu.add(item("Debug Overlay: Hit Test Target", command: .debugOverlayHitTestTarget))
+        menu.add(item("Debug Overlay: Focused Node", command: .debugOverlayFocusedNode))
         return menu
     }
 
@@ -159,6 +166,7 @@ enum EditorMenuBar {
                 item("Paste", command: .paste, key: .v),
                 item("Select All", command: .selectAll, key: .a),
                 MenuItem.separator,
+                item("Find in File", command: .findInFile, key: .f),
                 item("Find in Project", command: .findInProject, key: .f, modifiers: [.main, .shift]),
             ]
         )

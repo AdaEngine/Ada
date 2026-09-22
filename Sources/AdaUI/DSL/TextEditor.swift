@@ -7,6 +7,7 @@
 
 import AdaText
 import AdaUtils
+import Math
 
 /// Colors used by a text editor primitive.
 public struct TextEditorColors: Hashable, Sendable {
@@ -143,6 +144,7 @@ public struct TextEditorSelectionHint: Sendable {
 /// Optional source-aware interactions for ``TextEditor``.
 public struct TextEditorSourceInteraction {
     public var lineMarkers: [TextEditorLineMarker]
+    public var gutterHoverColor: Color?
     public var executionLine: Int?
     public var onGutterClick: ((Int) -> Void)?
     public var highlightedRanges: [TextEditorSourceRange]
@@ -151,6 +153,8 @@ public struct TextEditorSourceInteraction {
     public var focusedRange: TextEditorSourceRange?
     public var onHover: ((TextEditorSourcePosition?) -> Void)?
     public var onPrimaryClick: ((TextEditorSourcePosition) -> Void)?
+    /// Called when the caret changes, with its source position and bounds in the visible editor viewport.
+    public var onCaretViewportRectChange: ((TextEditorSourcePosition, Rect) -> Void)?
     public var onCaretChange: ((TextEditorSourcePosition, String) -> Void)?
     public var onRequestCompletion: ((TextEditorSourcePosition, String) -> Void)?
     public var onMoveCompletionSelection: ((Int) -> Bool)?
@@ -162,6 +166,7 @@ public struct TextEditorSourceInteraction {
 
     public init(
         lineMarkers: [TextEditorLineMarker] = [],
+        gutterHoverColor: Color? = nil,
         executionLine: Int? = nil,
         onGutterClick: ((Int) -> Void)? = nil,
         highlightedRanges: [TextEditorSourceRange] = [],
@@ -170,6 +175,7 @@ public struct TextEditorSourceInteraction {
         focusedRange: TextEditorSourceRange? = nil,
         onHover: ((TextEditorSourcePosition?) -> Void)? = nil,
         onPrimaryClick: ((TextEditorSourcePosition) -> Void)? = nil,
+        onCaretViewportRectChange: ((TextEditorSourcePosition, Rect) -> Void)? = nil,
         onCaretChange: ((TextEditorSourcePosition, String) -> Void)? = nil,
         onRequestCompletion: ((TextEditorSourcePosition, String) -> Void)? = nil,
         onMoveCompletionSelection: ((Int) -> Bool)? = nil,
@@ -180,6 +186,7 @@ public struct TextEditorSourceInteraction {
         selectionHint: TextEditorSelectionHint? = nil
     ) {
         self.lineMarkers = lineMarkers
+        self.gutterHoverColor = gutterHoverColor
         self.executionLine = executionLine
         self.onGutterClick = onGutterClick
         self.highlightedRanges = highlightedRanges
@@ -188,6 +195,7 @@ public struct TextEditorSourceInteraction {
         self.focusedRange = focusedRange
         self.onHover = onHover
         self.onPrimaryClick = onPrimaryClick
+        self.onCaretViewportRectChange = onCaretViewportRectChange
         self.onCaretChange = onCaretChange
         self.onRequestCompletion = onRequestCompletion
         self.onMoveCompletionSelection = onMoveCompletionSelection
