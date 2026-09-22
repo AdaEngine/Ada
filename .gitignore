@@ -16,6 +16,7 @@ dist/
 # Ignore SwiftPM state, such as the generated xcodeproj when opening the project directly
 .swiftpm
 .sourcekit-lsp/
+.codegraph/
 
 
 # Ignore user state in Xcode Projects
@@ -45,6 +46,3 @@ Derived/
 # Sloppy
 .sloppy/
 .sloppy-worktrees/
-
-# Compiled Shaders
-/Sources/AdaEngine/Rendering/Shaders/*.spv
