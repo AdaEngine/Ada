@@ -2,10 +2,10 @@ import AdaUtils
 import Foundation
 
 public struct RuntimeResourceDescriptor: Sendable {
-    public let fields: [EditorComponentFieldDescriptor]
+    public let fields: [ReflectedComponentField]
     public let typeIdentifier: ObjectIdentifier
 
-    public init<T: Resource>(type: T.Type, fields: [EditorComponentFieldDescriptor]) {
+    public init<T: Resource>(type: T.Type, fields: [ReflectedComponentField]) {
         self.fields = fields
         self.typeIdentifier = ObjectIdentifier(type)
     }
@@ -15,7 +15,7 @@ public enum RuntimeResourceReflectionRegistry {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var descriptors: [ObjectIdentifier: RuntimeResourceDescriptor] = [:]
 
-    public static func register<T: Resource>(_ type: T.Type, fields: [EditorComponentFieldDescriptor]) {
+    public static func register<T: Resource>(_ type: T.Type, fields: [ReflectedComponentField]) {
         lock.withLock {
             unsafe descriptors[ObjectIdentifier(type)] = RuntimeResourceDescriptor(type: type, fields: fields)
         }
@@ -61,7 +61,7 @@ public final class DynamicResource: @unchecked Sendable {
 
     public var isAvailable: Bool { unsafe pointer != nil }
 
-    public func read(field: EditorComponentFieldDescriptor) -> EditorFieldValue? {
+    public func read(field: ReflectedComponentField) -> ReflectedFieldValue? {
         guard let pointer = unsafe pointer, let readPointer = unsafe field.readPointer else {
             return nil
         }
@@ -69,7 +69,7 @@ public final class DynamicResource: @unchecked Sendable {
     }
 
     @discardableResult
-    public func write(field: EditorComponentFieldDescriptor, value: EditorFieldValue) -> Bool {
+    public func write(field: ReflectedComponentField, value: ReflectedFieldValue) -> Bool {
         guard
             field.accepts(value), let pointer = unsafe pointer, let writePointer = unsafe field.writePointer,
             unsafe writePointer(pointer, value)

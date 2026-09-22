@@ -2,22 +2,22 @@ import AdaECS
 import Foundation
 
 enum GravityScriptablePayload {
-    static func decode(from decoder: Decoder) throws -> [String: EditorFieldValue] {
+    static func decode(from decoder: Decoder) throws -> [String: ReflectedFieldValue] {
         try decoder.singleValueContainer()
             .decode([String: CodableFieldValue].self)
             .mapValues(\.value)
     }
 
-    static func encode(_ payload: [String: EditorFieldValue], to encoder: Encoder) throws {
+    static func encode(_ payload: [String: ReflectedFieldValue], to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(payload.mapValues(CodableFieldValue.init))
     }
 }
 
 private struct CodableFieldValue: Codable {
-    let value: EditorFieldValue
+    let value: ReflectedFieldValue
 
-    init(_ value: EditorFieldValue) {
+    init(_ value: ReflectedFieldValue) {
         self.value = value
     }
 

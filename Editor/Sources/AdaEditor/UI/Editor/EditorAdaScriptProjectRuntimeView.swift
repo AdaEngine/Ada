@@ -131,6 +131,8 @@ struct EditorAdaScriptProjectRuntimeView: View {
         switch pluginID {
         case .audio:
             app.addPlugin(AudioPlugin())
+        case .multiplayer:
+            app.addPlugin(EditorAdaScriptMultiplayerPlugin(settings: artifact.plugins.multiplayer))
         case .tilemap:
             app.addPlugin(TileMapPlugin())
         default:

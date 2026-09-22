@@ -88,6 +88,18 @@ public final class GravityLanguageServerSession {
         if rootURIs.isEmpty, let rootURI = params["rootUri"] as? String {
             rootURIs.append(rootURI)
         }
+        if let options = params["initializationOptions"] as? [String: Any],
+            let constructorValues = options["hostConstructors"] as? [[String: Any]] {
+            workspace.setHostConstructors(
+                constructorValues.compactMap { value in
+                    guard let name = value["name"] as? String,
+                        let parameters = value["parameters"] as? [String] else {
+                        return nil
+                    }
+                    return GravityHostConstructor(name: name, parameters: parameters)
+                }
+            )
+        }
         workspace.configure(rootURIs: rootURIs)
         isInitialized = true
 

@@ -1,10 +1,11 @@
-import AdaRender
+@testable import AdaCorePipelines
 import AdaECS
-import AdaSprite
+@testable import AdaRender
+@testable import AdaSprite
+@testable import AdaTilemap
 import AdaTransform
 import Math
 import Testing
-@testable import AdaTilemap
 
 @Suite
 @MainActor
@@ -43,6 +44,61 @@ struct TileMapTests {
         #expect(allLayersNeedUpdates)
         #expect(tileMap.layers.allSatisfy { $0.tileSet === replacement })
         #expect(additionalLayer.tileMap === tileMap)
+    }
+
+    @Test
+    func textureAtlasCellsDoNotCreateChildEntities() async throws {
+        try Self.setupHeadlessRenderEngineIfNeeded()
+        let world = Self.makeWorld()
+        let tileMap = TileMap()
+        let source = TextureAtlasTileSource(
+            from: Image(width: 1, height: 1, color: .white),
+            size: [1, 1]
+        )
+        source.createTile(for: [0, 0])
+        let sourceID = tileMap.tileSet.addTileSource(source)
+        let layer = try #require(tileMap.layers.first)
+        layer.setCell(at: [0, 0], sourceId: sourceID, atlasCoordinates: [0, 0])
+        layer.setCell(at: [1, 0], sourceId: sourceID, atlasCoordinates: [0, 0])
+        let owner = Self.makeOwner(in: world, tileMap: tileMap)
+
+        await world.runScheduler(.update)
+
+        #expect(world.getEntities().count == 1)
+        #expect(owner.children.isEmpty)
+        #expect(owner.components[TileMapComponent.self]?.renderedAtlasTiles[layer.id]?.count == 2)
+
+        let renderWorld = World(name: "TileMapRenderWorld")
+        renderWorld.addSchedulers(.extract, .preUpdate, .batching, .update)
+        renderWorld.insertResource(MainWorld(world: world))
+        renderWorld.insertResource(RenderDeviceHandler(renderDevice: unsafe RenderEngine.shared.renderDevice))
+        renderWorld.insertResource(ExtractedSprites())
+        renderWorld.insertResource(AdditionalExtractedSprites())
+        renderWorld.insertResource(RenderItems<Transparent2DRenderItem>())
+        renderWorld.insertResource(SortedRenderItems<Transparent2DRenderItem>())
+        renderWorld.insertResource(RenderPipelines(configurator: SpriteRenderPipeline()))
+        renderWorld.insertResource(SpriteDrawPass())
+        renderWorld.insertResource(SpriteBatches())
+        renderWorld.insertResource(SpriteDrawData.defaultValue)
+        renderWorld.addSystem(ClearTransparent2dRenderItemsSystem.self, on: .extract)
+        renderWorld.addSystem(ExtractTileMapSpritesSystem.self, on: .extract)
+        renderWorld.addSystem(PrepareSpritesSystem.self, on: .preUpdate)
+        renderWorld.addSystem(Transparent2DBatchingSystem.self, on: .batching)
+        renderWorld.addSystem(SpriteRenderSystem.self, on: .update)
+        renderWorld.spawn {
+            Camera()
+            VisibleEntities(entityIds: [owner.id])
+        }
+        await renderWorld.runScheduler(.extract)
+
+        #expect(renderWorld.getResource(AdditionalExtractedSprites.self)?.sprites.count == 2)
+        await renderWorld.runScheduler(.preUpdate)
+        #expect(renderWorld.getResource(RenderItems<Transparent2DRenderItem>.self)?.items.count == 2)
+        await renderWorld.runScheduler(.batching)
+        await renderWorld.runScheduler(.update)
+        #expect(renderWorld.getResource(SpriteBatches.self)?.batches.count == 1)
+        #expect(renderWorld.getResource(SpriteDrawData.self)?.vertexBuffer.count == 8)
+        #expect(renderWorld.getResource(SpriteDrawData.self)?.indexBuffer.count == 12)
     }
 
     @Test
@@ -361,7 +417,18 @@ struct TileMapTests {
     }
 
     private static func root(in owner: Entity) -> Entity? {
-        guard let rootID = rootID(for: owner) else { return nil }
+        guard let rootID = rootID(for: owner) else {
+            return nil
+        }
         return owner.world?.getEntityByID(rootID)
+    }
+
+    private static func setupHeadlessRenderEngineIfNeeded() throws {
+        guard unsafe RenderEngine.shared == nil else {
+            return
+        }
+
+        unsafe RenderEngine.configurations.preferredBackend = .headless
+        try RenderEngine.setupRenderEngine()
     }
 }

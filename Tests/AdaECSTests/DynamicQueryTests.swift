@@ -29,7 +29,7 @@ struct DynamicQueryTests {
         query.update(from: world)
 
         let descriptor = try #require(
-            DynamicQueryPosition.editorComponentDescriptor.fields.first { $0.key == "value" }
+            DynamicQueryPosition.componentDescriptor.fields.first { $0.key == "value" }
         )
         let cursor = query.wrappedValue.makeCursor()
         var visited = 0

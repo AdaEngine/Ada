@@ -153,20 +153,7 @@ extension TextEditorViewNode {
     }
 
     func ensureCaretVisibleIfNeeded() {
-        let lines = self.lines()
-        let position = self.position(forOffset: self.caretOffset, lines: lines)
-        let pointSize = self.resolvedFontPointSize()
-        let lineHeight = self.lineHeight(for: pointSize)
-        let characterAdvance = self.characterAdvance(for: pointSize)
-        let font = self.resolvedFontForRendering()
-        let textRect = self.textRect()
-        let lineText = lines.indices.contains(position.line) ? lines[position.line].text : ""
-        let caretRect = Rect(
-            x: textRect.minX + self.caretXOffset(forColumn: position.column, in: lineText, font: font, pointSize: pointSize),
-            y: textRect.minY + Float(position.line) * lineHeight,
-            width: characterAdvance,
-            height: lineHeight
-        )
+        let caretRect = self.caretRect()
         let padding = EdgeInsets(
             top: Constants.caretScrollPadding,
             leading: Constants.caretScrollPadding,
@@ -175,6 +162,33 @@ extension TextEditorViewNode {
         )
 
         _ = self.nearestScrollView()?.scrollToVisibleRect(caretRect, in: self, padding: padding)
+    }
+
+    func caretRect() -> Rect {
+        let lines = self.lines()
+        let position = self.position(forOffset: self.caretOffset, lines: lines)
+        let pointSize = self.resolvedFontPointSize()
+        let lineHeight = self.lineHeight(for: pointSize)
+        let font = self.resolvedFontForRendering()
+        let textRect = self.textRect()
+        let lineText = lines.indices.contains(position.line) ? lines[position.line].text : ""
+        return Rect(
+            x: textRect.minX + self.caretXOffset(forColumn: position.column, in: lineText, font: font, pointSize: pointSize),
+            y: textRect.minY + Float(position.line) * lineHeight,
+            width: Constants.caretLineWidth,
+            height: lineHeight
+        )
+    }
+
+    func caretViewportRect() -> Rect {
+        let caretRect = self.caretRect()
+        let contentOffset = self.nearestScrollView()?.contentOffset ?? .zero
+        return Rect(
+            x: caretRect.minX - contentOffset.x,
+            y: caretRect.minY - contentOffset.y,
+            width: caretRect.width,
+            height: caretRect.height
+        )
     }
 
     func visibleLineRange(lineHeight: Float, viewportHeight: Float) -> Range<Int> {

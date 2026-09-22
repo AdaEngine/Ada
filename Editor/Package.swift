@@ -72,6 +72,7 @@ let package = Package(
                 .product(name: "AdaDebugging", package: "AdaDebugging"),
                 .product(name: "AdaPlayerConnect", package: "AdaPlayerConnect"),
                 .product(name: "AdaEngine", package: "AdaEngine"),
+                .product(name: "AdaMultiplayer", package: "AdaEngine"),
                 .product(name: "AdaScriptCompilerCore", package: "AdaEngine"),
                 .product(name: "Math", package: "AdaEngine"),
                 .product(name: "AdaMCPPlugin", package: "AdaMCP"),

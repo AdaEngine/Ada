@@ -33,6 +33,7 @@ public struct Sprite: Codable {
     /// - Parameter flipX: Flip texture horizontally
     /// - Parameter flipY: Flip texture vertically.
     /// - Parameter size: The custom size of the sprite.
+    @AdaScriptInit
     public init(
         texture: AssetHandle<Texture2D>? = nil,
         tintColor: Color = .white,

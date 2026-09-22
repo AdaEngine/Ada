@@ -58,6 +58,22 @@ struct ImageSkinTests {
         #expect(textures.allSatisfy { $0.atlas === first.atlas })
     }
 
+    @Test func imageNodeReplacesTextureDuringViewUpdates() {
+        let firstImage = Image(width: 16, height: 16, color: .red)
+        let secondImage = Image(width: 16, height: 16, color: .blue)
+        let node = ImageViewNode(image: firstImage, isResizable: false, renderMode: .original, tintColor: nil, content: firstImage)
+        let replacement = ImageViewNode(image: secondImage, isResizable: true, renderMode: .template, tintColor: .green, content: secondImage)
+        let firstTexture = node.texture
+
+        node.update(from: replacement)
+
+        #expect(node.texture === replacement.texture)
+        #expect(node.texture !== firstTexture)
+        #expect(node.isResizable)
+        #expect(node.renderMode == .template)
+        #expect(node.tintColor == .green)
+    }
+
     @Test func statePriorityAndFallback() {
         let style = TextureButtonStyle(normal: Image(width: 1, height: 1), highlighted: Image(width: 2, height: 1), pressed: Image(width: 3, height: 1), disabled: Image(width: 4, height: 1))
         #expect(style.image(for: .normal).width == 1)

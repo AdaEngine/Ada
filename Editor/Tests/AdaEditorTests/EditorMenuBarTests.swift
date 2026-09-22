@@ -32,7 +32,18 @@ struct EditorMenuBarTests {
         #expect(build.items.map(\.title).contains("Run Tests"))
         #expect(code.items.map(\.title).contains("Show Preview"))
         #expect(code.items.map(\.title).contains("Rebuild Preview"))
-        #expect(system.items.map(\.title) == (EditorDistribution.current == .standalone ? ["Settings...", "Check for Updates…"] : ["Settings..."]))
+        #expect(edit.items.first { $0.title == "Find in File" }?.keyEquivalent == .f)
+        #expect(edit.items.first { $0.title == "Find in Project" }?.keyEquivalentModifierMask == [.main, .shift])
+        let systemTitles = system.items.filter { !$0.isSeparator }.map(\.title)
+        let expectedPrefix = EditorDistribution.current == .standalone ? ["Settings...", "Check for Updates…"] : ["Settings..."]
+        #expect(systemTitles.starts(with: expectedPrefix))
+        #expect(Array(systemTitles.suffix(5)) == [
+            "Disable Debug Overlay",
+            "Debug Overlay: Redraw",
+            "Debug Overlay: Layout Bounds",
+            "Debug Overlay: Hit Test Target",
+            "Debug Overlay: Focused Node",
+        ])
         #expect(system.items.first?.keyEquivalent == .comma)
         #expect(file.items.first { $0.title == "Save" }?.keyEquivalent == .s)
         #expect(build.items.first { $0.title == "Build Project" }?.keyEquivalent == .b)

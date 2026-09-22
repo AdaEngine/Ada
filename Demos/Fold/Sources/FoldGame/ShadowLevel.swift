@@ -79,7 +79,7 @@ public struct ShadowPlayerInput: Resource, Sendable {
     @MainActor public static func registerRuntimeType() {
         RuntimeTypeRegistry.registerResource(Self.self, names: ["ShadowPlayerInput"])
         RuntimeResourceReflectionRegistry.register(Self.self, fields: ["moveX", "jump", "flip", "transfer", "restart"].map { key in
-            unsafe EditorComponentFieldDescriptor(key: key, label: key, kind: key == "moveX" ? .float : .int, isEditable: true,
+            unsafe ReflectedComponentField(key: key, label: key, kind: key == "moveX" ? .float : .int, isWritable: true,
                 read: { _ in nil }, write: { _, _ in nil }, readPointer: { pointer in
                     let value = unsafe pointer.assumingMemoryBound(to: Self.self).pointee
                     switch key {
@@ -91,12 +91,12 @@ public struct ShadowPlayerInput: Resource, Sendable {
                     }
                 }, writePointer: { pointer, field in
                     let value = unsafe pointer.assumingMemoryBound(to: Self.self)
-                    if key == "moveX" { return unsafe EditorComponentReflection.write(field, to: &value.pointee.moveX) }
+                    if key == "moveX" { return unsafe ComponentReflection.write(field, to: &value.pointee.moveX) }
                     switch key {
-                    case "jump": return unsafe EditorComponentReflection.write(field, to: &value.pointee.jump)
-                    case "flip": return unsafe EditorComponentReflection.write(field, to: &value.pointee.flip)
-                    case "transfer": return unsafe EditorComponentReflection.write(field, to: &value.pointee.transfer)
-                    default: return unsafe EditorComponentReflection.write(field, to: &value.pointee.restart)
+                    case "jump": return unsafe ComponentReflection.write(field, to: &value.pointee.jump)
+                    case "flip": return unsafe ComponentReflection.write(field, to: &value.pointee.flip)
+                    case "transfer": return unsafe ComponentReflection.write(field, to: &value.pointee.transfer)
+                    default: return unsafe ComponentReflection.write(field, to: &value.pointee.restart)
                     }
                 })
         })
@@ -113,7 +113,7 @@ public struct ShadowProgress: Resource, Sendable {
     @MainActor public static func registerRuntimeType() {
         RuntimeTypeRegistry.registerResource(Self.self, names: ["ShadowProgress"])
         RuntimeResourceReflectionRegistry.register(Self.self, fields: ["checkpoint", "completed", "outer", "message"].map { key in
-            unsafe EditorComponentFieldDescriptor(key: key, label: key, kind: .readOnly, isEditable: false, accepts: { _ in false },
+            unsafe ReflectedComponentField(key: key, label: key, kind: .readOnly, isWritable: false, accepts: { _ in false },
                 read: { _ in nil }, write: { _, _ in nil }, readPointer: { pointer in
                     let value = unsafe pointer.assumingMemoryBound(to: Self.self).pointee
                     switch key {

@@ -54,6 +54,7 @@ final class ProjectOpeningViewModel {
     var selectedTemplate = EditorProjectTemplate.adaScript
     var selectedProject: EditorProjectReference?
     var statusMessage: String = "Select a recent Ada project, create a blank one, or open an existing project."
+    var operationErrorMessage: String?
     var validationDiagnostics: [ProjectOpeningDiagnostic] = []
     var projectToOpenInEditor: EditorProjectReference?
     var projectToOpenInEditorToken = 0
@@ -469,10 +470,12 @@ final class ProjectOpeningViewModel {
             validationDiagnostics = []
             statusMessage = "\(prefix): \(error.localizedDescription)"
         }
+        operationErrorMessage = statusMessage
     }
 
     private func clearValidationDiagnostics() {
         validationDiagnostics = []
+        operationErrorMessage = nil
     }
 
     static func abbreviatedPath(_ path: String) -> String {

@@ -64,7 +64,7 @@ public struct ScriptUIBindingSystem {
 }
 
 extension UIValue {
-    init(exportedField value: EditorFieldValue) {
+    init(exportedField value: ReflectedFieldValue) {
         switch value {
         case .null: self = .null
         case let .bool(value): self = .bool(value)
@@ -76,7 +76,7 @@ extension UIValue {
         }
     }
 
-    var exportedField: EditorFieldValue {
+    var exportedField: ReflectedFieldValue {
         switch self {
         case .null: .null
         case let .bool(value): .bool(value)

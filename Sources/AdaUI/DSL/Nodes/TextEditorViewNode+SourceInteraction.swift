@@ -16,6 +16,16 @@ extension TextEditorViewNode {
         }
 
         let localPoint = self.convertPointFromRoot(event.mousePosition)
+        if event.phase == .changed, event.button == .none {
+            let hoveredLine = gutterLine(at: localPoint)
+            updateHoveredGutterLine(hoveredLine)
+            if hoveredLine != nil {
+                notifySourceHover(nil)
+                resetSourceCursorIfNeeded()
+                resetTextCursorIfNeeded()
+                return true
+            }
+        }
         if let line = gutterLine(at: localPoint), let action = sourceInteraction.onGutterClick {
             if event.phase == .began, event.button == .left {
                 action(line)
@@ -48,11 +58,20 @@ extension TextEditorViewNode {
                 break
             }
         } else if event.phase == .changed, event.button == .none {
+            updateHoveredGutterLine(nil)
             self.notifySourceHover(nil)
             self.resetSourceCursorIfNeeded()
         }
 
         return false
+    }
+
+    func updateHoveredGutterLine(_ line: Int?) {
+        guard hoveredGutterLine != line else {
+            return
+        }
+        hoveredGutterLine = line
+        requestDisplay()
     }
 
     func gutterLine(at point: Point) -> Int? {
@@ -83,13 +102,16 @@ extension TextEditorViewNode {
             self.sourceInteraction?.onSelectionChange?(nil, nil)
         }
 
+        let position = self.position(forOffset: self.selectionHead, lines: self.lines())
+        let sourcePosition = TextEditorSourcePosition(line: position.line, column: position.column)
+        self.sourceInteraction?.onCaretViewportRectChange?(sourcePosition, self.caretViewportRect())
+
         guard requestsCompletion else {
             return
         }
 
-        let position = self.position(forOffset: self.selectionHead, lines: self.lines())
         self.sourceInteraction?.onCaretChange?(
-            TextEditorSourcePosition(line: position.line, column: position.column),
+            sourcePosition,
             self.text
         )
     }

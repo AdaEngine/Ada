@@ -3,7 +3,7 @@ import Gravity
 
 @GSExportable("AdaResource")
 final class AnnotatedGravityResourceView: @unchecked Sendable {
-    private let fields: [String: EditorComponentFieldDescriptor]
+    private let fields: [String: ReflectedComponentField]
     private let parameter: DynamicResource
     private let reportDiagnostic: @Sendable (String) -> Void
     private let virtualMachine: GravityVirtualMachine
@@ -11,7 +11,7 @@ final class AnnotatedGravityResourceView: @unchecked Sendable {
     @GSExportableIgnore
     static func make(
         parameter: DynamicResource,
-        fields: [String: EditorComponentFieldDescriptor],
+        fields: [String: ReflectedComponentField],
         reportDiagnostic: @escaping @Sendable (String) -> Void,
         virtualMachine: GravityVirtualMachine
     ) -> AnnotatedGravityResourceView {
@@ -25,7 +25,7 @@ final class AnnotatedGravityResourceView: @unchecked Sendable {
 
     private init(
         parameter: DynamicResource,
-        fields: [String: EditorComponentFieldDescriptor],
+        fields: [String: ReflectedComponentField],
         reportDiagnostic: @escaping @Sendable (String) -> Void,
         virtualMachine: GravityVirtualMachine
     ) {
@@ -54,7 +54,7 @@ final class AnnotatedGravityResourceView: @unchecked Sendable {
             return false
         }
         guard
-            let fieldValue = AnnotatedGravityValueBridge.makeEditorFieldValue(value),
+            let fieldValue = AnnotatedGravityValueBridge.makeReflectedFieldValue(value),
             parameter.write(field: field, value: fieldValue)
         else {
             reportDiagnostic("Invalid value for resource field '\(fieldName)'")

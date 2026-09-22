@@ -25,9 +25,13 @@ struct GravityLiveEditorTests {
         let model = EditorViewModel(
             project: EditorProjectReference(name: "Test", path: root.path),
             workspaceService: SwiftPMWorkspaceService(),
-            workbench: EditorWorkbenchViewModel(activeEditorTab: .code, openDocuments: [.text(document)])
+            workbench: EditorWorkbenchViewModel(
+                activeEditorTab: document.title,
+                openDocuments: [.text(document)],
+                activeDocumentID: document.id
+            )
         )
-        model.refreshSemanticTokens(for: .text(document))
+        model.refreshSemanticTokens(for: EditorWorkbenchDocument.text(document))
         for _ in 0..<200 {
             if model.problems.contains(where: { $0.source == "adascript-lsp" }) {
                 break
@@ -47,7 +51,7 @@ struct GravityLiveEditorTests {
         var fixed = highlighted
         fixed.content = "class Main { var speed = 0 }"
         model.workbench.updateTextDocument(id: fixed.id) { $0.content = fixed.content }
-        model.refreshSemanticTokens(for: .text(fixed))
+        model.refreshSemanticTokens(for: EditorWorkbenchDocument.text(fixed))
         for _ in 0..<200 {
             if !model.problems.contains(where: { $0.source == "adascript-lsp" }) {
                 break
@@ -85,7 +89,11 @@ struct GravityLiveEditorTests {
         let model = EditorViewModel(
             project: EditorProjectReference(name: "Test", path: root.path),
             workspaceService: service,
-            workbench: EditorWorkbenchViewModel(activeEditorTab: .code, openDocuments: [.text(document)])
+            workbench: EditorWorkbenchViewModel(
+                activeEditorTab: document.title,
+                openDocuments: [.text(document)],
+                activeDocumentID: document.id
+            )
         )
         let position = EditorSourceLocation(line: 0, character: 12)
         model.handleSourceHover(document: document, position: position)
@@ -109,7 +117,7 @@ struct GravityLiveEditorTests {
         #expect(hovered.sourceHoverDescription?.contains("VladComponent") == true)
         let targets = await service.definition(fileURL: file, language: .ada, text: source, position: position)
         #expect(targets.first?.filePath == component.path)
-        model.handleSourceHover(document: hovered, position: nil)
+        model.handleSourceHover(document: hovered, position: nil as EditorSourceLocation?)
         guard case let .text(cleared)? = model.workbench.activeDocument else {
             return
         }

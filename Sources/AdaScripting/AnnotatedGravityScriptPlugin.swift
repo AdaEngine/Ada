@@ -48,8 +48,12 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         name: String,
         startupSystemIdentifier: String? = nil
     ) throws {
+        let componentConstructors = AdaScriptComponentRuntime.linkedConstructors()
         let module = try GravityScriptModuleResolver.resolve(sources)
-        let runtime = try AnnotatedGravityRuntime(module: module)
+        let runtime = try AnnotatedGravityRuntime(
+            module: module,
+            componentConstructors: componentConstructors
+        )
         let resourceBindings = try AdaScriptSchemaParser.parseResourceBindings(sources: sources)
         let capabilities = try AdaScriptSchemaParser.parseSystemCapabilities(sources: sources)
         var plans = try AdaScriptSystemPlanBuilder.makePlans(
@@ -200,7 +204,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
                 // fetched components. Static access inference will narrow this set.
                 access.addComponentWrite(component.identifier)
                 let typeName = String(reflecting: component)
-                let descriptor = EditorComponentReflectionRegistry.descriptor(named: typeName)
+                let descriptor = ComponentReflectionRegistry.descriptor(named: typeName)
                 return AnnotatedComponentAccess(
                     alias: defaultAlias(for: name),
                     componentIndex: index,
@@ -274,7 +278,7 @@ private struct PreparedAnnotatedSystem: Sendable {
 
 private enum PreparedAnnotatedResource: Sendable {
     case reflected(
-        fields: [String: EditorComponentFieldDescriptor],
+        fields: [String: ReflectedComponentField],
         parameter: DynamicResource,
         propertyName: String,
         resourceName: String
@@ -324,7 +328,7 @@ private struct PreparedAnnotatedQuery: Sendable {
 struct AnnotatedComponentAccess: Sendable {
     let alias: String
     let componentIndex: Int
-    let fields: [String: EditorComponentFieldDescriptor]
+    let fields: [String: ReflectedComponentField]
 }
 
 private struct AnnotatedGravityScriptSystem: System {
@@ -411,7 +415,10 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
     private let virtualMachine: GravityVirtualMachine
     private var instances: [String: GSValue] = [:]
 
-    init(module: ResolvedGravityScriptModule) throws {
+    init(
+        module: ResolvedGravityScriptModule,
+        componentConstructors: [AdaScriptLinkedComponentConstructor]
+    ) throws {
         let delegate = AnnotatedGravityRuntimeDelegate(module: module)
         self.delegate = delegate
 
@@ -429,9 +436,16 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         try virtualMachine.bindClass(with: AnnotatedGravityComponentView.self)
         try virtualMachine.bindClass(with: AnnotatedGravityResourceView.self)
         try virtualMachine.bindClass(with: AdaScriptViewBridge.self)
+        try AdaScriptComponentRuntime.bind(
+            to: virtualMachine,
+            constructors: componentConstructors,
+            reportDiagnostic: delegate.append
+        )
         virtualMachine.setValue(AdaScriptViewBridge(), forKey: "adaUIBuilder")
 
-        let binary = virtualMachine.loadGravityFile(from: module.entrySource)
+        let binary = virtualMachine.loadGravityFile(
+            from: AdaScriptComponentRuntime.prelude(constructors: componentConstructors) + module.entrySource
+        )
         guard delegate.errors.isEmpty else {
             throw AdaScriptError.compilation(delegate.errors)
         }
@@ -456,6 +470,13 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
             guard instance.hasMethod(named: "update") else {
                 throw AdaScriptError.invalidManifest("@system class '\(plan.className)' must define update(context)")
             }
+            // The VM's collector cannot see Swift's GSValue dictionary. Publish a
+            // private VM global so the system instance remains a live GC root for
+            // the complete plugin lifetime, matching scriptable-object instances.
+            virtualMachine.setValue(
+                instance,
+                forKey: "__ada_live_system_" + plan.identifier
+            )
             instances[plan.className] = instance
         }
     }

@@ -401,8 +401,9 @@ extension EditorViewModel {
     }
 
     static func shouldSkipProjectTreeURL(_ url: URL) -> Bool {
-        let skippedNames: Set<String> = [".ada", ".build", ".DS_Store", ".git", ".swiftpm", "DerivedData"]
-        return skippedNames.contains(url.lastPathComponent)
+        let name = url.lastPathComponent
+        let skippedNames: Set<String> = [".ada", ".DS_Store", ".git", ".swiftpm", "DerivedData"]
+        return skippedNames.contains(name) || name == ".build" || name.hasPrefix(".build-")
     }
 
     static func isSymbolicLink(at url: URL) -> Bool {

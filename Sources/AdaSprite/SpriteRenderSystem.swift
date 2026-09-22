@@ -49,6 +49,17 @@ public struct ExtractedSprites: Resource {
     }
 }
 
+/// Sprite data contributed by render features that do not materialize one ECS entity per sprite.
+public struct AdditionalExtractedSprites: Resource {
+    /// Extracted sprites keyed by their frame-local render identifier.
+    public var sprites: [Entity.ID: ExtractedSprite]
+
+    /// Initialize additional extracted sprites.
+    public init(sprites: [Entity.ID: ExtractedSprite] = [:]) {
+        self.sprites = sprites
+    }
+}
+
 /// A sprite that contains the extracted sprite.
 public struct ExtractedSprite: Sendable {
     /// The entity id of the extracted sprite.
@@ -67,6 +78,31 @@ public struct ExtractedSprite: Sendable {
     public var transform: Transform
     /// The world transform of the extracted sprite.
     public var worldTransform: Transform3D
+    /// The source entity used for per-camera visibility, or `nil` to render for every camera.
+    public var visibilityEntityId: Entity.ID?
+
+    /// Initialize an extracted sprite.
+    public init(
+        entityId: Entity.ID,
+        texture: Texture2D?,
+        size: Size?,
+        flipX: Bool,
+        flipY: Bool,
+        tintColor: Color,
+        transform: Transform,
+        worldTransform: Transform3D,
+        visibilityEntityId: Entity.ID? = nil
+    ) {
+        self.entityId = entityId
+        self.texture = texture
+        self.size = size
+        self.flipX = flipX
+        self.flipY = flipY
+        self.tintColor = tintColor
+        self.transform = transform
+        self.worldTransform = worldTransform
+        self.visibilityEntityId = visibilityEntityId
+    }
 }
 
 /// A data for drawing sprites.
@@ -105,7 +141,8 @@ public func ExtractSprite(
             flipY: sprite.flipY,
             tintColor: sprite.tintColor,
             transform: transform,
-            worldTransform: globalTransform.matrix
+            worldTransform: globalTransform.matrix,
+            visibilityEntityId: entity.id
         )
     }
 }
@@ -156,6 +193,7 @@ func PrepareSprites(
     _ spriteRenderPipeline: ResMut<RenderPipelines<SpriteRenderPipeline>>,
     _ renderDevice: Res<RenderDeviceHandler>,
     _ extractedSprites: Res<ExtractedSprites>,
+    _ additionalSprites: Res<AdditionalExtractedSprites>,
     _ spriteDrawPass: Res<SpriteDrawPass>
 ) {
     camera.forEach { _, entities in
@@ -164,6 +202,23 @@ func PrepareSprites(
                 continue
             }
 
+            let pipeline = spriteRenderPipeline.wrappedValue.pipeline(device: renderDevice.renderDevice)
+            renderItems.items.append(
+                Transparent2DRenderItem(
+                    entity: sprite.entityId,
+                    drawPass: spriteDrawPass.wrappedValue,
+                    renderPipeline: pipeline,
+                    sortKey: sprite.worldTransform.w.z,
+                    batchRange: 0..<0
+                )
+            )
+        }
+
+        for sprite in additionalSprites.sprites.values {
+            if let visibilityEntityId = sprite.visibilityEntityId,
+                !entities.entityIds.contains(visibilityEntityId) {
+                continue
+            }
             let pipeline = spriteRenderPipeline.wrappedValue.pipeline(device: renderDevice.renderDevice)
             renderItems.items.append(
                 Transparent2DRenderItem(
@@ -188,6 +243,9 @@ public struct SpriteRenderSystem {
 
     @Res<ExtractedSprites>
     private var extractedSprites
+
+    @Res<AdditionalExtractedSprites>
+    private var additionalSprites
 
     @ResMut
     private var spriteRenderPipeline: RenderPipelines<SpriteRenderPipeline>
@@ -235,7 +293,8 @@ public struct SpriteRenderSystem {
         }
 
         for index in renderItems.items.items.indices {
-            guard let sprite = extractedSprites.sprites[renderItems.items.items[index].entity] else {
+            let renderEntityID = renderItems.items.items[index].entity
+            guard let sprite = extractedSprites.sprites[renderEntityID] ?? additionalSprites.sprites[renderEntityID] else {
                 finishCurrentBatch()
                 currentTexture = nil
                 batchEntityId = nil

@@ -152,6 +152,76 @@ struct SwiftToolingTests {
         #expect(await service.commands.last == .runWeb(target: "My-Game", outputPath: "dist/web", serve: true))
     }
 
+    @Test("toolbar Run uses the selected Web destination even when a scene is active")
+    @MainActor
+    func toolbarRunUsesSelectedWebDestinationWithActiveScene() async throws {
+        let projectURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ToolbarWebRun-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: projectURL) }
+        try ProjectSystem.saveProject(ProjectSystem.defaultProject(projectName: "Game"), at: projectURL)
+        let service = RecordingWorkspaceService(
+            outputEvents: [
+                EditorProcessOutputEvent(
+                    stream: .standardError,
+                    text: "Serving /tmp/web at http://127.0.0.1:8080\n"
+                )
+            ]
+        )
+        var openedURL: URL?
+        let packageModel = SwiftPackageModel(
+            name: "Game",
+            products: [SwiftPackageProduct(name: "Game", type: "executable", targets: ["Game"])],
+            targets: [],
+            dependencies: []
+        )
+        let viewModel = EditorViewModel(
+            project: EditorProjectReference(name: "Game", path: projectURL.path),
+            workspaceService: service,
+            externalURLOpener: { url in
+                openedURL = url
+                return true
+            },
+            workbench: EditorViewModel().workbench,
+            workspaceStatus: .ready,
+            packageModel: packageModel,
+            selectedRunProduct: "Game",
+            selectedRunDestination: .web
+        )
+        #expect(viewModel.workbench.activeSceneDocument != nil)
+
+        viewModel.runFromToolbar()
+        try await waitForRecordedCommands(service, count: 1)
+
+        #expect(await service.commands == [.runWeb(target: "Game", outputPath: "dist/web", serve: true)])
+        #expect(viewModel.playModeState == EditorPlayModeState.editing)
+        #expect(openedURL?.absoluteString == "http://127.0.0.1:8080")
+    }
+
+    @Test("toolbar Run never enters editor Play Mode for an AdaScript Web destination")
+    @MainActor
+    func toolbarRunDoesNotEnterPlayModeForAdaScriptWebDestination() async throws {
+        let projectURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ToolbarAdaScriptWebRun-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: projectURL) }
+        var settings = ProjectSystem.defaultProject(projectName: "Game")
+        settings.build.system = .adaScript
+        try ProjectSystem.saveProject(settings, at: projectURL)
+        let service = RecordingWorkspaceService()
+        let viewModel = EditorViewModel(
+            project: EditorProjectReference(name: "Game", path: projectURL.path),
+            workspaceService: service,
+            workbench: EditorViewModel().workbench,
+            selectedRunDestination: .web
+        )
+
+        viewModel.runFromToolbar()
+        await Task.yield()
+
+        #expect(viewModel.playModeState == EditorPlayModeState.editing)
+        #expect(viewModel.workspaceStatus == .failed("Web run is not available for AdaScript projects yet."))
+        #expect(await service.commands.isEmpty)
+    }
+
     @Test("run aborts when the active dirty document cannot be saved")
     @MainActor
     func runAbortsAfterSaveFailure() async {
@@ -606,6 +676,65 @@ struct SwiftToolingTests {
         #expect(clearedDocument.sourceHoverRange == nil)
         #expect(clearedDocument.sourceHoverDescription == nil)
         #expect(clearedDocument.symbolHighlights.isEmpty)
+    }
+
+    @Test("go to definition opens a read-only Swift interface with persistent documentation")
+    @MainActor
+    func goToDefinitionOpensGeneratedInterfaceAndDocumentation() async throws {
+        let uri = "sourcekit-lsp://generated-swift-interface/Foundation.swiftinterface?moduleName=Foundation"
+        let selection = EditorSourceRange(
+            start: EditorSourceLocation(line: 1, character: 13),
+            end: EditorSourceLocation(line: 1, character: 31)
+        )
+        let interface = "/// A notification delivery center.\npublic class NotificationCenter {}\n"
+        let service = RecordingWorkspaceService(
+            hoverResponse: EditorSymbolHover(contents: "Delivers notifications to registered observers.", range: nil),
+            definitionResponse: [
+                EditorSourceSymbolTarget(
+                    uri: uri,
+                    filePath: "/Foundation.swiftinterface",
+                    range: EditorSourceRange(
+                        start: EditorSourceLocation(line: 0, character: 0),
+                        end: EditorSourceLocation(line: 1, character: 34)
+                    ),
+                    selectionRange: selection,
+                    content: interface
+                )
+            ]
+        )
+        let source = EditorTextDocument(
+            id: "main",
+            title: "main.swift",
+            relativePath: "Sources/Game/main.swift",
+            absolutePath: "/tmp/Game/Sources/Game/main.swift",
+            language: .swift,
+            content: "let center = NotificationCenter.default"
+        )
+        let viewModel = EditorViewModel(
+            project: EditorProjectReference(name: "Game", path: "/tmp/Game"),
+            workspaceService: service,
+            workbench: EditorWorkbenchViewModel(openDocuments: [.text(source)], activeDocumentID: source.id)
+        )
+
+        viewModel.goToDefinition(document: source, position: EditorSourceLocation(line: 0, character: 15))
+        for _ in 0..<100 {
+            if case let .text(document)? = viewModel.workbench.activeDocument, document.sourceURI == uri {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+
+        guard case let .text(document)? = viewModel.workbench.activeDocument else {
+            Issue.record("Expected generated interface document")
+            return
+        }
+        #expect(document.sourceURI == uri)
+        #expect(document.absolutePath == nil)
+        #expect(document.content == interface)
+        #expect(document.isReadOnly)
+        #expect(document.focusedRange == selection)
+        #expect(document.symbolDocumentation == "Delivers notifications to registered observers.")
+        #expect(document.statusMessage == "Read-only: generated Swift interface")
     }
 
     @Test("build diagnostics replacement preserves SourceKit diagnostics")
@@ -1138,6 +1267,7 @@ struct SwiftToolingTests {
             case let .array(workspaceFolders)? = initializeObject["workspaceFolders"],
             case let .object(workspaceFolder)? = workspaceFolders.first,
             case let .object(capabilities)? = initializeObject["capabilities"],
+            case let .object(experimentalCapabilities)? = capabilities["experimental"],
             case let .object(workspaceCapabilities)? = capabilities["workspace"],
             case let .object(textDocumentCapabilities)? = capabilities["textDocument"],
             case let .object(semanticTokenCapabilities)? = textDocumentCapabilities["semanticTokens"]
@@ -1148,6 +1278,10 @@ struct SwiftToolingTests {
         #expect(workspaceFolder["name"] == .string("Game"))
         #expect(workspaceFolder["uri"] == .string(URL(fileURLWithPath: "/tmp/Game", isDirectory: true).absoluteString))
         #expect(workspaceCapabilities["workspaceFolders"] == .bool(true))
+        #expect(
+            experimentalCapabilities["sourcekit/workspace/getReferenceDocument"]
+                == .object(["supported": .bool(true)])
+        )
         #expect(semanticTokenCapabilities["formats"] == .array([.string("relative")]))
         let preparationParams = try #require(requests.first { $0.method == "workspace/_sourceKitOptions" }?.params)
         guard case let .object(preparationObject) = preparationParams else {
@@ -1290,6 +1424,40 @@ struct SwiftToolingTests {
         #expect(targets[0].selectionRange.start.line == 2)
         #expect(targets[1].filePath == "/tmp/Game/Sources/Game/Player.swift")
         #expect(targets[1].selectionRange.start.character == 9)
+    }
+
+    @Test("SourceKit generated interfaces are requested and attached to definitions")
+    func generatedInterfaceDefinition() async throws {
+        let uri = "sourcekit-lsp://generated-swift-interface/Foundation.swiftinterface?moduleName=Foundation"
+        let interface = "/// A notification delivery center.\npublic class NotificationCenter {}\n"
+        let connection = FakeSourceKitLSPConnection(responses: [
+            "textDocument/definition": .object([
+                "targetUri": .string(uri),
+                "targetRange": sourceRange(0, 0, 1, 34),
+                "targetSelectionRange": sourceRange(1, 13, 1, 31),
+            ]),
+            "sourcekit/workspace/getReferenceDocument": .object([
+                "content": .string(interface)
+            ]),
+        ])
+        let client = SourceKitLSPClient(connection: connection)
+        let projectURL = URL(fileURLWithPath: "/tmp/Game", isDirectory: true)
+        let fileURL = projectURL.appendingPathComponent("Sources/Game/main.swift")
+        try await client.start(
+            toolchain: SwiftToolchain(swiftExecutablePath: "/usr/bin/swift", sourceKitLSPExecutablePath: "/usr/bin/sourcekit-lsp"),
+            projectURL: projectURL
+        )
+
+        let targets = try await client.definition(fileURL: fileURL, position: EditorSourceLocation(line: 0, character: 4))
+        let target = try #require(targets.first)
+        #expect(target.uri == uri)
+        #expect(target.content == interface)
+        #expect(target.selectionRange == EditorSourceRange(
+            start: EditorSourceLocation(line: 1, character: 13),
+            end: EditorSourceLocation(line: 1, character: 31)
+        ))
+        let requests = await connection.requests
+        #expect(requests.contains { $0.method == "sourcekit/workspace/getReferenceDocument" })
     }
 
     @Test("LSP references hover and document highlights decode")
@@ -1661,14 +1829,20 @@ private actor RecordingWorkspaceService: SwiftPMWorkspaceServicing {
     private(set) var commands: [SwiftPMCommandKind] = []
     private(set) var completionRequests: [(position: EditorSourceLocation, text: String)] = []
     private let hoverResponse: EditorSymbolHover?
+    private let definitionResponse: [EditorSourceSymbolTarget]
     private let documentHighlightResponse: [EditorDocumentHighlight]
+    private let outputEvents: [EditorProcessOutputEvent]
 
     init(
         hoverResponse: EditorSymbolHover? = nil,
-        documentHighlightResponse: [EditorDocumentHighlight] = []
+        definitionResponse: [EditorSourceSymbolTarget] = [],
+        documentHighlightResponse: [EditorDocumentHighlight] = [],
+        outputEvents: [EditorProcessOutputEvent] = []
     ) {
         self.hoverResponse = hoverResponse
+        self.definitionResponse = definitionResponse
         self.documentHighlightResponse = documentHighlightResponse
+        self.outputEvents = outputEvents
     }
 
     nonisolated func makeCommand(_ kind: SwiftPMCommandKind, projectURL: URL, toolchain: SwiftToolchain) -> EditorProcessCommand {
@@ -1696,6 +1870,22 @@ private actor RecordingWorkspaceService: SwiftPMWorkspaceServicing {
 
     func execute(_ kind: SwiftPMCommandKind, projectURL: URL) -> EditorProcessResult {
         commands.append(kind)
+        return result(for: kind, projectURL: projectURL)
+    }
+
+    func execute(
+        _ kind: SwiftPMCommandKind,
+        projectURL: URL,
+        output: @Sendable @escaping (EditorProcessOutputEvent) async -> Void
+    ) async -> EditorProcessResult {
+        commands.append(kind)
+        for event in outputEvents {
+            await output(event)
+        }
+        return result(for: kind, projectURL: projectURL)
+    }
+
+    private func result(for kind: SwiftPMCommandKind, projectURL: URL) -> EditorProcessResult {
         let toolchain = SwiftToolchain(swiftExecutablePath: "swift", sourceKitLSPExecutablePath: nil)
         return EditorProcessResult(
             command: makeCommand(kind, projectURL: projectURL, toolchain: toolchain),
@@ -1710,7 +1900,9 @@ private actor RecordingWorkspaceService: SwiftPMWorkspaceServicing {
         completionRequests.append((position, text))
         return []
     }
-    func definition(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) -> [EditorSourceSymbolTarget] { [] }
+    func definition(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) -> [EditorSourceSymbolTarget] {
+        definitionResponse
+    }
     func references(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) -> [EditorSourceReference] { [] }
     func hover(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) -> EditorSymbolHover? { hoverResponse }
     func documentHighlights(fileURL _: URL, language _: EditorSourceLanguage, text _: String, position _: EditorSourceLocation) -> [EditorDocumentHighlight] {

@@ -74,7 +74,27 @@ extension EditorViewModel {
         }
         if settings.build.system.isAdaScript {
             debugger.selectedLanguage = .adaScript
-            debugger.status = "AdaScript debug runtime is not available in this build."
+            guard selectedRunDestination == .macOS else {
+                debugger.status = "AdaScript debugging currently runs in the local macOS runtime. Select macOS as the destination."
+                return
+            }
+            let projectName = settings.project.displayName ?? settings.project.name ?? project?.name ?? "AdaScript Project"
+            debugger.status = "Preparing AdaScript debug run…"
+            debugger.launchedBreakpoints = debugger.breakpoints
+            buildAdaScriptProject(
+                settings,
+                at: projectURL,
+                statusTitle: "Prepare AdaScript Debug Run"
+            ) { [weak self] artifact in
+                guard let self else {
+                    return
+                }
+                if self.launchAdaScriptProject(artifact, projectName: projectName) {
+                    self.debugger.status = "AdaScript runtime is running. VM pause, stepping, and breakpoint suspension are not available yet."
+                } else {
+                    self.debugger.status = "AdaScript debug run failed to launch. See Output for details."
+                }
+            }
             return
         }
         guard EditorDistribution.current.supportsSwiftProjects else {

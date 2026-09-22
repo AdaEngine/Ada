@@ -25,8 +25,11 @@ package struct MainSchedulerPlugin: Plugin {
             .fixed,
 
             // Update
+            .networkReceive,
             .preUpdate,
             .update,
+            .networkSend,
+            .networkInterpolate,
             .postUpdate,
 
             // Fixed
@@ -44,11 +47,14 @@ package struct MainSchedulerPlugin: Plugin {
         app.insertResource(
             DefaultSchedulerOrder(
                 order: [
+                    .networkReceive,
                     .preUpdate,
                     .update,
                     // Apply fixed-step writes before post-update systems derive
                     // render state such as GlobalTransform.
                     .fixed,
+                    .networkSend,
+                    .networkInterpolate,
                     .postUpdate,
                 ]
             )
@@ -112,6 +118,15 @@ public struct FixedTimeSchedulerSystem {
 }
 
 extension SchedulerName {
+    /// Receives and applies network data before gameplay systems run.
+    public static let networkReceive = SchedulerName(rawValue: "networkReceive")
+
+    /// Captures authoritative state after fixed simulation and sends network data.
+    public static let networkSend = SchedulerName(rawValue: "networkSend")
+
+    /// Applies client presentation interpolation before transform propagation.
+    public static let networkInterpolate = SchedulerName(rawValue: "networkInterpolate")
+
     /// The scheduler that synchronizes ECS state into physics backends.
     public static let physicsSync = SchedulerName(rawValue: "physicsSync")
 

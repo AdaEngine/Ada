@@ -61,8 +61,8 @@ enum GravityAPICatalog {
             ),
             GravityAPIMember(
                 "spawn",
-                detail: "spawn(componentNames) -> Int — spawn an entity through deferred commands",
-                insertText: "spawn(componentNames)",
+                detail: "spawn(components) -> Int — spawn initialized components through deferred commands",
+                insertText: "spawn(components)",
                 kind: .method,
                 returnType: "Int"
             ),
@@ -75,7 +75,18 @@ enum GravityAPICatalog {
             GravityAPIMember("world", detail: "Scoped AdaECS world access", kind: .property, returnType: "$AdaWorldContext"),
         ],
         "$AdaWorldContext": [
-            GravityAPIMember("commands", detail: "Scoped deferred world commands", kind: .property, returnType: "$AdaCommands")
+            GravityAPIMember("commands", detail: "Scoped deferred world commands", kind: .property, returnType: "$AdaCommands"),
+            GravityAPIMember(
+                "spawn",
+                detail: "spawn(components) -> Int — spawn initialized components through deferred commands",
+                insertText: "spawn(components)",
+                kind: .method,
+                returnType: "Int"
+            ),
+        ],
+        "Vector3": [
+            GravityAPIMember("ZERO", detail: "Zero three-dimensional vector", kind: .property, returnType: "Vector3"),
+            GravityAPIMember("zero", detail: "Zero three-dimensional vector", kind: .property, returnType: "Vector3"),
         ],
         "$AdaEditorToolContext": [
             GravityAPIMember(

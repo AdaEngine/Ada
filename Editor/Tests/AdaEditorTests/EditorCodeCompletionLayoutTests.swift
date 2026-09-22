@@ -10,8 +10,7 @@ struct EditorCodeCompletionLayoutTests {
         let viewport = Size(width: 440, height: 120)
         let frame = EditorCompletionPopupLayout.frame(
             viewportSize: viewport,
-            caretPosition: EditorSourceLocation(line: 4, character: 8),
-            fontSize: 12,
+            caretRect: Rect(x: 128, y: 82, width: 1.5, height: 18),
             itemCount: 40
         )
         let contentHeight = frame.height - EditorCompletionPopupLayout.verticalPadding * 2
@@ -23,14 +22,26 @@ struct EditorCodeCompletionLayoutTests {
 
     @Test("completion moves above a caret near the bottom edge")
     func completionUsesSpaceAboveBottomCaret() {
-        let caretTop = Float(18) + Float(4) * max(18, Float(12) * 1.45)
+        let caretRect = Rect(x: 128, y: 104, width: 1.5, height: 18)
         let frame = EditorCompletionPopupLayout.frame(
             viewportSize: Size(width: 440, height: 140),
-            caretPosition: EditorSourceLocation(line: 4, character: 8),
-            fontSize: 12,
+            caretRect: caretRect,
             itemCount: 2
         )
 
-        #expect(frame.maxY <= caretTop)
+        #expect(frame.maxY <= caretRect.minY)
+    }
+
+    @Test("completion tracks the visible caret after document scrolling")
+    func completionTracksScrolledCaret() {
+        let caretRect = Rect(x: 240, y: 74, width: 1.5, height: 18)
+        let frame = EditorCompletionPopupLayout.frame(
+            viewportSize: Size(width: 900, height: 700),
+            caretRect: caretRect,
+            itemCount: 3
+        )
+
+        #expect(frame.minX == caretRect.minX)
+        #expect(frame.minY == caretRect.maxY)
     }
 }

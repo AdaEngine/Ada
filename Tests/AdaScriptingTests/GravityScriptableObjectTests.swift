@@ -129,21 +129,21 @@ struct GravityScriptableObjectTests {
     }
 
     @safe
-    private static let resourceValueField = unsafe EditorComponentFieldDescriptor(
+    private static let resourceValueField = unsafe ReflectedComponentField(
         key: "value",
         label: "value",
         kind: .float,
-        isEditable: true,
-        accepts: { EditorComponentReflection.accepts($0, for: Double.self) },
+        isWritable: true,
+        accepts: { ComponentReflection.accepts($0, for: Double.self) },
         read: { _ in nil },
         write: { _, _ in nil },
         readPointer: { pointer in
             let resource = unsafe pointer.assumingMemoryBound(to: ScriptableBoundResource.self)
-            return EditorComponentReflection.read(unsafe resource.pointee.value)
+            return ComponentReflection.read(unsafe resource.pointee.value)
         },
         writePointer: { pointer, value in
             let resource = unsafe pointer.assumingMemoryBound(to: ScriptableBoundResource.self)
-            return unsafe EditorComponentReflection.write(value, to: &resource.pointee.value)
+            return unsafe ComponentReflection.write(value, to: &resource.pointee.value)
         }
     )
 }

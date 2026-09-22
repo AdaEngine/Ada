@@ -198,7 +198,7 @@ enum EditorScriptableObjectCatalogLoader {
         }
     }
 
-    private static func editorFieldValue(_ value: AdaScriptSchemaField.Value) -> EditorFieldValue {
+    private static func editorFieldValue(_ value: AdaScriptSchemaField.Value) -> ReflectedFieldValue {
         switch value {
         case let .bool(value): .bool(value)
         case let .double(value): .double(value)

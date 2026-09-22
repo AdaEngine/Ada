@@ -244,7 +244,8 @@ extension EditorViewModel {
         }
         if let projectURL,
             let settings = projectSettings,
-            settings.build.system == .adaScript {
+            settings.build.system == .adaScript,
+            selectedRunDestination == .macOS {
             let projectName = settings.project.displayName ?? settings.project.name ?? project?.name ?? "AdaScript Project"
             buildAdaScriptProject(
                 settings,
@@ -253,6 +254,13 @@ extension EditorViewModel {
             ) { [weak self] artifact in
                 self?.launchAdaScriptProject(artifact, projectName: projectName)
             }
+            return
+        }
+        if projectSettings?.build.system == .adaScript, selectedRunDestination == .web {
+            let message = "Web run is not available for AdaScript projects yet."
+            workspaceStatus = .failed(message)
+            footer.setWorkspaceFooterTitle(workspaceStatus.title)
+            appendOutput(message)
             return
         }
         switch selectedRunDestination {
@@ -409,10 +417,11 @@ extension EditorViewModel {
         appendOutput(message)
     }
 
+    @discardableResult
     func launchAdaScriptProject(
         _ artifact: EditorAdaScriptProjectBuildArtifact,
         projectName: String
-    ) {
+    ) -> Bool {
         do {
             let runtimeView = try EditorAdaScriptProjectRuntimeView(artifact: artifact)
             let windowManager = try requireWindowManager()
@@ -443,16 +452,21 @@ extension EditorViewModel {
                 self.workspaceStatus = .ready
                 self.footer.setWorkspaceFooterTitle(self.workspaceStatus.title)
                 self.appendOutput("AdaScript project \(windowTitle) stopped.")
+                if self.debugger.status.hasPrefix("AdaScript runtime is running") {
+                    self.debugger.status = "AdaScript debug run stopped."
+                }
             }
             window.showWindow(makeFocused: true)
             adaScriptRuntimeWindow = window
             workspaceStatus = .running("Run \(windowTitle)")
             footer.setWorkspaceFooterTitle(workspaceStatus.title)
             appendOutput("Running AdaScript project \(windowTitle) in a separate window scene.")
+            return true
         } catch {
             workspaceStatus = .failed(error.localizedDescription)
             footer.setWorkspaceFooterTitle(workspaceStatus.title)
             appendOutput("AdaScript launch failed: \(error.localizedDescription)")
+            return false
         }
     }
 
@@ -522,15 +536,7 @@ extension EditorViewModel {
     }
 
     func runFromToolbar() {
-        if selectedRunDestination == .player {
-            runSelectedTarget()
-            return
-        }
-        if workbench.activeSceneDocument != nil {
-            runActiveSceneInEditor()
-        } else {
-            runSelectedTarget()
-        }
+        runSelectedTarget()
     }
 
     func stopFromToolbar() {
@@ -615,6 +621,16 @@ extension EditorViewModel {
             EditorUpdateCenter.shared.checkForUpdates()
         case .showSettings:
             presentSettings(.general)
+        case .debugOverlayOff:
+            showsDebugOverlay = nil
+        case .debugOverlayRedraw:
+            toggleDebugOverlay(.redraw)
+        case .debugOverlayLayoutBounds:
+            toggleDebugOverlay(.layoutBounds)
+        case .debugOverlayHitTestTarget:
+            toggleDebugOverlay(.hitTestTarget)
+        case .debugOverlayFocusedNode:
+            toggleDebugOverlay(.focusedNode)
         case .newFile:
             presentNewFileDialog()
         case .newProject:
@@ -629,6 +645,14 @@ extension EditorViewModel {
             if workbench.saveAllDocuments() {
                 refreshSourceControl()
                 reloadScriptableObjectSupport()
+            }
+        case .findInFile:
+            guard workbench.presentFileSearch() else {
+                return false
+            }
+            Task { @MainActor in
+                await Task.yield()
+                _ = EditorSearchShortcutMonitor.shared.focusSearchField(identifier: EditorCodeFileView.fileSearchFieldIdentifier)
             }
         case .findInProject:
             presentTextSearch()

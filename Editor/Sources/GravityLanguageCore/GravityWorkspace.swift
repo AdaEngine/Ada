@@ -8,13 +8,21 @@ public final class GravityWorkspace {
     }
 
     private let fileManager: FileManager
-    private let languageService = GravityLanguageService()
+    private var languageService: GravityLanguageService
     private var diskDocuments: [String: Document] = [:]
     private var openDocuments: [String: Document] = [:]
     private var rootURLs: [URL] = []
 
-    public init(fileManager: FileManager = .default) {
+    public init(
+        fileManager: FileManager = .default,
+        hostConstructors: [GravityHostConstructor] = []
+    ) {
         self.fileManager = fileManager
+        self.languageService = GravityLanguageService(hostConstructors: hostConstructors)
+    }
+
+    public func setHostConstructors(_ constructors: [GravityHostConstructor]) {
+        languageService = GravityLanguageService(hostConstructors: constructors)
     }
 
     public func configure(rootURIs: [String]) {

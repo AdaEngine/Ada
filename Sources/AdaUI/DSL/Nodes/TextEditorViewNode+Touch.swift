@@ -54,6 +54,7 @@ extension TextEditorViewNode {
     }
 
     func handleTextEditorMouseLeave() {
+        self.updateHoveredGutterLine(nil)
         self.notifySourceHover(nil)
         self.resetSourceCursorIfNeeded()
         self.resetTextCursorIfNeeded()

@@ -30,7 +30,7 @@ public enum ScriptableObjectCodingError: Error, Equatable, Sendable, CustomStrin
 public struct ScriptableObjectDescriptor: Sendable {
     public let aliases: [String]
     public let declaredAccess: SystemAccessSet
-    public let exportedFields: [String: EditorFieldValue]
+    public let exportedFields: [String: ReflectedFieldValue]
     public let identifier: String
     public let requiredComponents: [ComponentId]
     public let version: Int
@@ -44,7 +44,7 @@ public struct ScriptableObjectDescriptor: Sendable {
         version: Int,
         aliases: [String] = [],
         declaredAccess: SystemAccessSet = SystemAccessSet(),
-        exportedFields: [String: EditorFieldValue] = [:],
+        exportedFields: [String: ReflectedFieldValue] = [:],
         requiredComponents: [ComponentId] = [],
         runtimeType: ObjectIdentifier? = nil,
         make: @escaping @Sendable () -> ScriptableObject,
@@ -74,7 +74,7 @@ public enum ScriptableObjectRegistry {
         version: Int = 1,
         aliases: [String] = [],
         declaredAccess: SystemAccessSet = SystemAccessSet(),
-        exportedFields: [String: EditorFieldValue] = [:],
+        exportedFields: [String: ReflectedFieldValue] = [:],
         requiredComponents: [any Component.Type] = []
     ) throws {
         try register(

@@ -40,6 +40,28 @@ struct SpriteRenderSystemTests {
         #expect(items.items.first?.sortKey == 12)
     }
 
+    @Test("Additional extracted sprites render without backing ECS entities")
+    func additionalExtractedSpritesArePrepared() async throws {
+        try Self.setupHeadlessRenderEngineIfNeeded()
+        Camera.registerComponent()
+        VisibleEntities.registerComponent()
+        let renderID = Int.min
+        let sprite = Self.extractedSprite(id: renderID, texture: .whiteTexture)
+        let world = try Self.makeRenderWorld(extractedSprites: [:], items: [])
+        world.insertResource(AdditionalExtractedSprites(sprites: [renderID: sprite]))
+        world.insertResource(RenderItems<Transparent2DRenderItem>())
+        world.addSystem(PrepareSpritesSystem.self, on: .preUpdate)
+        world.spawn {
+            Camera()
+            VisibleEntities()
+        }
+
+        await world.runScheduler(.preUpdate)
+
+        let items = try #require(world.getResource(RenderItems<Transparent2DRenderItem>.self))
+        #expect(items.items.map(\.entity) == [renderID])
+    }
+
     @Test("A non-sprite item separates sprite batches")
     func nonSpriteItemsSeparateSpriteBatches() async throws {
         try Self.setupHeadlessRenderEngineIfNeeded()
@@ -225,6 +247,7 @@ struct SpriteRenderSystemTests {
         let world = World()
         world
             .insertResource(ExtractedSprites(sprites: SparseSet(extractedSprites)))
+            .insertResource(AdditionalExtractedSprites())
             .insertResource(SortedRenderItems(items: RenderItems(items: items)))
             .insertResource(SpriteDrawPass())
             .insertResource(SpriteBatches())

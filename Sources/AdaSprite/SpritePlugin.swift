@@ -28,6 +28,7 @@ public struct SpritePlugin: Plugin {
         renderWorld
             // Sprite resources
             .insertResource(ExtractedSprites())
+            .insertResource(AdditionalExtractedSprites())
             .insertResource(SpriteDrawPass())
             .insertResource(SpriteBatches())
             .initResource(SpriteDrawData.self)

@@ -64,6 +64,57 @@ struct EditorRealWorkspaceTests {
         #expect(!document.content.contains("Game simulation entry point"))
     }
 
+    @Test("SwiftPM scratch directories cannot starve project targets")
+    @MainActor
+    func projectTreeSkipsNamedSwiftPMScratchDirectories() throws {
+        let projectURL = try makeRealWorkspaceDirectory(named: "ScratchDirectoryTree")
+        defer { removeRealWorkspaceDirectory(projectURL) }
+
+        let sourceDirectory = projectURL.appendingPathComponent("Sources", isDirectory: true)
+        let sceneDirectory = projectURL.appendingPathComponent("Assets/Scenes", isDirectory: true)
+        let scratchDirectory = projectURL.appendingPathComponent(".build-codex", isDirectory: true)
+        try FileManager.default.createDirectory(at: sourceDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: sceneDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: scratchDirectory, withIntermediateDirectories: true)
+        try "@system class Arena {}\n".write(
+            to: sourceDirectory.appendingPathComponent("Arena.ada"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "scene: Main\n".write(
+            to: sceneDirectory.appendingPathComponent("Main.ascn"),
+            atomically: true,
+            encoding: .utf8
+        )
+        for index in 0...2_000 {
+            _ = FileManager.default.createFile(
+                atPath: scratchDirectory.appendingPathComponent("Generated-\(index).swift").path,
+                contents: Data()
+            )
+        }
+
+        var metadata = ProjectSystem.defaultProject(projectName: "ScratchDirectoryTree", buildSystem: .adaScript)
+        metadata.runtime.moduleName = "ArenaGame"
+        metadata.paths.sources = "Sources"
+        metadata.paths.assets = "Assets"
+        try ProjectSystem.saveProject(metadata, at: projectURL)
+
+        let project = EditorProjectReference(name: "ScratchDirectoryTree", path: projectURL.path)
+        let viewModel = EditorViewModel(project: project)
+
+        #expect(!viewModel.projectSidebar.items.contains { $0.relativePath.hasPrefix(".build-codex") })
+        #expect(
+            viewModel.projectSidebar.visibleItems.map(\.relativePath) == [
+                "Assets",
+                "Assets/Scenes",
+                "Assets/Scenes/Main.ascn",
+                "Sources",
+                "Sources/Arena.ada",
+            ]
+        )
+        #expect(viewModel.projectSidebar.visibleItems.first { $0.relativePath == "Sources" }?.title == "ArenaGame")
+    }
+
     @Test("empty real project stays empty")
     @MainActor
     func emptyProjectDoesNotShowSampleFiles() throws {

@@ -1,7 +1,11 @@
 import Foundation
 
 public struct GravityLanguageService: Sendable {
-    public init() {}
+    private let hostConstructors: [GravityHostConstructor]
+
+    public init(hostConstructors: [GravityHostConstructor] = []) {
+        self.hostConstructors = hostConstructors.sorted { $0.name < $1.name }
+    }
 
     public func analyze(text: String) -> GravityDocumentAnalysis {
         GravityDocumentAnalyzer.parse(text).analysis
@@ -28,6 +32,9 @@ public struct GravityLanguageService: Sendable {
             let member = GravityAPICatalog.member(named: token.text, in: receiverType) {
             return GravityHover(contents: member.detail, range: token.range)
         }
+        if let constructor = hostConstructors.first(where: { $0.name == token.text }) {
+            return GravityHover(contents: constructor.signature, range: token.range)
+        }
         let symbols = parsed.analysis.symbols + parsed.analysis.symbols.flatMap(\.members)
         guard let symbol = symbols.first(where: { $0.name == token.text }) else {
             return nil
@@ -46,14 +53,7 @@ public struct GravityLanguageService: Sendable {
                 _ = openParentheses.popLast()
             }
         }
-        guard
-            let openIndex = openParentheses.last,
-            openIndex > 0,
-            tokens[openIndex - 1].kind == .identifier,
-            let receiverPath = Self.receiverPath(beforeMemberAt: openIndex - 1, tokens: tokens),
-            let receiverType = resolvedType(receiverPath: receiverPath, position: position, parsed: parsed),
-            let member = GravityAPICatalog.member(named: tokens[openIndex - 1].text, in: receiverType)
-        else {
+        guard let openIndex = openParentheses.last, openIndex > 0, tokens[openIndex - 1].kind == .identifier else {
             return nil
         }
 
@@ -68,7 +68,15 @@ public struct GravityLanguageService: Sendable {
                 activeParameter += 1
             }
         }
-        return GravitySignatureHelp(activeParameter: activeParameter, label: member.detail)
+        if let receiverPath = Self.receiverPath(beforeMemberAt: openIndex - 1, tokens: tokens),
+            let receiverType = resolvedType(receiverPath: receiverPath, position: position, parsed: parsed),
+            let member = GravityAPICatalog.member(named: tokens[openIndex - 1].text, in: receiverType) {
+            return GravitySignatureHelp(activeParameter: activeParameter, label: member.detail)
+        }
+        guard let constructor = hostConstructors.first(where: { $0.name == tokens[openIndex - 1].text }) else {
+            return nil
+        }
+        return GravitySignatureHelp(activeParameter: activeParameter, label: constructor.signature)
     }
 
     public func completions(
@@ -95,7 +103,9 @@ public struct GravityLanguageService: Sendable {
         } else if context.isAnnotation {
             candidates = GravityBuiltins.annotationCandidates
         } else {
-            candidates = GravityBuiltins.globalCandidates + symbols.map(GravityCompletionCandidate.init(symbol:))
+            candidates = GravityBuiltins.globalCandidates
+                + hostConstructors.map(hostConstructorCandidate)
+                + symbols.map(GravityCompletionCandidate.init(symbol:))
         }
 
         return
@@ -124,6 +134,16 @@ public struct GravityLanguageService: Sendable {
                     sortText: candidate.sortText
                 )
             }
+    }
+
+    private func hostConstructorCandidate(_ constructor: GravityHostConstructor) -> GravityCompletionCandidate {
+        GravityCompletionCandidate(
+            detail: constructor.signature,
+            insertText: "\(constructor.name)()",
+            kind: .class,
+            label: constructor.name,
+            sortText: "18"
+        )
     }
 
     private func memberCandidates(

@@ -92,6 +92,8 @@ final class EditorViewModel {
     @ObservationIgnored
     let adaScriptPreviewBuilder: EditorAdaScriptPreviewBuilder
     @ObservationIgnored
+    let externalURLOpener: @MainActor (URL) -> Bool
+    @ObservationIgnored
     let previewLibrary = EditorPreviewDynamicLibrary()
     @ObservationIgnored
     var workspaceTask: Task<Void, Never>?
@@ -103,6 +105,8 @@ final class EditorViewModel {
     var previewBuildGeneration = 0
     @ObservationIgnored
     var adaScriptRuntimeWindow: UIWindow?
+    @ObservationIgnored
+    var pendingWebRunURL: URL?
     @ObservationIgnored
     var completionTask: Task<Void, Never>?
     @ObservationIgnored
@@ -133,6 +137,7 @@ final class EditorViewModel {
         sourceControlService: any GitRepositoryServicing = GitRepositoryService(),
         previewBuilder: EditorPreviewBuilder = EditorPreviewBuilder(),
         adaScriptPreviewBuilder: EditorAdaScriptPreviewBuilder = EditorAdaScriptPreviewBuilder(),
+        externalURLOpener: @escaping @MainActor (URL) -> Bool = EditorPlatformFileActions.openInDefaultApplication,
         toolbar: EditorToolbarViewModel = EditorToolbarViewModel(),
         toolStrip: EditorToolStripViewModel = EditorToolStripViewModel(),
         projectSidebar: EditorProjectSidebarViewModel? = nil,
@@ -185,6 +190,7 @@ final class EditorViewModel {
         self.fileManager = fileManager
         self.previewBuilder = previewBuilder
         self.adaScriptPreviewBuilder = adaScriptPreviewBuilder
+        self.externalURLOpener = externalURLOpener
         self.autosaveDelay = autosaveDelay
         self.toolbar = toolbar
         self.toolStrip = toolStrip

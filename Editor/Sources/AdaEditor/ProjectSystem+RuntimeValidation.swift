@@ -34,6 +34,25 @@ extension ProjectSystem {
                 message: "Physics2D gravity must contain two finite numbers."
             )
         }
+        let multiplayer = plugins.settings.multiplayer
+        guard ["host", "peer"].contains(multiplayer.role) else {
+            throw .invalidField(
+                path: "runtime.plugins.settings.multiplayer.role",
+                message: "Multiplayer role must be host or peer."
+            )
+        }
+        guard (1...65_535).contains(multiplayer.port) else {
+            throw .invalidField(
+                path: "runtime.plugins.settings.multiplayer.port",
+                message: "Multiplayer port must be between 1 and 65535."
+            )
+        }
+        guard (1...255).contains(multiplayer.peerIndex) else {
+            throw .invalidField(
+                path: "runtime.plugins.settings.multiplayer.peerIndex",
+                message: "Multiplayer peerIndex must be between 1 and 255."
+            )
+        }
     }
 
     static func validateRuntimeWindow(_ window: AdaProjectRuntimeWindow) throws(ProjectSystemError) {

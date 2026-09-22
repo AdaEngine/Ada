@@ -118,7 +118,7 @@ final class AnnotatedGravityRuntimeDelegate: GravityVirtualMachineDelegate, @unc
 }
 
 enum AnnotatedGravityValueBridge {
-    static func makeGravityValue(_ value: EditorFieldValue, virtualMachine: GravityVirtualMachine) -> GSValue {
+    static func makeGravityValue(_ value: ReflectedFieldValue, virtualMachine: GravityVirtualMachine) -> GSValue {
         switch value {
         case .null: GSValue(nullIn: virtualMachine)
         case let .bool(value): GSValue(boolean: value, in: virtualMachine)
@@ -138,7 +138,7 @@ enum AnnotatedGravityValueBridge {
         }
     }
 
-    static func makeEditorFieldValue(_ value: GSValue) -> EditorFieldValue? {
+    static func makeReflectedFieldValue(_ value: GSValue) -> ReflectedFieldValue? {
         if value.isNull || value.isUndefined {
             return .null
         }
@@ -158,9 +158,9 @@ enum AnnotatedGravityValueBridge {
             return .string(value.toString)
         }
         if value.isList {
-            var result: [EditorFieldValue] = []
+            var result: [ReflectedFieldValue] = []
             for item in value.toList {
-                guard let converted = makeEditorFieldValue(item) else {
+                guard let converted = makeReflectedFieldValue(item) else {
                     return nil
                 }
                 result.append(converted)

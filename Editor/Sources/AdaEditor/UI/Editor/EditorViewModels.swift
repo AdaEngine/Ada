@@ -239,6 +239,7 @@ struct EditorTextDocument: Equatable, Sendable {
     var title: String
     var relativePath: String
     var absolutePath: String?
+    var sourceURI: String?
     var language: EditorSourceLanguage
     var content: String
     var lastSavedContent: String?
@@ -257,6 +258,8 @@ struct EditorTextDocument: Equatable, Sendable {
     var focusedRange: EditorSourceRange?
     var selectionRange: EditorSourceRange?
     var selectedText: String?
+    var symbolDocumentation: String?
+    var fileSearch = EditorFileSearchState()
 }
 
 struct EditorSceneDocument: Equatable, Sendable {

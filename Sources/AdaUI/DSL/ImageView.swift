@@ -72,15 +72,15 @@ extension Image {
 
 final class ImageViewNode: ViewNode {
     /// The texture.
-    let texture: Texture2D
-    private let slices: [(column: Int, row: Int, texture: Texture2D)]
-    private let sliceGrid: ImageSliceGrid?
+    private(set) var texture: Texture2D
+    private var slices: [(column: Int, row: Int, texture: Texture2D)]
+    private var sliceGrid: ImageSliceGrid?
     /// A Boolean value indicating whether the image view is resizable.
-    let isResizable: Bool
+    private(set) var isResizable: Bool
     /// The render mode.
-    let renderMode: ImageRenderMode
+    private(set) var renderMode: ImageRenderMode
     /// The tint color.
-    let tintColor: Color?
+    private(set) var tintColor: Color?
 
     init<Content: View>(
         image: Image,
@@ -111,6 +111,24 @@ final class ImageViewNode: ViewNode {
         self.renderMode = renderMode
         self.isResizable = isResizable
         super.init(content: content)
+    }
+
+    override func update(from newNode: ViewNode) {
+        guard let otherNode = newNode as? ImageViewNode else {
+            super.update(from: newNode)
+            return
+        }
+
+        super.update(from: otherNode)
+        texture = otherNode.texture
+        slices = otherNode.slices
+        sliceGrid = otherNode.sliceGrid
+        isResizable = otherNode.isResizable
+        renderMode = otherNode.renderMode
+        tintColor = otherNode.tintColor
+        markNeedsLayout()
+        invalidateNearestLayer()
+        owner?.containerView?.setNeedsDisplay(in: visualAbsoluteFrame())
     }
 
     override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {

@@ -123,6 +123,7 @@ struct AdaScriptRuntimeConfigurationTests {
     }
 
     @Test("missing entry view offers the runtime entry settings page")
+    @MainActor
     func missingEntryViewOffersRuntimeSettings() {
         let action = EditorViewModel.notificationAction(
             for: .entryViewMissing(identifier: "game.main"),

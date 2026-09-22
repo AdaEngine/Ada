@@ -38,6 +38,7 @@ enum EditorAdaScriptRuntimePluginCatalog {
         .init(dependencies: [.core2D, .mesh2D, .sprite], displayName: "2D Lighting", id: .light2D),
         .init(dependencies: [.core2D], displayName: "2D Physics", id: .physics2D),
         .init(dependencies: [.core3D], displayName: "3D Physics", id: .physics3D),
+        .init(dependencies: [.core2D, .sprite], displayName: "Multiplayer", id: .multiplayer),
         .init(dependencies: [.core2D, .mesh2D, .sprite], displayName: "Tilemaps", id: .tilemap),
         .init(dependencies: [], displayName: "Audio", id: .audio),
         .init(dependencies: [], displayName: "Upscaling", id: .upscale),
@@ -62,6 +63,7 @@ enum EditorAdaScriptRuntimePluginCatalog {
             ]
         ),
         .init("Platform", plugins: [.audio, .upscale]),
+        .init("Networking", plugins: [.multiplayer]),
     ]
 
     static func presetPlugins(_ preset: AdaProjectRuntimePluginPreset) -> Set<AdaProjectRuntimePluginID> {
@@ -77,6 +79,7 @@ enum EditorAdaScriptRuntimePluginCatalog {
 }
 
 struct EditorAdaScriptResolvedRuntimePlugins: Equatable, Sendable {
+    let multiplayer: AdaProjectMultiplayerSettings
     let pluginIDs: [AdaProjectRuntimePluginID]
     let physics2DGravity: [Double]
 
@@ -144,6 +147,7 @@ enum EditorAdaScriptRuntimePluginResolver {
             .map(\.id)
             .filter(resolved.contains)
         return EditorAdaScriptResolvedRuntimePlugins(
+            multiplayer: configuration.settings.multiplayer,
             pluginIDs: orderedPluginIDs,
             physics2DGravity: configuration.settings.physics2D.gravity
         )

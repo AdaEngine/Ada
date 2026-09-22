@@ -396,6 +396,11 @@ extension EditorViewModel {
         } else {
             workspaceOutputIsGame = false
         }
+        if case .runWeb = kind {
+            pendingWebRunURL = URL(string: "http://127.0.0.1:8080")
+        } else {
+            pendingWebRunURL = nil
+        }
         workspaceStatus = .running(statusTitle)
         buildActivity = EditorBuildActivity(title: statusTitle)
         pendingWorkspaceStandardOutput = ""
@@ -418,6 +423,7 @@ extension EditorViewModel {
                 if EditorNotificationCenter.shared.activities.all.first(where: { $0.id == notificationRunID })?.state == .cancelled {
                     self.flushPendingWorkspaceOutput()
                     self.workspaceOutputIsGame = false
+                    self.pendingWebRunURL = nil
                     self.workspaceStatus = .ready
                     self.buildActivity = nil
                     self.notificationWorkspaceRunID = nil
@@ -437,6 +443,7 @@ extension EditorViewModel {
                     self.appendOutput(result)
                 }
                 self.workspaceOutputIsGame = false
+                self.pendingWebRunURL = nil
                 self.buildActivity?.finish(succeeded: result.succeeded)
                 self.replaceBuildDiagnostics(with: EditorDiagnostic.diagnostics(from: result, projectURL: projectURL))
                 self.showProblemsIfNeeded()
@@ -455,14 +462,28 @@ extension EditorViewModel {
         didReceiveStreamingWorkspaceOutput = true
         switch event.stream {
         case .standardOutput:
+            openWebRunDestinationIfReady(from: pendingWorkspaceStandardOutput + event.text)
             let update = Self.streamingOutput(event.text, pending: pendingWorkspaceStandardOutput)
             pendingWorkspaceStandardOutput = update.pending
             appendStreamingLines(update.lines)
         case .standardError:
+            openWebRunDestinationIfReady(from: pendingWorkspaceStandardError + event.text)
             let update = Self.streamingOutput(event.text, pending: pendingWorkspaceStandardError)
             pendingWorkspaceStandardError = update.pending
             appendStreamingLines(update.lines)
         }
+    }
+
+    private func openWebRunDestinationIfReady(from output: String) {
+        guard let pendingWebRunURL, output.contains("Serving "), output.contains(pendingWebRunURL.absoluteString) else {
+            return
+        }
+        self.pendingWebRunURL = nil
+        guard externalURLOpener(pendingWebRunURL) else {
+            appendOutput("Unable to open \(pendingWebRunURL.absoluteString) in the default browser.")
+            return
+        }
+        appendOutput("Opened \(pendingWebRunURL.absoluteString) in the default browser.")
     }
 
     func appendStreamingLines(_ lines: [String]) {

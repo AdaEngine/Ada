@@ -1,8 +1,8 @@
+import AdaEngine
 import Foundation
 import GravityLanguageCore
 
 struct EditorGravityLanguageService: Sendable {
-    private static let languageService = GravityLanguageService()
     private static let annotationLabels: Set<String> = [
         "access", "component", "environment", "export", "previewable", "query", "res",
         "resource", "scriptable", "state", "system", "tool", "view",
@@ -14,13 +14,13 @@ struct EditorGravityLanguageService: Sendable {
     ) -> [EditorCompletionItem] {
         let lspPosition = lspPosition(from: position, in: text)
         return completionItems(
-            languageService.completions(text: text, position: lspPosition),
+            languageService().completions(text: text, position: lspPosition),
             text: text
         )
     }
 
     static func semanticTokens(text: String) -> [EditorSemanticToken] {
-        languageService.semanticTokens(text: text)
+        languageService().semanticTokens(text: text)
             .compactMap { token in
                 guard token.range.start.line == token.range.end.line else {
                     return nil
@@ -39,7 +39,7 @@ struct EditorGravityLanguageService: Sendable {
 
     static func hover(text: String, position: EditorSourceLocation) -> EditorSymbolHover? {
         guard
-            let hover = languageService.hover(
+            let hover = languageService().hover(
                 text: text,
                 position: lspPosition(from: position, in: text)
             )
@@ -83,6 +83,7 @@ struct EditorGravityLanguageService: Sendable {
         text: String,
         position: EditorSourceLocation
     ) -> EditorSymbolHover? {
+        workspace.setHostConstructors(hostConstructors())
         workspace.change(uri: uri, text: text, version: nil)
         guard let hover = workspace.hover(uri: uri, position: lspPosition(from: position, in: text)) else {
             return nil
@@ -91,6 +92,7 @@ struct EditorGravityLanguageService: Sendable {
     }
 
     static func diagnostics(workspace: GravityWorkspace, fileURL: URL, text: String) -> [EditorDiagnostic] {
+        workspace.setHostConstructors(hostConstructors())
         let uri = fileURL.standardizedFileURL.absoluteString
         workspace.change(uri: uri, text: text, version: nil)
         return (workspace.analysis(for: uri)?.diagnostics ?? [])
@@ -111,11 +113,25 @@ struct EditorGravityLanguageService: Sendable {
         text: String,
         position: EditorSourceLocation
     ) -> [EditorCompletionItem] {
+        workspace.setHostConstructors(hostConstructors())
         workspace.change(uri: uri, text: text, version: nil)
         return completionItems(
             workspace.completions(uri: uri, position: lspPosition(from: position, in: text)),
             text: text
         )
+    }
+
+    private static func hostConstructors() -> [GravityHostConstructor] {
+        return RuntimeTypeRegistry.registeredRuntimeComponentConstructors().map { constructor in
+            GravityHostConstructor(
+                name: constructor.name,
+                parameters: constructor.parameters.map(\.name)
+            )
+        }
+    }
+
+    private static func languageService() -> GravityLanguageService {
+        GravityLanguageService(hostConstructors: hostConstructors())
     }
 
     private static func completionItems(

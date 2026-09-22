@@ -307,6 +307,7 @@ extension Parser {
             usesDeferredCommands =
                 usesDeferredCommands
                 || checkSequence(["context", ".", "world", ".", "commands"])
+                || checkSequence(["context", ".", "world", ".", "spawn"])
             if depth == 1, let binding = try parseResourceBinding(systemName: systemName) {
                 bindings.append(binding)
                 continue
