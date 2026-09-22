@@ -1381,6 +1381,48 @@
       },
       {
         "kind": "heading",
+        "text": "Multiplayer schemas",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use a typed command for peer intent. Field tags, rather than declaration order\nor source names, define the wire schema:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@network_command(\n    id: \"game.player-input\",\n    delivery: \"unreliable_sequenced\",\n    channel: \"input\"\n)\nstruct PlayerInput {\n    @network_field(1) var moveX = 0.0;\n    @network_field(2) var moveY = 0.0;\n    @network_field(3) var attackSequence = 0;\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Peers send the generated value through the scoped multiplayer resource. Host\nsystems receive typed values and an authenticated transport source:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system\nclass InputSystem {\n    @res var multiplayer: Multiplayer;\n    @remote_commands(PlayerInput) var inputs;\n\n    func update(context) {\n        multiplayer.send(PlayerInput(1.0, 0.0, 4));\n        for (var message in inputs) {\n            var peer = message.source;\n            var movement = message.value.moveX;\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The runtime owns packet sequences and command envelopes. `message.source`\ncannot be supplied by script payload data. Swift and AdaScript declarations\nwith matching IDs, versions, tags, types, direction, delivery, and channel\nproduce the same compatibility schema.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@replicated_component` uses `@network_field` plus optional `@local` fields.\nSwiftPM targets receive a generated native ECS backing component through\n`AdaScriptBuildPlugin`. Portable AdaEditor projects still reject custom\ncomponent layouts until runtime-defined ECS layouts are implemented; typed\ncommands do not have that restriction.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
         "text": "AdaUI views",
         "level": 2,
         "links": []
