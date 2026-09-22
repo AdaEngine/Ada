@@ -109,6 +109,108 @@ struct AdaScriptSchemaParserTests {
         ])
     }
 
+    @Test("Parses replicated components and typed network commands")
+    func parsesNetworkSchemas() throws {
+        let source = AdaScriptCompilerSource(
+            path: "Network.ada",
+            source: """
+            @replicated_component(
+                id: "arena.player",
+                version: 2,
+                authority: "host",
+                visibility: "all_peers"
+            )
+            struct ArenaPlayer {
+                @network_field(1, mode: "latest", interpolate: "linear")
+                var position = 0.0;
+                @network_field(2, mode: "state")
+                var health = 3;
+                @local var consumedInput = 0;
+            }
+
+            @network_command(
+                id: "arena.input",
+                delivery: "unreliable_sequenced",
+                channel: "input"
+            )
+            struct PlayerInput {
+                @network_field(1) var moveX = 0.0;
+                @network_field(2) var attackSequence = 0;
+            }
+
+            @system
+            class Gameplay {
+                @remote_commands(PlayerInput) var inputs;
+                func update(context) {}
+            }
+            """
+        )
+
+        let component = try #require(AdaScriptSchemaParser.parse(sources: [source]).first)
+        #expect(component.id == "arena.player")
+        #expect(component.kind == .component)
+        #expect(component.replication == AdaScriptReplicatedComponentSchema(
+            authority: "host",
+            version: 2,
+            visibility: "all_peers"
+        ))
+        #expect(component.fields.map(\.network) == [
+            AdaScriptNetworkFieldSchema(interpolation: "linear", mode: "latest", tag: 1),
+            AdaScriptNetworkFieldSchema(interpolation: "none", mode: "state", tag: 2),
+            nil,
+        ])
+
+        let command = try #require(AdaScriptSchemaParser.parseNetworkCommands(sources: [source]).first)
+        #expect(command.id == "arena.input")
+        #expect(command.delivery == "unreliable_sequenced")
+        #expect(command.channel == "input")
+        #expect(command.fields.compactMap(\.network?.tag) == [1, 2])
+        let bindings = try AdaScriptSchemaParser.parseRemoteCommandBindings(sources: [source])
+        #expect(bindings == [
+            AdaScriptRemoteCommandBinding(
+                commandName: "PlayerInput",
+                propertyName: "inputs",
+                systemName: "Gameplay"
+            ),
+        ])
+    }
+
+    @Test("Rejects duplicate network field tags")
+    func rejectsDuplicateNetworkTags() {
+        #expect(throws: AdaScriptSchemaError.self) {
+            try AdaScriptSchemaParser.parseNetworkCommands(sources: [
+                AdaScriptCompilerSource(
+                    path: "BadNetwork.ada",
+                    source: """
+                    @network_command(id: "bad.command")
+                    struct BadCommand {
+                        @network_field(1) var first = 1;
+                        @network_field(1) var second = 2;
+                    }
+                    """
+                ),
+            ])
+        }
+    }
+
+    @Test("Lowers command declarations into typed runtime factories")
+    func lowersNetworkCommand() {
+        let lowered = AdaScriptNetworkLowerer.lower(source: """
+        @network_command(id: "game.input")
+        struct PlayerInput {
+            @network_field(1) var moveX = 0.0;
+            @network_field(2) var attack = 0;
+        }
+
+        @system class Gameplay { func update(context) {} }
+        """)
+
+        #expect(lowered.contains("func PlayerInput(moveX, attack)"))
+        #expect(lowered.contains("__adaNetworkFactory.make(\"PlayerInput\", [moveX, attack])"))
+        #expect(!lowered.contains("@network_command"))
+        #expect(lowered.contains("@system class Gameplay"))
+    }
+
     @Test("Infers deferred commands only for systems that use WorldContext")
     func parsesSystemCapabilities() throws {
         let capabilities = try AdaScriptSchemaParser.parseSystemCapabilities(sources: [

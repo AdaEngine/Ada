@@ -24,7 +24,7 @@ public protocol NetworkRequest: NetworkMessage {
 }
 
 /// Allowed direction for a registered RPC message.
-public enum RPCDirection: String, Codable, Sendable {
+public enum RPCDirection: String, Codable, Hashable, Sendable {
     case peerToHost
     case hostToPeer
     case bidirectional
@@ -42,6 +42,7 @@ struct RPCDescriptor: Sendable {
     var kind: RPCMessageKind
     var direction: RPCDirection
     var maximumPayloadSize: Int
+    var schema: NetworkTypeDescriptor?
     var clear: @Sendable (World) -> Void
     var deliver: @Sendable (
         _ source: PeerID,
@@ -220,6 +221,22 @@ extension AppWorlds {
         )
     }
 
+    /// Registers a command using metadata synthesized by ``NetworkCommand(id:version:direction:delivery:channel:maximumPayloadSize:)``.
+    @discardableResult
+    public func registerNetworkCommand<T: NetworkCommand & NetworkDescribedMessage>(
+        _ type: T.Type
+    ) -> Self {
+        let schema = T.networkDescriptor
+        guard schema.kind == .command, let direction = schema.direction else {
+            preconditionFailure("Generated command schema is invalid for \(schema.typeID)")
+        }
+        return registerNetworkCommand(
+            type,
+            direction: direction,
+            maximumPayloadSize: schema.maximumPayloadSize
+        )
+    }
+
     /// Registers a host-to-peer event type.
     @discardableResult
     public func registerNetworkEvent<T: NetworkEvent>(
@@ -312,6 +329,7 @@ extension AppWorlds {
             kind: kind,
             direction: direction,
             maximumPayloadSize: max(1, maximumPayloadSize),
+            schema: (T.self as? any NetworkDescribedMessage.Type)?.networkDescriptor,
             clear: clear,
             deliver: deliver
         )

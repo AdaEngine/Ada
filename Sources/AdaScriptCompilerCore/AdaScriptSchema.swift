@@ -43,6 +43,7 @@ extension Parser {
         } else if annotations.contains(where: { $0.name == "system" }) {
             let system = try parseSystemBody(systemName: name)
             output.resourceBindings += system.resourceBindings
+            output.remoteCommandBindings += system.remoteCommandBindings
             output.systemCapabilities.append(system.capabilities)
         } else if let annotation = annotations.first(where: { $0.name == "scriptable" }) {
             output.scriptables.append(try parseScriptable(name: name, annotation: annotation))
@@ -67,9 +68,21 @@ extension Parser {
         if annotations.contains(where: { $0.name == "view" || $0.name == "previewable" || $0.name == "tool" }) {
             throw error("@view, @previewable, and @tool can only annotate a class")
         }
-        guard let schemaAnnotation = annotations.first(where: { $0.name == "component" || $0.name == "resource" }) else {
+        if let commandAnnotation = annotations.first(where: { $0.name == "network_command" }) {
+            guard annotations.count == 1 else {
+                throw error("@network_command cannot be combined with other declaration annotations on \(name)")
+            }
+            output.networkCommands.append(try parseNetworkCommand(name: name, annotation: commandAnnotation))
+            return
+        }
+        guard let schemaAnnotation = annotations.first(where: {
+            $0.name == "component" || $0.name == "replicated_component" || $0.name == "resource"
+        }) else {
             try skipDeclarationBody()
             return
+        }
+        guard annotations.count == 1 else {
+            throw error("@\(schemaAnnotation.name) cannot be combined with other declaration annotations on \(name)")
         }
         output.schemas.append(try parseSchema(name: name, annotation: schemaAnnotation))
     }
@@ -296,11 +309,16 @@ extension Parser {
 
     private mutating func parseSystemBody(
         systemName: String
-    ) throws -> (resourceBindings: [AdaScriptResourceBinding], capabilities: AdaScriptSystemCapabilities) {
+    ) throws -> (
+        resourceBindings: [AdaScriptResourceBinding],
+        remoteCommandBindings: [AdaScriptRemoteCommandBinding],
+        capabilities: AdaScriptSystemCapabilities
+    ) {
         guard match("{") else {
             throw error("expected '{' after system \(systemName)")
         }
         var bindings: [AdaScriptResourceBinding] = []
+        var remoteCommandBindings: [AdaScriptRemoteCommandBinding] = []
         var depth = 1
         var usesDeferredCommands = false
         while !isAtEnd, depth > 0 {
@@ -308,9 +326,16 @@ extension Parser {
                 usesDeferredCommands
                 || checkSequence(["context", ".", "world", ".", "commands"])
                 || checkSequence(["context", ".", "world", ".", "spawn"])
-            if depth == 1, let binding = try parseResourceBinding(systemName: systemName) {
-                bindings.append(binding)
-                continue
+            if depth == 1 {
+                let parsedBindings = try parseSystemBindings(systemName: systemName)
+                if let resource = parsedBindings.resource {
+                    bindings.append(resource)
+                    continue
+                }
+                if let remoteCommands = parsedBindings.remoteCommands {
+                    remoteCommandBindings.append(remoteCommands)
+                    continue
+                }
             }
             advanceSystemBody(depth: &depth)
         }
@@ -319,6 +344,7 @@ extension Parser {
         }
         return (
             bindings,
+            remoteCommandBindings,
             AdaScriptSystemCapabilities(
                 systemName: systemName,
                 usesDeferredCommands: usesDeferredCommands
@@ -326,10 +352,31 @@ extension Parser {
         )
     }
 
-    private mutating func parseResourceBinding(systemName: String) throws -> AdaScriptResourceBinding? {
+    private mutating func parseSystemBindings(
+        systemName: String
+    ) throws -> (resource: AdaScriptResourceBinding?, remoteCommands: AdaScriptRemoteCommandBinding?) {
         let annotations = try parseAnnotations()
+        if let remoteCommands = annotations.first(where: { $0.name == "remote_commands" }) {
+            guard
+                annotations.count == 1,
+                case let .identifier(commandName)? = remoteCommands.positionalArguments.first,
+                remoteCommands.positionalArguments.count == 1,
+                remoteCommands.arguments.isEmpty,
+                match("var"), let propertyName = consumeIdentifier(), match(";")
+            else {
+                throw error("@remote_commands in \(systemName) must annotate 'var name;' and name one command type")
+            }
+            return (
+                nil,
+                AdaScriptRemoteCommandBinding(
+                    commandName: commandName,
+                    propertyName: propertyName,
+                    systemName: systemName
+                )
+            )
+        }
         guard let resourceAnnotation = annotations.first(where: { $0.name == "res" }) else {
-            return nil
+            return (nil, nil)
         }
         guard
             match("var"), let propertyName = consumeIdentifier(), match(":"),
@@ -343,11 +390,14 @@ extension Parser {
         } else {
             isOptional = false
         }
-        return AdaScriptResourceBinding(
-            isOptional: isOptional,
-            propertyName: propertyName,
-            resourceName: resourceName,
-            systemName: systemName
+        return (
+            AdaScriptResourceBinding(
+                isOptional: isOptional,
+                propertyName: propertyName,
+                resourceName: resourceName,
+                systemName: systemName
+            ),
+            nil
         )
     }
 
@@ -365,7 +415,10 @@ extension Parser {
         guard match("{") else {
             throw error("expected '{' after \(name)")
         }
-        let fields = try parseFields(declarationName: name)
+        let fields = try parseFields(
+            declarationName: name,
+            networkDeclaration: annotation.name == "replicated_component"
+        )
         guard match("}") else {
             throw error("unterminated data declaration '\(name)'")
         }
@@ -377,13 +430,18 @@ extension Parser {
             id: try schemaID(name: name, annotation: annotation),
             kind: schemaKind(annotation),
             name: name,
+            replication: try replicatedComponentSchema(annotation),
             sourcePath: path
         )
     }
 
-    private mutating func parseFields(declarationName: String) throws -> [AdaScriptSchemaField] {
+    private mutating func parseFields(
+        declarationName: String,
+        networkDeclaration: Bool
+    ) throws -> [AdaScriptSchemaField] {
         var fields: [AdaScriptSchemaField] = []
         var fieldNames = Set<String>()
+        var networkTags = Set<UInt16>()
         while !isAtEnd, !check("}") {
             let annotations = try parseAnnotations()
             guard match("var") else {
@@ -405,13 +463,22 @@ extension Parser {
             guard match(";") else {
                 throw error("expected ';' after field '\(fieldName)'")
             }
-            guard annotations.contains(where: { $0.name == "export" }) else {
+            let networkAnnotation = annotations.first(where: { $0.name == "network_field" })
+            let isLocal = annotations.contains(where: { $0.name == "local" })
+            if networkAnnotation != nil && isLocal {
+                throw error("field '\(fieldName)' cannot be both @network_field and @local")
+            }
+            guard networkDeclaration || annotations.contains(where: { $0.name == "export" }) else {
                 continue
             }
             guard fieldNames.insert(fieldName).inserted else {
                 throw error("duplicate field '\(fieldName)' in \(declarationName)")
             }
-            fields.append(AdaScriptSchemaField(defaultValue: defaultValue, name: fieldName))
+            let network = try networkAnnotation.map { try parseNetworkField($0, fieldName: fieldName) }
+            if let network, !networkTags.insert(network.tag).inserted {
+                throw error("duplicate network field tag \(network.tag) in \(declarationName)")
+            }
+            fields.append(AdaScriptSchemaField(defaultValue: defaultValue, name: fieldName, network: network))
         }
         return fields
     }
@@ -424,13 +491,122 @@ extension Parser {
     }
 
     private func schemaKind(_ annotation: Annotation) -> AdaScriptDataSchema.Kind {
-        if annotation.name == "component" {
+        if annotation.name == "component" || annotation.name == "replicated_component" {
             return .component
         }
         if case let .bool(value) = annotation.arguments["autoInsert"] {
             return .resource(autoInsert: value)
         }
         return .resource(autoInsert: false)
+    }
+
+    private func replicatedComponentSchema(_ annotation: Annotation) throws -> AdaScriptReplicatedComponentSchema? {
+        guard annotation.name == "replicated_component" else {
+            return nil
+        }
+        let allowed = Set(["id", "version", "authority", "visibility"])
+        guard annotation.positionalArguments.isEmpty, annotation.arguments.keys.allSatisfy(allowed.contains) else {
+            throw error("@replicated_component supports id, version, authority, and visibility")
+        }
+        let authority = try annotationString(annotation, key: "authority", default: "host")
+        let visibility = try annotationString(annotation, key: "visibility", default: "all_peers")
+        guard ["host", "any_peer"].contains(authority), visibility == "all_peers" else {
+            throw error("@replicated_component has unsupported authority or visibility")
+        }
+        return AdaScriptReplicatedComponentSchema(
+            authority: authority,
+            version: try annotationPositiveInt(annotation, key: "version", default: 1),
+            visibility: visibility
+        )
+    }
+
+    private mutating func parseNetworkCommand(
+        name: String,
+        annotation: Annotation
+    ) throws -> AdaScriptNetworkCommandSchema {
+        guard match("{") else {
+            throw error("expected '{' after \(name)")
+        }
+        let fields = try parseFields(declarationName: name, networkDeclaration: true)
+        guard match("}") else {
+            throw error("unterminated network command declaration '\(name)'")
+        }
+        guard !fields.isEmpty, fields.allSatisfy({ $0.network != nil }) else {
+            throw error("@network_command \(name) requires every field to use @network_field")
+        }
+        let allowed = Set(["id", "version", "direction", "delivery", "channel", "maximumPayloadSize"])
+        guard annotation.positionalArguments.isEmpty, annotation.arguments.keys.allSatisfy(allowed.contains) else {
+            throw error("@network_command contains an unsupported argument")
+        }
+        let channel = try annotationString(annotation, key: "channel", default: "command")
+        let delivery = try annotationString(annotation, key: "delivery", default: "reliable_ordered")
+        let direction = try annotationString(annotation, key: "direction", default: "peer_to_host")
+        guard !channel.isEmpty,
+            ["reliable_ordered", "unreliable", "unreliable_sequenced"].contains(delivery),
+            ["peer_to_host", "host_to_peer", "bidirectional"].contains(direction)
+        else {
+            throw error("@network_command has unsupported direction, delivery, or channel")
+        }
+        return AdaScriptNetworkCommandSchema(
+            channel: channel,
+            delivery: delivery,
+            direction: direction,
+            fields: fields,
+            id: try schemaID(name: name, annotation: annotation),
+            maximumPayloadSize: try annotationPositiveInt(annotation, key: "maximumPayloadSize", default: 64 * 1_024),
+            name: name,
+            sourcePath: path,
+            version: try annotationPositiveInt(annotation, key: "version", default: 1)
+        )
+    }
+
+    private func parseNetworkField(
+        _ annotation: Annotation,
+        fieldName: String
+    ) throws -> AdaScriptNetworkFieldSchema {
+        guard
+            annotation.positionalArguments.count == 1,
+            case let .number(tagText) = annotation.positionalArguments[0],
+            let tag = UInt16(tagText),
+            tag > 0,
+            annotation.arguments.keys.allSatisfy({ $0 == "mode" || $0 == "interpolate" })
+        else {
+            throw error("@network_field on \(fieldName) requires one positive UInt16 tag")
+        }
+        let interpolation = try annotationString(annotation, key: "interpolate", default: "none")
+        let mode = try annotationString(annotation, key: "mode", default: "state")
+        guard ["none", "linear", "custom"].contains(interpolation),
+            ["state", "latest", "initial_only"].contains(mode)
+        else {
+            throw error("@network_field on \(fieldName) has unsupported mode or interpolation")
+        }
+        return AdaScriptNetworkFieldSchema(
+            interpolation: interpolation,
+            mode: mode,
+            tag: tag
+        )
+    }
+
+    private func annotationString(_ annotation: Annotation, key: String, default defaultValue: String) throws -> String {
+        guard let value = annotation.arguments[key] else {
+            return defaultValue
+        }
+        switch value {
+        case let .identifier(value), let .string(value):
+            return value
+        default:
+            throw error("@\(annotation.name) \(key) must be a string or identifier")
+        }
+    }
+
+    private func annotationPositiveInt(_ annotation: Annotation, key: String, default defaultValue: Int) throws -> Int {
+        guard let value = annotation.arguments[key] else {
+            return defaultValue
+        }
+        guard case let .number(text) = value, let parsed = Int(text), parsed > 0 else {
+            throw error("@\(annotation.name) \(key) must be a positive integer")
+        }
+        return parsed
     }
 
     private mutating func parseFieldValue(fieldName: String) throws -> AdaScriptSchemaField.Value {

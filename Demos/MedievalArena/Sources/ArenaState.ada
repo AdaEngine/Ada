@@ -1,3 +1,14 @@
+@network_command(
+    id: "medieval-arena.input",
+    delivery: "unreliable_sequenced",
+    channel: "input"
+)
+struct ArenaInputCommand {
+    @network_field(1) var moveX = 0.0;
+    @network_field(2) var moveY = 0.0;
+    @network_field(3) var attackSequence = 0;
+}
+
 // All state and rules below belong to Medieval Arena, not to AdaEngine.
 class ArenaGame {
     static var moveX = 0.0;

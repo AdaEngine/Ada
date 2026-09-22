@@ -217,6 +217,54 @@ systems. Retaining it after a callback produces a diagnostic. Scriptable
 objects intentionally have no immediate-mode GUI callback; declarative UI
 belongs to AdaUI script views.
 
+## Multiplayer schemas
+
+Use a typed command for peer intent. Field tags, rather than declaration order
+or source names, define the wire schema:
+
+```ada
+@network_command(
+    id: "game.player-input",
+    delivery: "unreliable_sequenced",
+    channel: "input"
+)
+struct PlayerInput {
+    @network_field(1) var moveX = 0.0;
+    @network_field(2) var moveY = 0.0;
+    @network_field(3) var attackSequence = 0;
+}
+```
+
+Peers send the generated value through the scoped multiplayer resource. Host
+systems receive typed values and an authenticated transport source:
+
+```ada
+@system
+class InputSystem {
+    @res var multiplayer: Multiplayer;
+    @remote_commands(PlayerInput) var inputs;
+
+    func update(context) {
+        multiplayer.send(PlayerInput(1.0, 0.0, 4));
+        for (var message in inputs) {
+            var peer = message.source;
+            var movement = message.value.moveX;
+        }
+    }
+}
+```
+
+The runtime owns packet sequences and command envelopes. `message.source`
+cannot be supplied by script payload data. Swift and AdaScript declarations
+with matching IDs, versions, tags, types, direction, delivery, and channel
+produce the same compatibility schema.
+
+`@replicated_component` uses `@network_field` plus optional `@local` fields.
+SwiftPM targets receive a generated native ECS backing component through
+`AdaScriptBuildPlugin`. Portable AdaEditor projects still reject custom
+component layouts until runtime-defined ECS layouts are implemented; typed
+commands do not have that restriction.
+
 ## AdaUI views
 
 Use `@view` on a class whose `body()` contains declarative AdaUI expressions.

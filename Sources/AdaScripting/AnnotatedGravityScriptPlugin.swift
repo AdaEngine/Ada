@@ -1,6 +1,7 @@
 import AdaApp
 @_spi(Scripting) import AdaECS
 import AdaInput
+import AdaMultiplayer
 import AdaScriptCompilerCore
 import Foundation
 import Gravity
@@ -21,6 +22,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     }
 
     private let plans: [AnnotatedSystemPlan]
+    private let networkCommands: [AdaScriptNetworkCommandSchema]
     private let runtime: AnnotatedGravityRuntime
 
     public convenience init(contentsOf fileURL: URL) throws {
@@ -49,15 +51,25 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         startupSystemIdentifier: String? = nil
     ) throws {
         let componentConstructors = AdaScriptComponentRuntime.linkedConstructors()
+        let networkCommands = try AdaScriptSchemaParser.parseNetworkCommands(sources: sources)
         let module = try GravityScriptModuleResolver.resolve(sources)
         let runtime = try AnnotatedGravityRuntime(
             module: module,
-            componentConstructors: componentConstructors
+            componentConstructors: componentConstructors,
+            networkCommands: networkCommands
         )
         let resourceBindings = try AdaScriptSchemaParser.parseResourceBindings(sources: sources)
+        let remoteCommandBindings = try AdaScriptSchemaParser.parseRemoteCommandBindings(sources: sources)
+        let networkCommandNames = Set(networkCommands.map(\.name))
+        if let unknownBinding = remoteCommandBindings.first(where: { !networkCommandNames.contains($0.commandName) }) {
+            throw AdaScriptError.invalidManifest(
+                "@remote_commands references unknown command '\(unknownBinding.commandName)'"
+            )
+        }
         let capabilities = try AdaScriptSchemaParser.parseSystemCapabilities(sources: sources)
         var plans = try AdaScriptSystemPlanBuilder.makePlans(
             from: runtime.annotations,
+            remoteCommandBindings: remoteCommandBindings,
             resourceBindings: resourceBindings,
             systemCapabilities: capabilities
         )
@@ -76,6 +88,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             plans.insert(startupPlan, at: 0)
         }
         self.name = name
+        self.networkCommands = networkCommands
         self.runtime = runtime
         self.plans = plans
         try runtime.instantiateSystems(plans)
@@ -98,6 +111,30 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
 
     @MainActor
     public func setup(in app: borrowing AppWorlds) {
+        if !networkCommands.isEmpty {
+            guard app.getResource(MultiplayerRegistry.self) != nil else {
+                runtime.appendDiagnostic("Typed AdaScript network declarations require MultiplayerPlugin")
+                return
+            }
+            do {
+                for command in networkCommands {
+                    let fields = Dictionary(
+                        uniqueKeysWithValues: command.fields.compactMap { field in
+                            field.network.map { ($0.tag, field.name) }
+                        }
+                    )
+                    app.registerAdaScriptNetworkCommand(
+                        name: command.name,
+                        schema: try AdaScriptNetworkBridge.descriptor(for: command),
+                        fieldNames: fields,
+                        orderedTags: command.fields.compactMap(\.network?.tag)
+                    )
+                }
+            } catch {
+                runtime.appendDiagnostic(String(describing: error))
+                return
+            }
+        }
         for plan in plans {
             do {
                 let prepared = try Self.prepare(plan, pluginIdentifier: name, world: app.main)
@@ -127,6 +164,13 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         let resources = try plan.resources.map { resource in
             try prepareResource(resource, systemIdentifier: plan.identifier)
         }
+        let remoteCommands = plan.remoteCommands.map {
+            PreparedAnnotatedRemoteCommands(
+                commandName: $0.commandName,
+                parameter: Res<AdaScriptNetworkRuntime>(),
+                propertyName: $0.propertyName
+            )
+        }
         return PreparedAnnotatedSystem(
             className: plan.className,
             commands: plan.usesDeferredCommands ? Commands(entities: world.entities, commandsQueue: world.commandQueue) : nil,
@@ -141,6 +185,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             identifier: plan.identifier,
             scheduler: plan.scheduler,
             queries: queries,
+            remoteCommands: remoteCommands,
             resources: resources
         )
     }
@@ -151,6 +196,12 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     ) throws -> PreparedAnnotatedResource {
         if plan.resourceName == "Input" {
             return .input(propertyName: plan.propertyName, parameter: Res<Input?>(), optional: plan.isOptional)
+        }
+        if plan.resourceName == "Multiplayer" {
+            return .multiplayer(
+                parameter: ResMut<AdaScriptNetworkRuntime>(),
+                propertyName: plan.propertyName
+            )
         }
         guard let resourceType = RuntimeTypeRegistry.resourceType(named: plan.resourceName) else {
             throw AdaScriptError.unknownResource(system: systemIdentifier, resource: plan.resourceName)
@@ -249,8 +300,14 @@ struct AnnotatedSystemPlan: Sendable {
     let identifier: String
     let scheduler: SchedulerName
     let queries: [AnnotatedQueryPlan]
+    let remoteCommands: [AnnotatedRemoteCommandPlan]
     let resources: [AnnotatedResourcePlan]
     let usesDeferredCommands: Bool
+}
+
+struct AnnotatedRemoteCommandPlan: Sendable {
+    let commandName: String
+    let propertyName: String
 }
 
 struct AnnotatedResourcePlan: Sendable {
@@ -273,7 +330,14 @@ private struct PreparedAnnotatedSystem: Sendable {
     let identifier: String
     let scheduler: SchedulerName
     let queries: [PreparedAnnotatedQuery]
+    let remoteCommands: [PreparedAnnotatedRemoteCommands]
     let resources: [PreparedAnnotatedResource]
+}
+
+private struct PreparedAnnotatedRemoteCommands: Sendable {
+    let commandName: String
+    let parameter: Res<AdaScriptNetworkRuntime>
+    let propertyName: String
 }
 
 private enum PreparedAnnotatedResource: Sendable {
@@ -284,18 +348,21 @@ private enum PreparedAnnotatedResource: Sendable {
         resourceName: String
     )
     case input(propertyName: String, parameter: Res<Input?>, optional: Bool)
+    case multiplayer(parameter: ResMut<AdaScriptNetworkRuntime>, propertyName: String)
 
     var parameter: any SystemParameter {
         switch self {
         case let .reflected(_, parameter, _, _): parameter
         case let .input(_, parameter, _): parameter
+        case let .multiplayer(parameter, _): parameter
         }
     }
 
     var propertyName: String {
         switch self {
         case let .reflected(_, _, name, _),
-            let .input(name, _, _):
+            let .input(name, _, _),
+            let .multiplayer(_, name):
             name
         }
     }
@@ -304,16 +371,20 @@ private enum PreparedAnnotatedResource: Sendable {
 private enum AnnotatedResourceBridge {
     case reflected(AnnotatedGravityResourceView)
     case input(AdaScriptInputBridge)
+    case multiplayer(AdaScriptMultiplayerAPI)
 
     var object: AnyObject {
         switch self {
         case let .reflected(bridge): bridge
         case let .input(bridge): bridge
+        case let .multiplayer(bridge): bridge
         }
     }
 
     func invalidate() {
         if case let .input(bridge) = self {
+            bridge.invalidate()
+        } else if case let .multiplayer(bridge) = self {
             bridge.invalidate()
         }
     }
@@ -351,6 +422,7 @@ private struct AnnotatedGravityScriptSystem: System {
     var queries: SystemQueries {
         var parameters: [any SystemParameter] = preparedSystem?.queries.map { $0.query as any SystemParameter } ?? []
         parameters += preparedSystem?.resources.map { $0.parameter as any SystemParameter } ?? []
+        parameters += preparedSystem?.remoteCommands.map { $0.parameter as any SystemParameter } ?? []
         if let commands = preparedSystem?.commands {
             parameters.append(commands)
         }
@@ -394,12 +466,22 @@ private struct AnnotatedGravityScriptSystem: System {
                 resource: runtime.makeResourceBridge(resource)
             )
         }
+        let remoteCommands = preparedSystem.remoteCommands.map { commands in
+            (
+                propertyName: commands.propertyName,
+                value: runtime.makeRemoteCommands(
+                    named: commands.commandName,
+                    runtime: commands.parameter.wrappedValue
+                )
+            )
+        }
         let world = runtime.makeWorldBridge(commands: preparedSystem.commands)
         runtime.update(
             className: preparedSystem.className,
             systemIdentifier: preparedSystem.identifier,
             deltaTime: Double(deltaTime.wrappedValue?.deltaTime ?? 0),
             queries: zip(preparedSystem.queries, queries).map { ($0.propertyName, $1) },
+            remoteCommands: remoteCommands,
             resources: resources,
             world: world
         )
@@ -417,7 +499,8 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
 
     init(
         module: ResolvedGravityScriptModule,
-        componentConstructors: [AdaScriptLinkedComponentConstructor]
+        componentConstructors: [AdaScriptLinkedComponentConstructor],
+        networkCommands: [AdaScriptNetworkCommandSchema]
     ) throws {
         let delegate = AnnotatedGravityRuntimeDelegate(module: module)
         self.delegate = delegate
@@ -435,16 +518,31 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         try virtualMachine.bindClass(with: AnnotatedGravityQueryRow.self)
         try virtualMachine.bindClass(with: AnnotatedGravityComponentView.self)
         try virtualMachine.bindClass(with: AnnotatedGravityResourceView.self)
+        try virtualMachine.bindClass(with: AdaScriptMultiplayerAPI.self)
+        try virtualMachine.bindClass(with: AdaScriptNetworkCommandFactory.self)
+        try virtualMachine.bindClass(with: AdaScriptNetworkCommandValue.self)
+        try virtualMachine.bindClass(with: AdaScriptNetworkValueBridge.self)
+        try virtualMachine.bindClass(with: AdaScriptRemoteCommandBridge.self)
         try virtualMachine.bindClass(with: AdaScriptViewBridge.self)
         try AdaScriptComponentRuntime.bind(
             to: virtualMachine,
             constructors: componentConstructors,
             reportDiagnostic: delegate.append
         )
+        try AdaScriptAssetRuntime.bind(to: virtualMachine, reportDiagnostic: delegate.append)
+        virtualMachine.setValue(
+            AdaScriptNetworkCommandFactory.make(
+                schemas: networkCommands,
+                reportDiagnostic: delegate.append
+            ),
+            forKey: "__adaNetworkFactory"
+        )
         virtualMachine.setValue(AdaScriptViewBridge(), forKey: "adaUIBuilder")
 
         let binary = virtualMachine.loadGravityFile(
-            from: AdaScriptComponentRuntime.prelude(constructors: componentConstructors) + module.entrySource
+            from: AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
+                + AdaScriptNetworkBridge.prelude(commands: networkCommands)
+                + module.entrySource
         )
         guard delegate.errors.isEmpty else {
             throw AdaScriptError.compilation(delegate.errors)
@@ -486,6 +584,7 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         systemIdentifier: String,
         deltaTime: Double,
         queries: [(propertyName: String, query: AnnotatedGravityQueryBridge)],
+        remoteCommands: [(propertyName: String, value: GSValue)],
         resources: [(propertyName: String, resource: AnnotatedResourceBridge)],
         world: AnnotatedGravityWorldContext
     ) {
@@ -511,6 +610,12 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
             let resourceValue = GSValue(object: resource.object, in: virtualMachine)
             guard instance.setStoredProperty(named: propertyName, to: resourceValue) else {
                 delegate.append("Unable to bind @res property '\(propertyName)' in system '\(systemIdentifier)'")
+                return
+            }
+        }
+        for (propertyName, value) in remoteCommands {
+            guard instance.setStoredProperty(named: propertyName, to: value) else {
+                delegate.append("Unable to bind @remote_commands property '\(propertyName)' in system '\(systemIdentifier)'")
                 return
             }
         }
@@ -550,7 +655,27 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
                     virtualMachine: virtualMachine
                 )
             )
+        case let .multiplayer(parameter, _):
+            return .multiplayer(
+                AdaScriptMultiplayerAPI.make(
+                    runtime: parameter.projectedValue,
+                    reportDiagnostic: appendDiagnostic
+                )
+            )
         }
+    }
+
+    func makeRemoteCommands(
+        named name: String,
+        runtime: AdaScriptNetworkRuntime
+    ) -> GSValue {
+        let values = runtime.commands(named: name).map {
+            GSValue(
+                object: AdaScriptRemoteCommandBridge(payload: $0, virtualMachine: virtualMachine),
+                in: virtualMachine
+            ) as Any
+        }
+        return GSValue(newArrayIn: virtualMachine, items: values)
     }
 
     func makeWorldBridge(commands: Commands?) -> AnnotatedGravityWorldContext {

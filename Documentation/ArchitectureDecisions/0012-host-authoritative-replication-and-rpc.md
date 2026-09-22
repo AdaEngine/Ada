@@ -57,3 +57,7 @@ epoch zero and reliable ordered delivery.
   the disconnect grace period ends the session.
 - Snapshot capture may optimize with direct ECS change ticks, but the observable
   wire result must remain component-level deltas with baseline recovery.
+
+The declarative Swift macro and AdaScript authoring surface, shared field-tagged
+schema ABI, and removal of game-authored snapshot mailboxes are specified by
+[ADR-0014](0014-declarative-multiplayer-schemas.md).

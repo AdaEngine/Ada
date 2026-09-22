@@ -88,6 +88,29 @@ enum GravityAPICatalog {
             GravityAPIMember("ZERO", detail: "Zero three-dimensional vector", kind: .property, returnType: "Vector3"),
             GravityAPIMember("zero", detail: "Zero three-dimensional vector", kind: .property, returnType: "Vector3"),
         ],
+        "Assets": [
+            GravityAPIMember(
+                "load",
+                detail: "load(path) -> Asset — load and hot-reload a project asset",
+                insertText: "load(\"@res://\")",
+                kind: .method,
+                returnType: "String"
+            ),
+            GravityAPIMember(
+                "preload",
+                detail: "preload(path) -> Asset — load a statically referenced project asset",
+                insertText: "preload(\"@res://\")",
+                kind: .method,
+                returnType: "String"
+            ),
+            GravityAPIMember(
+                "save",
+                detail: "save(asset, path) -> Bool — save to @user:// or @cache://",
+                insertText: "save(asset, \"@user://\")",
+                kind: .method,
+                returnType: "Bool"
+            ),
+        ],
         "$AdaEditorToolContext": [
             GravityAPIMember(
                 "addCommand",

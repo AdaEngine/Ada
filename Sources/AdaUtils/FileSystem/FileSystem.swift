@@ -12,6 +12,7 @@ import Foundation
 /// A convenient interface to the contents of the file system, and the primary means of interacting with it.
 public class FileSystem: @unchecked Sendable {
     public enum SearchDirectoryPath {
+        case applicationSupportDirectory
         case downloadsDirectory
         case documentDirectory
         case cachesDirectory

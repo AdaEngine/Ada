@@ -17,7 +17,7 @@ struct MedievalArenaScriptTests {
     func gameplayBelongsToAdaScriptProject() throws {
         Self.registerRuntimeTypes()
         #expect(Transform.runtimeComponentConstructor.parameters.map(\.name) == ["rotation", "scale", "position"])
-        #expect(Sprite.runtimeComponentConstructor.parameters.map(\.name) == ["tintColor", "flipX", "flipY"])
+        #expect(Sprite.runtimeComponentConstructor.parameters.map(\.name) == ["texture", "tintColor", "flipX", "flipY"])
         try AdaScriptPlugin.validate(
             sources: [
                 AdaScriptSource(
@@ -143,6 +143,17 @@ struct MedievalArenaScriptTests {
         InputPlugin(actions: [InputAction(name: "Attack", bindings: [.key(.space)])]).setup(in: app)
         world.insertResource(DeltaTime(deltaTime: 1.0 / 60.0))
         let peerUUID = try #require(UUID(uuidString: "4D415045-4552-4000-8000-000000000001"))
+        MultiplayerPlugin(
+            configuration: MultiplayerConfiguration(
+                role: .host,
+                localPeerID: PeerID(rawValue: peerUUID),
+                compatibility: NetworkCompatibility(
+                    gameIdentifier: "medieval-arena-script-tests",
+                    buildIdentifier: "1"
+                )
+            ),
+            transport: InMemoryTransport(hub: InMemoryTransportHub())
+        ).setup(in: app)
         world.insertResource(
             AdaScriptMultiplayerState(
                 role: .host,

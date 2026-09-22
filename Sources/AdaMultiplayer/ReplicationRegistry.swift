@@ -30,8 +30,9 @@ public struct ReplicatedComponentOptions<T: Component & Codable & Sendable>: Sen
 }
 
 struct ReplicatedComponentDescriptor: Sendable {
-    var typeID: String
-    var version: UInt16
+    var schema: NetworkTypeDescriptor
+    var typeID: String { schema.typeID }
+    var version: UInt16 { schema.version }
     var componentID: ComponentId
     var encode: @Sendable (World, Entity.ID, any NetworkCodec) throws -> Data?
     var apply: @Sendable (Data, World, Entity.ID, any NetworkCodec) throws -> Void
@@ -49,10 +50,13 @@ public struct MultiplayerRegistry: Resource {
 
     public var schemaDigest: String {
         let componentEntries = replicatedComponentsByTypeID.values.map {
-            "component:\($0.typeID):\($0.version)"
+            "component:\($0.schema.compatibilitySignature)"
         }
         let rpcEntries = rpcByTypeID.values.map {
-            "rpc:\($0.typeID):\($0.version):\($0.kind.rawValue):\($0.direction.rawValue)"
+            if let schema = $0.schema {
+                return "rpc:\(schema.compatibilitySignature)"
+            }
+            return "rpc:\($0.typeID):\($0.version):\($0.kind.rawValue):\($0.direction.rawValue)"
         }
         return Self.fnv1a64((componentEntries + rpcEntries).sorted().joined(separator: "|"))
     }
@@ -61,7 +65,8 @@ public struct MultiplayerRegistry: Resource {
         _ type: T.Type,
         id: String,
         version: UInt16,
-        options: ReplicatedComponentOptions<T>
+        options: ReplicatedComponentOptions<T>,
+        schema: NetworkTypeDescriptor? = nil
     ) {
         precondition(!id.isEmpty, "Network component identifier must not be empty")
         precondition(replicatedComponentsByTypeID[id] == nil, "Network component identifier \(id) is already registered")
@@ -78,8 +83,13 @@ public struct MultiplayerRegistry: Resource {
         }
 
         let descriptor: ReplicatedComponentDescriptor = ReplicatedComponentDescriptor(
-            typeID: id,
-            version: version,
+            schema: schema ?? NetworkTypeDescriptor(
+                typeID: id,
+                version: version,
+                kind: .component,
+                authority: .host,
+                fields: []
+            ),
             componentID: T.identifier,
             encode: { world, entity, codec in
                 guard let component = world.get(T.self, from: entity) else {
@@ -128,6 +138,27 @@ extension AppWorlds {
             id: id,
             version: version,
             options: options
+        )
+        return self
+    }
+
+    /// Registers a component using metadata synthesized by ``ReplicatedComponent``.
+    @discardableResult
+    public func registerReplicatedComponent<T: NetworkReplicatedComponent>(
+        _ type: T.Type,
+        options: ReplicatedComponentOptions<T> = ReplicatedComponentOptions()
+    ) -> Self {
+        let schema = T.networkDescriptor
+        T.registerComponent()
+        guard getResource(MultiplayerRegistry.self) != nil else {
+            preconditionFailure("Add MultiplayerPlugin before registering network components")
+        }
+        getRefResource(MultiplayerRegistry.self).wrappedValue.register(
+            type,
+            id: schema.typeID,
+            version: schema.version,
+            options: options,
+            schema: schema
         )
         return self
     }

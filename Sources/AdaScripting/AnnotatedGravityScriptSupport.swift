@@ -105,6 +105,9 @@ final class AnnotatedGravityRuntimeDelegate: GravityVirtualMachineDelegate, @unc
         if let resource = target.toObjectOf(AnnotatedGravityResourceView.self) {
             return resource.get(key)
         }
+        if let value = target.toObjectOf(AdaScriptNetworkValueBridge.self) {
+            return value.get(key)
+        }
         if let component = target.toObjectOf(GravityAttachedComponentView.self) {
             return component.get(key)
         }

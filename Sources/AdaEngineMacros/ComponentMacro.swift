@@ -281,6 +281,40 @@ extension ComponentMacro {
                 : "\(parameter.externalName): \(parameter.localName)"
             initializerArguments.append(callArgument)
 
+            if let assetType = optionalAssetHandleElementType(parameter.typeName) {
+                let scriptName = parameter.externalName == "_" ? parameter.localName : parameter.externalName
+                exposedParameters.append(
+                    """
+                    AdaECS.RuntimeComponentConstructorParameter(
+                        name: "\(scriptName)",
+                        kind: .assetReference
+                    )
+                    """
+                )
+                argumentDecoders.append(
+                    """
+                    let \(parameter.localName): \(parameter.typeName)
+                    if let fieldValue = arguments[\(argumentIndex)] {
+                        guard let path = AdaECS.ComponentReflection.value(fieldValue, as: String.self) else {
+                            throw AdaECS.RuntimeComponentConstructorError.invalidArgument(
+                                component: String(reflecting: Self.self),
+                                parameter: "\(scriptName)"
+                            )
+                        }
+                        #if WASM
+                            \(parameter.localName) = nil
+                        #else
+                            \(parameter.localName) = try AdaAssets.AssetsManager.loadSync(\(assetType).self, at: path)
+                        #endif
+                    } else {
+                        \(parameter.localName) = nil
+                    }
+                    """
+                )
+                argumentIndex += 1
+                continue
+            }
+
             guard isSupportedRuntimeConstructorType(parameter.typeName) else {
                 guard let defaultExpression = parameter.defaultExpression else {
                     throw MacroError.macroUsage(
@@ -354,6 +388,25 @@ extension ComponentMacro {
             "Vector2", "Vector3", "Vector4", "Quat", "Color",
         ]
         return supportedTypes.contains { typeName == $0 || typeName.hasSuffix(".\($0)") }
+    }
+
+    private static func optionalAssetHandleElementType(_ typeName: String) -> String? {
+        guard typeName.hasSuffix("?") else {
+            return nil
+        }
+        let unwrapped = String(typeName.dropLast())
+        guard
+            let handleRange = unwrapped.range(of: "AssetHandle<"),
+            unwrapped.hasSuffix(">")
+        else {
+            return nil
+        }
+        let elementStart = handleRange.upperBound
+        let elementEnd = unwrapped.index(before: unwrapped.endIndex)
+        guard elementStart < elementEnd else {
+            return nil
+        }
+        return String(unwrapped[elementStart..<elementEnd])
     }
 
     private static func generateDeclaration<T: TypeSyntaxProtocol>(

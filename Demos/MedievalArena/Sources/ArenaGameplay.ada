@@ -1,10 +1,11 @@
-import { ArenaGame } from "./ArenaState.ada";
+import { ArenaGame, ArenaInputCommand } from "./ArenaState.ada";
 
 @after(id: "arena.input")
 @before(id: "arena.presentation")
 @system(scheduler: "update", id: "arena.gameplay")
 class ArenaGameplaySystem {
     @res var multiplayer: AdaScriptMultiplayerState;
+    @remote_commands(ArenaInputCommand) var commands;
 
     func update(context) {
         if (multiplayer.role != "host") return;
@@ -18,11 +19,12 @@ class ArenaGameplaySystem {
 
         var inputs = [:];
         inputs[multiplayer.localPeerID] = [ArenaGame.moveX, ArenaGame.moveY, ArenaGame.attackSequence];
-        for (var envelope in multiplayer.receivedCommands) {
-            if (envelope.count >= 3) {
-                var payload = envelope[2];
-                if (payload.count >= 3) inputs[envelope[0]] = payload;
-            }
+        for (var command in commands) {
+            inputs[command.source] = [
+                command.value.moveX,
+                command.value.moveY,
+                command.value.attackSequence
+            ];
         }
 
         stepPlayer(multiplayer.localPeerID, inputs[multiplayer.localPeerID], context.deltaTime);

@@ -67,8 +67,10 @@ public struct AssetsManager: Resource {
 
     private static let logger = Logger(label: "org.adaengine.AssetsManager")
 
-    private static let resKeyWord = "@res://"
-    nonisolated(unsafe) private static var registredAssetTypes: [String: any Asset.Type] = [:]
+    private static let resourcePathPrefix = "@res://"
+    private static let userPathPrefix = "@user://"
+    private static let cachePathPrefix = "@cache://"
+    private static let registeredTypes = Mutex<[String: any Asset.Type]>([:])
 
     @AssetActor
     private static var defaultScopeState = AssetsScopeState()
@@ -101,6 +103,7 @@ public struct AssetsManager: Resource {
         at path: String,
         handleChanges: Bool = false
     ) async throws -> AssetHandle<A> {
+        try validateVirtualPath(path)
         let span = AdaTrace.startSpan(lazyName: "Assets.load.\(String(reflecting: A.self))")
         defer {
             span.end()
@@ -198,6 +201,7 @@ public struct AssetsManager: Resource {
         from bundle: Bundle,
         handleChanges _: Bool = false
     ) async throws -> AssetHandle<A> {
+        try validateVirtualPath(path)
         let span = AdaTrace.startSpan(lazyName: "Assets.load.\(String(reflecting: A.self))")
         defer {
             span.end()
@@ -292,11 +296,24 @@ public struct AssetsManager: Resource {
         at path: String,
         name: String
     ) async throws {
+        let fullPath = path.hasSuffix("/") ? path + name : path + "/" + name
+        try await save(asset, at: fullPath)
+    }
+
+    /// Saves an asset to a complete resource path.
+    ///
+    /// Use ``@user://`` for persistent runtime data and ``@cache://`` for
+    /// replaceable data. ``@res://`` addresses project resources and may be
+    /// read-only in packaged applications.
+    @AssetActor
+    public static func save<R: Asset>(
+        _ asset: R,
+        at path: String
+    ) async throws {
+        try validateVirtualPath(path)
         try await AdaTrace.span("Assets.save.\(String(reflecting: R.self))") {
             let fileSystem = FileSystem.current
             var processedPath = self.processPath(path)
-
-            processedPath.url.append(path: name)
 
             if processedPath.url.pathExtension.isEmpty {
                 processedPath.url.appendPathExtension(R.extensions().first ?? "")
@@ -350,18 +367,88 @@ public struct AssetsManager: Resource {
     // MARK: - Public methods
 
     public static func getAssetType(for typeName: String) -> (any Asset.Type)? {
-        return unsafe registredAssetTypes[typeName]
+        registeredTypes.withLock { $0[typeName] }
     }
 
     public static func registerAssetType<T: Asset>(_ type: T.Type) {
-        Task { @AssetActor in
-            unsafe registredAssetTypes[String(reflecting: type)] = T.self
+        registeredTypes.withLock { types in
+            types[String(reflecting: type)] = T.self
         }
     }
 
     public static func registeredAssetTypes() -> [String: any Asset.Type] {
-        unsafe registredAssetTypes
+        registeredTypes.withLock { $0 }
     }
+
+    /// Returns a registered asset type by its fully qualified or short name.
+    public static func getAssetType(named typeName: String) -> (any Asset.Type)? {
+        let registered = registeredAssetTypes()
+        return registered[typeName]
+            ?? registered.first(where: { key, type in
+                key == typeName
+                    || key.hasSuffix(".\(typeName)")
+                    || String(describing: type) == typeName
+            })?.value
+    }
+
+    /// Returns the only registered asset type that accepts the path extension.
+    public static func inferAssetType(at path: String) -> (any Asset.Type)? {
+        let pathWithoutQuery = path.split(separator: "#", maxSplits: 1).first.map(String.init) ?? path
+        let pathExtension = URL(fileURLWithPath: pathWithoutQuery).pathExtension.lowercased()
+        guard !pathExtension.isEmpty else {
+            return nil
+        }
+        let matches = registeredAssetTypes().values.filter { type in
+            type.extensions().contains { $0.lowercased() == pathExtension }
+        }
+        guard matches.count == 1 else {
+            return nil
+        }
+        return matches[0]
+    }
+
+    /// Loads a registered asset without requiring its Swift generic type at the call site.
+    public static func loadErased(
+        _ type: any Asset.Type,
+        at path: String,
+        handleChanges: Bool = false
+    ) async throws -> any AnyAssetHandleInfo {
+        func loadOpened<A: Asset>(_ openedType: A.Type) async throws -> any AnyAssetHandleInfo {
+            try await load(openedType, at: path, handleChanges: handleChanges)
+        }
+        return try await loadOpened(type)
+    }
+
+    #if !WASM
+        /// Synchronously loads a registered asset for synchronous host-language bridges.
+        public static func loadErasedSync(
+            _ type: any Asset.Type,
+            at path: String,
+            handleChanges: Bool = false
+        ) throws -> any AnyAssetHandleInfo {
+            let scopeID = AppWorldsExecutionContext.currentID
+            let task = UnsafeTask<any AnyAssetHandleInfo> {
+                try await AppWorldsExecutionContext.$currentID.withValue(scopeID) {
+                    try await loadErased(type, at: path, handleChanges: handleChanges)
+                }
+            }
+            return try task.get()
+        }
+
+        /// Synchronously saves a type-erased asset for synchronous host-language bridges.
+        public static func saveErasedSync(_ asset: any Asset, at path: String) throws {
+            let scopeID = AppWorldsExecutionContext.currentID
+            let task = UnsafeTask<Void> {
+                try await AppWorldsExecutionContext.$currentID.withValue(scopeID) {
+                    func saveOpened<A: Asset>(_ openedAsset: A) async throws {
+                        try await save(openedAsset, at: path)
+                    }
+                    try await saveOpened(asset)
+                }
+            }
+            try task.get()
+        }
+    #endif
 
     @AssetActor
     public static func cachedAssets() -> [CachedAssetInfo] {
@@ -670,10 +757,16 @@ public struct AssetsManager: Resource {
         }
     }
 
-    private static func setProjectDirectories(
-        _ projectDirectories: ProjectDirectories,
-        scopeID: UUID?
-    ) {
+    /// Configures virtual asset roots for an application execution scope.
+    @AssetActor
+    public static func setProjectDirectories(_ projectDirectories: ProjectDirectories) {
+        setProjectDirectories(projectDirectories, scopeID: AppWorldsExecutionContext.currentID)
+        scopeState.storage.loadedAssets.removeAll()
+        scopeState.storage.hotReloadingAssets.removeAll()
+        updateFileWatcher()
+    }
+
+    private static func setProjectDirectories(_ projectDirectories: ProjectDirectories, scopeID: UUID?) {
         scopeConfigurations.withLock { configurations in
             if let scopeID {
                 configurations.directoriesByScope[scopeID] = projectDirectories
@@ -737,17 +830,14 @@ extension AssetsManager {
         self.scopeState.storage.loadedAssets[path]?.first(where: { $0.value is AssetHandle<A> })
     }
 
-    /// Replace tag `@res://` to relative path or create url from given path.
+    /// Resolves a virtual asset path or creates a file URL from a native path.
     private static func processPath(_ path: String) -> Path {
         var path = path
         var url: URL
 
-        if path.hasPrefix(self.resKeyWord) && !path.hasPrefix("file://") {
-            path.removeFirst(self.resKeyWord.count)
-            let resourceDirectory =
-                currentProjectDirectories?.assetsDirectory
-                ?? URL(fileURLWithPath: ".", isDirectory: true)
-            url = resourceDirectory.appendingPathComponent(path)
+        if let root = virtualRoot(for: path) {
+            path.removeFirst(root.prefix.count)
+            url = root.url.appendingPathComponent(path)
         } else {
             url = path.hasPrefix("file://")
                 ? URL(string: path).unwrap(message: "Invalid file URL: \(path)")
@@ -765,6 +855,40 @@ extension AssetsManager {
         }
 
         return Path(url: url, query: query)
+    }
+
+    private static func virtualRoot(for path: String) -> (prefix: String, url: URL)? {
+        let directories = currentProjectDirectories
+        if path.hasPrefix(resourcePathPrefix) {
+            return (
+                resourcePathPrefix,
+                directories?.assetsDirectory ?? URL(fileURLWithPath: ".", isDirectory: true)
+            )
+        }
+        if path.hasPrefix(userPathPrefix) {
+            return (
+                userPathPrefix,
+                directories?.userDataDirectory ?? URL(fileURLWithPath: "UserData", isDirectory: true)
+            )
+        }
+        if path.hasPrefix(cachePathPrefix) {
+            return (
+                cachePathPrefix,
+                directories?.cacheDirectory ?? URL(fileURLWithPath: ".cache", isDirectory: true)
+            )
+        }
+        return nil
+    }
+
+    private static func validateVirtualPath(_ path: String) throws {
+        let prefixes = [resourcePathPrefix, userPathPrefix, cachePathPrefix]
+        guard let prefix = prefixes.first(where: { path.hasPrefix($0) }) else {
+            return
+        }
+        let relativePath = path.dropFirst(prefix.count).split(separator: "#", maxSplits: 1).first ?? ""
+        guard !relativePath.split(separator: "/", omittingEmptySubsequences: false).contains("..") else {
+            throw AssetError.message("Asset path escapes its virtual root: \(path)")
+        }
     }
 
     @AssetActor
@@ -961,7 +1085,49 @@ public struct ProjectDirectories: Sendable {
     /// Assets directory is a directory where we store all assets for the project.
     public let assetsDirectory: URL
 
+    /// Persistent writable data owned by the running application.
+    public let userDataDirectory: URL
+
+    /// Replaceable writable data that may be removed by the operating system.
+    public let cacheDirectory: URL
+
+    public init(
+        source: URL,
+        assetsDirectory: URL,
+        userDataDirectory: URL? = nil,
+        cacheDirectory: URL? = nil
+    ) {
+        self.source = source
+        self.assetsDirectory = assetsDirectory
+
+        let namespace = source.lastPathComponent.isEmpty ? "AdaEngine" : source.lastPathComponent
+        self.userDataDirectory = userDataDirectory ?? Self.defaultDirectory(
+            for: .applicationSupportDirectory,
+            namespace: namespace,
+            fallbackRoot: source.appendingPathComponent(".ada/user", isDirectory: true)
+        )
+        self.cacheDirectory = cacheDirectory ?? Self.defaultDirectory(
+            for: .cachesDirectory,
+            namespace: namespace,
+            fallbackRoot: source.appendingPathComponent(".ada/cache", isDirectory: true)
+        )
+    }
+
     public var packageDirectory: URL {
         source
+    }
+
+    private static func defaultDirectory(
+        for searchPath: FileSystem.SearchDirectoryPath,
+        namespace: String,
+        fallbackRoot: URL
+    ) -> URL {
+        #if WASM
+            return fallbackRoot
+        #else
+            return ((try? FileSystem.current.url(for: searchPath, create: true)) ?? fallbackRoot)
+                .appendingPathComponent("AdaEngine", isDirectory: true)
+                .appendingPathComponent(namespace, isDirectory: true)
+        #endif
     }
 }

@@ -58,12 +58,14 @@ enum GravityScriptModuleResolver {
             guard parsedSources[path] == nil else {
                 throw AdaScriptError.duplicateSourcePath(path)
             }
-            let loweredSource: String
+            let loweredViewSource: String
             do {
-                loweredSource = try AdaScriptViewBuilderLowerer.lower(source: source.source, path: path)
+                loweredViewSource = try AdaScriptViewBuilderLowerer.lower(source: source.source, path: path)
             } catch let error as AdaScriptViewBuilderError {
                 throw AdaScriptError.invalidManifest(error.description)
             }
+            let loweredAssetsSource = AdaScriptAssetsLowerer.lower(source: loweredViewSource)
+            let loweredSource = AdaScriptNetworkLowerer.lower(source: loweredAssetsSource)
             var scanner = AdaScriptSourceScanner(source: loweredSource, path: path)
             parsedSources[path] = try scanner.scan()
         }
@@ -105,7 +107,11 @@ enum GravityScriptModuleResolver {
             orderedPaths
             .map { path in "#include \"\(escapeGravityString(path))\"" }
             .joined(separator: "\n")
-        let entrySource = "extern var adaUIBuilder;\n\(includes)"
+        let entrySource = """
+        extern var adaUIBuilder;
+        extern var __adaAssets;
+        \(includes)
+        """
 
         return ResolvedGravityScriptModule(
             entrySource: entrySource,
@@ -116,6 +122,8 @@ enum GravityScriptModuleResolver {
 
     private static let rootAnnotations: Set<String> = [
         "component",
+        "network_command",
+        "replicated_component",
         "resource",
         "scriptable",
         "system",

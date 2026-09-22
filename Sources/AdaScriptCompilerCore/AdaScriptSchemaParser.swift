@@ -28,6 +28,34 @@ public enum AdaScriptSchemaParser {
         return bindings
     }
 
+    public static func parseNetworkCommands(sources: [AdaScriptCompilerSource]) throws -> [AdaScriptNetworkCommandSchema] {
+        var schemas: [AdaScriptNetworkCommandSchema] = []
+        for source in sources.sorted(by: { $0.path < $1.path }) {
+            var parser = Parser(source: source.source, path: source.path)
+            schemas += try parser.parse().networkCommands
+        }
+        var ids = Set<String>()
+        var names = Set<String>()
+        for schema in schemas {
+            guard ids.insert(schema.id).inserted else {
+                throw AdaScriptSchemaError.duplicateID(schema.id)
+            }
+            guard names.insert(schema.name).inserted else {
+                throw AdaScriptSchemaError.duplicateName(schema.name)
+            }
+        }
+        return schemas
+    }
+
+    public static func parseRemoteCommandBindings(sources: [AdaScriptCompilerSource]) throws -> [AdaScriptRemoteCommandBinding] {
+        var bindings: [AdaScriptRemoteCommandBinding] = []
+        for source in sources.sorted(by: { $0.path < $1.path }) {
+            var parser = Parser(source: source.source, path: source.path)
+            bindings += try parser.parse().remoteCommandBindings
+        }
+        return bindings
+    }
+
     public static func parseScriptables(sources: [AdaScriptCompilerSource]) throws -> [AdaScriptableSchema] {
         var schemas: [AdaScriptableSchema] = []
         for source in sources.sorted(by: { $0.path < $1.path }) {
@@ -142,6 +170,8 @@ struct Token {
 
 struct Parser {
     struct Output {
+        var networkCommands: [AdaScriptNetworkCommandSchema] = []
+        var remoteCommandBindings: [AdaScriptRemoteCommandBinding] = []
         var resourceBindings: [AdaScriptResourceBinding] = []
         var schemas: [AdaScriptDataSchema] = []
         var scriptables: [AdaScriptableSchema] = []

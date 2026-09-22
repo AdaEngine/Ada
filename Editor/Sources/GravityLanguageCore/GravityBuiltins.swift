@@ -147,6 +147,7 @@ enum GravityBuiltins {
             GravityCompletionCandidate(detail: "Overlaying AdaUI stack", insertText: "ZStack {\n    \n}", kind: .class, label: "ZStack", sortText: "18"),
             GravityCompletionCandidate(detail: "Flexible AdaUI space", insertText: "Spacer()", kind: .class, label: "Spacer", sortText: "18"),
             GravityCompletionCandidate(detail: "AdaUI divider", insertText: "Divider()", kind: .class, label: "Divider", sortText: "18"),
+            GravityCompletionCandidate(detail: "AdaEngine asset manager", insertText: "Assets", kind: .variable, label: "Assets", sortText: "18"),
             GravityCompletionCandidate(
                 detail: "Three-dimensional vector",
                 insertText: "Vector3(0, 0, 0)",

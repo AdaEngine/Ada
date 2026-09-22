@@ -40,3 +40,4 @@ describes the intended design even when its implementation is still planned.
 | [ADR-0011](0011-multiplayer-runtime-boundaries.md) | Accepted | Partial (foundation shipped) | Optional transport-independent multiplayer runtime and plugin extension model |
 | [ADR-0012](0012-host-authoritative-replication-and-rpc.md) | Accepted | Partial (foundation shipped) | Host-authoritative marker replication, interpolation, and typed RPC |
 | [ADR-0013](0013-multiplayer-transports-and-cloud-relay.md) | Accepted | Partial (foundation shipped) | Apple LAN transport and region-gated AdaEngine Cloud WebSocket relay |
+| [ADR-0014](0014-declarative-multiplayer-schemas.md) | Accepted | Partial (Swift and AdaScript command foundations shipped) | Generated Swift and AdaScript schemas for typed RPC and declarative ECS replication |

@@ -17,6 +17,10 @@ struct AdaEngineMacrosPlugin: CompilerPlugin {
         SystemMacro.self,
         BundleMacro.self,
         PreviewableMacro.self,
+        ReplicatedComponentMacro.self,
+        NetworkCommandMacro.self,
+        NetworkFieldMacro.self,
+        LocalOnlyMacro.self,
         StateMacro.self,
     ]
 }

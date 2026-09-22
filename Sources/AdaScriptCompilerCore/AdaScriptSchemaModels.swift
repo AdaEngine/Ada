@@ -18,7 +18,48 @@ public struct AdaScriptDataSchema: Equatable, Sendable {
     public let id: String
     public let kind: Kind
     public let name: String
+    public let replication: AdaScriptReplicatedComponentSchema?
     public let sourcePath: String
+
+    public init(
+        fields: [AdaScriptSchemaField],
+        id: String,
+        kind: Kind,
+        name: String,
+        replication: AdaScriptReplicatedComponentSchema? = nil,
+        sourcePath: String
+    ) {
+        self.fields = fields
+        self.id = id
+        self.kind = kind
+        self.name = name
+        self.replication = replication
+        self.sourcePath = sourcePath
+    }
+}
+
+public struct AdaScriptReplicatedComponentSchema: Equatable, Sendable {
+    public let authority: String
+    public let version: Int
+    public let visibility: String
+
+    public init(authority: String, version: Int, visibility: String) {
+        self.authority = authority
+        self.version = version
+        self.visibility = visibility
+    }
+}
+
+public struct AdaScriptNetworkFieldSchema: Equatable, Sendable {
+    public let interpolation: String
+    public let mode: String
+    public let tag: UInt16
+
+    public init(interpolation: String, mode: String, tag: UInt16) {
+        self.interpolation = interpolation
+        self.mode = mode
+        self.tag = tag
+    }
 }
 
 public struct AdaScriptSchemaField: Equatable, Sendable {
@@ -30,11 +71,63 @@ public struct AdaScriptSchemaField: Equatable, Sendable {
     }
 
     public let defaultValue: Value
+    public let network: AdaScriptNetworkFieldSchema?
     public let name: String
 
-    public init(defaultValue: Value, name: String) {
+    public init(
+        defaultValue: Value,
+        name: String,
+        network: AdaScriptNetworkFieldSchema? = nil
+    ) {
         self.defaultValue = defaultValue
         self.name = name
+        self.network = network
+    }
+}
+
+public struct AdaScriptNetworkCommandSchema: Equatable, Sendable {
+    public let channel: String
+    public let delivery: String
+    public let direction: String
+    public let fields: [AdaScriptSchemaField]
+    public let id: String
+    public let maximumPayloadSize: Int
+    public let name: String
+    public let sourcePath: String
+    public let version: Int
+
+    public init(
+        channel: String,
+        delivery: String,
+        direction: String,
+        fields: [AdaScriptSchemaField],
+        id: String,
+        maximumPayloadSize: Int,
+        name: String,
+        sourcePath: String,
+        version: Int
+    ) {
+        self.channel = channel
+        self.delivery = delivery
+        self.direction = direction
+        self.fields = fields
+        self.id = id
+        self.maximumPayloadSize = maximumPayloadSize
+        self.name = name
+        self.sourcePath = sourcePath
+        self.version = version
+    }
+}
+
+public struct AdaScriptRemoteCommandBinding: Equatable, Sendable {
+    public let commandName: String
+    public let propertyName: String
+    public let systemName: String
+
+    public init(commandName: String, propertyName: String, systemName: String) {
+        self.commandName = commandName
+        self.propertyName = propertyName
+        self.systemName = systemName
     }
 }
 

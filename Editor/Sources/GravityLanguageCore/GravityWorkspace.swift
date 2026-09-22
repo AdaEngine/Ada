@@ -79,11 +79,104 @@ public final class GravityWorkspace {
         guard let text = text(for: uri) else {
             return []
         }
+        if let resource = resourceCompletionContext(text: text, position: position) {
+            return resourceCompletions(context: resource)
+        }
         return languageService.completions(
             text: text,
             position: position,
             workspaceSymbols: workspaceSymbols(for: uri)
         )
+    }
+
+    private struct ResourceCompletionContext {
+        var prefix: String
+        var replacementRange: GravitySourceRange
+    }
+
+    private func resourceCompletionContext(
+        text: String,
+        position: GravitySourcePosition
+    ) -> ResourceCompletionContext? {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        guard lines.indices.contains(position.line) else {
+            return nil
+        }
+        let line = String(lines[position.line])
+        guard let caret = line.stringIndex(atUTF16Offset: position.utf16Column) else {
+            return nil
+        }
+        let beforeCaret = line[..<caret]
+        guard
+            let quote = beforeCaret.lastIndex(where: { $0 == "\"" || $0 == "'" }),
+            beforeCaret[beforeCaret.index(after: quote)...].contains("@res:")
+        else {
+            return nil
+        }
+        let contentStart = beforeCaret.index(after: quote)
+        let prefix = String(beforeCaret[contentStart...])
+        guard prefix.hasPrefix("@res:") else {
+            return nil
+        }
+        return ResourceCompletionContext(
+            prefix: prefix,
+            replacementRange: GravitySourceRange(
+                start: GravitySourcePosition(
+                    line: position.line,
+                    utf16Column: line[..<contentStart].utf16.count
+                ),
+                end: position
+            )
+        )
+    }
+
+    private func resourceCompletions(context: ResourceCompletionContext) -> [GravityCompletion] {
+        let normalizedPrefix = context.prefix == "@res:" ? "@res://" : context.prefix
+        return resourcePaths()
+            .filter { $0.localizedCaseInsensitiveContains(normalizedPrefix) }
+            .map { path in
+                GravityCompletion(
+                    label: path,
+                    detail: "Project asset",
+                    insertText: path,
+                    kind: .variable,
+                    replacementRange: context.replacementRange,
+                    sortText: path.hasPrefix(normalizedPrefix) ? "00" : "10"
+                )
+            }
+    }
+
+    private func resourcePaths() -> [String] {
+        var paths = Set<String>()
+        for root in rootURLs {
+            for directoryName in ["Assets", "Resources"] {
+                let assetsURL = root.appendingPathComponent(directoryName, isDirectory: true)
+                guard
+                    let enumerator = fileManager.enumerator(
+                        at: assetsURL,
+                        includingPropertiesForKeys: [.isDirectoryKey],
+                        options: [.skipsHiddenFiles]
+                    )
+                else {
+                    continue
+                }
+                for case let fileURL as URL in enumerator {
+                    guard
+                        let values = try? fileURL.resourceValues(forKeys: [.isDirectoryKey]),
+                        values.isDirectory != true
+                    else {
+                        continue
+                    }
+                    let rootPath = assetsURL.standardizedFileURL.path
+                    let filePath = fileURL.standardizedFileURL.path
+                    guard filePath.hasPrefix(rootPath + "/") else {
+                        continue
+                    }
+                    paths.insert("@res://" + String(filePath.dropFirst(rootPath.count + 1)))
+                }
+            }
+        }
+        return paths.sorted()
     }
 
     public func semanticTokens(uri: String) -> [GravitySemanticToken] {

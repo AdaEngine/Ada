@@ -344,6 +344,7 @@ var targets: [Target] = [
         dependencies: [
             "AdaApp",
             "AdaECS",
+            "AdaEngineMacros",
             "AdaTransform",
             "AdaUtils",
             "Math",
@@ -381,8 +382,10 @@ var targets: [Target] = [
         dependencies: [
             "AdaScriptCompilerCore",
             "AdaApp",
+            "AdaAssets",
             "AdaECS",
             "AdaInput",
+            "AdaMultiplayer",
             "AdaScene",
             "AdaUI",
             .product(name: "Gravity", package: "gravity-lang")

@@ -14,6 +14,35 @@ private struct LocalOnlyState: Codable, Equatable, Sendable {
     var secret: Int
 }
 
+@ReplicatedComponent(id: "tests.generated-position")
+private struct GeneratedPosition: Equatable {
+    @NetworkField(1, mode: .latest)
+    var x: Int
+
+    @LocalOnly
+    var secret = 0
+}
+
+@ReplicatedComponent(id: "tests.public-generated-position")
+public struct PublicGeneratedPosition {
+    @NetworkField(1)
+    public var x: Int
+
+    public init(x: Int) {
+        self.x = x
+    }
+}
+
+@NetworkCommand(
+    id: "tests.generated-move",
+    delivery: .unreliableSequenced,
+    channel: "input"
+)
+private struct GeneratedMoveCommand: Equatable {
+    @NetworkField(1)
+    var x: Int
+}
+
 private struct MoveCommand: NetworkCommand, Equatable {
     static let networkIdentifier = "tests.move"
     var x: Int
@@ -27,12 +56,16 @@ private struct PingRequest: NetworkRequest {
 
 private struct CapturedCommands: Resource {
     var values: [MoveCommand] = []
+    var generatedValues: [GeneratedMoveCommand] = []
 }
 
 @PlainSystem
 struct CaptureCommandsSystem {
     @RemoteCommands<MoveCommand>
     private var commands
+
+    @RemoteCommands<GeneratedMoveCommand>
+    private var generatedCommands
 
     @ResMut<CapturedCommands>
     private var captured
@@ -41,6 +74,7 @@ struct CaptureCommandsSystem {
 
     func update(context _: UpdateContext) async {
         captured.values.append(contentsOf: commands.map(\.value))
+        captured.generatedValues.append(contentsOf: generatedCommands.map(\.value))
     }
 }
 
@@ -62,7 +96,9 @@ private struct TestNetworkingPlugin: Plugin {
     func setup(in app: borrowing AppWorlds) {
         app
             .registerReplicatedComponent(TestPosition.self, id: "tests.position")
+            .registerReplicatedComponent(GeneratedPosition.self)
             .registerNetworkCommand(MoveCommand.self)
+            .registerNetworkCommand(GeneratedMoveCommand.self)
             .registerNetworkRequest(PingRequest.self)
             .insertResource(CapturedCommands())
             .addSystem(CaptureCommandsSystem.self, on: .update)
@@ -169,6 +205,37 @@ struct AdaMultiplayerTests {
         #expect(peer.main.get(LocalOnlyState.self, from: replica.id) == nil)
     }
 
+    @Test("generated component implies marker and excludes local state")
+    func generatedComponentReplication() async throws {
+        let (host, peer) = try await makeConnectedApps()
+        let entity = host.main.spawn("Generated") {
+            GeneratedPosition(x: 17, secret: 42)
+        }
+
+        #expect(host.main.has(ReplicatedEntity.self, in: entity.id))
+        await sendSnapshot(host: host, peer: peer)
+
+        let replica = try #require(
+            Array(peer.main.performQuery(EntityQuery(where: .has(GeneratedPosition.self)))).first
+        )
+        #expect(peer.main.get(GeneratedPosition.self, from: replica.id) == GeneratedPosition(x: 17))
+
+        let schema = GeneratedPosition.networkDescriptor
+        #expect(schema.typeID == "tests.generated-position")
+        #expect(schema.fields == [
+            NetworkFieldDescriptor(
+                tag: 1,
+                wireType: .signedInteger,
+                replication: .latest
+            ),
+        ])
+
+        let encoded = try JSONEncoder().encode(GeneratedPosition(x: 17, secret: 42))
+        let encodedObject = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Int])
+        #expect(encodedObject == ["1": 17])
+        #expect(PublicGeneratedPosition.networkDescriptor.fields.map(\.tag) == [1])
+    }
+
     @Test("delta covers update, removal, and despawn")
     func deltaLifecycle() async throws {
         let (host, peer) = try await makeConnectedApps()
@@ -211,6 +278,25 @@ struct AdaMultiplayerTests {
         try await Task.sleep(for: .milliseconds(10))
         await peer.main.runScheduler(.networkReceive)
         #expect(try await response.value == "pong:hello")
+    }
+
+    @Test("generated command routes typed field-tagged payload")
+    func generatedCommandRoundTrip() async throws {
+        let (host, peer) = try await makeConnectedApps()
+        let peerSession = try #require(peer.main.getResource(MultiplayerSession.self))
+
+        try await peerSession.sendCommand(GeneratedMoveCommand(x: 27))
+        await host.main.runScheduler(.networkReceive)
+        await host.main.runScheduler(.update)
+
+        #expect(host.main.getResource(CapturedCommands.self)?.generatedValues == [GeneratedMoveCommand(x: 27)])
+        #expect(GeneratedMoveCommand.networkIdentifier == "tests.generated-move")
+        #expect(GeneratedMoveCommand.networkDescriptor.delivery == .unreliableSequenced)
+        #expect(GeneratedMoveCommand.networkDescriptor.channel == "input")
+
+        let encoded = try JSONEncoder().encode(GeneratedMoveCommand(x: 27))
+        let encodedObject = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Int])
+        #expect(encodedObject == ["1": 27])
     }
 
     @Test("AdaScript bridge routes detached commands and authoritative snapshots")

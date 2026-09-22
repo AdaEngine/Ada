@@ -26,6 +26,8 @@ final class FoundationFileSystem: FileSystem, @unchecked Sendable {
         let searchPathDir: FileManager.SearchPathDirectory
 
         switch searchPath {
+        case .applicationSupportDirectory:
+            searchPathDir = .applicationSupportDirectory
         case .downloadsDirectory:
             searchPathDir = .downloadsDirectory
         case .documentDirectory:

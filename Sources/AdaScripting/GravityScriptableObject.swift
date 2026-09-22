@@ -437,6 +437,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
             constructors: componentConstructors,
             reportDiagnostic: delegate.append
         )
+        try AdaScriptAssetRuntime.bind(to: virtualMachine, reportDiagnostic: delegate.append)
         virtualMachine.setValue(AdaScriptViewBridge(), forKey: "adaUIBuilder")
         let factories =
             factoryNamesByClass

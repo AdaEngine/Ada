@@ -249,6 +249,7 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
         self.virtualMachine = try AdaScriptRuntimeCoordinator.lock.withLock {
             let virtualMachine = GravityVirtualMachine(settings: .init(), delegate: delegate)
             try virtualMachine.bindClass(with: AdaScriptViewBridge.self)
+            try AdaScriptAssetRuntime.bind(to: virtualMachine, reportDiagnostic: delegate.append)
             virtualMachine.setValue(AdaScriptViewBridge(), forKey: "adaUIBuilder")
 
             let factories = views.enumerated()

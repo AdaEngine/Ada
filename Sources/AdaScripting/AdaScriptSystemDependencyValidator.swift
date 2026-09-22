@@ -5,6 +5,7 @@ import Gravity
 enum AdaScriptSystemPlanBuilder {
     static func makePlans(
         from annotations: [GravityAnnotation],
+        remoteCommandBindings: [AdaScriptRemoteCommandBinding],
         resourceBindings: [AdaScriptResourceBinding],
         systemCapabilities: [AdaScriptSystemCapabilities]
     ) throws -> [AnnotatedSystemPlan] {
@@ -19,6 +20,7 @@ enum AdaScriptSystemPlanBuilder {
             try makeSystemPlan(
                 $0,
                 annotations: annotations,
+                remoteCommandBindings: remoteCommandBindings,
                 resourceBindings: resourceBindings,
                 systemCapabilities: systemCapabilities
             )
@@ -61,6 +63,7 @@ enum AdaScriptSystemPlanBuilder {
     private static func makeSystemPlan(
         _ annotation: GravityAnnotation,
         annotations: [GravityAnnotation],
+        remoteCommandBindings: [AdaScriptRemoteCommandBinding],
         resourceBindings: [AdaScriptResourceBinding],
         systemCapabilities: [AdaScriptSystemCapabilities]
     ) throws -> AnnotatedSystemPlan {
@@ -80,6 +83,15 @@ enum AdaScriptSystemPlanBuilder {
                 annotations
                 .filter { $0.name == "query" && $0.target.parentIdentifier == className }
                 .map(makeQueryPlan),
+            remoteCommands:
+                remoteCommandBindings
+                .filter { $0.systemName == className }
+                .map {
+                    AnnotatedRemoteCommandPlan(
+                        commandName: $0.commandName,
+                        propertyName: $0.propertyName
+                    )
+                },
             resources:
                 resourceBindings
                 .filter { $0.systemName == className }

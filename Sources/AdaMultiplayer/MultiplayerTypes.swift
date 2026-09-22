@@ -1,4 +1,5 @@
 import AdaECS
+import protocol AdaUtils.DefaultValue
 import Foundation
 
 /// Stable identifier for a multiplayer session.
@@ -107,7 +108,7 @@ public struct MultiplayerConfiguration: Sendable {
 ///
 /// The host fills ``id`` on the first network snapshot. Only component types
 /// registered with `registerReplicatedComponent` are serialized.
-public struct ReplicatedEntity: Component, Codable, Sendable {
+public struct ReplicatedEntity: Component, Codable, DefaultValue, Sendable {
     public static var requiredComponents: RequiredComponents {
         RequiredComponents(components: [])
     }
@@ -116,6 +117,10 @@ public struct ReplicatedEntity: Component, Codable, Sendable {
 
     public init(id: NetworkEntityID? = nil) {
         self.id = id
+    }
+
+    public static var defaultValue: Self {
+        Self()
     }
 }
 

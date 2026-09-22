@@ -2,7 +2,7 @@
 
 Portable AdaScript multiplayer sample for AdaEditor and AdaPlayer. The project
 contains no Swift package and no native game sources. The precompiled
-`multiplayer` capability only transports detached command/snapshot payloads;
+`multiplayer` capability transports typed input commands and authoritative state;
 all Medieval Arena rules stay in this directory:
 
 - `ArenaState.ada` owns player state and game constants;

@@ -1,10 +1,11 @@
-import { ArenaGame } from "./ArenaState.ada";
+import { ArenaGame, ArenaInputCommand } from "./ArenaState.ada";
 
 @before(id: "arena.gameplay")
 @system(scheduler: "update", id: "arena.input")
 class ArenaInputSystem {
     @res var input: Input;
     @res var multiplayer: AdaScriptMultiplayerState;
+    @res var network: Multiplayer;
 
     func update(context) {
         ArenaGame.moveX = input.getActionStrength("MoveRight") - input.getActionStrength("MoveLeft");
@@ -14,8 +15,7 @@ class ArenaInputSystem {
         }
 
         if (multiplayer.role == "peer") {
-            multiplayer.outgoingCommand = [ArenaGame.moveX, ArenaGame.moveY, ArenaGame.attackSequence];
-            multiplayer.outgoingCommandSequence += 1;
+            network.send(ArenaInputCommand(ArenaGame.moveX, ArenaGame.moveY, ArenaGame.attackSequence));
         }
     }
 }

@@ -6,7 +6,7 @@ import Testing
 
 // TODO: We should fix tests
 
-@Suite("AssetsManager Tests", .tags(.assets))
+@Suite("AssetsManager Tests", .serialized, .tags(.assets))
 struct AssetsManagerTests: Sendable {
 
     @AssetActor
@@ -35,6 +35,74 @@ struct AssetsManagerTests: Sendable {
         let resolved = AssetsManager.resolveAssetURL(at: "@res://Textures/player.png")
 
         #expect(resolved == assetDirectory.appendingPathComponent("Textures/player.png"))
+    }
+
+    @Test("Writable asset URLs resolve under their configured directories")
+    @AssetActor
+    func writableURLsResolveUnderConfiguredDirectories() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let assets = root.appendingPathComponent("Assets", isDirectory: true)
+        let user = root.appendingPathComponent("User", isDirectory: true)
+        let cache = root.appendingPathComponent("Cache", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        AssetsManager.setProjectDirectories(
+            ProjectDirectories(
+                source: root,
+                assetsDirectory: assets,
+                userDataDirectory: user,
+                cacheDirectory: cache
+            )
+        )
+
+        #expect(AssetsManager.resolveAssetURL(at: "@user://Saves/slot.txt") == user.appendingPathComponent("Saves/slot.txt"))
+        #expect(AssetsManager.resolveAssetURL(at: "@cache://Images/thumb.png") == cache.appendingPathComponent("Images/thumb.png"))
+    }
+
+    @Test("Save accepts a complete writable resource path")
+    @AssetActor
+    func saveAtCompleteWritablePath() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let user = root.appendingPathComponent("User", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        AssetsManager.setProjectDirectories(
+            ProjectDirectories(
+                source: root,
+                assetsDirectory: root.appendingPathComponent("Assets", isDirectory: true),
+                userDataDirectory: user,
+                cacheDirectory: root.appendingPathComponent("Cache", isDirectory: true)
+            )
+        )
+
+        try await AssetsManager.save(TestAsset(testData: "saved"), at: "@user://Saves/slot.txt")
+        let loaded = try await AssetsManager.load(TestAsset.self, at: "@user://Saves/slot.txt")
+
+        #expect(loaded.asset.testData == "saved")
+    }
+
+    @Test("Virtual asset paths cannot escape their roots")
+    @AssetActor
+    func rejectsEscapingVirtualPaths() async {
+        await #expect(throws: AssetError.self) {
+            try await AssetsManager.save(TestAsset(testData: "unsafe"), at: "@user://../outside.txt")
+        }
+    }
+
+    @Test("Type-erased synchronous loading preserves the typed handle")
+    func typeErasedSynchronousLoad() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try await AssetsManager.setAssetDirectory(root)
+        AssetsManager.registerAssetType(TestAsset.self)
+        try await AssetsManager.save(TestAsset(testData: "erased"), at: "@res://value.txt")
+
+        let handle = try AssetsManager.loadErasedSync(TestAsset.self, at: "@res://value.txt")
+
+        #expect((handle.untypedAsset as? TestAsset)?.testData == "erased")
     }
 
     @Test("Explicit bundled asset root controls resource URL mapping")

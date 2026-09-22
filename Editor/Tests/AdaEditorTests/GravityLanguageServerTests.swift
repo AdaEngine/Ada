@@ -138,6 +138,30 @@ struct GravityLanguageServerTests {
         #expect(items.contains { $0.label == "tick" && $0.insertText == "tick()" })
     }
 
+    @Test("Workspace completes project assets inside resource strings")
+    func resourcePathCompletion() throws {
+        let projectURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AdaScriptAssets-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: projectURL) }
+        let texturesURL = projectURL.appendingPathComponent("Assets/Textures", isDirectory: true)
+        try FileManager.default.createDirectory(at: texturesURL, withIntermediateDirectories: true)
+        try Data([0]).write(to: texturesURL.appendingPathComponent("player.png"))
+
+        let workspace = GravityWorkspace()
+        workspace.configure(rootURIs: [projectURL.absoluteString])
+        let sourceURL = projectURL.appendingPathComponent("Main.ada")
+        let source = "var texture: Texture2D = Assets.load(\"@res:\");"
+        workspace.open(uri: sourceURL.absoluteString, text: source, version: 1)
+
+        let items = workspace.completions(
+            uri: sourceURL.absoluteString,
+            position: GravitySourcePosition(line: 0, utf16Column: source.utf16.count - 3)
+        )
+
+        #expect(items.contains { $0.label == "@res://Textures/player.png" })
+        #expect(items.first { $0.label == "@res://Textures/player.png" }?.insertText == "@res://Textures/player.png")
+    }
+
     @Test("Workspace indexes generated AdaScript sources in hidden Ada directories")
     func generatedWorkspaceCompletion() throws {
         let projectURL = FileManager.default.temporaryDirectory

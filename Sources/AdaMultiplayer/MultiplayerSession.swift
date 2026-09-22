@@ -131,6 +131,21 @@ public actor MultiplayerSession: Resource {
         )
     }
 
+    func sendCommand(typeID: String, version: UInt16, payload: Data) async throws {
+        guard configuration.role == .peer else {
+            throw MultiplayerError.peerOnly
+        }
+        try await send(
+            frame: NetworkFrame(
+                kind: .command,
+                typeID: typeID,
+                typeVersion: version,
+                payload: payload
+            ),
+            to: .host
+        )
+    }
+
     /// Sends a typed event from the host to one or more peers.
     public func sendEvent<T: NetworkEvent>(_ event: T, to target: NetworkTarget = .allPeers) async throws {
         guard configuration.role == .host else {
@@ -156,9 +171,9 @@ public actor MultiplayerSession: Resource {
     ) async throws -> T.Response {
         let target: NetworkTarget
         switch (configuration.role, requestedTarget) {
-        case (.peer, nil), (.peer, .host?):
+        case (.peer, nil), (.peer, .host):
             target = .host
-        case let (.host, .peer(peer)?):
+        case let (.host, .peer(peer)):
             target = .peer(peer)
         default:
             throw MultiplayerError.invalidDirection

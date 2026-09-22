@@ -227,6 +227,8 @@ public protocol AnyAssetHandleInfo: AnyObject, Sendable {
     var assetTypeName: String { get }
     var assetMetaInfo: AssetMetaInfo? { get }
     var isLoaded: Bool { get }
+    /// The current type-erased asset value.
+    var untypedAsset: (any Asset)? { get }
 }
 
 extension AssetHandle: AnyAssetHandleInfo {
@@ -240,6 +242,10 @@ extension AssetHandle: AnyAssetHandleInfo {
 
     public var assetMetaInfo: AssetMetaInfo? {
         self.assetMeta
+    }
+
+    public var untypedAsset: (any Asset)? {
+        asset
     }
 }
 
