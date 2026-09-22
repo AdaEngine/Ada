@@ -56,6 +56,9 @@ jobs:
       - name: Apply AdaEngine documentation theme
         run: node scripts/apply-docc-theme.mjs docs
 
+      - name: Prepare documentation for search
+        run: node scripts/prepare-docc-search.mjs docs
+
       - name: Add custom domain and redirects
         run: |
           printf 'docs.adaengine.org\n' > docs/CNAME
