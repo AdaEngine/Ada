@@ -8,6 +8,41 @@ import Testing
 
 @Suite("AdaScript project runtime", .serialized)
 struct AdaScriptProjectRuntimeTests {
+    @Test("Medieval Arena opens its portable Play window")
+    @MainActor
+    func medievalArenaOpensPlayWindow() async throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "Medieval Arena Play setup")))
+        }
+        EditorComponentRegistry.registerBuiltIns()
+        let projectURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Demos/MedievalArena", isDirectory: true)
+        let previousManager = UIWindowManager.shared
+        let windowManager = AdaScriptRuntimeTestWindowManager()
+        UIWindowManager.setShared(windowManager)
+        defer {
+            if let previousManager { UIWindowManager.setShared(previousManager) }
+        }
+
+        let viewModel = EditorViewModel(
+            project: EditorProjectReference(name: "MedievalArena", path: projectURL.path),
+            selectedRunDestination: .macOS
+        )
+        viewModel.runSelectedTarget()
+        for _ in 0..<300 where windowManager.shownWindowCount == 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(windowManager.shownWindowCount == 1, Comment(rawValue: viewModel.outputLines.map(\.text).joined(separator: " | ")))
+        #expect(viewModel.workspaceStatus == .running("Run Medieval Arena"))
+        viewModel.cancelWorkspaceCommand()
+    }
+
     @Test("Regular windows stay in the current native scene by default")
     @MainActor
     func regularWindowsUseCurrentScene() {

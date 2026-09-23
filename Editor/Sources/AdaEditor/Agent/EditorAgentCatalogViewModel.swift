@@ -14,14 +14,39 @@ final class EditorAgentCatalogViewModel {
     var agents: [EditorRegistryAgent] = []
     var discovered: [EditorDiscoveredAgent] = []
     var installed: [EditorInstalledAgent] = []
+    var registeredSloppy: EditorSloppyAccount?
     var isBusy = false
     var status = ""
     var notificationAction = EditorNotificationAction(title: "Agent settings", destination: .agentSettings)
     var notificationProjectName: String?
     private var hasLoaded = false
     private let service: EditorAgentCatalogService
+    private let sloppyInvites: EditorSloppyInviteService
 
-    init(service: EditorAgentCatalogService = .shared) { self.service = service }
+    init(service: EditorAgentCatalogService = .shared, sloppyInvites: EditorSloppyInviteService = .shared) {
+        self.service = service
+        self.sloppyInvites = sloppyInvites
+    }
+
+    var showsSloppyInvite: Bool {
+        !discovered.contains { $0.name == "Sloppy" }
+            && !installed.contains { $0.name == "Sloppy" }
+            && (query.isEmpty || "Sloppy invite".localizedCaseInsensitiveContains(query))
+    }
+
+    func registerSloppyInvite(server: String, invite: String, name: String, login: String, password: String) async {
+        guard !isBusy else { return }
+        isBusy = true
+        defer { isBusy = false }
+        do {
+            let credentials = try await sloppyInvites.register(server: server, invite: invite, name: name, login: login, password: password)
+            registeredSloppy = EditorSloppyAccount(serverURL: credentials.serverURL, login: credentials.login)
+            status = "Sloppy account \(credentials.login) registered at \(credentials.serverURL.host ?? "server"). "
+                + "Session saved in Keychain. Install Sloppy locally and enable ACP Server to use it in Agent Chat."
+        } catch {
+            reportError(error.localizedDescription)
+        }
+    }
 
     var visibleAgents: [EditorRegistryAgent] {
         agents.filter { agent in
@@ -54,6 +79,7 @@ final class EditorAgentCatalogViewModel {
         isBusy = true
         defer { isBusy = false }
         discovered = await service.discover()
+        registeredSloppy = await sloppyInvites.registeredAccounts().first
         do {
             installed = try await service.installed()
         } catch {

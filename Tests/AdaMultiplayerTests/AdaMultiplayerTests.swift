@@ -109,6 +109,59 @@ private struct TestNetworkingPlugin: Plugin {
 @Suite("AdaMultiplayer")
 @MainActor
 struct AdaMultiplayerTests {
+    @Test("Runtime components replicate tagged fields and retain local fields")
+    func runtimeComponentReplication() throws {
+        let world = World(name: "Runtime replication")
+        let app = AppWorlds(main: world)
+        MultiplayerPlugin(
+            configuration: MultiplayerConfiguration(
+                role: .host,
+                compatibility: NetworkCompatibility(gameIdentifier: "runtime-tests", buildIdentifier: "1")
+            ),
+            transport: InMemoryTransport(hub: InMemoryTransportHub())
+        ).setup(in: app)
+        let component = RuntimeComponentDescriptor(
+            stableID: "tests.runtime-player",
+            name: "RuntimePlayer",
+            fieldNames: ["x", "health", "localCounter"],
+            defaultValues: [.double(0), .int(3), .int(99)]
+        )
+        world.registerRuntimeComponent(component)
+        app.registerReplicatedRuntimeComponent(
+            component,
+            schema: NetworkTypeDescriptor(
+                typeID: component.stableID,
+                kind: .component,
+                authority: .host,
+                fields: [
+                    NetworkFieldDescriptor(tag: 1, wireType: .floatingPoint, interpolation: .linear),
+                    NetworkFieldDescriptor(tag: 2, wireType: .signedInteger),
+                ]
+            ),
+            fieldIndices: [1: 0, 2: 1]
+        )
+
+        let source = world.spawn {
+            RuntimeComponentPayload(
+                componentID: component.componentID,
+                stableID: component.stableID,
+                values: [.double(12), .int(2), .int(7)]
+            )
+        }
+        let destination = world.spawn()
+        let registered = try #require(
+            world.getResource(MultiplayerRegistry.self)?.replicatedComponentsByTypeID[component.stableID]
+        )
+        let codec = JSONNetworkCodec()
+        let payload = try #require(try registered.encode(world, source.id, codec))
+        try registered.apply(payload, world, destination.id, codec)
+
+        #expect(world.get(ReplicatedEntity.self, from: source.id) != nil)
+        #expect(world.getRuntimeComponent(component.componentID, from: destination.id)?.values == [
+            .double(12), .int(2), .int(99),
+        ])
+    }
+
     @Test("binary envelope rejects invalid data")
     func wireEnvelope() throws {
         let original = NetworkFrame(kind: .event, sequence: 42, payload: Data([1, 2, 3]))

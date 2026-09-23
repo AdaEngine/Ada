@@ -6,6 +6,7 @@ enum AdaScriptSystemPlanBuilder {
     static func makePlans(
         from annotations: [GravityAnnotation],
         remoteCommandBindings: [AdaScriptRemoteCommandBinding],
+        rpcMethodBindings: [AdaScriptRPCMethodBinding],
         resourceBindings: [AdaScriptResourceBinding],
         systemCapabilities: [AdaScriptSystemCapabilities]
     ) throws -> [AnnotatedSystemPlan] {
@@ -21,6 +22,7 @@ enum AdaScriptSystemPlanBuilder {
                 $0,
                 annotations: annotations,
                 remoteCommandBindings: remoteCommandBindings,
+                rpcMethodBindings: rpcMethodBindings,
                 resourceBindings: resourceBindings,
                 systemCapabilities: systemCapabilities
             )
@@ -64,6 +66,7 @@ enum AdaScriptSystemPlanBuilder {
         _ annotation: GravityAnnotation,
         annotations: [GravityAnnotation],
         remoteCommandBindings: [AdaScriptRemoteCommandBinding],
+        rpcMethodBindings: [AdaScriptRPCMethodBinding],
         resourceBindings: [AdaScriptResourceBinding],
         systemCapabilities: [AdaScriptSystemCapabilities]
     ) throws -> AnnotatedSystemPlan {
@@ -92,6 +95,9 @@ enum AdaScriptSystemPlanBuilder {
                         propertyName: $0.propertyName
                     )
                 },
+            rpcMethods: rpcMethodBindings
+                .filter { $0.systemName == className }
+                .map { AnnotatedRPCMethodPlan(commandName: $0.commandName, fieldNames: $0.fieldNames) },
             resources:
                 resourceBindings
                 .filter { $0.systemName == className }

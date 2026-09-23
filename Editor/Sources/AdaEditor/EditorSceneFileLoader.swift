@@ -134,7 +134,42 @@ enum EditorSceneFileLoader {
                 }
 
                 do {
-                    if let component = try EditorComponentRegistry.decode(typeName: componentName, payload: componentPayload) {
+                    var resolvedPayload = componentPayload
+                    if componentName == EditorBuiltInComponentType.tileMap,
+                        let reference = componentPayload["map"]?.stringValue,
+                        !reference.isEmpty {
+                        guard let mapURL = resolveTileMapReference(reference, relativeTo: sourceURL, resourceRootURL: resourceRootURL) else {
+                            throw EditorTileMapReferenceError.invalid(reference)
+                        }
+                        let resource = try EditorTileMapResource.read(from: mapURL)
+                        resolvedPayload.merge(resource.componentPayload) { _, resource in resource }
+                        if let paths = resource.atlasTextures {
+                            resolvedPayload["atlasTextures"] = .array(paths.map { path in
+                                let url = URL(fileURLWithPath: path, relativeTo: mapURL.deletingLastPathComponent()).standardizedFileURL
+                                return .string(url.path)
+                            })
+                        }
+                        if let tileSetReference = resource.tileSetReference {
+                            let tileSetURL: URL
+                            if tileSetReference.hasPrefix("@res://"), let resourceRootURL {
+                                tileSetURL = resourceRootURL.appendingPathComponent(String(tileSetReference.dropFirst("@res://".count))).standardizedFileURL
+                            } else {
+                                tileSetURL = URL(fileURLWithPath: tileSetReference, relativeTo: mapURL.deletingLastPathComponent()).standardizedFileURL
+                            }
+                            let resolvedTileSetURL = tileSetURL.resolvingSymlinksInPath().standardizedFileURL
+                            if tileSetReference.hasPrefix("@res://"), let resourceRootURL {
+                                let rootPath = resourceRootURL.resolvingSymlinksInPath().standardizedFileURL.path
+                                guard resolvedTileSetURL.path.hasPrefix(rootPath + "/") else {
+                                    throw EditorTileMapReferenceError.invalid(tileSetReference)
+                                }
+                            }
+                            guard resolvedTileSetURL.pathExtension == "tileset", FileManager.default.fileExists(atPath: resolvedTileSetURL.path) else {
+                                throw EditorTileMapReferenceError.invalid(tileSetReference)
+                            }
+                            resolvedPayload["tileSetReference"] = .string(resolvedTileSetURL.path)
+                        }
+                    }
+                    if let component = try EditorComponentRegistry.decode(typeName: componentName, payload: resolvedPayload) {
                         if let ui = (component as? UIComponent) ?? (component as? CompanionPanel)?.ui {
                             let runtime = world.getResource(UIComponentRuntimeResource.self)?.runtime
                             if let source = ui.source {
@@ -317,6 +352,29 @@ enum EditorSceneFileLoader {
             }
         }
         return result
+    }
+
+    private static func resolveTileMapReference(
+        _ reference: String,
+        relativeTo sourceURL: URL?,
+        resourceRootURL: URL?
+    ) -> URL? {
+        let root = resourceRootURL ?? sourceURL?.deletingLastPathComponent().deletingLastPathComponent()
+        let url: URL
+        if reference.hasPrefix("@res://") {
+            guard let root else { return nil }
+            url = root.appendingPathComponent(String(reference.dropFirst("@res://".count)))
+        } else {
+            guard let sourceURL else { return nil }
+            url = sourceURL.deletingLastPathComponent().appendingPathComponent(reference)
+        }
+        let resolved = url.resolvingSymlinksInPath().standardizedFileURL
+        guard resolved.pathExtension == "tilemap" else { return nil }
+        if reference.hasPrefix("@res://"), let root {
+            let rootPath = root.resolvingSymlinksInPath().standardizedFileURL.path
+            guard resolved.path.hasPrefix(rootPath + "/") else { return nil }
+        }
+        return resolved
     }
 
     private static func resolveSceneReference(

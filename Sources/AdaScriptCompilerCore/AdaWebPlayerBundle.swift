@@ -7,21 +7,24 @@ public enum AdaWebPlayerBundle {
         let fileManager = FileManager.default
         let project = try AdaWebPlayerProject.load(at: directory)
         let sources = try project.loadSources(at: directory)
-        guard
-            try AdaScriptSchemaParser.parse(sources: sources).isEmpty,
-            try AdaScriptSchemaParser.parseSystemCapabilities(sources: sources).isEmpty
-        else {
-            throw AdaWebPlayerProjectError.invalid("This Web Player profile supports views without ECS systems or custom native data.")
-        }
-        guard try AdaScriptSchemaParser.parseViews(sources: sources).contains(where: { $0.id == project.entryView }) else {
-            throw AdaWebPlayerProjectError.invalid("Entry view '\(project.entryView)' was not found.")
+        if project.entryScene == nil {
+            guard
+                try AdaScriptSchemaParser.parse(sources: sources).isEmpty,
+                try AdaScriptSchemaParser.parseSystemCapabilities(sources: sources).isEmpty
+            else {
+                throw AdaWebPlayerProjectError.invalid("This Web Player profile supports views without ECS systems or custom native data.")
+            }
+            guard try AdaScriptSchemaParser.parseViews(sources: sources).contains(where: { $0.id == project.entryView }) else {
+                throw AdaWebPlayerProjectError.invalid("Entry view '\(project.entryView)' was not found.")
+            }
         }
         let descriptor = try JSONDecoder()
             .decode(
                 PlayerDescriptor.self,
                 from: Data(contentsOf: template.appendingPathComponent("ada-web-player.json"))
             )
-        guard descriptor.runtimeAPI >= project.runtimeAPI, descriptor.profile == "views" else {
+        guard descriptor.runtimeAPI >= project.runtimeAPI,
+            descriptor.profile == project.profile || descriptor.profile == "universal" else {
             throw AdaWebPlayerProjectError.invalid("The player template is incompatible with this project's runtime API or profile.")
         }
         for path in ["index.html", "main.js", "AdaWebPlayer.wasm", "runtime.mjs", "bridge-js.js", "browser-wasi-shim/dist/index.js"] {
@@ -68,6 +71,11 @@ public enum AdaWebPlayerBundle {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         try encoder.encode(project).write(to: game.appendingPathComponent("project.json"))
         resources.append(ResourceEntry(path: "game/project.json", url: "game/project.json"))
+        let adaSettings = directory.appendingPathComponent(".ada/project.json")
+        if fileManager.fileExists(atPath: adaSettings.path) {
+            try fileManager.copyItem(at: adaSettings, to: game.appendingPathComponent("runtime-settings.json"))
+            resources.append(ResourceEntry(path: "game/runtime-settings.json", url: "game/runtime-settings.json"))
+        }
         for source in sources {
             let destination = game.appendingPathComponent(source.path)
             try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -80,6 +88,15 @@ public enum AdaWebPlayerBundle {
                 }
                 .joined(separator: "/")
             resources.append(ResourceEntry(path: path, url: url))
+        }
+        for path in project.files ?? [] {
+            let source = try project.resourceURL(path, at: directory)
+            let destination = game.appendingPathComponent(path)
+            try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fileManager.copyItem(at: source, to: destination)
+            let resourcePath = "game/\(path)"
+            let resourceURL = resourcePath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "?#%"))) ?? resourcePath
+            resources.append(ResourceEntry(path: resourcePath, url: resourceURL))
         }
         for asset in project.assets ?? [] {
             let source = try project.resourceURL(asset.path, at: directory)

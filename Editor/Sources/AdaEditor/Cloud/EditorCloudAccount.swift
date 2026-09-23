@@ -398,6 +398,13 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         UserDefaults.standard.removeObject(forKey: operationKey)
         status = "Published until " + Date(timeIntervalSince1970: published["expiresAt"].seconds).formatted()
     }
+    func createMultiplayerRoom() async throws -> EditorCloudValue {
+        guard accountID != nil else {
+            throw CloudError.message("Sign in to AdaEngine Cloud before hosting a Web multiplayer room.")
+        }
+        return try await request("/multiplayer/sessions", method: "POST", body: [:])
+    }
+
     func request(_ path: String, method: String = "GET", body: EditorCloudValue? = nil, authenticated: Bool = true, retry: Bool = true) async throws -> EditorCloudValue {
         guard let base = URL(string: server), Self.isAllowedCloudURL(base), let url = URL(string: server.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/v1" + path) else {
             throw CloudError.message("Cloud server is not configured.")

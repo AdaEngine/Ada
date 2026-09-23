@@ -520,7 +520,7 @@ struct EditorSettingsWindowView: View {
         } else if viewModel.selectedSection == .agent {
             agentSettings(viewModel.agent)
         } else if viewModel.selectedSection == .general, viewModel.editorViewModel == nil {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 0) {
                 settingsGroup("CLOUD ACCOUNT") { EditorCloudSettingsView() }
                 settingsGroup("APPEARANCE") { EditorAgentGlowSettings() }
             }
@@ -543,7 +543,7 @@ struct EditorSettingsWindowView: View {
     }
 
     private var generalSettings: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 0) {
             settingsGroup("CLOUD ACCOUNT") { EditorCloudSettingsView() }
             settingsGroup("APPEARANCE") {
                 EditorAgentGlowSettings()
@@ -617,7 +617,7 @@ struct EditorSettingsWindowView: View {
     }
 
     private func projectSettings(_ editorViewModel: EditorViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 0) {
             settingsGroup("PROJECT") {
                 settingsField(
                     editorViewModel.project?.name ?? "Game",
@@ -679,7 +679,7 @@ struct EditorSettingsWindowView: View {
     }
 
     private func agentSettings(_ agent: EditorAgentViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 0) {
             if viewModel.showsPage("AGENTS") {
                 EditorAgentCatalogView(agent: agent, showsToolbar: false)
             }

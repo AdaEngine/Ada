@@ -228,6 +228,7 @@ enum EditorProjectFileKind: Equatable, Sendable {
 
 enum EditorAssetPreviewKind: String, Equatable, Sendable {
     case tileSource
+    case tileMap
     case atlas
     case image
     case audio

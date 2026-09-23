@@ -256,11 +256,20 @@ extension EditorViewModel {
             }
             return
         }
-        if projectSettings?.build.system == .adaScript, selectedRunDestination == .web {
-            let message = "Web run is not available for AdaScript projects yet."
-            workspaceStatus = .failed(message)
-            footer.setWorkspaceFooterTitle(workspaceStatus.title)
-            appendOutput(message)
+        if let projectURL,
+            let settings = projectSettings,
+            settings.build.system == .adaScript,
+            selectedRunDestination == .web {
+            #if os(macOS)
+                buildAdaScriptProject(settings, at: projectURL, statusTitle: "Build AdaScript Project") { [weak self] artifact in
+                    self?.runAdaScriptProjectOnWeb(settings, artifact: artifact, at: projectURL)
+                }
+            #else
+                let message = "Web run requires a macOS host with the Web Player template."
+                workspaceStatus = .failed(message)
+                footer.setWorkspaceFooterTitle(workspaceStatus.title)
+                appendOutput(message)
+            #endif
             return
         }
         switch selectedRunDestination {
@@ -586,6 +595,15 @@ extension EditorViewModel {
     }
 
     func cancelWorkspaceCommand() {
+        #if os(macOS)
+        if adaScriptWebServer != nil {
+            stopAdaScriptWebServer()
+            workspaceStatus = .ready
+            footer.setWorkspaceFooterTitle(workspaceStatus.title)
+            appendOutput("Stopped AdaScript Web run.")
+            return
+        }
+        #endif
         if playerSession.isRunning || playerSession.isBusy {
             playerSession.stop()
             return
@@ -611,6 +629,9 @@ extension EditorViewModel {
         workspaceStatus = .cancelled
         Task {
             await workspaceService.cancel()
+            #if os(macOS)
+            await adaScriptWebExportRunner?.cancelAll()
+            #endif
         }
     }
 

@@ -163,6 +163,8 @@ struct ProjectOpeningView: View {
                     }
                 case .showProjectSettings:
                     presentSettings(.project)
+                case .closeEditorTab:
+                    EditorMenuCommandRouter.shared.perform(.closeEditor)
                 default:
                     return false
                 }

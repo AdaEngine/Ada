@@ -27,7 +27,7 @@ public struct AdaWebPlayerMaterial: Codable, Equatable, Sendable {
 
 extension AdaWebPlayerProject {
     public func resourceURL(_ path: String, at directory: URL) throws -> URL {
-        guard Self.isResourcePath(path) else {
+        guard Self.isResourcePath(path) || path == ".ada/project.json" else {
             throw AdaWebPlayerProjectError.invalid("Invalid resource path: \(path).")
         }
         let root = directory.resolvingSymlinksInPath().standardizedFileURL
@@ -53,7 +53,7 @@ extension AdaWebPlayerProject {
         else {
             throw AdaWebPlayerProjectError.invalid("Duplicate resource or material identifier.")
         }
-        let paths = sources + assets.map(\.path) + ["project.json"]
+        let paths = sources + (files ?? []) + assets.map(\.path) + ["project.json"]
         guard Set(paths.map { $0.lowercased() }).count == paths.count else {
             throw AdaWebPlayerProjectError.invalid("Resource paths collide with another resource or project file.")
         }

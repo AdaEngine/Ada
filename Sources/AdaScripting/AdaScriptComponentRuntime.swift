@@ -1,4 +1,5 @@
 @_spi(Scripting) import AdaECS
+import AdaScriptCompilerCore
 import Gravity
 
 struct AdaScriptLinkedComponentConstructor: Sendable {
@@ -8,6 +9,20 @@ struct AdaScriptLinkedComponentConstructor: Sendable {
 }
 
 enum AdaScriptComponentRuntime {
+    static func runtimeDescriptors(
+        schemas: [AdaScriptDataSchema]
+    ) -> [RuntimeComponentDescriptor] {
+        schemas.compactMap { schema in
+            guard schema.kind == .component else { return nil }
+            return RuntimeComponentDescriptor(
+                stableID: schema.id,
+                name: schema.name,
+                fieldNames: schema.fields.map(\.name),
+                defaultValues: schema.fields.map { reflectedValue($0.defaultValue) }
+            )
+        }
+    }
+
     static func linkedConstructors() -> [AdaScriptLinkedComponentConstructor] {
         RuntimeTypeRegistry.registeredRuntimeComponentConstructors()
             .enumerated()
@@ -57,6 +72,7 @@ enum AdaScriptComponentRuntime {
     static func bind(
         to virtualMachine: GravityVirtualMachine,
         constructors: [AdaScriptLinkedComponentConstructor],
+        runtimeDescriptors: [RuntimeComponentDescriptor] = [],
         reportDiagnostic: @escaping @Sendable (String) -> Void
     ) throws {
         try virtualMachine.bindClass(with: AnnotatedGravityComponentValue.self)
@@ -64,6 +80,7 @@ enum AdaScriptComponentRuntime {
         virtualMachine.setValue(
             AnnotatedGravityComponentFactory.make(
                 constructors: constructors.map(\.constructor),
+                runtimeDescriptors: runtimeDescriptors,
                 reportDiagnostic: reportDiagnostic
             ),
             forKey: "__adaComponentFactory"
@@ -75,6 +92,15 @@ enum AdaScriptComponentRuntime {
             return false
         }
         return value.dropFirst().allSatisfy { $0 == "_" || $0.isLetter || $0.isNumber }
+    }
+
+    private static func reflectedValue(_ value: AdaScriptSchemaField.Value) -> ReflectedFieldValue {
+        switch value {
+        case let .bool(value): .bool(value)
+        case let .double(value): .double(value)
+        case let .int(value): .int(Int(value))
+        case let .string(value): .string(value)
+        }
     }
 }
 
@@ -107,24 +133,39 @@ final class AnnotatedGravityComponentFactory: @unchecked Sendable {
     private let constructors: [RegisteredRuntimeComponentConstructor]
 
     @GSExportableIgnore
+    private let constructorsByName: [String: RegisteredRuntimeComponentConstructor]
+
+    @GSExportableIgnore
+    private let runtimeDescriptorsByName: [String: RuntimeComponentDescriptor]
+
+    @GSExportableIgnore
     private let reportDiagnostic: @Sendable (String) -> Void
 
     @GSExportableIgnore
     static func make(
         constructors: [RegisteredRuntimeComponentConstructor],
+        runtimeDescriptors: [RuntimeComponentDescriptor],
         reportDiagnostic: @escaping @Sendable (String) -> Void
     ) -> AnnotatedGravityComponentFactory {
         AnnotatedGravityComponentFactory(
             constructors: constructors,
+            runtimeDescriptors: runtimeDescriptors,
             reportDiagnostic: reportDiagnostic
         )
     }
 
     private init(
         constructors: [RegisteredRuntimeComponentConstructor],
+        runtimeDescriptors: [RuntimeComponentDescriptor],
         reportDiagnostic: @escaping @Sendable (String) -> Void
     ) {
         self.constructors = constructors
+        self.constructorsByName = Dictionary(uniqueKeysWithValues: constructors.map { ($0.name, $0) })
+        self.runtimeDescriptorsByName = Dictionary(
+            uniqueKeysWithValues: runtimeDescriptors.flatMap { descriptor in
+                [(descriptor.name, descriptor), (descriptor.stableID, descriptor)]
+            }
+        )
         self.reportDiagnostic = reportDiagnostic
     }
 
@@ -133,24 +174,7 @@ final class AnnotatedGravityComponentFactory: @unchecked Sendable {
             reportDiagnostic("AdaScript component constructor index \(constructorIndex) is not linked")
             return AnnotatedGravityComponentValue()
         }
-        guard argumentValues.isList else {
-            reportDiagnostic("AdaScript component constructor arguments must be a list")
-            return AnnotatedGravityComponentValue()
-        }
-
-        var arguments: [ReflectedFieldValue?] = []
-        arguments.reserveCapacity(argumentValues.toList.count)
-        for value in argumentValues.toList {
-            if value.isNull || value.isUndefined {
-                arguments.append(nil)
-                continue
-            }
-            guard let fieldValue = AnnotatedGravityValueBridge.makeReflectedFieldValue(value) else {
-                reportDiagnostic("AdaScript component constructor received an unsupported value")
-                return AnnotatedGravityComponentValue()
-            }
-            arguments.append(fieldValue)
-        }
+        guard let arguments = arguments(from: argumentValues) else { return AnnotatedGravityComponentValue() }
 
         do {
             return AnnotatedGravityComponentValue(
@@ -160,5 +184,62 @@ final class AnnotatedGravityComponentFactory: @unchecked Sendable {
             reportDiagnostic(String(describing: error))
             return AnnotatedGravityComponentValue()
         }
+    }
+
+    func makeNamed(_ name: String, _ argumentValues: GSValue) -> AnnotatedGravityComponentValue {
+        guard let arguments = arguments(from: argumentValues) else { return AnnotatedGravityComponentValue() }
+        if let constructor = constructorsByName[name] {
+            do {
+                return AnnotatedGravityComponentValue(component: try constructor.construct(arguments: arguments))
+            } catch {
+                reportDiagnostic(String(describing: error))
+                return AnnotatedGravityComponentValue()
+            }
+        }
+        guard let descriptor = runtimeDescriptorsByName[name] else {
+            reportDiagnostic("Unknown AdaScript component constructor '\(name)'")
+            return AnnotatedGravityComponentValue()
+        }
+        guard arguments.count == descriptor.defaultValues.count else {
+            reportDiagnostic("AdaScript component '\(name)' expected \(descriptor.defaultValues.count) arguments")
+            return AnnotatedGravityComponentValue()
+        }
+        var values = descriptor.defaultValues
+        for index in arguments.indices {
+            if let value = arguments[index] {
+                guard descriptor.fields[index].accepts(value) else {
+                    reportDiagnostic("AdaScript component '\(name)' received an invalid value for '\(descriptor.fields[index].key)'")
+                    return AnnotatedGravityComponentValue()
+                }
+                values[index] = value
+            }
+        }
+        return AnnotatedGravityComponentValue(
+            component: RuntimeComponentPayload(
+                componentID: descriptor.componentID,
+                stableID: descriptor.stableID,
+                values: values
+            )
+        )
+    }
+
+    private func arguments(from argumentValues: GSValue) -> [ReflectedFieldValue?]? {
+        guard argumentValues.isList else {
+            reportDiagnostic("AdaScript component constructor arguments must be a list")
+            return nil
+        }
+        var arguments: [ReflectedFieldValue?] = []
+        arguments.reserveCapacity(argumentValues.toList.count)
+        for value in argumentValues.toList {
+            if value.isNull || value.isUndefined {
+                arguments.append(nil)
+            } else if let fieldValue = AnnotatedGravityValueBridge.makeReflectedFieldValue(value) {
+                arguments.append(fieldValue)
+            } else {
+                reportDiagnostic("AdaScript component constructor received an unsupported value")
+                return nil
+            }
+        }
+        return arguments
     }
 }

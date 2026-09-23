@@ -1,29 +1,22 @@
-import { ArenaGame } from "./ArenaState.ada";
+import { ArenaGame, ArenaPlayer } from "./ArenaState.ada";
 
 @after(id: "arena.gameplay")
 @system(scheduler: "update", id: "arena.presentation")
 class ArenaPresentationSystem {
-    @res var multiplayer: AdaScriptMultiplayerState;
+    @query(ArenaPlayer) var players;
     @query(Transform, Sprite) var visuals;
 
     func update(context) {
-        var snapshot = multiplayer.receivedSnapshot;
-        if (multiplayer.role == "host") snapshot = multiplayer.publishedSnapshot;
-
-        var index = 0;
-        while (index + 7 < snapshot.count) {
-            var peer = snapshot[index];
+        for (var row in players) {
+            var peer = row.arenaPlayer.peer;
             var state = [
-                snapshot[index + 1], snapshot[index + 2], snapshot[index + 3],
-                snapshot[index + 4], snapshot[index + 5], snapshot[index + 6],
-                snapshot[index + 7]
+                row.arenaPlayer.x, row.arenaPlayer.y, row.arenaPlayer.health,
+                row.arenaPlayer.facing, row.arenaPlayer.attackSequence,
+                row.arenaPlayer.respawn, row.arenaPlayer.variant
             ];
             ensureVisuals(peer, state, context);
             presentAttack(peer, state, context);
-            ArenaGame.players[peer] = [
-                state[0], state[1], state[2], state[3], state[4], 0, state[5], state[6]
-            ];
-            index += 8;
+            ArenaGame.presentedPlayers[peer] = state;
         }
 
         for (var row in visuals) {
@@ -35,22 +28,30 @@ class ArenaPresentationSystem {
         if (ArenaGame.playerEntities[peer] == null) {
             ArenaGame.playerEntities[peer] = spawnVisual(
                 Vector3(state[0], state[1], 4.0),
-                context
+                context,
+                playerTexture(state[6])
             );
         }
         if (ArenaGame.heartEntities[peer] == null) {
             ArenaGame.heartEntities[peer] = [
-                spawnVisual(Vector3(state[0] - 17.0, state[1] + 36.0, 7.0), context),
-                spawnVisual(Vector3(state[0], state[1] + 36.0, 7.0), context),
-                spawnVisual(Vector3(state[0] + 17.0, state[1] + 36.0, 7.0), context)
+                spawnVisual(Vector3(state[0] - 17.0, state[1] + 36.0, 7.0), context, null),
+                spawnVisual(Vector3(state[0], state[1] + 36.0, 7.0), context, null),
+                spawnVisual(Vector3(state[0] + 17.0, state[1] + 36.0, 7.0), context, null)
             ];
         }
     }
 
-    func spawnVisual(position, context) {
+    func playerTexture(variant) {
+        if (variant == 1) return "@res://Tiles/tile_0097.png";
+        if (variant == 2) return "@res://Tiles/tile_0098.png";
+        if (variant == 3) return "@res://Tiles/tile_0100.png";
+        return "@res://Tiles/tile_0096.png";
+    }
+
+    func spawnVisual(position, context, texture) {
         return context.world.spawn([
             Transform(position: position, scale: Vector3(2, 2, 2)),
-            Sprite()
+            Sprite(texture: texture)
         ]);
     }
 
@@ -59,22 +60,22 @@ class ArenaPresentationSystem {
         if (previous != null && previous != state[4]) {
             var oldSword = ArenaGame.swords[peer];
             if (oldSword != null) context.world.commands.despawn(oldSword[0]);
-            var sword = spawnVisual(Vector3(state[0], state[1], 8.0), context);
+            var sword = spawnVisual(Vector3(state[0], state[1], 8.0), context, "@res://Tiles/tile_0103.png");
             ArenaGame.swords[peer] = [sword, 0.18, state[3], state[0], state[1]];
         }
         ArenaGame.lastPresentedAttack[peer] = state[4];
     }
 
     func updateVisual(row, context) {
-        for (var peer in ArenaGame.players.keys()) {
-            var player = ArenaGame.players[peer];
+        for (var peer in ArenaGame.presentedPlayers.keys()) {
+            var player = ArenaGame.presentedPlayers[peer];
             if (row.id == ArenaGame.playerEntities[peer]) {
                 row.transform.position = [player[0], player[1], 4.0];
-                row.transform.scale = [42.0, 46.0, 1.0];
+                row.transform.scale = [2.625, 2.625, 1.0];
                 row.sprite.flipX = player[3] == 2;
                 var alpha = 1.0;
                 if (player[2] <= 0) alpha = 0.25;
-                row.sprite.tintColor = ArenaGame.playerColor(player[7], alpha);
+                row.sprite.tintColor = [1.0, 1.0, 1.0, alpha];
             }
 
             var hearts = ArenaGame.heartEntities[peer];
@@ -102,8 +103,7 @@ class ArenaPresentationSystem {
                     if (sword[2] == 2) offsetX = -34.0;
                     if (sword[2] == 3) offsetX = 34.0;
                     row.transform.position = [sword[3] + offsetX, sword[4] + offsetY, 8.0];
-                    if (sword[2] < 2) row.transform.scale = [8.0, 38.0, 1.0];
-                    else row.transform.scale = [38.0, 8.0, 1.0];
+                    row.transform.scale = [2.125, 2.125, 1.0];
                     row.sprite.tintColor = [0.92, 0.94, 1.0, sword[1] / 0.18];
                     if (sword[1] <= 0.0) {
                         context.world.commands.despawn(sword[0]);

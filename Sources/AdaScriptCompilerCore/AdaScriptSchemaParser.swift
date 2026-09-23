@@ -56,6 +56,15 @@ public enum AdaScriptSchemaParser {
         return bindings
     }
 
+    public static func parseRPCMethodBindings(sources: [AdaScriptCompilerSource]) throws -> [AdaScriptRPCMethodBinding] {
+        var bindings: [AdaScriptRPCMethodBinding] = []
+        for source in sources.sorted(by: { $0.path < $1.path }) {
+            var parser = Parser(source: source.source, path: source.path)
+            bindings += try parser.parse().rpcMethodBindings
+        }
+        return bindings
+    }
+
     public static func parseScriptables(sources: [AdaScriptCompilerSource]) throws -> [AdaScriptableSchema] {
         var schemas: [AdaScriptableSchema] = []
         for source in sources.sorted(by: { $0.path < $1.path }) {
@@ -172,6 +181,7 @@ struct Parser {
     struct Output {
         var networkCommands: [AdaScriptNetworkCommandSchema] = []
         var remoteCommandBindings: [AdaScriptRemoteCommandBinding] = []
+        var rpcMethodBindings: [AdaScriptRPCMethodBinding] = []
         var resourceBindings: [AdaScriptResourceBinding] = []
         var schemas: [AdaScriptDataSchema] = []
         var scriptables: [AdaScriptableSchema] = []

@@ -53,7 +53,7 @@ enum EditorDocumentationWindowController {
                 return nil
             }
             switch command {
-            case .closeEditor:
+            case .closeEditor, .closeEditorTab:
                 window.close()
             case .navigateBack:
                 coordinator.model?.goBack()

@@ -59,13 +59,12 @@ struct EditorGravityLanguageService: Sendable {
         position: EditorSourceLocation
     ) -> EditorSourceSymbolTarget? {
         workspace.change(uri: uri, text: text, version: nil)
-        guard
-            let definition = workspace.definition(
+        let sourcePosition = lspPosition(from: position, in: text)
+        guard let definition = workspace.definition(
                 uri: uri,
-                position: lspPosition(from: position, in: text)
-            )
-        else {
-            return nil
+                position: sourcePosition
+            ) else {
+            return AdaScriptSwiftSourceResolver.definition(text: text, position: position)
         }
         let targetText = workspace.text(for: definition.uri) ?? ""
         let fileURL = URL(string: definition.uri)
@@ -86,7 +85,7 @@ struct EditorGravityLanguageService: Sendable {
         workspace.setHostConstructors(hostConstructors())
         workspace.change(uri: uri, text: text, version: nil)
         guard let hover = workspace.hover(uri: uri, position: lspPosition(from: position, in: text)) else {
-            return nil
+            return AdaScriptSwiftSourceResolver.hover(text: text, position: position)
         }
         return EditorSymbolHover(contents: hover.contents, range: editorRange(from: hover.range, in: text))
     }

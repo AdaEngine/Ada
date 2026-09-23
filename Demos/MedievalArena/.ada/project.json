@@ -1,111 +1,169 @@
 {
-  "ai": {
-    "mcp": {
-      "allowedResourceRoots": [],
-      "enabled": true
+  "ai" : {
+    "mcp" : {
+      "allowedResourceRoots" : [
+
+      ],
+      "enabled" : true
     }
   },
-  "build": {
-    "excludedFiles": [],
-    "includedFiles": [],
-    "system": "adascript",
-    "targets": []
+  "build" : {
+    "excludedFiles" : [
+
+    ],
+    "includedFiles" : [
+
+    ],
+    "system" : "adascript",
+    "targets" : [
+
+    ]
   },
-  "editor": {
-    "startupScene": "Assets/Scenes/Main.ascn"
+  "editor" : {
+    "startupScene" : "Assets/Scenes/Main.ascn"
   },
-  "engine": {},
-  "inputActions": [
+  "engine" : {
+
+  },
+  "inputActions" : [
     {
-      "bindings": [
-        { "key": { "_0": "w" } },
-        { "key": { "_0": "126" } }
+      "bindings" : [
+        {
+          "key" : {
+            "_0" : "w"
+          }
+        },
+        {
+          "key" : {
+            "_0" : "126"
+          }
+        }
       ],
-      "deadZone": 0.2,
-      "name": "MoveUp"
+      "deadZone" : 0.2,
+      "name" : "MoveUp"
     },
     {
-      "bindings": [
-        { "key": { "_0": "s" } },
-        { "key": { "_0": "125" } }
+      "bindings" : [
+        {
+          "key" : {
+            "_0" : "s"
+          }
+        },
+        {
+          "key" : {
+            "_0" : "125"
+          }
+        }
       ],
-      "deadZone": 0.2,
-      "name": "MoveDown"
+      "deadZone" : 0.2,
+      "name" : "MoveDown"
     },
     {
-      "bindings": [
-        { "key": { "_0": "a" } },
-        { "key": { "_0": "123" } }
+      "bindings" : [
+        {
+          "key" : {
+            "_0" : "a"
+          }
+        },
+        {
+          "key" : {
+            "_0" : "123"
+          }
+        }
       ],
-      "deadZone": 0.2,
-      "name": "MoveLeft"
+      "deadZone" : 0.2,
+      "name" : "MoveLeft"
     },
     {
-      "bindings": [
-        { "key": { "_0": "d" } },
-        { "key": { "_0": "124" } }
+      "bindings" : [
+        {
+          "key" : {
+            "_0" : "d"
+          }
+        },
+        {
+          "key" : {
+            "_0" : "124"
+          }
+        }
       ],
-      "deadZone": 0.2,
-      "name": "MoveRight"
+      "deadZone" : 0.2,
+      "name" : "MoveRight"
     },
     {
-      "bindings": [
-        { "key": { "_0": " " } }
+      "bindings" : [
+        {
+          "key" : {
+            "_0" : " "
+          }
+        }
       ],
-      "deadZone": 0.2,
-      "name": "Attack"
+      "deadZone" : 0.2,
+      "name" : "Attack"
     }
   ],
-  "paths": {
-    "assets": "Assets",
-    "resourceRoots": [
+  "paths" : {
+    "assets" : "Assets",
+    "resourceRoots" : [
       "Assets"
     ],
-    "run": {
-      "workingDirectory": "."
+    "run" : {
+      "workingDirectory" : "."
     },
-    "sources": "Sources"
+    "sources" : "Sources"
   },
-  "project": {
-    "displayName": "Medieval Arena",
-    "name": "MedievalArena"
+  "project" : {
+    "displayName" : "Medieval Arena",
+    "name" : "MedievalArena"
   },
-  "run": {
-    "arguments": [],
-    "destination": "macos",
-    "environment": {},
-    "workingDirectory": "."
-  },
-  "runtime": {
-    "entry": {
-      "scene": "Assets/Scenes/Main.ascn"
+  "run" : {
+    "arguments" : [
+
+    ],
+    "destination" : "macos",
+    "environment" : {
+
     },
-    "moduleName": "MedievalArenaGame",
-    "plugins": {
-      "disable": [],
-      "enable": [
+    "workingDirectory" : "."
+  },
+  "runtime" : {
+    "entry" : {
+      "scene" : "Assets/Scenes/Main.ascn"
+    },
+    "moduleName" : "MedievalArenaGame",
+    "plugins" : {
+      "disable" : [
+
+      ],
+      "enable" : [
         "multiplayer"
       ],
-      "preset": "game2d",
-      "presetVersion": 1,
-      "settings": {
-        "multiplayer": {
-          "buildIdentifier": "1",
-          "gameIdentifier": "org.adaengine.medieval-arena",
-          "host": "::1",
-          "peerIndex": 1,
-          "port": 37778,
-          "role": "host"
+      "preset" : "game2d",
+      "presetVersion" : 1,
+      "settings" : {
+        "multiplayer" : {
+          "buildIdentifier" : "1",
+          "gameIdentifier" : "org.adaengine.medieval-arena",
+          "host" : "::1",
+          "peerIndex" : 1,
+          "port" : 37778,
+          "role" : "host"
+        },
+        "physics2d" : {
+          "gravity" : [
+            0,
+            -9.81
+          ]
         }
       }
     },
-    "window": {
-      "isResizable": true,
-      "size": {
-        "height": 640,
-        "width": 960
+    "window" : {
+      "isResizable" : true,
+      "size" : {
+        "height" : 640,
+        "width" : 960
       }
     }
   },
-  "schemaVersion": 3
+  "schemaVersion" : 3
 }

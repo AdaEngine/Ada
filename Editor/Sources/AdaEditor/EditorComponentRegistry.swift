@@ -324,6 +324,9 @@ enum EditorComponentRegistry {
         if let descriptor = overrideDescriptorsByName[typeName] {
             return try descriptor.decode(payload)
         }
+        if typeName == String(reflecting: NoFrustumCulling.self) {
+            return NoFrustumCulling()
+        }
 
         guard
             let componentType = RuntimeTypeRegistry.componentType(named: typeName),

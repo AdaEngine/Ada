@@ -43,6 +43,9 @@ struct EditorContextualInspector: View {
         case let .text(document):
             return AnyView(EditorFileInspector(document: .text(document)))
         case let .asset(document):
+            if document.kind == .tileSource {
+                return AnyView(EditorTileSourceAssetEditor(document: document, model: workbench.tileSourceModel(for: document)).inspector)
+            }
             return AnyView(EditorFileInspector(document: .asset(document)))
         case let .git(document):
             return AnyView(EditorFileInspector(document: .git(document)))

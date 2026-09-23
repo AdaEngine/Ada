@@ -165,6 +165,68 @@ extension AppWorlds {
 }
 
 extension MultiplayerRegistry {
+    mutating func registerRuntimeComponent(
+        _ descriptor: RuntimeComponentDescriptor,
+        schema: NetworkTypeDescriptor,
+        fieldIndices: [UInt16: Int]
+    ) {
+        precondition(schema.kind == .component, "Runtime replication schema must describe a component")
+        precondition(replicatedComponentsByTypeID[schema.typeID] == nil, "Network component identifier \(schema.typeID) is already registered")
+        let replicated = ReplicatedComponentDescriptor(
+            schema: schema,
+            componentID: descriptor.componentID,
+            encode: { world, entity, codec in
+                guard let component = world.getRuntimeComponent(descriptor.componentID, from: entity) else {
+                    return nil
+                }
+                let values = Dictionary(uniqueKeysWithValues: fieldIndices.compactMap { tag, index -> (UInt16, ReflectedFieldValue)? in
+                    guard component.values.indices.contains(index) else { return nil }
+                    return (tag, component.values[index])
+                })
+                return try codec.encode(RuntimeTaggedComponentPayload(values: values))
+            },
+            apply: { data, world, entity, codec in
+                let payload = try codec.decode(RuntimeTaggedComponentPayload.self, from: data)
+                var component = world.getRuntimeComponent(descriptor.componentID, from: entity) ?? descriptor.makeDefault()
+                for (tag, value) in payload.values {
+                    guard
+                        let index = fieldIndices[tag],
+                        component.values.indices.contains(index),
+                        descriptor.fields[index].accepts(value)
+                    else {
+                        continue
+                    }
+                    component.values[index] = value
+                }
+                world.insertRuntimeComponent(component, for: entity)
+            },
+            remove: { world, entity in
+                world.remove(descriptor.componentID, from: entity)
+            },
+            interpolate: { previous, current, alpha, codec in
+                let lhs = try codec.decode(RuntimeTaggedComponentPayload.self, from: previous)
+                let rhs = try codec.decode(RuntimeTaggedComponentPayload.self, from: current)
+                var values = rhs.values
+                for field in schema.fields where field.interpolation == .linear {
+                    guard let previousValue = lhs.values[field.tag], let currentValue = rhs.values[field.tag] else {
+                        continue
+                    }
+                    switch (previousValue, currentValue) {
+                    case let (.double(lhs), .double(rhs)):
+                        values[field.tag] = .double(lhs + (rhs - lhs) * Double(alpha))
+                    case let (.int(lhs), .int(rhs)):
+                        values[field.tag] = .int(Int((Double(lhs) + (Double(rhs - lhs) * Double(alpha))).rounded()))
+                    default:
+                        continue
+                    }
+                }
+                return try codec.encode(RuntimeTaggedComponentPayload(values: values))
+            }
+        )
+        replicatedComponentsByTypeID[schema.typeID] = replicated
+        replicatedTypeIDByComponentID[descriptor.componentID] = schema.typeID
+    }
+
     mutating func registerBuiltInComponents() {
         register(
             NetworkOwner.self,
@@ -189,5 +251,54 @@ extension MultiplayerRegistry {
                 )
             }
         )
+    }
+}
+
+private struct RuntimeTaggedComponentPayload: Codable, Sendable {
+    let values: [UInt16: ReflectedFieldValue]
+
+    init(values: [UInt16: ReflectedFieldValue]) {
+        self.values = values
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let values = try container.decode([String: ReflectedFieldValue].self)
+        self.values = try Dictionary(uniqueKeysWithValues: values.map { key, value in
+            guard let tag = UInt16(key), tag > 0 else {
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid network field tag")
+            }
+            return (tag, value)
+        })
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(Dictionary(uniqueKeysWithValues: values.map { (String($0.key), $0.value) }))
+    }
+}
+
+extension AppWorlds {
+    /// Registers replication for a component whose layout is defined by a portable runtime schema.
+    @discardableResult
+    public func registerReplicatedRuntimeComponent(
+        _ descriptor: RuntimeComponentDescriptor,
+        schema: NetworkTypeDescriptor,
+        fieldIndices: [UInt16: Int]
+    ) -> Self {
+        guard getResource(MultiplayerRegistry.self) != nil else {
+            preconditionFailure("Add MultiplayerPlugin before registering network components")
+        }
+        main.registerRequiredComponent(
+            ReplicatedEntity.self,
+            forRuntimeComponent: descriptor.componentID,
+            constructor: { ReplicatedEntity() }
+        )
+        getRefResource(MultiplayerRegistry.self).wrappedValue.registerRuntimeComponent(
+            descriptor,
+            schema: schema,
+            fieldIndices: fieldIndices
+        )
+        return self
     }
 }

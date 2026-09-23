@@ -4,6 +4,32 @@ import AdaScriptCompilerCore
 import Gravity
 
 enum AdaScriptNetworkBridge {
+    static func descriptor(for schema: AdaScriptDataSchema) throws -> NetworkTypeDescriptor {
+        guard schema.kind == .component, let replication = schema.replication else {
+            throw AdaScriptError.invalidManifest("'\(schema.name)' is not a replicated component")
+        }
+        guard let version = UInt16(exactly: replication.version) else {
+            throw AdaScriptError.invalidManifest("Replicated component '\(schema.name)' version is out of range")
+        }
+        let authority: NetworkAuthority = replication.authority == "host" ? .host : .anyPeer
+        return NetworkTypeDescriptor(
+            typeID: schema.id,
+            version: version,
+            kind: .component,
+            authority: authority,
+            visibility: .allPeers,
+            fields: try schema.fields.compactMap { field in
+                guard let network = field.network else { return nil }
+                return NetworkFieldDescriptor(
+                    tag: network.tag,
+                    wireType: wireType(for: field.defaultValue),
+                    replication: try replicationMode(network.mode),
+                    interpolation: try interpolationMode(network.interpolation)
+                )
+            }
+        )
+    }
+
     static func descriptor(for schema: AdaScriptNetworkCommandSchema) throws -> NetworkTypeDescriptor {
         guard let version = UInt16(exactly: schema.version) else {
             throw AdaScriptError.invalidManifest("Network command '\(schema.name)' version is out of range")

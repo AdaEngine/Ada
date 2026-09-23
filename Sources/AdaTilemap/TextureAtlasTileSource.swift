@@ -42,6 +42,22 @@ public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
         super.init()
     }
 
+    /// Copy a loaded source into another tile set without changing the original asset's owner.
+    func copyForTileMap() throws -> TextureAtlasTileSource {
+        guard let textureAtlas else {
+            throw AssetDecodingError.decodingProblem("Tile source image is not loaded.")
+        }
+        let copy = TextureAtlasTileSource(atlas: textureAtlas)
+        copy.name = name
+        copy.tiles = tiles
+        copy.imageDescriptor = imageDescriptor
+        return copy
+    }
+
+    func containsTile(at coordinates: PointInt) -> Bool {
+        tiles[coordinates] != nil
+    }
+
     // MARK: - Codable
 
     enum CodingKeys: CodingKey {

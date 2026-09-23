@@ -17,6 +17,11 @@ class MovementSystem {
 The scheduler defaults to `update`. System identifiers must be unique within a
 script module.
 
+For one-time world setup, use `@system(scheduler: "startup")`. Its
+`update(context)` runs on the default scheduler runner's first update, before
+the regular frame stages. A script class constructor does not receive a world
+context. See <doc:AdaScriptAnnotations> for all annotation arguments.
+
 ## Order systems
 
 Use repeatable `@after` and `@before` annotations when component and resource

@@ -1,3 +1,4 @@
+@_spi(AdaEngine) import AdaEngine
 import Foundation
 import Testing
 
@@ -43,9 +44,9 @@ struct ProjectOpeningTemplateTests {
         #expect(report.entryView == "game.main")
     }
 
-    @Test("AdaScript project reports native data schemas instead of compiling Swift")
+    @Test("AdaScript project accepts portable runtime components without compiling Swift")
     @MainActor
-    func adaScriptProjectRejectsNativeDataGeneration() throws {
+    func adaScriptProjectAcceptsRuntimeComponents() throws {
         let rootURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("EditorAdaScriptDataProject-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
@@ -56,20 +57,52 @@ struct ProjectOpeningTemplateTests {
         .createProject(named: "Runtime Data", at: rootURL, template: .adaScript)
         let projectURL = URL(fileURLWithPath: reference.path, isDirectory: true)
         let mainURL = projectURL.appendingPathComponent("Sources/Main.ada")
-        try """
+        let originalSource = try String(contentsOf: mainURL, encoding: .utf8)
+        try (originalSource + "\n" + """
         @component(id: "game.health")
         struct Health {
             @export
             var current = 100.0;
         }
-        """
+        """)
         .write(to: mainURL, atomically: true, encoding: .utf8)
         let project = try ProjectSystem.loadProject(at: projectURL)
 
-        #expect(throws: EditorAdaScriptProjectBuildError.nativeDataRequiresRuntimeLayout(names: ["Health"])) {
-            try EditorAdaScriptProjectBuilder().build(project: project, at: projectURL)
-        }
+        let report = try EditorAdaScriptProjectBuilder().build(project: project, at: projectURL)
+        #expect(report.sourceCount == 1)
         #expect(!FileManager.default.fileExists(atPath: projectURL.appendingPathComponent("Package.swift").path))
+    }
+
+    @Test("Medieval Arena portable project prepares for Play")
+    @MainActor
+    func medievalArenaPreparesForPlay() throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "Medieval Arena renderer setup")))
+        }
+        EditorComponentRegistry.registerBuiltIns()
+        let projectURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Demos/MedievalArena", isDirectory: true)
+        let project = try ProjectSystem.loadProject(at: projectURL)
+        let artifact = try EditorAdaScriptProjectBuilder().prepare(project: project, at: projectURL)
+        let view = try EditorAdaScriptProjectRuntimeView(artifact: artifact)
+        let scene = try #require(artifact.sceneModel)
+        let world = World(name: "Medieval Arena Play validation")
+        let loaded = EditorSceneFileLoader.load(
+            model: scene,
+            into: world,
+            resourceRootURL: artifact.assetsDirectory
+        )
+
+        #expect(artifact.report.sourceCount == 4)
+        #expect(artifact.report.systemCount == 3)
+        #expect(loaded.entityCount == 5)
+        #expect(loaded.warnings.isEmpty)
+        _ = view
     }
 
     @Test("launcher exposes project, template, and sample sections with both language templates")

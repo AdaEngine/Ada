@@ -11,6 +11,21 @@ extension Parser {
                 try parseStruct(annotations: annotations, output: &output)
                 continue
             }
+            if match("func") {
+                if let rpc = annotations.first(where: { $0.name == "rpc" }) {
+                    guard annotations.count == 1 else {
+                        throw error("@rpc cannot be combined with other declaration annotations")
+                    }
+                    let parsed = try parseRPCFunction(annotation: rpc)
+                    guard !parsed.hasBody else {
+                        throw error("@rpc method bodies must be declared inside an @system class")
+                    }
+                    output.networkCommands.append(parsed.schema)
+                } else {
+                    try skipFunctionDeclaration()
+                }
+                continue
+            }
             advance()
         }
         return output
@@ -44,6 +59,8 @@ extension Parser {
             let system = try parseSystemBody(systemName: name)
             output.resourceBindings += system.resourceBindings
             output.remoteCommandBindings += system.remoteCommandBindings
+            output.networkCommands += system.networkCommands
+            output.rpcMethodBindings += system.rpcMethodBindings
             output.systemCapabilities.append(system.capabilities)
         } else if let annotation = annotations.first(where: { $0.name == "scriptable" }) {
             output.scriptables.append(try parseScriptable(name: name, annotation: annotation))
@@ -312,6 +329,8 @@ extension Parser {
     ) throws -> (
         resourceBindings: [AdaScriptResourceBinding],
         remoteCommandBindings: [AdaScriptRemoteCommandBinding],
+        networkCommands: [AdaScriptNetworkCommandSchema],
+        rpcMethodBindings: [AdaScriptRPCMethodBinding],
         capabilities: AdaScriptSystemCapabilities
     ) {
         guard match("{") else {
@@ -319,6 +338,8 @@ extension Parser {
         }
         var bindings: [AdaScriptResourceBinding] = []
         var remoteCommandBindings: [AdaScriptRemoteCommandBinding] = []
+        var networkCommands: [AdaScriptNetworkCommandSchema] = []
+        var rpcMethodBindings: [AdaScriptRPCMethodBinding] = []
         var depth = 1
         var usesDeferredCommands = false
         while !isAtEnd, depth > 0 {
@@ -327,7 +348,23 @@ extension Parser {
                 || checkSequence(["context", ".", "world", ".", "commands"])
                 || checkSequence(["context", ".", "world", ".", "spawn"])
             if depth == 1 {
-                let parsedBindings = try parseSystemBindings(systemName: systemName)
+                let annotations = try parseAnnotations()
+                if let rpc = annotations.first(where: { $0.name == "rpc" }) {
+                    guard annotations.count == 1, match("func") else {
+                        throw error("@rpc in \(systemName) must annotate a method")
+                    }
+                    let parsed = try parseRPCFunction(annotation: rpc)
+                    networkCommands.append(parsed.schema)
+                    if parsed.hasBody {
+                        rpcMethodBindings.append(AdaScriptRPCMethodBinding(
+                            commandName: parsed.schema.name,
+                            fieldNames: parsed.schema.fields.map(\.name),
+                            systemName: systemName
+                        ))
+                    }
+                    continue
+                }
+                let parsedBindings = try parseSystemBindings(systemName: systemName, annotations: annotations)
                 if let resource = parsedBindings.resource {
                     bindings.append(resource)
                     continue
@@ -345,6 +382,8 @@ extension Parser {
         return (
             bindings,
             remoteCommandBindings,
+            networkCommands,
+            rpcMethodBindings,
             AdaScriptSystemCapabilities(
                 systemName: systemName,
                 usesDeferredCommands: usesDeferredCommands
@@ -353,9 +392,9 @@ extension Parser {
     }
 
     private mutating func parseSystemBindings(
-        systemName: String
+        systemName: String,
+        annotations: [Annotation]
     ) throws -> (resource: AdaScriptResourceBinding?, remoteCommands: AdaScriptRemoteCommandBinding?) {
-        let annotations = try parseAnnotations()
         if let remoteCommands = annotations.first(where: { $0.name == "remote_commands" }) {
             guard
                 annotations.count == 1,
@@ -534,9 +573,73 @@ extension Parser {
         guard !fields.isEmpty, fields.allSatisfy({ $0.network != nil }) else {
             throw error("@network_command \(name) requires every field to use @network_field")
         }
+        return try makeNetworkCommand(name: name, fields: fields, annotation: annotation)
+    }
+
+    private mutating func parseRPCFunction(annotation: Annotation) throws -> (schema: AdaScriptNetworkCommandSchema, hasBody: Bool) {
+        guard let name = consumeIdentifier(), match("(") else {
+            throw error("@rpc must annotate a function with parameters")
+        }
+        var fields: [AdaScriptSchemaField] = []
+        var tags = Set<UInt16>()
+        while !isAtEnd, !check(")") {
+            let annotations = try parseAnnotations()
+            guard
+                annotations.count == 1,
+                let network = annotations.first,
+                network.name == "network_field",
+                let fieldName = consumeIdentifier()
+            else {
+                throw error("@rpc \(name) requires @network_field on every parameter")
+            }
+            if match(":") {
+                guard consumeIdentifier() != nil else {
+                    throw error("@rpc \(name) parameter '\(fieldName)' has no type")
+                }
+            }
+            guard match("=") else {
+                throw error("@rpc \(name) parameter '\(fieldName)' requires a constant default")
+            }
+            let defaultValue = try parseFieldValue(fieldName: fieldName)
+            let networkField = try parseNetworkField(network, fieldName: fieldName)
+            guard tags.insert(networkField.tag).inserted else {
+                throw error("duplicate network field tag \(networkField.tag) in \(name)")
+            }
+            fields.append(AdaScriptSchemaField(defaultValue: defaultValue, name: fieldName, network: networkField))
+            if !match(",") { break }
+        }
+        guard match(")"), !fields.isEmpty else {
+            throw error("@rpc \(name) requires at least one tagged parameter")
+        }
+        var hasBody = false
+        if match("{") {
+            hasBody = !check("}")
+            var depth = 1
+            while !isAtEnd, depth > 0 {
+                advanceSystemBody(depth: &depth)
+            }
+            guard depth == 0 else {
+                throw error("unterminated @rpc body in \(name)")
+            }
+        } else {
+            guard match(";") else {
+                throw error("@rpc \(name) must end with ';' or an empty body")
+            }
+        }
+        if hasBody, fields.contains(where: { $0.name == "source" }) {
+            throw error("@rpc \(name) reserves 'source' for the authenticated sender")
+        }
+        return (try makeNetworkCommand(name: name, fields: fields, annotation: annotation), hasBody)
+    }
+
+    private func makeNetworkCommand(
+        name: String,
+        fields: [AdaScriptSchemaField],
+        annotation: Annotation
+    ) throws -> AdaScriptNetworkCommandSchema {
         let allowed = Set(["id", "version", "direction", "delivery", "channel", "maximumPayloadSize"])
         guard annotation.positionalArguments.isEmpty, annotation.arguments.keys.allSatisfy(allowed.contains) else {
-            throw error("@network_command contains an unsupported argument")
+            throw error("@\(annotation.name) contains an unsupported argument")
         }
         let channel = try annotationString(annotation, key: "channel", default: "command")
         let delivery = try annotationString(annotation, key: "delivery", default: "reliable_ordered")
@@ -545,7 +648,7 @@ extension Parser {
             ["reliable_ordered", "unreliable", "unreliable_sequenced"].contains(delivery),
             ["peer_to_host", "host_to_peer", "bidirectional"].contains(direction)
         else {
-            throw error("@network_command has unsupported direction, delivery, or channel")
+            throw error("@\(annotation.name) has unsupported direction, delivery, or channel")
         }
         return AdaScriptNetworkCommandSchema(
             channel: channel,
@@ -727,6 +830,12 @@ extension Parser {
                 advance()
             }
         }
+    }
+
+    private mutating func skipFunctionDeclaration() throws {
+        while !isAtEnd, !check("{"), !check(";") { advance() }
+        if match(";") { return }
+        try skipDeclarationBody()
     }
 
     private var current: Token? { tokens.indices.contains(index) ? tokens[index] : nil }

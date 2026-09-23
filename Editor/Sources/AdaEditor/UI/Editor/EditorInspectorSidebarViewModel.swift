@@ -84,6 +84,7 @@ final class EditorInspectorSidebarViewModel {
     var componentSearchText = ""
     var scriptableObjectCatalog: [EditorScriptableObjectDescriptor] = []
     var textureAssets: [TextureAsset] = []
+    var tileMapAssets: [TextureAsset] = []
     var sceneAssets: [SceneAsset] = []
     var uiSourcePaths: [String] = []
     var uiSceneFiles: [String: String] = [:]
@@ -265,6 +266,14 @@ final class EditorInspectorSidebarViewModel {
             return textureAssets
         }
         return textureAssets.filter {
+            $0.name.lowercased().contains(normalizedQuery) || $0.reference.lowercased().contains(normalizedQuery)
+        }
+    }
+
+    func tileMapAssets(matching query: String) -> [TextureAsset] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedQuery.isEmpty else { return tileMapAssets }
+        return tileMapAssets.filter {
             $0.name.lowercased().contains(normalizedQuery) || $0.reference.lowercased().contains(normalizedQuery)
         }
     }

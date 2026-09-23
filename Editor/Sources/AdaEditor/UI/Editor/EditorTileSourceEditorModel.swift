@@ -3,10 +3,16 @@ import Foundation
 import Observation
 import Yams
 
+struct EditorTileSourcePreview {
+    let image: Image
+    let layout: TileSourceImageDescriptor
+}
+
 @Observable
 @MainActor
 final class EditorTileSourceEditorModel {
     private(set) var image: Image?
+    private(set) var previews: [EditorTileSourcePreview?] = []
     private(set) var sources: [[String: Any]] = []
     private(set) var selectedSource = 0
     private(set) var selectedTile: PointInt?
@@ -79,6 +85,7 @@ final class EditorTileSourceEditorModel {
             }
             root = parsed
             sources = loadedSources
+            previews = loadedSources.indices.map { loadPreview(at: $0) }
             savedData = data
             displayWidth = String(x)
             displayHeight = String(y)
@@ -99,37 +106,38 @@ final class EditorTileSourceEditorModel {
         image = nil
         layout = nil
         name = sourceNameSafely(index)
-        guard
-            sources.indices.contains(index),
-            sources[index]["type"] as? String == String(reflecting: TextureAtlasTileSource.self),
-            let raw = sourceData["image"], let url
-        else {
+        guard sources.indices.contains(index) else { return }
+        guard let preview = previews[index] else {
             if !sources.isEmpty {
-                status = "This source uses a legacy atlas or a custom type. Its data is preserved."
+                status = "Image preview unavailable. Legacy or custom source data is preserved."
             }
             return
         }
+        layout = preview.layout
+        image = preview.image
+        width = String(preview.layout.tileSize.width)
+        height = String(preview.layout.tileSize.height)
+        marginX = String(preview.layout.margin.width)
+        marginY = String(preview.layout.margin.height)
+        spacingX = String(preview.layout.spacing.width)
+        spacingY = String(preview.layout.spacing.height)
+        status = "Click a cell to inspect it. Add tiles individually or create the whole grid."
+    }
+
+    private func loadPreview(at index: Int) -> EditorTileSourcePreview? {
+        guard sources.indices.contains(index),
+              sources[index]["type"] as? String == String(reflecting: TextureAtlasTileSource.self),
+              let data = sources[index]["data"] as? [String: Any],
+              let raw = data["image"], let url else { return nil }
         do {
             let settings = try YAMLDecoder().decode(TileSourceImageDescriptor.self, from: Yams.dump(object: raw))
             try settings.validate()
-            layout = settings
-            width = String(settings.tileSize.width)
-            height = String(settings.tileSize.height)
-            marginX = String(settings.margin.width)
-            marginY = String(settings.margin.height)
-            spacingX = String(settings.spacing.width)
-            spacingY = String(settings.spacing.height)
             let path = settings.resolvedPath(relativeTo: url.deletingLastPathComponent())
-            if path.hasPrefix("@res://") {
-                throw EditorTileSourceError.message("Choose a PNG with a relative image path to preview this source.")
-            }
+            guard !path.hasPrefix("@res://") else { return nil }
             let imageURL = path.hasPrefix("file://") ? URL(string: path) : URL(fileURLWithPath: path)
-            guard let imageURL else {
-                return
-            }
-            image = try Image(contentsOf: imageURL)
-            status = "Click a cell to inspect it. Add tiles individually or create the whole grid."
-        } catch { status = "Image: \(error.localizedDescription)" }
+            guard let imageURL else { return nil }
+            return try EditorTileSourcePreview(image: Image(contentsOf: imageURL), layout: settings)
+        } catch { return nil }
     }
 
     func presentImagePicker() {
@@ -187,7 +195,7 @@ final class EditorTileSourceEditorModel {
             guard updated.count != sources.count else {
                 return
             }
-            try save(updated)
+            try save(updated, refreshPreviews: true)
             selectSource(updated.count - 1)
         } catch {
             for path in copied { try? FileManager.default.removeItem(at: path) }
@@ -226,7 +234,7 @@ final class EditorTileSourceEditorModel {
                 data["image"] = imageData
                 updated[selectedSource]["data"] = data
             }
-            try save(updated, tileSize: ["x": x, "y": y])
+            try save(updated, tileSize: ["x": x, "y": y], refreshPreviews: true)
             selectSource(selectedSource)
             status = "Saved slicing settings"
         } catch { status = error.localizedDescription }
@@ -307,7 +315,7 @@ final class EditorTileSourceEditorModel {
         var updated = sources
         updated.remove(at: selectedSource)
         do {
-            try save(updated)
+            try save(updated, refreshPreviews: true)
             selectSource(min(selectedSource, max(0, updated.count - 1)))
         } catch { status = error.localizedDescription }
     }
@@ -333,7 +341,7 @@ extension EditorTileSourceEditorModel {
         } catch { status = error.localizedDescription }
     }
 
-    private func save(_ updated: [[String: Any]], tileSize: [String: Int]? = nil) throws {
+    private func save(_ updated: [[String: Any]], tileSize: [String: Int]? = nil, refreshPreviews: Bool = false) throws {
         guard isEditable, let url else {
             throw EditorTileSourceError.message("File is read-only.")
         }
@@ -350,6 +358,7 @@ extension EditorTileSourceEditorModel {
         try data.write(to: url, options: .atomic)
         root = candidate
         sources = updated
+        if refreshPreviews { previews = updated.indices.map { loadPreview(at: $0) } }
         savedData = data
     }
 
@@ -385,6 +394,15 @@ extension EditorTileSourceEditorModel {
     }
 
     private func sourceNameSafely(_ index: Int) -> String { sources.indices.contains(index) ? sourceName(at: index) : "" }
+}
+
+extension EditorWorkbenchViewModel {
+    func tileSourceModel(for document: EditorAssetDocument) -> EditorTileSourceEditorModel {
+        if let model = tileSourceModels[document.id] { return model }
+        let model = EditorTileSourceEditorModel(document: document)
+        tileSourceModels[document.id] = model
+        return model
+    }
 }
 
 enum EditorTileSourceError: LocalizedError {

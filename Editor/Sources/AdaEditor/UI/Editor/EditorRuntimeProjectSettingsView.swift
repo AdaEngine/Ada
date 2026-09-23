@@ -7,7 +7,7 @@ struct EditorRuntimeProjectSettingsView: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 0) {
             entrySettings
             profileSettings
             pluginSettings

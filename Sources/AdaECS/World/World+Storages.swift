@@ -74,6 +74,22 @@ extension World {
         func getRequiredComponents<T: Component>(for _: T.Type) -> [RequiredComponentInfo] {
             getComponentId(T.self).flatMap { self.requiredComponents[$0] } ?? []
         }
+
+        func getRequiredComponents(for componentID: ComponentId) -> [RequiredComponentInfo] {
+            requiredComponents[componentID] ?? []
+        }
+
+        mutating func registerRequiredComponent<T: Component>(
+            forRuntimeComponent componentID: ComponentId,
+            requiredComponentId: ComponentId,
+            constructor: @Sendable @escaping () -> T
+        ) {
+            registerRequiredComponent(
+                for: componentID,
+                requiredComponentId: requiredComponentId,
+                constructor: constructor
+            )
+        }
     }
 }
 

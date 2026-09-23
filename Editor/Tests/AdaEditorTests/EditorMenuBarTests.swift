@@ -46,6 +46,10 @@ struct EditorMenuBarTests {
         ])
         #expect(system.items.first?.keyEquivalent == .comma)
         #expect(file.items.first { $0.title == "Save" }?.keyEquivalent == .s)
+        #expect(file.items.first { $0.title == "Close Editor Tab" }?.keyEquivalent == .w)
+        #expect(file.items.first { $0.title == "Close Editor Tab" }?.keyEquivalentModifierMask == .main)
+        #expect(file.items.first { $0.title == "Close Window" }?.keyEquivalentModifierMask == [.main, .shift])
+        #expect(code.items.first { $0.title == "Close Editor Tab" } == nil)
         #expect(build.items.first { $0.title == "Build Project" }?.keyEquivalent == .b)
     }
 }

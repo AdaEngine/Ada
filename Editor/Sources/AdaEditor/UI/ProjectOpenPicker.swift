@@ -291,6 +291,42 @@ enum ProjectOpenPicker {
         #endif
     }
 
+    @MainActor
+    static func presentTileSetPicker(
+        directoryURL: URL,
+        completion: @escaping @MainActor (AssetFilePickerResult) -> Void
+    ) {
+        #if canImport(AppKit)
+            let panel = NSOpenPanel()
+            panel.title = "Link Tile Source"
+            panel.prompt = "Link"
+            panel.message = "Choose a .tileset file inside this project's Assets folder."
+            panel.directoryURL = directoryURL
+            panel.canChooseDirectories = false
+            panel.canChooseFiles = true
+            panel.allowsMultipleSelection = false
+            panel.canCreateDirectories = false
+            panel.resolvesAliases = true
+            panel.begin { response in
+                completion(response == .OK ? .selected(panel.urls) : .cancelled)
+            }
+        #elseif canImport(UIKit)
+            guard let presenter = activeViewController() else {
+                completion(.unavailable("AdaEditor has no active window from which to open Files."))
+                return
+            }
+            let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: false)
+            picker.directoryURL = directoryURL
+            let delegate = BuildFileDocumentPickerDelegate(completion: completion)
+            activeBuildFilePickerDelegate = delegate
+            picker.delegate = delegate
+            picker.allowsMultipleSelection = false
+            presenter.present(picker, animated: true)
+        #else
+            completion(.unavailable("Tile source selection is not supported on this platform."))
+        #endif
+    }
+
     static func projectDirectoryURL(fromPickerSelection selectedURL: URL) -> URL {
         if selectedURL.lastPathComponent == "Package.swift" {
             return selectedURL.deletingLastPathComponent().standardizedFileURL

@@ -26,6 +26,7 @@ struct EditorAgentSidebar: View {
             RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
                 .stroke(theme.editorColors.border, lineWidth: 1)
         }
+        .onAppear { viewModel.connectIfNeeded() }
     }
 
     private var agentHeader: some View {
@@ -53,17 +54,13 @@ struct EditorAgentSidebar: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
         .background(theme.editorColors.surface)
         .accessibilityIdentifier("AdaEditor.Agent.Header")
     }
 
     private var conversationToolbar: some View {
         HStack(spacing: 6) {
-            Text("Chats")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(theme.editorColors.muted)
-                .frame(height: 30)
             ScrollView(.horizontal) {
                 HStack(spacing: 6) {
                     ForEach(viewModel.sessions, id: \.id) { session in
@@ -72,14 +69,12 @@ struct EditorAgentSidebar: View {
                 }
                 .fixedSize(horizontal: true, vertical: false)
             }
-            if let onOpenCatalog {
-                toolbarButton(symbol: "\u{E8B8}", title: "Settings", action: onOpenCatalog)
+            if case .failed = viewModel.currentConnectionState {
+                Button("Retry", action: viewModel.connect)
+                    .font(.system(size: 12))
+                    .disabled(viewModel.isSending)
+                    .accessibilityIdentifier("AdaEditor.Agent.Retry")
             }
-            Button(viewModel.currentConnectionState == .connecting ? "Connecting…" : "Connect", action: viewModel.connect)
-                .font(.system(size: 12))
-                .disabled(viewModel.isSending || viewModel.currentConnectionState == .connecting)
-                .accessibilityIdentifier("AdaEditor.Agent.Connect")
-            toolbarButton(symbol: "\u{E872}", title: "Delete session", action: viewModel.deleteActiveSession)
             Button(action: {
                 Task {
                     try? await viewModel.createSession()
@@ -93,7 +88,7 @@ struct EditorAgentSidebar: View {
             .buttonStyle(DefaultButtonStyle())
         }
         .padding(.horizontal, 8)
-        .frame(height: 42)
+        .frame(height: 38)
         .background(theme.editorColors.surface)
         .overlay {
             VStack(spacing: 0) {
@@ -102,17 +97,6 @@ struct EditorAgentSidebar: View {
             }
         }
         .accessibilityIdentifier("AdaEditor.Agent.ConversationToolbar")
-    }
-
-    private func toolbarButton(symbol: String, title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(symbol)
-                .font(AdaEditorMaterialSymbolFont.font(size: 16))
-                .foregroundColor(theme.editorColors.muted)
-                .frame(width: 30, height: 30)
-        }
-        .buttonStyle(DefaultButtonStyle())
-        .accessibilityIdentifier("AdaEditor.Agent.\(title)")
     }
 
     private func sessionButton(_ session: EditorAgentSessionSummary) -> some View {
@@ -128,6 +112,9 @@ struct EditorAgentSidebar: View {
                 .overlay { RoundedRectangleShape(cornerRadius: 7).stroke(active ? theme.editorColors.blue : theme.editorColors.border, lineWidth: 1) }
         }
         .buttonStyle(DefaultButtonStyle())
+        .contextMenu {
+            Button("Delete session") { viewModel.deleteSession(session) }
+        }
         .accessibilityIdentifier("AdaEditor.Agent.Session.\(session.id)")
     }
 
@@ -176,11 +163,9 @@ struct EditorAgentSidebar: View {
                 .foregroundColor(theme.editorColors.muted)
         case .disconnected,
             .failed:
-            Button(action: viewModel.connect) {
-                configurationLabel("Select model")
-            }
-            .buttonStyle(DefaultButtonStyle())
-            .disabled(viewModel.isSending)
+            Text("Select model")
+                .font(.system(size: 11))
+                .foregroundColor(theme.editorColors.muted)
         }
     }
 

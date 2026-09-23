@@ -81,9 +81,12 @@ the previous active generation when one exists.
 ### Use runtime ECS layouts for script data
 
 Maximum iPadOS support requires script-defined components and resources to stop
-depending on newly generated Swift metatypes. AdaECS will gain type-erased
-runtime layouts containing stable identity, size, alignment, initialization,
-move, destruction, coding, and field-reflection operations.
+depending on newly generated Swift metatypes. Script-defined components use a
+memory-safe `RuntimeComponentPayload` carrier while every schema receives its
+own deterministic `ComponentId`, reflection table, defaults, and coding rules.
+This avoids synthesizing unsafe size/alignment/destructor metadata for arbitrary
+layouts while preserving the ECS identity that matters to archetypes and
+scheduling.
 
 Each script component retains a distinct archetype column and scheduler access
 identity. Storing every script component in one dictionary component remains
@@ -91,9 +94,10 @@ rejected because it would lose archetype filtering, per-component conflicts,
 change tracking, and chunk iteration. Native Swift component types adapt to the
 same layout abstraction without losing their typed APIs.
 
-Until runtime layouts ship, AdaScript builds that declare `@component` or
-`@resource` fail with an explicit runtime-layout diagnostic. They must never
-fall back to generating and compiling Swift on iPadOS.
+Portable AdaScript builds now accept `@component` and
+`@replicated_component` without generating or compiling Swift. Runtime-defined
+resources remain unsupported and fail with an explicit diagnostic; they must
+never fall back to compiling Swift on iPadOS.
 
 ### Give each runtime session its own platform resources
 

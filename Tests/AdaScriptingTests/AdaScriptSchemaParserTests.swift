@@ -211,6 +211,71 @@ struct AdaScriptSchemaParserTests {
         #expect(lowered.contains("@system class Gameplay"))
     }
 
+    @Test("Method RPC lowers to the typed command registry")
+    func lowersRPCMethod() throws {
+        let source = """
+        @system class Gameplay {
+            @rpc(id: "game.input", delivery: "unreliable_sequenced")
+            func sendInput(@network_field(1) moveX = 0.0, @network_field(2) attack = 0);
+            @remote_commands(sendInput) var inputs;
+            func update(context) {}
+        }
+        """
+        let commands = try AdaScriptSchemaParser.parseNetworkCommands(sources: [
+            AdaScriptCompilerSource(path: "Game.ada", source: source)
+        ])
+        let command = try #require(commands.first)
+        #expect(command.name == "sendInput")
+        #expect(command.id == "game.input")
+        #expect(command.fields.map(\.name) == ["moveX", "attack"])
+        #expect(command.fields.compactMap(\.network?.tag) == [1, 2])
+
+        let lowered = AdaScriptNetworkLowerer.lower(source: source)
+        #expect(lowered.contains("func sendInput(moveX, attack)"))
+        #expect(lowered.contains("__adaNetworkFactory.make(\"sendInput\", [moveX, attack])"))
+        #expect(!lowered.contains("@rpc"))
+    }
+
+    @Test("RPC body lowers to a receiver handler")
+    func lowersRPCBody() throws {
+        let source = """
+        @system class Gameplay {
+            @rpc(id: "game.input")
+            func sendInput(@network_field(1) moveX = 0.0) {
+                capture.value = moveX;
+                capture.source = source;
+            }
+            func update(context) {}
+        }
+        """
+        let bindings = try AdaScriptSchemaParser.parseRPCMethodBindings(sources: [
+            AdaScriptCompilerSource(path: "Game.ada", source: source)
+        ])
+        #expect(bindings == [AdaScriptRPCMethodBinding(commandName: "sendInput", fieldNames: ["moveX"], systemName: "Gameplay")])
+        let lowered = AdaScriptNetworkLowerer.lower(source: source)
+        #expect(lowered.contains("func __ada_rpc_handler_sendInput(source, moveX)"))
+        #expect(lowered.contains("capture.source = source"))
+    }
+
+    @Test("Lowers portable component declarations into runtime factories")
+    func lowersPortableComponent() throws {
+        let source = """
+        @component(id: "game.health")
+        struct Health {
+            @export var current = 10;
+            @export var title = "Player";
+        }
+        """
+        let schemas = try AdaScriptSchemaParser.parse(sources: [
+            AdaScriptCompilerSource(path: "Health.ada", source: source)
+        ])
+        let lowered = AdaScriptComponentLowerer.lower(source: source, schemas: schemas)
+
+        #expect(lowered.contains("func Health(current, title)"))
+        #expect(lowered.contains("__adaComponentFactory.makeNamed(\"Health\", [current, title])"))
+        #expect(!lowered.contains("@component"))
+    }
+
     @Test("Infers deferred commands only for systems that use WorldContext")
     func parsesSystemCapabilities() throws {
         let capabilities = try AdaScriptSchemaParser.parseSystemCapabilities(sources: [

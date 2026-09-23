@@ -105,6 +105,14 @@ final class EditorViewModel {
     var previewBuildGeneration = 0
     @ObservationIgnored
     var adaScriptRuntimeWindow: UIWindow?
+    #if os(macOS)
+        @ObservationIgnored
+        var adaScriptWebServer: Process?
+        @ObservationIgnored
+        var adaScriptWebRunDirectory: URL?
+        @ObservationIgnored
+        var adaScriptWebExportRunner: EditorProcessRunner?
+    #endif
     @ObservationIgnored
     var pendingWebRunURL: URL?
     @ObservationIgnored
@@ -231,6 +239,7 @@ final class EditorViewModel {
         self.selectedTestFilter = selectedTestFilter
         self.playModeState = playModeState
         self.inspectorSidebar.textureAssets = Self.textureAssets(from: self.projectSidebar.items)
+        self.inspectorSidebar.tileMapAssets = Self.tileMapAssets(from: self.projectSidebar.items)
         self.inspectorSidebar.sceneAssets = Self.sceneAssets(from: self.projectSidebar.items)
         self.inspectorSidebar.uiSourcePaths = Self.uiSourcePaths(from: self.projectSidebar.items)
         self.inspectorSidebar.uiSceneFiles = Self.uiSceneFiles(from: self.projectSidebar.items)

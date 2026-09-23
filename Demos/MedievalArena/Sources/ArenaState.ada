@@ -1,42 +1,44 @@
-@network_command(
+@replicated_component(
+    id: "medieval-arena.player",
+    version: 1,
+    authority: "host",
+    visibility: "all_peers"
+)
+struct ArenaPlayer {
+    @network_field(1, mode: "initial_only") var peer = "";
+    @network_field(2, mode: "latest", interpolate: "linear") var x = 0.0;
+    @network_field(3, mode: "latest", interpolate: "linear") var y = 0.0;
+    @network_field(4, mode: "state") var health = 3;
+    @network_field(5, mode: "latest") var facing = 3;
+    @network_field(6, mode: "latest") var attackSequence = 0;
+    @network_field(7, mode: "latest", interpolate: "linear") var respawn = 0.0;
+    @network_field(8, mode: "initial_only") var variant = 0;
+    @local var consumedInput = 0;
+}
+
+@rpc(
     id: "medieval-arena.input",
     delivery: "unreliable_sequenced",
     channel: "input"
 )
-struct ArenaInputCommand {
-    @network_field(1) var moveX = 0.0;
-    @network_field(2) var moveY = 0.0;
-    @network_field(3) var attackSequence = 0;
-}
+func ArenaInputCommand(
+    @network_field(1) moveX = 0.0,
+    @network_field(2) moveY = 0.0,
+    @network_field(3) attackSequence = 0
+);
 
 // All state and rules below belong to Medieval Arena, not to AdaEngine.
 class ArenaGame {
     static var moveX = 0.0;
     static var moveY = 0.0;
     static var attackSequence = 0;
-    static var snapshotClock = 0.0;
 
-    // peer -> [x, y, health, facing, attackSequence, consumedInput, respawn, variant]
-    static var players = [:];
+    // Presentation-only cache. Authoritative and replicated state lives in ArenaPlayer.
+    static var presentedPlayers = [:];
     static var playerEntities = [:];
     static var heartEntities = [:];
     static var swords = [:];
     static var lastPresentedAttack = [:];
-
-    static func ensurePlayer(peer, variant) {
-        if (players[peer] != null) return;
-        var x = 0.0;
-        var y = 0.0;
-        if (variant == 0) x = -72.0;
-        if (variant == 1) x = 72.0;
-        if (variant == 2) y = 100.0;
-        if (variant == 3) y = -100.0;
-        if (variant == 4) { x = -180.0; y = 90.0; }
-        if (variant >= 5) { x = 180.0; y = -90.0; }
-        var facing = 3;
-        if (variant != 0) facing = 2;
-        players[peer] = [x, y, 3, facing, 0, 0, 0.0, variant];
-    }
 
     static func clamp(value, lower, upper) {
         if (value < lower) return lower;

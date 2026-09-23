@@ -119,23 +119,40 @@ struct EditorTileSourceTests {
             return
         }
         #expect(document.kind == .tileSource)
+        #expect(project.toolStrip.activeRightTool == "inspector")
+        #expect(project.showRightPanel)
         #expect(document.absolutePath.map { URL(fileURLWithPath: $0).standardizedFileURL.path } == fixture.file.standardizedFileURL.path)
-        let model = EditorTileSourceEditorModel(document: document)
-        model.addImages([fixture.png])
+        let model = project.workbench.tileSourceModel(for: document)
+        model.addImages([fixture.png, fixture.png])
+        #expect(model.sources.count == 2)
         model.selectTile([0, 0])
         try #require(model.image != nil, "\(model.status)")
         let container = UIContainerView(rootView: EditorTileSourceAssetEditor(document: document, model: model))
         container.frame = Rect(x: 0, y: 0, width: 1000, height: 1100)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
-        let preview = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Preview"))
-        let inspector = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Inspector"))
-        #expect(preview.absoluteFrame.maxX <= inspector.absoluteFrame.minX)
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Preview"))
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Card.0"))
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Card.1"))
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Source.0"))
+        #expect(model.selectedSource == 0)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.ZoomIn"))
         #expect(model.zoom > 2)
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.CreateAll"))
+        let inspector = UIContainerView(rootView: EditorContextualInspector(
+            document: .asset(document),
+            workbench: project.workbench,
+            sceneInspectorViewModel: project.inspectorSidebar,
+            resourceRootURL: nil
+        ))
+        inspector.frame = Rect(x: 0, y: 0, width: 300, height: 1100)
+        inspector.bounds.size = inspector.frame.size
+        inspector.layoutIfNeeded()
+        _ = try inspector.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Inspector"))
+        _ = try inspector.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.CreateAll"))
         #expect(!model.tiles.isEmpty)
-        #expect(EditorTileSourceEditorModel(document: document).tiles.count == model.tiles.count)
+        let reloaded = EditorTileSourceEditorModel(document: document)
+        reloaded.selectSource(model.selectedSource)
+        #expect(reloaded.tiles.count == model.tiles.count)
     }
 
     @Test func gridExcludesPartialCells() {

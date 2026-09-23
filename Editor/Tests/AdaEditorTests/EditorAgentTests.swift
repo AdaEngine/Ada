@@ -513,6 +513,7 @@ actor FakeEditorAgentService: EditorAgentServicing {
     }
 
     var lastRequest: EditorAgentRunRequest?
+    var connectCount = 0
 
     func connect(
         _ request: EditorAgentRunRequest,
@@ -520,6 +521,7 @@ actor FakeEditorAgentService: EditorAgentServicing {
         onProjectFileChanged _: @escaping @Sendable (String) async -> Void
     ) async throws -> EditorAgentSessionConfiguration {
         lastRequest = request
+        connectCount += 1
         if let connectionError {
             throw connectionError
         }
@@ -528,6 +530,10 @@ actor FakeEditorAgentService: EditorAgentServicing {
 
     func recordedRequest() -> EditorAgentRunRequest? {
         lastRequest
+    }
+
+    func connectionCount() -> Int {
+        connectCount
     }
 
     func send(

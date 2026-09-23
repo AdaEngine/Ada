@@ -295,8 +295,8 @@ public struct Chunk: Sendable {
         self.componentsData = [:]
         for component in layout.components {
             self.componentsData[component.identifier] = ComponentsData(
-                capacity: entitiesPerChunk * MemoryLayout.stride(ofValue: component),
-                component: component
+                capacity: entitiesPerChunk * MemoryLayout.stride(ofValue: component.componentType),
+                component: component.componentType
             )
         }
     }
@@ -399,7 +399,7 @@ public struct Chunk: Sendable {
 
     func insert(at entityIndex: RowIndex, components: [any Component], tick: Tick) {
         for component in components {
-            let componentId = type(of: component).identifier
+            let componentId = componentIdentifier(of: component)
             guard let array = componentsData[componentId] else {
                 fatalError("Passed not registred component")
             }
@@ -494,6 +494,26 @@ public struct Chunk: Sendable {
         return componentsData.values.map { key, data in
             (key, data.data.get(at: index, as: data.componentType))
         }
+    }
+
+    func getRuntimeComponent(
+        _ componentID: ComponentId,
+        at entityIndex: RowIndex
+    ) -> RuntimeComponentPayload? {
+        componentsData[componentID]?.data.get(at: entityIndex, as: RuntimeComponentPayload.self)
+    }
+
+    func insertRuntimeComponent(
+        _ component: consuming RuntimeComponentPayload,
+        at entityIndex: RowIndex,
+        lastTick: Tick
+    ) {
+        guard let componentData = componentsData[component.componentID] else {
+            assertionFailure("Runtime component \(component.stableID) not found in chunk")
+            return
+        }
+        componentData.changeTicks.insert(lastTick, at: entityIndex)
+        componentData.data.insert(component, at: entityIndex)
     }
 
     public func getComponentSlice<T: Component>(for _: T.Type) -> UnsafeBufferPointer<T>? {

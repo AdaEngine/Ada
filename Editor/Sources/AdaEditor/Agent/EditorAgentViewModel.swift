@@ -231,15 +231,18 @@ final class EditorAgentViewModel {
             sessions = try await store.listSessions()
             if let notificationSessionID {
                 activeSession = runningSession?.id == notificationSessionID ? runningSession : try await store.loadSession(id: notificationSessionID)
+                connectIfNeeded()
                 return
             }
             if let activeID = try await store.activeSessionID(), let session = try? await store.loadSession(id: activeID) {
                 activeSession = session
                 selectedSkillIDs = Set(session.selectedSkillIDs)
+                connectIfNeeded()
             } else if let first = sessions.first, let session = try? await store.loadSession(id: first.id) {
                 activeSession = session
                 selectedSkillIDs = Set(session.selectedSkillIDs)
                 try await store.setActiveSession(id: first.id)
+                connectIfNeeded()
             } else {
                 try await createSession()
             }
@@ -248,7 +251,7 @@ final class EditorAgentViewModel {
         }
     }
 
-    func createSession() async throws {
+    func createSession(connectAutomatically: Bool = true) async throws {
         notificationSessionID = nil
         guard let store else {
             return
@@ -261,6 +264,10 @@ final class EditorAgentViewModel {
         pendingAttachments = []
         codeSelection = nil
         sessionConfiguration = .empty
+        connectionState = .disconnected
+        if connectAutomatically {
+            connectIfNeeded()
+        }
     }
 
     func selectSession(_ summary: EditorAgentSessionSummary) {
@@ -272,33 +279,42 @@ final class EditorAgentViewModel {
             do {
                 activeSession = runningSession?.id == summary.id ? runningSession : try await store.loadSession(id: summary.id)
                 selectedSkillIDs = Set(activeSession?.selectedSkillIDs ?? [])
-                sessionConfiguration = .empty
-                connectionState = .disconnected
+                if runningSession?.id != id {
+                    sessionConfiguration = .empty
+                    connectionState = .disconnected
+                }
                 try await store.setActiveSession(id: summary.id)
+                connectIfNeeded()
             } catch {
                 statusMessage = error.localizedDescription
             }
         }
     }
 
-    func deleteActiveSession() {
-        guard runningSession?.id != activeSession?.id || runningSession == nil else {
+    func deleteSession(_ summary: EditorAgentSessionSummary) {
+        guard runningSession?.id != summary.id else {
             statusMessage = "Stop the running agent before deleting its session."
             return
         }
-        guard let store, let activeSession else {
+        guard let store else {
             return
         }
         Task {
             do {
-                await service.cancel(sessionID: activeSession.id)
-                try await store.deleteSession(id: activeSession.id)
+                await service.cancel(sessionID: summary.id)
+                try await store.deleteSession(id: summary.id)
                 sessions = try await store.listSessions()
-                if let next = sessions.first {
-                    self.activeSession = try await store.loadSession(id: next.id)
-                    try await store.setActiveSession(id: next.id)
-                } else {
-                    try await createSession()
+                if activeSession?.id == summary.id {
+                    if let next = sessions.first {
+                        activeSession = try await store.loadSession(id: next.id)
+                        selectedSkillIDs = Set(activeSession?.selectedSkillIDs ?? [])
+                        sessionConfiguration = .empty
+                        connectionState = .disconnected
+                        try await store.setActiveSession(id: next.id)
+                        connectIfNeeded()
+                    } else {
+                        try await createSession()
+                    }
                 }
             } catch {
                 statusMessage = error.localizedDescription
@@ -316,12 +332,20 @@ final class EditorAgentViewModel {
     }
 
     func connect() {
-        guard connectionState != .connecting, !isConnectingCatalogAgent else {
+        guard currentConnectionState != .connecting, !isConnectingCatalogAgent else {
             return
         }
+        connectionState = .connecting
         Task {
             await connectAsync()
         }
+    }
+
+    func connectIfNeeded() {
+        guard settings.configuration.enabled, activeSession != nil, currentConnectionState == .disconnected else {
+            return
+        }
+        connect()
     }
 
     func selectConfiguration(selectorID: String, valueID: String) {
@@ -363,9 +387,9 @@ final class EditorAgentViewModel {
             try settings.save(configuration)
             await service.shutdown()
             // ACP session IDs belong to one provider; never resume them in another agent.
-            try await createSession()
+            try await createSession(connectAutomatically: false)
             connectionState = .disconnected
-            settingsStatusMessage = "\(entry.name) selected for all projects. Connect or send a message in Agent Chat."
+            settingsStatusMessage = "\(entry.name) selected for all projects. Open Agent Chat to send a message."
             return true
         } catch {
             settingsStatusMessage = "Unable to use \(entry.name): \(error.localizedDescription)"
@@ -392,6 +416,17 @@ final class EditorAgentViewModel {
         isConnectingCatalogAgent = true
         defer { isConnectingCatalogAgent = false }
         settingsStatusMessage = ""
+        #if os(macOS)
+            let target = installed?.target ?? local?.target
+            if EditorSloppyLocalSetup.isSloppyTarget(target) {
+                do {
+                    guard try EditorSloppyLocalSetup.prepare() else { return }
+                } catch {
+                    settingsStatusMessage = "Unable to prepare Sloppy: \(error.localizedDescription)"
+                    return
+                }
+            }
+        #endif
         let entry: EditorInstalledAgent?
         if let installed {
             entry = installed
@@ -420,7 +455,7 @@ final class EditorAgentViewModel {
         case let .failed(message):
             settingsStatusMessage = "\(entry.name) selected, but connection failed: \(message)"
         default:
-            settingsStatusMessage = statusMessage ?? "Connection did not complete. Try Connect again."
+            settingsStatusMessage = statusMessage ?? "Connection did not complete. Open Agent Chat to retry."
         }
     }
 
@@ -484,7 +519,10 @@ final class EditorAgentViewModel {
                 }
                 activeSession = runningSession?.id == id ? runningSession : try await store.loadSession(id: id)
                 selectedSkillIDs = Set(activeSession?.selectedSkillIDs ?? [])
+                sessionConfiguration = .empty
+                connectionState = .disconnected
                 try await store.setActiveSession(id: id)
+                connectIfNeeded()
             } catch {
                 notificationSessionID = nil
                 statusMessage = "This agent session is no longer available."
@@ -861,7 +899,7 @@ final class EditorAgentViewModel {
         refreshSkills()
         connectionState = .connecting
         do {
-            sessionConfiguration = try await service.connect(
+            let configuration = try await service.connect(
                 EditorAgentRunRequest(
                     project: projectConfig,
                     projectURL: projectURL,
@@ -885,8 +923,11 @@ final class EditorAgentViewModel {
                     }
                 }
             )
-            connectionState = .ready(sessionConfiguration.agentName)
+            guard activeSession?.id == session.id, connectionSettings == settings.configuration else { return }
+            sessionConfiguration = configuration
+            connectionState = .ready(configuration.agentName)
         } catch {
+            guard activeSession?.id == session.id, connectionSettings == settings.configuration else { return }
             statusMessage = error.localizedDescription
             connectionState = .failed(error.localizedDescription)
             notifications.post(

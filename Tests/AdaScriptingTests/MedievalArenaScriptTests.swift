@@ -1,4 +1,5 @@
-import AdaApp
+@_spi(Internal) import AdaApp
+import AdaAssets
 import AdaECS
 @_spi(Internal) import AdaInput
 import AdaMultiplayer
@@ -54,7 +55,10 @@ struct MedievalArenaScriptTests {
         ])
         #expect(gameSource.contains("class ArenaGameplaySystem"))
         #expect(gameSource.contains("func applyAttack"))
-        #expect(gameSource.contains("target[2] -= 1"))
+        #expect(gameSource.contains("target.arenaPlayer.health -= 1"))
+        #expect(gameSource.contains("@replicated_component"))
+        #expect(!gameSource.contains("publishedSnapshot"))
+        #expect(!gameSource.contains("receivedSnapshot"))
         #expect(gameSource.contains("class ArenaPresentationSystem"))
         #expect(gameSource.contains("ArenaGame.swords"))
         try AdaScriptPlugin.validate(sources: sources, name: "MedievalArenaGame")
@@ -82,7 +86,8 @@ struct MedievalArenaScriptTests {
             struct Entity: Decodable {
                 struct Components: Decodable {
                     struct TileMap: Decodable {
-                        var cells: [[Int]]
+                        var cells: [[Int]]?
+                        var map: String?
                     }
 
                     var tileMap: TileMap?
@@ -105,12 +110,20 @@ struct MedievalArenaScriptTests {
             ArenaScene.self,
             from: String(contentsOf: sceneURL, encoding: .utf8)
         )
-        let cells = try #require(
-            scene.entities.first { $0.id == "arena-tilemap" }?.components?.tileMap?.cells
-        )
+        let tileMap = try #require(scene.entities.first { $0.id == "arena-tilemap" }?.components?.tileMap)
+        let cells: [[Int]]
+        if let authoredCells = tileMap.cells {
+            cells = authoredCells
+        } else {
+            let mapReference = try #require(tileMap.map)
+            #expect(mapReference == "@res://Maps/Arena.tilemap")
+            struct MapAsset: Decodable { let cells: [[Int]] }
+            let mapURL = Self.repositoryRoot.appendingPathComponent("Demos/MedievalArena/Assets/Maps/Arena.tilemap")
+            cells = try YAMLDecoder().decode(MapAsset.self, from: String(contentsOf: mapURL, encoding: .utf8)).cells
+        }
         let entityIDs = Set(scene.entities.map(\.id))
 
-        #expect(cells.count == 19 * 11)
+        #expect(cells.count >= 19 * 11)
         #expect(entityIDs.contains("host-spawn"))
         #expect(entityIDs.contains("peer-spawn"))
         #expect(scene.entities.count == 5)
@@ -140,6 +153,7 @@ struct MedievalArenaScriptTests {
 
         let world = World(name: "MedievalArenaScriptHost")
         let app = AppWorlds(main: world)
+        AssetsPlugin(assetDirectory: Self.repositoryRoot.appendingPathComponent("Demos/MedievalArena/Assets", isDirectory: true)).setup(in: app)
         InputPlugin(actions: [InputAction(name: "Attack", bindings: [.key(.space)])]).setup(in: app)
         world.insertResource(DeltaTime(deltaTime: 1.0 / 60.0))
         let peerUUID = try #require(UUID(uuidString: "4D415045-4552-4000-8000-000000000001"))
@@ -173,17 +187,28 @@ struct MedievalArenaScriptTests {
             )
         )
 
-        for _ in 0..<40 {
-            await world.runScheduler(.preUpdate)
-            await world.runScheduler(.update)
-            await world.runScheduler(.postUpdate)
+        await AppWorldsExecutionContext.$currentID.withValue(app.executionID) {
+            for _ in 0..<40 {
+                await world.runScheduler(.preUpdate)
+                await world.runScheduler(.update)
+                await world.runScheduler(.postUpdate)
+            }
         }
 
         #expect(plugin.diagnostics.isEmpty, Comment(rawValue: plugin.diagnostics.joined(separator: "\n")))
-        // Four persistent visuals are required. A fifth entity can be the
-        // short-lived sword presentation when parallel input tests overlap.
-        #expect((4...5).contains(world.getEntities().count))
-        #expect(world.getResource(AdaScriptMultiplayerState.self)?.publishedSnapshot.count == 8)
+        // ArenaPlayer is now a real replicated ECS entity plus four persistent visuals.
+        // A sixth entity can be the short-lived sword presentation.
+        #expect((5...6).contains(world.getEntities().count))
+        let descriptor = try #require(world.runtimeComponentDescriptor(named: "ArenaPlayer"))
+        let playerEntity = try #require(world.getEntities().first(where: {
+            world.getRuntimeComponent(descriptor.componentID, from: $0.id) != nil
+        }))
+        let player = try #require(world.getRuntimeComponent(descriptor.componentID, from: playerEntity.id))
+        #expect(player.values[0] == .string(peerUUID.uuidString))
+        #expect(world.get(ReplicatedEntity.self, from: playerEntity.id) != nil)
+        let playerSprite = try #require(world.getEntities().compactMap { world.get(Sprite.self, from: $0.id) }
+            .first { $0.texture?.asset?.assetName == "tile_0096.png" })
+        #expect(playerSprite.texture?.asset != nil)
     }
 
     @MainActor

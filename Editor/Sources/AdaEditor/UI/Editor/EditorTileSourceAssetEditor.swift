@@ -12,22 +12,16 @@ struct EditorTileSourceAssetEditor: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 10) {
-                toolbar
-                preview
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                Text(model.status)
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.editorColors.muted)
-                    .lineLimit(3)
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            inspector
-                .frame(width: 280)
-                .frame(maxHeight: .infinity)
+        VStack(alignment: .leading, spacing: 10) {
+            toolbar
+            preview.frame(maxWidth: .infinity, maxHeight: .infinity)
+            Text(model.status)
+                .font(.system(size: 11))
+                .foregroundColor(theme.editorColors.muted)
+                .lineLimit(3)
         }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.editorColors.background)
         .accessibilityIdentifier("AdaEditor.TileSourceEditor")
     }
@@ -50,34 +44,21 @@ struct EditorTileSourceAssetEditor: View {
 
     @ViewBuilder
     private var preview: some View {
-        if let image = model.image, let layout = model.layout {
-            ScrollView([.horizontal, .vertical]) {
-                ZStack {
-                    image.resizable()
-                        .frame(width: Float(image.width) * model.zoom, height: Float(image.height) * model.zoom)
-                    grid(layout: layout)
-                        .frame(width: Float(image.width) * model.zoom, height: Float(image.height) * model.zoom)
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onEnded { value in
-                            let x = value.location.x / model.zoom - Float(layout.margin.width)
-                            let y = value.location.y / model.zoom - Float(layout.margin.height)
-                            guard x >= 0, y >= 0 else {
-                                return
+        if !model.sources.isEmpty {
+            GeometryReader { geometry in
+                let columns = max(1, Int(geometry.size.width / 252))
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(0..<((model.sources.count + columns - 1) / columns), id: \.self) { row in
+                            HStack(alignment: .top, spacing: 12) {
+                                ForEach(row * columns..<min((row + 1) * columns, model.sources.count), id: \.self) { index in
+                                    sourceCard(at: index)
+                                }
                             }
-                            let strideX = Float(layout.tileSize.width + layout.spacing.width)
-                            let strideY = Float(layout.tileSize.height + layout.spacing.height)
-                            guard
-                                x.truncatingRemainder(dividingBy: strideX) < Float(layout.tileSize.width),
-                                y.truncatingRemainder(dividingBy: strideY) < Float(layout.tileSize.height)
-                            else {
-                                return
-                            }
-                            model.selectTile([Int(x / strideX), Int(y / strideY)])
                         }
-                )
-                .padding(24)
+                    }
+                    .padding(16)
+                }
             }
             .background(theme.editorColors.surface)
             .accessibilityIdentifier("AdaEditor.TileSourceEditor.Preview")
@@ -97,9 +78,53 @@ struct EditorTileSourceAssetEditor: View {
         }
     }
 
-    private func grid(layout: TileSourceImageDescriptor) -> some View {
+    private func sourceCard(at index: Int) -> some View {
+        let selected = index == model.selectedSource
+        return VStack(alignment: .leading, spacing: 8) {
+            action(model.sourceName(at: index), id: "Source.\(index)") { model.selectSource(index) }
+            if model.previews.indices.contains(index), let preview = model.previews[index] {
+                let scale = min(model.zoom, min(208 / Float(preview.image.width), 180 / Float(preview.image.height)))
+                let imageWidth = Float(preview.image.width) * scale
+                let imageHeight = Float(preview.image.height) * scale
+                ZStack {
+                    preview.image.resizable().frame(width: imageWidth, height: imageHeight)
+                    if selected {
+                        grid(layout: preview.layout, scale: scale)
+                            .frame(width: imageWidth, height: imageHeight)
+                    }
+                }
+                .frame(width: imageWidth, height: imageHeight)
+                .gesture(DragGesture(minimumDistance: 0).onEnded { value in
+                    model.selectSource(index)
+                    let x = value.location.x / scale - Float(preview.layout.margin.width)
+                    let y = value.location.y / scale - Float(preview.layout.margin.height)
+                    guard x >= 0, y >= 0 else { return }
+                    let strideX = Float(preview.layout.tileSize.width + preview.layout.spacing.width)
+                    let strideY = Float(preview.layout.tileSize.height + preview.layout.spacing.height)
+                    guard x.truncatingRemainder(dividingBy: strideX) < Float(preview.layout.tileSize.width),
+                          y.truncatingRemainder(dividingBy: strideY) < Float(preview.layout.tileSize.height) else { return }
+                    model.selectTile([Int(x / strideX), Int(y / strideY)])
+                })
+            } else {
+                Text("Preview unavailable")
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.editorColors.muted)
+            }
+            Spacer()
+        }
+        .padding(10)
+        .frame(width: 228, height: 246, alignment: .topLeading)
+        .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.surfaceElevated))
+        .overlay {
+            RoundedRectangleShape(cornerRadius: 6)
+                .stroke(selected ? theme.editorColors.blue : theme.editorColors.border, lineWidth: selected ? 2 : 1)
+        }
+        .accessibilityIdentifier("AdaEditor.TileSourceEditor.Card.\(index)")
+    }
+
+    private func grid(layout: TileSourceImageDescriptor, scale: Float) -> some View {
         Canvas { context, _ in
-            let grid = model.gridSize
+            let grid = layout.gridSize(imageSize: [model.image?.width ?? 0, model.image?.height ?? 0])
             func outline(_ rect: Rect, color: Color, thickness: Float) {
                 context.drawRect(Rect(x: rect.minX, y: rect.minY, width: rect.width, height: thickness), color: color)
                 context.drawRect(Rect(x: rect.minX, y: rect.maxY - thickness, width: rect.width, height: thickness), color: color)
@@ -109,7 +134,7 @@ struct EditorTileSourceAssetEditor: View {
             if model.showGrid, grid.width * grid.height <= 65_536 {
                 for y in 0..<grid.height {
                     for x in 0..<grid.width {
-                        outline(tileRect([x, y], layout: layout), color: .white.opacity(0.35), thickness: 1)
+                        outline(tileRect([x, y], layout: layout, scale: scale), color: .white.opacity(0.35), thickness: 1)
                     }
                 }
             }
@@ -117,38 +142,34 @@ struct EditorTileSourceAssetEditor: View {
                 guard let xy = tile["xy"] as? [Int], xy.count == 2 else {
                     continue
                 }
-                outline(tileRect([xy[0], xy[1]], layout: layout), color: theme.editorColors.blue.opacity(0.8), thickness: 1)
+                outline(tileRect([xy[0], xy[1]], layout: layout, scale: scale), color: theme.editorColors.blue.opacity(0.8), thickness: 1)
             }
             if let selected = model.selectedTile {
-                context.drawRect(tileRect(selected, layout: layout), color: theme.editorColors.blue.opacity(0.25))
-                outline(tileRect(selected, layout: layout), color: .white, thickness: 2)
+                context.drawRect(tileRect(selected, layout: layout, scale: scale), color: theme.editorColors.blue.opacity(0.25))
+                outline(tileRect(selected, layout: layout, scale: scale), color: .white, thickness: 2)
             }
         }
     }
 
-    private func tileRect(_ point: PointInt, layout: TileSourceImageDescriptor) -> Rect {
+    private func tileRect(_ point: PointInt, layout: TileSourceImageDescriptor, scale: Float) -> Rect {
         Rect(
-            x: Float(layout.margin.width + point.x * (layout.tileSize.width + layout.spacing.width)) * model.zoom,
-            y: Float(layout.margin.height + point.y * (layout.tileSize.height + layout.spacing.height)) * model.zoom,
-            width: Float(layout.tileSize.width) * model.zoom,
-            height: Float(layout.tileSize.height) * model.zoom
+            x: Float(layout.margin.width + point.x * (layout.tileSize.width + layout.spacing.width)) * scale,
+            y: Float(layout.margin.height + point.y * (layout.tileSize.height + layout.spacing.height)) * scale,
+            width: Float(layout.tileSize.width) * scale,
+            height: Float(layout.tileSize.height) * scale
         )
     }
 
-    private var inspector: some View {
+    var inspector: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    heading("Sources")
-                    Spacer()
-                    action("+ Add", id: "Add") { model.presentImagePicker() }.disabled(!model.isEditable)
-                }
-                ForEach(Array(model.sources.indices), id: \.self) { index in
-                    action("\(model.sourceName(at: index))\(index == model.selectedSource ? "  •" : "")", id: "Source.\(index)") {
-                        model.selectSource(index)
-                    }
-                }
+                adaEditorInspectorTitle(theme: theme)
+                heading("Tile Source")
+                action("+ Add image", id: "Add") { model.presentImagePicker() }.disabled(!model.isEditable)
                 if !model.sources.isEmpty {
+                    Text("Selected: \(model.sourceName(at: model.selectedSource))")
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.editorColors.muted)
                     action("Remove source", id: "RemoveSource") { model.removeSource() }.disabled(!model.isEditable)
                 }
                 Divider()

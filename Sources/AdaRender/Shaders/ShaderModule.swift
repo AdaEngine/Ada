@@ -276,7 +276,7 @@ private enum ShaderModuleError: LocalizedError {
     }
 
     extension ShaderReflectionData {
-        private mutating func ensureDescriptorSet(at index: Int) {
+        fileprivate mutating func ensureDescriptorSet(at index: Int) {
             guard index >= descriptorSets.count else {
                 return
             }

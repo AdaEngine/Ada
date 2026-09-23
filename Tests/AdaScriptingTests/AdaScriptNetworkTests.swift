@@ -86,6 +86,7 @@ struct AdaScriptNetworkTests {
         await exchangeHandshake(host: host, peer: peer)
 
         await peer.main.runScheduler(.update)
+        #expect(peer.main.getResource(ScriptNetworkCapture.self)?.amount == 0)
         await peer.main.runScheduler(.networkSend)
         await host.main.runScheduler(.networkReceive)
         await host.main.runScheduler(.update)
@@ -206,30 +207,26 @@ struct AdaScriptNetworkTests {
     )
 
     private static let source = """
-    @network_command(
-        id: "tests.adascript-input",
-        delivery: "unreliable_sequenced",
-        channel: "input"
-    )
-    struct ScriptInput {
-        @network_field(1) var amount = 0;
-    }
-
     @system(id: "typed.network")
     class TypedNetworkSystem {
+        @rpc(
+            id: "tests.adascript-input",
+            delivery: "unreliable_sequenced",
+            channel: "input"
+        )
+        func ScriptInput(@network_field(1) amount = 0) {
+            capture.source = source;
+            capture.amount = amount;
+        }
+
         @res var multiplayer: Multiplayer;
         @res var capture: ScriptNetworkCapture;
         @res var trigger: ScriptNetworkTrigger;
-        @remote_commands(ScriptInput) var inputs;
 
         func update(context) {
             if (trigger.shouldSend) {
                 multiplayer.send(ScriptInput(27));
                 trigger.shouldSend = false;
-            }
-            for (var message in inputs) {
-                capture.source = message.source;
-                capture.amount = message.value.amount;
             }
         }
     }

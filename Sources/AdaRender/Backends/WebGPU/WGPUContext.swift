@@ -53,7 +53,7 @@
             #if WASM && canImport(JavaScriptKit)
                 guard
                     let browserSurface = surface as? BrowserCanvasRenderSurface,
-                    let getContext: (String) -> JSValue = browserSurface.canvas.getContext,
+                    let getContext: ((any ConvertibleToJSValue...) -> JSValue) = browserSurface.canvas.getContext,
                     let contextObject = getContext("webgpu").object
                 else {
                     throw ContextError.invalidSurface

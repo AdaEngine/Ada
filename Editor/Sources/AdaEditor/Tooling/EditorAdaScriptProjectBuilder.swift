@@ -40,7 +40,7 @@ enum EditorAdaScriptProjectBuildError: Error, Equatable, LocalizedError, Sendabl
         case let .entryViewMissing(identifier):
             "AdaScript entry view '\(identifier)' was not found. Set runtime.entry.view to an existing @view id."
         case let .nativeDataRequiresRuntimeLayout(names):
-            "AdaScript runtime components and resources are not available yet: \(names.joined(separator: ", "))."
+            "AdaScript runtime resources are not available yet: \(names.joined(separator: ", "))."
         case let .noSources(path):
             "No .ada source files were found under \(path)."
         case let .notAdaScriptProject(buildSystem):
@@ -81,9 +81,13 @@ struct EditorAdaScriptProjectBuilder {
         }
 
         let dataSchemas = try AdaScriptSchemaParser.parse(sources: sources)
-        guard dataSchemas.isEmpty else {
+        let unsupportedResources = dataSchemas.filter {
+            if case .resource = $0.kind { return true }
+            return false
+        }
+        guard unsupportedResources.isEmpty else {
             throw EditorAdaScriptProjectBuildError.nativeDataRequiresRuntimeLayout(
-                names: dataSchemas.map(\.name).sorted()
+                names: unsupportedResources.map(\.name).sorted()
             )
         }
         let scriptableObjectSupport = try EditorScriptableObjectCatalogLoader.makeResult(

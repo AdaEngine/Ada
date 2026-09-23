@@ -44,6 +44,71 @@ struct EditorAgentCatalogTests {
         #expect(found.first { $0.id == "codex-acp" }?.target?.command == adapter.path)
     }
 
+    @Test("discovers Sloppy's built-in ACP server before a legacy adapter")
+    func sloppyDiscovery() throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sloppy = try executable("sloppy", at: root)
+        _ = try executable("sloppy-acp", at: root)
+        let found = try #require(EditorAgentDiscovery.discover(paths: [root.path]).first { $0.name == "Sloppy" })
+        #expect(found.path == sloppy.path)
+        #expect(found.target?.command == sloppy.path)
+        #expect(found.target?.arguments == ["acp", "serve"])
+        try FileManager.default.removeItem(at: sloppy)
+        let fallback = try #require(EditorAgentDiscovery.discover(paths: [root.path]).first { $0.name == "Sloppy" })
+        #expect(fallback.target?.arguments == [])
+    }
+
+    @Test("Sloppy invite sign-in accepts remote HTTPS and local HTTP servers")
+    func sloppyInviteServer() throws {
+        #expect(try EditorSloppyInviteService.serverURL("https://sloppy.example.com").host == "sloppy.example.com")
+        #expect(try EditorSloppyInviteService.serverURL("http://localhost:25101").port == 25101)
+        for invalid in ["http://sloppy.example.com", "https://user:password@sloppy.example.com", "https://sloppy.example.com/path"] {
+            #expect(throws: EditorSloppyInviteError.self) { try EditorSloppyInviteService.serverURL(invalid) }
+        }
+    }
+
+    @Test("invite option disappears when a local Sloppy ACP provider is available")
+    @MainActor
+    func sloppyInviteVisibility() {
+        let catalog = EditorAgentCatalogViewModel()
+        #expect(catalog.showsSloppyInvite)
+        catalog.discovered = [EditorDiscoveredAgent(id: "sloppy-acp", name: "Sloppy", path: "/bin/sloppy")]
+        #expect(!catalog.showsSloppyInvite)
+    }
+
+    #if os(macOS)
+        @Test("enabling local Sloppy ACP keeps the rest of its configuration and file permissions")
+        @MainActor
+        func sloppyLocalACPSetup() throws {
+            let sloppyTarget = AdaProjectAgentTarget(command: "/usr/local/bin/sloppy", arguments: ["acp", "serve"])
+            let otherTarget = AdaProjectAgentTarget(command: "/usr/local/bin/opencode", arguments: ["acp"])
+            #expect(EditorSloppyLocalSetup.isSloppyTarget(sloppyTarget) == true)
+            #expect(EditorSloppyLocalSetup.isSloppyTarget(otherTarget) == false)
+            let root = try temporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let config = root.appendingPathComponent(".sloppy/sloppy.json")
+            try FileManager.default.createDirectory(at: config.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try """
+            {"acp":{"server":{"enabled":false,"agentId":"","cwd":"/work"}},"models":[{"apiKey":"leave-me"}]}
+            """.write(to: config, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: config.path)
+            let agent = root.appendingPathComponent(".sloppy/agents/engineer")
+            try FileManager.default.createDirectory(at: agent, withIntermediateDirectories: true)
+            try "{}".write(to: agent.appendingPathComponent("agent.json"), atomically: true, encoding: .utf8)
+            #expect(EditorSloppyLocalSetup.availableAgentIDs(home: root) == ["engineer"])
+            try EditorSloppyLocalSetup.enableACP(at: config, agentID: "engineer")
+            let object = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: config)) as? [String: Any])
+            let acp = try #require(object["acp"] as? [String: Any])
+            let server = try #require(acp["server"] as? [String: Any])
+            #expect(server["enabled"] as? Bool == true)
+            #expect(server["agentId"] as? String == "engineer")
+            #expect(server["cwd"] as? String == "/work")
+            #expect(((object["models"] as? [[String: Any]])?.first)?["apiKey"] as? String == "leave-me")
+            #expect(try FileManager.default.attributesOfItem(atPath: config.path)[.posixPermissions] as? Int == 0o600)
+        }
+    #endif
+
     @Test("GUI discovery includes user toolchains and ignores relative PATH entries")
     func searchPaths() throws {
         let root = try temporaryDirectory()
@@ -53,6 +118,7 @@ struct EditorAgentCatalogTests {
         #expect(EditorAgentDiscovery.executable("node", paths: [binary.deletingLastPathComponent().path]) == binary.path)
         #expect(paths.contains(binary.deletingLastPathComponent().path))
         #expect(paths.contains("/Applications/Codex.app/Contents/Resources"))
+        #expect(paths.contains(root.appendingPathComponent("Library/Application Support/Sloppy/Backend/current/bin").path))
         #expect(!paths.contains("."))
         #expect(paths.count == Set(paths).count)
     }
@@ -224,6 +290,8 @@ struct EditorAgentCatalogTests {
             let refresh = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agents.Refresh"))
             let addLocal = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agents.AddLocal.local"))
             let install = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agents.Install.registry"))
+            let sloppyInvite = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agents.SloppyInvite"))
+            #expect(sloppyInvite.absoluteFrame.width > 0)
             for button in [refresh, addLocal, install] {
                 #expect(button.absoluteFrame.height <= 32)
                 #expect(button.absoluteFrame.width < 180)

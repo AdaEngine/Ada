@@ -4,6 +4,23 @@ import Testing
 
 @Suite("Web Player portable bundle")
 struct AdaWebPlayerTests {
+    @Test("Converts Medieval Arena portable project to scene profile")
+    func medievalArenaProject() throws {
+        let directory = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Demos/MedievalArena", isDirectory: true)
+        let project = try AdaWebPlayerProject.load(at: directory)
+
+        #expect(project.profile == "scene")
+        #expect(project.runtimeAPI == 3)
+        #expect(project.sources.count == 4)
+        #expect(project.files?.contains("Assets/Scenes/Main.ascn") == true)
+        #expect(project.files?.contains("Assets/Maps/Arena.tilemap") == true)
+        #expect(try project.loadSources(at: directory).count == 4)
+    }
+
     @Test("External source edits are picked up without changing the player bytes")
     func externalSources() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -39,7 +56,7 @@ struct AdaWebPlayerTests {
     @Test("Checks runtime API and case-insensitive collisions")
     func incompatibleProject() {
         var project = AdaWebPlayerProject(title: "Game", entryView: "Game", sources: ["Main.ada"])
-        project.runtimeAPI = 3
+        project.runtimeAPI = 4
         #expect(throws: AdaWebPlayerProjectError.self) { try project.validate() }
         project.runtimeAPI = 1
         project.sources.append("main.ada")
@@ -58,6 +75,60 @@ struct AdaWebPlayerTests {
             try AdaWebPlayerBundle.assemble(template: root.appendingPathComponent("missing"), project: root, output: root.appendingPathComponent("out"))
         }
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("out").path))
+    }
+
+    @Test("Scene profile packages AdaScript systems and startup scene bytes")
+    func sceneProfile() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let projectRoot = root.appendingPathComponent("project")
+        let template = root.appendingPathComponent("template")
+        try FileManager.default.createDirectory(at: projectRoot.appendingPathComponent("Sources"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: projectRoot.appendingPathComponent("Assets/Scenes"), withIntermediateDirectories: true)
+        try makeTemplate(at: template)
+        try Data(#"{"runtimeAPI":3,"profile":"universal"}"#.utf8).write(to: template.appendingPathComponent("ada-web-player.json"))
+        let script = "@system class Tick { func update(context) {} }"
+        try script.write(to: projectRoot.appendingPathComponent("Sources/Main.ada"), atomically: true, encoding: .utf8)
+        let scene = "format: ada.scene\nschemaVersion: 1\nscene:\n  id: test\n  name: Test\nentities: []\n"
+        try scene.write(to: projectRoot.appendingPathComponent("Assets/Scenes/Main.ascn"), atomically: true, encoding: .utf8)
+        var project = AdaWebPlayerProject(title: "Game", entryScene: "Assets/Scenes/Main.ascn", moduleName: "Game", sources: ["Sources/Main.ada"])
+        project.files = ["Assets/Scenes/Main.ascn"]
+        try JSONEncoder().encode(project).write(to: projectRoot.appendingPathComponent("project.json"))
+
+        let output = root.appendingPathComponent("out")
+        try AdaWebPlayerBundle.assemble(template: template, project: projectRoot, output: output)
+        let game = output.appendingPathComponent("game")
+        #expect(try AdaWebPlayerProject.load(at: game).entryScene == "Assets/Scenes/Main.ascn")
+        #expect(try String(contentsOf: game.appendingPathComponent("Assets/Scenes/Main.ascn"), encoding: .utf8) == scene)
+        let entries = try JSONDecoder().decode([Entry].self, from: Data(contentsOf: output.appendingPathComponent("ada-resource-manifest.json")))
+        #expect(entries.contains(Entry(path: "game/Assets/Scenes/Main.ascn", url: "game/Assets/Scenes/Main.ascn")))
+    }
+
+    @Test("AdaEditor scene projects package their sources and runtime settings")
+    func editorProjectSceneExport() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let project = root.appendingPathComponent("project")
+        let template = root.appendingPathComponent("template")
+        try FileManager.default.createDirectory(at: project.appendingPathComponent(".ada"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: project.appendingPathComponent("Sources"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: project.appendingPathComponent("Assets/Scenes"), withIntermediateDirectories: true)
+        try makeTemplate(at: template)
+        try Data(#"{"runtimeAPI":3,"profile":"universal"}"#.utf8).write(to: template.appendingPathComponent("ada-web-player.json"))
+        try Data("lobby".utf8).write(to: template.appendingPathComponent("player-lobby.js"))
+        let settings = #"{"build":{"system":"adascript"},"project":{"name":"SceneGame"},"paths":{"sources":"Sources","assets":"Assets"},"runtime":{"moduleName":"SceneGame","entry":{"scene":"Assets/Scenes/Main.ascn"}}}"#
+        try settings.write(to: project.appendingPathComponent(".ada/project.json"), atomically: true, encoding: .utf8)
+        try "@system class Tick { func update(context) {} }".write(to: project.appendingPathComponent("Sources/Main.ada"), atomically: true, encoding: .utf8)
+        try "format: ada.scene\n".write(to: project.appendingPathComponent("Assets/Scenes/Main.ascn"), atomically: true, encoding: .utf8)
+
+        let output = root.appendingPathComponent("out")
+        try AdaWebPlayerBundle.assemble(template: template, project: project, output: output)
+        let game = output.appendingPathComponent("game")
+        let manifest = try AdaWebPlayerProject.load(at: game)
+        #expect(manifest.profile == "scene")
+        #expect(manifest.title == "SceneGame")
+        #expect(try Data(contentsOf: game.appendingPathComponent("runtime-settings.json")) == Data(settings.utf8))
+        #expect(try String(contentsOf: game.appendingPathComponent("Assets/Scenes/Main.ascn"), encoding: .utf8) == "format: ada.scene\n")
     }
 
     @Test("Rejects a template whose resource manifest points at missing shader bytes")

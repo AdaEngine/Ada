@@ -260,6 +260,9 @@ extension EditorViewModel {
         if fileExtension == "tileset" {
             return .tileSource
         }
+        if fileExtension == "tilemap" {
+            return .tileMap
+        }
         if fileExtension == "atlas" {
             return .atlas
         }
@@ -298,6 +301,16 @@ extension EditorViewModel {
                 reference: reference,
                 absolutePath: absolutePath
             )
+        }
+    }
+
+    static func tileMapAssets(from items: [EditorProjectSidebarViewModel.Item]) -> [EditorInspectorSidebarViewModel.TextureAsset] {
+        items.compactMap { item in
+            guard URL(fileURLWithPath: item.title).pathExtension.lowercased() == "tilemap",
+                let assetsRoot = item.assetRoot,
+                let reference = assetReference(for: item.relativePath, assetsRoot: assetsRoot),
+                let absolutePath = absoluteFilePath(from: item.id) else { return nil }
+            return .init(name: item.title, reference: reference, absolutePath: absolutePath)
         }
     }
 
@@ -347,6 +360,7 @@ extension EditorViewModel {
 
     func syncInspectorTextureAssets() {
         inspectorSidebar.textureAssets = Self.textureAssets(from: projectSidebar.items)
+        inspectorSidebar.tileMapAssets = Self.tileMapAssets(from: projectSidebar.items)
         inspectorSidebar.sceneAssets = Self.sceneAssets(from: projectSidebar.items)
         inspectorSidebar.uiSourcePaths = Self.uiSourcePaths(from: projectSidebar.items)
         inspectorSidebar.uiSceneFiles = Self.uiSceneFiles(from: projectSidebar.items)

@@ -65,7 +65,12 @@ enum GravityScriptModuleResolver {
                 throw AdaScriptError.invalidManifest(error.description)
             }
             let loweredAssetsSource = AdaScriptAssetsLowerer.lower(source: loweredViewSource)
-            let loweredSource = AdaScriptNetworkLowerer.lower(source: loweredAssetsSource)
+            let schemas = try AdaScriptSchemaParser.parse(sources: [source])
+            let loweredComponentSource = AdaScriptComponentLowerer.lower(
+                source: loweredAssetsSource,
+                schemas: schemas
+            )
+            let loweredSource = AdaScriptNetworkLowerer.lower(source: loweredComponentSource)
             var scanner = AdaScriptSourceScanner(source: loweredSource, path: path)
             parsedSources[path] = try scanner.scan()
         }
@@ -123,6 +128,7 @@ enum GravityScriptModuleResolver {
     private static let rootAnnotations: Set<String> = [
         "component",
         "network_command",
+        "rpc",
         "replicated_component",
         "resource",
         "scriptable",

@@ -40,6 +40,7 @@ AdaEditor projects configure automatic script discovery by default. For an exist
 
 - <doc:GettingStartedWithAdaScript>
 - <doc:AdaScriptLanguage>
+- <doc:AdaScriptAnnotations>
 - <doc:AdaScriptLibraries>
 
 ### ECS Integration

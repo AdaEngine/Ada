@@ -58,9 +58,9 @@ engine features they need in Runtime Settings. Libraries share the game's module
 class names, function names, and annotation IDs to avoid collisions. Imports do not create namespaces.
 Library authors should not declare `main()`.
 
-Pure AdaScript projects use native types already supported by the host. Their existing restriction
-on new `@component` and `@resource` layouts still applies. SwiftPM games can generate those layouts
-through `AdaScriptBuildPlugin`. Installing a library does not compile arbitrary Swift or install native binaries.
+Pure AdaScript projects can register supported runtime-defined component layouts. SwiftPM games
+generate native backing types through `AdaScriptBuildPlugin`. Installing a library does not compile
+arbitrary Swift or install native binaries. See <doc:AdaScriptAnnotations> for schema rules.
 
 ## Dependencies and reproducibility
 

@@ -14,6 +14,9 @@ extension EditorViewModel {
         projectSidebar.select(item)
         let document = Self.document(for: item)
         workbench.open(document)
+        if case let .asset(asset) = document, asset.kind == .tileSource {
+            presentSceneInspector()
+        }
         if case .ui = document {
             refreshUIExports()
         }

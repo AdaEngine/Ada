@@ -8,6 +8,10 @@ import Observation
 #endif
 
 struct AdaPlayerApp: App {
+    init() {
+        EditorComponentRegistry.registerBuiltIns()
+    }
+
     var body: some AppScene {
         WindowGroup { AdaPlayerHomeView() }
             .windowTitle("AdaPlayer")

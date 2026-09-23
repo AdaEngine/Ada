@@ -114,7 +114,7 @@ extension EditorInspectorSidebar {
                     Text("\u{E3F4}")
                         .font(AdaEditorMaterialSymbolFont.font(size: 17))
                         .foregroundColor(theme.editorColors.purple)
-                    Text(value.isEmpty ? "Choose texture…" : value)
+                    Text(value.isEmpty ? (fieldID.hasSuffix(".map") ? "Choose tile map…" : "Choose texture…") : value)
                         .font(.system(size: 10))
                         .foregroundColor(value.isEmpty ? theme.editorColors.muted : theme.editorColors.text)
                         .lineLimit(1)
@@ -139,7 +139,10 @@ extension EditorInspectorSidebar {
                             assetSearchText = ""
                         },
                         onDrop: { url in
-                            guard let asset = viewModel.textureAsset(droppedFileURL: url) else {
+                            let asset = fieldID.hasSuffix(".map")
+                                ? viewModel.tileMapAssets.first(where: { $0.absolutePath == url.path })
+                                : viewModel.textureAsset(droppedFileURL: url)
+                            guard let asset else {
                                 return
                             }
                             text.wrappedValue = asset.reference
@@ -150,7 +153,7 @@ extension EditorInspectorSidebar {
             }
 
             if activeAssetFieldID == fieldID {
-                assetPicker(text: text)
+                assetPicker(text: text, tileMaps: fieldID.hasSuffix(".map"))
             }
         }
     }
@@ -262,9 +265,9 @@ extension EditorInspectorSidebar {
         .overlay { RoundedRectangleShape(cornerRadius: 6).stroke(theme.editorColors.border.opacity(0.65), lineWidth: 1) }
     }
 
-    func assetPicker(text: Binding<String>) -> some View {
+    func assetPicker(text: Binding<String>, tileMaps: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            TextField("Search project textures", text: Binding(get: { assetSearchText }, set: { assetSearchText = $0 }))
+            TextField(tileMaps ? "Search project tile maps" : "Search project textures", text: Binding(get: { assetSearchText }, set: { assetSearchText = $0 }))
                 .font(.system(size: 10, weight: .bold))
                 .foregroundColor(theme.editorColors.text)
                 .padding(.horizontal, 8)
@@ -290,13 +293,13 @@ extension EditorInspectorSidebar {
                         .frame(height: 28)
                     }
                     .buttonStyle(DefaultButtonStyle())
-                    if viewModel.textureAssets(matching: assetSearchText).isEmpty {
-                        Text("No image assets found in this project.")
+                    if (tileMaps ? viewModel.tileMapAssets(matching: assetSearchText) : viewModel.textureAssets(matching: assetSearchText)).isEmpty {
+                        Text(tileMaps ? "No tile maps found in this project." : "No image assets found in this project.")
                             .font(.system(size: 9))
                             .foregroundColor(theme.editorColors.muted)
                             .padding(6)
                     } else {
-                        ForEach(viewModel.textureAssets(matching: assetSearchText), id: \.id) { asset in
+                        ForEach(tileMaps ? viewModel.tileMapAssets(matching: assetSearchText) : viewModel.textureAssets(matching: assetSearchText), id: \.id) { asset in
                             Button(action: {
                                 text.wrappedValue = asset.reference
                                 activeAssetFieldID = nil

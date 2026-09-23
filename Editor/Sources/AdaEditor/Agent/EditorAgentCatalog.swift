@@ -66,6 +66,7 @@ enum EditorAgentDiscovery {
             .map {
                 home.appendingPathComponent($0).path
             }
+        paths.append(home.appendingPathComponent("Library/Application Support/Sloppy/Backend/current/bin").path)
         let nvm = home.appendingPathComponent(".nvm/versions/node")
         let versions = (try? fileManager.contentsOfDirectory(atPath: nvm.path)) ?? []
         paths += versions.sorted { $0.compare($1, options: .numeric) == .orderedDescending }
@@ -94,7 +95,7 @@ enum EditorAgentDiscovery {
             ("gemini", "Gemini CLI", [("gemini", ["--acp"])]),
             ("opencode", "OpenCode", [("opencode", ["acp"])]),
             ("github-copilot-cli", "GitHub Copilot", [("copilot", ["--acp"])]),
-            ("sloppy-acp", "Sloppy", [("sloppy-acp", [])]),
+            ("sloppy-acp", "Sloppy", [("sloppy", ["acp", "serve"]), ("sloppy-acp", [])]),
         ]
         return candidates.compactMap { id, name, commands in
             for (command, arguments) in commands {

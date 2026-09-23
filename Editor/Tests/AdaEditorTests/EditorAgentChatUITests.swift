@@ -41,7 +41,7 @@ struct EditorAgentChatUITests {
         #expect(model.prompt.isEmpty)
     }
 
-    @Test("Conversation settings invokes the settings action and tabs have separate hit areas")
+    @Test("Header has one settings action and compact tabs have a deletion menu")
     func tabsAndSettings() throws {
         let model = EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())
         _ = makeContainer(model)
@@ -56,10 +56,58 @@ struct EditorAgentChatUITests {
         container.layoutIfNeeded()
         let a = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Session.\(first.id)"))
         let b = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Session.\(second.id)"))
+        let header = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Header"))
         #expect(a.absoluteFrame.maxX < b.absoluteFrame.minX)
         #expect(a.absoluteFrame.height == 32)
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Settings"))
+        #expect(a.absoluteFrame.minY - header.absoluteFrame.maxY <= 3)
+        #expect(throws: (any Error).self) { try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Connect")) }
+        #expect(throws: (any Error).self) { try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Delete session")) }
+        var menu: ContextMenuPresentation?
+        let previous = ContextMenuPresentationCenter.present
+        ContextMenuPresentationCenter.present = { menu = $0 }
+        defer { ContextMenuPresentationCenter.present = previous }
+        container.onMouseEvent(MouseEvent(
+            window: RID(), button: .right, mousePosition: Point(b.absoluteFrame.midX, b.absoluteFrame.midY),
+            phase: .began, modifierKeys: [], time: 0
+        ))
+        #expect(menu?.items.map(\.title) == ["Delete session"])
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.OpenCatalog"))
         #expect(opened)
+    }
+
+    @Test("Connection failure shows Retry and a new session connects automatically")
+    func automaticConnectionAndRetry() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("AgentRetry-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try ProjectSystem.saveProject(ProjectSystem.defaultProject(projectName: "Retry"), at: root)
+        let settings = EditorAgentSettingsStore()
+        try settings.save(AdaProjectAgent(enabled: true, target: AdaProjectAgentTarget(command: "/bin/echo")))
+        let service = FakeEditorAgentService(connectionError: .providerFailure("Unavailable"))
+        let model = EditorAgentViewModel(project: .init(name: "Retry", path: root.path), settings: settings, service: service)
+        await model.loadSessions()
+        for _ in 0..<100 {
+            if case .failed = model.currentConnectionState { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        guard case .failed = model.currentConnectionState else {
+            Issue.record("Expected automatic connection to fail")
+            return
+        }
+        let container = makeContainer(model)
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Retry"))
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Retry"))
+        for _ in 0..<100 {
+            if case .failed = model.currentConnectionState, await service.connectionCount() >= 2 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(await service.connectionCount() >= 2)
+        try await model.createSession()
+        for _ in 0..<100 {
+            if await service.connectionCount() >= 3 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(await service.connectionCount() >= 3)
     }
 
     @Test("Provider JSON errors remain readable instead of disappearing in Markdown")

@@ -27,24 +27,32 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable {
 final class AnnotatedGravityCommandsBridge: @unchecked Sendable {
     private var commands: Commands?
     private let reportDiagnostic: @Sendable (String) -> Void
+    private let runtimeComponents: [String: RuntimeComponentDescriptor]
     private var isActive = true
 
     @GSExportableIgnore
     static func make(
         commands: Commands?,
+        runtimeComponents: [RuntimeComponentDescriptor] = [],
         reportDiagnostic: @escaping @Sendable (String) -> Void
     ) -> AnnotatedGravityCommandsBridge {
         AnnotatedGravityCommandsBridge(
             commands: commands,
+            runtimeComponents: runtimeComponents,
             reportDiagnostic: reportDiagnostic
         )
     }
 
     private init(
         commands: Commands?,
+        runtimeComponents: [RuntimeComponentDescriptor],
         reportDiagnostic: @escaping @Sendable (String) -> Void
     ) {
         self.commands = commands
+        self.runtimeComponents = runtimeComponents.reduce(into: [:]) { result, descriptor in
+            result[descriptor.name] = descriptor
+            result[descriptor.stableID] = descriptor
+        }
         self.reportDiagnostic = reportDiagnostic
     }
 
@@ -64,7 +72,7 @@ final class AnnotatedGravityCommandsBridge: @unchecked Sendable {
             let diagnosticName: String
             if componentValue.isString {
                 let name = componentValue.toString
-                guard let defaultComponent = RuntimeTypeRegistry.makeDefaultComponent(named: name) else {
+                guard let defaultComponent = makeDefaultComponent(named: name) else {
                     reportDiagnostic("Component '\(name)' does not have a registered default")
                     return -1
                 }
@@ -81,7 +89,8 @@ final class AnnotatedGravityCommandsBridge: @unchecked Sendable {
                 reportDiagnostic("world.spawn values must be component constructors")
                 return -1
             }
-            guard componentIDs.insert(type(of: component).identifier).inserted else {
+            let componentID = (component as? RuntimeComponentPayload)?.componentID ?? type(of: component).identifier
+            guard componentIDs.insert(componentID).inserted else {
                 reportDiagnostic("world.spawn contains duplicate component '\(diagnosticName)'")
                 return -1
             }
@@ -99,7 +108,7 @@ final class AnnotatedGravityCommandsBridge: @unchecked Sendable {
         guard validateAccess(), let commands else {
             return false
         }
-        guard let component = RuntimeTypeRegistry.makeDefaultComponent(named: componentName) else {
+        guard let component = makeDefaultComponent(named: componentName) else {
             reportDiagnostic("Component '\(componentName)' does not have a registered default")
             return false
         }
@@ -112,11 +121,16 @@ final class AnnotatedGravityCommandsBridge: @unchecked Sendable {
         guard validateAccess(), let commands else {
             return false
         }
-        guard let componentType = RuntimeTypeRegistry.componentType(named: componentName) else {
+        let componentID: ComponentId
+        if let componentType = RuntimeTypeRegistry.componentType(named: componentName) {
+            componentID = componentType.identifier
+        } else if let descriptor = runtimeComponents[componentName] {
+            componentID = descriptor.componentID
+        } else {
             reportDiagnostic("Unknown component '\(componentName)'")
             return false
         }
-        commands.entity(entityID).remove(componentType.identifier, from: entityID)
+        commands.entity(entityID).remove(componentID, from: entityID)
         return true
     }
 
@@ -144,5 +158,9 @@ final class AnnotatedGravityCommandsBridge: @unchecked Sendable {
             return false
         }
         return true
+    }
+
+    private func makeDefaultComponent(named name: String) -> (any Component)? {
+        RuntimeTypeRegistry.makeDefaultComponent(named: name) ?? runtimeComponents[name]?.makeDefault()
     }
 }

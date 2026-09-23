@@ -22,7 +22,9 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     }
 
     private let plans: [AnnotatedSystemPlan]
+    private let dataSchemas: [AdaScriptDataSchema]
     private let networkCommands: [AdaScriptNetworkCommandSchema]
+    private let runtimeComponents: [RuntimeComponentDescriptor]
     private let runtime: AnnotatedGravityRuntime
 
     public convenience init(contentsOf fileURL: URL) throws {
@@ -51,15 +53,19 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         startupSystemIdentifier: String? = nil
     ) throws {
         let componentConstructors = AdaScriptComponentRuntime.linkedConstructors()
+        let dataSchemas = try AdaScriptSchemaParser.parse(sources: sources)
+        let runtimeComponents = AdaScriptComponentRuntime.runtimeDescriptors(schemas: dataSchemas)
         let networkCommands = try AdaScriptSchemaParser.parseNetworkCommands(sources: sources)
         let module = try GravityScriptModuleResolver.resolve(sources)
         let runtime = try AnnotatedGravityRuntime(
             module: module,
             componentConstructors: componentConstructors,
+            runtimeComponents: runtimeComponents,
             networkCommands: networkCommands
         )
         let resourceBindings = try AdaScriptSchemaParser.parseResourceBindings(sources: sources)
         let remoteCommandBindings = try AdaScriptSchemaParser.parseRemoteCommandBindings(sources: sources)
+        let rpcMethodBindings = try AdaScriptSchemaParser.parseRPCMethodBindings(sources: sources)
         let networkCommandNames = Set(networkCommands.map(\.name))
         if let unknownBinding = remoteCommandBindings.first(where: { !networkCommandNames.contains($0.commandName) }) {
             throw AdaScriptError.invalidManifest(
@@ -70,6 +76,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         var plans = try AdaScriptSystemPlanBuilder.makePlans(
             from: runtime.annotations,
             remoteCommandBindings: remoteCommandBindings,
+            rpcMethodBindings: rpcMethodBindings,
             resourceBindings: resourceBindings,
             systemCapabilities: capabilities
         )
@@ -88,7 +95,9 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             plans.insert(startupPlan, at: 0)
         }
         self.name = name
+        self.dataSchemas = dataSchemas
         self.networkCommands = networkCommands
+        self.runtimeComponents = runtimeComponents
         self.runtime = runtime
         self.plans = plans
         try runtime.instantiateSystems(plans)
@@ -111,12 +120,31 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
 
     @MainActor
     public func setup(in app: borrowing AppWorlds) {
-        if !networkCommands.isEmpty {
+        for descriptor in runtimeComponents {
+            app.main.registerRuntimeComponent(descriptor)
+        }
+        let replicatedSchemas = dataSchemas.filter { $0.replication != nil }
+        if !networkCommands.isEmpty || !replicatedSchemas.isEmpty {
             guard app.getResource(MultiplayerRegistry.self) != nil else {
                 runtime.appendDiagnostic("Typed AdaScript network declarations require MultiplayerPlugin")
                 return
             }
             do {
+                for schema in replicatedSchemas where
+                    RuntimeTypeRegistry.componentType(named: schema.name) == nil &&
+                    RuntimeTypeRegistry.componentType(named: schema.id) == nil {
+                    guard let descriptor = runtimeComponents.first(where: { $0.stableID == schema.id }) else {
+                        continue
+                    }
+                    let fieldIndices = Dictionary(uniqueKeysWithValues: schema.fields.enumerated().compactMap { index, field in
+                        field.network.map { ($0.tag, index) }
+                    })
+                    app.registerReplicatedRuntimeComponent(
+                        descriptor,
+                        schema: try AdaScriptNetworkBridge.descriptor(for: schema),
+                        fieldIndices: fieldIndices
+                    )
+                }
                 for command in networkCommands {
                     let fields = Dictionary(
                         uniqueKeysWithValues: command.fields.compactMap { field in
@@ -159,7 +187,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     ) throws -> PreparedAnnotatedSystem {
         let queries = try plan.queries.enumerated()
             .map { queryIndex, query in
-                try prepareQuery(query, systemIdentifier: plan.identifier, queryIndex: queryIndex)
+                try prepareQuery(query, systemIdentifier: plan.identifier, queryIndex: queryIndex, world: world)
             }
         let resources = try plan.resources.map { resource in
             try prepareResource(resource, systemIdentifier: plan.identifier)
@@ -170,6 +198,9 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
                 parameter: Res<AdaScriptNetworkRuntime>(),
                 propertyName: $0.propertyName
             )
+        }
+        let rpcMethods = plan.rpcMethods.map {
+            PreparedAnnotatedRPCMethod(commandName: $0.commandName, fieldNames: $0.fieldNames, parameter: Res<AdaScriptNetworkRuntime>())
         }
         return PreparedAnnotatedSystem(
             className: plan.className,
@@ -186,6 +217,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             scheduler: plan.scheduler,
             queries: queries,
             remoteCommands: remoteCommands,
+            rpcMethods: rpcMethods,
             resources: resources
         )
     }
@@ -218,12 +250,13 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     private static func prepareQuery(
         _ plan: AnnotatedQueryPlan,
         systemIdentifier: String,
-        queryIndex: Int
+        queryIndex: Int,
+        world: World
     ) throws -> PreparedAnnotatedQuery {
-        var resolved: [String: any Component.Type] = [:]
+        var resolved: [String: ResolvedAnnotatedComponent] = [:]
         let allNames = plan.components + plan.withComponents + plan.withoutComponents
         for name in allNames where resolved[name] == nil {
-            guard let component = resolveComponent(named: name) else {
+            guard let component = resolveComponent(named: name, world: world) else {
                 throw AdaScriptError.unknownComponent(
                     system: systemIdentifier,
                     queryIndex: queryIndex,
@@ -254,12 +287,10 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
                 // The first vertical slice conservatively grants write access to
                 // fetched components. Static access inference will narrow this set.
                 access.addComponentWrite(component.identifier)
-                let typeName = String(reflecting: component)
-                let descriptor = ComponentReflectionRegistry.descriptor(named: typeName)
                 return AnnotatedComponentAccess(
                     alias: defaultAlias(for: name),
                     componentIndex: index,
-                    fields: Dictionary(uniqueKeysWithValues: descriptor?.fields.map { ($0.key, $0) } ?? [])
+                    fields: Dictionary(uniqueKeysWithValues: component.fields.map { ($0.key, $0) })
                 )
             }
 
@@ -271,18 +302,27 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         )
     }
 
-    private static func resolveComponent(named name: String) -> (any Component.Type)? {
+    private static func resolveComponent(named name: String, world: World) -> ResolvedAnnotatedComponent? {
         if let exact = RuntimeTypeRegistry.componentType(named: name) {
-            return exact
+            return resolvedNativeComponent(exact)
         }
         let matches = RuntimeTypeRegistry.registeredComponentTypes()
             .filter { registeredName, _ in
                 registeredName == name || registeredName.hasSuffix(".\(name)")
             }
-        guard matches.count == 1 else {
-            return nil
+        if matches.count == 1, let component = matches.first?.value {
+            return resolvedNativeComponent(component)
         }
-        return matches.first?.value
+        guard let descriptor = world.runtimeComponentDescriptor(named: name) else { return nil }
+        return ResolvedAnnotatedComponent(identifier: descriptor.componentID, fields: descriptor.fields)
+    }
+
+    private static func resolvedNativeComponent(_ component: any Component.Type) -> ResolvedAnnotatedComponent {
+        let typeName = String(reflecting: component)
+        return ResolvedAnnotatedComponent(
+            identifier: component.identifier,
+            fields: ComponentReflectionRegistry.descriptor(named: typeName)?.fields ?? []
+        )
     }
 
     private static func defaultAlias(for componentName: String) -> String {
@@ -294,6 +334,11 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     }
 }
 
+private struct ResolvedAnnotatedComponent {
+    let identifier: ComponentId
+    let fields: [ReflectedComponentField]
+}
+
 struct AnnotatedSystemPlan: Sendable {
     let className: String
     let dependencies: [SystemDependency]
@@ -301,6 +346,7 @@ struct AnnotatedSystemPlan: Sendable {
     let scheduler: SchedulerName
     let queries: [AnnotatedQueryPlan]
     let remoteCommands: [AnnotatedRemoteCommandPlan]
+    let rpcMethods: [AnnotatedRPCMethodPlan]
     let resources: [AnnotatedResourcePlan]
     let usesDeferredCommands: Bool
 }
@@ -308,6 +354,11 @@ struct AnnotatedSystemPlan: Sendable {
 struct AnnotatedRemoteCommandPlan: Sendable {
     let commandName: String
     let propertyName: String
+}
+
+struct AnnotatedRPCMethodPlan: Sendable {
+    let commandName: String
+    let fieldNames: [String]
 }
 
 struct AnnotatedResourcePlan: Sendable {
@@ -331,6 +382,7 @@ private struct PreparedAnnotatedSystem: Sendable {
     let scheduler: SchedulerName
     let queries: [PreparedAnnotatedQuery]
     let remoteCommands: [PreparedAnnotatedRemoteCommands]
+    let rpcMethods: [PreparedAnnotatedRPCMethod]
     let resources: [PreparedAnnotatedResource]
 }
 
@@ -338,6 +390,12 @@ private struct PreparedAnnotatedRemoteCommands: Sendable {
     let commandName: String
     let parameter: Res<AdaScriptNetworkRuntime>
     let propertyName: String
+}
+
+private struct PreparedAnnotatedRPCMethod: Sendable {
+    let commandName: String
+    let fieldNames: [String]
+    let parameter: Res<AdaScriptNetworkRuntime>
 }
 
 private enum PreparedAnnotatedResource: Sendable {
@@ -423,6 +481,7 @@ private struct AnnotatedGravityScriptSystem: System {
         var parameters: [any SystemParameter] = preparedSystem?.queries.map { $0.query as any SystemParameter } ?? []
         parameters += preparedSystem?.resources.map { $0.parameter as any SystemParameter } ?? []
         parameters += preparedSystem?.remoteCommands.map { $0.parameter as any SystemParameter } ?? []
+        parameters += preparedSystem?.rpcMethods.map { $0.parameter as any SystemParameter } ?? []
         if let commands = preparedSystem?.commands {
             parameters.append(commands)
         }
@@ -475,6 +534,13 @@ private struct AnnotatedGravityScriptSystem: System {
                 )
             )
         }
+        let rpcCalls = preparedSystem.rpcMethods.map { method in
+            (
+                commandName: method.commandName,
+                fieldNames: method.fieldNames,
+                payloads: method.parameter.wrappedValue.commands(named: method.commandName)
+            )
+        }
         let world = runtime.makeWorldBridge(commands: preparedSystem.commands)
         runtime.update(
             className: preparedSystem.className,
@@ -482,6 +548,7 @@ private struct AnnotatedGravityScriptSystem: System {
             deltaTime: Double(deltaTime.wrappedValue?.deltaTime ?? 0),
             queries: zip(preparedSystem.queries, queries).map { ($0.propertyName, $1) },
             remoteCommands: remoteCommands,
+            rpcCalls: rpcCalls,
             resources: resources,
             world: world
         )
@@ -494,16 +561,19 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
     // The runtime owns its delegate for exactly the VM lifetime; this is not a callback back-reference.
     // swiftlint:disable:next weak_delegate
     private let delegate: AnnotatedGravityRuntimeDelegate
+    private let runtimeComponents: [RuntimeComponentDescriptor]
     private let virtualMachine: GravityVirtualMachine
     private var instances: [String: GSValue] = [:]
 
     init(
         module: ResolvedGravityScriptModule,
         componentConstructors: [AdaScriptLinkedComponentConstructor],
+        runtimeComponents: [RuntimeComponentDescriptor],
         networkCommands: [AdaScriptNetworkCommandSchema]
     ) throws {
         let delegate = AnnotatedGravityRuntimeDelegate(module: module)
         self.delegate = delegate
+        self.runtimeComponents = runtimeComponents
 
         AdaScriptRuntimeCoordinator.lock.lock()
         defer { AdaScriptRuntimeCoordinator.lock.unlock() }
@@ -527,6 +597,7 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         try AdaScriptComponentRuntime.bind(
             to: virtualMachine,
             constructors: componentConstructors,
+            runtimeDescriptors: runtimeComponents,
             reportDiagnostic: delegate.append
         )
         try AdaScriptAssetRuntime.bind(to: virtualMachine, reportDiagnostic: delegate.append)
@@ -585,6 +656,7 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         deltaTime: Double,
         queries: [(propertyName: String, query: AnnotatedGravityQueryBridge)],
         remoteCommands: [(propertyName: String, value: GSValue)],
+        rpcCalls: [(commandName: String, fieldNames: [String], payloads: [AdaScriptRemoteCommandPayload])],
         resources: [(propertyName: String, resource: AnnotatedResourceBridge)],
         world: AnnotatedGravityWorldContext
     ) {
@@ -620,6 +692,18 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
             }
         }
         let context = AnnotatedGravitySystemContext.make(deltaTime: deltaTime, world: world)
+        for rpc in rpcCalls {
+            for payload in rpc.payloads {
+                let arguments: [GSValue] = [GSValue(string: payload.source, in: virtualMachine)] + rpc.fieldNames.compactMap { name in
+                    payload.values[name].map { AnnotatedGravityValueBridge.makeGravityValue($0, virtualMachine: virtualMachine) }
+                }
+                guard arguments.count == rpc.fieldNames.count + 1 else {
+                    delegate.append("Missing @rpc field in '\(rpc.commandName)' for system '\(systemIdentifier)'")
+                    continue
+                }
+                _ = instance.callMethod(named: "__ada_rpc_handler_\(rpc.commandName)", with: arguments)
+            }
+        }
         _ = instance.callMethod(named: "update", with: [context])
     }
 
@@ -682,6 +766,7 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         AnnotatedGravityWorldContext.make(
             commands: AnnotatedGravityCommandsBridge.make(
                 commands: commands,
+                runtimeComponents: runtimeComponents,
                 reportDiagnostic: appendDiagnostic
             )
         )

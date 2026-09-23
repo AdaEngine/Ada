@@ -142,4 +142,37 @@ struct EditorSettingsTreeTests {
         )
         #expect(abs(context.absoluteFrame.maxY - container.bounds.height) < 0.5)
     }
+
+    @Test("Project settings pages start at the same vertical position")
+    func projectPagesStayTopAligned() async throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "SettingsPageAlignment")))
+        }
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SettingsPageAlignment-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        let project = try EditorProjectStore(storageURL: rootURL.appendingPathComponent("projects.json"))
+            .createProject(named: "SettingsPageAlignment", at: rootURL, template: .adaScript)
+        let model = EditorSettingsWindowViewModel(editorViewModel: EditorViewModel(project: project), selectedSection: .project)
+        let container = UIContainerView(rootView: EditorSettingsWindowView(viewModel: model).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 1000, height: 720)
+        container.bounds.size = container.frame.size
+
+        var pageTopPositions: [Float] = []
+        for page in ["PROJECT", "FEATURE PLUGINS", "BUILD FILE SELECTION", "RUN DESTINATION"] {
+            model.selectPage(page, in: .project)
+            for _ in 0..<10 {
+                await Task.yield()
+                container.update(1.0 / 60.0)
+                container.layoutIfNeeded()
+            }
+            let group = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.Group.\(page)"))
+            pageTopPositions.append(group.absoluteFrame.minY)
+        }
+
+        let firstPageTop = try #require(pageTopPositions.first)
+        #expect(pageTopPositions.allSatisfy { abs($0 - firstPageTop) < 1 })
+    }
 }

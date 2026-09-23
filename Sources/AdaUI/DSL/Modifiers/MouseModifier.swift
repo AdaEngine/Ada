@@ -26,6 +26,85 @@ extension View {
     public func onMiddleClick(perform action: @escaping () -> Void) -> some View {
         self.modifier(MiddleClickModifier(action: action, content: self))
     }
+
+    /// Receives scroll, pinch and optional secondary-button input without intercepting primary gestures.
+    public func onPointerNavigation(
+        scroll: @escaping (MouseEvent) -> Void,
+        pinch: @escaping (PinchEvent) -> Void,
+        secondaryDrag: ((MouseEvent) -> Void)? = nil
+    ) -> some View {
+        modifier(PointerNavigationModifier(content: self, scroll: scroll, pinch: pinch, secondaryDrag: secondaryDrag))
+    }
+}
+
+private struct PointerNavigationModifier<Content: View>: ViewModifier, ViewNodeBuilder {
+    typealias Body = Never
+
+    let content: Content
+    let scroll: (MouseEvent) -> Void
+    let pinch: (PinchEvent) -> Void
+    let secondaryDrag: ((MouseEvent) -> Void)?
+
+    func buildViewNode(in context: BuildContext) -> ViewNode {
+        PointerNavigationModifierNode(
+            contentNode: context.makeNode(from: content),
+            content: content,
+            scroll: scroll,
+            pinch: pinch,
+            secondaryDrag: secondaryDrag
+        )
+    }
+}
+
+private final class PointerNavigationModifierNode: ViewModifierNode {
+    private var scroll: (MouseEvent) -> Void
+    private var pinch: (PinchEvent) -> Void
+    private var secondaryDrag: ((MouseEvent) -> Void)?
+
+    init<Content: View>(
+        contentNode: ViewNode,
+        content: Content,
+        scroll: @escaping (MouseEvent) -> Void,
+        pinch: @escaping (PinchEvent) -> Void,
+        secondaryDrag: ((MouseEvent) -> Void)?
+    ) {
+        self.scroll = scroll
+        self.pinch = pinch
+        self.secondaryDrag = secondaryDrag
+        super.init(contentNode: contentNode, content: content)
+    }
+
+    override func update(from newNode: ViewNode) {
+        super.update(from: newNode)
+        guard let node = newNode as? PointerNavigationModifierNode else { return }
+        scroll = node.scroll
+        pinch = node.pinch
+        secondaryDrag = node.secondaryDrag
+    }
+
+    override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
+        guard self.point(inside: point, with: event) else { return nil }
+        if event is PinchEvent { return self }
+        if let mouse = event as? MouseEvent {
+            if mouse.button == .scrollWheel { return self }
+            if mouse.button == .right, secondaryDrag != nil { return self }
+        }
+        return super.hitTest(point, with: event)
+    }
+
+    override func onMouseEvent(_ event: MouseEvent) {
+        if event.button == .scrollWheel {
+            scroll(event)
+        } else if event.button == .right, let secondaryDrag {
+            secondaryDrag(event)
+        } else {
+            contentNode.onMouseEvent(event)
+        }
+    }
+
+    override func onPinchEvent(_ event: PinchEvent) {
+        pinch(event)
+    }
 }
 
 // MARK: - MiddleClickModifier

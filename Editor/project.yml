@@ -46,6 +46,8 @@ targets:
         com.apple.developer.game-center: true
         com.apple.security.app-sandbox: true
         com.apple.security.files.user-selected.read-write: true
+        com.apple.security.temporary-exception.files.home-relative-path.read-write:
+          - /.sloppy/
         com.apple.security.network.client: true
         com.apple.security.network.server: true
     type: application

@@ -122,7 +122,7 @@
             let document = JSObject.global.document
             guard
                 let container = document.getElementById("ada-canvas-root").object ?? document.body.object,
-                let appendChild: (JSObject) -> JSValue = container.appendChild
+                let appendChild: ((any ConvertibleToJSValue...) -> JSValue) = container.appendChild
             else {
                 preconditionFailure("Browser document must provide a canvas container.")
             }
@@ -196,7 +196,7 @@
             let observer = resizeObserverConstructor.new(closure)
             let document = JSObject.global.document
             let container = document.getElementById("ada-canvas-root").object ?? document.body.object
-            if let container, let observe: (JSObject) -> JSValue = observer.observe {
+            if let container, let observe: ((any ConvertibleToJSValue...) -> JSValue) = observer.observe {
                 _ = observe(container)
             }
             eventClosures[window.id, default: []].append(closure)
@@ -245,7 +245,7 @@
 
                 return .undefined
             }
-            guard let addEventListener: (String, JSClosure) -> JSValue = target.addEventListener else {
+            guard let addEventListener: ((any ConvertibleToJSValue...) -> JSValue) = target.addEventListener else {
                 preconditionFailure("JavaScript event targets must provide addEventListener.")
             }
             _ = addEventListener(name, closure)
@@ -441,7 +441,7 @@
 
         func location(from event: JSObject) -> Point {
             guard
-                let getBoundingClientRect: () -> JSValue = canvas.getBoundingClientRect,
+                let getBoundingClientRect: ((any ConvertibleToJSValue...) -> JSValue) = canvas.getBoundingClientRect,
                 let rect = getBoundingClientRect().object
             else {
                 return .zero
@@ -523,7 +523,7 @@
     }
 
     extension KeyModifier {
-        private init(browserEvent event: JSObject) {
+        fileprivate init(browserEvent event: JSObject) {
             self.init()
             if event.shiftKey.boolean == true {
                 insert(.shift)
@@ -541,7 +541,7 @@
     }
 
     extension KeyCode {
-        private init(browserEvent event: JSObject) {
+        fileprivate init(browserEvent event: JSObject) {
             let key = event.key.string ?? ""
             if key.count == 1, let scalar = key.lowercased().unicodeScalars.first {
                 self = KeyCode(rawValue: String(scalar)) ?? .none
@@ -574,7 +574,7 @@
     }
 
     extension MouseButton {
-        private init?(browserButton: Int) {
+        fileprivate init?(browserButton: Int) {
             switch browserButton {
             case 0:
                 self = .left
@@ -587,7 +587,7 @@
             }
         }
 
-        private init(browserButtons: Int) {
+        fileprivate init(browserButtons: Int) {
             if browserButtons & 1 != 0 {
                 self = .left
             } else if browserButtons & 4 != 0 {
@@ -601,7 +601,7 @@
     }
 
     extension Input.CursorShape {
-        private var browserCSSCursor: String {
+        fileprivate var browserCSSCursor: String {
             switch self {
             case .arrow: "default"
             case .pointingHand: "pointer"

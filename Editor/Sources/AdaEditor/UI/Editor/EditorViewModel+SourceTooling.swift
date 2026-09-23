@@ -361,7 +361,7 @@ extension EditorViewModel {
                     return
                 }
 
-                target.documentation = hover?.contents
+                target.documentation = hover?.contents ?? target.documentation
                 self.openSourceTarget(target)
             }
         }

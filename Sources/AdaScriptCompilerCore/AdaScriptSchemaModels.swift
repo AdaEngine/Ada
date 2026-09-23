@@ -131,6 +131,19 @@ public struct AdaScriptRemoteCommandBinding: Equatable, Sendable {
     }
 }
 
+/// An authored @rpc method body dispatched from authenticated network input.
+public struct AdaScriptRPCMethodBinding: Equatable, Sendable {
+    public let commandName: String
+    public let fieldNames: [String]
+    public let systemName: String
+
+    public init(commandName: String, fieldNames: [String], systemName: String) {
+        self.commandName = commandName
+        self.fieldNames = fieldNames
+        self.systemName = systemName
+    }
+}
+
 public struct AdaScriptableSchema: Equatable, Sendable {
     public let aliases: [String]
     public let bindings: [AdaScriptableBinding]

@@ -234,6 +234,11 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
             throw UIDiagnostic("Exported UI parameter names must be stored-property identifiers.")
         }
         self.exportedParameters = exportedParameters
+        let componentConstructors = AdaScriptComponentRuntime.linkedConstructors()
+        let runtimeComponents = AdaScriptComponentRuntime.runtimeDescriptors(
+            schemas: try AdaScriptSchemaParser.parse(sources: sources)
+        )
+        let networkCommands = try AdaScriptSchemaParser.parseNetworkCommands(sources: sources)
         let module = try GravityScriptModuleResolver.resolve(sources)
         self.factoryNamesByIdentifier = Dictionary(
             uniqueKeysWithValues: views.enumerated()
@@ -249,6 +254,18 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
         self.virtualMachine = try AdaScriptRuntimeCoordinator.lock.withLock {
             let virtualMachine = GravityVirtualMachine(settings: .init(), delegate: delegate)
             try virtualMachine.bindClass(with: AdaScriptViewBridge.self)
+            try AdaScriptComponentRuntime.bind(
+                to: virtualMachine,
+                constructors: componentConstructors,
+                runtimeDescriptors: runtimeComponents,
+                reportDiagnostic: delegate.append
+            )
+            try virtualMachine.bindClass(with: AdaScriptNetworkCommandFactory.self)
+            try virtualMachine.bindClass(with: AdaScriptNetworkCommandValue.self)
+            virtualMachine.setValue(
+                AdaScriptNetworkCommandFactory.make(schemas: networkCommands, reportDiagnostic: delegate.append),
+                forKey: "__adaNetworkFactory"
+            )
             try AdaScriptAssetRuntime.bind(to: virtualMachine, reportDiagnostic: delegate.append)
             virtualMachine.setValue(AdaScriptViewBridge(), forKey: "adaUIBuilder")
 
@@ -262,7 +279,11 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
                     "func __ada_ui_get_\(index)(instance) { return instance.\(name); }"
                 }
                 .joined(separator: "\n")
-            let binary = virtualMachine.loadGravityFile(from: module.entrySource + "\n" + factories + "\n" + getters)
+            let binary = virtualMachine.loadGravityFile(
+                from: AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
+                    + AdaScriptNetworkBridge.prelude(commands: networkCommands)
+                    + module.entrySource + "\n" + factories + "\n" + getters
+            )
             guard delegate.errors.isEmpty else {
                 throw AdaScriptError.compilation(delegate.errors)
             }

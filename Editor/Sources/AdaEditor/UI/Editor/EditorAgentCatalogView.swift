@@ -1,5 +1,9 @@
 @_spi(AdaEngine) import AdaEngine
 
+#if os(macOS)
+    import AppKit
+#endif
+
 struct EditorAgentCatalogView: View {
     let agent: EditorAgentViewModel
     var loadsCatalog = true
@@ -47,6 +51,9 @@ struct EditorAgentCatalogView: View {
                 }
                 if catalog.filter != .installed {
                     localAgents
+                    if catalog.showsSloppyInvite {
+                        sloppyInviteRow
+                    }
                     ForEach(
                         catalog.visibleAgents.filter { item in
                             !catalog.installed.contains { $0.id == item.id } && !catalog.discovered.contains { $0.id == item.id }
@@ -114,6 +121,10 @@ struct EditorAgentCatalogView: View {
                     }
                 }
                 Text(local.path).font(.system(size: 10)).foregroundColor(theme.editorColors.muted).lineLimit(2)
+                if local.name == "Sloppy" {
+                    Text("Connect will choose a Sloppy agent and enable its local ACP Server if needed.")
+                        .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+                }
                 if local.target == nil {
                     Text(
                         catalog.adapter(for: local) != nil
@@ -125,6 +136,36 @@ struct EditorAgentCatalogView: View {
             }
         }
     }
+
+    #if os(macOS)
+        private var sloppyInviteRow: some View {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Sloppy was not found on this Mac").font(.system(size: 12, weight: .semibold))
+                    Text(catalog.registeredSloppy.map { "Registered as \($0.login) on \($0.serverURL.host ?? "Sloppy Core"). Install Sloppy to use ACP." }
+                        ?? "Have a Sloppy user invite (slp_inv_)? Create an account on your Sloppy Core.")
+                        .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+                }
+                Spacer()
+                Button(catalog.registeredSloppy == nil ? "Sign in with invite" : "Use another invite") {
+                    if let values = EditorSloppyInvitePrompt.show() {
+                        Task {
+                            await catalog.registerSloppyInvite(
+                                server: values.server,
+                                invite: values.invite,
+                                name: values.name,
+                                login: values.login,
+                                password: values.password
+                            )
+                        }
+                    }
+                }
+                .buttonStyle(actionButtonStyle)
+                .disabled(catalog.isBusy)
+                .accessibilityIdentifier("AdaEditor.Agents.SloppyInvite")
+            }
+        }
+    #endif
 
     private func registryRow(_ item: EditorRegistryAgent) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -148,6 +189,49 @@ struct EditorAgentCatalogView: View {
         EditorAgentCatalogActionButtonStyle(theme: theme)
     }
 }
+
+#if os(macOS)
+    @MainActor
+    private enum EditorSloppyInvitePrompt {
+        struct Values {
+            let server: String
+            let invite: String
+            let name: String
+            let login: String
+            let password: String
+        }
+
+        static func show() -> Values? {
+            let alert = NSAlert()
+            alert.messageText = "Create a Sloppy account"
+            alert.informativeText = "Use the server address and one-time user invite supplied by your Sloppy administrator."
+            alert.addButton(withTitle: "Create account")
+            alert.addButton(withTitle: "Cancel")
+            let server = NSTextField(string: "")
+            server.placeholderString = "https://your-sloppy-core.example"
+            let name = NSTextField(string: "")
+            name.placeholderString = "Name"
+            let login = NSTextField(string: "")
+            login.placeholderString = "Login"
+            let password = NSSecureTextField(string: "")
+            password.placeholderString = "Password"
+            let invite = NSSecureTextField(string: "")
+            invite.placeholderString = "User invite (slp_inv_)"
+            let stack = NSStackView(views: [server, name, login, password, invite])
+            stack.orientation = .vertical
+            stack.spacing = 8
+            stack.frame = NSRect(x: 0, y: 0, width: 360, height: 180)
+            for field in [server, name, login, password, invite] {
+                field.translatesAutoresizingMaskIntoConstraints = false
+                field.widthAnchor.constraint(equalToConstant: 360).isActive = true
+                field.heightAnchor.constraint(equalToConstant: 28).isActive = true
+            }
+            alert.accessoryView = stack
+            guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+            return Values(server: server.stringValue, invite: invite.stringValue, name: name.stringValue, login: login.stringValue, password: password.stringValue)
+        }
+    }
+#endif
 
 private struct EditorAgentCatalogSearchBarStyle: SearchBarStyle {
     let theme: Theme

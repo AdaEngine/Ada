@@ -203,8 +203,7 @@ struct SwiftToolingTests {
         let projectURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("ToolbarAdaScriptWebRun-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: projectURL) }
-        var settings = ProjectSystem.defaultProject(projectName: "Game")
-        settings.build.system = .adaScript
+        let settings = ProjectSystem.defaultProject(projectName: "Game", buildSystem: .adaScript)
         try ProjectSystem.saveProject(settings, at: projectURL)
         let service = RecordingWorkspaceService()
         let viewModel = EditorViewModel(
@@ -215,10 +214,17 @@ struct SwiftToolingTests {
         )
 
         viewModel.runFromToolbar()
-        await Task.yield()
+        for _ in 0..<100 {
+            if case .failed = viewModel.workspaceStatus { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
 
         #expect(viewModel.playModeState == EditorPlayModeState.editing)
-        #expect(viewModel.workspaceStatus == .failed("Web run is not available for AdaScript projects yet."))
+        if case let .failed(message) = viewModel.workspaceStatus {
+            #expect(message.contains("Sources"))
+        } else {
+            Issue.record("AdaScript Web run did not validate the project sources.")
+        }
         #expect(await service.commands.isEmpty)
     }
 
@@ -456,6 +462,48 @@ struct SwiftToolingTests {
                     end: EditorSourceLocation(line: 0, character: 9)
                 )
         )
+    }
+
+    @Test("AdaScript Swift resources open their host source and documentation")
+    func gravitySwiftResourceNavigation() async throws {
+        let service = SwiftPMWorkspaceService()
+        let fileURL = URL(fileURLWithPath: "/tmp/HostResources.ada")
+        let source = """
+            class InputSystem {
+                @res var input: Input;
+                @res var multiplayer: Multiplayer;
+                @res var state: AdaScriptMultiplayerState;
+                func update() { input.isActionJustPressed("Jump"); multiplayer.send(null); }
+                func status() { input.available(); }
+            }
+            """
+        let cases: [(Int, Int, String, String, String)] = [
+            (1, 22, "InputManager.swift", "public struct Input", "inputs from keyboards"),
+            (2, 28, "AdaScriptNetworkBridge.swift", "class AdaScriptMultiplayerAPI", "Multiplayer bridge"),
+            (3, 24, "AdaScriptMultiplayerBridge.swift", "struct AdaScriptMultiplayerState", "transport-neutral mailbox"),
+        ]
+        for (line, column, fileName, declaration, documentation) in cases {
+            let position = EditorSourceLocation(line: line, character: column)
+            let target = try #require(await service.definition(fileURL: fileURL, language: .ada, text: source, position: position).first)
+            #expect(target.filePath.hasSuffix(fileName))
+            let swift = try String(contentsOfFile: target.filePath, encoding: .utf8)
+            #expect(swift.components(separatedBy: .newlines)[target.selectionRange.start.line].contains(declaration))
+            let hover = try #require(await service.hover(fileURL: fileURL, language: .ada, text: source, position: position))
+            #expect(hover.contents.contains(documentation))
+        }
+
+        let memberPosition = EditorSourceLocation(line: 4, character: 34)
+        let member = try #require(await service.definition(fileURL: fileURL, language: .ada, text: source, position: memberPosition).first)
+        #expect(member.filePath.hasSuffix("InputAction.swift"))
+        #expect(member.selectionRange.start.line > 10)
+        #expect(member.documentation?.contains("action became active") == true)
+        let bridgeMethod = try #require(await service.definition(
+            fileURL: fileURL,
+            language: .ada,
+            text: source,
+            position: EditorSourceLocation(line: 5, character: 30)
+        ).first)
+        #expect(bridgeMethod.filePath.hasSuffix("AdaScriptInputBridge.swift"))
     }
 
     @Test("AdaScript editor completion uses workspace symbols and character columns")

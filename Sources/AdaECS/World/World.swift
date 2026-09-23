@@ -49,6 +49,7 @@ public final class World: @unchecked Sendable, Codable {
     private var removedComponents: [Entity.ID: Set<ComponentId>] = [:]
 
     private var componentsStorage = ComponentsStorage()
+    var runtimeComponents = RuntimeComponentsStorage()
     public var commandQueue: WorldCommandQueue = WorldCommandQueue()
 
     var resources = Resources()
@@ -69,6 +70,7 @@ public final class World: @unchecked Sendable, Codable {
         self.archetypes = world.archetypes
         self.entities = world.entities
         self.componentsStorage = world.componentsStorage
+        self.runtimeComponents = world.runtimeComponents
     }
 
     /// Initialize a new world from a decoder.
@@ -535,6 +537,10 @@ extension World {
     }
 
     public func insert<T: Component>(_ component: T, for entityId: Entity.ID) {
+        if let runtimeComponent = component as? RuntimeComponentPayload {
+            insertRuntimeComponent(runtimeComponent, for: entityId)
+            return
+        }
         guard let location = self.entities.entities[entityId] else {
             return
         }
@@ -607,6 +613,71 @@ extension World {
             .archetypes[newLocation.archetypeId]
             .chunks
             .insert(component, for: entityId, lastTick: currentTick)
+    }
+
+    /// Inserts or replaces a logical runtime component on an entity.
+    public func insertRuntimeComponent(
+        _ component: RuntimeComponentPayload,
+        for entityId: Entity.ID
+    ) {
+        guard let location = entities.entities[entityId] else {
+            return
+        }
+        var archetype = archetypes.archetypes[location.archetypeId]
+        if archetype.componentLayout.maskSet.contains(component.componentID) {
+            archetypes.archetypes[location.archetypeId]
+                .chunks.chunks[location.chunkIndex]
+                .insertRuntimeComponent(component, at: location.chunkRow, lastTick: currentTick)
+            return
+        }
+
+        var newLayout = archetype.componentLayout
+        newLayout.insert(runtime: component.componentID)
+        var requiredComponents: [any Component] = []
+        for required in componentsStorage.getRequiredComponents(for: component.componentID) {
+            guard !newLayout.maskSet.contains(required.id) else {
+                continue
+            }
+            let value = required.constructor()
+            requiredComponents.append(value)
+            newLayout.insert(type(of: value))
+        }
+
+        let newArchetype: Archetype.ID
+        if let cached = archetype.edges.getArchetypeAfterInsertion(for: newLayout) {
+            newArchetype = cached
+        } else {
+            newArchetype = archetypes.getOrCreate(for: newLayout)
+            archetype.edges.addArchetypeAfterInsertion(newArchetype, for: newLayout)
+            archetypes.archetypes[location.archetypeId] = archetype
+        }
+        moveEntityToArchetype(entityId, oldLocation: location, newArchetype: newArchetype)
+        guard let newLocation = entities.entities[entityId] else {
+            assertionFailure("Failed to insert runtime component")
+            return
+        }
+        for required in requiredComponents {
+            archetypes.archetypes[newLocation.archetypeId]
+                .chunks.insert(required, for: entityId, lastTick: currentTick)
+        }
+        archetypes.archetypes[newLocation.archetypeId]
+            .chunks.chunks[newLocation.chunkIndex]
+            .insertRuntimeComponent(component, at: newLocation.chunkRow, lastTick: currentTick)
+    }
+
+    /// Makes a native component an invariant of one logical runtime component.
+    @discardableResult
+    public func registerRequiredComponent<T: Component>(
+        _ requiredComponent: T.Type,
+        forRuntimeComponent componentID: ComponentId,
+        constructor: @Sendable @escaping () -> T
+    ) -> Self {
+        componentsStorage.registerRequiredComponent(
+            forRuntimeComponent: componentID,
+            requiredComponentId: requiredComponent.identifier,
+            constructor: constructor
+        )
+        return self
     }
 
     @inline(__always)
@@ -741,7 +812,13 @@ extension World {
     /// Insert entity to the world. Expect, that entity is already stored in `Entities`.
     func insertNewEntity(_ entity: Entity, components: [any Component]) {
         let components: [any Component] = components.reduce(into: []) { partialResult, component in
-            for requiredComponent in componentsStorage.getRequiredComponents(for: component) {
+            let registeredRequirements: [ComponentsStorage.RequiredComponentInfo]
+            if let runtimeComponent = component as? RuntimeComponentPayload {
+                registeredRequirements = componentsStorage.getRequiredComponents(for: runtimeComponent.componentID)
+            } else {
+                registeredRequirements = componentsStorage.getRequiredComponents(for: component)
+            }
+            for requiredComponent in registeredRequirements {
                 partialResult.append(requiredComponent.constructor())
             }
             for requiredComponent in type(of: component).requiredComponents.components {

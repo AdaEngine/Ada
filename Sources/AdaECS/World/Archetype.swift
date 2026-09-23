@@ -101,21 +101,32 @@ public final class Archetypes: @unchecked Sendable {
 }
 
 public struct ComponentLayout: Hashable, Sendable {
-    public private(set) var components: [any Component.Type]
+    public struct Entry: @unchecked Sendable {
+        public let componentType: any Component.Type
+        public let identifier: ComponentId
+
+        init(componentType: any Component.Type, identifier: ComponentId) {
+            self.componentType = componentType
+            self.identifier = identifier
+        }
+    }
+
+    public private(set) var components: [Entry]
     public private(set) var maskSet: ComponentMaskSet
     public var componentsSize: Int {
-        components.reduce(0) { partialResult, type in
-            partialResult + MemoryLayout.size(ofValue: type)
+        components.reduce(0) { partialResult, entry in
+            partialResult + MemoryLayout.size(ofValue: entry.componentType)
         }
     }
 
     public init(components: [any Component]) {
-        var componentTypes = [any Component.Type]()
+        var componentTypes: [Entry] = []
         var maskSet = ComponentMaskSet(reservingCapacity: components.count)
         for component in components {
             let componentType = type(of: component)
-            componentTypes.append(componentType)
-            maskSet.insert(componentType.identifier)
+            let identifier = componentIdentifier(of: component)
+            componentTypes.append(Entry(componentType: componentType, identifier: identifier))
+            maskSet.insert(identifier)
         }
         self.maskSet = maskSet
         self.components = componentTypes
@@ -127,15 +138,17 @@ public struct ComponentLayout: Hashable, Sendable {
             set.insert(component.identifier)
         }
         self.maskSet = set
-        self.components = componentTypes
+        self.components = componentTypes.map {
+            Entry(componentType: $0, identifier: $0.identifier)
+        }
     }
 
     public init<each T: Component>(components _: repeat each T) {
-        var components = [any Component.Type]()
+        var components: [Entry] = []
         var maskSet = ComponentMaskSet()
         for component in repeat (each T).self {
             let id = component.identifier
-            components.append(component)
+            components.append(Entry(componentType: component, identifier: id))
             maskSet.insert(id)
         }
         self.components = components
@@ -144,12 +157,17 @@ public struct ComponentLayout: Hashable, Sendable {
 
     public mutating func insert<T: Component>(_ component: T.Type) {
         self.maskSet.insert(component)
-        self.components.append(component)
+        self.components.append(Entry(componentType: component, identifier: component.identifier))
     }
 
     public mutating func insert(_ component: any Component.Type) {
         self.maskSet.insert(component)
-        self.components.append(component)
+        self.components.append(Entry(componentType: component, identifier: component.identifier))
+    }
+
+    public mutating func insert(runtime componentID: ComponentId) {
+        self.maskSet.insert(componentID)
+        self.components.append(Entry(componentType: RuntimeComponentPayload.self, identifier: componentID))
     }
 
     public mutating func remove(_ component: ComponentId) {
@@ -369,7 +387,7 @@ extension Array where Element == any Component {
     var maskSet: ComponentMaskSet {
         var set = ComponentMaskSet(reservingCapacity: self.count)
         for component in self {
-            set.insert(type(of: component).identifier)
+            set.insert(componentIdentifier(of: component))
         }
         return set
     }

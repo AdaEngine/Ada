@@ -1,4 +1,5 @@
 @_spi(AdaEngine) import AdaEngine
+import Foundation
 
 enum EditorAdaScriptRuntimeError: Error, LocalizedError {
     case windowManagerUnavailable
@@ -67,7 +68,7 @@ struct EditorAdaScriptProjectRuntimeView: View {
             app.addPlugin(scriptPlugin)
         }
         if let sceneModel = artifact.sceneModel {
-            app.addPlugin(EditorAdaScriptRuntimeEntryPlugin(sceneModel: sceneModel))
+            app.addPlugin(EditorAdaScriptRuntimeEntryPlugin(sceneModel: sceneModel, assetsDirectory: artifact.assetsDirectory))
         }
     }
 
@@ -143,9 +144,10 @@ struct EditorAdaScriptProjectRuntimeView: View {
 
 private struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
     let sceneModel: EditorSceneModel
+    let assetsDirectory: URL
 
     func setup(in app: borrowing AppWorlds) {
-        let result = EditorSceneFileLoader.load(model: sceneModel, into: app.main)
+        let result = EditorSceneFileLoader.load(model: sceneModel, into: app.main, resourceRootURL: assetsDirectory)
         if result.warnings.isEmpty {
             EditorAchievementBootstrap.center?.record(EditorAchievementRules.playedScene(sceneModel, adaScript: true))
         }

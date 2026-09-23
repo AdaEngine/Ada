@@ -149,7 +149,8 @@ enum EditorMenuBar {
                 item("Save", command: .save, key: .s),
                 item("Save All", command: .saveAll, key: .s, modifiers: [.main, .alt]),
                 MenuItem.separator,
-                item("Close Window", command: .closeEditor, key: .w),
+                item("Close Editor Tab", command: .closeEditorTab, key: .w),
+                item("Close Window", command: .closeEditor, key: .w, modifiers: [.main, .shift]),
             ]
         )
     }
@@ -227,7 +228,6 @@ enum EditorMenuBar {
                 item("Show Preview", command: .showPreview),
                 item("Rebuild Preview", command: .rebuildPreview, key: .p, modifiers: [.main, .alt]),
                 MenuItem.separator,
-                item("Close Editor Tab", command: .closeEditorTab, key: .w, modifiers: [.main, .shift]),
                 item("Close All Editor Tabs", command: .closeAllEditorTabs, key: .w, modifiers: [.main, .alt]),
                 MenuItem.separator,
                 item("Increase Font Size", command: .increaseCodeFontSize, key: .plus),

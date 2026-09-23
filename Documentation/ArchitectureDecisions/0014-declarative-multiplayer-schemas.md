@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-22
-- Implementation: Partial (Swift and AdaScript command foundations shipped)
+- Implementation: Partial (Swift and portable AdaScript component/command paths shipped)
 
 ## Implementation status
 
@@ -26,21 +26,32 @@ Shipped:
   `@network_field`, `@remote_commands`, and `@replicated_component`.
 - [x] Portable AdaScript typed command send/receive with authenticated source,
   numeric wire tags, and no script-authored mailbox or sequence.
+- [x] AdaScript method-level `@rpc` constructor sugar over the typed command
+  schema and send/receive path.
+- [x] AdaScript `@rpc` receiver bodies dispatched automatically from a typed,
+  authenticated command to a statically bound system method.
 - [x] Cross-language Swift/AdaScript command schema digest parity.
 - [x] Build-plugin native backing generation and registration for AdaScript
   replicated components, including local-field coding exclusion.
 - [x] Medieval Arena peer input migrated from positional mailbox envelopes to
   a typed AdaScript command.
+- [x] Portable AdaScript runtime component layouts with distinct archetype and
+  scheduler identities over one memory-safe Swift carrier.
+- [x] Runtime component constructor lowering, `@query` access, deferred
+  spawn/insert/remove, tagged replication, local-field exclusion, and linear
+  numeric interpolation.
+- [x] Medieval Arena authoritative player state migrated to
+  `@replicated_component ArenaPlayer`; the demo no longer publishes or reads a
+  game-authored snapshot array.
 
 Remaining:
 
 - [ ] Generated Swift event, request, and network-module macros.
-- [ ] Portable runtime layouts for custom AdaScript replicated components; the
-  build-plugin native path is implemented.
 - [ ] Field-level `.state`, `.latest`, `.initialOnly`, delivery, and
-  interpolation behavior in the runtime.
-- [ ] Medieval Arena authoritative state migration and old snapshot mailbox
-  deprecation.
+  acknowledgement/coalescing behavior in the runtime. Runtime layouts already
+  honor field tags, local exclusion, and descriptor interpolation.
+- [ ] Generic legacy snapshot mailbox API deprecation and removal after its
+  compatibility window.
 
 ## Context
 
@@ -250,9 +261,14 @@ The runtime owns transport sequence numbers. A gameplay counter such as
 `attackSequence` is allowed because it describes gameplay semantics, not packet
 publication.
 
-Function-level `@RPC` syntax may later lower to a generated message and handler,
-but it is sugar over descriptors. The protocol never invokes a Swift or
-AdaScript method selected by an untrusted remote string.
+AdaScript method-level `@rpc` lowers to a typed command constructor and, when
+the method has an authored body, a private receiver handler. Its parameters
+require numeric `@network_field` tags and constant defaults. Sending still uses
+`multiplayer.send`. On receipt, the runtime invokes the statically bound handler
+with authenticated `source` and decoded fields before the system's `update`.
+Bodyless methods and `@remote_commands` remain supported. Swift method-level
+`@RPC` is future work. The protocol never invokes a method selected by an
+untrusted remote string.
 
 ### Give AdaScript the same declarations and semantics
 
@@ -291,8 +307,10 @@ struct ArenaPlayer {
 ```
 
 `@replicated_component` implies `@component`; authors do not stack both
-annotations. Its generated Swift backing type conforms to the same native
-protocols and emits the same descriptor ABI as a Swift declaration.
+annotations. A SwiftPM build may generate a native backing type for the hot
+path. A portable/precompiled host instead registers the same schema as a
+runtime logical component. Both paths use the same stable component and
+network identities.
 
 Typed AdaScript messages use parallel syntax:
 
@@ -337,10 +355,11 @@ presentation reads the component applied by `networkReceive` rather than
 rebuilding a parallel dictionary.
 
 The AdaScript build pipeline discovers annotated network declarations across
-the resolved module graph, validates them using the authoritative compiler AST,
-generates native backing types and descriptors, and emits a portable schema
-manifest for the language server, Editor, compatibility handshake, and
-precompiled hosts. A second regex or ad-hoc source scanner is forbidden.
+the resolved module graph and validates them using the authoritative compiler
+parser. SwiftPM builds may generate native backing types. Portable hosts lower
+component declarations into runtime constructors and register a logical ECS
+layout before resolving systems and queries. A second regex or ad-hoc schema
+parser is forbidden.
 
 ### Require explicit module registration without runtime scanning
 
@@ -529,9 +548,10 @@ Rejected because registration order, package composition, duplicate handling,
 precompiled hosts, and compatibility digests must be deterministic before a
 connection is accepted.
 
-### Invoke remote methods by name
+### Invoke methods selected by a remote name
 
 Rejected because it couples the wire protocol to implementation symbols,
 weakens registration and direction validation, and exposes an unnecessary
-dynamic dispatch surface. Function annotations may generate typed messages but
-do not change the underlying protocol.
+dynamic dispatch surface. AdaScript function annotations bind a local handler
+at compile time to a registered typed message; they do not change the underlying
+protocol or accept a method name from the wire.

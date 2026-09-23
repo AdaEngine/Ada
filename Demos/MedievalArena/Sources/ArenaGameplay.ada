@@ -1,4 +1,4 @@
-import { ArenaGame, ArenaInputCommand } from "./ArenaState.ada";
+import { ArenaGame, ArenaInputCommand, ArenaPlayer } from "./ArenaState.ada";
 
 @after(id: "arena.input")
 @before(id: "arena.presentation")
@@ -6,14 +6,15 @@ import { ArenaGame, ArenaInputCommand } from "./ArenaState.ada";
 class ArenaGameplaySystem {
     @res var multiplayer: AdaScriptMultiplayerState;
     @remote_commands(ArenaInputCommand) var commands;
+    @query(ArenaPlayer) var players;
 
     func update(context) {
         if (multiplayer.role != "host") return;
 
-        ArenaGame.ensurePlayer(multiplayer.localPeerID, 0);
+        ensurePlayer(multiplayer.localPeerID, 0, context);
         var variant = 1;
         for (var peer in multiplayer.peerIDs) {
-            ArenaGame.ensurePlayer(peer, variant);
+            ensurePlayer(peer, variant, context);
             variant += 1;
         }
 
@@ -27,35 +28,62 @@ class ArenaGameplaySystem {
             ];
         }
 
-        stepPlayer(multiplayer.localPeerID, inputs[multiplayer.localPeerID], context.deltaTime);
-        for (var peer in multiplayer.peerIDs) {
-            var peerInput = inputs[peer];
-            if (peerInput != null) stepPlayer(peer, peerInput, context.deltaTime);
+        var attacks = [];
+        for (var row in players) {
+            var input = inputs[row.arenaPlayer.peer];
+            if (input != null && stepPlayer(row, input, context.deltaTime)) {
+                attacks.push([
+                    row.arenaPlayer.peer,
+                    row.arenaPlayer.x,
+                    row.arenaPlayer.y,
+                    row.arenaPlayer.facing
+                ]);
+            }
         }
-
-        ArenaGame.snapshotClock += context.deltaTime;
-        if (ArenaGame.snapshotClock >= 0.05) {
-            ArenaGame.snapshotClock = 0.0;
-            publishSnapshot();
+        for (var attacker in attacks) {
+            applyAttack(attacker);
         }
     }
 
-    func stepPlayer(peer, input, deltaTime) {
-        var player = ArenaGame.players[peer];
-        if (player == null) return;
+    func ensurePlayer(peer, variant, context) {
+        for (var row in players) {
+            if (row.arenaPlayer.peer == peer) return;
+        }
+        var x = 0.0;
+        var y = 0.0;
+        if (variant == 0) x = -72.0;
+        if (variant == 1) x = 72.0;
+        if (variant == 2) y = 100.0;
+        if (variant == 3) y = -100.0;
+        if (variant == 4) { x = -180.0; y = 90.0; }
+        if (variant >= 5) { x = 180.0; y = -90.0; }
+        var facing = 3;
+        if (variant != 0) facing = 2;
+        context.world.spawn([ArenaPlayer(
+            peer: peer,
+            x: x,
+            y: y,
+            health: 3,
+            facing: facing,
+            attackSequence: 0,
+            respawn: 0.0,
+            variant: variant,
+            consumedInput: 0
+        )]);
+    }
 
-        if (player[2] <= 0) {
-            player[6] -= deltaTime;
-            if (player[6] <= 0.0) {
-                player[2] = 3;
-                player[6] = 0.0;
-                if (player[7] == 0) { player[0] = -72.0; player[1] = 0.0; }
-                if (player[7] == 1) { player[0] = 72.0; player[1] = 0.0; }
-                if (player[7] == 2) { player[0] = 0.0; player[1] = 100.0; }
-                if (player[7] == 3) { player[0] = 0.0; player[1] = -100.0; }
+    func stepPlayer(row, input, deltaTime) {
+        if (row.arenaPlayer.health <= 0) {
+            row.arenaPlayer.respawn -= deltaTime;
+            if (row.arenaPlayer.respawn <= 0.0) {
+                row.arenaPlayer.health = 3;
+                row.arenaPlayer.respawn = 0.0;
+                if (row.arenaPlayer.variant == 0) { row.arenaPlayer.x = -72.0; row.arenaPlayer.y = 0.0; }
+                if (row.arenaPlayer.variant == 1) { row.arenaPlayer.x = 72.0; row.arenaPlayer.y = 0.0; }
+                if (row.arenaPlayer.variant == 2) { row.arenaPlayer.x = 0.0; row.arenaPlayer.y = 100.0; }
+                if (row.arenaPlayer.variant == 3) { row.arenaPlayer.x = 0.0; row.arenaPlayer.y = -100.0; }
             }
-            ArenaGame.players[peer] = player;
-            return;
+            return false;
         }
 
         var moveX = ArenaGame.clamp(input[0], -1.0, 1.0);
@@ -64,30 +92,26 @@ class ArenaGameplaySystem {
             moveX *= 0.707106;
             moveY *= 0.707106;
         }
-        player[0] = ArenaGame.clamp(player[0] + moveX * 175.0 * deltaTime, -410.0, 410.0);
-        player[1] = ArenaGame.clamp(player[1] + moveY * 175.0 * deltaTime, -220.0, 220.0);
-        if (moveX < -0.01) player[3] = 2;
-        if (moveX > 0.01) player[3] = 3;
-        if (moveY < -0.01) player[3] = 1;
-        if (moveY > 0.01) player[3] = 0;
+        row.arenaPlayer.x = ArenaGame.clamp(row.arenaPlayer.x + moveX * 175.0 * deltaTime, -410.0, 410.0);
+        row.arenaPlayer.y = ArenaGame.clamp(row.arenaPlayer.y + moveY * 175.0 * deltaTime, -220.0, 220.0);
+        if (moveX < -0.01) row.arenaPlayer.facing = 2;
+        if (moveX > 0.01) row.arenaPlayer.facing = 3;
+        if (moveY < -0.01) row.arenaPlayer.facing = 1;
+        if (moveY > 0.01) row.arenaPlayer.facing = 0;
 
-        var shouldAttack = input[2] > player[5];
+        var shouldAttack = input[2] > row.arenaPlayer.consumedInput;
         if (shouldAttack) {
-            player[5] = input[2];
-            player[4] += 1;
+            row.arenaPlayer.consumedInput = input[2];
+            row.arenaPlayer.attackSequence += 1;
         }
-        ArenaGame.players[peer] = player;
-        if (shouldAttack) applyAttack(peer);
+        return shouldAttack;
     }
 
-    func applyAttack(attackerPeer) {
-        var attacker = ArenaGame.players[attackerPeer];
-        for (var targetPeer in ArenaGame.players.keys()) {
-            if (targetPeer != attackerPeer) {
-                var target = ArenaGame.players[targetPeer];
-                if (target[2] > 0) {
-                    var dx = target[0] - attacker[0];
-                    var dy = target[1] - attacker[1];
+    func applyAttack(attacker) {
+        for (var target in players) {
+            if (target.arenaPlayer.peer != attacker[0] && target.arenaPlayer.health > 0) {
+                    var dx = target.arenaPlayer.x - attacker[1];
+                    var dy = target.arenaPlayer.y - attacker[2];
                     var inReach = dx * dx + dy * dy <= 3844.0;
                     var inFront = false;
                     if (attacker[3] == 0 && dy > 10.0) inFront = true;
@@ -95,32 +119,13 @@ class ArenaGameplaySystem {
                     if (attacker[3] == 2 && dx < -10.0) inFront = true;
                     if (attacker[3] == 3 && dx > 10.0) inFront = true;
                     if (inReach && inFront) {
-                        target[2] -= 1;
-                        if (target[2] <= 0) {
-                            target[2] = 0;
-                            target[6] = 2.0;
+                        target.arenaPlayer.health -= 1;
+                        if (target.arenaPlayer.health <= 0) {
+                            target.arenaPlayer.health = 0;
+                            target.arenaPlayer.respawn = 2.0;
                         }
-                        ArenaGame.players[targetPeer] = target;
                     }
-                }
             }
         }
-    }
-
-    func publishSnapshot() {
-        var snapshot = [];
-        for (var peer in ArenaGame.players.keys()) {
-            var player = ArenaGame.players[peer];
-            snapshot.push(peer);
-            snapshot.push(player[0]);
-            snapshot.push(player[1]);
-            snapshot.push(player[2]);
-            snapshot.push(player[3]);
-            snapshot.push(player[4]);
-            snapshot.push(player[6]);
-            snapshot.push(player[7]);
-        }
-        multiplayer.publishedSnapshot = snapshot;
-        multiplayer.publishedSnapshotSequence += 1;
     }
 }

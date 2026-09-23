@@ -41,7 +41,7 @@ struct CloudRelayPacket: Codable, Sendable {
 /// The connection ticket is sent as the first WebSocket message, never as part
 /// of the URL. The relay reads only the outer routing envelope; `payload` is an
 /// opaque AdaMultiplayer frame.
-#if !WASI
+#if !os(WASI)
 public actor CloudWebSocketTransport: MultiplayerTransport {
     public nonisolated let capabilities: MultiplayerTransportCapabilities = [.reliableOrdered]
 

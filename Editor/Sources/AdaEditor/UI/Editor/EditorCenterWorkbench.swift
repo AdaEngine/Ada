@@ -171,7 +171,8 @@ extension EditorCenterWorkbench {
         case let .asset(document):
             switch document.kind {
             case .atlas,
-                .tileSource:
+                .tileSource,
+                .tileMap:
                 return "▦"
             case .image:
                 return "□"
@@ -200,7 +201,8 @@ extension EditorCenterWorkbench {
         case let .asset(document):
             switch document.kind {
             case .atlas,
-                .tileSource:
+                .tileSource,
+                .tileMap:
                 return theme.editorColors.blue
             case .image:
                 return theme.editorColors.blue
@@ -237,7 +239,12 @@ extension EditorCenterWorkbench {
     private func assetPreview(document: EditorAssetDocument) -> some View {
         switch document.kind {
         case .tileSource:
-            EditorTileSourceAssetEditor(document: document)
+            EditorTileSourceAssetEditor(document: document, model: viewModel.tileSourceModel(for: document))
+                .id(document.id)
+        case .tileMap:
+            EditorTileMapAssetEditor(document: document, onSave: {
+                viewModel.tileMapResourceRevision &+= 1
+            })
                 .id(document.id)
         case .atlas:
             EditorTextureAtlasAssetEditor(document: document)
@@ -424,6 +431,7 @@ extension EditorCenterWorkbench {
             onPlay: onPlayScene,
             onStop: onStopScene
         )
+        .id("\(document.id).tilemap-\(viewModel.tileMapResourceRevision)")
         .accessibilityIdentifier("AdaEditor.SceneDocument.\(document.title)")
     }
 

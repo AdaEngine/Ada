@@ -20,6 +20,15 @@
       }
     },
     {
+      "identity" : "sparkle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sparkle-project/Sparkle",
+      "state" : {
+        "revision" : "ac2def288cbff5cfc7df3ffef6abdf45b72bcb0a",
+        "version" : "2.9.6"
+      }
+    },
+    {
       "identity" : "swift-acp",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/TeamSloppy/swift-acp",
@@ -85,7 +94,7 @@
     {
       "identity" : "swift-service-context",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-service-context.git",
+      "location" : "https://github.com/apple/swift-service-context",
       "state" : {
         "revision" : "d0997351b0c7779017f88e7a93bc30a1878d7f29",
         "version" : "1.3.0"

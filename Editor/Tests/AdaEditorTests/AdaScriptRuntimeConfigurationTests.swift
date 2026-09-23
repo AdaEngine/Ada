@@ -58,6 +58,19 @@ struct AdaScriptRuntimeConfigurationTests {
         #expect(resolved.pluginIDs == [.core2D, .sprite, .mesh2D, .tilemap, .upscale])
     }
 
+    @Test("multiplayer is opt in for AdaScript games")
+    func multiplayerIsOptIn() throws {
+        let solo = try EditorAdaScriptRuntimePluginResolver.resolve(
+            AdaProjectRuntimePlugins(preset: .game2D)
+        )
+        let networked = try EditorAdaScriptRuntimePluginResolver.resolve(
+            AdaProjectRuntimePlugins(preset: .game2D, enable: [.multiplayer])
+        )
+
+        #expect(!solo.contains(.multiplayer))
+        #expect(networked.contains(.multiplayer))
+    }
+
     @Test("plugin settings sections cover every catalog plugin once")
     func pluginSettingsSectionsCoverCatalog() {
         let sectionPluginIDs = EditorAdaScriptRuntimePluginCatalog.settingsSections

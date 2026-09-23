@@ -56,19 +56,10 @@ Ada Script declaration annotations have three forms:
 Arguments are compile-time constants or symbolic identifiers. They do not run
 user code during module discovery.
 
-The initial AdaEngine annotations are:
-
-- `@system` for ECS systems;
-- `@after` and `@before` for ordering systems by their module-local IDs;
-- `@query` for native ECS iterators;
-- `@access` for explicit scheduler access;
-- `@component` and `@resource` for generated data declarations;
-- `@scriptable` for attached script objects;
-- `@view` for declarative AdaUI views;
-- `@previewable` for AdaUI views exposed in AdaEditor Preview;
-- `@state` for state owned by an Ada Script view;
-- `@environment` for read-only AdaUI environment values;
-- `@export` for persistent and inspectable fields.
+See <doc:AdaScriptAnnotations> for supported annotations, declaration targets,
+arguments, defaults, and lifetimes. A one-time world initializer is a
+`@system(scheduler: "startup")` class with `update(context)`; there is no
+function-level `@init` annotation yet.
 
 ## Script-defined data
 
@@ -88,11 +79,11 @@ struct GameBalance {
 }
 ```
 
-The first schema slice supports `Bool`, signed `Int64`, finite `Double`, and
-`String` defaults. Generated Swift symbol names are private implementation
-details. Runtime lookup accepts both the Ada Script declaration name (`Health`) and
-the stable ID (`game.health`). `autoInsert: true` inserts the generated resource
-before systems are installed.
+Generated Swift symbol names are private implementation details. Runtime lookup
+accepts both the Ada Script declaration name (`Health`) and the stable ID
+(`game.health`). `autoInsert: true` inserts the resource before systems are
+installed. SwiftPM targets use generated backing types; AdaEditor can register
+supported runtime-defined component layouts for pure AdaScript projects.
 
 Bind a resource directly on a system with `@res`. The binding uses a native ECS
 resource pointer during `update(context)`; field writes update the resource
@@ -158,11 +149,13 @@ context.world.commands.despawn(entity);
 Direct command use is inferred per system and declares deferred-world access to
 the scheduler. Command facades expire when `update(context)` returns; using a
 retained or undeclared facade reports a plugin diagnostic and performs no
-mutation. Component constructor arguments, explicit dynamic `@access`, events,
-assets, UI commands, and exclusive immediate world access are planned.
+mutation. Typed component constructors can be passed to
+`context.world.spawn([...])`; the legacy string-based command form remains
+available. Explicit dynamic `@access` and exclusive immediate world access
+are not implemented.
 
-Script-defined data requires `AdaScriptBuildPlugin`; manual runtime-only source
-loading cannot introduce a new native Swift layout.
+SwiftPM generation of native backing types requires `AdaScriptBuildPlugin`;
+supported pure AdaScript layouts can be registered by the runtime.
 
 Swift and Editor tooling can attach the generated default without naming its
 private backing type:
@@ -171,9 +164,9 @@ private backing type:
 world.insertDefaultComponent(named: "game.health", into: entity.id)
 ```
 
-Generated-component dynamic mutation/removal and scene coding, vectors, colors,
-enums, entity references, and asset references are not part of that data-schema
-slice yet.
+Field types and serialization support vary by schema and bridge. Check the
+nearest compiler diagnostic when a constructor argument or field default is
+unsupported.
 
 ## Scriptable objects
 
@@ -261,9 +254,36 @@ produce the same compatibility schema.
 
 `@replicated_component` uses `@network_field` plus optional `@local` fields.
 SwiftPM targets receive a generated native ECS backing component through
-`AdaScriptBuildPlugin`. Portable AdaEditor projects still reject custom
-component layouts until runtime-defined ECS layouts are implemented; typed
-commands do not have that restriction.
+`AdaScriptBuildPlugin`. Portable AdaEditor projects register each component as
+a distinct runtime ECS layout without compiling Swift.
+
+`@rpc` declares both a typed wire command and an optional receiver method:
+
+```ada
+@system class InputSystem {
+    @res var multiplayer: Multiplayer;
+    @res var playerInput: PlayerInputState;
+
+    @rpc(id: "arena.input", delivery: "unreliable_sequenced", channel: "input")
+    func input(@network_field(1) moveX = 0.0, @network_field(2) attack = 0) {
+        playerInput.peer = source;
+        playerInput.moveX = moveX;
+        playerInput.attack = attack;
+    }
+
+    func update(context) {
+        multiplayer.send(input(1.0, 2));
+    }
+}
+```
+
+Calling `input(...)` constructs a typed command; `multiplayer.send(...)` sends
+it. The authored body does not run on the sender. On receipt, the system invokes
+it before `update`, with `source` bound to the authenticated transport peer ID.
+Fields remain tagged and require constant defaults. An empty or bodyless method
+still works as a command constructor; `@remote_commands(input)` remains available
+for explicit message processing. Request/response and local echo are not yet
+supported.
 
 ## AdaUI views
 
@@ -296,6 +316,43 @@ class LifetimeSystem {
 Use local variables for per-call calculations. Store ECS gameplay state in
 components and shared singleton state in resources rather than global mutable
 variables.
+
+## Common language patterns
+
+Functions use `func`, parameters are comma-separated, and a returned value
+uses `return`. Code blocks use braces. Declare mutable local values with `var`;
+use `if`, `else`, and `for` for control flow. End statements with `;`.
+
+```ada
+func clampHealth(value, maximum) {
+    if (value < 0) { return 0; }
+    if (value > maximum) { return maximum; }
+    return value;
+}
+
+@system
+class DamageSystem {
+    @query(Health, without: Invulnerable)
+    var targets;
+
+    func update(context) {
+        for (var target in targets) {
+            target.health.current = clampHealth(target.health.current - 1, 100);
+        }
+    }
+}
+```
+
+Functions called by a system are ordinary helpers; they do not become
+scheduler callbacks. A system's `update(context)` is the entry point selected
+by `@system`. A scriptable object's `ready(context)` instead belongs to that
+entity's attachment lifecycle. For one-time world setup, use the `startup`
+scheduler described in <doc:AdaScriptAnnotations>.
+
+An `import { name } from "./Helpers";` brings a helper into the target-level
+module. Importing a file does not create a second world or a second run of its
+systems. A library can contribute its own annotated declarations; keep IDs
+unique across the assembled module. See <doc:AdaScriptLibraries>.
 
 ## Values crossing the bridge
 

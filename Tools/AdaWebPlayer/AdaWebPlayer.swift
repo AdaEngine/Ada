@@ -49,14 +49,18 @@ private struct PlayerContent: View {
             guard let project else {
                 throw AdaWebPlayerProjectError.invalid(loadError ?? "Missing project.")
             }
-            // Reject native data layouts just as the iPad project builder does.
-            guard try AdaScriptSchemaParser.parse(sources: sources).isEmpty else {
-                throw AdaWebPlayerProjectError.invalid("Web Player does not support custom native components or resources yet.")
+            if project.entryScene != nil {
+                let scene = try PlayerScene(project: project, sources: sources, directory: directory)
+                self.content = AnyView(scene.view)
+                print("[AdaWebPlayer] Ready: scene \(project.entryScene ?? "")")
+                return
             }
-            // The prototype deliberately renders a source-backed view. ECS/scene hosting is a subsequent profile.
+            guard try AdaScriptSchemaParser.parse(sources: sources).isEmpty else {
+                throw AdaWebPlayerProjectError.invalid("Web Player views do not support native components or resources.")
+            }
             guard try AdaScriptSchemaParser.parseSystemCapabilities(sources: sources).isEmpty,
-                  project.startupSystem == nil else {
-                throw AdaWebPlayerProjectError.invalid("This Web Player profile supports AdaScript views; ECS systems require the scene profile.")
+                project.startupSystem == nil else {
+                throw AdaWebPlayerProjectError.invalid("AdaScript systems require the scene profile.")
             }
             let resources = PlayerResources(project: project, directory: directory)
             self.content = AnyView(try AdaScriptView(sources: sources, identifier: project.entryView, catalog: resources.catalog()))

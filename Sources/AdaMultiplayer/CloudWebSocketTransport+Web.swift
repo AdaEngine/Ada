@@ -1,4 +1,4 @@
-#if WASI
+#if os(WASI)
     import Foundation
     import JavaScriptFoundationCompat
     import JavaScriptKit
@@ -146,14 +146,14 @@
         }
 
         private func send(_ text: String) throws {
-            guard let socket, let send: (String) -> JSValue = socket.send else {
+            guard let socket, let send: ((any ConvertibleToJSValue...) -> JSValue) = socket.send else {
                 throw MultiplayerError.notConnected
             }
             _ = send(text)
         }
 
         private func send(_ data: Data) throws {
-            guard let socket, let send: (JSValue) -> JSValue = socket.send else {
+            guard let socket, let send: ((any ConvertibleToJSValue...) -> JSValue) = socket.send else {
                 throw MultiplayerError.notConnected
             }
             _ = send(data.jsTypedArray.jsValue)

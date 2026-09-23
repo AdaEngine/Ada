@@ -158,9 +158,11 @@ var products: [Product] = [
 var commonPlugins: [Target.PluginUsage] = []
 
 #if os(macOS) || os(Linux)
-commonPlugins.append(
-    .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
-)
+if !isWebExportEnabled {
+    commonPlugins.append(
+        .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
+    )
+}
 #endif
 
 var swiftSettings: [SwiftSetting] = [
@@ -636,6 +638,8 @@ targets.append(
         name: "AdaWebPlayer",
         dependencies: [
             "AdaEngine", "AdaScriptCompilerCore",
+            .product(name: "Yams", package: "Yams"),
+            "AdaMultiplayer",
             .product(name: "JavaScriptKit", package: "JavaScriptKit", condition: .when(platforms: [.wasi])),
             .product(name: "JavaScriptEventLoop", package: "JavaScriptKit", condition: .when(platforms: [.wasi]))
         ],
@@ -1313,8 +1317,13 @@ package.dependencies += [
     // Plugins
     .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", from: "602.0.0"),
-    .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.62.1"),
 ]
+
+if !isWebExportEnabled {
+    package.dependencies.append(
+        .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.62.1")
+    )
+}
 
 if !isHeadlessCIEnabled {
     package.dependencies.append(
