@@ -13,7 +13,7 @@
   "use strict";
 
   const keywords = new Set([
-    "_args", "_func", "and", "break", "case", "class", "const", "continue", "default", "else", "enum", "event", "extern", "false",
+    "_args", "_func", "and", "async", "await", "break", "case", "class", "const", "continue", "default", "else", "enum", "event", "extern", "false",
     "file", "for", "func", "if", "import", "in", "internal", "is", "lazy", "module", "not", "null", "or", "private", "public", "repeat",
     "return", "static", "struct", "super", "switch", "true", "undefined", "var", "while"
   ]);

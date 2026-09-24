@@ -3,12 +3,12 @@
 //  AdaEngine
 //
 
-import Testing
-@testable import AdaUI
 @testable import AdaPlatform
+@testable import AdaUI
 @testable import AdaUtils
-import Observation
 import Math
+import Observation
+import Testing
 
 // MARK: - Test environment keys
 
@@ -29,10 +29,13 @@ private struct TestThemeKey: ThemeKey {
 }
 
 extension EnvironmentValues {
+    // The same-file view fixtures access these keys outside this extension.
+    // swiftlint:disable:next strict_fileprivate
     fileprivate var testCounter: Int {
         get { self[CounterKey.self] }
         set { self[CounterKey.self] = newValue }
     }
+    // swiftlint:disable:next strict_fileprivate
     fileprivate var testLabel: String {
         get { self[LabelKey.self] }
         set { self[LabelKey.self] = newValue }
@@ -71,7 +74,6 @@ private struct ObservableEnvironmentView: View {
 @MainActor
 @Suite("Environment propagation optimizations")
 struct EnvironmentPropagationTests {
-
     init() async throws {
         try Application.prepareForTest()
     }
@@ -96,14 +98,28 @@ struct EnvironmentPropagationTests {
 
     @Test("@Environment observable subscribes only to observable storage")
     func observableEnvironmentCapturesObservableStorageKeyID() {
-        var capturedIDs = Set<ObjectIdentifier>()
-        EnvironmentValues._recordKeyAccess = { capturedIDs.insert($0) }
-        _ = EnvironmentValues().observableStorage
-        EnvironmentValues._recordKeyAccess = nil
+        let recorder = EnvironmentKeyAccessRecorder()
+        EnvironmentValues.$_recordKeyAccess.withValue(recorder) {
+            _ = EnvironmentValues().observableStorage
+        }
 
         let wrapper = Environment(ObservableEnvironmentModel.self)
-        #expect(wrapper.container.subscribedKeyIDs == capturedIDs)
+        #expect(wrapper.container.subscribedKeyIDs == recorder.capturedKeys)
         #expect(!wrapper.container.subscribedKeyIDs.contains(ObjectIdentifier(CounterKey.self)))
+    }
+
+    @Test("Concurrent environment reads do not enter another task's key recorder")
+    func keyRecorderIsTaskLocal() async {
+        let recorder = EnvironmentKeyAccessRecorder()
+        await EnvironmentValues.$_recordKeyAccess.withValue(recorder) {
+            // A detached worker deliberately does not inherit this task-local recorder.
+            let worker = Task.detached {
+                for _ in 0..<1_000 { _ = EnvironmentValues().testLabel }
+            }
+            for _ in 0..<1_000 { _ = EnvironmentValues().testCounter }
+            await worker.value
+        }
+        #expect(recorder.capturedKeys == Set([ObjectIdentifier(CounterKey.self)]))
     }
 
     // MARK: version guard
@@ -317,5 +333,4 @@ struct EnvironmentPropagationTests {
         #expect(probe.values.last == 1)
         withExtendedLifetime(tester) {}
     }
-
 }

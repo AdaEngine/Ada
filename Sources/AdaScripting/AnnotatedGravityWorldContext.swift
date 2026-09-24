@@ -2,7 +2,7 @@
 import Gravity
 
 @GSExportable("AdaWorldContext")
-final class AnnotatedGravityWorldContext: @unchecked Sendable {
+final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSendableBridge {
     let commands: AnnotatedGravityCommandsBridge
 
     @GSExportableIgnore
@@ -24,7 +24,7 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable {
 }
 
 @GSExportable("AdaCommands")
-final class AnnotatedGravityCommandsBridge: @unchecked Sendable {
+final class AnnotatedGravityCommandsBridge: @unchecked Sendable, AdaScriptNonSendableBridge {
     private var commands: Commands?
     private let reportDiagnostic: @Sendable (String) -> Void
     private let runtimeComponents: [String: RuntimeComponentDescriptor]

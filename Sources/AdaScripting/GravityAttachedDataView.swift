@@ -2,7 +2,7 @@
 import Gravity
 
 @GSExportable("AdaAttachedComponent")
-final class GravityAttachedComponentView: @unchecked Sendable {
+final class GravityAttachedComponentView: @unchecked Sendable, AdaScriptNonSendableBridge {
     private let componentType: any Component.Type
     private let descriptor: ReflectedComponentDescriptor?
     private let entityID: Entity.ID
@@ -79,7 +79,7 @@ final class GravityAttachedComponentView: @unchecked Sendable {
 }
 
 @GSExportable("AdaAttachedResource")
-final class GravityAttachedResourceView: @unchecked Sendable {
+final class GravityAttachedResourceView: @unchecked Sendable, AdaScriptNonSendableBridge {
     private let fields: [String: ReflectedComponentField]
     private let optional: Bool
     private let reportDiagnostic: @Sendable (String) -> Void

@@ -177,7 +177,8 @@ struct GravityDocumentAnalyzer {
             if let symbol = declarationSymbol(
                 keyword: token.text,
                 nameToken: tokens[nameIndex],
-                memberContext: memberContext
+                memberContext: memberContext,
+                isAsync: token.text == "func" && index > 0 && tokens[index - 1].text == "async"
             ) {
                 symbols.append(symbol)
             }
@@ -186,13 +187,20 @@ struct GravityDocumentAnalyzer {
         return symbols
     }
 
-    private static func declarationSymbol(keyword: String, nameToken: GravityToken, memberContext: Bool) -> GravitySymbol? {
+    private static func declarationSymbol(
+        keyword: String,
+        nameToken: GravityToken,
+        memberContext: Bool,
+        isAsync: Bool
+    ) -> GravitySymbol? {
         let kind: GravitySymbolKind
         let detail: String
         switch keyword {
         case "func":
             kind = memberContext ? .method : .function
-            detail = memberContext ? "AdaScript method" : "AdaScript function"
+            detail = isAsync
+                ? (memberContext ? "AdaScript async method" : "AdaScript async function")
+                : (memberContext ? "AdaScript method" : "AdaScript function")
         case "var":
             kind = memberContext ? .property : .variable
             detail = memberContext ? "AdaScript property" : "AdaScript variable"

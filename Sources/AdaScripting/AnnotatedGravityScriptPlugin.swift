@@ -21,6 +21,11 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         runtime.diagnostics
     }
 
+    /// Number of suspended or ready AdaScript tasks owned by this module.
+    public var activeAsyncTaskCount: Int {
+        runtime.activeAsyncTaskCount
+    }
+
     private let plans: [AnnotatedSystemPlan]
     private let dataSchemas: [AdaScriptDataSchema]
     private let networkCommands: [AdaScriptNetworkCommandSchema]
@@ -80,6 +85,12 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             resourceBindings: resourceBindings,
             systemCapabilities: capabilities
         )
+        for plan in plans {
+            try module.requireSynchronousCallback(className: plan.className, method: "update", annotation: "@system")
+        }
+        for binding in rpcMethodBindings {
+            try module.requireSynchronousCallback(className: binding.systemName, method: binding.commandName, annotation: "@rpc")
+        }
         if let startupSystemIdentifier {
             guard let startupIndex = plans.firstIndex(where: { $0.identifier == startupSystemIdentifier }) else {
                 throw AdaScriptError.invalidManifest(
@@ -163,6 +174,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
                 return
             }
         }
+        app.main.schedulers.addSystem(AdaScriptTaskPumpSystem(pluginIdentifier: name, runtime: runtime), for: .update)
         for plan in plans {
             do {
                 let prepared = try Self.prepare(plan, pluginIdentifier: name, world: app.main)
@@ -178,6 +190,11 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
                 runtime.appendDiagnostic(String(describing: error))
             }
         }
+    }
+
+    @MainActor
+    public func destroy(for app: borrowing AppWorlds) {
+        runtime.cancelTasks(forWorld: "world:\(ObjectIdentifier(app.main).hashValue)")
     }
 
     private static func prepare(
@@ -313,7 +330,9 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         if matches.count == 1, let component = matches.first?.value {
             return resolvedNativeComponent(component)
         }
-        guard let descriptor = world.runtimeComponentDescriptor(named: name) else { return nil }
+        guard let descriptor = world.runtimeComponentDescriptor(named: name) else {
+            return nil
+        }
         return ResolvedAnnotatedComponent(identifier: descriptor.componentID, fields: descriptor.fields)
     }
 
@@ -440,7 +459,9 @@ private enum AnnotatedResourceBridge {
     }
 
     func invalidate() {
-        if case let .input(bridge) = self {
+        if case let .reflected(bridge) = self {
+            bridge.invalidate()
+        } else if case let .input(bridge) = self {
             bridge.invalidate()
         } else if case let .multiplayer(bridge) = self {
             bridge.invalidate()
@@ -460,6 +481,34 @@ struct AnnotatedComponentAccess: Sendable {
     let fields: [String: ReflectedComponentField]
 }
 
+private struct AdaScriptTaskPumpSystem: System {
+    private let deltaTime = Res<DeltaTime?>()
+    private let pluginIdentifier: String
+    private let runtime: AnnotatedGravityRuntime?
+
+    var systemIdentifier: String { Self.makeIdentifier(plugin: pluginIdentifier) }
+    var queries: SystemQueries { SystemQueries(queries: [deltaTime]) }
+
+    init(world _: World) {
+        pluginIdentifier = "Unconfigured"
+        runtime = nil
+    }
+
+    init(pluginIdentifier: String, runtime: AnnotatedGravityRuntime) {
+        self.pluginIdentifier = pluginIdentifier
+        self.runtime = runtime
+    }
+
+    static func makeIdentifier(plugin: String) -> String { "AdaScripting.TaskPump.\(plugin)" }
+
+    func update(context: UpdateContext) async {
+        runtime?.pumpTasks(
+            deltaTime: Double(deltaTime.wrappedValue?.deltaTime ?? 0),
+            worldID: "world:\(ObjectIdentifier(context.world).hashValue)"
+        )
+    }
+}
+
 private struct AnnotatedGravityScriptSystem: System {
     private let deltaTime = Res<DeltaTime?>()
     private let pluginIdentifier: String
@@ -474,7 +523,13 @@ private struct AnnotatedGravityScriptSystem: System {
     }
 
     var systemDependencies: [SystemDependency] {
-        preparedSystem?.dependencies ?? []
+        guard let preparedSystem else {
+            return []
+        }
+        let pumpDependency: [SystemDependency] = preparedSystem.scheduler == .update
+            ? [.after(AdaScriptTaskPumpSystem.makeIdentifier(plugin: pluginIdentifier))]
+            : []
+        return pumpDependency + preparedSystem.dependencies
     }
 
     var queries: SystemQueries {
@@ -509,7 +564,7 @@ private struct AnnotatedGravityScriptSystem: System {
         "AdaScripting.System.\(plugin.utf8.count):\(plugin)\(system.utf8.count):\(system)"
     }
 
-    func update(context _: UpdateContext) async {
+    func update(context: UpdateContext) async {
         guard let preparedSystem, let runtime else {
             return
         }
@@ -550,7 +605,8 @@ private struct AnnotatedGravityScriptSystem: System {
             remoteCommands: remoteCommands,
             rpcCalls: rpcCalls,
             resources: resources,
-            world: world
+            world: world,
+            ownerID: "world:\(ObjectIdentifier(context.world).hashValue):system:\(preparedSystem.identifier)"
         )
     }
 }
@@ -563,7 +619,16 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
     private let delegate: AnnotatedGravityRuntimeDelegate
     private let runtimeComponents: [RuntimeComponentDescriptor]
     private let virtualMachine: GravityVirtualMachine
+    private let taskRuntime: AdaScriptTaskRuntime
+    private let asyncHost: AdaScriptAsyncHost
     private var instances: [String: GSValue] = [:]
+
+    deinit {
+        AdaScriptRuntimeCoordinator.lock.withLock {
+            taskRuntime.cancelAll()
+            asyncHost.cancelAll()
+        }
+    }
 
     init(
         module: ResolvedGravityScriptModule,
@@ -580,15 +645,31 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
 
         let virtualMachine = GravityVirtualMachine(settings: .init(), delegate: delegate)
         self.virtualMachine = virtualMachine
-        try virtualMachine.bindClass(with: AnnotatedGravitySystemContext.self)
-        try virtualMachine.bindClass(with: AdaScriptInputBridge.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityWorldContext.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityCommandsBridge.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityQueryBridge.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityQueryRow.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityComponentView.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityResourceView.self)
-        try virtualMachine.bindClass(with: AdaScriptMultiplayerAPI.self)
+        let suspensionPolicy = AdaScriptSuspensionPolicy(scriptNonSendableTypes: module.nonSendableTypeNames)
+        let taskRuntime = AdaScriptTaskRuntime.make(
+            virtualMachine: virtualMachine,
+            reportDiagnostic: delegate.append,
+            suspensionPolicy: suspensionPolicy
+        )
+        self.taskRuntime = taskRuntime
+        let asyncHost = AdaScriptAsyncHost()
+        self.asyncHost = asyncHost
+        asyncHost.onWake = { taskRuntime.wake() }
+        asyncHost.ownerProvider = { taskRuntime.currentOwnerID }
+        try virtualMachine.bindClass(with: AdaScriptTaskRuntime.self)
+        try suspensionPolicy.bindSafe(AdaScriptAsyncResult.self, to: virtualMachine)
+        try suspensionPolicy.bindSafe(AdaScriptAsyncOperation.self, to: virtualMachine)
+        try virtualMachine.bindClass(with: AdaScriptAsyncHost.self)
+        try suspensionPolicy.bindSafe(AdaScriptSaveWriter.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravitySystemContext.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AdaScriptInputBridge.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityWorldContext.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityCommandsBridge.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityQueryBridge.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityQueryRow.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityComponentView.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityResourceView.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AdaScriptMultiplayerAPI.self, to: virtualMachine)
         try virtualMachine.bindClass(with: AdaScriptNetworkCommandFactory.self)
         try virtualMachine.bindClass(with: AdaScriptNetworkCommandValue.self)
         try virtualMachine.bindClass(with: AdaScriptNetworkValueBridge.self)
@@ -600,7 +681,11 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
             runtimeDescriptors: runtimeComponents,
             reportDiagnostic: delegate.append
         )
-        try AdaScriptAssetRuntime.bind(to: virtualMachine, reportDiagnostic: delegate.append)
+        try AdaScriptAssetRuntime.bind(
+            to: virtualMachine,
+            reportDiagnostic: delegate.append,
+            wake: { taskRuntime.wake() }
+        )
         virtualMachine.setValue(
             AdaScriptNetworkCommandFactory.make(
                 schemas: networkCommands,
@@ -609,9 +694,12 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
             forKey: "__adaNetworkFactory"
         )
         virtualMachine.setValue(AdaScriptViewBridge(), forKey: "adaUIBuilder")
+        virtualMachine.setValue(taskRuntime, forKey: "__adaTasks")
+        virtualMachine.setValue(asyncHost, forKey: "__adaAsync")
 
         let binary = virtualMachine.loadGravityFile(
-            from: AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
+            from: AdaScriptTaskPrelude.source + "\n"
+                + AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
                 + AdaScriptNetworkBridge.prelude(commands: networkCommands)
                 + module.entrySource
         )
@@ -658,13 +746,21 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         remoteCommands: [(propertyName: String, value: GSValue)],
         rpcCalls: [(commandName: String, fieldNames: [String], payloads: [AdaScriptRemoteCommandPayload])],
         resources: [(propertyName: String, resource: AnnotatedResourceBridge)],
-        world: AnnotatedGravityWorldContext
+        world: AnnotatedGravityWorldContext,
+        ownerID: String
     ) {
         AdaScriptRuntimeCoordinator.lock.lock()
         defer { AdaScriptRuntimeCoordinator.lock.unlock() }
+        let previousOwner = taskRuntime.currentOwnerID
+        taskRuntime.currentOwnerID = ownerID
+        defer { taskRuntime.currentOwnerID = previousOwner }
         defer {
             world.invalidate()
+            for (_, query) in queries { query.invalidate() }
             for (_, resource) in resources { resource.invalidate() }
+        }
+        guard !taskRuntime.isVMAborted else {
+            return
         }
 
         guard let instance = instances[className] else {
@@ -705,6 +801,20 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
             }
         }
         _ = instance.callMethod(named: "update", with: [context])
+    }
+
+    func pumpTasks(deltaTime: Double, worldID: String) {
+        AdaScriptRuntimeCoordinator.lock.withLock {
+            asyncHost.advanceGameTime(by: deltaTime, forWorld: worldID)
+            taskRuntime.pump(onlyWorld: worldID)
+        }
+    }
+
+    func cancelTasks(forWorld worldID: String) {
+        AdaScriptRuntimeCoordinator.lock.withLock {
+            taskRuntime.cancel(worldID: worldID)
+            asyncHost.cancelGameTimers(forWorld: worldID)
+        }
     }
 
     func makeQueryBridge(
@@ -774,6 +884,10 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
 
     var diagnostics: [String] {
         AdaScriptRuntimeCoordinator.lock.withLock { delegate.errors }
+    }
+
+    var activeAsyncTaskCount: Int {
+        AdaScriptRuntimeCoordinator.lock.withLock { taskRuntime.activeTaskCount }
     }
 
     func appendDiagnostic(_ message: String) {

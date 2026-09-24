@@ -128,6 +128,8 @@ public struct AdaScriptView: View {
                 "scaleFactor": .double(Double(scaleFactor)),
                 "userInterfaceIdiom": .string(userInterfaceIdiom.adaScriptName),
             ])
+            let revision = $revision
+            resolvedStorage.onTaskProgress = { revision.wrappedValue += 1 }
             if let error = resolvedStorage.error {
                 return AnyView(
                     Text("Ada Script view error: \(error)")
@@ -135,7 +137,6 @@ public struct AdaScriptView: View {
                         .padding(12)
                 )
             }
-            let revision = $revision
             guard let model = resolvedStorage.model else {
                 throw AdaScriptError.invalidManifest("@view '\(identifier)' did not produce a view tree")
             }
@@ -195,6 +196,12 @@ public enum AdaScriptViewRegistry {
             }
             next[view.identifier] = Registration(moduleName: moduleName, runtime: runtime)
         }
+        let previousRuntimes = registrations.values
+            .filter { $0.moduleName == moduleName }
+            .map(\.runtime)
+        for previous in previousRuntimes {
+            previous.retire()
+        }
         registrations = next
     }
 
@@ -227,7 +234,12 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
     // swiftlint:disable:next weak_delegate
     private let delegate: AnnotatedGravityRuntimeDelegate
     private let virtualMachine: GravityVirtualMachine
+    private let taskRuntime: AdaScriptTaskRuntime
+    private let asyncHost: AdaScriptAsyncHost
     private let exportedParameters: [String]
+
+    @MainActor private var storages: [WeakAdaScriptViewStorage] = []
+    @MainActor private var isRetired = false
 
     init(sources: [AdaScriptSource], views: [AdaScriptViewMetadata], exportedParameters: [String] = []) throws {
         guard exportedParameters.allSatisfy({ $0.range(of: "^[A-Za-z_][A-Za-z0-9_]*$", options: .regularExpression) != nil }) else {
@@ -240,6 +252,9 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
         )
         let networkCommands = try AdaScriptSchemaParser.parseNetworkCommands(sources: sources)
         let module = try GravityScriptModuleResolver.resolve(sources)
+        for view in views {
+            try module.requireSynchronousCallback(className: view.className, method: "body", annotation: "@view")
+        }
         self.factoryNamesByIdentifier = Dictionary(
             uniqueKeysWithValues: views.enumerated()
                 .map { index, view in
@@ -251,9 +266,23 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
         let delegate = AnnotatedGravityRuntimeDelegate(module: module)
         self.delegate = delegate
 
-        self.virtualMachine = try AdaScriptRuntimeCoordinator.lock.withLock {
+        let runtimeBundle = try AdaScriptRuntimeCoordinator.lock.withLock {
             let virtualMachine = GravityVirtualMachine(settings: .init(), delegate: delegate)
-            try virtualMachine.bindClass(with: AdaScriptViewBridge.self)
+            let suspensionPolicy = AdaScriptSuspensionPolicy(scriptNonSendableTypes: module.nonSendableTypeNames)
+            let taskRuntime = AdaScriptTaskRuntime.make(
+                virtualMachine: virtualMachine,
+                reportDiagnostic: delegate.append,
+                suspensionPolicy: suspensionPolicy
+            )
+            let asyncHost = AdaScriptAsyncHost()
+            asyncHost.onWake = { taskRuntime.wake() }
+            asyncHost.ownerProvider = { taskRuntime.currentOwnerID }
+            try virtualMachine.bindClass(with: AdaScriptTaskRuntime.self)
+            try suspensionPolicy.bindSafe(AdaScriptAsyncResult.self, to: virtualMachine)
+            try suspensionPolicy.bindSafe(AdaScriptAsyncOperation.self, to: virtualMachine)
+            try virtualMachine.bindClass(with: AdaScriptAsyncHost.self)
+            try suspensionPolicy.bindSafe(AdaScriptSaveWriter.self, to: virtualMachine)
+            try suspensionPolicy.bindBorrowed(AdaScriptViewBridge.self, to: virtualMachine)
             try AdaScriptComponentRuntime.bind(
                 to: virtualMachine,
                 constructors: componentConstructors,
@@ -266,8 +295,14 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
                 AdaScriptNetworkCommandFactory.make(schemas: networkCommands, reportDiagnostic: delegate.append),
                 forKey: "__adaNetworkFactory"
             )
-            try AdaScriptAssetRuntime.bind(to: virtualMachine, reportDiagnostic: delegate.append)
+            try AdaScriptAssetRuntime.bind(
+                to: virtualMachine,
+                reportDiagnostic: delegate.append,
+                wake: { taskRuntime.wake() }
+            )
             virtualMachine.setValue(AdaScriptViewBridge(), forKey: "adaUIBuilder")
+            virtualMachine.setValue(taskRuntime, forKey: "__adaTasks")
+            virtualMachine.setValue(asyncHost, forKey: "__adaAsync")
 
             let factories = views.enumerated()
                 .map { index, view in
@@ -280,7 +315,8 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
                 }
                 .joined(separator: "\n")
             let binary = virtualMachine.loadGravityFile(
-                from: AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
+                from: AdaScriptTaskPrelude.source + "\n"
+                    + AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
                     + AdaScriptNetworkBridge.prelude(commands: networkCommands)
                     + module.entrySource + "\n" + factories + "\n" + getters
             )
@@ -291,13 +327,52 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
             guard delegate.errors.isEmpty else {
                 throw AdaScriptError.compilation(delegate.errors)
             }
-            return virtualMachine
+            return (virtualMachine, taskRuntime, asyncHost)
+        }
+        self.virtualMachine = runtimeBundle.0
+        self.taskRuntime = runtimeBundle.1
+        self.asyncHost = runtimeBundle.2
+        taskRuntime.onWake = { [weak self] in
+            Task { @MainActor [weak self] in self?.dispatchTasks() }
+        }
+    }
+
+    deinit {
+        AdaScriptRuntimeCoordinator.lock.withLock {
+            taskRuntime.cancelAll()
+            asyncHost.cancelAll()
         }
     }
 
     @MainActor
     func makeStorage(identifier: String) throws -> AdaScriptViewStorage {
-        try AdaScriptViewStorage(runtime: self, identifier: identifier)
+        let storage = try AdaScriptViewStorage(runtime: self, identifier: identifier)
+        storages.append(WeakAdaScriptViewStorage(storage))
+        return storage
+    }
+
+    @MainActor
+    private func dispatchTasks() {
+        guard !isRetired else {
+            return
+        }
+        AdaScriptRuntimeCoordinator.lock.withLock { taskRuntime.pump() }
+        storages.removeAll(where: { $0.storage == nil })
+        for storage in storages.compactMap(\.storage) {
+            storage.invalidateAfterTaskProgress()
+        }
+    }
+
+    @MainActor
+    func retire() {
+        guard !isRetired else {
+            return
+        }
+        isRetired = true
+        AdaScriptRuntimeCoordinator.lock.withLock {
+            taskRuntime.cancelAll()
+            asyncHost.cancelAll()
+        }
     }
 
     func validate(identifier: String) throws {
@@ -360,7 +435,13 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
         identifier: String,
         environment: [String: ReflectedFieldValue]
     ) throws -> AdaScriptViewModel {
-        try AdaScriptRuntimeCoordinator.lock.withLock {
+        guard !isRetired else {
+            throw AdaScriptError.invalidManifest("Ada Script view belongs to a retired module generation")
+        }
+        guard !taskRuntime.isVMAborted else {
+            throw AdaScriptError.invalidManifest("Ada Script VM stopped after a coroutine failure; reload the module")
+        }
+        return try AdaScriptRuntimeCoordinator.lock.withLock {
             guard let metadata = viewsByIdentifier[identifier] else {
                 throw AdaScriptError.invalidManifest("Unknown @view id '\(identifier)'")
             }
@@ -383,7 +464,7 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
                 let value = instance.callMethod(named: "body", with: []),
                 let bridge = value.toObjectOf(AdaScriptViewBridge.self)
             else {
-                let diagnostic = delegate.errors.last.map { ": \($0)" } ?? ""
+                let diagnostic = delegate.errors.isEmpty ? "" : ": \(delegate.errors.suffix(5).joined(separator: "; "))"
                 throw AdaScriptError.invalidManifest("@view '\(identifier)' body() must return a View value\(diagnostic)")
             }
             return bridge.model
@@ -391,8 +472,17 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
     }
 
     @MainActor
-    func perform(instance: GSValue, action: String, identifier: String) throws {
+    func perform(instance: GSValue, action: String, identifier: String, ownerID: String) throws {
+        guard !isRetired else {
+            throw AdaScriptError.invalidManifest("Ada Script view belongs to a retired module generation")
+        }
+        guard !taskRuntime.isVMAborted else {
+            throw AdaScriptError.invalidManifest("Ada Script VM stopped after a coroutine failure; reload the module")
+        }
         try AdaScriptRuntimeCoordinator.lock.withLock {
+            let previousOwner = taskRuntime.currentOwnerID
+            taskRuntime.currentOwnerID = "view:\(ownerID)"
+            defer { taskRuntime.currentOwnerID = previousOwner }
             guard instance.hasMethod(named: action) else {
                 throw AdaScriptError.invalidManifest("Unknown action '\(action)' in @view '\(identifier)'")
             }
@@ -402,16 +492,30 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
             }
         }
     }
+
+    func cancelTasks(ownerID: String) {
+        AdaScriptRuntimeCoordinator.lock.withLock {
+            taskRuntime.cancel(ownerID: "view:\(ownerID)")
+            asyncHost.cancelSaveWriters(forOwner: "view:\(ownerID)")
+        }
+    }
+
+    @MainActor
+    var activeTaskCount: Int {
+        AdaScriptRuntimeCoordinator.lock.withLock { taskRuntime.activeTaskCount }
+    }
 }
 
 @MainActor
 final class AdaScriptViewStorage {
     var error: (any Error)?
+    var onTaskProgress: (@MainActor () -> Void)?
     private(set) var model: AdaScriptViewModel?
 
     private let identifier: String
     private let instance: GSValue
     private let runtime: AdaScriptViewModuleRuntime
+    private let ownerID = UUID().uuidString
     private var environment: [String: ReflectedFieldValue] = [:]
 
     init(runtime: AdaScriptViewModuleRuntime, identifier: String) throws {
@@ -421,6 +525,8 @@ final class AdaScriptViewStorage {
         self.instance = instance
         self.model = nil
     }
+
+    deinit { runtime.cancelTasks(ownerID: ownerID) }
 
     private var inputs: [String: UIValue] = [:]
 
@@ -444,10 +550,22 @@ final class AdaScriptViewStorage {
     }
 
     func perform(action: String) throws {
-        try runtime.perform(instance: instance, action: action, identifier: identifier)
+        try runtime.perform(instance: instance, action: action, identifier: identifier, ownerID: ownerID)
         model = try runtime.evaluate(instance: instance, identifier: identifier, environment: environment)
         error = nil
     }
+
+    func invalidateAfterTaskProgress() {
+        model = nil
+        onTaskProgress?()
+    }
+}
+
+@MainActor
+private final class WeakAdaScriptViewStorage {
+    weak var storage: AdaScriptViewStorage?
+
+    init(_ storage: AdaScriptViewStorage) { self.storage = storage }
 }
 
 extension UserInterfaceIdiom {

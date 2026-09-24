@@ -15,6 +15,8 @@ describes the intended design even when its implementation is still planned.
 - **Planned**: no production slice of the decision has shipped.
 - **Partial (foundation shipped)**: a tested production slice has shipped, but
   the ADR's own implementation checklist still has open requirements.
+- **Partial (worktree foundation; not released)**: a tested implementation is
+  available in an isolated worktree, with remaining ADR requirements open.
 - **Implemented**: every normative requirement in the ADR is shipped and its
   validation is recorded.
 
@@ -32,6 +34,7 @@ describes the intended design even when its implementation is still planned.
 | [ADR-0008](0008-adascript-projects-on-ipados.md) | Accepted | Partial (project foundation shipped) | Portable AdaScript projects, iPadOS runtime sessions, Files/iCloud, and Git ownership |
 | [ADR-0009](0009-adascript-runtime-configuration.md) | Accepted | Partial (foundation shipped) | Declarative entry plans, plugin presets, typed settings, and runtime-window configuration |
 | [ADR-0010](0010-adascript-native-adaui-extension-registry.md) | Accepted | Planned | Versioned descriptors and host factories for native AdaUI views and modifiers used by AdaScript |
+| [ADR-0015](0015-adascript-async-tasks-and-coroutines.md) | Accepted | Partial (worktree foundation; not released) | Structured AdaScript async functions, awaitables, task ownership, timers, background I/O, and safe coroutine resumption |
 
 ## Multiplayer decisions
 

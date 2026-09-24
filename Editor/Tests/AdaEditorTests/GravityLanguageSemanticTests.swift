@@ -5,6 +5,16 @@ import Testing
 
 @Suite("AdaScript semantic language features")
 struct GravityLanguageSemanticTests {
+    @Test("Async declarations remain navigable in AdaScript")
+    func asyncFunctionsAreRecognized() {
+        let service = GravityLanguageService()
+        let source = "async func requestConfirmation() { var answer = await wait_confirmation(); }"
+        let analysis = service.analyze(text: source)
+        #expect(analysis.symbols.contains { $0.name == "requestConfirmation" && $0.detail == "AdaScript async function" })
+        let completions = service.completions(text: "as", position: GravitySourcePosition(line: 0, utf16Column: 2))
+        #expect(completions.contains { $0.label == "async func" })
+    }
+
     @Test("Annotated lifecycle parameters expose typed host APIs")
     func annotatedLifecycleCompletion() {
         let service = GravityLanguageService(hostConstructors: [

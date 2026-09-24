@@ -292,6 +292,86 @@ Add `@previewable` when that view should appear in AdaEditor Preview. See
 <doc:AdaScriptViews> for the supported view constructors, modifiers, and
 preview workflow.
 
+## Asynchronous work
+
+Declare a function that can suspend with `async func`. Use `await` inside that
+function; a synchronous action starts it explicitly with `Tasks.start(...)`.
+The action returns immediately while the game or UI continues updating.
+
+```ada
+async func loadShop() {
+    var result = await Assets.loadAsync("@res://Catalog/shop.json");
+    if (result.isSuccess()) {
+        System.print("Shop asset: " + result.value());
+    } else {
+        System.print(result.errorCode() + ": " + result.message());
+    }
+}
+
+@system class ShopSystem {
+    var started = false;
+
+    func update(context) {
+        if (!started) {
+            started = true;
+            Tasks.start(loadShop());
+        }
+    }
+}
+```
+
+`Assets.loadAsync` and `Assets.saveAsync` use the native asset registry and
+return an awaitable result. `Saves.writeAsync("@user://save.txt", text)` writes
+an immutable string in the background and reports `committed()` after its
+atomic file replacement. For data that cannot be copied in one callback, use
+bounded chunks:
+
+```ada
+async func saveLargeData() {
+    var writer = Saves.begin("@user://save.txt");
+    var first = await writer.appendAsync("first chunk");
+    if (!first.isSuccess()) { writer.cancel(); return; }
+    var committed = await writer.finishAsync();
+    if (!committed.committed()) { System.print(committed.message()); }
+}
+```
+
+Each chunk is limited to 256 KiB. The writer appends to a temporary file and
+replaces the destination only after `finishAsync()` succeeds. Build large ECS
+snapshots in bounded pieces; do not retain a query row or live component view
+in a task.
+
+Mark a script-owned type with `@nonsendable` when its instances are tied to a
+callback or another short lifetime. AdaScript rejects a typed async parameter
+or method that would capture that type. Before a task starts, the runtime also
+checks actual arguments, nested lists, returned values, and promise results;
+this catches borrowed engine values passed through an untyped alias. Maps are
+conservatively rejected until their entries can be inspected. See
+<doc:AdaScriptAnnotations>.
+
+`await Time.sleep(seconds)` advances with the scheduler's `deltaTime` and stops
+advancing when that scheduler is paused. AdaEngine does not yet expose a
+separate game time-scale resource.
+`await Time.sleepRealTime(seconds)` uses a monotonic clock; continuation still
+waits for a script dispatch point. `Tasks.promise()` creates a one-shot wait
+that an action can resolve with `complete(value)`. A Boolean `false` from a
+confirmation is a user choice; closing its view cancels the waiting task.
+`Tasks.start(...)` returns a handle with `status()` and `cancel()`.
+
+AdaScript callbacks such as `update(context)`, `body()`, and UI actions remain
+synchronous. Do not mark them `async`; start a separate async function and pass
+detached values. Callback contexts, queries, resources, and commands expire at
+callback exit. Awaited work resumes in the serialized script runtime, not on
+the native I/O worker. A task started by a view is cancelled when that view
+is disposed or its module is replaced. Cancelling a save does not roll back
+a file that was already committed.
+
+Fallible operations return a result with `isSuccess()`, `value()`,
+`errorCode()`, and `message()`; inspect it after `await`. A script VM trap
+currently stops that module and cancels its pending tasks. Diagnostics include
+the failing task, owner, and trace ID; reload the module to continue. Other
+module instances and native gameplay remain separate.
+
 ## System context
 
 `update(context)` receives a scoped system context. `context.deltaTime` is the

@@ -134,6 +134,8 @@ enum GravityBuiltins {
     static let globalCandidates: [GravityCompletionCandidate] =
         [
             GravityCompletionCandidate(detail: "Function declaration", insertText: "func name() {\n    \n}", kind: .snippet, label: "func", sortText: "10"),
+            GravityCompletionCandidate(detail: "Suspending function declaration", insertText: "async func name() {\n    \n}", kind: .snippet, label: "async func", sortText: "10"),
+            GravityCompletionCandidate(detail: "Wait for an async task", insertText: "await ", kind: .keyword, label: "await", sortText: "10"),
             GravityCompletionCandidate(detail: "Class declaration", insertText: "class Name {\n    \n}", kind: .snippet, label: "class", sortText: "11"),
             GravityCompletionCandidate(detail: "Variable declaration", insertText: "var ", kind: .keyword, label: "var", sortText: "12"),
             GravityCompletionCandidate(detail: "Return statement", insertText: "return ", kind: .keyword, label: "return", sortText: "13"),
@@ -148,6 +150,9 @@ enum GravityBuiltins {
             GravityCompletionCandidate(detail: "Flexible AdaUI space", insertText: "Spacer()", kind: .class, label: "Spacer", sortText: "18"),
             GravityCompletionCandidate(detail: "AdaUI divider", insertText: "Divider()", kind: .class, label: "Divider", sortText: "18"),
             GravityCompletionCandidate(detail: "AdaEngine asset manager", insertText: "Assets", kind: .variable, label: "Assets", sortText: "18"),
+            GravityCompletionCandidate(detail: "AdaScript task scheduler", insertText: "Tasks", kind: .class, label: "Tasks", sortText: "18"),
+            GravityCompletionCandidate(detail: "AdaScript timers", insertText: "Time", kind: .class, label: "Time", sortText: "18"),
+            GravityCompletionCandidate(detail: "Background save operations", insertText: "Saves", kind: .class, label: "Saves", sortText: "18"),
             GravityCompletionCandidate(
                 detail: "Three-dimensional vector",
                 insertText: "Vector3(0, 0, 0)",

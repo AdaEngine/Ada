@@ -3,7 +3,7 @@ import Gravity
 
 /// A callback-scoped input snapshot. Access and invalidation are serialized by AdaScriptRuntimeCoordinator.
 @GSExportable("AdaInputActions")
-final class AdaScriptInputBridge: @unchecked Sendable {
+final class AdaScriptInputBridge: @unchecked Sendable, AdaScriptNonSendableBridge {
     private var snapshot: Input?
 
     @GSExportableIgnore

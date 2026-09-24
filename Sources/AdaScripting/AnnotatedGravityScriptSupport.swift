@@ -3,7 +3,7 @@ import AdaUtils
 import Gravity
 
 @GSExportable("AdaSystemContext")
-final class AnnotatedGravitySystemContext: @unchecked Sendable {
+final class AnnotatedGravitySystemContext: @unchecked Sendable, AdaScriptNonSendableBridge {
     let deltaTime: Double
     let world: AnnotatedGravityWorldContext
 

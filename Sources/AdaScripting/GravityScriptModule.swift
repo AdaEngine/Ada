@@ -48,15 +48,88 @@ struct ResolvedGravityScriptModule: Sendable {
     let entrySource: String
     let sourcesByPath: [String: Source]
     let pathsByFileID: [UInt32: String]
+    let nonSendableTypeNames: Set<String>
+    let asyncDeclarations: [AdaScriptAsyncDeclaration]
+
+    func requireSynchronousCallback(className: String, method: String, annotation: String) throws {
+        guard let declaration = asyncDeclarations.first(where: { $0.ownerType == className && $0.name == method }) else {
+            return
+        }
+        throw AdaScriptError.invalidManifest(
+            "\(annotation) callback '\(className).\(method)' at line \(declaration.line) cannot be async"
+        )
+    }
 }
 
 enum GravityScriptModuleResolver {
     static func resolve(_ sources: [AdaScriptSource]) throws -> ResolvedGravityScriptModule {
-        var parsedSources: [String: ParsedSource] = [:]
+        var sourceByPath: [String: AdaScriptSource] = [:]
+        var preliminarySources: [String: ParsedSource] = [:]
         for source in sources {
             let path = try canonicalSourcePath(source.path)
-            guard parsedSources[path] == nil else {
+            guard sourceByPath[path] == nil else {
                 throw AdaScriptError.duplicateSourcePath(path)
+            }
+            sourceByPath[path] = source
+            var scanner = AdaScriptSourceScanner(source: source.source, path: path)
+            preliminarySources[path] = try scanner.scan()
+        }
+
+        let sortedPaths = sourceByPath.keys.sorted()
+        let discoveryRoots = sortedPaths.filter { path in
+            guard let annotations = preliminarySources[path]?.annotations else {
+                return false
+            }
+            return !annotations.isDisjoint(with: rootAnnotations)
+        }
+        let roots = discoveryRoots.isEmpty ? sortedPaths : discoveryRoots
+
+        var states: [String: VisitState] = [:]
+        var stack: [String] = []
+        var orderedPaths: [String] = []
+        for root in roots {
+            try visit(
+                root,
+                parsedSources: preliminarySources,
+                states: &states,
+                stack: &stack,
+                orderedPaths: &orderedPaths
+            )
+        }
+
+        var nonSendableTypeNames = Set<String>()
+        for path in orderedPaths {
+            guard let source = sourceByPath[path] else {
+                continue
+            }
+            do {
+                nonSendableTypeNames.formUnion(try AdaScriptNonSendableTypes.declared(in: source.source, path: path))
+            } catch let error as AdaScriptAsyncSyntaxError {
+                throw AdaScriptError.invalidManifest(error.description)
+            }
+        }
+
+        var asyncDeclarations: [AdaScriptAsyncDeclaration] = []
+        for path in orderedPaths {
+            guard let source = sourceByPath[path] else {
+                continue
+            }
+            do {
+                let declarations = try AdaScriptAsyncDeclarationScanner.declarations(
+                    in: source.source,
+                    path: path,
+                    nonSendableTypes: nonSendableTypeNames
+                )
+                asyncDeclarations += declarations
+            } catch let error as AdaScriptAsyncSyntaxError {
+                throw AdaScriptError.invalidManifest(error.description)
+            }
+        }
+
+        var parsedSources: [String: ParsedSource] = [:]
+        for path in sortedPaths {
+            guard let source = sourceByPath[path] else {
+                continue
             }
             let loweredViewSource: String
             do {
@@ -73,28 +146,6 @@ enum GravityScriptModuleResolver {
             let loweredSource = AdaScriptNetworkLowerer.lower(source: loweredComponentSource)
             var scanner = AdaScriptSourceScanner(source: loweredSource, path: path)
             parsedSources[path] = try scanner.scan()
-        }
-
-        let sortedPaths = parsedSources.keys.sorted()
-        let discoveryRoots = sortedPaths.filter { path in
-            guard let annotations = parsedSources[path]?.annotations else {
-                return false
-            }
-            return !annotations.isDisjoint(with: rootAnnotations)
-        }
-        let roots = discoveryRoots.isEmpty ? sortedPaths : discoveryRoots
-
-        var states: [String: VisitState] = [:]
-        var stack: [String] = []
-        var orderedPaths: [String] = []
-        for root in roots {
-            try visit(
-                root,
-                parsedSources: parsedSources,
-                states: &states,
-                stack: &stack,
-                orderedPaths: &orderedPaths
-            )
         }
 
         var sourcesByPath: [String: ResolvedGravityScriptModule.Source] = [:]
@@ -121,7 +172,9 @@ enum GravityScriptModuleResolver {
         return ResolvedGravityScriptModule(
             entrySource: entrySource,
             sourcesByPath: sourcesByPath,
-            pathsByFileID: pathsByFileID
+            pathsByFileID: pathsByFileID,
+            nonSendableTypeNames: nonSendableTypeNames,
+            asyncDeclarations: asyncDeclarations
         )
     }
 

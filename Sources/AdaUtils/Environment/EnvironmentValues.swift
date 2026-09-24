@@ -5,6 +5,8 @@
 //  Created by Vladislav Prusakov on 30.05.2025.
 //
 
+import Foundation
+
 @attached(accessor)
 @attached(peer, names: prefixed(__Key_))
 public macro Entry() = #externalMacro(module: "AdaEngineMacros", type: "EntryMacro")
@@ -54,6 +56,22 @@ public protocol EnvironmentKey {
     associatedtype Value: Sendable
 
     static var defaultValue: Value { get }
+}
+
+/// Collects environment keys within one task-local view-property initialization.
+package final class EnvironmentKeyAccessRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var keys = Set<ObjectIdentifier>()
+
+    package init() {}
+
+    package func record(_ key: ObjectIdentifier) {
+        lock.withLock { _ = keys.insert(key) }
+    }
+
+    package var capturedKeys: Set<ObjectIdentifier> {
+        lock.withLock { keys }
+    }
 }
 
 /// A collection of environment values propagated through a view hierarchy.
@@ -111,16 +129,14 @@ public struct EnvironmentValues: Sendable {
     /// Creates an environment values instance.
     public init() {}
 
-    /// When non-nil, every subscript READ reports the accessed key's ObjectIdentifier here.
-    /// Used once during `@Environment` initialisation to discover which keys it subscribes to.
-    /// All accesses occur on the main actor; `nonisolated(unsafe)` avoids a spurious concurrency error
-    /// from the nonisolated subscript getter context.
-    nonisolated(unsafe) package static var _recordKeyAccess: ((ObjectIdentifier) -> Void)?
+    /// Scoped to the task building an `@Environment` property so another
+    /// scheduler cannot mutate its capture set concurrently.
+    @TaskLocal package static var _recordKeyAccess: EnvironmentKeyAccessRecorder?
 
     /// Accesses the environment value associated with a custom key.
     public subscript<K: EnvironmentKey>(_ type: K.Type) -> K.Value {
         get {
-            unsafe Self._recordKeyAccess?(ObjectIdentifier(type))
+            Self._recordKeyAccess?.record(ObjectIdentifier(type))
             return (self.values[ObjectIdentifier(type)] as? K.Value) ?? K.defaultValue
         }
         set {
