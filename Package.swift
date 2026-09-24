@@ -1298,11 +1298,9 @@ let package = Package(
 )
 
 package.dependencies += [
-    ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_LOCAL_PATH"].map {
-        .package(name: "gravity-lang", path: $0)
-    } ?? .package(
+    .package(
         url: "https://github.com/AdaEngine/gravity-lang.git",
-        exact: "0.9.9"
+        revision: "24695757a0ba5638b3633004a2166b7878c116de"
     ),
     .package(url: "https://github.com/apple/swift-collections", from: "1.3.0"),
     .package(url: "https://github.com/apple/swift-log", from: "1.8.0"),

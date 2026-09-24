@@ -26,9 +26,8 @@ Implemented and covered by focused tests in this worktree:
 - [x] AdaUI action continuation, view disposal, and view-generation retirement;
   Editor keyword, declaration, and completion support.
 - [x] Native `async`/`await` tokens, AST lowering, and direct-call effect checks
-  in the local `gravity-lang` branch. The AdaEngine runtime still owns task
-  scheduling and suspension policy. Cross-repository publication and the
-  dependency pin remain pending.
+  in `gravity-lang` revision `24695757a0ba5638b3633004a2166b7878c116de`.
+  The AdaEngine runtime still owns task scheduling and suspension policy.
 
 Remaining before this ADR is fully implemented:
 
@@ -39,8 +38,6 @@ Remaining before this ADR is fully implemented:
 - [ ] Full static effect and borrowed-value analysis through aliases, map
   entries, and imported method declarations; typed result descriptors and
   source maps for generated async continuations.
-- [ ] Publish the tested `gravity-lang` compiler commit and pin AdaEngine to
-  that revision. The currently published dependency remains `0.9.9`.
 - [ ] Engine-owned, incremental snapshots of arbitrary ECS data, beyond the
   available bounded streaming writer.
 - [ ] A game time-scale resource, complete Editor diagnostics, and platform
