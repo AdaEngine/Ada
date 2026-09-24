@@ -46,7 +46,6 @@ struct EditorRuntimeProjectSettingsView: View {
     private var entrySettings: some View {
         settingsGroup(EditorSettingsPage.runtimeEntry) {
             settingsField("Game", detail: "AdaScript module name.", text: viewModel.runtimeTextBinding(\.moduleName))
-            settingsField("game.main", detail: "Optional root AdaUI view identifier.", text: viewModel.runtimeTextBinding(\.view))
                 .accessibilityIdentifier("AdaEditor.Settings.RuntimeEntry.View")
             settingsField(
                 "game.bootstrap",

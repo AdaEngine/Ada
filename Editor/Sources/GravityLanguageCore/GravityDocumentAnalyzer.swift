@@ -92,6 +92,10 @@ struct GravityDocumentAnalyzer {
             var diagnostics = annotations.compactMap { annotation -> GravityDiagnostic? in
                 let requiredKind: String?
                 switch annotation.text {
+                case "view":
+                    return GravityDiagnostic(message: "AdaUI views in AdaScript are temporarily unavailable.", range: annotation.range)
+                case "previewable":
+                    return GravityDiagnostic(message: "AdaUI previews in AdaScript are temporarily unavailable.", range: annotation.range)
                 case "component", "replicated_component", "resource", "network_command":
                     requiredKind = "struct"
                 case "system", "scriptable", "tool":
@@ -110,7 +114,7 @@ struct GravityDocumentAnalyzer {
                 )
             }
             let declarationAnnotations = annotations.filter {
-                ["component", "replicated_component", "resource", "network_command", "system", "scriptable", "tool", "view"].contains($0.text)
+                ["component", "replicated_component", "resource", "network_command", "system", "scriptable", "tool"].contains($0.text)
             }
             if let first = declarationAnnotations.first {
                 diagnostics += declarationAnnotations.dropFirst().map { annotation in

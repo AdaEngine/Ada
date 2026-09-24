@@ -1,5 +1,7 @@
 # ADR-0015: Add structured asynchronous tasks to AdaScript
 
+> Any async behavior that depended on AdaScript `@view` callbacks is unavailable while [ADR-0016](0016-temporarily-disable-adascript-adaui.md) is in force.
+
 - Status: Accepted
 - Date: 2026-09-24
 - Implementation: Partial (worktree foundation; not released)

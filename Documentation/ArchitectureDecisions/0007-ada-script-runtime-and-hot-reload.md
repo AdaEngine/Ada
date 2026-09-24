@@ -1,5 +1,7 @@
 # ADR-0007: Use transactional Ada Script module generations
 
+> Current AdaUI view availability is defined by [ADR-0016](0016-temporarily-disable-adascript-adaui.md); AdaScript-backed views are temporarily disabled.
+
 - Status: Accepted
 - Date: 2026-08-31
 - Implementation: Planned

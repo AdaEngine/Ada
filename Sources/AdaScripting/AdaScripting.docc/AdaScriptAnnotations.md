@@ -154,20 +154,11 @@ class InputSystem {
 }
 ```
 
-## AdaUI and editor tools
+## Editor tools
 
 | Annotation | Target | Effect |
 | --- | --- | --- |
-| `@view(id: "...", title: "...")` | Class or struct | Registers a declarative view with `body()`. Both arguments are optional. |
-| `@previewable(title: "...")` | `@view` class or struct | Lists the view in AdaEditor Preview. The optional title overrides the view title. |
-| `@state` | Stored view property | Holds view-owned mutable state while the view identity lives. |
-| `@environment(key)` | Stored view property | Reads an AdaUI environment value before evaluating `body()`. |
 | `@tool(id: "...", ...)` | Class | Declares AdaEditor tool metadata; `id` is required. |
-
-Supported `@environment` keys are `colorScheme`, `isEnabled`, `scaleFactor`,
-and `userInterfaceIdiom`. `@binding` for nested script-view parameters is not
-implemented and produces a diagnostic. `@previewable` without `@view`, or on
-a declaration without `@view`, is invalid. See <doc:AdaScriptViews> for view syntax.
 
 `@tool` accepts optional `name`, `version`, `api`, `platforms`, and
 `permissions`. Defaults are a humanized class name, version `1.0.0`, API `1`,

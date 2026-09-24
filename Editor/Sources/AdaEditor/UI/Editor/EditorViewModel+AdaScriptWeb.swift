@@ -233,7 +233,7 @@
         var errorDescription: String? {
             switch self {
             case .browserUnavailable: "The Web Player is ready, but the browser could not be opened."
-            case .entrySceneRequired: "Set runtime.entry.scene or runtime.entry.view before running this AdaScript project on Web."
+            case .entrySceneRequired: "Set runtime.entry.scene before running this AdaScript project on Web."
             case let .exportFailed(detail): "Web Player export failed: \(detail)"
             case .serverUnavailable: "The Web Player server could not start on 127.0.0.1:8080."
             case .swiftToolchainUnavailable: "Swift 6.3.2 WebAssembly toolchain is unavailable. Install it or set ADA_WEB_SWIFT_EXECUTABLE."

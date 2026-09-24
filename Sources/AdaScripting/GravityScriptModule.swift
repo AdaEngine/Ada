@@ -181,7 +181,6 @@ enum GravityScriptModuleResolver {
             .map { path in "#include \"\(escapeGravityString(path))\"" }
             .joined(separator: "\n")
         let entrySource = """
-        extern var adaUIBuilder;
         extern var __adaAssets;
         \(includes)
         """

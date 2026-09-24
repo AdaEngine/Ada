@@ -405,12 +405,7 @@ struct EditorSceneEditingTests {
             statusMessage: nil,
             loadSummary: EditorSceneFileLoader.summary(from: content)
         )
-        var didRequestEntityPicker = false
         var didRequestPlay = false
-        var contextMenu: ContextMenuPresentation?
-        let previousPresenter = ContextMenuPresentationCenter.present
-        ContextMenuPresentationCenter.present = { contextMenu = $0 }
-        defer { ContextMenuPresentationCenter.present = previousPresenter }
         let container = UIContainerView(
             rootView: EditorSceneViewportView(
                 document: document,
@@ -419,7 +414,6 @@ struct EditorSceneEditingTests {
                 playModeState: .editing,
                 playRuntime: nil,
                 onEntitySelected: nil,
-                onCreateEntity: { didRequestEntityPicker = true },
                 onPlay: { didRequestPlay = true },
                 onStop: nil,
                 onDocumentChanged: { _ in }
@@ -431,21 +425,9 @@ struct EditorSceneEditingTests {
 
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneViewport.Controls"))
         #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.SceneViewport.Create")).isEmpty)
-        let contextSurface = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneViewport.ContextSurface"))
-        container.onMouseEvent(
-            MouseEvent(
-                window: RID(),
-                button: .right,
-                mousePosition: Point(contextSurface.absoluteFrame.midX, contextSurface.absoluteFrame.midY),
-                phase: .began,
-                modifierKeys: [],
-                time: 0
-            )
-        )
-        contextMenu?.items.first(where: { $0.title == "Create Entity…" })?.action?()
+        #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.SceneViewport.ContextSurface")).isEmpty)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.SceneViewport.Control.Play"))
 
-        #expect(didRequestEntityPicker)
         #expect(didRequestPlay)
     }
 

@@ -448,14 +448,12 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         try virtualMachine.bindClass(with: AnnotatedGravityResourceView.self)
         try virtualMachine.bindClass(with: GravityAttachedComponentView.self)
         try virtualMachine.bindClass(with: GravityAttachedResourceView.self)
-        try virtualMachine.bindClass(with: AdaScriptViewBridge.self)
         try AdaScriptComponentRuntime.bind(
             to: virtualMachine,
             constructors: componentConstructors,
             reportDiagnostic: delegate.append
         )
         try AdaScriptAssetRuntime.bind(to: virtualMachine, reportDiagnostic: delegate.append)
-        virtualMachine.setValue(AdaScriptViewBridge(), forKey: "adaUIBuilder")
         let factories =
             factoryNamesByClass
             .map { className, factoryName in

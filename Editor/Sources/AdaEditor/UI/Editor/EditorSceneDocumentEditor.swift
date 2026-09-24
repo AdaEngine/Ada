@@ -34,10 +34,6 @@ struct EditorSceneDocumentEditor: View {
                 playModeState: playModeState,
                 playRuntime: playRuntime,
                 onEntitySelected: onEntitySelected,
-                onCreateEntity: {
-                    let parentID = document.sceneModel?.editor?.selectedEntity ?? document.sceneModel?.rootEntityID
-                    workbench.presentEntityPicker(documentID: document.id, parentID: parentID)
-                },
                 onPlay: onPlay,
                 onStop: onStop,
                 onDocumentChanged: { workbench.replaceSceneDocument($0) }

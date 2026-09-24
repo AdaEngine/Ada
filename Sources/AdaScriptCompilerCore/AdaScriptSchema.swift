@@ -130,93 +130,12 @@ extension Parser {
 
 extension Parser {
     private mutating func parseView(
-        name: String,
-        annotation: Annotation,
-        previewAnnotation: Annotation?,
-        line: Int
+        name _: String,
+        annotation _: Annotation,
+        previewAnnotation _: Annotation?,
+        line _: Int
     ) throws -> AdaScriptViewSchema {
-        let environment = try parseViewBody(name: name)
-        let id: String
-        let isIDExplicit: Bool
-        if case let .string(explicitID) = annotation.arguments["id"] {
-            id = explicitID
-            isIDExplicit = true
-        } else {
-            id = name
-            isIDExplicit = false
-        }
-
-        let title: String
-        let isTitleExplicit: Bool
-        if let previewTitle = try previewAnnotation?.previewTitle(viewName: name, path: path) {
-            title = previewTitle
-            isTitleExplicit = true
-        } else if case let .string(explicitTitle) = annotation.arguments["title"] {
-            title = explicitTitle
-            isTitleExplicit = true
-        } else {
-            title = humanizedAdaScriptViewTitle(name)
-            isTitleExplicit = false
-        }
-
-        return AdaScriptViewSchema(
-            className: name,
-            environment: environment,
-            id: id,
-            isIDExplicit: isIDExplicit,
-            isPreviewable: previewAnnotation != nil,
-            isTitleExplicit: isTitleExplicit,
-            line: line,
-            sourcePath: path,
-            title: title
-        )
-    }
-
-    private mutating func parseViewBody(name: String) throws -> [AdaScriptViewEnvironmentBinding] {
-        guard match("{") else {
-            throw error("expected '{' after view \(name)")
-        }
-        var bindings: [AdaScriptViewEnvironmentBinding] = []
-        var depth = 1
-        while !isAtEnd, depth > 0 {
-            if depth == 1 {
-                let annotations = try parseAnnotations()
-                if let binding = try parseViewEnvironmentBinding(annotations, viewName: name) {
-                    bindings.append(binding)
-                    continue
-                }
-                if annotations.contains(where: { $0.name == "binding" }) {
-                    throw error("@binding in \(name) requires nested script-view parameters, which are not implemented yet")
-                }
-            }
-            advanceSystemBody(depth: &depth)
-        }
-        guard depth == 0 else {
-            throw error("unterminated view declaration '\(name)'")
-        }
-        return bindings
-    }
-
-    private mutating func parseViewEnvironmentBinding(
-        _ annotations: [Annotation],
-        viewName: String
-    ) throws -> AdaScriptViewEnvironmentBinding? {
-        guard let environment = annotations.first(where: { $0.name == "environment" }) else {
-            return nil
-        }
-        guard case let .identifier(key)? = environment.positionalArguments.first else {
-            throw error("@environment in \(viewName) requires a symbolic key")
-        }
-        guard match("var"), let propertyName = consumeIdentifier() else {
-            throw error("@environment in \(viewName) must annotate a stored var")
-        }
-        if match(":"), consumeIdentifier() == nil {
-            throw error("expected environment value type for \(propertyName)")
-        }
-        guard match(";") else {
-            throw error("expected ';' after environment property '\(propertyName)'")
-        }
-        return AdaScriptViewEnvironmentBinding(key: key, propertyName: propertyName)
+        throw error("AdaUI views in AdaScript are temporarily unavailable.")
     }
 
     private mutating func parseScriptable(name: String, annotation: Annotation) throws -> AdaScriptableSchema {

@@ -2,6 +2,13 @@ public enum AdaScriptViewBuilderLowerer {
     public static func lower(source: String, path: String) throws -> String {
         var lexer = Lexer(source: source)
         let tokens = lexer.lex()
+        if let viewIndex = tokens.indices.dropLast().first(where: { tokens[$0].text == "@" && tokens[$0 + 1].text == "view" }) {
+            throw AdaScriptViewBuilderError(
+                path: path,
+                line: tokens[viewIndex].line,
+                message: "AdaUI views in AdaScript are temporarily unavailable."
+            )
+        }
         let characters = Array(source)
         let replacements = try replacements(tokens: tokens, characters: characters, path: path)
 

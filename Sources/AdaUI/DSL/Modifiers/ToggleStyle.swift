@@ -55,6 +55,8 @@ public struct SwitchToggleStyle: ToggleStyle {
     public var showsStateText: Bool
     public var onText: String
     public var offText: String
+    /// The minimum gap between the toggle label and its state/control.
+    public var minimumLabelControlSpacing: Float
     public var rowCornerRadius: Float
     public var rowHeight: Float
     public var horizontalPadding: Float
@@ -71,6 +73,7 @@ public struct SwitchToggleStyle: ToggleStyle {
         showsStateText: Bool = false,
         onText: String = "On",
         offText: String = "Off",
+        minimumLabelControlSpacing: Float = 8,
         rowCornerRadius: Float = 7,
         rowHeight: Float = 32,
         horizontalPadding: Float = 0
@@ -85,6 +88,7 @@ public struct SwitchToggleStyle: ToggleStyle {
         self.showsStateText = showsStateText
         self.onText = onText
         self.offText = offText
+        self.minimumLabelControlSpacing = minimumLabelControlSpacing
         self.rowCornerRadius = rowCornerRadius
         self.rowHeight = rowHeight
         self.horizontalPadding = horizontalPadding
@@ -96,7 +100,7 @@ public struct SwitchToggleStyle: ToggleStyle {
                 if configuration.showsLabel {
                     configuration.label
                         .font(.system(size: 13))
-                    Spacer()
+                    Spacer(minLength: minimumLabelControlSpacing)
                 }
                 if showsStateText {
                     Text(configuration.isOn.wrappedValue ? onText : offText)

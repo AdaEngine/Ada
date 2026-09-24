@@ -1,7 +1,7 @@
 @_spi(AdaEngine) import AdaEngine
 
 extension ToggleStyle where Self == SwitchToggleStyle {
-    static func editorSettings(colors: EditorThemeColors) -> Self {
+    static func editorSettings(colors: EditorThemeColors, minimumLabelControlSpacing: Float = 8) -> Self {
         SwitchToggleStyle(
             tint: colors.blue,
             offTint: colors.border,
@@ -11,7 +11,8 @@ extension ToggleStyle where Self == SwitchToggleStyle {
             rowBorder: colors.border,
             showsStateText: true,
             rowHeight: 44,
-            horizontalPadding: 12
+            horizontalPadding: 12,
+            minimumLabelControlSpacing: minimumLabelControlSpacing
         )
     }
 }

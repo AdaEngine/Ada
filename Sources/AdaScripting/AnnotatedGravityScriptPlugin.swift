@@ -674,7 +674,6 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         try virtualMachine.bindClass(with: AdaScriptNetworkCommandValue.self)
         try virtualMachine.bindClass(with: AdaScriptNetworkValueBridge.self)
         try virtualMachine.bindClass(with: AdaScriptRemoteCommandBridge.self)
-        try virtualMachine.bindClass(with: AdaScriptViewBridge.self)
         try AdaScriptComponentRuntime.bind(
             to: virtualMachine,
             constructors: componentConstructors,
@@ -693,7 +692,6 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
             ),
             forKey: "__adaNetworkFactory"
         )
-        virtualMachine.setValue(AdaScriptViewBridge(), forKey: "adaUIBuilder")
         virtualMachine.setValue(taskRuntime, forKey: "__adaTasks")
         virtualMachine.setValue(asyncHost, forKey: "__adaAsync")
 

@@ -8,7 +8,7 @@ Write gameplay systems in Ada Script while keeping entity filtering and access p
 
 ## Overview
 
-Ada Script is AdaEngine's scripting layer for gameplay and declarative AdaUI. Its source files use the `.ada` extension. The current implementation uses an embedded language runtime, while the public API, diagnostics, and tooling consistently present Ada Script concepts.
+Ada Script is AdaEngine's scripting layer for gameplay and ECS integration. Its source files use the `.ada` extension. The current implementation uses an embedded language runtime, while the public API, diagnostics, and tooling consistently present Ada Script concepts.
 
 Annotations are not only syntax. AdaEngine resolves every query into native archetypes and component columns and publishes its component access to the scheduler.
 
@@ -49,14 +49,8 @@ AdaEditor projects configure automatic script discovery by default. For an exist
 - <doc:AdaScriptECS>
 - <doc:AdaScriptDiagnosticsAndPerformance>
 
-### User Interfaces
-
-- <doc:AdaScriptViews>
-
 ### Runtime API
 
 - ``AdaScriptPlugin``
 - ``AdaScriptSource``
 - ``AdaScriptError``
-- ``AdaScriptView``
-- ``AdaScriptViewRegistry``

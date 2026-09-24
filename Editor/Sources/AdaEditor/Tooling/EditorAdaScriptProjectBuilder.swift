@@ -28,6 +28,7 @@ struct EditorAdaScriptProjectBuildArtifact: Sendable {
 
 enum EditorAdaScriptProjectBuildError: Error, Equatable, LocalizedError, Sendable {
     case entryViewMissing(identifier: String)
+    case uiViewsUnavailable
     case nativeDataRequiresRuntimeLayout(names: [String])
     case noSources(path: String)
     case notAdaScriptProject(buildSystem: String)
@@ -39,7 +40,9 @@ enum EditorAdaScriptProjectBuildError: Error, Equatable, LocalizedError, Sendabl
     var errorDescription: String? {
         switch self {
         case let .entryViewMissing(identifier):
-            "AdaScript entry view '\(identifier)' was not found. Set runtime.entry.view to an existing @view id."
+            "AdaScript entry view '\(identifier)' is temporarily unavailable. Remove runtime.entry.view."
+        case .uiViewsUnavailable:
+            "AdaUI views in AdaScript are temporarily unavailable. Remove runtime.entry.view and @view declarations."
         case let .nativeDataRequiresRuntimeLayout(names):
             "AdaScript runtime resources are not available yet: \(names.joined(separator: ", "))."
         case let .noSources(path):
@@ -73,6 +76,9 @@ struct EditorAdaScriptProjectBuilder {
     func prepare(project: AdaProject, at projectURL: URL) throws -> EditorAdaScriptProjectBuildArtifact {
         guard project.build.system.isAdaScript else {
             throw EditorAdaScriptProjectBuildError.notAdaScriptProject(buildSystem: project.build.system.rawValue)
+        }
+        guard project.runtime.entry.view == nil else {
+            throw EditorAdaScriptProjectBuildError.uiViewsUnavailable
         }
 
         let sourceRoot = project.paths.sources ?? "Sources"

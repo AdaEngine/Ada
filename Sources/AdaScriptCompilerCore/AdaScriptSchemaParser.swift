@@ -136,22 +136,6 @@ struct Annotation {
     let name: String
     let positionalArguments: [Literal]
 
-    func previewTitle(viewName: String, path: String) throws -> String? {
-        guard arguments.keys.allSatisfy({ $0 == "title" }) else {
-            throw AdaScriptSchemaError.invalid(path: path, message: "@previewable on \(viewName) only supports title")
-        }
-        let titleCount = positionalArguments.count + (arguments["title"] == nil ? 0 : 1)
-        guard titleCount <= 1 else {
-            throw AdaScriptSchemaError.invalid(path: path, message: "@previewable on \(viewName) accepts one title")
-        }
-        guard let literal = arguments["title"] ?? positionalArguments.first else {
-            return nil
-        }
-        guard case let .string(title) = literal else {
-            throw AdaScriptSchemaError.invalid(path: path, message: "@previewable title on \(viewName) must be a string")
-        }
-        return title
-    }
 }
 
 enum Literal {

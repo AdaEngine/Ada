@@ -305,7 +305,7 @@ class AnnouncementSystem {
 }
 ```
 
-`update(context)`, scriptable callbacks, UI actions, and `body()` remain
+`update(context)` and scriptable callbacks remain
 synchronous. Do not keep `context`, query rows, resource views, or commands
 across `await`: those values expire when the callback returns. Pass detached
 values into the task. `Time.sleep` uses game time; `Time.sleepRealTime` uses a
@@ -333,7 +333,7 @@ class CreatePlayer {
 
 `@component` tells AdaEngine to register data; `@export` gives a supported
 field a default. `@system` registers an ECS callback. Other annotations define
-queries, resources, scriptable behavior, views, editor tools, and multiplayer
+queries, resources, scriptable behavior, editor tools, and multiplayer
 messages. Arguments are constants or symbolic identifiers used during module
 discovery. See <doc:AdaScriptAnnotations> for their valid targets, arguments,
 defaults, and limitations.

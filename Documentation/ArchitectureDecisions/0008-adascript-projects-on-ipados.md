@@ -57,6 +57,10 @@ An AdaScript project uses `.ada/project.json`, `Sources`, and `Assets` without a
 `Package.swift`. Its runtime settings declare a stable module name, an entry
 `@view` identifier, and an optional startup scene.
 
+The legacy view entry field is retained for project compatibility but cannot
+activate an AdaScript view while [ADR-0016](0016-temporarily-disable-adascript-adaui.md)
+is in force.
+
 SwiftPM remains supported on platforms with a suitable native toolchain. On
 iPadOS, Build and Run reject every SwiftPM project and every AdaScript project
 whose source root contains a `.swift` file. The diagnostic identifies the build

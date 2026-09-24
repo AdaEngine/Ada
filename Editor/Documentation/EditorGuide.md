@@ -26,4 +26,4 @@ The offline library contains hand-written engine and AdaScript guides. Generated
 
 ## Start scripting
 
-Read <doc:GettingStartedWithAdaScript>, then <doc:AdaScriptLanguage> and <doc:AdaScriptECS>. For declarative user interfaces and previews, see <doc:AdaScriptViews>.
+Read <doc:GettingStartedWithAdaScript>, then <doc:AdaScriptLanguage> and <doc:AdaScriptECS>.

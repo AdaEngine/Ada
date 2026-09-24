@@ -85,7 +85,7 @@
       },
       {
         "kind": "text",
-        "text": "Read Getting Started with AdaScript, then AdaScript Language and AdaScript ECS. For declarative user interfaces and previews, see AdaUI Views in AdaScript.",
+        "text": "Read Getting Started with AdaScript, then AdaScript Language and AdaScript ECS.",
         "level": 0,
         "links": [
           {
@@ -99,10 +99,6 @@
           {
             "title": "AdaScript ECS",
             "destination": "AdaScriptECS"
-          },
-          {
-            "title": "AdaUI Views in AdaScript",
-            "destination": "AdaScriptViews"
           }
         ]
       }
@@ -820,7 +816,7 @@
       },
       {
         "kind": "text",
-        "text": "AdaScript is AdaEngine's scripting layer for gameplay and declarative AdaUI. Its source files use the `.ada` extension. The current implementation uses an embedded language runtime, while the public API, diagnostics, and tooling consistently present AdaScript concepts.",
+        "text": "AdaScript is AdaEngine's scripting layer for gameplay and ECS integration. Its source files use the `.ada` extension. The current implementation uses an embedded language runtime, while the public API, diagnostics, and tooling consistently present AdaScript concepts.",
         "level": 0,
         "links": []
       },
@@ -915,30 +911,13 @@
       },
       {
         "kind": "heading",
-        "text": "User Interfaces",
-        "level": 3,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "• AdaUI Views in AdaScript",
-        "level": 0,
-        "links": [
-          {
-            "title": "AdaUI Views in AdaScript",
-            "destination": "AdaScriptViews"
-          }
-        ]
-      },
-      {
-        "kind": "heading",
         "text": "Runtime API",
         "level": 3,
         "links": []
       },
       {
         "kind": "text",
-        "text": "• `AdaScriptPlugin`\n• `AdaScriptSource`\n• `AdaScriptError`\n• `AdaScriptView`\n• `AdaScriptViewRegistry`",
+        "text": "• `AdaScriptPlugin`\n• `AdaScriptSource`\n• `AdaScriptError`",
         "level": 0,
         "links": []
       }
@@ -1178,6 +1157,42 @@
       },
       {
         "kind": "heading",
+        "text": "Optional strict type checking",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript remains dynamically typed by default. Enable strict checking for a\nsingle source by placing `@strict` before its first declaration:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@strict\n\nfunc addScore(score: Int, amount: Int) -> Int {\n    return score + amount;\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In an AdaEditor project, **Project Settings → Runtime → Type Checking → Strict**\nenables the same analysis for every `.ada` source. The serialized setting is:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "{\n  \"build\": {\n    \"system\": \"adascript\",\n    \"adaScriptTypeChecking\": \"strict\"\n  }\n}",
+        "language": "json",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Strict checking validates annotated assignments, function arguments, member\naccess, and return values before the module runs. Use `Any` for an intentional\ndynamic boundary. Untyped code and projects using `\"dynamic\"` keep normal\nAdaScript runtime behavior.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
         "text": "Imports",
         "level": 2,
         "links": []
@@ -1387,7 +1402,7 @@
       },
       {
         "kind": "text",
-        "text": "Scriptable contexts expose the same expiring deferred commands facade as\nsystems. Retaining it after a callback produces a diagnostic. Scriptable\nobjects intentionally have no immediate-mode GUI callback; declarative UI\nbelongs to AdaUI script views.",
+        "text": "Scriptable contexts expose the same expiring deferred commands facade as\nsystems. Retaining it after a callback produces a diagnostic. Scriptable\nobjects intentionally have no user-interface callback; compose interfaces in\nSwift with AdaUI.",
         "level": 0,
         "links": []
       },
@@ -1453,23 +1468,6 @@
       },
       {
         "kind": "heading",
-        "text": "AdaUI views",
-        "level": 2,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Use `@view` on a class or struct whose `body()` contains declarative AdaUI expressions.\nAdd `@previewable` when that view should appear in AdaEditor Preview. See\nAdaUI Views in AdaScript for the supported view constructors, modifiers, and\npreview workflow.",
-        "level": 0,
-        "links": [
-          {
-            "title": "AdaUI Views in AdaScript",
-            "destination": "AdaScriptViews"
-          }
-        ]
-      },
-      {
-        "kind": "heading",
         "text": "Asynchronous work",
         "level": 2,
         "links": []
@@ -1517,13 +1515,13 @@
       },
       {
         "kind": "text",
-        "text": "`await Time.sleep(seconds)` advances with the scheduler's `deltaTime` and stops\nadvancing when that scheduler is paused. AdaEngine does not yet expose a\nseparate game time-scale resource.\n`await Time.sleepRealTime(seconds)` uses a monotonic clock; continuation still\nwaits for a script dispatch point. `Tasks.promise()` creates a one-shot wait\nthat an action can resolve with `complete(value)`. A Boolean `false` from a\nconfirmation is a user choice; closing its view cancels the waiting task.\n`Tasks.start(...)` returns a handle with `status()` and `cancel()`.",
+        "text": "`await Time.sleep(seconds)` advances with the scheduler's `deltaTime` and stops\nadvancing when that scheduler is paused. AdaEngine does not yet expose a\nseparate game time-scale resource.\n`await Time.sleepRealTime(seconds)` uses a monotonic clock; continuation still\nwaits for a script dispatch point. `Tasks.promise()` creates a one-shot wait\nthat another script callback can resolve with `complete(value)`.\n`Tasks.start(...)` returns a handle with `status()` and `cancel()`.",
         "level": 0,
         "links": []
       },
       {
         "kind": "text",
-        "text": "AdaScript callbacks such as `update(context)`, `body()`, and UI actions remain\nsynchronous. Do not mark them `async`; start a separate async function and pass\ndetached values. Callback contexts, queries, resources, and commands expire at\ncallback exit. Awaited work resumes in the serialized script runtime, not on\nthe native I/O worker. A task started by a view is cancelled when that view\nis disposed or its module is replaced. Cancelling a save does not roll back\na file that was already committed.",
+        "text": "AdaScript callbacks such as `update(context)` remain synchronous. Do not mark\nthem `async`; start a separate async function and pass\ndetached values. Callback contexts, queries, resources, and commands expire at\ncallback exit. Awaited work resumes in the serialized script runtime, not on\nthe native I/O worker. Cancelling a save does not roll back\na file that was already committed.",
         "level": 0,
         "links": []
       },
@@ -1882,128 +1880,6 @@
     ]
   },
   {
-    "id": "AdaScriptViews",
-    "title": "AdaUI Views in AdaScript",
-    "section": "AdaScript",
-    "source": "Sources/AdaScripting/AdaScripting.docc/AdaScriptViews.md",
-    "blocks": [
-      {
-        "kind": "text",
-        "text": "Declare native AdaUI view trees in `.ada` files and preview them directly in AdaEditor.",
-        "level": 0,
-        "links": []
-      },
-      {
-        "kind": "heading",
-        "text": "Declare a view",
-        "level": 2,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Annotate a class or struct with `@view`. The build plugin derives its runtime identity\nfrom the Swift module and type name, humanizes the type name for AdaEditor,\nand emits a typed accessor. Use `id` or `title` only when an explicit override\nis required.",
-        "level": 0,
-        "links": []
-      },
-      {
-        "kind": "code",
-        "text": "@previewable\n@view\nstruct WelcomeView {\n    @state var message = \"Hello from Ada Script\";\n    @environment(colorScheme) var colorScheme;\n\n    func body() {\n        VStack(spacing: 12) {\n            Text(message).fontSize(28);\n            Text(\"Appearance: \" + colorScheme);\n            HStack {\n                Text(\"Native AdaUI\");\n                Spacer();\n            }\n            Button(\"Change message\") {\n                message = \"State updated\";\n            };\n        }\n        .padding(24)\n        .background(\"#20232aff\");\n    }\n}",
-        "language": "ada",
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "`body()` is an implicit view-builder context. AdaEngine lowers its declarative\nexpressions into the same native `View` graph used by Swift declarations. It\ndoes not use an immediate-mode drawing callback or retain live ECS pointers.",
-        "level": 0,
-        "links": []
-      },
-      {
-        "kind": "heading",
-        "text": "Show a registered view",
-        "level": 2,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "`AdaScriptBuildPlugin` embeds `.ada` files and registers their `@view`\ndeclarations from `AdaScriptPluginsGenerated`. Use the generated typed accessor\nin a Swift window or another AdaUI hierarchy:",
-        "level": 0,
-        "links": []
-      },
-      {
-        "kind": "code",
-        "text": "WindowGroup {\n    AdaScriptViewsGenerated.welcomeView\n}\n.addPlugins(AdaScriptPluginsGenerated())",
-        "language": "swift",
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "The first view slice supports `Text`, `VStack`, `HStack`, `ZStack`, `Spacer`,\n`Divider`, and `EmptyView`. Container children are collected implicitly by the\n`body()` view builder. Available modifiers are\n`.padding`, `.frame`, `.fontSize`, `.foregroundColor`, `.background`,\n`.opacity`, and `.accessibilityIdentifier`. Colors accept common names or\n`#RRGGBB` / `#RRGGBBAA` strings.",
-        "level": 0,
-        "links": []
-      },
-      {
-        "kind": "heading",
-        "text": "State and environment",
-        "level": 2,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Declare view-owned values with `@state`. The script view instance remains alive\nwhile its AdaUI identity remains alive. A `Button` action mutates that same\ninstance, reevaluates `body()`, and invalidates the native view subtree.",
-        "level": 0,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Use `@environment(key)` to bind a read-only AdaUI environment value before each\nevaluation. The current keys are `colorScheme`, `isEnabled`, `scaleFactor`, and\n`userInterfaceIdiom`.",
-        "level": 0,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "The intended two-way child-view syntax is `@binding var value;` with `$value`\nat the call site. Nested script-view parameters are not implemented in this\nslice, so `@binding` currently produces a compile-time diagnostic instead of a\nsilently disconnected value.",
-        "level": 0,
-        "links": []
-      },
-      {
-        "kind": "heading",
-        "text": "Preview in AdaEditor",
-        "level": 2,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Add `@previewable` to an `@view` declaration that should be an AdaEditor Preview entry\npoint. Runtime-only views remain plain `@view` declarations and do not clutter\nthe Preview list.",
-        "level": 0,
-        "links": []
-      },
-      {
-        "kind": "code",
-        "text": "@previewable(title: \"Welcome – Dark\")\n@view\nclass WelcomeDarkPreview {\n    func body() {\n        Text(\"Welcome preview\").background(\"#20232aff\");\n    }\n}",
-        "language": "ada",
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "The `title` argument is optional; AdaEditor otherwise uses `@view(title:)` or a\nhumanized type name. `@previewable` without `@view`, duplicate annotations, and\nnon-string titles produce compile-time diagnostics.",
-        "level": 0,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "When a `.ada` file is open, AdaEditor lists its `@previewable` declarations,\ngathers the target's `.ada` sources, substitutes the current unsaved document,\nevaluates the selected view, and mounts the resulting native AdaUI tree in the\nPreview panel.",
-        "level": 0,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Preview actions and state use the same persistent instance path as runtime\nviews. Cross-view bindings and state migration across source generations remain\nfollow-up work.",
-        "level": 0,
-        "links": []
-      }
-    ]
-  },
-  {
     "id": "AdaScriptDiagnosticsAndPerformance",
     "title": "AdaScript Diagnostics and Performance",
     "section": "AdaScript",
@@ -2104,6 +1980,18 @@
       {
         "kind": "text",
         "text": "Choose an annotation by the declaration it describes. Annotation arguments\nare literals, identifiers, or lists of those values, not runtime expressions.\nThe same spelling can have different roles: `@component` declares a struct,\nwhile `@component(required: true)` binds an existing component to a scriptable\ninstance.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "File type checking",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@strict` before the first declaration enables strict type checking for that\nsource file. It does not change runtime representation or require the rest of\nthe project to use static types. An explicit `Any` annotation keeps a value\ndynamic inside a strict file. Project-wide strict checking is configured by\n`build.adaScriptTypeChecking` in `.ada/project.json`.",
         "level": 0,
         "links": []
       },
@@ -2233,26 +2121,15 @@
       },
       {
         "kind": "heading",
-        "text": "AdaUI and editor tools",
+        "text": "Editor tools",
         "level": 2,
         "links": []
       },
       {
         "kind": "text",
-        "text": "| Annotation | Target | Effect |\n| --- | --- | --- |\n| `@view(id: \"...\", title: \"...\")` | Class or struct | Registers a declarative view with `body()`. Both arguments are optional. |\n| `@previewable(title: \"...\")` | `@view` class or struct | Lists the view in AdaEditor Preview. The optional title overrides the view title. |\n| `@state` | Stored view property | Holds view-owned mutable state while the view identity lives. |\n| `@environment(key)` | Stored view property | Reads an AdaUI environment value before evaluating `body()`. |\n| `@tool(id: \"...\", ...)` | Class | Declares AdaEditor tool metadata; `id` is required. |",
+        "text": "| Annotation | Target | Effect |\n| --- | --- | --- |\n| `@tool(id: \"...\", ...)` | Class | Declares AdaEditor tool metadata; `id` is required. |",
         "level": 0,
         "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Supported `@environment` keys are `colorScheme`, `isEnabled`, `scaleFactor`,\nand `userInterfaceIdiom`. `@binding` for nested script-view parameters is not\nimplemented and produces a diagnostic. `@previewable` without `@view`, or on\na declaration without `@view`, is invalid. See AdaUI Views in AdaScript for view syntax.",
-        "level": 0,
-        "links": [
-          {
-            "title": "AdaUI Views in AdaScript",
-            "destination": "AdaScriptViews"
-          }
-        ]
       },
       {
         "kind": "text",
@@ -2317,7 +2194,7 @@
       },
       {
         "kind": "text",
-        "text": "AdaScript is dynamically typed. A `var` holds a value, and later assignments\ncan replace it. Type annotations such as `var score: Int` help describe an API\nand support tooling; do not assume they provide full static type checking.",
+        "text": "AdaScript is dynamically typed. A `var` holds a value, and later assignments\ncan replace it. Type annotations such as `var score: Int` describe an API and\nsupport tooling. They are enforced only when strict type checking is enabled\nfor the project or source file; dynamic mode remains the default.",
         "level": 0,
         "links": []
       },
@@ -2571,7 +2448,7 @@
       },
       {
         "kind": "text",
-        "text": "`update(context)`, scriptable callbacks, UI actions, and `body()` remain\nsynchronous. Do not keep `context`, query rows, resource views, or commands\nacross `await`: those values expire when the callback returns. Pass detached\nvalues into the task. `Time.sleep` uses game time; `Time.sleepRealTime` uses a\nmonotonic clock. Read AdaScript Language for asset operations, save\nresults, cancellation, and task lifetimes.",
+        "text": "`update(context)` and scriptable callbacks remain\nsynchronous. Do not keep `context`, query rows, resource views, or commands\nacross `await`: those values expire when the callback returns. Pass detached\nvalues into the task. `Time.sleep` uses game time; `Time.sleepRealTime` uses a\nmonotonic clock. Read AdaScript Language for asset operations, save\nresults, cancellation, and task lifetimes.",
         "level": 0,
         "links": [
           {
@@ -2600,7 +2477,7 @@
       },
       {
         "kind": "text",
-        "text": "`@component` tells AdaEngine to register data; `@export` gives a supported\nfield a default. `@system` registers an ECS callback. Other annotations define\nqueries, resources, scriptable behavior, views, editor tools, and multiplayer\nmessages. Arguments are constants or symbolic identifiers used during module\ndiscovery. See AdaScript Annotation Reference for their valid targets, arguments,\ndefaults, and limitations.",
+        "text": "`@component` tells AdaEngine to register data; `@export` gives a supported\nfield a default. `@system` registers an ECS callback. Other annotations define\nqueries, resources, scriptable behavior, editor tools, and multiplayer\nmessages. Arguments are constants or symbolic identifiers used during module\ndiscovery. See AdaScript Annotation Reference for their valid targets, arguments,\ndefaults, and limitations.",
         "level": 0,
         "links": [
           {
@@ -2619,7 +2496,7 @@
     "blocks": [
       {
         "kind": "text",
-        "text": "Share reusable AdaScript functions, systems, scriptable objects, and views through a GitHub repository.\nAdaEditor installs the library and its transitive dependencies into the project. Run, Play Mode,\nPreview, and `AdaScriptBuildPlugin` load the same installed sources without network access.",
+        "text": "Share reusable AdaScript functions, systems, and scriptable objects through a GitHub repository.\nAdaEditor installs the library and its transitive dependencies into the project. Run, Play Mode,\nPreview, and `AdaScriptBuildPlugin` load the same installed sources without network access.",
         "level": 0,
         "links": []
       },
@@ -2697,7 +2574,7 @@
       },
       {
         "kind": "text",
-        "text": "Library `@system`, `@scriptable`, and `@view` declarations participate in the game's normal\ndiscovery and registration. Systems run automatically with the game's plugin. Enable the native\nengine features they need in Runtime Settings. Libraries share the game's module: use distinct\nclass names, function names, and annotation IDs to avoid collisions. Imports do not create namespaces.\nLibrary authors should not declare `main()`.",
+        "text": "Library `@system` and `@scriptable` declarations participate in the game's normal\ndiscovery and registration. Systems run automatically with the game's plugin. Enable the native\nengine features they need in Runtime Settings. Libraries share the game's module: use distinct\nclass names, function names, and annotation IDs to avoid collisions. Imports do not create namespaces.\nLibrary authors should not declare `main()`.",
         "level": 0,
         "links": []
       },

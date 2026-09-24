@@ -6,7 +6,6 @@ struct EditorRuntimeSettingsDraft: Equatable, Sendable {
     var moduleName: String
     var scene: String
     var startupSystem: String
-    var view: String
     var windowHeight: String
     var windowIsResizable: Bool
     var windowTitle: String
@@ -19,7 +18,6 @@ struct EditorRuntimeSettingsDraft: Equatable, Sendable {
         self.moduleName = runtime.moduleName
         self.scene = runtime.entry.scene ?? ""
         self.startupSystem = runtime.entry.startupSystem ?? ""
-        self.view = runtime.entry.view ?? ""
         self.windowHeight = String(runtime.window.size.height)
         self.windowIsResizable = runtime.window.isResizable
         self.windowTitle = runtime.window.title ?? ""
@@ -45,7 +43,7 @@ struct EditorRuntimeSettingsDraft: Equatable, Sendable {
         runtime.entry = AdaProjectRuntimeEntry(
             scene: scene.trimmedNilIfEmpty,
             startupSystem: startupSystem.trimmedNilIfEmpty,
-            view: view.trimmedNilIfEmpty
+            view: runtime.entry.view
         )
         runtime.plugins.settings.physics2D.gravity = [gravityX, gravityY]
         runtime.window = AdaProjectRuntimeWindow(

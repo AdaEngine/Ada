@@ -64,9 +64,7 @@ private enum EditorProjectTemplateSourceFactory {
                 struct Game: App {
                     var body: some AppScene {
                         WindowGroup(
-                            content: {
-                                AdaScriptViewsGenerated.mainView
-                            },
+                            content: { EmptyView() },
                             assetBundle: .module
                         )
                         .addPlugins(AdaScriptPluginsGenerated())
@@ -97,17 +95,6 @@ private enum EditorProjectTemplateSourceFactory {
     }
 
     static let adaScript = """
-        @previewable
-        @view(id: "game.main")
-        class MainView {
-            func body() {
-                VStack(spacing: 12) {
-                    Text("Hello, Ada!").fontSize(28);
-                    Text("Edit Main.ada to build your interface.");
-                }.padding(24);
-            }
-        }
-
         @system(scheduler: "update", id: "game.main")
         class MainSystem {
             func update(context: AdaSystemContext) {

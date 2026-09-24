@@ -8,7 +8,7 @@ enum EditorNewFileGroup: String, CaseIterable, Hashable, Sendable {
     case resources = "Resources"
     case swift = "Swift"
 
-    var templates: [EditorNewFileKind] { EditorNewFileKind.allCases.filter { $0.group == self } }
+    var templates: [EditorNewFileKind] { EditorNewFileKind.allCases.filter { $0.group == self && $0 != .uiScript } }
 }
 
 enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
@@ -68,7 +68,7 @@ enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
 
     var detail: String {
         switch self {
-        case .uiScript: "AdaUI view with live preview"
+        case .uiScript: "Temporarily unavailable"
         case .scriptableObject: "Attachable behavior with lifecycle hooks"
         case .script: "ECS system in the update scheduler"
         case .emptyScript: "Blank AdaScript source"
@@ -162,16 +162,7 @@ enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
         case .uiScript:
             return """
                 // \(fileName)
-
-                @view
-                @previewable
-                class \(name.hasSuffix("View") ? name : name + "View") {
-                    func body() {
-                        VStack(spacing: 8) {
-                            Text("Hello, AdaUI");
-                        }.padding(16);
-                    }
-                }
+                // AdaUI views in AdaScript are temporarily unavailable.
                 """
         case .scriptableObject:
             return """

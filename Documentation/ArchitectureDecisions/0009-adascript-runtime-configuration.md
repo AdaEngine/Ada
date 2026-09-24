@@ -36,6 +36,9 @@ graph, compile AdaScript, initialize the runtime world and assets, install
 feature plugins and AdaScript systems, load the scene, run the startup
 scheduler, publish the root view, then enter normal frame updates.
 
+The `view` field remains for manifest compatibility only. It is rejected while
+AdaScript views are disabled by [ADR-0016](0016-temporarily-disable-adascript-adaui.md).
+
 `editor.startupScene` remains editor-owned. It selects the fallback scene for
 in-editor play. `runtime.entry.scene` selects the scene used by the standalone
 game runtime.

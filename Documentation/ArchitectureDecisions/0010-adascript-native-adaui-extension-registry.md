@@ -4,6 +4,10 @@
 - Date: 2026-09-05
 - Implementation: Planned
 
+AdaScript views are temporarily unavailable until this design is implemented;
+see [ADR-0016](0016-temporarily-disable-adascript-adaui.md) for the active
+product status and follow-up sequence.
+
 ## Context
 
 [ADR-0006](0006-ada-script-adaui-integration.md) establishes that AdaScript UI

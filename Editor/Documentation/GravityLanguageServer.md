@@ -21,7 +21,6 @@ Then configure an LSP client to start `<bin-path>/gravity-lsp` for files ending 
 ## Supported features
 
 - Completion for Ada Script declarations, inferred local values, and AdaEngine scripting APIs such as `AdaPlugin`, `AdaQuery`, `AdaSystem`, query collections, and entities.
-- Completion for AdaUI annotations including `@view`, `@previewable`, `@state`, and `@environment`.
 - Workspace symbols collected from `.ada` files below the configured root, including `.ada/generated`.
 - Full-document synchronization for open and changed documents.
 - Document symbols.

@@ -75,6 +75,10 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 ## Контракт первой версии
 
+Этот исторический контракт больше не описывает доступную функциональность:
+source-backed AdaScript views отключены согласно
+[ADR-0016](../ArchitectureDecisions/0016-temporarily-disable-adascript-adaui.md).
+
 ```json
 {
   "schemaVersion": 1,

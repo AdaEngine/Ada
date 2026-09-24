@@ -9,7 +9,6 @@ struct EditorSceneViewportView: View {
     let playModeState: EditorPlayModeState
     let playRuntime: EditorScenePlayRuntime?
     let onEntitySelected: (() -> Void)?
-    let onCreateEntity: (() -> Void)?
     let onPlay: (() -> Void)?
     let onStop: (() -> Void)?
     let onDocumentChanged: (EditorSceneDocument) -> Void
@@ -81,15 +80,17 @@ struct EditorSceneViewportView: View {
                             viewportModel.attachSceneWorld(app.main, loadResult: result)
                         },
                         updateContent: { world, deltaTime in
+                            var didChangeViewport = false
                             if let input = world.getResource(Input.self) {
                                 for event in input.getInputEvents() {
                                     let handled = viewportModel.handleInput(event)
-                                    if handled {
-                                        redrawViewport()
-                                    }
+                                    didChangeViewport = didChangeViewport || handled
                                 }
                             }
                             if viewportModel.update(deltaTime: deltaTime) {
+                                didChangeViewport = true
+                            }
+                            if didChangeViewport {
                                 redrawViewport()
                             }
                         }
@@ -104,12 +105,6 @@ struct EditorSceneViewportView: View {
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
                 .mask(RectangleShape())
-                .contextMenu {
-                    Button("Create Entity…") {
-                        onCreateEntity?()
-                    }
-                }
-                .accessibilityIdentifier("AdaEditor.SceneViewport.ContextSurface")
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }

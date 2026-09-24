@@ -18,7 +18,7 @@ def articles():
                     if path.stem not in {'HowToBuildEngine', 'MakeTutorials'}]
     order = ['EditorGuide', 'AdaEngine', 'Building', 'AdaUIIdentity', 'VisionOSWindowed',
              'SPMDebug', 'Contributing', 'AdaScripting', 'GettingStartedWithAdaScript',
-             'AdaScriptLanguage', 'AdaScriptECS', 'AdaScriptViews', 'AdaScriptDiagnosticsAndPerformance']
+             'AdaScriptLanguage', 'AdaScriptECS', 'AdaScriptDiagnosticsAndPerformance']
     sources.sort(key=lambda entry: order.index(entry[0].stem) if entry[0].stem in order else len(order))
     titles = {path.stem: re.sub(r'`', '', path.read_text().splitlines()[0].removeprefix('# '))
               .replace('Ada Script', 'AdaScript') for path, _ in sources}

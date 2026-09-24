@@ -234,7 +234,7 @@ struct EditorNotificationSettings: View {
                     }
                 }
             ))
-            .toggleStyle(.editorSettings(colors: theme.editorColors))
+            .toggleStyle(.editorSettings(colors: theme.editorColors, minimumLabelControlSpacing: 40))
             .disabled(isRequestingPermission)
             .accessibilityIdentifier("AdaEditor.Notifications.System")
             Text(center.authorizationStatus).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
@@ -245,7 +245,7 @@ struct EditorNotificationSettings: View {
                     center.persist()
                 }
             ))
-            .toggleStyle(.editorSettings(colors: theme.editorColors))
+            .toggleStyle(.editorSettings(colors: theme.editorColors, minimumLabelControlSpacing: 40))
             .accessibilityIdentifier("AdaEditor.Notifications.Sound")
             Text("NOTIFICATION SOURCES").font(.system(size: 12, weight: .semibold)).padding(.top, 10)
             Text("Choose which events can send system notifications.")
@@ -263,7 +263,7 @@ struct EditorNotificationSettings: View {
                             center.persist()
                         }
                     ))
-                    .toggleStyle(.editorSettings(colors: theme.editorColors))
+                    .toggleStyle(.editorSettings(colors: theme.editorColors, minimumLabelControlSpacing: 40))
                     .accessibilityIdentifier("AdaEditor.Notifications.Source.\(source.rawValue)")
                 }
             }

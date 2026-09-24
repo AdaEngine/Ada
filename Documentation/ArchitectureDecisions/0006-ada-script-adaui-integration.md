@@ -1,6 +1,6 @@
 # ADR-0006: Build Ada Script UI on the native AdaUI graph
 
-- Status: Accepted
+- Status: Superseded by [ADR-0016](0016-temporarily-disable-adascript-adaui.md)
 - Date: 2026-08-31
 - Implementation: Partial (foundation shipped)
 

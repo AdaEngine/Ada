@@ -94,19 +94,13 @@ metadata. AdaScript supplies these accessors automatically for `@export` fields.
 See [BoundLabel.ui](../../Documentation/Examples/UIScenes/Assets/BoundLabel.ui)
 and [HUD.ada](../../Documentation/Examples/UIScenes/Scripts/HUD.ada) for a minimal pair.
 
-## Other UI sources
+## Connect a UI Scene to a game
 
-Existing `UIComponent(view: MyView(), behaviour: .overlay)` remains supported.
-AdaScript files use `try UIComponent(script: "Sources/HUD.ada", identifier: "HUD",
-resourceRoot: projectDirectory)`. The identifier is required when the loaded
-module has multiple @view declarations.
-
-In an entity inspector, add **UI Component**, choose a source kind and path or
-exported View identifier, and configure inputs. `.ascn` stores this reference.
-For code that decodes entities outside the editor, insert a
+In an entity inspector, add **UI Component**, choose the `.ui` source, and
+configure inputs. `.ascn` stores this reference. For code that decodes entities
+outside the editor, insert a
 `UIComponentRuntimeResource(UIComponentRuntime(resourceRoot: assetsDirectory))`
-into the world before updating UI. Call `runtime.enableAdaScript(sourceRoot: ...)`
-when the world also loads AdaScript files. Named game contexts are registered in
+into the world before updating UI. Named game contexts are registered in
 `runtime.contexts`; arbitrary Swift View instances and closures are not Codable.
 
 Resource paths accept `@res://` (relative to the resource root), or paths relative
@@ -123,13 +117,6 @@ in the game's UICatalog. The editor reads `.ada/ui-exports.json`, builds native
 providers using the existing Swift Preview builder, and verifies their compiled
 signatures before activating them. Keep export providers outside executable entry
 point files.
-
-AdaScript exports use the manifest's `scripts` array with `source`, `identifier`
-and `signature`. Parameters explicitly name stored properties. A parameter with
-`isBinding: true` writes back after an action; internal @state is not automatically
-exported. @previewable is independent of palette export. Exported script Views
-can use `NativeView("Game.Badge", title: "Hello")` with the same catalog, and
-`.nativeModifier("Game.Modifier", ["amount": 2])` for exported modifiers.
 
 Swift factories must be compiled into the host on iPadOS. Desktop SwiftPM
 projects can build their exports locally; portable AdaScript projects cannot

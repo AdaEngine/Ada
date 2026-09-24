@@ -1,5 +1,6 @@
 @_spi(Scripting) import AdaECS
 import AdaScriptCompilerCore
+import AdaText
 import AdaUI
 import AdaUtils
 import Foundation
@@ -65,165 +66,54 @@ public enum AdaScriptViewScanner {
 /// A native AdaUI view whose declarative tree is supplied by Ada Script.
 @MainActor
 public struct AdaScriptView: View {
-    private let directStorage: AdaScriptViewStorage?
-    private let identifier: String
-    private let catalog: UICatalog
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.scaleFactor) private var scaleFactor
-    @Environment(\.userInterfaceIdiom) private var userInterfaceIdiom
-    @State private var revision = 0
-    @State private var storage: AdaScriptViewStorage?
-
     /// Creates a view registered by `AdaScriptBuildPlugin`.
     public init(_ identifier: String, catalog: UICatalog = .standard) {
-        self.catalog = catalog
-        self.directStorage = nil
-        self.identifier = identifier
+        _ = identifier
+        _ = catalog
     }
 
-    /// Creates a view directly from source, primarily for tools and previews.
+    /// AdaScript-backed AdaUI views are temporarily unavailable.
     public init(sources: [AdaScriptSource], identifier: String, catalog: UICatalog = .standard) throws {
-        self.catalog = catalog
-        let metadata = try AdaScriptViewScanner.declarations(in: sources)
-        let runtime = try AdaScriptViewModuleRuntime(sources: sources, views: metadata)
-        let storage = try runtime.makeStorage(identifier: identifier)
-        try storage.updateEnvironment(defaultAdaScriptViewEnvironment())
-        self.directStorage = storage
-        self.identifier = identifier
+        _ = sources
+        _ = identifier
+        _ = catalog
+        throw AdaScriptError.invalidManifest("AdaUI views in AdaScript are temporarily unavailable.")
     }
 
-    /// Compiles and validates a source-backed view without constructing UI state.
-    ///
-    /// Editor build tooling uses this entry point away from the main actor before
-    /// publishing a prepared runtime artifact back to the UI.
-    nonisolated public static func validate(
-        sources: [AdaScriptSource],
-        identifier: String
-    ) throws {
-        try AdaScriptRuntimeCoordinator.lock.withLock {
-            let metadata = try AdaScriptViewScanner.declarations(in: sources)
-            let runtime = try AdaScriptViewModuleRuntime(sources: sources, views: metadata)
-            try runtime.validate(identifier: identifier)
-        }
+    /// Rejects legacy preview and build requests for AdaScript-backed views.
+    nonisolated public static func validate(sources: [AdaScriptSource], identifier: String) throws {
+        _ = sources
+        _ = identifier
+        throw AdaScriptError.invalidManifest("AdaUI views in AdaScript are temporarily unavailable.")
     }
 
     public var body: some View {
-        _ = revision
-        do {
-            let resolvedStorage: AdaScriptViewStorage
-            if let storage {
-                resolvedStorage = storage
-            } else if let directStorage {
-                storage = directStorage
-                resolvedStorage = directStorage
-            } else {
-                let newStorage = try AdaScriptViewRegistry.makeStorage(identifier: identifier)
-                storage = newStorage
-                resolvedStorage = newStorage
-            }
-            try resolvedStorage.updateEnvironment([
-                "colorScheme": .string(colorScheme == .dark ? "dark" : "light"),
-                "isEnabled": .bool(isEnabled),
-                "scaleFactor": .double(Double(scaleFactor)),
-                "userInterfaceIdiom": .string(userInterfaceIdiom.adaScriptName),
-            ])
-            let revision = $revision
-            resolvedStorage.onTaskProgress = { revision.wrappedValue += 1 }
-            if let error = resolvedStorage.error {
-                return AnyView(
-                    Text("Ada Script view error: \(error)")
-                        .foregroundColor(.red)
-                        .padding(12)
-                )
-            }
-            guard let model = resolvedStorage.model else {
-                throw AdaScriptError.invalidManifest("@view '\(identifier)' did not produce a view tree")
-            }
-            return AnyView(
-                AdaScriptRenderedView(
-                    model: model,
-                    performAction: { action in
-                        do {
-                            try resolvedStorage.perform(action: action)
-                        } catch {
-                            resolvedStorage.error = error
-                        }
-                        revision.wrappedValue += 1
-                    },
-                    catalog: catalog
-                )
-            )
-        } catch {
-            return AnyView(
-                Text("Ada Script view error: \(error)")
-                    .foregroundColor(.red)
-                    .padding(12)
-            )
-        }
+        Text("AdaUI views in AdaScript are temporarily unavailable.")
     }
 }
 
-/// Process-wide registry populated by generated Ada Script plugins.
+/// Compatibility entry point retained while the AdaScript UI integration is redesigned.
 @MainActor
 public enum AdaScriptViewRegistry {
-    private struct Registration {
-        let moduleName: String
-        let runtime: AdaScriptViewModuleRuntime
-    }
-
-    private static var registrations: [String: Registration] = [:]
-
     public static func register(
         views: [AdaScriptViewMetadata],
         sources: [AdaScriptSource],
         moduleName: String
     ) throws {
-        guard !views.isEmpty else {
-            return
-        }
-
-        let runtime = try AdaScriptViewModuleRuntime(sources: sources, views: views)
-        for view in views {
-            let storage = try runtime.makeStorage(identifier: view.identifier)
-            try storage.updateEnvironment(defaultAdaScriptViewEnvironment())
-        }
-
-        var next = registrations.filter { $0.value.moduleName != moduleName }
-        for view in views {
-            guard next[view.identifier] == nil else {
-                throw AdaScriptError.invalidManifest("Duplicate @view id '\(view.identifier)'")
-            }
-            next[view.identifier] = Registration(moduleName: moduleName, runtime: runtime)
-        }
-        let previousRuntimes = registrations.values
-            .filter { $0.moduleName == moduleName }
-            .map(\.runtime)
-        for previous in previousRuntimes {
-            previous.retire()
-        }
-        registrations = next
+        _ = views
+        _ = sources
+        _ = moduleName
+        throw AdaScriptError.invalidManifest("AdaUI views in AdaScript are temporarily unavailable.")
     }
 
     public static func makeView(identifier: String) throws -> AnyView {
-        let storage = try makeStorage(identifier: identifier)
-        try storage.updateEnvironment(defaultAdaScriptViewEnvironment())
-        guard let model = storage.model else {
-            throw AdaScriptError.invalidManifest("@view '\(identifier)' did not produce a view tree")
-        }
-        return AnyView(
-            AdaScriptRenderedView(
-                model: model,
-                performAction: { action in try? storage.perform(action: action) }
-            )
-        )
+        _ = identifier
+        throw AdaScriptError.invalidManifest("AdaUI views in AdaScript are temporarily unavailable.")
     }
 
     static func makeStorage(identifier: String) throws -> AdaScriptViewStorage {
-        guard let registration = registrations[identifier] else {
-            throw AdaScriptError.invalidManifest("Unknown @view id '\(identifier)'")
-        }
-        return try registration.runtime.makeStorage(identifier: identifier)
+        _ = identifier
+        throw AdaScriptError.invalidManifest("AdaUI views in AdaScript are temporarily unavailable.")
     }
 }
 
@@ -282,7 +172,6 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
             try suspensionPolicy.bindSafe(AdaScriptAsyncOperation.self, to: virtualMachine)
             try virtualMachine.bindClass(with: AdaScriptAsyncHost.self)
             try suspensionPolicy.bindSafe(AdaScriptSaveWriter.self, to: virtualMachine)
-            try suspensionPolicy.bindBorrowed(AdaScriptViewBridge.self, to: virtualMachine)
             try AdaScriptComponentRuntime.bind(
                 to: virtualMachine,
                 constructors: componentConstructors,
@@ -300,7 +189,6 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
                 reportDiagnostic: delegate.append,
                 wake: { taskRuntime.wake() }
             )
-            virtualMachine.setValue(AdaScriptViewBridge(), forKey: "adaUIBuilder")
             virtualMachine.setValue(taskRuntime, forKey: "__adaTasks")
             virtualMachine.setValue(asyncHost, forKey: "__adaAsync")
 
@@ -459,8 +347,6 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
                     throw AdaScriptError.invalidManifest("Unable to bind @environment property '\(binding.propertyName)' in @view '\(identifier)'")
                 }
             }
-            let builder = AdaScriptViewBridge()
-            virtualMachine.setValue(builder, forKey: "adaUIBuilder")
             guard
                 let value = instance.callMethod(named: "body", with: []),
                 let bridge = value.toObjectOf(AdaScriptViewBridge.self)

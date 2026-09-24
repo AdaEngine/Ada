@@ -1,6 +1,6 @@
 # AdaScript Libraries
 
-Share reusable AdaScript functions, systems, scriptable objects, and views through a GitHub repository.
+Share reusable AdaScript functions, systems, and scriptable objects through a GitHub repository.
 AdaEditor installs the library and its transitive dependencies into the project. Run, Play Mode,
 Preview, and `AdaScriptBuildPlugin` load the same installed sources without network access.
 
@@ -52,7 +52,7 @@ Imports inside a library can use relative paths such as `./Shared/Math`, or the 
 form for another library. Extensions are optional in imports. Library paths are exposed as
 `Libraries/<id>/<source-path>` in diagnostics.
 
-Library `@system`, `@scriptable`, and `@view` declarations participate in the game's normal
+Library `@system` and `@scriptable` declarations participate in the game's normal
 discovery and registration. Systems run automatically with the game's plugin. Enable the native
 engine features they need in Runtime Settings. Libraries share the game's module: use distinct
 class names, function names, and annotation IDs to avoid collisions. Imports do not create namespaces.

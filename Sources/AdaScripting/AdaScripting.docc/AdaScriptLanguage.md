@@ -239,8 +239,8 @@ gameplay; attachment runs `ready` once and detachment runs `destroy` once.
 
 Scriptable contexts expose the same expiring deferred commands facade as
 systems. Retaining it after a callback produces a diagnostic. Scriptable
-objects intentionally have no immediate-mode GUI callback; declarative UI
-belongs to AdaUI script views.
+objects intentionally have no user-interface callback; compose interfaces in
+Swift with AdaUI.
 
 ## Multiplayer schemas
 
@@ -317,13 +317,6 @@ still works as a command constructor; `@remote_commands(input)` remains availabl
 for explicit message processing. Request/response and local echo are not yet
 supported.
 
-## AdaUI views
-
-Use `@view` on a class or struct whose `body()` contains declarative AdaUI expressions.
-Add `@previewable` when that view should appear in AdaEditor Preview. See
-<doc:AdaScriptViews> for the supported view constructors, modifiers, and
-preview workflow.
-
 ## Asynchronous work
 
 Declare a function that can suspend with `async func`. Use `await` inside that
@@ -386,16 +379,14 @@ advancing when that scheduler is paused. AdaEngine does not yet expose a
 separate game time-scale resource.
 `await Time.sleepRealTime(seconds)` uses a monotonic clock; continuation still
 waits for a script dispatch point. `Tasks.promise()` creates a one-shot wait
-that an action can resolve with `complete(value)`. A Boolean `false` from a
-confirmation is a user choice; closing its view cancels the waiting task.
+that another script callback can resolve with `complete(value)`.
 `Tasks.start(...)` returns a handle with `status()` and `cancel()`.
 
-AdaScript callbacks such as `update(context)`, `body()`, and UI actions remain
-synchronous. Do not mark them `async`; start a separate async function and pass
+AdaScript callbacks such as `update(context)` remain synchronous. Do not mark
+them `async`; start a separate async function and pass
 detached values. Callback contexts, queries, resources, and commands expire at
 callback exit. Awaited work resumes in the serialized script runtime, not on
-the native I/O worker. A task started by a view is cancelled when that view
-is disposed or its module is replaced. Cancelling a save does not roll back
+the native I/O worker. Cancelling a save does not roll back
 a file that was already committed.
 
 Fallible operations return a result with `isSuccess()`, `value()`,
