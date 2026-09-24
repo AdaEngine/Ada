@@ -56,6 +56,50 @@ struct EditorAdaScriptHighlightTests {
         #expect(color(line: 8, column: 21) == palette.string)
     }
 
+    @Test("Godot palette distinguishes AdaScript properties from plain text", arguments: [false, true])
+    func godotPropertyColors(semantic: Bool) throws {
+        let source = "class Main { func update() { row.arenaPlayer.peer; } }"
+        let palette = EditorCodeColorPalette.godot
+        let model = EditorWorkbenchViewModel()
+        var document = EditorTextDocument(id: "properties", title: "Main.ada", relativePath: "Main.ada", language: .ada, content: source, errorMessage: nil)
+        if semantic {
+            document.semanticTokens = EditorGravityLanguageService.semanticTokens(text: source)
+        }
+        model.open(.text(document))
+        let container = UIContainerView(rootView: makeView(document: document, model: model, palette: palette).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 900, height: 300)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        let node = try #require(editorNode(in: container.viewTree.rootNode))
+        let column = try #require(source.range(of: "arenaPlayer")).lowerBound.utf16Offset(in: source)
+        #expect(node.tokenSpans.contains { $0.line == 0 && $0.startColumn == column && $0.color == palette.memberColor })
+        #expect(palette.memberColor != palette.plainText)
+    }
+
+    @Test("Editor preference reaches the text editor without disabling folding")
+    func indentationPreference() throws {
+        let suite = "AdaEditor.IndentationEditorTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = EditorAppearanceSettings(defaults: defaults)
+        let model = EditorWorkbenchViewModel()
+        let document = EditorTextDocument(id: "indentation", title: "Main.ada", relativePath: "Main.ada", language: .ada, content: "class Main {\n    func update() {}\n}", errorMessage: nil)
+        model.open(.text(document))
+        var view = makeView(document: document, model: model, palette: .godot)
+        view.appearanceSettings = settings
+        let container = UIContainerView(rootView: view.theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 900, height: 300)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        let node = try #require(editorNode(in: container.viewTree.rootNode))
+        #expect(node.showsIndentationMarkers)
+        #expect(node.foldingStyle == .braces)
+        settings.showsIndentationMarkers = false
+        container.layoutIfNeeded()
+        #expect(!node.showsIndentationMarkers)
+        #expect(node.foldingStyle == .braces)
+    }
+
     @Test("Inserting an unfinished annotation invalidates old tokens and keeps subsequent lines colored", arguments: [EditorCodePalettePreset.adaDark, .godot])
     func editsInvalidateSemanticPositions(preset: EditorCodePalettePreset) throws {
         let original = "@system(scheduler: \"update\")\nclass MainSystem {\n    func update(context: AdaSystemContext) {\n        // gameplay\n    }\n}"

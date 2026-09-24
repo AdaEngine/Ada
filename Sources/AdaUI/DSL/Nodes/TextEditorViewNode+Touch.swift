@@ -15,6 +15,8 @@ extension TextEditorViewNode {
             self.isSelectingWithTouch = false
             self.mousePressStartPoint = nil
             self.touchPressStartPoint = nil
+            self.foldMouseLine = nil
+            self.foldTouchLine = nil
             self.clearTapCandidate()
         }
         self.caretVisible = isFocused
@@ -29,6 +31,19 @@ extension TextEditorViewNode {
         }
 
         let localPoint = self.convertPointFromRoot(touch.location)
+        if touch.phase == .began, let line = self.foldLine(at: localPoint) {
+            self.foldTouchLine = line
+            return
+        }
+        if let line = self.foldTouchLine {
+            if touch.phase == .ended, self.foldLine(at: localPoint) == line {
+                self.toggleFold(at: line)
+            }
+            if touch.phase == .ended || touch.phase == .cancelled {
+                self.foldTouchLine = nil
+            }
+            return
+        }
         if touch.phase == .began, let line = gutterLine(at: localPoint) {
             gutterTouchLine = line
             return

@@ -33,6 +33,8 @@ struct EditorCenterWorkbench: View {
     @Environment(\.theme) private var theme
 
     @State private var previewResizeState = EditorPreviewResizeState()
+    @State private var draggedTabID: String?
+    @State private var dropTargetTabID: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -73,7 +75,13 @@ extension EditorCenterWorkbench {
 
     private func editorTab(_ document: EditorWorkbenchDocument, active: Bool) -> some View {
         HStack(spacing: 0) {
-            Button(action: { onSelectDocument?(document.id) ?? viewModel.selectDocument(id: document.id) }) {
+            Button(action: {
+                if draggedTabID == document.id {
+                    draggedTabID = nil
+                    return
+                }
+                onSelectDocument?(document.id) ?? viewModel.selectDocument(id: document.id)
+            }) {
                 HStack(spacing: 7) {
                     Text(tabIcon(for: document))
                         .font(.system(size: 12))
@@ -90,6 +98,31 @@ extension EditorCenterWorkbench {
             .buttonStyle(DefaultButtonStyle())
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 26, maxHeight: 26)
             .accessibilityIdentifier("AdaEditor.Tab.Select.\(document.id)")
+            .gesture(
+                DragGesture(minimumDistance: 8)
+                    .onChanged { value in
+                        draggedTabID = document.id
+                        dropTargetTabID = tabDropTarget(for: document.id, translationX: value.translation.width)
+                    }
+                    .onEnded { value in
+                        let targetID = tabDropTarget(for: document.id, translationX: value.translation.width)
+                        dropTargetTabID = nil
+                        // The button receives this same release after the gesture.
+                        // Clear the drag flag on the next turn if its action was not invoked.
+                        Task { @MainActor in
+                            if draggedTabID == document.id {
+                                draggedTabID = nil
+                            }
+                        }
+                        guard
+                            let targetID,
+                            let targetIndex = viewModel.openDocuments.firstIndex(where: { $0.id == targetID })
+                        else {
+                            return
+                        }
+                        viewModel.moveDocument(id: document.id, toIndex: targetIndex)
+                    }
+            )
 
             Button(action: { viewModel.closeDocument(id: document.id) }) {
                 Text("×")
@@ -106,8 +139,13 @@ extension EditorCenterWorkbench {
         .background(RoundedRectangleShape(cornerRadius: 5).fill(active ? theme.editorColors.surface : theme.editorColors.surfaceElevated))
         .overlay {
             RoundedRectangleShape(cornerRadius: 5)
-                .stroke(active ? theme.editorColors.blue.opacity(0.72) : theme.editorColors.border.opacity(0.52), lineWidth: 1)
+                .stroke(
+                    dropTargetTabID == document.id ? theme.editorColors.blue :
+                        active ? theme.editorColors.blue.opacity(0.72) : theme.editorColors.border.opacity(0.52),
+                    lineWidth: dropTargetTabID == document.id ? 2 : 1
+                )
         }
+        .opacity(draggedTabID == document.id ? 0.7 : 1)
         .onMiddleClick {
             viewModel.closeDocument(id: document.id)
         }
@@ -156,6 +194,25 @@ extension EditorCenterWorkbench {
 
     private func editorTabWidth(_ document: EditorWorkbenchDocument) -> Float {
         max(124, min(220, Float(tabTitle(for: document).count) * 7 + 64))
+    }
+
+    private func tabDropTarget(for documentID: String, translationX: Float) -> String? {
+        let documents = viewModel.openDocuments
+        guard let sourceIndex = documents.firstIndex(where: { $0.id == documentID }) else {
+            return nil
+        }
+
+        var centers: [Float] = []
+        var x: Float = 0
+        for document in documents {
+            let width = editorTabWidth(document)
+            centers.append(x + width / 2)
+            x += width + 4
+        }
+
+        let draggedCenter = centers[sourceIndex] + translationX
+        let targetIndex = centers.indices.min { abs(centers[$0] - draggedCenter) < abs(centers[$1] - draggedCenter) } ?? sourceIndex
+        return targetIndex == sourceIndex ? nil : documents[targetIndex].id
     }
 
     private func tabIcon(for document: EditorWorkbenchDocument) -> String {
@@ -729,7 +786,7 @@ private struct EditorPreviewPanel: View {
         case let .building(declaration, message):
             if let retainedPreviewView {
                 retainedPreviewContent(retainedPreviewView) {
-                    statusBanner(title: declaration.title, message: message, showsBuildOutputButton: false)
+                    statusBanner(title: declaration.title, message: message, showsBuildOutputButton: false, isBuilding: true)
                 }
             } else {
                 progressView(title: declaration.title, message: message)
@@ -773,9 +830,13 @@ private struct EditorPreviewPanel: View {
 
     private func progressView(title: String, message: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 13))
-                .foregroundColor(theme.editorColors.text)
+            HStack(spacing: 8) {
+                EditorFlipLoadingIndicator(color: theme.editorColors.blue)
+                    .accessibilityIdentifier("AdaEditor.Preview.BuildFlip")
+                Text(title)
+                    .font(.system(size: 13))
+                    .foregroundColor(theme.editorColors.text)
+            }
             Text(message)
                 .font(.system(size: 11))
                 .foregroundColor(theme.editorColors.muted)
@@ -808,12 +869,19 @@ private struct EditorPreviewPanel: View {
     private func statusBanner(
         title: String,
         message: String,
-        showsBuildOutputButton: Bool
+        showsBuildOutputButton: Bool,
+        isBuilding: Bool = false
     ) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(theme.editorColors.text)
+            HStack(spacing: 6) {
+                if isBuilding {
+                    EditorFlipLoadingIndicator(size: 12, color: theme.editorColors.blue)
+                        .accessibilityIdentifier("AdaEditor.Preview.BannerFlip")
+                }
+                Text(title)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(theme.editorColors.text)
+            }
             Text(message)
                 .font(.system(size: 10))
                 .foregroundColor(theme.editorColors.muted)

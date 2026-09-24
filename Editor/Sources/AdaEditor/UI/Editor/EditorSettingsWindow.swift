@@ -523,6 +523,7 @@ struct EditorSettingsWindowView: View {
             VStack(alignment: .leading, spacing: 0) {
                 settingsGroup("CLOUD ACCOUNT") { EditorCloudSettingsView() }
                 settingsGroup("APPEARANCE") { EditorAgentGlowSettings() }
+                settingsGroup("EDITOR DISPLAY") { EditorCodeDisplaySettings() }
             }
         } else if let editorViewModel = viewModel.editorViewModel {
             switch viewModel.selectedSection {
@@ -547,6 +548,9 @@ struct EditorSettingsWindowView: View {
             settingsGroup("CLOUD ACCOUNT") { EditorCloudSettingsView() }
             settingsGroup("APPEARANCE") {
                 EditorAgentGlowSettings()
+            }
+            settingsGroup("EDITOR DISPLAY") {
+                EditorCodeDisplaySettings()
             }
             settingsGroup("EDITOR FONT") {
                 settingsRow(

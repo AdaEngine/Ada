@@ -2,6 +2,13 @@ import AdaEngine
 import Foundation
 import GravityLanguageCore
 
+struct EditorSourceQuickFix: Equatable, Sendable {
+    let title: String
+    let range: EditorSourceRange
+    let originalText: String
+    let replacement: String
+}
+
 struct EditorGravityLanguageService: Sendable {
     private static let annotationLabels: Set<String> = [
         "access", "component", "environment", "export", "previewable", "query", "res",
@@ -104,6 +111,21 @@ struct EditorGravityLanguageService: Sendable {
                     source: "adascript-lsp"
                 )
             }
+    }
+
+    static func quickFixes(text: String, position: EditorSourceLocation) -> [EditorSourceQuickFix] {
+        let sourcePosition = lspPosition(from: position, in: text)
+        return languageService().quickFixes(
+            text: text,
+            range: GravitySourceRange(start: sourcePosition, end: sourcePosition)
+        ).map { fix in
+            EditorSourceQuickFix(
+                title: fix.title,
+                range: editorRange(from: fix.replacementRange, in: text),
+                originalText: fix.newText == "struct" ? "class" : "struct",
+                replacement: fix.newText
+            )
+        }
     }
 
     static func completions(

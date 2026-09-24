@@ -11,6 +11,46 @@ public struct GravityLanguageService: Sendable {
         GravityDocumentAnalyzer.parse(text).analysis
     }
 
+    public func quickFixes(text: String, range: GravitySourceRange) -> [GravityQuickFix] {
+        let parsed = GravityDocumentAnalyzer.parse(text)
+        let tokens = parsed.tokens.filter { $0.kind != .comment }
+        return parsed.typeRegions.flatMap { region -> [GravityQuickFix] in
+            guard
+                region.symbol.kind == .class || region.symbol.kind == .struct,
+                let declarationIndex = tokens.firstIndex(where: { $0.range.start == region.symbol.range.start })
+            else {
+                return []
+            }
+            let replacement = region.symbol.kind == .class ? "struct" : "class"
+            let invalidAnnotations: Set<String> = region.symbol.kind == .class
+                ? ["component", "replicated_component", "resource", "network_command"]
+                : ["system", "scriptable", "tool"]
+            return GravityDocumentAnalyzer.annotationTokens(before: declarationIndex, in: tokens).compactMap { annotation in
+                guard
+                    invalidAnnotations.contains(annotation.text),
+                    annotation.range.start <= range.end,
+                    range.start <= annotation.range.end,
+                    let diagnostic = parsed.analysis.diagnostics.first(where: { $0.range == annotation.range })
+                else {
+                    return nil
+                }
+                let keywordRange = GravitySourceRange(
+                    start: region.symbol.range.start,
+                    end: GravitySourcePosition(
+                        line: region.symbol.range.start.line,
+                        utf16Column: region.symbol.range.start.utf16Column + (region.symbol.kind == .class ? 5 : 6)
+                    )
+                )
+                return GravityQuickFix(
+                    diagnostic: diagnostic,
+                    title: "Change to \(replacement)",
+                    replacementRange: keywordRange,
+                    newText: replacement
+                )
+            }
+        }
+    }
+
     public func semanticTokens(text: String) -> [GravitySemanticToken] {
         GravitySemanticAnalyzer.tokens(in: text)
     }

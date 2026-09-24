@@ -54,7 +54,7 @@ struct EditorCodeColorPalette: Hashable, Sendable {
         selection: Color.fromHex(0x405C78).opacity(0.65),
         annotation: Color.fromHex(0xECA05D),
         function: Color.fromHex(0x60C7DF),
-        member: Color.fromHex(0xB0CCE1)
+        member: Color.fromHex(0xD6AEED)
     )
 
     static let monokai = Self(

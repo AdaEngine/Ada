@@ -4,15 +4,15 @@ Declare native AdaUI view trees in `.ada` files and preview them directly in Ada
 
 ## Declare a view
 
-Annotate a class with `@view`. The build plugin derives its runtime identity
-from the Swift module and class name, humanizes the class name for AdaEditor,
+Annotate a class or struct with `@view`. The build plugin derives its runtime identity
+from the Swift module and type name, humanizes the type name for AdaEditor,
 and emits a typed accessor. Use `id` or `title` only when an explicit override
 is required.
 
 ```ada
 @previewable
 @view
-class WelcomeView {
+struct WelcomeView {
     @state var message = "Hello from Ada Script";
     @environment(colorScheme) var colorScheme;
 
@@ -75,7 +75,7 @@ silently disconnected value.
 
 ## Preview in AdaEditor
 
-Add `@previewable` to an `@view` class that should be an AdaEditor Preview entry
+Add `@previewable` to an `@view` declaration that should be an AdaEditor Preview entry
 point. Runtime-only views remain plain `@view` declarations and do not clutter
 the Preview list.
 
@@ -90,7 +90,7 @@ class WelcomeDarkPreview {
 ```
 
 The `title` argument is optional; AdaEditor otherwise uses `@view(title:)` or a
-humanized class name. `@previewable` without `@view`, duplicate annotations, and
+humanized type name. `@previewable` without `@view`, duplicate annotations, and
 non-string titles produce compile-time diagnostics.
 
 When a `.ada` file is open, AdaEditor lists its `@previewable` declarations,

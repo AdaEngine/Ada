@@ -45,7 +45,7 @@ extension AdaScriptViewBuilderLowerer {
             }
 
             let declarationIndex = try declarationIndex(afterViewAt: index, tokens: tokens, path: path)
-            guard tokens.indices.contains(declarationIndex), tokens[declarationIndex].text == "class" else {
+            guard tokens.indices.contains(declarationIndex), ["class", "struct"].contains(tokens[declarationIndex].text) else {
                 index += 2
                 continue
             }
@@ -53,7 +53,7 @@ extension AdaScriptViewBuilderLowerer {
                 let classOpen = tokens[declarationIndex...].firstIndex(where: { $0.text == "{" }),
                 let classClose = matchingIndex(openingIndex: classOpen, opening: "{", closing: "}", tokens: tokens)
             else {
-                throw AdaScriptViewBuilderError(path: path, line: tokens[declarationIndex].line, message: "unterminated @view class")
+                throw AdaScriptViewBuilderError(path: path, line: tokens[declarationIndex].line, message: "unterminated @view declaration")
             }
 
             if let bodyRange = try bodyRange(in: classOpen..<classClose, tokens: tokens, path: path),

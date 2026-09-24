@@ -14,6 +14,7 @@ final class EditorAgentViewModel {
     var selectedCompletionIndex = 0
     var promptCompletionFocus: TextEditorSourceRange?
     @ObservationIgnored private var promptCaretOffset: Int?
+    @ObservationIgnored private var isPanelVisible = false
     var pendingAttachments: [EditorAgentAttachment] = []
     var sceneContext: EditorAgentSceneContext?
     var codeSelection: EditorAgentCodeSelectionContext?
@@ -231,18 +232,18 @@ final class EditorAgentViewModel {
             sessions = try await store.listSessions()
             if let notificationSessionID {
                 activeSession = runningSession?.id == notificationSessionID ? runningSession : try await store.loadSession(id: notificationSessionID)
-                connectIfNeeded()
+                if isPanelVisible { connectIfNeeded() }
                 return
             }
             if let activeID = try await store.activeSessionID(), let session = try? await store.loadSession(id: activeID) {
                 activeSession = session
                 selectedSkillIDs = Set(session.selectedSkillIDs)
-                connectIfNeeded()
+                if isPanelVisible { connectIfNeeded() }
             } else if let first = sessions.first, let session = try? await store.loadSession(id: first.id) {
                 activeSession = session
                 selectedSkillIDs = Set(session.selectedSkillIDs)
                 try await store.setActiveSession(id: first.id)
-                connectIfNeeded()
+                if isPanelVisible { connectIfNeeded() }
             } else {
                 try await createSession()
             }
@@ -279,10 +280,8 @@ final class EditorAgentViewModel {
             do {
                 activeSession = runningSession?.id == summary.id ? runningSession : try await store.loadSession(id: summary.id)
                 selectedSkillIDs = Set(activeSession?.selectedSkillIDs ?? [])
-                if runningSession?.id != id {
-                    sessionConfiguration = .empty
-                    connectionState = .disconnected
-                }
+                sessionConfiguration = .empty
+                connectionState = .disconnected
                 try await store.setActiveSession(id: summary.id)
                 connectIfNeeded()
             } catch {
@@ -346,6 +345,15 @@ final class EditorAgentViewModel {
             return
         }
         connect()
+    }
+
+    func panelDidAppear() {
+        isPanelVisible = true
+        connectIfNeeded()
+    }
+
+    func panelDidDisappear() {
+        isPanelVisible = false
     }
 
     func selectConfiguration(selectorID: String, valueID: String) {
@@ -519,8 +527,10 @@ final class EditorAgentViewModel {
                 }
                 activeSession = runningSession?.id == id ? runningSession : try await store.loadSession(id: id)
                 selectedSkillIDs = Set(activeSession?.selectedSkillIDs ?? [])
-                sessionConfiguration = .empty
-                connectionState = .disconnected
+                if runningSession?.id != id {
+                    sessionConfiguration = .empty
+                    connectionState = .disconnected
+                }
                 try await store.setActiveSession(id: id)
                 connectIfNeeded()
             } catch {
@@ -914,7 +924,9 @@ final class EditorAgentViewModel {
                 ),
                 onEvent: { [weak self] event in
                     await MainActor.run {
-                        self?.appendEvent(event)
+                        if event.configuration != nil {
+                            self?.appendEvent(event)
+                        }
                     }
                 },
                 onProjectFileChanged: { [weak self] relativePath in

@@ -7,6 +7,7 @@ import Observation
 final class EditorAppearanceSettings {
     static let shared = EditorAppearanceSettings()
     private static let glowKey = "AdaEditor.appearance.agentActivityGlowEnabled"
+    private static let indentationMarkersKey = "AdaEditor.editor.showsIndentationMarkers"
     private static let accentKey = "AdaEditor.appearance.agentGlowAccent"
     private static let radiusKey = "AdaEditor.appearance.agentGlowRadius"
     private static let opacityKey = "AdaEditor.appearance.agentGlowOpacity"
@@ -21,9 +22,14 @@ final class EditorAppearanceSettings {
         didSet { defaults.set(agentActivityGlowEnabled, forKey: Self.glowKey) }
     }
 
+    var showsIndentationMarkers: Bool {
+        didSet { defaults.set(showsIndentationMarkers, forKey: Self.indentationMarkersKey) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         agentActivityGlowEnabled = defaults.object(forKey: Self.glowKey) as? Bool ?? true
+        showsIndentationMarkers = defaults.object(forKey: Self.indentationMarkersKey) as? Bool ?? true
         let hex = defaults.string(forKey: Self.accentKey)
         agentGlowAccentHex = hex.flatMap { EditorInspectorColorValue(hexText: $0) == nil ? nil : $0 }
         radius = Self.clamp(defaults.object(forKey: Self.radiusKey) as? Double ?? Self.defaultRadius, to: 4...100, fallback: Self.defaultRadius)
@@ -69,6 +75,17 @@ final class EditorAppearanceSettings {
 
     private static func clamp(_ value: Double, to range: ClosedRange<Double>, fallback: Double) -> Double {
         value.isFinite ? min(max(value, range.lowerBound), range.upperBound) : fallback
+    }
+}
+
+struct EditorCodeDisplaySettings: View {
+    var settings: EditorAppearanceSettings = .shared
+
+    var body: some View {
+        EditorSettingsToggleRow(title: "Show indentation marks", isOn: settings.showsIndentationMarkers) {
+            settings.showsIndentationMarkers.toggle()
+        }
+        .accessibilityIdentifier("AdaEditor.Settings.IndentationMarkers")
     }
 }
 

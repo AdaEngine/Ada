@@ -194,6 +194,36 @@ struct AdaScriptViewTests {
         #expect(textValues(in: container.viewTree.rootNode).contains("After"))
     }
 
+    @Test("Struct view state survives actions and invalidates the native view")
+    func structViewStateSurvivesButtonAction() throws {
+        let view = try AdaScriptView(
+            sources: [
+                AdaScriptSource(path: "Counter.ada", source: """
+                    @view
+                    struct CounterView {
+                        @state var label = "Before";
+                        func body() {
+                            VStack {
+                                Text(label);
+                                Button("Change") { label = "After"; }
+                                    .accessibilityIdentifier("change-label");
+                            };
+                        }
+                    }
+                    """)
+            ],
+            identifier: "CounterView"
+        )
+        let container = UIContainerView(rootView: view)
+        container.frame.size = Size(width: 320, height: 200)
+        container.layoutSubviews()
+
+        #expect(textValues(in: container.viewTree.rootNode).contains("Before"))
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("change-label"))
+        container.layoutSubviews()
+        #expect(textValues(in: container.viewTree.rootNode).contains("After"))
+    }
+
     @Test("Environment values are rebound before body evaluation")
     func environmentValuesAreBound() throws {
         let view = try AdaScriptView(

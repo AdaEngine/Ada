@@ -102,7 +102,9 @@ extension TextEditorViewNode {
     func moveCaretVertically(delta: Int, extendSelection: Bool) {
         let lines = self.lines()
         let position = self.position(forOffset: self.caretOffset, lines: lines)
-        let targetLine = max(0, min(lines.count - 1, position.line + delta))
+        let displayed = self.displayedLines()
+        let targetRow = max(0, min(displayed.count - 1, self.displayRow(forLine: position.line) + delta))
+        let targetLine = displayed[targetRow]
         let targetColumn = min(self.preferredColumn ?? position.column, lines[targetLine].text.count)
         self.preferredColumn = self.preferredColumn ?? position.column
         self.moveCaret(to: self.offset(line: targetLine, column: targetColumn, lines: lines), extendSelection: extendSelection)

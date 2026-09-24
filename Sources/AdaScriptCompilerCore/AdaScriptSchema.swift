@@ -36,6 +36,9 @@ extension Parser {
         guard let name = consumeIdentifier() else {
             throw error("expected class name")
         }
+        if let annotation = annotations.first(where: { ["component", "replicated_component", "resource", "network_command"].contains($0.name) }) {
+            throw error("@\(annotation.name) on \(name) requires a struct; change 'class' to 'struct'")
+        }
         let viewAnnotation = annotations.first(where: { $0.name == "view" })
         let toolAnnotations = annotations.filter { $0.name == "tool" }
         let previewAnnotations = annotations.filter { $0.name == "previewable" }
@@ -49,7 +52,11 @@ extension Parser {
             throw error("@previewable can only be applied once to \(name)")
         }
         guard previewAnnotations.isEmpty || viewAnnotation != nil else {
-            throw error("@previewable can only annotate an @view class")
+            throw error("@previewable can only annotate an @view declaration")
+        }
+        let declarationAnnotations = annotations.filter { ["tool", "system", "scriptable", "view"].contains($0.name) }
+        guard declarationAnnotations.count <= 1 else {
+            throw error("\(declarationAnnotations.map { "@\($0.name)" }.joined(separator: " and ")) cannot be combined on \(name)")
         }
 
         if let toolAnnotation = toolAnnotations.first {
@@ -79,11 +86,27 @@ extension Parser {
     }
 
     private mutating func parseStruct(annotations: [Annotation], output: inout Output) throws {
+        let declarationLine = current?.line ?? 1
         guard let name = consumeIdentifier() else {
             throw error("expected struct name")
         }
-        if annotations.contains(where: { $0.name == "view" || $0.name == "previewable" || $0.name == "tool" }) {
-            throw error("@view, @previewable, and @tool can only annotate a class")
+        if let annotation = annotations.first(where: { ["system", "scriptable", "tool"].contains($0.name) }) {
+            throw error("@\(annotation.name) on \(name) requires a class; change 'struct' to 'class'")
+        }
+        let viewAnnotations = annotations.filter { $0.name == "view" }
+        let previewAnnotations = annotations.filter { $0.name == "previewable" }
+        guard viewAnnotations.count <= 1, previewAnnotations.count <= 1 else {
+            throw error("@view and @previewable can only be applied once to \(name)")
+        }
+        guard previewAnnotations.isEmpty || !viewAnnotations.isEmpty else {
+            throw error("@previewable can only annotate an @view declaration")
+        }
+        if let viewAnnotation = viewAnnotations.first {
+            guard annotations.count == 1 + previewAnnotations.count else {
+                throw error("@view cannot be combined with data annotations on \(name)")
+            }
+            output.views.append(try parseView(name: name, annotation: viewAnnotation, previewAnnotation: previewAnnotations.first, line: declarationLine))
+            return
         }
         if let commandAnnotation = annotations.first(where: { $0.name == "network_command" }) {
             guard annotations.count == 1 else {

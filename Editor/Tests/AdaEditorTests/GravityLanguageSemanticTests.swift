@@ -15,6 +15,70 @@ struct GravityLanguageSemanticTests {
         #expect(completions.contains { $0.label == "async func" })
     }
 
+    @Test("Diagnostics reject invalid annotation targets and accept struct views")
+    func declarationAnnotationDiagnostics() {
+        let source = """
+            @component class Health {}
+            @system struct MovementSystem {}
+            @previewable @view struct WelcomeView { func body() { Text("Hello"); } }
+            @previewable struct MissingView {}
+            """
+        let diagnostics = GravityLanguageService().analyze(text: source).diagnostics
+        #expect(diagnostics.count == 3)
+        #expect(diagnostics.contains { $0.message.contains("@component requires a struct") && $0.range.start.line == 0 })
+        #expect(diagnostics.contains { $0.message.contains("@system requires a class") && $0.range.start.line == 1 })
+        #expect(diagnostics.contains { $0.message == "@previewable requires @view" && $0.range.start.line == 3 })
+    }
+
+    @Test("LSP offers a class-to-struct quick fix for component annotations")
+    func componentDeclarationQuickFix() throws {
+        let session = GravityLanguageServerSession()
+        try validateInitialization(of: session)
+        let uri = "file:///tmp/WrongComponent.ada"
+        let opened = session.handle([
+            "jsonrpc": "2.0",
+            "method": "textDocument/didOpen",
+            "params": [
+                "textDocument": [
+                    "languageId": "adascript",
+                    "text": "@component class Health {}",
+                    "uri": uri,
+                    "version": 1,
+                ]
+            ],
+        ])
+        let notification = try #require(opened.outgoingMessages.first)
+        let notificationParams = try #require(notification["params"] as? [String: Any])
+        let diagnostics = try #require(notificationParams["diagnostics"] as? [[String: Any]])
+        #expect(diagnostics.count == 1)
+
+        let response = session.handle([
+            "id": 2,
+            "jsonrpc": "2.0",
+            "method": "textDocument/codeAction",
+            "params": [
+                "textDocument": ["uri": uri],
+                "range": [
+                    "start": ["line": 0, "character": 1],
+                    "end": ["line": 0, "character": 10],
+                ],
+                "context": ["diagnostics": diagnostics],
+            ],
+        ])
+        let message = try #require(response.outgoingMessages.first)
+        let actions = try #require(message["result"] as? [[String: Any]])
+        #expect(actions.count == 1)
+        let action = try #require(actions.first)
+        #expect(action["title"] as? String == "Change to struct")
+        let edit = try #require(action["edit"] as? [String: Any])
+        let changes = try #require(edit["changes"] as? [String: [[String: Any]]])
+        let textEdit = try #require(changes[uri]?.first)
+        #expect(textEdit["newText"] as? String == "struct")
+        let editRange = try #require(textEdit["range"] as? [String: [String: Int]])
+        #expect(editRange["start"]?["character"] == 11)
+        #expect(editRange["end"]?["character"] == 16)
+    }
+
     @Test("Annotated lifecycle parameters expose typed host APIs")
     func annotatedLifecycleCompletion() {
         let service = GravityLanguageService(hostConstructors: [
@@ -197,6 +261,7 @@ struct GravityLanguageSemanticTests {
         let response = try #require(initialize.outgoingMessages.first)
         let result = try #require(response["result"] as? [String: Any])
         let capabilities = try #require(result["capabilities"] as? [String: Any])
+        #expect(capabilities["codeActionProvider"] as? Bool == true)
         #expect(capabilities["hoverProvider"] as? Bool == true)
         #expect(capabilities["semanticTokensProvider"] != nil)
         #expect(capabilities["signatureHelpProvider"] != nil)

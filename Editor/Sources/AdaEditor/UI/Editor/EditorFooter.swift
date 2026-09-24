@@ -227,9 +227,13 @@ private struct EditorActivityProgressView: View {
     var body: some View {
         let progressWidth = width < 300 ? Float(84) : Float(150)
         let countWidth = additionalActivityCount > 0 ? Float(28) : Float(0)
-        let titleWidth = max(100, width - progressWidth - countWidth - 16)
+        let spacingWidth: Float = additionalActivityCount > 0 ? 24 : 16
+        let titleWidth = max(100, width - progressWidth - countWidth - 14 - spacingWidth)
 
         HStack(spacing: 8) {
+            EditorFlipLoadingIndicator(color: theme.editorColors.blue)
+                .accessibilityIdentifier("AdaEditor.ActivityProgress.Flip")
+
             Text(activity.compactTitle)
                 .lineLimit(1)
                 .frame(width: titleWidth, alignment: .trailing)
@@ -274,6 +278,7 @@ private struct EditorActivityProgressBar: View {
                         .fill(theme.editorColors.blue)
                         .frame(width: segmentWidth, height: 3)
                         .offset(x: (width + segmentWidth) * phase - segmentWidth)
+                        .frame(width: width, height: 3, alignment: .leading)
                 }
                 .frame(width: width, height: 3)
                 .mask(RectangleShape())

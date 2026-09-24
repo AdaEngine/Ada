@@ -423,6 +423,27 @@ struct OffscreenViewportTests {
     }
 
     @Test
+    func disablingInteractionReleasesHeldInputAndStopsHitTesting() {
+        let delegate = MockViewportDelegate()
+        var isInteractive = true
+        let tester = ViewTester {
+            OffscreenViewportView(delegate: delegate, isInteractive: isInteractive)
+                .frame(width: 400, height: 300)
+        }
+        .setSize(Size(width: 400, height: 300))
+        .performLayout()
+
+        tester.sendMouseEvent(at: Point(200, 150), button: .left, phase: .began, time: 0)
+        tester.sendKeyEvent(.b, status: .down)
+        isInteractive = false
+        tester.invalidateContent().performLayout()
+
+        #expect(delegate.receivedInputEvents.compactMap { $0 as? KeyEvent }.map(\.status) == [.down, .up])
+        #expect(delegate.receivedInputEvents.compactMap { $0 as? MouseEvent }.map(\.phase) == [.began, .cancelled])
+        #expect(tester.click(at: Point(200, 150)) == nil)
+    }
+
+    @Test
     func containerPassesDelegateToContent() {
         let delegate = MockViewportDelegate()
         var receivedDelegate: (any OffscreenViewportDelegate)?

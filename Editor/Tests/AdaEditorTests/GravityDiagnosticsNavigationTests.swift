@@ -91,7 +91,7 @@ struct GravityDiagnosticsNavigationTests {
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let component = root.appendingPathComponent("VladComponent.ada")
-        try "@component class VladComponent { var someValue = 0 }".write(to: component, atomically: true, encoding: .utf8)
+        try "@component(id: \"test.vlad\") struct VladComponent { @export var someValue = 0; }".write(to: component, atomically: true, encoding: .utf8)
         let uri = root.appendingPathComponent("Main.ada").absoluteString
         let workspace = GravityWorkspace()
         workspace.configure(rootURIs: [root.absoluteString])

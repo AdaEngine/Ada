@@ -287,7 +287,7 @@ supported.
 
 ## AdaUI views
 
-Use `@view` on a class whose `body()` contains declarative AdaUI expressions.
+Use `@view` on a class or struct whose `body()` contains declarative AdaUI expressions.
 Add `@previewable` when that view should appear in AdaEditor Preview. See
 <doc:AdaScriptViews> for the supported view constructors, modifiers, and
 preview workflow.

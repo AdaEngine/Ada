@@ -76,6 +76,50 @@ struct EditorDebuggerGutterTests {
         #expect(node.hoveredGutterLine == nil)
     }
 
+    @Test func gutterStaysAtViewportEdgeAfterHorizontalScroll() throws {
+        var text = "first line " + String(repeating: "wide content ", count: 80) + "\nsecond line"
+        var clicked: [Int] = []
+        let tester = ViewTester {
+            TextEditor(
+                text: Binding(get: { text }, set: { text = $0 }),
+                sourceInteraction: .init(onGutterClick: { clicked.append($0) })
+            )
+            .font(.system(size: 12))
+            .frame(width: 280, height: 140)
+        }.setSize(Size(width: 300, height: 160)).performLayout()
+
+        let node = try #require(tester.hitTest(Point(20, 28), event: MouseEvent(
+            window: .empty, button: .left, mousePosition: Point(20, 28), phase: .began, modifierKeys: [], time: 0
+        )) as? TextEditorViewNode)
+        let scroll = try #require(node.nearestScrollView())
+        let originalGutter = node.gutterViewportRect()
+        let initialDrawing = UIGraphicsContext()
+        node.draw(with: initialDrawing)
+        #expect(!initialDrawing.getDrawCommands().contains { command in
+            if case .drawLinearGradient = command { return true }
+            return false
+        })
+        #expect(scroll.scrollToVisibleRect(Rect(x: 500, y: 0, width: 20, height: 20), in: scroll))
+        #expect(scroll.contentOffset.x > 0)
+
+        let pinnedGutter = node.gutterViewportRect()
+        #expect(abs(pinnedGutter.minX - originalGutter.minX - scroll.contentOffset.x) < 0.01)
+        let scrolledDrawing = UIGraphicsContext()
+        node.draw(with: scrolledDrawing)
+        #expect(scrolledDrawing.getDrawCommands().contains { command in
+            if case .drawLinearGradient = command { return true }
+            return false
+        })
+        let point = Point(
+            node.visualAbsoluteFrame().minX + pinnedGutter.minX + 5,
+            node.visualAbsoluteFrame().minY + node.textContentRect().minY + node.lineHeight(for: node.resolvedFontPointSize()) * 1.5
+        )
+        tester.sendMouseEvent(at: point, phase: .began)
+        tester.sendMouseEvent(at: point, phase: .ended)
+        #expect(clicked == [1])
+        #expect(text.hasSuffix("\nsecond line"))
+    }
+
     @Test func touchTogglesOnlyOnReleaseAndCancellationDoesNothing() throws {
         var text = "first\nsecond"
         var clicked: [Int] = []

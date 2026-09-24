@@ -136,6 +136,19 @@ final class EditorWorkbenchViewModel {
         selectDocument(id: document.id)
     }
 
+    func moveDocument(id: String, toIndex destinationIndex: Int) {
+        guard
+            let sourceIndex = openDocuments.firstIndex(where: { $0.id == id }),
+            openDocuments.indices.contains(destinationIndex),
+            sourceIndex != destinationIndex
+        else {
+            return
+        }
+
+        let document = openDocuments.remove(at: sourceIndex)
+        openDocuments.insert(document, at: destinationIndex)
+    }
+
     func selectDocument(id: String) {
         selectDocument(id: id, recordsNavigation: true)
     }

@@ -135,6 +135,7 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             var assistantText: String
             var assistantEventID: String
             var thinkingEventID: String
+            var hasSentPrompt: Bool
             var configuration: EditorAgentSessionConfiguration
         }
 
@@ -171,11 +172,13 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             managed.assistantText = ""
             managed.assistantEventID = UUID().uuidString
             managed.thinkingEventID = UUID().uuidString
+            let content = try promptContent(for: request)
+            managed.hasSentPrompt = true
             sessions[request.session.id] = managed
 
             let response = try await managed.client.sendPrompt(
                 sessionId: managed.upstreamSessionID,
-                content: try promptContent(for: request)
+                content: content
             )
 
             managed = sessions[request.session.id] ?? managed
@@ -360,6 +363,7 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
                 assistantText: "",
                 assistantEventID: UUID().uuidString,
                 thinkingEventID: UUID().uuidString,
+                hasSentPrompt: false,
                 configuration: Self.configuration(
                     agentName: agentName,
                     modes: modes,
@@ -489,6 +493,14 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
                 var managed = sessions[localSessionID]
             else {
                 return
+            }
+
+            switch payload.update {
+            case .agentMessageChunk, .agentThoughtChunk, .plan, .toolCall, .toolCallUpdate:
+                // session/load replays prior transcript updates before the first prompt.
+                guard managed.hasSentPrompt else { return }
+            default:
+                break
             }
 
             switch payload.update {

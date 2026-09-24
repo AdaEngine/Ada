@@ -11,11 +11,31 @@ import Math
 
 extension TextEditorViewNode {
     func handleSourceInteractionMouseEvent(_ event: MouseEvent) -> Bool {
+        let localPoint = self.convertPointFromRoot(event.mousePosition)
+        if let foldMouseLine {
+            if event.phase == .ended, self.foldLine(at: localPoint) == foldMouseLine {
+                self.toggleFold(at: foldMouseLine)
+            }
+            if event.phase == .ended || event.phase == .cancelled {
+                self.foldMouseLine = nil
+            }
+            return true
+        }
+        if let line = self.foldLine(at: localPoint) {
+            if event.phase == .began, event.button == .left {
+                self.foldMouseLine = line
+            }
+            if event.button == .left || (event.phase == .changed && event.button == .none) {
+                self.updateHoveredGutterLine(nil)
+                self.notifySourceHover(nil)
+                self.resetTextCursorIfNeeded()
+                return true
+            }
+        }
         guard let sourceInteraction else {
             return false
         }
 
-        let localPoint = self.convertPointFromRoot(event.mousePosition)
         if event.phase == .changed, event.button == .none {
             let hoveredLine = gutterLine(at: localPoint)
             updateHoveredGutterLine(hoveredLine)
@@ -79,11 +99,13 @@ extension TextEditorViewNode {
             return nil
         }
         let content = textContentRect()
-        guard point.x >= content.minX, point.x < textRect().minX, point.y >= content.minY else {
+        let gutter = gutterViewportRect()
+        guard point.x >= gutter.minX, point.x < gutter.maxX, point.y >= content.minY else {
             return nil
         }
-        let line = Int((point.y - content.minY) / lineHeight(for: resolvedFontPointSize()))
-        return lines().indices.contains(line) ? line : nil
+        let row = Int((point.y - content.minY) / lineHeight(for: resolvedFontPointSize()))
+        guard row >= 0, row < displayedLines().count else { return nil }
+        return sourceLine(atDisplayRow: row)
     }
 
     func notifySourceHover(_ position: TextEditorSourcePosition?) {
@@ -197,13 +219,13 @@ extension TextEditorViewNode {
         let lines = lines()
         let first = position(forOffset: selectionRange.lowerBound, lines: lines).line
         let last = position(forOffset: selectionRange.upperBound - 1, lines: lines).line
-        let firstVisible = max(first, Int(((viewport.minY - content.minY) / lineHeight).rounded(.down)))
-        let lastVisible = min(last, Int(((viewport.maxY - content.minY - 1) / lineHeight).rounded(.down)))
+        let firstVisible = max(displayRow(forLine: first), Int(((viewport.minY - content.minY) / lineHeight).rounded(.down)))
+        let lastVisible = min(displayRow(forLine: last), Int(((viewport.maxY - content.minY - 1) / lineHeight).rounded(.down)))
         guard firstVisible <= lastVisible else {
             return nil
         }
-        let activeLine = selectionHead < selectionAnchor ? firstVisible : lastVisible
-        let rowCenter = content.minY + (Float(activeLine) + 0.5) * lineHeight
+        let activeRow = selectionHead < selectionAnchor ? firstVisible : lastVisible
+        let rowCenter = content.minY + (Float(activeRow) + 0.5) * lineHeight
         return Rect(
             x: viewport.maxX - width - 12,
             y: min(max(viewport.minY + 4, rowCenter - height / 2), viewport.maxY - height - 4),

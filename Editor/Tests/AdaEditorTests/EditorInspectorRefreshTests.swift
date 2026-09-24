@@ -188,6 +188,31 @@ struct EditorInspectorRefreshTests {
         }
     }
 
+    @Test("tile size axis labels start at the left edge of their fields")
+    func tileSizeAxisLabelsAreLeadingAligned() throws {
+        var scene = EditorSceneModel.default(projectName: "Tile size layout")
+        _ = scene.addEntity(template: .tileMap, parentID: scene.rootEntityID)
+        let inspector = EditorInspectorSidebarViewModel()
+        let viewport = EditorSceneViewportModel()
+        defer { viewport.disconnect() }
+        viewport.configure(sceneContent: try scene.encodedYAML(), onSelectionChanged: { inspector.selectEntity($0) }, onDocumentContentChanged: { _ in })
+
+        let container = UIContainerView(rootView: EditorInspectorSidebar(viewModel: inspector))
+        container.frame = Rect(x: 0, y: 0, width: 600, height: 900)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+
+        for axis in ["X", "Y"] {
+            let selector = UINodeSelector.accessibilityIdentifier("AdaEditor.Inspector.Axis.\(EditorBuiltInComponentType.tileMap).tileDisplaySize.\(axis)")
+            _ = try container.uiScrollToNode(matching: selector)
+            container.layoutIfNeeded()
+            let field = try container.uiNode(matching: selector)
+            let label = try #require(flatten([field]).first { $0.nodeType.contains("TextViewNode") })
+            // The glyph is centered inside its 24-point badge; the badge must not drift into the field.
+            #expect(abs(label.absoluteFrame.minX - field.absoluteFrame.minX) < 12)
+        }
+    }
+
     @Test("editing one live axis preserves the latest values of the other axes")
     func editingLiveAxisPreservesOtherAxes() throws {
         var scene = EditorSceneModel.default(projectName: "Live axes")

@@ -25,7 +25,9 @@ struct GravityDocumentAnalyzer {
         let parsedImports = GravityImportParser.parse(tokens)
         return GravityParsedDocument(
             analysis: GravityDocumentAnalysis(
-                diagnostics: lexResult.diagnostics + parsedImports.diagnostics + duplicatePropertyDiagnostics(typeRegions, tokens: tokens),
+                diagnostics: lexResult.diagnostics + parsedImports.diagnostics
+                    + duplicatePropertyDiagnostics(typeRegions, tokens: tokens)
+                    + declarationAnnotationDiagnostics(typeRegions, tokens: tokens),
                 imports: parsedImports.imports,
                 symbols: symbols
             ),
@@ -70,6 +72,48 @@ struct GravityDocumentAnalyzer {
                     range: member.selectionRange
                 )
             }
+        }
+    }
+
+    private static func declarationAnnotationDiagnostics(_ regions: [GravityTypeRegion], tokens: [GravityToken]) -> [GravityDiagnostic] {
+        regions.flatMap { region -> [GravityDiagnostic] in
+            guard let declarationIndex = tokens.firstIndex(where: { $0.range.start == region.symbol.range.start }) else {
+                return []
+            }
+            let annotations = annotationTokens(before: declarationIndex, in: tokens)
+            let names = Set(annotations.map(\.text))
+            var diagnostics = annotations.compactMap { annotation -> GravityDiagnostic? in
+                let requiredKind: String?
+                switch annotation.text {
+                case "component", "replicated_component", "resource", "network_command":
+                    requiredKind = "struct"
+                case "system", "scriptable", "tool":
+                    requiredKind = "class"
+                case "previewable" where !names.contains("view"):
+                    return GravityDiagnostic(message: "@previewable requires @view", range: annotation.range)
+                default:
+                    requiredKind = nil
+                }
+                guard let requiredKind, region.symbol.kind != (requiredKind == "class" ? .class : .struct) else {
+                    return nil
+                }
+                return GravityDiagnostic(
+                    message: "@\(annotation.text) requires a \(requiredKind); change '\(kindDescription(region.symbol.kind))' to '\(requiredKind)'",
+                    range: annotation.range
+                )
+            }
+            let declarationAnnotations = annotations.filter {
+                ["component", "replicated_component", "resource", "network_command", "system", "scriptable", "tool", "view"].contains($0.text)
+            }
+            if let first = declarationAnnotations.first {
+                diagnostics += declarationAnnotations.dropFirst().map { annotation in
+                    GravityDiagnostic(
+                        message: "@\(annotation.text) cannot be combined with @\(first.text) on \(region.symbol.name)",
+                        range: annotation.range
+                    )
+                }
+            }
+            return diagnostics
         }
     }
 

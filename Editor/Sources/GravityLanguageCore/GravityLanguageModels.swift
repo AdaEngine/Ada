@@ -201,6 +201,20 @@ public struct GravityDiagnostic: Equatable, Hashable, Sendable {
     }
 }
 
+public struct GravityQuickFix: Equatable, Sendable {
+    public var diagnostic: GravityDiagnostic
+    public var title: String
+    public var replacementRange: GravitySourceRange
+    public var newText: String
+
+    public init(diagnostic: GravityDiagnostic, title: String, replacementRange: GravitySourceRange, newText: String) {
+        self.diagnostic = diagnostic
+        self.title = title
+        self.replacementRange = replacementRange
+        self.newText = newText
+    }
+}
+
 public struct GravityImport: Equatable, Hashable, Sendable {
     public var names: [String]
     public var namespace: String?

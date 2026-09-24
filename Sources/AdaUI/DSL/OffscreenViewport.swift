@@ -30,13 +30,15 @@ package struct OffscreenViewportView: View, ViewNodeBuilder {
     package typealias Body = Never
 
     let delegate: any OffscreenViewportDelegate
+    let isInteractive: Bool
 
-    package init(delegate: any OffscreenViewportDelegate) {
+    package init(delegate: any OffscreenViewportDelegate, isInteractive: Bool = true) {
         self.delegate = delegate
+        self.isInteractive = isInteractive
     }
 
     func buildViewNode(in _: BuildContext) -> ViewNode {
-        OffscreenViewportNode(delegate: delegate, content: self)
+        OffscreenViewportNode(delegate: delegate, isInteractive: isInteractive, content: self)
     }
 }
 
@@ -73,6 +75,10 @@ private final class OffscreenViewportNode: ViewNode {
     private var lastReportedSize: SizeInt = .zero
     private var isActive = false
     private var didBootstrap = false
+    private var isInteractive: Bool
+    private var pressedKeys: [KeyCode: KeyEvent] = [:]
+    private var pressedMouse: MouseEvent?
+    private var activeTouches: [RID: TouchEvent] = [:]
 
     private static weak var currentActiveViewport: OffscreenViewportNode?
 
@@ -80,9 +86,22 @@ private final class OffscreenViewportNode: ViewNode {
         false
     }
 
-    init<C: View>(delegate: any OffscreenViewportDelegate, content: C) {
+    init<C: View>(delegate: any OffscreenViewportDelegate, isInteractive: Bool, content: C) {
         self.viewportRenderer = delegate
+        self.isInteractive = isInteractive
         super.init(content: content)
+    }
+
+    override func update(from newNode: ViewNode) {
+        guard let other = newNode as? OffscreenViewportNode else {
+            super.update(from: newNode)
+            return
+        }
+        if isInteractive && !other.isInteractive {
+            cancelActiveInput()
+        }
+        isInteractive = other.isInteractive
+        super.update(from: newNode)
     }
 
     // MARK: Layout
@@ -164,7 +183,7 @@ private final class OffscreenViewportNode: ViewNode {
     // MARK: Input
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event) else {
+        guard isInteractive, self.point(inside: point, with: event) else {
             return nil
         }
         return self
@@ -176,6 +195,7 @@ private final class OffscreenViewportNode: ViewNode {
     }
 
     override func onPinchEvent(_ event: PinchEvent) {
+        guard isInteractive else { return }
         if event.phase == .began {
             activateViewport()
         }
@@ -191,6 +211,7 @@ private final class OffscreenViewportNode: ViewNode {
     }
 
     override func onMouseEvent(_ event: MouseEvent) {
+        guard isInteractive else { return }
         let localPosition = viewportLocalPosition(event.mousePosition)
         let localEvent = MouseEvent(
             window: event.window,
@@ -204,6 +225,9 @@ private final class OffscreenViewportNode: ViewNode {
 
         if event.phase == .began {
             activateViewport()
+            pressedMouse = localEvent
+        } else if event.phase == .ended || event.phase == .cancelled {
+            pressedMouse = nil
         }
 
         viewportRenderer.updateMousePosition(localPosition)
@@ -211,6 +235,7 @@ private final class OffscreenViewportNode: ViewNode {
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
+        guard isInteractive else { return }
         if touches.contains(where: { $0.phase == .began }) {
             activateViewport()
         }
@@ -224,38 +249,79 @@ private final class OffscreenViewportNode: ViewNode {
                 time: touch.time,
                 contactID: touch.contactID
             )
+            if touch.phase == .began || touch.phase == .moved {
+                activeTouches[touch.contactID] = localTouch
+            } else {
+                activeTouches[touch.contactID] = nil
+            }
             viewportRenderer.receiveInputEvent(localTouch)
         }
     }
 
     override func onKeyEvent(_ event: KeyEvent) {
-        guard isActive else {
+        guard isActive, isInteractive else {
             return
+        }
+        if event.status == .down {
+            pressedKeys[event.keyCode] = event
+        } else {
+            pressedKeys[event.keyCode] = nil
         }
         viewportRenderer.receiveInputEvent(event)
     }
 
     override func onTextInputEvent(_ event: TextInputEvent) {
-        guard isActive else {
+        guard isActive, isInteractive else {
             return
         }
         viewportRenderer.receiveInputEvent(event)
     }
 
-    override var canBecomeFocused: Bool { true }
+    override var canBecomeFocused: Bool { isInteractive }
 
     override func onFocusChanged(isFocused: Bool) {
         if !isFocused && isActive {
-            isActive = false
+            cancelActiveInput()
         }
     }
 
     override func didMove(to parent: ViewNode?) {
         super.didMove(to: parent)
         if parent == nil, Self.currentActiveViewport === self {
+            cancelActiveInput()
             isActive = false
             Self.currentActiveViewport = nil
         }
+    }
+
+    private func cancelActiveInput() {
+        for event in pressedKeys.values {
+            viewportRenderer.receiveInputEvent(
+                KeyEvent(window: event.window, keyCode: event.keyCode, modifiers: event.modifiers, status: .up, time: event.time, isRepeated: false)
+            )
+        }
+        pressedKeys.removeAll()
+        if let event = pressedMouse {
+            viewportRenderer.receiveInputEvent(
+                MouseEvent(
+                    window: event.window,
+                    button: event.button,
+                    mousePosition: event.mousePosition,
+                    phase: .cancelled,
+                    modifierKeys: event.modifierKeys,
+                    time: event.time
+                )
+            )
+            pressedMouse = nil
+        }
+        for touch in activeTouches.values {
+            viewportRenderer.receiveInputEvent(
+                TouchEvent(window: touch.window, location: touch.location, phase: .cancelled, time: touch.time, contactID: touch.contactID)
+            )
+        }
+        activeTouches.removeAll()
+        isActive = false
+        if Self.currentActiveViewport === self { Self.currentActiveViewport = nil }
     }
 
     // MARK: Private
@@ -270,7 +336,7 @@ private final class OffscreenViewportNode: ViewNode {
 
     private func activateViewport() {
         if let previous = Self.currentActiveViewport, previous !== self {
-            previous.isActive = false
+            previous.cancelActiveInput()
         }
         isActive = true
         Self.currentActiveViewport = self

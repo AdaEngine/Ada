@@ -207,6 +207,16 @@ public struct TextEditorSourceInteraction {
     }
 }
 
+/// How a text editor finds collapsible source blocks.
+public enum TextEditorFoldingStyle: Equatable, Sendable {
+    /// Do not show folding controls.
+    case none
+    /// Match multi-line blocks delimited by braces.
+    case braces
+    /// Fold lines indented beneath a line ending in a colon.
+    case indentation
+}
+
 /// A multi-line text editing view.
 public struct TextEditor: View {
     let placeholder: String
@@ -214,6 +224,9 @@ public struct TextEditor: View {
     let tokenSpans: [TextEditorTokenSpan]
     let sourceInteraction: TextEditorSourceInteraction?
     let showsLineNumbers: Bool
+    let foldingStyle: TextEditorFoldingStyle
+    let showsIndentationMarkers: Bool
+    let highlightsSelectedIdentifier: Bool
 
     public var body: some View {
         ScrollView([.horizontal, .vertical], showsIndicators: true) {
@@ -222,7 +235,10 @@ public struct TextEditor: View {
                 text: text,
                 tokenSpans: tokenSpans,
                 sourceInteraction: sourceInteraction,
-                showsLineNumbers: showsLineNumbers
+                showsLineNumbers: showsLineNumbers,
+                foldingStyle: foldingStyle,
+                showsIndentationMarkers: showsIndentationMarkers,
+                highlightsSelectedIdentifier: highlightsSelectedIdentifier
             )
         }
     }
@@ -238,13 +254,19 @@ public struct TextEditor: View {
         text: Binding<String>,
         tokenSpans: [TextEditorTokenSpan] = [],
         sourceInteraction: TextEditorSourceInteraction? = nil,
-        showsLineNumbers: Bool = true
+        showsLineNumbers: Bool = true,
+        foldingStyle: TextEditorFoldingStyle = .none,
+        showsIndentationMarkers: Bool = false,
+        highlightsSelectedIdentifier: Bool = false
     ) {
         self.placeholder = placeholder
         self.text = text
         self.tokenSpans = tokenSpans
         self.sourceInteraction = sourceInteraction
         self.showsLineNumbers = showsLineNumbers
+        self.foldingStyle = foldingStyle
+        self.showsIndentationMarkers = showsIndentationMarkers
+        self.highlightsSelectedIdentifier = highlightsSelectedIdentifier
     }
 
     /// Creates a text editor.
@@ -256,13 +278,19 @@ public struct TextEditor: View {
         text: Binding<String>,
         tokenSpans: [TextEditorTokenSpan] = [],
         sourceInteraction: TextEditorSourceInteraction? = nil,
-        showsLineNumbers: Bool = true
+        showsLineNumbers: Bool = true,
+        foldingStyle: TextEditorFoldingStyle = .none,
+        showsIndentationMarkers: Bool = false,
+        highlightsSelectedIdentifier: Bool = false
     ) {
         self.placeholder = ""
         self.text = text
         self.tokenSpans = tokenSpans
         self.sourceInteraction = sourceInteraction
         self.showsLineNumbers = showsLineNumbers
+        self.foldingStyle = foldingStyle
+        self.showsIndentationMarkers = showsIndentationMarkers
+        self.highlightsSelectedIdentifier = highlightsSelectedIdentifier
     }
 }
 
@@ -275,6 +303,9 @@ struct TextEditorPrimitive: View, ViewNodeBuilder {
     let tokenSpans: [TextEditorTokenSpan]
     let sourceInteraction: TextEditorSourceInteraction?
     let showsLineNumbers: Bool
+    let foldingStyle: TextEditorFoldingStyle
+    let showsIndentationMarkers: Bool
+    let highlightsSelectedIdentifier: Bool
 
     func buildViewNode(in context: BuildContext) -> ViewNode {
         TextEditorViewNode(inputs: context, content: self)

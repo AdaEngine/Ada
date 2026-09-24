@@ -12,40 +12,62 @@ enum EditorAgentTranscriptEntry: Identifiable {
         }
     }
 
-    /// One action disclosure per user turn. Replies, errors and pending approvals stay visible.
+    /// Put one action disclosure before the replies in each user turn.
     static func grouped(_ events: [EditorAgentEvent]) -> [Self] {
         var entries: [Self] = []
-        var actionsByID: [String: [EditorAgentEvent]] = [:]
         var turnID = "initial"
-        var groupIndex: Int?
+        var actions: [EditorAgentEvent] = []
+        var visible: [Self] = []
+
+        func flushTurn() {
+            if !actions.isEmpty {
+                entries.append(.actions(id: "actions:\(turnID)", events: actions))
+            }
+            entries.append(contentsOf: visible)
+            actions.removeAll()
+            visible.removeAll()
+        }
+
         for event in events {
             if event.message?.role == .user {
+                flushTurn()
+                entries.append(.event(event))
                 turnID = event.id
-                groupIndex = nil
+                continue
             }
-            let isThinking = event.message.map { !$0.segments.isEmpty && $0.segments.allSatisfy { $0.kind == .thinking } } ?? false
+
+            if let message = event.message, message.role == .assistant {
+                let thoughts = message.segments.filter { $0.kind == .thinking }
+                if !thoughts.isEmpty {
+                    var thoughtEvent = event
+                    if thoughts.count != message.segments.count {
+                        thoughtEvent.id += ":thinking"
+                    }
+                    thoughtEvent.message?.segments = thoughts
+                    actions.append(thoughtEvent)
+                    let replySegments = message.segments.filter { $0.kind != .thinking }
+                    if !replySegments.isEmpty {
+                        var replyEvent = event
+                        replyEvent.message?.segments = replySegments
+                        visible.append(.event(replyEvent))
+                    }
+                    continue
+                }
+            }
+
             let isAction =
-                event.kind == .runStatus || event.toolCall != nil || isThinking
+                event.kind == .runStatus || event.toolCall != nil
                 || (event.permission != nil && event.permission?.state != .pending)
             if isAction && event.kind != .error && event.permission?.state != .pending {
-                if let groupIndex {
-                    actionsByID[entries[groupIndex].id, default: []].append(event)
-                } else {
-                    groupIndex = entries.count
-                    let id = "actions:\(turnID)"
-                    actionsByID[id] = [event]
-                    entries.append(.actions(id: id, events: []))
+                if event.kind != .runStatus || event.title != "Done" {
+                    actions.append(event)
                 }
             } else {
-                entries.append(.event(event))
+                visible.append(.event(event))
             }
         }
-        return entries.map { entry in
-            if case let .actions(id, _) = entry {
-                return .actions(id: id, events: actionsByID[id] ?? [])
-            }
-            return entry
-        }
+        flushTurn()
+        return entries
     }
 }
 
@@ -64,7 +86,7 @@ struct EditorAgentActionsDisclosure: View {
                 HStack(spacing: 6) {
                     Text(isExpanded ? "\u{E5CF}" : "\u{E5CC}")
                         .font(AdaEditorMaterialSymbolFont.font(size: 16))
-                    Text("Actions · \(events.filter { $0.toolCall != nil }.count)")
+                    Text("Actions · \(events.count)")
                         .font(.system(size: 12, weight: .semibold))
                     Spacer()
                     if let title = events.last?.title {

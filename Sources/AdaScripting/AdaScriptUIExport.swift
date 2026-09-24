@@ -5,7 +5,7 @@ import AdaUtils
 import Foundation
 import Gravity
 
-/// Explicit export metadata. Parameter names address stored properties on the @view class.
+/// Explicit export metadata. Parameter names address stored properties on the @view type.
 public struct AdaScriptUIExport: Codable, Hashable, Sendable {
     public var source: String
     public var identifier: String

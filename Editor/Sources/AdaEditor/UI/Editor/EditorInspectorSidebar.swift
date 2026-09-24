@@ -20,7 +20,38 @@ struct EditorInspectorSidebar: View {
                 adaEditorInspectorTitle(theme: theme)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        if let selectedEntity = viewModel.selectedEntity {
+                        if let runtimeSelection = viewModel.runtimeSelection {
+                            inspectorSection("PLAY MODE · \(runtimeSelection.name.uppercased())") {
+                                Text("Entity #\(runtimeSelection.id)")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(theme.editorColors.muted)
+                                Text("Live values · read only")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(theme.editorColors.muted)
+                            }
+                            inspectorSection("COMPONENTS") {
+                                ForEach(runtimeSelection.components, id: \.name) { component in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(component.name)
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(theme.editorColors.text)
+                                        Text(component.value)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(theme.editorColors.muted)
+                                            .lineLimit(3)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                        } else if viewModel.isInspectingPlayMode {
+                            inspectorSection("PLAY MODE") {
+                                Text("Select a live entity from the Play toolbar to inspect its components.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(theme.editorColors.muted)
+                                    .lineLimit(3)
+                            }
+                        } else if let selectedEntity = viewModel.selectedEntity {
                             inspectorSection(selectedEntity.name.uppercased()) {
                                 Text(selectedEntity.editorID)
                                     .font(.system(size: 11))
@@ -255,7 +286,7 @@ struct EditorInspectorSidebar: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(minWidth: 72, maxWidth: .infinity, minHeight: 32, maxHeight: 32)
+        .frame(minWidth: 72, maxWidth: .infinity, minHeight: 32, maxHeight: 32, alignment: .leading)
         .background(RoundedRectangleShape(cornerRadius: 5).fill(isEditable ? theme.editorColors.surface : theme.editorColors.surfaceElevated))
         .mask(RoundedRectangleShape(cornerRadius: 5))
         .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }

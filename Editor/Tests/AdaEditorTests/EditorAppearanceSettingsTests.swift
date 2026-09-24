@@ -21,6 +21,23 @@ struct EditorAppearanceSettingsTests {
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.AgentActivityGlow"))
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.IndentationMarkers"))
+    }
+
+    @Test("Indentation marks can be turned off and the choice survives reloading")
+    func indentationMarkersPersistence() throws {
+        let suite = "AdaEditor.IndentationMarkersTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = EditorAppearanceSettings(defaults: defaults)
+        #expect(settings.showsIndentationMarkers)
+        let container = UIContainerView(rootView: EditorCodeDisplaySettings(settings: settings).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 500, height: 100)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Settings.IndentationMarkers"))
+        #expect(!settings.showsIndentationMarkers)
+        #expect(!EditorAppearanceSettings(defaults: defaults).showsIndentationMarkers)
     }
 
     @Test("Glow is enabled by default and the disabled choice survives reloading")

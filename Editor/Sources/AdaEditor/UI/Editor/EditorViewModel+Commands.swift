@@ -432,17 +432,18 @@ extension EditorViewModel {
         projectName: String
     ) -> Bool {
         do {
-            let runtimeView = try EditorAdaScriptProjectRuntimeView(artifact: artifact)
-            let windowManager = try requireWindowManager()
-            adaScriptRuntimeWindow?.close()
             let windowSettings = artifact.window
             let width = Float(windowSettings.size.width)
             let height = Float(windowSettings.size.height)
+            let controls = EditorGameWindowControls(projectSize: Size(width: width, height: height))
+            let runtimeView = try EditorAdaScriptProjectRuntimeView(artifact: artifact, controls: controls)
+            let windowManager = try requireWindowManager()
+            adaScriptRuntimeWindow?.close()
             let windowTitle = windowSettings.title.flatMap { $0.isEmpty ? nil : $0 } ?? projectName
             let configuration = UIWindow.Configuration(
                 title: windowTitle,
-                frame: Rect(x: 0, y: 0, width: width, height: height),
-                minimumSize: Size(width: min(640, width), height: min(420, height)),
+                frame: Rect(x: 0, y: 0, width: width, height: height + EditorGameWindowToolbar.height),
+                minimumSize: Size(width: min(640, width), height: min(420, height) + EditorGameWindowToolbar.height),
                 mode: .windowed,
                 showsImmediately: false,
                 makeKey: true,
@@ -452,8 +453,12 @@ extension EditorViewModel {
             let window = windowManager.spawnWindow(configuration: configuration) {
                 runtimeView
             }
+            controls.attach(window: window, inspector: inspectorSidebar) { [weak self] in
+                self?.presentSceneInspector()
+            }
             window.onDidDisappear = { [weak self, weak window, performanceSession = runtimeView.performanceSession] in
                 performanceSession.stop()
+                controls.finish()
                 guard let self, self.adaScriptRuntimeWindow === window else {
                     return
                 }

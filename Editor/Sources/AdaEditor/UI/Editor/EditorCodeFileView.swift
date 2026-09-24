@@ -28,6 +28,7 @@ struct EditorCodeFileView: View {
     var onMoveFileSearchSelection: ((String, Int) -> Void)?
     var onDismissFileSearch: ((String) -> Void)?
     var debugger: EditorDebugger?
+    var appearanceSettings: EditorAppearanceSettings = .shared
 
     @State private var caretViewportRect: Rect?
     @Environment(\.theme) private var theme
@@ -98,7 +99,14 @@ extension EditorCodeFileView {
     }
 
     private var codeEditor: some View {
-        TextEditor(text: text, tokenSpans: tokenSpans, sourceInteraction: sourceInteraction)
+        TextEditor(
+            text: text,
+            tokenSpans: tokenSpans,
+            sourceInteraction: sourceInteraction,
+            foldingStyle: foldingStyle,
+            showsIndentationMarkers: appearanceSettings.showsIndentationMarkers && foldingStyle != .none,
+            highlightsSelectedIdentifier: true
+        )
             .font(AdaEditorCodeFont.font(family: fontFamily, weight: fontWeight, size: fontSize))
             .foregroundColor(colorPalette.plainText)
             .accentColor(theme.editorColors.blue)
@@ -106,6 +114,17 @@ extension EditorCodeFileView {
             .drawingGroup()
             .padding(10)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var foldingStyle: TextEditorFoldingStyle {
+        switch document.language {
+        case .yaml:
+            .indentation
+        case .plainText, .markdown:
+            .none
+        default:
+            .braces
+        }
     }
 
     private func symbolDocumentation(_ documentation: String) -> some View {

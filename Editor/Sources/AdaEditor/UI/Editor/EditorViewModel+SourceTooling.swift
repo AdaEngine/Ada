@@ -421,7 +421,7 @@ extension EditorViewModel {
             return []
         }
 
-        return [
+        var items = [
             TextEditorContextMenuItem(title: "Toggle Breakpoint") { [weak self] in
                 guard let path = document.absolutePath else {
                     return
@@ -446,8 +446,63 @@ extension EditorViewModel {
                 self?.handleSourceHover(document: document, position: position)
             },
             TextEditorContextMenuItem(title: "Rename (Unavailable)"),
-            TextEditorContextMenuItem(title: "Code Actions (Unavailable)"),
         ]
+        let quickFixes = document.language == .ada
+            ? EditorGravityLanguageService.quickFixes(text: document.content, position: position)
+            : []
+        if quickFixes.isEmpty {
+            items.append(TextEditorContextMenuItem(title: "Code Actions (Unavailable)"))
+        } else {
+            items.append(TextEditorContextMenuItem(
+                title: "Code Actions",
+                submenu: quickFixes.map { fix in
+                    TextEditorContextMenuItem(title: fix.title) { [weak self] in
+                        self?.applySourceQuickFix(fix, to: document)
+                    }
+                }
+            ))
+        }
+        return items
+    }
+
+    func applySourceQuickFix(_ fix: EditorSourceQuickFix, to document: EditorTextDocument) {
+        workbench.updateTextDocument(id: document.id) { updatedDocument in
+            guard let updatedText = Self.applyingSourceQuickFix(fix, to: updatedDocument.content) else {
+                return
+            }
+            updatedDocument.content = updatedText
+            updatedDocument.isDirty = true
+            updatedDocument.statusMessage = "Edited"
+            updatedDocument.errorMessage = nil
+            let caret = EditorSourceLocation(
+                line: fix.range.start.line,
+                character: fix.range.start.character + fix.replacement.count
+            )
+            updatedDocument.focusedRange = EditorSourceRange(start: caret, end: caret)
+        }
+    }
+
+    nonisolated static func applyingSourceQuickFix(_ fix: EditorSourceQuickFix, to text: String) -> String? {
+        var lines = text.components(separatedBy: "\n")
+        let range = fix.range
+        guard
+            range.start.line == range.end.line,
+            lines.indices.contains(range.start.line),
+            range.start.character >= 0,
+            range.end.character >= range.start.character,
+            range.end.character <= lines[range.start.line].count
+        else {
+            return nil
+        }
+        var line = lines[range.start.line]
+        let start = line.index(line.startIndex, offsetBy: range.start.character)
+        let end = line.index(line.startIndex, offsetBy: range.end.character)
+        guard line[start..<end] == fix.originalText else {
+            return nil
+        }
+        line.replaceSubrange(start..<end, with: fix.replacement)
+        lines[range.start.line] = line
+        return lines.joined(separator: "\n")
     }
 
     func refreshSemanticTokens(for document: EditorWorkbenchDocument) {

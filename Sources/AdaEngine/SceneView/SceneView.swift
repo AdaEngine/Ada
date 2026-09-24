@@ -28,24 +28,29 @@ import Math
 /// })
 /// ```
 public struct SceneView<Placeholder: View>: View {
+    let isInteractive: Bool
     let make: @MainActor (inout AppWorlds) -> Void
     let updateContent: @MainActor (World, AdaUtils.TimeInterval) -> Void
     let placeholder: @MainActor () -> Placeholder
 
     public init(
+        isInteractive: Bool = true,
         make: @escaping @MainActor (inout AppWorlds) -> Void,
         updateContent: @escaping @MainActor (World, AdaUtils.TimeInterval) -> Void
     ) where Placeholder == EmptyView {
+        self.isInteractive = isInteractive
         self.make = make
         self.updateContent = updateContent
         self.placeholder = { EmptyView() }
     }
 
     public init(
+        isInteractive: Bool = true,
         make: @escaping @MainActor (inout AppWorlds) -> Void,
         updateContent: @escaping @MainActor (World, AdaUtils.TimeInterval) -> Void,
         @ViewBuilder placeholder: @escaping @MainActor () -> Placeholder
     ) {
+        self.isInteractive = isInteractive
         self.make = make
         self.updateContent = updateContent
         self.placeholder = placeholder
@@ -59,10 +64,10 @@ public struct SceneView<Placeholder: View>: View {
                     updateContent: updateContent
                 )
             },
-            contentBuilder: { [placeholder] delegate in
+            contentBuilder: { [placeholder, isInteractive] delegate in
                 let coordinator = delegate as! SceneViewCoordinator
                 ZStack {
-                    OffscreenViewportView(delegate: coordinator)
+                    OffscreenViewportView(delegate: coordinator, isInteractive: isInteractive)
 
                     if coordinator.renderTexture == nil {
                         placeholder()

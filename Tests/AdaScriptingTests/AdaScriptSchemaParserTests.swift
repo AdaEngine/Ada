@@ -73,6 +73,38 @@ struct AdaScriptSchemaParserTests {
         }
     }
 
+    @Test("Rejects data annotations on classes and behavior annotations on structs")
+    func rejectsWrongDeclarationKinds() {
+        for annotation in ["component", "replicated_component", "resource", "network_command"] {
+            #expect(throws: AdaScriptSchemaError.invalid(path: "Wrong.ada", message: "@\(annotation) on Wrong requires a struct; change 'class' to 'struct'")) {
+                try AdaScriptSchemaParser.parse(sources: [
+                    AdaScriptCompilerSource(path: "Wrong.ada", source: "@\(annotation) class Wrong {}")
+                ])
+            }
+        }
+        for annotation in ["system", "scriptable", "tool"] {
+            #expect(throws: AdaScriptSchemaError.invalid(path: "Wrong.ada", message: "@\(annotation) on Wrong requires a class; change 'struct' to 'class'")) {
+                try AdaScriptSchemaParser.parse(sources: [
+                    AdaScriptCompilerSource(path: "Wrong.ada", source: "@\(annotation) struct Wrong {}")
+                ])
+            }
+        }
+    }
+
+    @Test("Rejects incompatible declaration annotations")
+    func rejectsIncompatibleAnnotations() {
+        #expect(throws: AdaScriptSchemaError.self) {
+            try AdaScriptSchemaParser.parseViews(sources: [
+                AdaScriptCompilerSource(path: "Wrong.ada", source: "@view @system class Wrong {}")
+            ])
+        }
+        #expect(throws: AdaScriptSchemaError.self) {
+            try AdaScriptSchemaParser.parseViews(sources: [
+                AdaScriptCompilerSource(path: "Wrong.ada", source: "@component @view struct Wrong {}")
+            ])
+        }
+    }
+
     @Test("Parses typed resource bindings from systems")
     func parsesResourceBindings() throws {
         let bindings = try AdaScriptSchemaParser.parseResourceBindings(sources: [
@@ -454,22 +486,26 @@ extension AdaScriptSchemaParserTests {
         ])
     }
 
-    @Test("Rejects @view on value types")
-    func rejectsViewStruct() {
-        #expect(throws: AdaScriptSchemaError.self) {
-            try AdaScriptSchemaParser.parseViews(sources: [
-                AdaScriptCompilerSource(path: "Invalid.ada", source: "@view struct InvalidView {}")
-            ])
-        }
+    @Test("Parses previewable struct views")
+    func parsesViewStruct() throws {
+        let views = try AdaScriptSchemaParser.parseViews(sources: [
+            AdaScriptCompilerSource(
+                path: "View.ada",
+                source: "@previewable @view struct WelcomeView { func body() { Text(\"Hello\"); } }"
+            )
+        ])
+        #expect(views.count == 1)
+        #expect(views.first?.className == "WelcomeView")
+        #expect(views.first?.isPreviewable == true)
     }
 
-    @Test("Rejects @previewable without @view")
-    func rejectsPreviewableNonView() {
+    @Test("Rejects @previewable without @view", arguments: ["class", "struct"])
+    func rejectsPreviewableNonView(declarationKind: String) {
         #expect(throws: AdaScriptSchemaError.self) {
             try AdaScriptSchemaParser.parseViews(sources: [
                 AdaScriptCompilerSource(
                     path: "Invalid.ada",
-                    source: "@previewable class InvalidPreview { func body() { Text(\"No\"); } }"
+                    source: "@previewable \(declarationKind) InvalidPreview { func body() { Text(\"No\"); } }"
                 )
             ])
         }
@@ -501,6 +537,16 @@ extension AdaScriptSchemaParserTests {
         #expect(lowered.contains(".child(adaUIBuilder.hStack().child(adaUIBuilder.text(\"Detail\")).child(adaUIBuilder.spacer()))"))
         #expect(lowered.contains(".padding(16);"))
         #expect(!lowered.contains("VStack(spacing:"))
+    }
+
+    @Test("Lowers implicit view-builder blocks in structs")
+    func lowersStructViewBuilderBlocks() throws {
+        let lowered = try AdaScriptViewBuilderLowerer.lower(
+            source: "@view struct CardView { func body() { VStack { Text(\"Title\"); } } }",
+            path: "Card.ada"
+        )
+        #expect(lowered.contains("return adaUIBuilder.vStack()"))
+        #expect(lowered.contains(".child(adaUIBuilder.text(\"Title\"))"))
     }
 
     @Test("Rejects unsupported builder constructors")

@@ -64,6 +64,8 @@ public final class GravityLanguageServerSession {
             return completion(id: id, params: params)
         case "textDocument/definition":
             return definition(id: id, params: params)
+        case "textDocument/codeAction":
+            return codeAction(id: id, params: params)
         case "textDocument/hover",
             "textDocument/signatureHelp",
             "textDocument/semanticTokens/full":
@@ -104,6 +106,7 @@ public final class GravityLanguageServerSession {
         isInitialized = true
 
         let capabilities: [String: Any] = [
+            "codeActionProvider": true,
             "completionProvider": [
                 "resolveProvider": false,
                 "triggerCharacters": ["."],
@@ -230,6 +233,45 @@ public final class GravityLanguageServerSession {
         }
         let result: Any = workspace.definition(uri: uri, position: position).map(Self.locationLink(from:)) ?? NSNull()
         return GravityLanguageServerAction(outgoingMessages: [response(id: id, result: result)])
+    }
+
+    private func codeAction(id: Any?, params: [String: Any]) -> GravityLanguageServerAction {
+        guard
+            let id,
+            let document = params["textDocument"] as? [String: Any],
+            let uri = document["uri"] as? String,
+            let requestedRange = params["range"] as? [String: Any],
+            let start = Self.position(from: requestedRange["start"]),
+            let end = Self.position(from: requestedRange["end"])
+        else {
+            return GravityLanguageServerAction(outgoingMessages: id.map { [errorResponse(id: $0, code: -32602, message: "Invalid code action parameters")] } ?? [])
+        }
+        guard let text = workspace.text(for: uri) else {
+            return GravityLanguageServerAction(outgoingMessages: [response(id: id, result: [])])
+        }
+        let fixes = GravityLanguageService().quickFixes(
+            text: text,
+            range: GravitySourceRange(start: start, end: end)
+        )
+        let actions: [[String: Any]] = fixes.map { fix in
+            let edit: [String: Any] = [
+                "changes": [
+                    uri: [
+                        [
+                            "range": Self.lspRange(from: fix.replacementRange),
+                            "newText": fix.newText,
+                        ]
+                    ]
+                ]
+            ]
+            return [
+                "title": fix.title,
+                "kind": "quickfix",
+                "diagnostics": [Self.diagnostic(from: fix.diagnostic)],
+                "edit": edit,
+            ]
+        }
+        return GravityLanguageServerAction(outgoingMessages: [response(id: id, result: actions)])
     }
 
     private func didChangeWatchedFiles(params: [String: Any]) -> GravityLanguageServerAction {

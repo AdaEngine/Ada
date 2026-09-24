@@ -41,8 +41,9 @@ final class TextEditorViewNode: ViewNode {
     enum Constants {
         static let horizontalInset: Float = 10
         static let verticalInset: Float = 8
-        static let gutterWidth: Float = 52
+        static let gutterWidth: Float = 64
         static let gutterSpacing: Float = 10
+        static let gutterShadowWidth: Float = 16
         static let minimumWidth: Float = 260
         static let minimumHeight: Float = 120
         static let placeholderOpacity: Float = 0.45
@@ -60,6 +61,9 @@ final class TextEditorViewNode: ViewNode {
     var tokenSpans: [TextEditorTokenSpan]
     var sourceInteraction: TextEditorSourceInteraction?
     var showsLineNumbers: Bool
+    var foldingStyle: TextEditorFoldingStyle
+    var showsIndentationMarkers: Bool
+    var highlightsSelectedIdentifier: Bool
     var text: String
 
     var isFocused = false
@@ -68,6 +72,8 @@ final class TextEditorViewNode: ViewNode {
     var isSelectingWithMouse = false
     var isSelectingWithTouch = false
     var gutterTouchLine: Int?
+    var foldTouchLine: Int?
+    var foldMouseLine: Int?
     var hoveredGutterLine: Int?
     var mousePressStartPoint: Point?
     var touchPressStartPoint: Point?
@@ -89,6 +95,12 @@ final class TextEditorViewNode: ViewNode {
     var textLayoutCacheHits = 0
     var textLayoutCacheMisses = 0
     var lineCache: [LineInfo]?
+    var foldRangesCache: [Int: Range<Int>]?
+    var displayedLinesCache: [Int]?
+    var collapsedFoldLines: Set<Int> = []
+    var cachedOccurrenceSelectionRange: Range<Int>?
+    var cachedOccurrenceWord: String?
+    var cachedOccurrencesByLine: [Int: [Range<Int>]] = [:]
 
     init(inputs: _ViewInputs, content: TextEditorPrimitive) {
         self.placeholder = content.placeholder
@@ -96,6 +108,9 @@ final class TextEditorViewNode: ViewNode {
         self.tokenSpans = content.tokenSpans
         self.sourceInteraction = content.sourceInteraction
         self.showsLineNumbers = content.showsLineNumbers
+        self.foldingStyle = content.foldingStyle
+        self.showsIndentationMarkers = content.showsIndentationMarkers
+        self.highlightsSelectedIdentifier = content.highlightsSelectedIdentifier
         self.text = Self.normalizeInputText(content.text.wrappedValue)
         super.init(content: content)
         self.updateEnvironment(inputs.environment)
@@ -111,11 +126,12 @@ final class TextEditorViewNode: ViewNode {
         let pointSize = self.resolvedFontPointSize()
         let lineHeight = self.lineHeight(for: pointSize)
         let lines = self.lines()
-        let maxLineCharacterCount = max(lines.map(\.text.count).max() ?? 0, self.placeholder.count, 1)
+        let displayedLines = self.displayedLines()
+        let maxLineCharacterCount = max(displayedLines.map { lines[$0].text.count }.max() ?? 0, self.placeholder.count, 1)
         let maxLineWidth = Float(maxLineCharacterCount) * self.characterAdvance(for: pointSize)
         let ideal = Size(
             width: max(Constants.minimumWidth, Constants.horizontalInset * 2 + self.gutterInset + maxLineWidth),
-            height: max(Constants.minimumHeight, Constants.verticalInset * 2 + lineHeight * Float(max(lines.count, 1)))
+            height: max(Constants.minimumHeight, Constants.verticalInset * 2 + lineHeight * Float(max(displayedLines.count, 1)))
         )
 
         var result = proposal.replacingUnspecifiedDimensions(by: ideal)
@@ -141,6 +157,15 @@ final class TextEditorViewNode: ViewNode {
         self.tokenSpans = node.tokenSpans
         self.sourceInteraction = node.sourceInteraction
         self.showsLineNumbers = node.showsLineNumbers
+        if self.foldingStyle != node.foldingStyle {
+            self.foldingStyle = node.foldingStyle
+            self.foldRangesCache = nil
+            self.displayedLinesCache = nil
+            self.collapsedFoldLines.removeAll()
+            self.markNeedsLayout()
+        }
+        self.showsIndentationMarkers = node.showsIndentationMarkers
+        self.highlightsSelectedIdentifier = node.highlightsSelectedIdentifier
 
         let externalText = Self.normalizeInputText(node.textBinding.wrappedValue)
         if externalText != self.text {
@@ -381,125 +406,135 @@ final class TextEditorViewNode: ViewNode {
             return
         }
 
-        if self.showsLineNumbers {
-            context.drawLine(
-                start: Point(textRect.origin.x - Constants.gutterSpacing * 0.5, -contentRect.minY),
-                end: Point(textRect.origin.x - Constants.gutterSpacing * 0.5, -contentRect.maxY),
-                lineWidth: 1,
-                color: editorColors.gutterRule
-            )
-        }
-
         let clipRect = self.visualAbsoluteContentRect()
         context.clip(to: clipRect) { clippedContext in
             var clippedContext = clippedContext
             let viewportHeight = min(contentRect.height, self.nearestScrollView()?.frame.height ?? contentRect.height)
-            let visibleLines = self.visibleLineRange(lineHeight: lineHeight, viewportHeight: viewportHeight)
+            let visibleRows = self.visibleLineRange(lineHeight: lineHeight, viewportHeight: viewportHeight)
+            let displayedLines = self.displayedLines()
             let lines = self.lines()
             let caretPosition = self.position(forOffset: self.selectionHead, lines: lines)
             let textColor = self.resolvedTextColor()
             let resolvedFont = self.resolvedFontForRendering()
+            let occurrencesByLine = self.selectionOccurrences()
 
-            for lineIndex in visibleLines where lines.indices.contains(lineIndex) {
-                let line = lines[lineIndex]
-                let rowY = contentRect.origin.y + Float(lineIndex) * lineHeight
-                let rowRect = Rect(x: contentRect.minX, y: rowY, width: contentRect.width, height: lineHeight)
+            let codeClipRect: Rect
+            if self.showsLineNumbers {
+                let minimumX = self.visualAbsoluteFrame().minX + self.gutterViewportRect().maxX
+                codeClipRect = Rect(x: minimumX, y: clipRect.minY, width: max(0, clipRect.maxX - minimumX), height: clipRect.height)
+            } else {
+                codeClipRect = clipRect
+            }
+            clippedContext.clip(to: codeClipRect) { codeContext in
+                var codeContext = codeContext
+                for row in visibleRows {
+                    let lineIndex = displayedLines[row]
+                    let line = lines[lineIndex]
+                    let rowY = contentRect.origin.y + Float(row) * lineHeight
+                    let rowRect = Rect(x: contentRect.minX, y: rowY, width: contentRect.width, height: lineHeight)
 
-                if self.isFocused, caretPosition.line == lineIndex {
-                    clippedContext.drawRect(rowRect, color: editorColors.currentLineBackground)
+                    if self.isFocused, caretPosition.line == lineIndex {
+                        codeContext.drawRect(rowRect, color: editorColors.currentLineBackground)
+                    }
+
+                    if self.sourceInteraction?.executionLine == lineIndex {
+                        codeContext.drawRect(rowRect, color: self.environment.accentColor.opacity(0.20))
+                    }
+
+                    self.drawSourceHighlightsIfNeeded(
+                        in: &codeContext,
+                        line: line,
+                        lineIndex: lineIndex,
+                        rowY: rowY,
+                        lineHeight: lineHeight,
+                        pointSize: pointSize,
+                        font: resolvedFont
+                    )
+
+                    if let occurrences = occurrencesByLine[lineIndex] {
+                        self.drawSelectionOccurrences(
+                            occurrences,
+                            in: &codeContext,
+                            line: line,
+                            rowY: rowY,
+                            lineHeight: lineHeight,
+                            pointSize: pointSize,
+                            font: resolvedFont
+                        )
+                    }
+
+                    self.drawSelectionIfNeeded(
+                        in: &codeContext,
+                        line: line,
+                        lineIndex: lineIndex,
+                        rowY: rowY,
+                        lineHeight: lineHeight,
+                        pointSize: pointSize,
+                        font: resolvedFont,
+                        lineCount: lines.count
+                    )
+
+                    if let resolvedFont {
+                        if self.showsIndentationMarkers {
+                            self.drawIndentationMarkers(
+                                in: &codeContext,
+                                line: line,
+                                rowY: rowY,
+                                pointSize: pointSize,
+                                font: resolvedFont
+                            )
+                        }
+                        self.drawLineText(
+                            line.text,
+                            lineIndex: lineIndex,
+                            font: resolvedFont,
+                            fallbackColor: textColor,
+                            in: &codeContext,
+                            at: Point(textRect.minX, rowY)
+                        )
+                    }
                 }
 
-                if self.sourceInteraction?.executionLine == lineIndex {
-                    clippedContext.drawRect(rowRect, color: self.environment.accentColor.opacity(0.20))
-                    clippedContext.drawRect(
-                        Rect(x: textRect.minX - 5, y: rowY, width: 3, height: lineHeight),
+                if self.text.isEmpty, !self.placeholder.isEmpty, !self.isFocused, let resolvedFont {
+                    self.drawString(
+                        self.placeholder,
+                        font: resolvedFont,
+                        color: textColor.opacity(Constants.placeholderOpacity),
+                        in: &codeContext,
+                        at: Point(textRect.minX, contentRect.minY)
+                    )
+                }
+
+                self.drawSelectionHint(in: &codeContext)
+
+                if self.isFocused, self.caretVisible, !self.hasSelection {
+                    let caretLineText = lines.indices.contains(caretPosition.line) ? lines[caretPosition.line].text : ""
+                    let caretX = textRect.minX + self.caretXOffset(forColumn: caretPosition.column, in: caretLineText, font: resolvedFont, pointSize: pointSize)
+                    let caretY = contentRect.minY + Float(self.displayRow(forLine: caretPosition.line)) * lineHeight
+                    codeContext.drawRect(
+                        Rect(
+                            x: caretX - Constants.caretLineWidth * 0.5,
+                            y: caretY,
+                            width: Constants.caretLineWidth,
+                            height: lineHeight
+                        ),
                         color: self.environment.accentColor
                     )
                 }
-                if self.showsLineNumbers,
-                    let marker = self.sourceInteraction?.lineMarkers.first(where: { $0.line == lineIndex }) {
-                    clippedContext.drawEllipse(
-                        in: Rect(x: contentRect.minX, y: rowY + (lineHeight - 10) * 0.5, width: 10, height: 10),
-                        color: marker.color,
-                        thickness: marker.isFilled ? 1 : 0.22
-                    )
-                } else if self.showsLineNumbers,
-                    self.hoveredGutterLine == lineIndex,
-                    let color = self.sourceInteraction?.gutterHoverColor {
-                    clippedContext.drawEllipse(
-                        in: Rect(x: contentRect.minX, y: rowY + (lineHeight - 10) * 0.5, width: 10, height: 10),
-                        color: color,
-                        thickness: 0.22
-                    )
-                }
+            }
 
-                self.drawSourceHighlightsIfNeeded(
+            if self.showsLineNumbers {
+                self.drawPinnedGutter(
                     in: &clippedContext,
-                    line: line,
-                    lineIndex: lineIndex,
-                    rowY: rowY,
-                    lineHeight: lineHeight,
-                    pointSize: pointSize,
-                    font: resolvedFont
-                )
-
-                self.drawSelectionIfNeeded(
-                    in: &clippedContext,
-                    line: line,
-                    lineIndex: lineIndex,
-                    rowY: rowY,
+                    visibleRows: visibleRows,
+                    displayedLines: displayedLines,
+                    lines: lines,
+                    contentRect: contentRect,
                     lineHeight: lineHeight,
                     pointSize: pointSize,
                     font: resolvedFont,
-                    lineCount: lines.count
-                )
-
-                if let resolvedFont {
-                    if self.showsLineNumbers {
-                        let number = String(lineIndex + 1)
-                        self.drawString(
-                            number,
-                            font: resolvedFont,
-                            color: editorColors.gutter,
-                            in: &clippedContext,
-                            at: Point(contentRect.minX + Constants.gutterWidth - Float(number.count) * self.characterAdvance(for: pointSize), rowY)
-                        )
-                    }
-                    self.drawLineText(
-                        line.text,
-                        lineIndex: lineIndex,
-                        font: resolvedFont,
-                        fallbackColor: textColor,
-                        in: &clippedContext,
-                        at: Point(textRect.minX, rowY)
-                    )
-                }
-            }
-
-            if self.text.isEmpty, !self.placeholder.isEmpty, !self.isFocused, let resolvedFont {
-                self.drawString(
-                    self.placeholder,
-                    font: resolvedFont,
-                    color: textColor.opacity(Constants.placeholderOpacity),
-                    in: &clippedContext,
-                    at: Point(textRect.minX, contentRect.minY)
-                )
-            }
-
-            self.drawSelectionHint(in: &clippedContext)
-
-            if self.isFocused, self.caretVisible, !self.hasSelection {
-                let caretLineText = lines.indices.contains(caretPosition.line) ? lines[caretPosition.line].text : ""
-                let caretX = textRect.minX + self.caretXOffset(forColumn: caretPosition.column, in: caretLineText, font: resolvedFont, pointSize: pointSize)
-                let caretY = contentRect.minY + Float(caretPosition.line) * lineHeight
-                clippedContext.drawRect(
-                    Rect(
-                        x: caretX - Constants.caretLineWidth * 0.5,
-                        y: caretY,
-                        width: Constants.caretLineWidth,
-                        height: lineHeight
-                    ),
-                    color: self.environment.accentColor
+                    caretLine: caretPosition.line,
+                    colors: editorColors
                 )
             }
         }

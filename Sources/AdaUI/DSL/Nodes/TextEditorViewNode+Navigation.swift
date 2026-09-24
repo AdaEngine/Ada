@@ -40,6 +40,13 @@ extension TextEditorViewNode {
     func invalidateTextCaches() {
         self.lineCache = nil
         self.textLayoutCache.removeAll(keepingCapacity: true)
+        self.foldRangesCache = nil
+        self.displayedLinesCache = nil
+        self.collapsedFoldLines.removeAll()
+        self.cachedOccurrenceSelectionRange = nil
+        self.cachedOccurrenceWord = nil
+        self.cachedOccurrencesByLine.removeAll(keepingCapacity: true)
+        self.markNeedsLayout()
     }
 
     func position(forOffset offset: Int, lines: [LineInfo]) -> TextPosition {
@@ -77,7 +84,7 @@ extension TextEditorViewNode {
 
         let y = max(0, point.y - textRect.origin.y)
         let x = max(0, point.x - textRect.origin.x)
-        let line = max(0, min(Int(y / max(1, lineHeight)), lines.count - 1))
+        let line = self.sourceLine(atDisplayRow: Int(y / max(1, lineHeight)))
         let column = self.closestColumn(toX: x, in: lines[line].text, font: font, pointSize: pointSize)
         return self.offset(line: line, column: column, lines: lines)
     }
@@ -153,6 +160,7 @@ extension TextEditorViewNode {
     }
 
     func ensureCaretVisibleIfNeeded() {
+        self.revealCaretLineIfNeeded()
         let caretRect = self.caretRect()
         let padding = EdgeInsets(
             top: Constants.caretScrollPadding,
@@ -174,7 +182,7 @@ extension TextEditorViewNode {
         let lineText = lines.indices.contains(position.line) ? lines[position.line].text : ""
         return Rect(
             x: textRect.minX + self.caretXOffset(forColumn: position.column, in: lineText, font: font, pointSize: pointSize),
-            y: textRect.minY + Float(position.line) * lineHeight,
+            y: textRect.minY + Float(self.displayRow(forLine: position.line)) * lineHeight,
             width: Constants.caretLineWidth,
             height: lineHeight
         )
@@ -192,12 +200,12 @@ extension TextEditorViewNode {
     }
 
     func visibleLineRange(lineHeight: Float, viewportHeight: Float) -> Range<Int> {
-        let lines = self.lines()
+        let displayed = self.displayedLines()
         let scrollY = self.nearestScrollView()?.contentOffset.y ?? 0
         let firstLine = max(0, Int(max(0, scrollY - self.textContentRect().minY) / max(1, lineHeight)))
         let visibleCount = max(1, Int(ceil(viewportHeight / max(1, lineHeight))) + 2)
-        let lowerBound = min(lines.count, firstLine)
-        return lowerBound..<min(lines.count, lowerBound + visibleCount)
+        let lowerBound = min(displayed.count, firstLine)
+        return lowerBound..<min(displayed.count, lowerBound + visibleCount)
     }
 
     func isTap(at position: Point, start: Point?) -> Bool {

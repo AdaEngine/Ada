@@ -80,6 +80,8 @@ final class EditorInspectorSidebarViewModel {
     var scriptName: String
     var scriptDescription: String
     var selectedEntity: SelectedEntity?
+    var runtimeSelection: EditorPlayInspectionModel.Snapshot?
+    var isInspectingPlayMode = false
     var isComponentPickerPresented = false
     var componentSearchText = ""
     var scriptableObjectCatalog: [EditorScriptableObjectDescriptor] = []

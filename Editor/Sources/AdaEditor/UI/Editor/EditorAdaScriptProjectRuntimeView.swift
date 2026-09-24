@@ -16,11 +16,13 @@ enum EditorAdaScriptRuntimeError: Error, LocalizedError {
 struct EditorAdaScriptProjectRuntimeView: View {
     let performanceSession = EditorGamePerformanceSession()
     private let artifact: EditorAdaScriptProjectBuildArtifact
+    private let controls: EditorGameWindowControls?
     private let entryView: AdaScriptView?
     private let scriptPlugin: AdaScriptPlugin?
 
-    init(artifact: EditorAdaScriptProjectBuildArtifact) throws {
+    init(artifact: EditorAdaScriptProjectBuildArtifact, controls: EditorGameWindowControls? = nil) throws {
         self.artifact = artifact
+        self.controls = controls
         EditorComponentRegistry.registerBuiltIns()
         self.entryView = try artifact.entry.view.map { identifier in
             try AdaScriptView(
@@ -33,22 +35,33 @@ struct EditorAdaScriptProjectRuntimeView: View {
     }
 
     var body: some View {
-        ZStack {
-            SceneView(
-                make: { app in
-                    configureRuntime(&app)
-                },
-                updateContent: { _, _ in }
-            )
-            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-
-            if let entryView {
-                entryView
-                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        VStack(spacing: 0) {
+            if let controls {
+                EditorGameWindowToolbar(controls: controls)
             }
+            ZStack {
+                SceneView(
+                    isInteractive: controls?.inputEnabled ?? true,
+                    make: { app in
+                        configureRuntime(&app)
+                    },
+                    updateContent: { _, _ in controls?.refresh() }
+                )
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+
+                if let entryView {
+                    entryView
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                        .allowsHitTesting(controls?.inputEnabled ?? true)
+                }
+            }
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }
         .background(.black)
-        .onDisappear { performanceSession.stop() }
+        .onDisappear {
+            performanceSession.stop()
+            controls?.finish()
+        }
     }
 
     private func configureRuntime(_ app: inout AppWorlds) {
@@ -70,6 +83,7 @@ struct EditorAdaScriptProjectRuntimeView: View {
         if let sceneModel = artifact.sceneModel {
             app.addPlugin(EditorAdaScriptRuntimeEntryPlugin(sceneModel: sceneModel, assetsDirectory: artifact.assetsDirectory))
         }
+        controls?.attach(world: app.main)
     }
 
     private func installFeaturePlugins(in app: inout AppWorlds) {

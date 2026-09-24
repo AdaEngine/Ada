@@ -1750,13 +1750,13 @@
       },
       {
         "kind": "text",
-        "text": "Annotate a class with `@view`. The build plugin derives its runtime identity\nfrom the Swift module and class name, humanizes the class name for AdaEditor,\nand emits a typed accessor. Use `id` or `title` only when an explicit override\nis required.",
+        "text": "Annotate a class or struct with `@view`. The build plugin derives its runtime identity\nfrom the Swift module and type name, humanizes the type name for AdaEditor,\nand emits a typed accessor. Use `id` or `title` only when an explicit override\nis required.",
         "level": 0,
         "links": []
       },
       {
         "kind": "code",
-        "text": "@previewable\n@view\nclass WelcomeView {\n    @state var message = \"Hello from Ada Script\";\n    @environment(colorScheme) var colorScheme;\n\n    func body() {\n        VStack(spacing: 12) {\n            Text(message).fontSize(28);\n            Text(\"Appearance: \" + colorScheme);\n            HStack {\n                Text(\"Native AdaUI\");\n                Spacer();\n            }\n            Button(\"Change message\") {\n                message = \"State updated\";\n            };\n        }\n        .padding(24)\n        .background(\"#20232aff\");\n    }\n}",
+        "text": "@previewable\n@view\nstruct WelcomeView {\n    @state var message = \"Hello from Ada Script\";\n    @environment(colorScheme) var colorScheme;\n\n    func body() {\n        VStack(spacing: 12) {\n            Text(message).fontSize(28);\n            Text(\"Appearance: \" + colorScheme);\n            HStack {\n                Text(\"Native AdaUI\");\n                Spacer();\n            }\n            Button(\"Change message\") {\n                message = \"State updated\";\n            };\n        }\n        .padding(24)\n        .background(\"#20232aff\");\n    }\n}",
         "language": "ada",
         "links": []
       },
@@ -1822,7 +1822,7 @@
       },
       {
         "kind": "text",
-        "text": "Add `@previewable` to an `@view` class that should be an AdaEditor Preview entry\npoint. Runtime-only views remain plain `@view` declarations and do not clutter\nthe Preview list.",
+        "text": "Add `@previewable` to an `@view` declaration that should be an AdaEditor Preview entry\npoint. Runtime-only views remain plain `@view` declarations and do not clutter\nthe Preview list.",
         "level": 0,
         "links": []
       },
@@ -1834,7 +1834,7 @@
       },
       {
         "kind": "text",
-        "text": "The `title` argument is optional; AdaEditor otherwise uses `@view(title:)` or a\nhumanized class name. `@previewable` without `@view`, duplicate annotations, and\nnon-string titles produce compile-time diagnostics.",
+        "text": "The `title` argument is optional; AdaEditor otherwise uses `@view(title:)` or a\nhumanized type name. `@previewable` without `@view`, duplicate annotations, and\nnon-string titles produce compile-time diagnostics.",
         "level": 0,
         "links": []
       },

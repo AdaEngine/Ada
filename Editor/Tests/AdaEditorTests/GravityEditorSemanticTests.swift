@@ -5,6 +5,20 @@ import Testing
 
 @Suite("AdaScript editor semantic integration")
 struct GravityEditorSemanticTests {
+    @Test("Editor code action safely changes an invalid component class to a struct")
+    func componentQuickFix() throws {
+        let source = "@component class Health {}"
+        let fixes = EditorGravityLanguageService.quickFixes(
+            text: source,
+            position: EditorSourceLocation(line: 0, character: 3)
+        )
+        let fix = try #require(fixes.first)
+        #expect(fixes.count == 1)
+        #expect(fix.title == "Change to struct")
+        #expect(EditorViewModel.applyingSourceQuickFix(fix, to: source) == "@component struct Health {}")
+        #expect(EditorViewModel.applyingSourceQuickFix(fix, to: "@component struct Health {}") == nil)
+    }
+
     @Test("Editor maps AdaScript method tokens into renderable semantic tokens")
     func editorSemanticTokens() {
         let source = """

@@ -110,6 +110,58 @@ struct EditorAgentChatUITests {
         #expect(await service.connectionCount() >= 3)
     }
 
+    @Test("Opening the agent panel connects a loaded session")
+    func panelOpeningConnects() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("AgentOpen-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try ProjectSystem.saveProject(ProjectSystem.defaultProject(projectName: "Open"), at: root)
+        _ = try await EditorAgentSessionStore(projectURL: root).createSession()
+        let settings = EditorAgentSettingsStore()
+        let service = FakeEditorAgentService()
+        let model = EditorAgentViewModel(project: .init(name: "Open", path: root.path), settings: settings, service: service)
+        await model.loadSessions()
+        #expect(await service.connectionCount() == 0)
+        try settings.save(AdaProjectAgent(enabled: true, target: AdaProjectAgentTarget(command: "/bin/echo")))
+        _ = makeContainer(model)
+        for _ in 0..<100 {
+            if await service.connectionCount() > 0 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(await service.connectionCount() == 1)
+    }
+
+    @Test("Tab context menu deletes the clicked session and keeps the active session")
+    func deleteClickedSession() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("AgentDelete-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try ProjectSystem.saveProject(ProjectSystem.defaultProject(projectName: "Delete"), at: root)
+        let model = EditorAgentViewModel(project: .init(name: "Delete", path: root.path), settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())
+        await model.loadSessions()
+        let oldSession = try #require(model.activeSession)
+        try await model.createSession()
+        let activeID = try #require(model.activeSession?.id)
+        let container = makeContainer(model)
+        let tab = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Session.\(oldSession.id)"))
+        var menu: ContextMenuPresentation?
+        let previous = ContextMenuPresentationCenter.present
+        ContextMenuPresentationCenter.present = { menu = $0 }
+        defer { ContextMenuPresentationCenter.present = previous }
+        container.onMouseEvent(MouseEvent(
+            window: RID(), button: .right, mousePosition: Point(tab.absoluteFrame.midX, tab.absoluteFrame.midY),
+            phase: .began, modifierKeys: [], time: 0
+        ))
+        let delete = try #require(menu?.items.first?.action)
+        delete()
+        for _ in 0..<100 {
+            if !model.sessions.contains(where: { $0.id == oldSession.id }) { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(!model.sessions.contains(where: { $0.id == oldSession.id }))
+        #expect(model.activeSession?.id == activeID)
+    }
+
     @Test("Provider JSON errors remain readable instead of disappearing in Markdown")
     func providerFailurePresentation() {
         let failure = #"{"type":"error","status":400,"error":{"message":"Please upgrade Codex."}}"#

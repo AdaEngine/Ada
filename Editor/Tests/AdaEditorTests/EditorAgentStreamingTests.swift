@@ -68,6 +68,42 @@ import Testing
             }
         }
 
+        @Test("Loading an ACP session does not append replayed history")
+        func loadedSessionReplay() async throws {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("AgentReplay-\(UUID())")
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let script = root.appendingPathComponent("agent.py")
+            try Self.replayAgentScript.write(to: script, atomically: true, encoding: .utf8)
+            var project = ProjectSystem.defaultProject(projectName: "Replay")
+            project.ai.agent.enabled = true
+            project.ai.agent.target = .init(command: "/usr/bin/python3", arguments: [script.path])
+            var session = EditorAgentSession()
+            session.upstreamSessionID = "previous-session"
+            session.agentTargetIdentity = project.ai.agent.target.sessionIdentity
+            let request = EditorAgentRunRequest(
+                project: project, projectURL: root, session: session, mode: .build,
+                prompt: "new prompt", attachments: [], sceneContext: nil,
+                codeSelection: nil, skills: []
+            )
+            let service = EditorACPAgentService()
+            let recorder = StreamingRecorder()
+            let onEvent: @Sendable (EditorAgentEvent) async -> Void = { event in
+                await recorder.record(event, beforeCompletion: true)
+            }
+            do {
+                _ = try await service.connect(request, onEvent: onEvent, onProjectFileChanged: { _ in })
+                #expect(await recorder.chunks.isEmpty)
+                let result = try await service.send(request, onEvent: onEvent, onProjectFileChanged: { _ in })
+                #expect(result.assistantText == "Fresh reply")
+                #expect(await recorder.chunks.compactMap { $0.message?.segments.first?.text } == ["Fresh reply"])
+                await service.shutdown()
+            } catch {
+                await service.shutdown()
+                throw error
+            }
+        }
+
         @Test("A completed ACP run saves its original session without a completion notification")
         @MainActor
         func notificationSessionIdentity() async throws {
@@ -214,6 +250,30 @@ import Testing
                     result = {"stopReason":"end_turn"}
                 else:
                     result = {}
+                if "id" in req:
+                    emit({"jsonrpc":"2.0","id":req["id"],"result":result})
+            """#
+
+        private static let replayAgentScript = #"""
+            import json, sys
+            def emit(value):
+                print(json.dumps(value), flush=True)
+            def message(text):
+                emit({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"previous-session",
+                    "update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":text}}}})
+            for line in sys.stdin:
+                req = json.loads(line)
+                method = req.get("method")
+                if method == "initialize":
+                    result = {"protocolVersion":1,"agentCapabilities":{"loadSession":True},"agentInfo":{"name":"replay","version":"1"}}
+                elif method == "session/load":
+                    message("Old reply")
+                    result = {"sessionId":"previous-session"}
+                elif method == "session/prompt":
+                    message("Fresh reply")
+                    result = {"stopReason":"end_turn"}
+                else:
+                    result = {"sessionId":"previous-session"}
                 if "id" in req:
                     emit({"jsonrpc":"2.0","id":req["id"],"result":result})
             """#

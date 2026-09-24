@@ -26,35 +26,38 @@ struct EditorAgentSidebar: View {
             RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
                 .stroke(theme.editorColors.border, lineWidth: 1)
         }
-        .onAppear { viewModel.connectIfNeeded() }
+        .onAppear { viewModel.panelDidAppear() }
+        .onDisappear { viewModel.panelDidDisappear() }
     }
 
     private var agentHeader: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 8) {
-                Text(viewModel.projectName)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(theme.editorColors.text)
-                    .lineLimit(1)
-                Spacer()
-                if let onOpenCatalog {
-                    Button(action: onOpenCatalog) {
-                        Text("\u{E8B8}")
-                            .font(AdaEditorMaterialSymbolFont.font(size: 16))
-                            .foregroundColor(theme.editorColors.muted)
-                            .frame(width: 28, height: 28)
-                    }
-                    .buttonStyle(DefaultButtonStyle())
-                    .accessibilityIdentifier("AdaEditor.Agent.OpenCatalog")
-                }
+        HStack(spacing: 8) {
+            Text(viewModel.projectName)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(theme.editorColors.text)
+                .lineLimit(1)
+            if viewModel.currentConnectionState == .connecting || viewModel.isConnectingCatalogAgent {
+                EditorFlipLoadingIndicator(size: 12, color: theme.editorColors.blue)
+                    .accessibilityIdentifier("AdaEditor.Agent.ConnectionFlip")
             }
-            Text(viewModel.settings.configuration.enabled ? viewModel.currentConnectionState.title : "Choose an agent in global settings")
+            Text(viewModel.isConnectingCatalogAgent ? "Connecting" : (viewModel.settings.configuration.enabled ? viewModel.currentConnectionState.title : "Choose an agent"))
                 .font(.system(size: 10))
                 .foregroundColor(theme.editorColors.muted)
                 .lineLimit(1)
+            Spacer()
+            if let onOpenCatalog {
+                Button(action: onOpenCatalog) {
+                    Text("\u{E8B8}")
+                        .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                        .foregroundColor(theme.editorColors.muted)
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(DefaultButtonStyle())
+                .accessibilityIdentifier("AdaEditor.Agent.OpenCatalog")
+            }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .frame(height: 34)
         .background(theme.editorColors.surface)
         .accessibilityIdentifier("AdaEditor.Agent.Header")
     }
@@ -286,6 +289,8 @@ struct EditorAgentSidebar: View {
                     }
                     .frame(height: 34)
                     if viewModel.isSending {
+                        EditorFlipLoadingIndicator(size: 12, color: theme.editorColors.blue)
+                            .accessibilityIdentifier("AdaEditor.Agent.SendingFlip")
                         Button(action: { viewModel.interrupt() }) {
                             Text("\u{E047}")
                                 .font(AdaEditorMaterialSymbolFont.font(size: 20))

@@ -55,6 +55,35 @@ struct EditorAgentTranscriptTests {
         #expect(actions.map(\.id) == ["a", "b"])
     }
 
+    @Test("Thoughts and actions precede the reply, while completion status stays hidden")
+    func responseOrder() {
+        let mixed = EditorAgentEvent(
+            id: "assistant",
+            kind: .message,
+            message: .init(role: .assistant, segments: [
+                .init(kind: .thinking, text: "Considering the request"),
+                .init(kind: .text, text: "Hello"),
+            ])
+        )
+        let events = [
+            message("user", role: .user), mixed, tool("read"),
+            EditorAgentEvent(id: "done", kind: .runStatus, title: "Done", details: "end_turn"),
+        ]
+        let rows = EditorAgentTranscriptEntry.grouped(events)
+        #expect(rows.map(\.id) == ["user", "actions:user", "assistant"])
+        guard case let .actions(_, actions) = rows[1] else {
+            Issue.record("Expected action group")
+            return
+        }
+        #expect(actions.map(\.id) == ["assistant:thinking", "read"])
+        #expect(actions[0].message?.segments.map(\.kind) == [.thinking])
+        guard case let .event(reply) = rows[2] else {
+            Issue.record("Expected reply")
+            return
+        }
+        #expect(reply.message?.segments.map(\.kind) == [.text])
+    }
+
     @Test("One collapsed section expands and keeps its identity as tools arrive")
     func disclosure() async throws {
         let model = makeModel()
