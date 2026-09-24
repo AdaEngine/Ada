@@ -4,6 +4,7 @@
 //
 
 @_spi(AdaEngine) import AdaEngine
+import AdaScriptCompilerCore
 import Foundation
 import Observation
 
@@ -75,6 +76,7 @@ final class EditorSettingsWindowViewModel {
     var codePalettePreset: EditorCodePalettePreset
     var generalSettingsStatusMessage = ""
     var inputBindingsDraft: EditorInputBindingsDraft
+    var adaScriptTypeChecking: AdaScriptTypeCheckingMode
     var runtimeDraft: EditorRuntimeSettingsDraft
     var runtimeSettings: AdaProjectRuntime
     var runtimeSettingsStatusMessage = ""
@@ -93,6 +95,7 @@ final class EditorSettingsWindowViewModel {
         self.keywordFontWeight = editorViewModel?.workbench.keywordFontWeight ?? .bold
         self.codePalettePreset = EditorCodePalettePreset.matching(editorViewModel?.workbench.codeColorPalette ?? .godot)
         self.inputBindingsDraft = Self.loadInputBindings(from: editorViewModel)
+        self.adaScriptTypeChecking = Self.loadTypeChecking(from: editorViewModel)
         self.runtimeSettings = runtimeSettings
         self.runtimeDraft = EditorRuntimeSettingsDraft(runtime: runtimeSettings)
         self.selectedPage = nil
@@ -133,6 +136,7 @@ final class EditorSettingsWindowViewModel {
             codePalettePreset = EditorCodePalettePreset.matching(workbench.codeColorPalette)
         }
         inputBindingsDraft = Self.loadInputBindings(from: editorViewModel)
+        adaScriptTypeChecking = Self.loadTypeChecking(from: editorViewModel)
         runtimeSettings = Self.loadRuntimeSettings(from: editorViewModel)
         runtimeDraft = EditorRuntimeSettingsDraft(runtime: runtimeSettings)
         generalSettingsStatusMessage = ""
@@ -217,6 +221,11 @@ final class EditorSettingsWindowViewModel {
         }
     }
 
+    func selectTypeChecking(_ mode: AdaScriptTypeCheckingMode) {
+        adaScriptTypeChecking = mode
+        runtimeSettingsStatusMessage = ""
+    }
+
     func isRuntimePluginEnabled(_ pluginID: AdaProjectRuntimePluginID) -> Bool {
         (try? EditorAdaScriptRuntimePluginResolver.resolve(runtimeSettings.plugins))?.contains(pluginID) == true
     }
@@ -260,7 +269,11 @@ final class EditorSettingsWindowViewModel {
                 runtimeDraft.scene = editorViewModel.projectMainSceneText
                 runtimeSettings = try runtimeDraft.applying(to: runtimeSettings)
                 _ = try EditorAdaScriptRuntimePluginResolver.resolve(runtimeSettings.plugins)
-                editorViewModel.saveProjectSettings(runtime: runtimeSettings, inputActions: actions)
+                editorViewModel.saveProjectSettings(
+                    runtime: runtimeSettings,
+                    inputActions: actions,
+                    adaScriptTypeChecking: adaScriptTypeChecking
+                )
             } else {
                 editorViewModel.saveProjectSettings(inputActions: actions)
             }
@@ -283,6 +296,16 @@ final class EditorSettingsWindowViewModel {
             return AdaProjectRuntime()
         }
         return project.runtime
+    }
+
+    private static func loadTypeChecking(from editorViewModel: EditorViewModel?) -> AdaScriptTypeCheckingMode {
+        guard
+            let projectURL = editorViewModel?.projectURL,
+            let project = try? ProjectSystem.loadProject(at: projectURL)
+        else {
+            return .dynamic
+        }
+        return project.build.adaScriptTypeChecking
     }
 }
 

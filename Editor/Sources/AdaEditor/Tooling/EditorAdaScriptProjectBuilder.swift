@@ -34,6 +34,7 @@ enum EditorAdaScriptProjectBuildError: Error, Equatable, LocalizedError, Sendabl
     case sourceReadFailed(path: String, message: String)
     case startupSceneInvalid(path: String, message: String)
     case startupSceneMissing(path: String)
+    case typeChecking(String)
 
     var errorDescription: String? {
         switch self {
@@ -51,6 +52,8 @@ enum EditorAdaScriptProjectBuildError: Error, Equatable, LocalizedError, Sendabl
             "AdaScript startup scene '\(path)' is invalid: \(message)"
         case let .startupSceneMissing(path):
             "AdaScript startup scene was not found at \(path)."
+        case let .typeChecking(message):
+            message
         }
     }
 }
@@ -81,6 +84,14 @@ struct EditorAdaScriptProjectBuilder {
         }
 
         let dataSchemas = try AdaScriptSchemaParser.parse(sources: sources)
+        var analysisEnvironment = AdaScriptTypeEnvironment.standard
+        analysisEnvironment.register(schemas: dataSchemas)
+        let analysis = AdaScriptAnalyzer.analyze(sources: sources, environment: analysisEnvironment)
+        do {
+            try analysis.requireValidTypes(mode: project.build.adaScriptTypeChecking)
+        } catch let error as AdaScriptTypeCheckingError {
+            throw EditorAdaScriptProjectBuildError.typeChecking(error.description)
+        }
         let unsupportedResources = dataSchemas.filter {
             if case .resource = $0.kind { return true }
             return false

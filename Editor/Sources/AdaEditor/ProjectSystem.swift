@@ -1,4 +1,5 @@
 import AdaEngine
+import AdaScriptCompilerCore
 import Foundation
 
 /// Reads, validates, and creates Ada project metadata stored at `.ada/project.json`.
@@ -520,6 +521,7 @@ public struct AdaProjectRunPaths: Codable, Equatable, Sendable {
 
 public struct AdaProjectBuild: Codable, Equatable, Sendable {
     public var system: AdaProjectBuildSystem
+    public var adaScriptTypeChecking: AdaScriptTypeCheckingMode
     public var configuration: String?
     public var targets: [String]
     /// Project-relative files or directories explicitly included in the selected SwiftPM target.
@@ -529,23 +531,28 @@ public struct AdaProjectBuild: Codable, Equatable, Sendable {
 
     public init(
         system: AdaProjectBuildSystem = .swiftpm,
+        adaScriptTypeChecking: AdaScriptTypeCheckingMode = .dynamic,
         configuration: String? = nil,
         targets: [String] = [],
         includedFiles: [String] = [],
         excludedFiles: [String] = []
     ) {
         self.system = system
+        self.adaScriptTypeChecking = adaScriptTypeChecking
         self.configuration = configuration
         self.targets = targets
         self.includedFiles = includedFiles
         self.excludedFiles = excludedFiles
     }
 
-    private enum CodingKeys: String, CodingKey { case system, configuration, targets, includedFiles, excludedFiles }
+    private enum CodingKeys: String, CodingKey {
+        case adaScriptTypeChecking, configuration, excludedFiles, includedFiles, system, targets
+    }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         system = try container.decodeIfPresent(AdaProjectBuildSystem.self, forKey: .system) ?? .swiftpm
+        adaScriptTypeChecking = try container.decodeIfPresent(AdaScriptTypeCheckingMode.self, forKey: .adaScriptTypeChecking) ?? .dynamic
         configuration = try container.decodeIfPresent(String.self, forKey: .configuration)
         targets = try container.decodeIfPresent([String].self, forKey: .targets) ?? []
         includedFiles = try container.decodeIfPresent([String].self, forKey: .includedFiles) ?? []
@@ -555,6 +562,9 @@ public struct AdaProjectBuild: Codable, Equatable, Sendable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(system, forKey: .system)
+        if adaScriptTypeChecking != .dynamic {
+            try container.encode(adaScriptTypeChecking, forKey: .adaScriptTypeChecking)
+        }
         try container.encodeIfPresent(configuration, forKey: .configuration)
         try container.encode(targets, forKey: .targets)
         try container.encode(includedFiles, forKey: .includedFiles)

@@ -129,6 +129,13 @@ enum GravityBuiltins {
             label: "tool",
             sortText: "11"
         ),
+        GravityCompletionCandidate(
+            detail: "Enable strict type checking for this AdaScript file",
+            insertText: "strict",
+            kind: .keyword,
+            label: "strict",
+            sortText: "12"
+        ),
     ]
 
     static let globalCandidates: [GravityCompletionCandidate] =

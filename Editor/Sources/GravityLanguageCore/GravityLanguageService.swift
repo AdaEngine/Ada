@@ -1,15 +1,21 @@
+import AdaScriptCompilerCore
 import Foundation
 
 public struct GravityLanguageService: Sendable {
     private let hostConstructors: [GravityHostConstructor]
+    private let projectTypeChecking: AdaScriptTypeCheckingMode
 
-    public init(hostConstructors: [GravityHostConstructor] = []) {
+    public init(
+        hostConstructors: [GravityHostConstructor] = [],
+        projectTypeChecking: AdaScriptTypeCheckingMode = .dynamic
+    ) {
         self.hostConstructors = hostConstructors.sorted { $0.name < $1.name }
+        self.projectTypeChecking = projectTypeChecking
     }
 
     /// Analyzes source without compiling it. Workspace symbols keep imported project names resolvable.
     public func analyze(text: String, workspaceSymbols: [GravitySymbol] = []) -> GravityDocumentAnalysis {
-        let parsed = GravityDocumentAnalyzer.parse(text)
+        let parsed = GravityDocumentAnalyzer.parse(text, projectTypeChecking: projectTypeChecking)
         var analysis = parsed.analysis
         analysis.diagnostics += GravityUnresolvedValueAnalyzer.diagnostics(
             tokens: parsed.tokens,

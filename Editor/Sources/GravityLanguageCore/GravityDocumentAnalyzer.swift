@@ -1,3 +1,4 @@
+import AdaScriptCompilerCore
 import Foundation
 
 struct GravityParsedDocument: Sendable {
@@ -16,22 +17,28 @@ struct GravityTypeRegion: Sendable {
 }
 
 struct GravityDocumentAnalyzer {
-    static func parse(_ text: String) -> GravityParsedDocument {
+    static func parse(_ text: String, projectTypeChecking: AdaScriptTypeCheckingMode = .dynamic) -> GravityParsedDocument {
         var lexer = GravityLexer(source: text)
         let lexResult = lexer.lex()
         let tokens = lexResult.tokens.filter { $0.kind != .comment }
-        let typeRegions = parseTypeRegions(tokens)
+        let sharedAnalysis = AdaScriptAnalyzer.analyze(source: text)
+        let sharedInferredTypes = sharedAnalysis.inferredTypes.mapValues(\.displayName)
+        let typeRegions = parseTypeRegions(tokens, inferredTypes: sharedInferredTypes)
         let symbols = parseGlobalSymbols(tokens, typeRegions: typeRegions)
         let parsedImports = GravityImportParser.parse(tokens)
+        let typeDiagnostics = sharedAnalysis.typeIssues
+            .filter { _ in projectTypeChecking == .strict || sharedAnalysis.syntax.isStrict }
+            .map(gravityDiagnostic)
         return GravityParsedDocument(
             analysis: GravityDocumentAnalysis(
                 diagnostics: lexResult.diagnostics + parsedImports.diagnostics
                     + duplicatePropertyDiagnostics(typeRegions, tokens: tokens)
-                    + declarationAnnotationDiagnostics(typeRegions, tokens: tokens),
+                    + declarationAnnotationDiagnostics(typeRegions, tokens: tokens)
+                    + typeDiagnostics,
                 imports: parsedImports.imports,
                 symbols: symbols
             ),
-            inferredTypes: inferTypes(tokens),
+            inferredTypes: sharedInferredTypes,
             tokens: lexResult.tokens,
             typeRegions: typeRegions
         )
@@ -117,7 +124,10 @@ struct GravityDocumentAnalyzer {
         }
     }
 
-    private static func parseTypeRegions(_ tokens: [GravityToken]) -> [GravityTypeRegion] {
+    private static func parseTypeRegions(
+        _ tokens: [GravityToken],
+        inferredTypes: [String: String]
+    ) -> [GravityTypeRegion] {
         var regions: [GravityTypeRegion] = []
         var index = 0
         while index < tokens.count {
@@ -153,12 +163,7 @@ struct GravityDocumentAnalyzer {
                 GravityTypeRegion(
                     annotations: annotations,
                     closeBraceIndex: closeBraceIndex,
-                    implicitTypes: implicitTypes(
-                        annotations: annotations,
-                        openBraceIndex: openBraceIndex,
-                        closeBraceIndex: closeBraceIndex,
-                        tokens: tokens
-                    ),
+                    implicitTypes: inferredTypes,
                     openBraceIndex: openBraceIndex,
                     symbol: symbol
                 )
@@ -257,68 +262,20 @@ struct GravityDocumentAnalyzer {
         return GravitySymbol(name: nameToken.text, kind: kind, detail: detail, range: nameToken.range)
     }
 
-    private static func inferTypes(_ tokens: [GravityToken]) -> [String: String] {
-        var inferred: [String: String] = [:]
-        for index in tokens.indices where tokens[index].text == "@" {
-            guard index + 1 < tokens.count, tokens[index + 1].text == "query" else {
-                continue
-            }
-            var declarationIndex = index + 2
-            var parenthesisDepth = 0
-            while declarationIndex < tokens.count {
-                if tokens[declarationIndex].text == "(" {
-                    parenthesisDepth += 1
-                }
-                if tokens[declarationIndex].text == ")" {
-                    parenthesisDepth -= 1
-                }
-                if parenthesisDepth == 0, tokens[declarationIndex].text == "var",
-                    declarationIndex + 1 < tokens.count {
-                    inferred[tokens[declarationIndex + 1].text] = "$AdaQueryCollection"
-                    break
-                }
-                declarationIndex += 1
-            }
-        }
-        for index in tokens.indices {
-            guard
-                tokens[index].text == "var" || tokens[index].text == "const",
-                index + 3 < tokens.count,
-                tokens[index + 1].kind == .identifier,
-                tokens[index + 2].text == "="
-            else {
-                continue
-            }
-
-            let name = tokens[index + 1].text
-            let value = tokens[index + 3].text
-            if value == "queries" {
-                inferred[name] = "$AdaQueryCollection"
-            } else if value.first?.isUppercase == true {
-                inferred[name] = value
-            } else if let existing = inferred[value] {
-                inferred[name] = existing
-            }
-        }
-
-        for index in tokens.indices where tokens[index].text == "for" {
-            guard index + 4 < tokens.count, tokens[index + 1].text == "(" else {
-                continue
-            }
-            let hasVariableKeyword = tokens[index + 2].text == "var"
-            let entityIndex = hasVariableKeyword ? index + 3 : index + 2
-            let inIndex = entityIndex + 1
-            let queryIndex = inIndex + 1
-            guard
-                queryIndex < tokens.count,
-                tokens[inIndex].text == "in",
-                inferred[tokens[queryIndex].text] == "$AdaQueryCollection"
-            else {
-                continue
-            }
-            inferred[tokens[entityIndex].text] = "$AdaEntity"
-        }
-        return inferred
+    private static func gravityDiagnostic(_ issue: AdaScriptTypeIssue) -> GravityDiagnostic {
+        GravityDiagnostic(
+            message: issue.message,
+            range: GravitySourceRange(
+                start: GravitySourcePosition(
+                    line: issue.range.start.line,
+                    utf16Column: issue.range.start.utf16Column
+                ),
+                end: GravitySourcePosition(
+                    line: issue.range.end.line,
+                    utf16Column: issue.range.end.utf16Column
+                )
+            )
+        )
     }
 
     private static func typeKind(for text: String) -> GravitySymbolKind? {

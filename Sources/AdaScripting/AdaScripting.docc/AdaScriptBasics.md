@@ -30,8 +30,9 @@ different names.
 ## Values and basic types
 
 Ada Script is dynamically typed. A `var` holds a value, and later assignments
-can replace it. Type annotations such as `var score: Int` help describe an API
-and support tooling; do not assume they provide full static type checking.
+can replace it. Type annotations such as `var score: Int` describe an API and
+support tooling. They are enforced only when strict type checking is enabled
+for the project or source file; dynamic mode remains the default.
 
 | Type | Example | What it represents |
 | --- | --- | --- |

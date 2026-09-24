@@ -1,4 +1,5 @@
 import AdaEngine
+import AdaScriptCompilerCore
 import Foundation
 import GravityLanguageCore
 
@@ -12,7 +13,7 @@ struct EditorSourceQuickFix: Equatable, Sendable {
 struct EditorGravityLanguageService: Sendable {
     private static let annotationLabels: Set<String> = [
         "access", "component", "environment", "export", "previewable", "query", "res",
-        "resource", "scriptable", "state", "system", "tool", "view",
+        "resource", "scriptable", "state", "strict", "system", "tool", "view",
     ]
 
     static func completions(
@@ -99,6 +100,7 @@ struct EditorGravityLanguageService: Sendable {
 
     static func diagnostics(workspace: GravityWorkspace, fileURL: URL, text: String) -> [EditorDiagnostic] {
         workspace.setHostConstructors(hostConstructors())
+        workspace.setProjectTypeChecking(projectTypeChecking(for: fileURL))
         let uri = fileURL.standardizedFileURL.absoluteString
         workspace.change(uri: uri, text: text, version: nil)
         return (workspace.analysis(for: uri)?.diagnostics ?? [])
@@ -149,6 +151,22 @@ struct EditorGravityLanguageService: Sendable {
                 parameters: constructor.parameters.map(\.name)
             )
         }
+    }
+
+    private static func projectTypeChecking(for fileURL: URL) -> AdaScriptTypeCheckingMode {
+        var directory = fileURL.deletingLastPathComponent().standardizedFileURL
+        while directory.path != "/" {
+            let settingsURL = ProjectSystem.metadataURL(forProjectAt: directory)
+            if FileManager.default.fileExists(atPath: settingsURL.path) {
+                return (try? ProjectSystem.loadProject(at: directory).build.adaScriptTypeChecking) ?? .dynamic
+            }
+            let parent = directory.deletingLastPathComponent().standardizedFileURL
+            guard parent != directory else {
+                break
+            }
+            directory = parent
+        }
+        return .dynamic
     }
 
     private static func languageService() -> GravityLanguageService {

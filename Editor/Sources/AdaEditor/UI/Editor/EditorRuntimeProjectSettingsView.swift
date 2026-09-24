@@ -1,4 +1,5 @@
 @_spi(AdaEngine) import AdaEngine
+import AdaScriptCompilerCore
 
 struct EditorRuntimeProjectSettingsView: View {
     let projectName: String
@@ -9,12 +10,36 @@ struct EditorRuntimeProjectSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             entrySettings
+            typeCheckingSettings
             profileSettings
             pluginSettings
             if viewModel.isRuntimePluginEnabled(.physics2D) {
                 physicsSettings
             }
             windowSettings
+        }
+    }
+
+    private var typeCheckingSettings: some View {
+        settingsGroup("TYPE CHECKING") {
+            HStack(spacing: 8) {
+                selectionButton(
+                    "Dynamic",
+                    selected: viewModel.adaScriptTypeChecking == .dynamic
+                ) {
+                    viewModel.selectTypeChecking(.dynamic)
+                }
+                selectionButton(
+                    "Strict",
+                    selected: viewModel.adaScriptTypeChecking == .strict
+                ) {
+                    viewModel.selectTypeChecking(.strict)
+                }
+            }
+            Text("Dynamic preserves AdaScript runtime typing. Strict checks annotated values across the project; @strict enables it for one file.")
+                .font(.system(size: 11))
+                .foregroundColor(theme.editorColors.muted)
+                .lineLimit(2)
         }
     }
 

@@ -24,6 +24,36 @@ class CounterSystem {
 }
 ```
 
+## Optional strict type checking
+
+Ada Script remains dynamically typed by default. Enable strict checking for a
+single source by placing `@strict` before its first declaration:
+
+```ada
+@strict
+
+func addScore(score: Int, amount: Int) -> Int {
+    return score + amount;
+}
+```
+
+In an AdaEditor project, **Project Settings → Runtime → Type Checking → Strict**
+enables the same analysis for every `.ada` source. The serialized setting is:
+
+```json
+{
+  "build": {
+    "system": "adascript",
+    "adaScriptTypeChecking": "strict"
+  }
+}
+```
+
+Strict checking validates annotated assignments, function arguments, member
+access, and return values before the module runs. Use `Any` for an intentional
+dynamic boundary. Untyped code and projects using `"dynamic"` keep normal
+Ada Script runtime behavior.
+
 ## Imports
 
 Files with discovery annotations such as `@system` are module roots. Import a

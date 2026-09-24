@@ -78,6 +78,16 @@ enum GravityScriptModuleResolver {
         }
 
         let sortedPaths = sourceByPath.keys.sorted()
+        let compilerSources = sortedPaths.compactMap { sourceByPath[$0] }
+        let schemas = try AdaScriptSchemaParser.parse(sources: compilerSources)
+        var analysisEnvironment = AdaScriptTypeEnvironment.standard
+        analysisEnvironment.register(schemas: schemas)
+        let analysis = AdaScriptAnalyzer.analyze(sources: compilerSources, environment: analysisEnvironment)
+        do {
+            try analysis.requireValidTypes(mode: .dynamic)
+        } catch let error as AdaScriptTypeCheckingError {
+            throw AdaScriptError.compilation(error.description.components(separatedBy: "\n"))
+        }
         let discoveryRoots = sortedPaths.filter { path in
             guard let annotations = preliminarySources[path]?.annotations else {
                 return false
@@ -135,7 +145,10 @@ enum GravityScriptModuleResolver {
             }
             let loweredViewSource: String
             do {
-                loweredViewSource = try AdaScriptViewBuilderLowerer.lower(source: source.source, path: path)
+                loweredViewSource = try AdaScriptViewBuilderLowerer.lower(
+                    source: AdaScriptTypeAnnotationLowerer.lower(source: source.source),
+                    path: path
+                )
             } catch let error as AdaScriptViewBuilderError {
                 throw AdaScriptError.invalidManifest(error.description)
             }

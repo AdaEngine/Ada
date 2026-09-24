@@ -1,5 +1,6 @@
 @_spi(AdaEngine) import AdaEngine
 import AdaPackageManifestTool
+import AdaScriptCompilerCore
 import Foundation
 import Observation
 
@@ -354,7 +355,11 @@ extension EditorViewModel {
         }
     }
 
-    func saveProjectSettings(runtime: AdaProjectRuntime? = nil, inputActions: [InputAction]? = nil) {
+    func saveProjectSettings(
+        runtime: AdaProjectRuntime? = nil,
+        inputActions: [InputAction]? = nil,
+        adaScriptTypeChecking: AdaScriptTypeCheckingMode? = nil
+    ) {
         guard let projectURL else {
             projectSettingsStatusMessage = "No project is open."
             return
@@ -374,6 +379,9 @@ extension EditorViewModel {
             }
             if let inputActions {
                 settings.inputActions = inputActions
+            }
+            if let adaScriptTypeChecking {
+                settings.build.adaScriptTypeChecking = adaScriptTypeChecking
             }
             settings.project.displayName = Self.optionalText(from: projectDisplayNameText)
             settings.project.bundleIdentifier = Self.optionalText(from: projectBundleIdentifierText)

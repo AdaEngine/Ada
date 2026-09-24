@@ -7,7 +7,7 @@ private enum GeneratorError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .invalidArguments:
-            "Usage: AdaScriptGeneratorTool --output <path> --root <target-directory> --module-name <name> [script.ada ...]"
+            "Usage: AdaScriptGeneratorTool --output <path> --root <target-directory> --module-name <name> [--libraries-root <path>] [--strict] [script.ada ...]"
         }
     }
 }
@@ -28,16 +28,22 @@ struct AdaScriptGeneratorTool {
         let moduleName = arguments[5]
         var remaining = Array(arguments.dropFirst(6))
         var librariesRoot: URL?
+        var typeChecking: AdaScriptTypeCheckingMode = .dynamic
         if remaining.first == "--libraries-root", remaining.count >= 2 {
             librariesRoot = URL(fileURLWithPath: remaining[1], isDirectory: true)
             remaining.removeFirst(2)
+        }
+        if remaining.first == "--strict" {
+            typeChecking = .strict
+            remaining.removeFirst()
         }
         let scriptURLs = remaining.map { URL(fileURLWithPath: $0, isDirectory: false) }
         let generatedSource = try makeGeneratedSource(
             moduleName: moduleName,
             scriptURLs: scriptURLs,
             rootURL: rootURL,
-            librariesRoot: librariesRoot
+            librariesRoot: librariesRoot,
+            typeChecking: typeChecking
         )
 
         try FileManager.default.createDirectory(
@@ -54,7 +60,8 @@ struct AdaScriptGeneratorTool {
         moduleName: String,
         scriptURLs: [URL],
         rootURL: URL,
-        librariesRoot: URL?
+        librariesRoot: URL?,
+        typeChecking: AdaScriptTypeCheckingMode
     ) throws -> String {
         var scripts = try scriptURLs.map { scriptURL in
             let source = try String(contentsOf: scriptURL, encoding: .utf8)
@@ -69,6 +76,10 @@ struct AdaScriptGeneratorTool {
             AdaScriptCompilerSource(path: $0.path, source: $0.source)
         }
         let schemas = try AdaScriptSchemaParser.parse(sources: compilerSources)
+        var analysisEnvironment = AdaScriptTypeEnvironment.standard
+        analysisEnvironment.register(schemas: schemas)
+        let analysis = AdaScriptAnalyzer.analyze(sources: compilerSources, environment: analysisEnvironment)
+        try analysis.requireValidTypes(mode: typeChecking)
         _ = try AdaScriptSchemaParser.parseNetworkCommands(sources: compilerSources)
         let scriptables = try AdaScriptSchemaParser.parseScriptables(sources: compilerSources)
         let views = try AdaScriptSchemaParser.parseViews(sources: compilerSources)

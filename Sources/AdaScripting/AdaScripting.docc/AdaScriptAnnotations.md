@@ -6,6 +6,14 @@ The same spelling can have different roles: `@component` declares a struct,
 while `@component(required: true)` binds an existing component to a scriptable
 instance.
 
+## File type checking
+
+`@strict` before the first declaration enables strict type checking for that
+source file. It does not change runtime representation or require the rest of
+the project to use static types. An explicit `Any` annotation keeps a value
+dynamic inside a strict file. Project-wide strict checking is configured by
+`build.adaScriptTypeChecking` in `.ada/project.json`.
+
 ## Suspension policy
 
 `@nonsendable` marks a class, struct, or enum whose values must not be captured

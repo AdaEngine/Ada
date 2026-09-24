@@ -1,3 +1,4 @@
+import AdaScriptCompilerCore
 import Foundation
 
 public final class GravityWorkspace {
@@ -8,7 +9,10 @@ public final class GravityWorkspace {
     }
 
     private let fileManager: FileManager
+    private var hostConstructors: [GravityHostConstructor]
     private var languageService: GravityLanguageService
+    private var moduleAnalysisCache: AdaScriptModuleAnalysis?
+    private var projectTypeChecking: AdaScriptTypeCheckingMode = .dynamic
     private var diskDocuments: [String: Document] = [:]
     private var openDocuments: [String: Document] = [:]
     private var rootURLs: [URL] = []
@@ -18,25 +22,57 @@ public final class GravityWorkspace {
         hostConstructors: [GravityHostConstructor] = []
     ) {
         self.fileManager = fileManager
+        self.hostConstructors = hostConstructors
         self.languageService = GravityLanguageService(hostConstructors: hostConstructors)
     }
 
     public func setHostConstructors(_ constructors: [GravityHostConstructor]) {
-        languageService = GravityLanguageService(hostConstructors: constructors)
+        hostConstructors = constructors
+        rebuildLanguageService()
+    }
+
+    public func setProjectTypeChecking(_ mode: AdaScriptTypeCheckingMode) {
+        projectTypeChecking = mode
+        rebuildLanguageService()
+    }
+
+    private func rebuildLanguageService() {
+        languageService = GravityLanguageService(
+            hostConstructors: hostConstructors,
+            projectTypeChecking: projectTypeChecking
+        )
     }
 
     public func configure(rootURIs: [String]) {
         rootURLs = rootURIs.compactMap(Self.fileURL(from:))
+        projectTypeChecking = rootURLs.lazy.compactMap(Self.projectTypeChecking(at:)).first ?? .dynamic
+        rebuildLanguageService()
         openDocuments.removeAll(keepingCapacity: true)
+        moduleAnalysisCache = nil
         reloadDiskDocuments()
+    }
+
+    private static func projectTypeChecking(at rootURL: URL) -> AdaScriptTypeCheckingMode? {
+        let settingsURL = rootURL.appendingPathComponent(".ada/project.json")
+        guard
+            let data = try? Data(contentsOf: settingsURL),
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let build = object["build"] as? [String: Any],
+            let value = build["adaScriptTypeChecking"] as? String
+        else {
+            return nil
+        }
+        return AdaScriptTypeCheckingMode(rawValue: value)
     }
 
     public func open(uri: String, text: String, version: Int?) {
         openDocuments[Self.documentKey(uri)] = document(text: text, version: version)
+        moduleAnalysisCache = nil
     }
 
     public func change(uri: String, text: String, version: Int?) {
         openDocuments[Self.documentKey(uri)] = document(text: text, version: version)
+        moduleAnalysisCache = nil
     }
 
     public func close(uri: String) {
@@ -47,6 +83,7 @@ public final class GravityWorkspace {
         } else {
             diskDocuments.removeValue(forKey: key)
         }
+        moduleAnalysisCache = nil
     }
 
     public func save(uri: String, text: String?) {
@@ -59,6 +96,7 @@ public final class GravityWorkspace {
         } else if let url = Self.fileURL(from: uri), let diskText = try? String(contentsOf: url, encoding: .utf8) {
             diskDocuments[key] = document(text: diskText, version: nil)
         }
+        moduleAnalysisCache = nil
     }
 
     public func text(for uri: String) -> String? {
@@ -73,7 +111,46 @@ public final class GravityWorkspace {
         }
         var analysis = languageService.analyze(text: document.text, workspaceSymbols: workspaceSymbols(for: key))
         analysis.diagnostics += importDiagnostics(uri: key, imports: analysis.imports)
+        analysis.diagnostics += moduleTypeDiagnostics(for: key)
+        var seenDiagnostics = Set<GravityDiagnostic>()
+        analysis.diagnostics = analysis.diagnostics.filter { seenDiagnostics.insert($0).inserted }
         return analysis
+    }
+
+    private func moduleTypeDiagnostics(for uri: String) -> [GravityDiagnostic] {
+        var documents = diskDocuments
+        documents.merge(openDocuments) { _, open in open }
+        let sources = documents.map { key, document in
+            AdaScriptCompilerSource(path: key, source: document.text)
+        }
+        let module: AdaScriptModuleAnalysis
+        if let moduleAnalysisCache {
+            module = moduleAnalysisCache
+        } else {
+            module = AdaScriptAnalyzer.analyze(sources: sources)
+            moduleAnalysisCache = module
+        }
+        guard let source = module.sources.first(where: { $0.syntax.path == uri }) else {
+            return []
+        }
+        guard projectTypeChecking == .strict || source.syntax.isStrict else {
+            return []
+        }
+        return source.typeIssues.map { issue in
+            GravityDiagnostic(
+                message: issue.message,
+                range: GravitySourceRange(
+                    start: GravitySourcePosition(
+                        line: issue.range.start.line,
+                        utf16Column: issue.range.start.utf16Column
+                    ),
+                    end: GravitySourcePosition(
+                        line: issue.range.end.line,
+                        utf16Column: issue.range.end.utf16Column
+                    )
+                )
+            )
+        }
     }
 
     public func completions(uri: String, position: GravitySourcePosition) -> [GravityCompletion] {
@@ -399,6 +476,7 @@ public final class GravityWorkspace {
 
     private func reloadDiskDocuments() {
         diskDocuments.removeAll(keepingCapacity: true)
+        moduleAnalysisCache = nil
         let resourceKeys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey]
         for rootURL in rootURLs {
             guard

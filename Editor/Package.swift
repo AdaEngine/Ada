@@ -40,7 +40,10 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "GravityLanguageCore"
+            name: "GravityLanguageCore",
+            dependencies: [
+                .product(name: "AdaScriptCompilerCore", package: "AdaEngine")
+            ]
         ),
         .target(
             name: "GravityLanguageServerProtocol",

@@ -16,6 +16,9 @@ struct AdaScriptBuildPlugin: BuildToolPlugin {
         let output = context.pluginWorkDirectoryURL.appendingPathComponent("AdaScriptPluginsGenerated.swift")
 
         let libraryInputs = libraryInputFiles(at: context.package.directoryURL)
+        let projectSettings = context.package.directoryURL.appendingPathComponent(".ada/project.json")
+        let projectInputs = FileManager.default.fileExists(atPath: projectSettings.path) ? [projectSettings] : []
+        let typeCheckingArguments = isStrictTypeCheckingEnabled(at: projectSettings) ? ["--strict"] : []
 
         return [
             .buildCommand(
@@ -26,12 +29,24 @@ struct AdaScriptBuildPlugin: BuildToolPlugin {
                     "--root", target.directoryURL.path,
                     "--module-name", target.name,
                     "--libraries-root", context.package.directoryURL.path
-                ] + scripts.map(\.path),
+                ] + typeCheckingArguments + scripts.map(\.path),
                 environment: [:],
-                inputFiles: scripts + libraryInputs.sorted { $0.path < $1.path },
+                inputFiles: scripts + libraryInputs.sorted { $0.path < $1.path } + projectInputs,
                 outputFiles: [output]
             )
         ]
+    }
+
+    private func isStrictTypeCheckingEnabled(at settingsURL: URL) -> Bool {
+        guard
+            let data = try? Data(contentsOf: settingsURL),
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let build = object["build"] as? [String: Any],
+            let mode = build["adaScriptTypeChecking"] as? String
+        else {
+            return false
+        }
+        return mode == "strict"
     }
 
     private func libraryInputFiles(at packageURL: URL) -> [URL] {
