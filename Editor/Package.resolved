@@ -6,8 +6,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/AdaEngine/gravity-lang.git",
       "state" : {
-        "revision" : "ecfb4a53d719163ff84f84bc245315140c075229",
-        "version" : "0.9.9"
+        "revision" : "24695757a0ba5638b3633004a2166b7878c116de"
       }
     },
     {
