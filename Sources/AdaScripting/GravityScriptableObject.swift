@@ -349,7 +349,7 @@ private final class GravityScriptableObject: ScriptableObject, @unchecked Sendab
 }
 
 @GSExportable("AdaScriptableContext")
-private final class GravityScriptableLifecycleContext: @unchecked Sendable {
+private final class GravityScriptableLifecycleContext: @unchecked Sendable, AdaScriptNonSendableBridge {
     let deltaTime: Double
     let entityID: Int
     /// Stable world identity for module state scoped to one running scene.
@@ -383,6 +383,14 @@ private final class GravityScriptableLifecycleContext: @unchecked Sendable {
 }
 
 private final class GravityScriptableModuleRuntime: @unchecked Sendable {
+    private enum LifecycleCallback: String, CaseIterable {
+        case ready
+        case update
+        case fixedUpdate
+        case event
+        case destroy
+    }
+
     private let factoryNamesByClass: [String: String]
     private let getterNamesByClass: [String: [String: String]]
     // The runtime owns its delegate for exactly the VM lifetime; this is not a callback back-reference.
@@ -395,6 +403,15 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
     init(sources: [AdaScriptSource], schemas: [AdaScriptObjectSchema]) throws {
         let componentConstructors = AdaScriptComponentRuntime.linkedConstructors()
         let module = try GravityScriptModuleResolver.resolve(sources)
+        for schema in schemas {
+            for callback in LifecycleCallback.allCases {
+                try module.requireSynchronousCallback(
+                    className: schema.className,
+                    method: callback.rawValue,
+                    annotation: "@scriptable"
+                )
+            }
+        }
         let factoryNamesByClass = Dictionary(
             uniqueKeysWithValues: schemas.enumerated()
                 .map { index, schema in

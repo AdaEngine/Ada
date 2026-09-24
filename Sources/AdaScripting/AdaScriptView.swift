@@ -252,6 +252,9 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
         )
         let networkCommands = try AdaScriptSchemaParser.parseNetworkCommands(sources: sources)
         let module = try GravityScriptModuleResolver.resolve(sources)
+        for view in views {
+            try module.requireSynchronousCallback(className: view.className, method: "body", annotation: "@view")
+        }
         self.factoryNamesByIdentifier = Dictionary(
             uniqueKeysWithValues: views.enumerated()
                 .map { index, view in
@@ -265,16 +268,21 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
 
         let runtimeBundle = try AdaScriptRuntimeCoordinator.lock.withLock {
             let virtualMachine = GravityVirtualMachine(settings: .init(), delegate: delegate)
-            let taskRuntime = AdaScriptTaskRuntime.make(virtualMachine: virtualMachine, reportDiagnostic: delegate.append)
+            let suspensionPolicy = AdaScriptSuspensionPolicy(scriptNonSendableTypes: module.nonSendableTypeNames)
+            let taskRuntime = AdaScriptTaskRuntime.make(
+                virtualMachine: virtualMachine,
+                reportDiagnostic: delegate.append,
+                suspensionPolicy: suspensionPolicy
+            )
             let asyncHost = AdaScriptAsyncHost()
             asyncHost.onWake = { taskRuntime.wake() }
             asyncHost.ownerProvider = { taskRuntime.currentOwnerID }
             try virtualMachine.bindClass(with: AdaScriptTaskRuntime.self)
-            try virtualMachine.bindClass(with: AdaScriptAsyncResult.self)
-            try virtualMachine.bindClass(with: AdaScriptAsyncOperation.self)
+            try suspensionPolicy.bindSafe(AdaScriptAsyncResult.self, to: virtualMachine)
+            try suspensionPolicy.bindSafe(AdaScriptAsyncOperation.self, to: virtualMachine)
             try virtualMachine.bindClass(with: AdaScriptAsyncHost.self)
-            try virtualMachine.bindClass(with: AdaScriptSaveWriter.self)
-            try virtualMachine.bindClass(with: AdaScriptViewBridge.self)
+            try suspensionPolicy.bindSafe(AdaScriptSaveWriter.self, to: virtualMachine)
+            try suspensionPolicy.bindBorrowed(AdaScriptViewBridge.self, to: virtualMachine)
             try AdaScriptComponentRuntime.bind(
                 to: virtualMachine,
                 constructors: componentConstructors,

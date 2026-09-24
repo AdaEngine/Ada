@@ -21,7 +21,8 @@ Implemented and covered by focused tests in this worktree:
 - [x] Atomic background text save and a 256 KiB-per-chunk streamed save with
   an atomic commit and cancellation cleanup.
 - [x] Runtime leases for borrowed query rows and reflected resource views;
-  compiler diagnostics for the basic async effect and callback-context cases.
+  `@nonsendable` type metadata, typed-parameter checks, and runtime capture
+  validation across aliases, lists, returns, and one-shot results.
 - [x] AdaUI action continuation, view disposal, and view-generation retirement;
   Editor keyword, declaration, and completion support.
 
@@ -31,9 +32,12 @@ Remaining before this ADR is fully implemented:
   VM. The current dependency has no public recovery API. The runtime instead
   quarantines that module and requires reload, with one task/owner/trace
   diagnostic.
-- [ ] Full static effect and borrowed-value analysis through methods, aliases,
-  containers, and imported declarations; typed result descriptors and source
-  maps for generated async continuations.
+- [ ] Full static effect and borrowed-value analysis through aliases, map
+  entries, and imported method declarations; typed result descriptors and
+  source maps for generated async continuations.
+- [ ] Move the async syntax and effect representation into a versioned
+  `gravity-lang` parser/AST release. The Swift source lowerer is an interim
+  AdaScript adapter; the dependency is currently pinned to `0.9.9`.
 - [ ] Engine-owned, incremental snapshots of arbitrary ECS data, beyond the
   available bounded streaming writer.
 - [ ] A game time-scale resource, complete Editor diagnostics, and platform
@@ -204,6 +208,23 @@ type descriptors must be generated from or reconciled with the owning native
 capabilities; the bridge must not invent separate stringly asset or event
 registries. AdaScript callers see detached values or stable engine-owned
 handles, not native mutable objects.
+
+### Suspension policy
+
+`@nonsendable` is a type-level suspension policy. It marks a script class,
+struct, or enum whose instances cannot enter an async frame or cross an
+`await`. Native callback-scoped bridge types declare the equivalent policy at
+their binding site. This policy describes script lifetime; it is independent
+of Swift's `Sendable` conformance used to synchronize the bridge internally.
+
+The compiler rejects async parameters explicitly typed as `@nonsendable`,
+async methods whose receiver has that policy, and async effects on callbacks
+registered by `@system`, `@view`, `@scriptable`, or `@rpc` descriptors. It does not infer borrowing
+from variable names such as `context` or ban method names in an ordinary
+class. The runtime validates actual task arguments, nested lists, returned
+values, and promise completions, catching untyped aliases. A borrowed ECS
+lease also expires at callback exit as a final runtime guard. Map captures
+currently fail closed until entries can be traversed and checked.
 
 ### Error contract and authoring diagnostics
 

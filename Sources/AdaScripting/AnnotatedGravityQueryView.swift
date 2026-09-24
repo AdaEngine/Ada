@@ -7,7 +7,7 @@ final class AnnotatedGravityQueryLease: @unchecked Sendable {
 }
 
 @GSExportable("AdaQuery")
-final class AnnotatedGravityQueryBridge: @unchecked Sendable {
+final class AnnotatedGravityQueryBridge: @unchecked Sendable, AdaScriptNonSendableBridge {
     private let cursor: DynamicQueryCursor
     private let row: AnnotatedGravityQueryRow
     private let virtualMachine: GravityVirtualMachine
@@ -74,7 +74,7 @@ final class AnnotatedGravityQueryBridge: @unchecked Sendable {
 }
 
 @GSExportable("AdaQueryRow")
-final class AnnotatedGravityQueryRow: @unchecked Sendable {
+final class AnnotatedGravityQueryRow: @unchecked Sendable, AdaScriptNonSendableBridge {
     var id: Int {
         guard lease.isActive else {
             reportDiagnostic("Query row is no longer valid")
@@ -168,7 +168,7 @@ final class AnnotatedGravityQueryRow: @unchecked Sendable {
 }
 
 @GSExportable("AdaComponent")
-final class AnnotatedGravityComponentView: @unchecked Sendable {
+final class AnnotatedGravityComponentView: @unchecked Sendable, AdaScriptNonSendableBridge {
     private let access: AnnotatedComponentAccess
     private let cursor: DynamicQueryCursor
     private let reportDiagnostic: @Sendable (String) -> Void

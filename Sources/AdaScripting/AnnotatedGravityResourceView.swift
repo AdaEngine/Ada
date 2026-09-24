@@ -2,7 +2,7 @@
 import Gravity
 
 @GSExportable("AdaResource")
-final class AnnotatedGravityResourceView: @unchecked Sendable {
+final class AnnotatedGravityResourceView: @unchecked Sendable, AdaScriptNonSendableBridge {
     private let fields: [String: ReflectedComponentField]
     private let parameter: DynamicResource
     private let reportDiagnostic: @Sendable (String) -> Void

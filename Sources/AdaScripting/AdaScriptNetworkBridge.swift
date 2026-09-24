@@ -19,7 +19,9 @@ enum AdaScriptNetworkBridge {
             authority: authority,
             visibility: .allPeers,
             fields: try schema.fields.compactMap { field in
-                guard let network = field.network else { return nil }
+                guard let network = field.network else {
+                    return nil
+                }
                 return NetworkFieldDescriptor(
                     tag: network.tag,
                     wireType: wireType(for: field.defaultValue),
@@ -178,7 +180,7 @@ final class AdaScriptNetworkCommandFactory: @unchecked Sendable {
 }
 
 @GSExportable("AdaMultiplayer")
-final class AdaScriptMultiplayerAPI: @unchecked Sendable {
+final class AdaScriptMultiplayerAPI: @unchecked Sendable, AdaScriptNonSendableBridge {
     @GSExportableIgnore
     private var runtime: Ref<AdaScriptNetworkRuntime>?
 

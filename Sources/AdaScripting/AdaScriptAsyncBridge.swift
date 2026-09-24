@@ -4,7 +4,7 @@ import Gravity
 
 @GSExportable("AdaAsyncResult")
 // Fields are set before publication to a worker or the VM and never mutated afterward.
-final class AdaScriptAsyncResult: @unchecked Sendable {
+final class AdaScriptAsyncResult: @unchecked Sendable, AdaScriptSuspensionSafeBridge {
     @GSExportableIgnore
     private var successful = false
 
@@ -46,7 +46,7 @@ final class AdaScriptAsyncResult: @unchecked Sendable {
 
 @GSExportable("AdaAsyncOperation")
 // Completion state and the cancellation callback are protected by `lock`.
-final class AdaScriptAsyncOperation: @unchecked Sendable {
+final class AdaScriptAsyncOperation: @unchecked Sendable, AdaScriptSuspensionSafeBridge {
     @GSExportableIgnore
     private let lock = NSLock()
 

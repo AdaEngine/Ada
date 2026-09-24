@@ -6,6 +6,23 @@ The same spelling can have different roles: `@component` declares a struct,
 while `@component(required: true)` binds an existing component to a scriptable
 instance.
 
+## Suspension policy
+
+`@nonsendable` marks a class, struct, or enum whose values must not be captured
+by an async task or delivered through an awaited result. A typed async
+parameter or async method on a marked type is rejected while compiling;
+untyped values are checked when the task is created. AdaEngine marks its
+callback-scoped world, query, resource, and input bridge types the same way.
+This is a suspension lifetime rule, separate from Swift's `Sendable` protocol.
+
+```ada
+@nonsendable
+class TemporarySelection {}
+
+// Invalid: the parameter cannot live in an async function.
+async func inspect(selection: TemporarySelection) {}
+```
+
 ## Systems and scheduling
 
 | Annotation | Target | Effect |

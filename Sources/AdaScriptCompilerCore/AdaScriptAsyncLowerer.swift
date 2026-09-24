@@ -8,7 +8,15 @@ public struct AdaScriptAsyncSyntaxError: Error, Sendable, Equatable, CustomStrin
     public var description: String { "\(path):\(line): \(message)" }
 }
 
-/// Lowers explicit AdaScript async functions to VM fibers before Gravity compilation.
+public struct AdaScriptAsyncDeclaration: Equatable, Sendable {
+    public let name: String
+    public let ownerType: String?
+    public let line: Int
+}
+
+/// Interim adapter for the pinned Gravity 0.9.9 parser, which has no async AST.
+/// Borrow rules come from `@nonsendable` type metadata and runtime bridge policy;
+/// native async syntax/effects belong in a future versioned Gravity release.
 public enum AdaScriptAsyncLowerer {
     private struct Declaration {
         let range: Range<Int>
@@ -17,31 +25,71 @@ public enum AdaScriptAsyncLowerer {
         let parameters: String
         let arguments: [String]
         let receiver: String
+        let ownerType: String?
         let line: Int
     }
 
-    public static func globalFunctionNames(source: String, path: String) throws -> Set<String> {
-        var lexer = Lexer(source: source)
-        let tokens = lexer.lex()
-        let characters = Array(source)
-        var names = Set<String>()
-        for index in tokens.indices where tokens[index].text == "async" {
-            let declaration = try parse(at: index, tokens: tokens, characters: characters, path: path)
-            if declaration.receiver.isEmpty { names.insert(declaration.name) }
-        }
-        return names
+    private struct Parameter {
+        let name: String
+        let typeName: String?
     }
 
-    public static func lower(source: String, path: String, globalAsyncNames: Set<String> = []) throws -> String {
+    private enum Scope {
+        case type(String)
+        case other
+    }
+
+    public static func globalFunctionNames(source: String, path: String) throws -> Set<String> {
+        Set(try declarations(in: source, path: path).compactMap { $0.ownerType == nil ? $0.name : nil })
+    }
+
+    public static func declarations(
+        in source: String,
+        path: String,
+        nonSendableTypes: Set<String> = []
+    ) throws -> [AdaScriptAsyncDeclaration] {
         var lexer = Lexer(source: source)
         let tokens = lexer.lex()
         let characters = Array(source)
+        let markedTypes = try nonSendableTypes.union(AdaScriptNonSendableTypes.declared(in: source, path: path))
+        var declarations: [AdaScriptAsyncDeclaration] = []
+        for index in tokens.indices where tokens[index].text == "async" {
+            let declaration = try parse(
+                at: index,
+                tokens: tokens,
+                characters: characters,
+                path: path,
+                nonSendableTypes: markedTypes
+            )
+            declarations.append(
+                AdaScriptAsyncDeclaration(name: declaration.name, ownerType: declaration.ownerType, line: declaration.line)
+            )
+        }
+        return declarations
+    }
+
+    public static func lower(
+        source: String,
+        path: String,
+        globalAsyncNames: Set<String> = [],
+        nonSendableTypes: Set<String> = []
+    ) throws -> String {
+        var lexer = Lexer(source: source)
+        let tokens = lexer.lex()
+        let characters = Array(source)
+        let markedTypes = try nonSendableTypes.union(AdaScriptNonSendableTypes.declared(in: source, path: path))
         var declarations: [Declaration] = []
         var covered = Set<Int>()
 
         for index in tokens.indices where tokens[index].text == "async" {
             guard !covered.contains(index) else { continue }
-            let declaration = try parse(at: index, tokens: tokens, characters: characters, path: path)
+            let declaration = try parse(
+                at: index,
+                tokens: tokens,
+                characters: characters,
+                path: path,
+                nonSendableTypes: markedTypes
+            )
             declarations.append(declaration)
             for tokenIndex in index..<tokens.count where declaration.range.contains(tokens[tokenIndex].startOffset) {
                 covered.insert(tokenIndex)
@@ -62,11 +110,21 @@ public enum AdaScriptAsyncLowerer {
             let implementation = "__ada_async_impl_\(declaration.name)_\(declaration.range.lowerBound)"
             let call = "\(declaration.receiver)\(implementation)(\(declaration.arguments.joined(separator: ", ")))"
             let capturedReceiver = declaration.receiver.isEmpty ? "" : "var __ada_receiver = self;\n    "
+            let capturedValues = (declaration.receiver.isEmpty ? [] : ["__ada_receiver"]) + declaration.arguments
             let replacement = """
             func \(declaration.name)(\(declaration.parameters)) {
                 \(capturedReceiver)var __ada_task = __AdaTask();
+                if (!__adaTasks.validateCapture([\(capturedValues.joined(separator: ", "))])) {
+                    __ada_task.cancel();
+                    return __ada_task;
+                }
                 __ada_task.fiber = Fiber.create({
-                    __ada_task.value = \(call);
+                    var __ada_result = \(call);
+                    if (!__adaTasks.validateCapture([__ada_result])) {
+                        __ada_task.cancel();
+                        return;
+                    }
+                    __ada_task.value = __ada_result;
                     __ada_task.done = true;
                 });
                 return __ada_task;
@@ -78,7 +136,13 @@ public enum AdaScriptAsyncLowerer {
         return String(result)
     }
 
-    private static func parse(at index: Int, tokens: [Token], characters: [Character], path: String) throws -> Declaration {
+    private static func parse(
+        at index: Int,
+        tokens: [Token],
+        characters: [Character],
+        path: String,
+        nonSendableTypes: Set<String>
+    ) throws -> Declaration {
         let token = tokens[index]
         guard tokens.indices.contains(index + 3), tokens[index + 1].text == "func",
               tokens[index + 2].kind == .identifier, tokens[index + 3].text == "(",
@@ -87,22 +151,23 @@ public enum AdaScriptAsyncLowerer {
               let closeBody = closing(closeParameters + 1, tokens: tokens, open: "{", close: "}") else {
             throw error(path, token.line, "expected 'async func name(...) { ... }'")
         }
-        let method = try isMethod(at: index, tokens: tokens, path: path)
+        let ownerType = try enclosingType(at: index, tokens: tokens, path: path)
         let name = tokens[index + 2].text
-        if method && ["update", "fixedUpdate", "ready", "event", "body", "destroy"].contains(name) {
-            throw error(path, token.line, "engine lifecycle method '\(name)' must remain synchronous")
+        if let ownerType, nonSendableTypes.contains(ownerType) {
+            throw error(path, token.line, "async method captures @nonsendable type '\(ownerType)'")
         }
-        let arguments = try parameterNames(Array(tokens[(index + 4)..<closeParameters]), path: path, line: token.line)
-        if arguments.contains("context") {
-            throw error(path, token.line, "borrowed callback context cannot enter an async func")
+        let parameters = try parameterDeclarations(Array(tokens[(index + 4)..<closeParameters]), path: path, line: token.line)
+        if let forbidden = parameters.first(where: { $0.typeName.map(nonSendableTypes.contains) == true }) {
+            throw error(path, token.line, "async parameter '\(forbidden.name)' has @nonsendable type '\(forbidden.typeName ?? "")'")
         }
         return Declaration(
             range: token.startOffset..<tokens[closeBody].endOffset,
             body: tokens[closeParameters + 1].startOffset..<tokens[closeBody].endOffset,
             name: name,
             parameters: String(characters[tokens[index + 3].endOffset..<tokens[closeParameters].startOffset]),
-            arguments: arguments,
-            receiver: method ? "__ada_receiver." : "",
+            arguments: parameters.map(\.name),
+            receiver: ownerType == nil ? "" : "__ada_receiver.",
+            ownerType: ownerType,
             line: token.line
         )
     }
@@ -113,7 +178,7 @@ public enum AdaScriptAsyncLowerer {
         tokens: [Token],
         path: String
     ) throws {
-        let globalNames = globalAsyncNames.union(declarations.filter { $0.receiver.isEmpty }.map(\.name))
+        let globalNames = globalAsyncNames.union(declarations.filter { $0.ownerType == nil }.map(\.name))
         guard !globalNames.isEmpty else {
             return
         }
@@ -126,20 +191,22 @@ public enum AdaScriptAsyncLowerer {
             guard awaited || started else {
                 throw error(path, tokens[index].line, "async call '\(tokens[index].text)' requires await or Tasks.start")
             }
-            if let close = closing(index + 1, tokens: tokens, open: "(", close: ")"), close > index + 2,
-               tokens[(index + 2)..<close].contains(where: { $0.text == "context" }) {
-                throw error(path, tokens[index].line, "borrowed callback context cannot be passed to an async func")
-            }
         }
     }
 
-    private static func isMethod(at index: Int, tokens: [Token], path: String) throws -> Bool {
-        var scopes: [Bool] = []
+    private static func enclosingType(at index: Int, tokens: [Token], path: String) throws -> String? {
+        var scopes: [Scope] = []
         var segment = 0
         for cursor in 0..<index {
             switch tokens[cursor].text {
             case "{":
-                scopes.append(tokens[segment..<cursor].contains(where: { $0.text == "class" }))
+                let declaration = tokens[segment..<cursor]
+                let typeIndex = declaration.firstIndex(where: { ["class", "struct", "enum"].contains($0.text) })
+                if let typeIndex, tokens.indices.contains(typeIndex + 1), tokens[typeIndex + 1].kind == .identifier {
+                    scopes.append(.type(tokens[typeIndex + 1].text))
+                } else {
+                    scopes.append(.other)
+                }
                 segment = cursor + 1
             case "}":
                 guard !scopes.isEmpty else { throw error(path, tokens[cursor].line, "unbalanced braces") }
@@ -149,15 +216,21 @@ public enum AdaScriptAsyncLowerer {
             default: break
             }
         }
-        if scopes.last == false { throw error(path, tokens[index].line, "nested async func is not supported") }
-        return scopes.last == true
+        guard let scope = scopes.last else {
+            return nil
+        }
+        if case let .type(name) = scope {
+            return name
+        } else {
+            throw error(path, tokens[index].line, "nested async func is not supported")
+        }
     }
 
-    private static func parameterNames(_ tokens: [Token], path: String, line: Int) throws -> [String] {
+    private static func parameterDeclarations(_ tokens: [Token], path: String, line: Int) throws -> [Parameter] {
         guard !tokens.isEmpty else {
             return []
         }
-        var names: [String] = []
+        var parameters: [Parameter] = []
         var start = 0
         var depth = 0
         for cursor in 0...tokens.count {
@@ -169,10 +242,12 @@ public enum AdaScriptAsyncLowerer {
             guard start < cursor, tokens[start].kind == .identifier else {
                 throw error(path, line, "async parameters require named identifiers")
             }
-            names.append(tokens[start].text)
+            let typeIndex = tokens[start..<cursor].firstIndex(where: { $0.text == ":" }).map { $0 + 1 }
+            let typeName = typeIndex.flatMap { tokens.indices.contains($0) && $0 < cursor && tokens[$0].kind == .identifier ? tokens[$0].text : nil }
+            parameters.append(Parameter(name: tokens[start].text, typeName: typeName))
             start = cursor + 1
         }
-        return names
+        return parameters
     }
 
     private static func lowerAwaits(_ source: String, path: String, firstLine: Int) throws -> String {

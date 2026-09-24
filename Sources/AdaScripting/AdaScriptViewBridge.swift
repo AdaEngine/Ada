@@ -5,7 +5,7 @@ import Foundation
 import Gravity
 
 @GSExportable("__AdaUIView")
-final class AdaScriptViewBridge: @unchecked Sendable {
+final class AdaScriptViewBridge: @unchecked Sendable, AdaScriptNonSendableBridge {
     @GSExportableIgnore
     let model: AdaScriptViewModel
 

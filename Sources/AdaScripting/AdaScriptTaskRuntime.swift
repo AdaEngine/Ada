@@ -40,6 +40,9 @@ final class AdaScriptTaskRuntime: @unchecked Sendable {
     private var reportDiagnostic: @Sendable (String) -> Void = { _ in }
 
     @GSExportableIgnore
+    private var suspensionPolicy: AdaScriptSuspensionPolicy?
+
+    @GSExportableIgnore
     private let maximumTasks = 1024
 
     @GSExportableIgnore
@@ -51,12 +54,28 @@ final class AdaScriptTaskRuntime: @unchecked Sendable {
     @GSExportableIgnore
     static func make(
         virtualMachine: GravityVirtualMachine,
-        reportDiagnostic: @escaping @Sendable (String) -> Void
+        reportDiagnostic: @escaping @Sendable (String) -> Void,
+        suspensionPolicy: AdaScriptSuspensionPolicy
     ) -> AdaScriptTaskRuntime {
         let runtime = AdaScriptTaskRuntime()
         runtime.virtualMachine = virtualMachine
         runtime.reportDiagnostic = reportDiagnostic
+        runtime.suspensionPolicy = suspensionPolicy
         return runtime
+    }
+
+    func validateCapture(_ values: GSValue) -> Bool {
+        guard values.isList, let suspensionPolicy else {
+            reportDiagnostic("ADASCRIPT_NONSENDABLE invalid suspension capture")
+            return false
+        }
+        for value in values.toList {
+            if let reason = suspensionPolicy.validate(value) {
+                reportDiagnostic("ADASCRIPT_NONSENDABLE \(reason)")
+                return false
+            }
+        }
+        return true
     }
 
     /// Registers a task; script execution begins at the next dispatch point.
@@ -239,6 +258,7 @@ enum AdaScriptTaskPrelude {
 
         func complete(value) {
             if (done || cancelled) { return false; }
+            if (!__adaTasks.validateCapture([value])) { return false; }
             self.value = value;
             done = true;
             __adaTasks.wake();
@@ -276,6 +296,7 @@ enum AdaScriptTaskPrelude {
 
     class Tasks {
         static func start(task) {
+            if (task.cancelled) { return task; }
             if (!task.started) {
                 var identifier = __adaTasks.start(task);
                 if (identifier < 0) { task.cancel(); return task; }

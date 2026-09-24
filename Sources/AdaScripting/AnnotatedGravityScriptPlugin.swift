@@ -85,6 +85,12 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             resourceBindings: resourceBindings,
             systemCapabilities: capabilities
         )
+        for plan in plans {
+            try module.requireSynchronousCallback(className: plan.className, method: "update", annotation: "@system")
+        }
+        for binding in rpcMethodBindings {
+            try module.requireSynchronousCallback(className: binding.systemName, method: binding.commandName, annotation: "@rpc")
+        }
         if let startupSystemIdentifier {
             guard let startupIndex = plans.firstIndex(where: { $0.identifier == startupSystemIdentifier }) else {
                 throw AdaScriptError.invalidManifest(
@@ -639,26 +645,31 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
 
         let virtualMachine = GravityVirtualMachine(settings: .init(), delegate: delegate)
         self.virtualMachine = virtualMachine
-        let taskRuntime = AdaScriptTaskRuntime.make(virtualMachine: virtualMachine, reportDiagnostic: delegate.append)
+        let suspensionPolicy = AdaScriptSuspensionPolicy(scriptNonSendableTypes: module.nonSendableTypeNames)
+        let taskRuntime = AdaScriptTaskRuntime.make(
+            virtualMachine: virtualMachine,
+            reportDiagnostic: delegate.append,
+            suspensionPolicy: suspensionPolicy
+        )
         self.taskRuntime = taskRuntime
         let asyncHost = AdaScriptAsyncHost()
         self.asyncHost = asyncHost
         asyncHost.onWake = { taskRuntime.wake() }
         asyncHost.ownerProvider = { taskRuntime.currentOwnerID }
         try virtualMachine.bindClass(with: AdaScriptTaskRuntime.self)
-        try virtualMachine.bindClass(with: AdaScriptAsyncResult.self)
-        try virtualMachine.bindClass(with: AdaScriptAsyncOperation.self)
+        try suspensionPolicy.bindSafe(AdaScriptAsyncResult.self, to: virtualMachine)
+        try suspensionPolicy.bindSafe(AdaScriptAsyncOperation.self, to: virtualMachine)
         try virtualMachine.bindClass(with: AdaScriptAsyncHost.self)
-        try virtualMachine.bindClass(with: AdaScriptSaveWriter.self)
-        try virtualMachine.bindClass(with: AnnotatedGravitySystemContext.self)
-        try virtualMachine.bindClass(with: AdaScriptInputBridge.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityWorldContext.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityCommandsBridge.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityQueryBridge.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityQueryRow.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityComponentView.self)
-        try virtualMachine.bindClass(with: AnnotatedGravityResourceView.self)
-        try virtualMachine.bindClass(with: AdaScriptMultiplayerAPI.self)
+        try suspensionPolicy.bindSafe(AdaScriptSaveWriter.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravitySystemContext.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AdaScriptInputBridge.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityWorldContext.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityCommandsBridge.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityQueryBridge.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityQueryRow.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityComponentView.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AnnotatedGravityResourceView.self, to: virtualMachine)
+        try suspensionPolicy.bindBorrowed(AdaScriptMultiplayerAPI.self, to: virtualMachine)
         try virtualMachine.bindClass(with: AdaScriptNetworkCommandFactory.self)
         try virtualMachine.bindClass(with: AdaScriptNetworkCommandValue.self)
         try virtualMachine.bindClass(with: AdaScriptNetworkValueBridge.self)

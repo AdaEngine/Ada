@@ -48,6 +48,17 @@ struct ResolvedGravityScriptModule: Sendable {
     let entrySource: String
     let sourcesByPath: [String: Source]
     let pathsByFileID: [UInt32: String]
+    let nonSendableTypeNames: Set<String>
+    let asyncDeclarations: [AdaScriptAsyncDeclaration]
+
+    func requireSynchronousCallback(className: String, method: String, annotation: String) throws {
+        guard let declaration = asyncDeclarations.first(where: { $0.ownerType == className && $0.name == method }) else {
+            return
+        }
+        throw AdaScriptError.invalidManifest(
+            "\(annotation) callback '\(className).\(method)' at line \(declaration.line) cannot be async"
+        )
+    }
 }
 
 enum GravityScriptModuleResolver {
@@ -87,12 +98,31 @@ enum GravityScriptModuleResolver {
         }
 
         var globalAsyncNames = Set<String>()
+        var nonSendableTypeNames = Set<String>()
         for path in orderedPaths {
             guard let source = sourceByPath[path] else {
                 continue
             }
             do {
-                globalAsyncNames.formUnion(try AdaScriptAsyncLowerer.globalFunctionNames(source: source.source, path: path))
+                nonSendableTypeNames.formUnion(try AdaScriptNonSendableTypes.declared(in: source.source, path: path))
+            } catch let error as AdaScriptAsyncSyntaxError {
+                throw AdaScriptError.invalidManifest(error.description)
+            }
+        }
+
+        var asyncDeclarations: [AdaScriptAsyncDeclaration] = []
+        for path in orderedPaths {
+            guard let source = sourceByPath[path] else {
+                continue
+            }
+            do {
+                let declarations = try AdaScriptAsyncLowerer.declarations(
+                    in: source.source,
+                    path: path,
+                    nonSendableTypes: nonSendableTypeNames
+                )
+                asyncDeclarations += declarations
+                globalAsyncNames.formUnion(declarations.compactMap { $0.ownerType == nil ? $0.name : nil })
             } catch let error as AdaScriptAsyncSyntaxError {
                 throw AdaScriptError.invalidManifest(error.description)
             }
@@ -116,7 +146,8 @@ enum GravityScriptModuleResolver {
                 loweredAsyncSource = try AdaScriptAsyncLowerer.lower(
                     source: loweredAssetsSource,
                     path: path,
-                    globalAsyncNames: reachablePaths.contains(path) ? globalAsyncNames : []
+                    globalAsyncNames: reachablePaths.contains(path) ? globalAsyncNames : [],
+                    nonSendableTypes: reachablePaths.contains(path) ? nonSendableTypeNames : []
                 )
             } catch let error as AdaScriptAsyncSyntaxError {
                 throw AdaScriptError.invalidManifest(error.description)
@@ -155,7 +186,9 @@ enum GravityScriptModuleResolver {
         return ResolvedGravityScriptModule(
             entrySource: entrySource,
             sourcesByPath: sourcesByPath,
-            pathsByFileID: pathsByFileID
+            pathsByFileID: pathsByFileID,
+            nonSendableTypeNames: nonSendableTypeNames,
+            asyncDeclarations: asyncDeclarations
         )
     }
 

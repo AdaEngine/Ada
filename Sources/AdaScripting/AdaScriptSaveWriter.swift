@@ -5,7 +5,7 @@ import Gravity
 @GSExportable("AdaSaveWriter")
 // VM-owned configuration is published once; cancellation is locked and file
 // operations are serialized by AdaScriptSaveStreamState.
-final class AdaScriptSaveWriter: @unchecked Sendable {
+final class AdaScriptSaveWriter: @unchecked Sendable, AdaScriptSuspensionSafeBridge {
     @GSExportableIgnore
     private var state: AdaScriptSaveStreamState?
 

@@ -505,16 +505,20 @@ struct AdaScriptAsyncTests {
         AsyncPosition.registerComponent()
         let plugin = try AdaScriptPlugin(source: """
         var started = false;
-        async func writeLater(row) {
+        var retained = null;
+        async func writeLater() {
             await Tasks.nextFrame();
-            row.asyncPosition.value = 9;
+            retained.asyncPosition.value = 9;
         }
         @system class BorrowSystem {
             @query(AsyncPosition) var positions;
             func update(context) {
                 if (!started) {
                     started = true;
-                    for (var row in positions) { Tasks.start(writeLater(row)); }
+                    for (var row in positions) {
+                        retained = row;
+                        Tasks.start(writeLater());
+                    }
                 }
             }
         }

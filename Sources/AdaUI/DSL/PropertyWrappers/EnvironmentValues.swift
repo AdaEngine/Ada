@@ -26,13 +26,13 @@ public struct Environment<Value>: PropertyStoragable, UpdatableProperty {
     public init(_ keyPath: KeyPath<EnvironmentValues, Value>) {
         // Record which environment keys this wrapper reads so the node can skip
         // invalidation when only unrelated keys change (Phase 4 subscription tracking).
-        var capturedIDs = Set<ObjectIdentifier>()
-        EnvironmentValues._recordKeyAccess = { capturedIDs.insert($0) }
-        _ = EnvironmentValues()[keyPath: keyPath]
-        EnvironmentValues._recordKeyAccess = nil
+        let recorder = EnvironmentKeyAccessRecorder()
+        EnvironmentValues.$_recordKeyAccess.withValue(recorder) {
+            _ = EnvironmentValues()[keyPath: keyPath]
+        }
 
         let storage = ViewContextStorage()
-        storage.subscribedKeyIDs = capturedIDs
+        storage.subscribedKeyIDs = recorder.capturedKeys
         self.container = storage
         self.readValue = { $0.values[keyPath: keyPath] }
     }
@@ -42,13 +42,13 @@ public struct Environment<Value>: PropertyStoragable, UpdatableProperty {
 
 extension Environment where Value: Observable & AnyObject {
     public init(_ observable: Value.Type) where Value: Observable & AnyObject {
-        var capturedIDs = Set<ObjectIdentifier>()
-        EnvironmentValues._recordKeyAccess = { capturedIDs.insert($0) }
-        _ = EnvironmentValues().observableStorage
-        EnvironmentValues._recordKeyAccess = nil
+        let recorder = EnvironmentKeyAccessRecorder()
+        EnvironmentValues.$_recordKeyAccess.withValue(recorder) {
+            _ = EnvironmentValues().observableStorage
+        }
 
         let storage = ViewContextStorage()
-        storage.subscribedKeyIDs = capturedIDs
+        storage.subscribedKeyIDs = recorder.capturedKeys
         self.container = storage
         self.readValue = { container in
             // Return the injected observable directly.

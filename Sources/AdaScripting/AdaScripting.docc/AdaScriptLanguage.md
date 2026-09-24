@@ -341,6 +341,14 @@ replaces the destination only after `finishAsync()` succeeds. Build large ECS
 snapshots in bounded pieces; do not retain a query row or live component view
 in a task.
 
+Mark a script-owned type with `@nonsendable` when its instances are tied to a
+callback or another short lifetime. AdaScript rejects a typed async parameter
+or method that would capture that type. Before a task starts, the runtime also
+checks actual arguments, nested lists, returned values, and promise results;
+this catches borrowed engine values passed through an untyped alias. Maps are
+conservatively rejected until their entries can be inspected. See
+<doc:AdaScriptAnnotations>.
+
 `await Time.sleep(seconds)` advances with the scheduler's `deltaTime` and stops
 advancing when that scheduler is paused. AdaEngine does not yet expose a
 separate game time-scale resource.

@@ -23,30 +23,34 @@ struct AdaScriptAsyncLowererTests {
         }
     }
 
-    @Test("Rejects an async lifecycle callback and borrowed context parameter")
-    func rejectsUnsafeSignatures() {
+    @Test("Ordinary method and parameter names carry no suspension policy")
+    func allowsOrdinaryNames() throws {
+        let lowered = try AdaScriptAsyncLowerer.lower(
+            source: "class S { async func update(context) { await Tasks.nextFrame(); } }",
+            path: "Ordinary.ada"
+        )
+        #expect(lowered.contains("__ada_async_impl_update"))
+    }
+
+    @Test("Rejects async parameters and receivers with @nonsendable types")
+    func rejectsNonSendableTypes() {
         #expect(throws: AdaScriptAsyncSyntaxError.self) {
-            try AdaScriptAsyncLowerer.lower(source: "class S { async func update(context) {} }", path: "Invalid.ada")
+            try AdaScriptAsyncLowerer.lower(source: """
+            @nonsendable class Borrowed {}
+            async func hold(value: Borrowed) { await Tasks.nextFrame(); }
+            """, path: "Invalid.ada")
         }
         #expect(throws: AdaScriptAsyncSyntaxError.self) {
-            try AdaScriptAsyncLowerer.lower(source: "async func hold(context) { await Tasks.nextFrame(); }", path: "Invalid.ada")
+            try AdaScriptAsyncLowerer.lower(source: "@nonsendable class Borrowed { async func work() {} }", path: "Invalid.ada")
         }
     }
 
-    @Test("Rejects unawaited calls and borrowed arguments")
-    func rejectsUnsafeCalls() {
+    @Test("Rejects unawaited calls")
+    func rejectsUnawaitedCalls() {
         #expect(throws: AdaScriptAsyncSyntaxError.self) {
             try AdaScriptAsyncLowerer.lower(source: """
             async func work() { return 1; }
             func start() { work(); }
-            """, path: "Invalid.ada")
-        }
-        #expect(throws: AdaScriptAsyncSyntaxError.self) {
-            try AdaScriptAsyncLowerer.lower(source: """
-            async func work(value) { return value; }
-            @system class S {
-                func update(context) { Tasks.start(work(context)); }
-            }
             """, path: "Invalid.ada")
         }
     }
