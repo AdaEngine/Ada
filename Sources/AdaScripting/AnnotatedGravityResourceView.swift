@@ -7,6 +7,7 @@ final class AnnotatedGravityResourceView: @unchecked Sendable {
     private let parameter: DynamicResource
     private let reportDiagnostic: @Sendable (String) -> Void
     private let virtualMachine: GravityVirtualMachine
+    private var isActive = true
 
     @GSExportableIgnore
     static func make(
@@ -36,10 +37,18 @@ final class AnnotatedGravityResourceView: @unchecked Sendable {
     }
 
     func available() -> Bool {
-        parameter.isAvailable
+        guard isActive else {
+            reportDiagnostic("Resource view is no longer valid")
+            return false
+        }
+        return parameter.isAvailable
     }
 
     func get(_ fieldName: String) -> GSValue {
+        guard isActive else {
+            reportDiagnostic("Resource view is no longer valid")
+            return GSValue(nullIn: virtualMachine)
+        }
         guard let field = fields[fieldName], let value = parameter.read(field: field) else {
             reportDiagnostic("Unknown or unavailable resource field '\(fieldName)'")
             return GSValue(nullIn: virtualMachine)
@@ -49,6 +58,10 @@ final class AnnotatedGravityResourceView: @unchecked Sendable {
 
     @discardableResult
     func set(_ fieldName: String, _ value: GSValue) -> Bool {
+        guard isActive else {
+            reportDiagnostic("Resource view is no longer valid")
+            return false
+        }
         guard let field = fields[fieldName] else {
             reportDiagnostic("Unknown resource field '\(fieldName)'")
             return false
@@ -62,4 +75,7 @@ final class AnnotatedGravityResourceView: @unchecked Sendable {
         }
         return true
     }
+
+    @GSExportableIgnore
+    func invalidate() { isActive = false }
 }

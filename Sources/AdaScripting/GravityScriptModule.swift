@@ -52,32 +52,21 @@ struct ResolvedGravityScriptModule: Sendable {
 
 enum GravityScriptModuleResolver {
     static func resolve(_ sources: [AdaScriptSource]) throws -> ResolvedGravityScriptModule {
-        var parsedSources: [String: ParsedSource] = [:]
+        var sourceByPath: [String: AdaScriptSource] = [:]
+        var preliminarySources: [String: ParsedSource] = [:]
         for source in sources {
             let path = try canonicalSourcePath(source.path)
-            guard parsedSources[path] == nil else {
+            guard sourceByPath[path] == nil else {
                 throw AdaScriptError.duplicateSourcePath(path)
             }
-            let loweredViewSource: String
-            do {
-                loweredViewSource = try AdaScriptViewBuilderLowerer.lower(source: source.source, path: path)
-            } catch let error as AdaScriptViewBuilderError {
-                throw AdaScriptError.invalidManifest(error.description)
-            }
-            let loweredAssetsSource = AdaScriptAssetsLowerer.lower(source: loweredViewSource)
-            let schemas = try AdaScriptSchemaParser.parse(sources: [source])
-            let loweredComponentSource = AdaScriptComponentLowerer.lower(
-                source: loweredAssetsSource,
-                schemas: schemas
-            )
-            let loweredSource = AdaScriptNetworkLowerer.lower(source: loweredComponentSource)
-            var scanner = AdaScriptSourceScanner(source: loweredSource, path: path)
-            parsedSources[path] = try scanner.scan()
+            sourceByPath[path] = source
+            var scanner = AdaScriptSourceScanner(source: source.source, path: path)
+            preliminarySources[path] = try scanner.scan()
         }
 
-        let sortedPaths = parsedSources.keys.sorted()
+        let sortedPaths = sourceByPath.keys.sorted()
         let discoveryRoots = sortedPaths.filter { path in
-            guard let annotations = parsedSources[path]?.annotations else {
+            guard let annotations = preliminarySources[path]?.annotations else {
                 return false
             }
             return !annotations.isDisjoint(with: rootAnnotations)
@@ -90,11 +79,56 @@ enum GravityScriptModuleResolver {
         for root in roots {
             try visit(
                 root,
-                parsedSources: parsedSources,
+                parsedSources: preliminarySources,
                 states: &states,
                 stack: &stack,
                 orderedPaths: &orderedPaths
             )
+        }
+
+        var globalAsyncNames = Set<String>()
+        for path in orderedPaths {
+            guard let source = sourceByPath[path] else {
+                continue
+            }
+            do {
+                globalAsyncNames.formUnion(try AdaScriptAsyncLowerer.globalFunctionNames(source: source.source, path: path))
+            } catch let error as AdaScriptAsyncSyntaxError {
+                throw AdaScriptError.invalidManifest(error.description)
+            }
+        }
+
+        let reachablePaths = Set(orderedPaths)
+        var parsedSources: [String: ParsedSource] = [:]
+        for path in sortedPaths {
+            guard let source = sourceByPath[path] else {
+                continue
+            }
+            let loweredViewSource: String
+            do {
+                loweredViewSource = try AdaScriptViewBuilderLowerer.lower(source: source.source, path: path)
+            } catch let error as AdaScriptViewBuilderError {
+                throw AdaScriptError.invalidManifest(error.description)
+            }
+            let loweredAssetsSource = AdaScriptAssetsLowerer.lower(source: loweredViewSource)
+            let loweredAsyncSource: String
+            do {
+                loweredAsyncSource = try AdaScriptAsyncLowerer.lower(
+                    source: loweredAssetsSource,
+                    path: path,
+                    globalAsyncNames: reachablePaths.contains(path) ? globalAsyncNames : []
+                )
+            } catch let error as AdaScriptAsyncSyntaxError {
+                throw AdaScriptError.invalidManifest(error.description)
+            }
+            let schemas = try AdaScriptSchemaParser.parse(sources: [source])
+            let loweredComponentSource = AdaScriptComponentLowerer.lower(
+                source: loweredAsyncSource,
+                schemas: schemas
+            )
+            let loweredSource = AdaScriptNetworkLowerer.lower(source: loweredComponentSource)
+            var scanner = AdaScriptSourceScanner(source: loweredSource, path: path)
+            parsedSources[path] = try scanner.scan()
         }
 
         var sourcesByPath: [String: ResolvedGravityScriptModule.Source] = [:]

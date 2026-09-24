@@ -15,19 +15,20 @@ public enum AdaScriptAssetsLowerer {
         var typedCalls: [Int: (typeName: String, annotationRange: Range<Int>)] = [:]
 
         for index in tokens.indices where tokens[index].text == "var" {
+            let assetStart = tokens.indices.contains(index + 5) && tokens[index + 5].text == "await" ? index + 6 : index + 5
             guard
-                tokens.indices.contains(index + 8),
+                tokens.indices.contains(assetStart + 3),
                 tokens[index + 2].text == ":",
                 tokens[index + 3].kind == .identifier,
                 tokens[index + 4].text == "=",
-                tokens[index + 5].text == "Assets",
-                tokens[index + 6].text == ".",
-                ["load", "preload"].contains(tokens[index + 7].text),
-                tokens[index + 8].text == "("
+                tokens[assetStart].text == "Assets",
+                tokens[assetStart + 1].text == ".",
+                ["load", "preload", "loadAsync"].contains(tokens[assetStart + 2].text),
+                tokens[assetStart + 3].text == "("
             else {
                 continue
             }
-            typedCalls[index + 5] = (
+            typedCalls[assetStart] = (
                 typeName: tokens[index + 3].text,
                 annotationRange: tokens[index + 2].startOffset..<tokens[index + 3].endOffset
             )
@@ -37,31 +38,37 @@ public enum AdaScriptAssetsLowerer {
             guard
                 tokens.indices.contains(index + 3),
                 tokens[index + 1].text == ".",
-                ["load", "preload", "save"].contains(tokens[index + 2].text),
+                ["load", "preload", "save", "loadAsync", "saveAsync"].contains(tokens[index + 2].text),
                 tokens[index + 3].text == "(",
                 let closingIndex = matchingClosingParenthesis(openingAt: index + 3, tokens: tokens)
             else {
                 continue
             }
             let operation: String
+            let isAsync = tokens[index + 2].text.hasSuffix("Async")
             if let typed = typedCalls[index] {
-                operation = "\"loadTyped\", \"\(typed.typeName)\", "
+                operation = "\"\(isAsync ? "loadTypedAsync" : "loadTyped")\", \"\(typed.typeName)\", "
                 replacements.append(
                     Replacement(endOffset: typed.annotationRange.upperBound, source: "", startOffset: typed.annotationRange.lowerBound)
                 )
             } else {
-                operation = tokens[index + 2].text == "save" ? "\"save\", " : "\"load\", "
+                operation = "\"\(isAsync ? tokens[index + 2].text : (tokens[index + 2].text == "save" ? "save" : "load"))\", "
             }
             replacements.append(
                 Replacement(
                     endOffset: tokens[index + 3].endOffset,
-                    source: "__adaAssets.perform([\(operation)",
+                    source: isAsync ? "__adaTaskFromOperation(__adaAssets.begin([\(operation)" : "__adaAssets.perform([\(operation)",
                     startOffset: tokens[index].startOffset
                 )
             )
             replacements.append(
                 Replacement(endOffset: tokens[closingIndex].startOffset, source: "]", startOffset: tokens[closingIndex].startOffset)
             )
+            if isAsync {
+                replacements.append(
+                    Replacement(endOffset: tokens[closingIndex].endOffset, source: ")", startOffset: tokens[closingIndex].endOffset)
+                )
+            }
         }
 
         var result = characters

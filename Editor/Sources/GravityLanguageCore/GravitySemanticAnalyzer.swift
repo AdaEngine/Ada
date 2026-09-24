@@ -127,7 +127,7 @@ enum GravitySemanticAnalyzer {
     }
 
     private static let keywords: Set<String> = [
-        "break", "case", "class", "const", "continue", "else", "enum", "event", "extern", "false", "for", "func", "if", "import", "in", "null",
+        "async", "await", "break", "case", "class", "const", "continue", "else", "enum", "event", "extern", "false", "for", "func", "if", "import", "in", "null",
         "private", "public", "repeat", "return", "static", "struct", "switch", "true", "var", "while",
     ]
 }
