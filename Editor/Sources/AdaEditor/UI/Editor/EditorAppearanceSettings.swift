@@ -80,11 +80,14 @@ final class EditorAppearanceSettings {
 
 struct EditorCodeDisplaySettings: View {
     var settings: EditorAppearanceSettings = .shared
+    @Environment(\.theme) private var theme
 
     var body: some View {
-        EditorSettingsToggleRow(title: "Show indentation marks", isOn: settings.showsIndentationMarkers) {
-            settings.showsIndentationMarkers.toggle()
-        }
+        Toggle("Show indentation marks", isOn: Binding(
+            get: { settings.showsIndentationMarkers },
+            set: { settings.showsIndentationMarkers = $0 }
+        ))
+        .toggleStyle(.editorSettings(colors: theme.editorColors))
         .accessibilityIdentifier("AdaEditor.Settings.IndentationMarkers")
     }
 }
@@ -95,9 +98,11 @@ struct EditorAgentGlowSettings: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            EditorSettingsToggleRow(title: "Agent activity glow", isOn: settings.agentActivityGlowEnabled) {
-                settings.agentActivityGlowEnabled.toggle()
-            }
+            Toggle("Agent activity glow", isOn: Binding(
+                get: { settings.agentActivityGlowEnabled },
+                set: { settings.agentActivityGlowEnabled = $0 }
+            ))
+            .toggleStyle(.editorSettings(colors: theme.editorColors))
             .accessibilityIdentifier("AdaEditor.Settings.AgentActivityGlow")
             Text("Show colored window edges while an agent works or needs attention. Applies immediately to all editor windows.")
                 .font(.system(size: 11))

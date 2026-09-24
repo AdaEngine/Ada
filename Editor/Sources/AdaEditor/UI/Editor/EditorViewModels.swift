@@ -257,6 +257,7 @@ struct EditorTextDocument: Equatable, Sendable {
     var sourceHoverRange: EditorSourceRange?
     var sourceHoverDescription: String?
     var focusedRange: EditorSourceRange?
+    var activeSnippetPlaceholder: EditorSourceRange?
     var selectionRange: EditorSourceRange?
     var selectedText: String?
     var symbolDocumentation: String?

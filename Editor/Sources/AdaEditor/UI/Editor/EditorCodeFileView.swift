@@ -21,6 +21,7 @@ struct EditorCodeFileView: View {
     let onApplyCompletion: ((EditorCompletionItem, EditorTextDocument) -> Void)?
     let onMoveCompletionSelection: ((EditorTextDocument, Int) -> Bool)?
     let onAcceptCompletion: ((EditorTextDocument) -> Bool)?
+    var onAcceptSnippetPlaceholder: ((EditorTextDocument, EditorSourceRange?) -> Bool)? = nil
     let onTextSelection: ((EditorTextDocument, EditorSourceRange?, String?) -> Void)?
     let onChatSelection: ((EditorTextDocument, EditorSourceRange, String) -> Void)?
     let sourceContextMenuItems: ((EditorTextDocument, EditorSourceLocation) -> [TextEditorContextMenuItem])?
@@ -350,6 +351,9 @@ extension EditorCodeFileView {
                     return false
                 }
                 return onAcceptCompletion?(document) ?? false
+            },
+            onAcceptPlaceholder: { selection in
+                onAcceptSnippetPlaceholder?(document, selection.map(EditorSourceRange.init(textEditorRange:))) ?? false
             },
             onSelectionChange: { range, text in
                 onTextSelection?(document, range.map { EditorSourceRange(textEditorRange: $0) }, text)
@@ -1646,7 +1650,7 @@ enum EditorSyntaxHighlighter {
     ]
 
     private static let gravityKeywords: Set<String> = [
-        "_args", "_func", "and", "break", "case", "class", "const", "continue", "default", "else", "enum", "event", "extern", "false",
+        "_args", "_func", "and", "async", "await", "break", "case", "class", "const", "continue", "default", "else", "enum", "event", "extern", "false",
         "file", "for", "func", "if", "import", "in", "internal", "is", "lazy", "module", "not", "null", "or", "private", "public", "repeat",
         "return", "static", "struct", "super", "switch", "true", "undefined", "var", "while",
     ]

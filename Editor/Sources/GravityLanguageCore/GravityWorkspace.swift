@@ -68,9 +68,10 @@ public final class GravityWorkspace {
 
     public func analysis(for uri: String) -> GravityDocumentAnalysis? {
         let key = Self.documentKey(uri)
-        guard var analysis = (openDocuments[key] ?? diskDocuments[key])?.analysis else {
+        guard let document = openDocuments[key] ?? diskDocuments[key] else {
             return nil
         }
+        var analysis = languageService.analyze(text: document.text, workspaceSymbols: workspaceSymbols(for: key))
         analysis.diagnostics += importDiagnostics(uri: key, imports: analysis.imports)
         return analysis
     }
@@ -393,7 +394,7 @@ public final class GravityWorkspace {
     }
 
     private func document(text: String, version: Int?) -> Document {
-        Document(analysis: languageService.analyze(text: text), text: text, version: version)
+        Document(analysis: GravityDocumentAnalyzer.parse(text).analysis, text: text, version: version)
     }
 
     private func reloadDiskDocuments() {

@@ -1,10 +1,131 @@
 import Foundation
+@testable import AdaEditor
 import GravityLanguageCore
 import GravityLanguageServerProtocol
 import Testing
 
 @Suite("AdaScript live diagnostics and navigation")
 struct GravityDiagnosticsNavigationTests {
+    @Test("Unknown call argument is diagnosed without compiling")
+    func unknownSpawnArgument() throws {
+        let source = """
+            @system(scheduler: "update", id: "game.main")
+            class MainSystem {
+                func update(context: AdaSystemContext) {
+                    // Add gameplay here.
+                    context.world.spawn(components)
+                }
+            }
+            """
+        let diagnostic = try #require(GravityLanguageService().analyze(text: source).diagnostics.first)
+        let line = "        context.world.spawn(components)"
+        let start = try #require(line.range(of: "components"))
+        #expect(diagnostic.message == "Unknown value 'components'")
+        #expect(diagnostic.severity == .error)
+        #expect(diagnostic.range == GravitySourceRange(
+            start: .init(line: 4, utf16Column: line[..<start.lowerBound].utf16.count),
+            end: .init(line: 4, utf16Column: line[..<start.upperBound].utf16.count)
+        ))
+    }
+
+    @Test("Declared arguments, labels, members and comments are not unknown values")
+    func knownSpawnArguments() {
+        let source = """
+            class MainSystem {
+                var saved = null
+                func update(context: AdaSystemContext, components) {
+                    // spawn(missing)
+                    context.world.spawn(components)
+                    context.world.spawn(self.saved)
+                    context.world.spawn([Transform(position: Vector3.ZERO)])
+                }
+            }
+            """
+        #expect(GravityLanguageService().analyze(text: source).diagnostics.isEmpty)
+    }
+
+    @Test("Unknown named argument and member receiver are values too")
+    func unknownNestedValues() {
+        let source = "func update(context) { context.world.spawn(components: missing); context.world.spawn(unknown.value) }"
+        let diagnostics = GravityLanguageService().analyze(text: source).diagnostics
+        #expect(diagnostics.map(\.message) == ["Unknown value 'missing'", "Unknown value 'unknown'"])
+    }
+
+    @Test("Parameters and locals in another function do not resolve this call")
+    func unrelatedLocalNames() {
+        let source = """
+            func other(components) { var saved = components }
+            func update(context) { context.world.spawn(components); context.world.spawn(saved) }
+            """
+        let diagnostics = GravityLanguageService().analyze(text: source).diagnostics
+        #expect(diagnostics.map(\.message) == ["Unknown value 'components'", "Unknown value 'saved'"])
+    }
+
+    @Test("LSP publishes and clears an unknown value without a build")
+    func unknownValueLifecycle() throws {
+        let session = GravityLanguageServerSession()
+        _ = session.handle(["jsonrpc": "2.0", "id": 1, "method": "initialize", "params": ["rootUri": NSNull()]])
+        let uri = "file:///tmp/UnknownValue.ada"
+        let opened = session.handle([
+            "jsonrpc": "2.0", "method": "textDocument/didOpen",
+            "params": ["textDocument": ["uri": uri, "languageId": "adascript", "version": 1, "text": "func update(context) { context.world.spawn(components) }"]],
+        ])
+        let openParams = try #require(opened.outgoingMessages.first?["params"] as? [String: Any])
+        let diagnostics = try #require(openParams["diagnostics"] as? [[String: Any]])
+        #expect(diagnostics.count == 1)
+        #expect(diagnostics.first?["message"] as? String == "Unknown value 'components'")
+        let changed = session.handle([
+            "jsonrpc": "2.0", "method": "textDocument/didChange",
+            "params": [
+                "textDocument": ["uri": uri, "version": 2],
+                "contentChanges": [["text": "func update(context, components) { context.world.spawn(components) }"]],
+            ],
+        ])
+        let changeParams = try #require(changed.outgoingMessages.first?["params"] as? [String: Any])
+        #expect((changeParams["diagnostics"] as? [[String: Any]])?.isEmpty == true)
+    }
+
+    @Test("Editor refreshes AdaScript diagnostics on edits without invoking a build")
+    @MainActor
+    func editorRefreshesDiagnosticsOnEdit() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("AdaScriptAnalysis-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let fileURL = root.appendingPathComponent("Main.ada")
+        let initial = "func update(context) { context.world.spawn([]) }"
+        try initial.write(to: fileURL, atomically: true, encoding: .utf8)
+        let document = EditorTextDocument(
+            id: "main",
+            title: "Main.ada",
+            relativePath: "Main.ada",
+            absolutePath: fileURL.path,
+            language: .ada,
+            content: initial
+        )
+        let viewModel = EditorViewModel(
+            project: EditorProjectReference(name: "Game", path: root.path),
+            workspaceService: SwiftPMWorkspaceService(),
+            workbench: EditorWorkbenchViewModel(activeEditorTab: "Main.ada", openDocuments: [.text(document)], activeDocumentID: document.id)
+        )
+        viewModel.workbench.textDocumentBinding(documentID: document.id).wrappedValue = "func update(context) { context.world.spawn(components) }"
+        for _ in 0..<40 {
+            if viewModel.workbench.textDocument(id: document.id)?.diagnostics.contains(where: { $0.message == "Unknown value 'components'" }) == true {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(viewModel.workbench.textDocument(id: document.id)?.diagnostics.contains(where: { $0.message == "Unknown value 'components'" }) == true)
+
+        viewModel.workbench.textDocumentBinding(documentID: document.id).wrappedValue = initial
+        for _ in 0..<40 {
+            if viewModel.workbench.textDocument(id: document.id)?.diagnostics.isEmpty == true {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(viewModel.workbench.textDocument(id: document.id)?.diagnostics.isEmpty == true)
+    }
+
     @Test("Duplicate exported properties underline the second name before running")
     func duplicateExportedProperties() throws {
         let source = """

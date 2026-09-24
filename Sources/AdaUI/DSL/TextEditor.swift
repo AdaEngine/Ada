@@ -159,6 +159,8 @@ public struct TextEditorSourceInteraction {
     public var onRequestCompletion: ((TextEditorSourcePosition, String) -> Void)?
     public var onMoveCompletionSelection: ((Int) -> Bool)?
     public var onAcceptCompletion: (() -> Bool)?
+    /// Return true to accept the selected snippet value and consume Enter.
+    public var onAcceptPlaceholder: ((TextEditorSourceRange?) -> Bool)?
     public var onSelectionChange: ((TextEditorSourceRange?, String?) -> Void)?
     public var onChatSelection: ((TextEditorSourceRange, String) -> Void)?
     public var contextMenuItems: ((TextEditorSourcePosition) -> [TextEditorContextMenuItem])?
@@ -180,6 +182,7 @@ public struct TextEditorSourceInteraction {
         onRequestCompletion: ((TextEditorSourcePosition, String) -> Void)? = nil,
         onMoveCompletionSelection: ((Int) -> Bool)? = nil,
         onAcceptCompletion: (() -> Bool)? = nil,
+        onAcceptPlaceholder: ((TextEditorSourceRange?) -> Bool)? = nil,
         onSelectionChange: ((TextEditorSourceRange?, String?) -> Void)? = nil,
         onChatSelection: ((TextEditorSourceRange, String) -> Void)? = nil,
         contextMenuItems: ((TextEditorSourcePosition) -> [TextEditorContextMenuItem])? = nil,
@@ -200,6 +203,7 @@ public struct TextEditorSourceInteraction {
         self.onRequestCompletion = onRequestCompletion
         self.onMoveCompletionSelection = onMoveCompletionSelection
         self.onAcceptCompletion = onAcceptCompletion
+        self.onAcceptPlaceholder = onAcceptPlaceholder
         self.onSelectionChange = onSelectionChange
         self.onChatSelection = onChatSelection
         self.contextMenuItems = contextMenuItems

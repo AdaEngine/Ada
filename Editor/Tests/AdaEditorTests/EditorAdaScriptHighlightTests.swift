@@ -14,6 +14,26 @@ struct EditorAdaScriptHighlightTests {
         }
     }
 
+    @Test("Async keywords have the keyword color with and without semantic tokens", arguments: [false, true])
+    func asyncKeywordColors(semantic: Bool) throws {
+        let source = "async func name() {\n    await work()\n}"
+        let palette = EditorCodeColorPalette.dark
+        let model = EditorWorkbenchViewModel()
+        var document = EditorTextDocument(id: "async", title: "Async.ada", relativePath: "Async.ada", language: .ada, content: source, errorMessage: nil)
+        if semantic {
+            document.semanticTokens = EditorGravityLanguageService.semanticTokens(text: source)
+        }
+        model.open(.text(document))
+        let container = UIContainerView(rootView: makeView(document: document, model: model, palette: palette).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 900, height: 300)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        let node = try #require(editorNode(in: container.viewTree.rootNode))
+
+        #expect(node.tokenSpans.contains { $0.line == 0 && $0.startColumn == 0 && $0.length == 5 && $0.color == palette.keyword })
+        #expect(node.tokenSpans.contains { $0.line == 1 && $0.startColumn == 4 && $0.length == 5 && $0.color == palette.keyword })
+    }
+
     @Test("AdaScript editor colors annotations and member access with and without semantic tokens", arguments: [false, true])
     func annotationAndMemberColors(semantic: Bool) throws {
         let source = Self.source

@@ -526,6 +526,11 @@ struct SwiftPMBootstrapResult: Equatable, Sendable {
     }
 }
 
+struct EditorAdaScriptSourceAnalysis: Sendable {
+    var diagnostics: [EditorDiagnostic]
+    var semanticTokens: [EditorSemanticToken]
+}
+
 protocol SwiftPMWorkspaceServicing: Sendable {
     func makeCommand(_ kind: SwiftPMCommandKind, projectURL: URL, toolchain: SwiftToolchain) -> EditorProcessCommand
     func bootstrap(projectURL: URL) async -> SwiftPMBootstrapResult
@@ -537,6 +542,7 @@ protocol SwiftPMWorkspaceServicing: Sendable {
         output: @Sendable @escaping (EditorProcessOutputEvent) async -> Void
     ) async -> EditorProcessResult
     func semanticTokens(fileURL: URL, language: EditorSourceLanguage, text: String) async -> [EditorSemanticToken]
+    func adaScriptAnalysis(fileURL: URL, text: String) async -> EditorAdaScriptSourceAnalysis
     func completions(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) async -> [EditorCompletionItem]
     func definition(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) async -> [EditorSourceSymbolTarget]
     func references(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) async -> [EditorSourceReference]
@@ -548,6 +554,13 @@ protocol SwiftPMWorkspaceServicing: Sendable {
 }
 
 extension SwiftPMWorkspaceServicing {
+    func adaScriptAnalysis(fileURL: URL, text: String) async -> EditorAdaScriptSourceAnalysis {
+        EditorAdaScriptSourceAnalysis(
+            diagnostics: [],
+            semanticTokens: await semanticTokens(fileURL: fileURL, language: .ada, text: text)
+        )
+    }
+
     func bootstrap(projectURL: URL, progress _: @Sendable @escaping (SwiftPMWorkspaceProgress) async -> Void) async -> SwiftPMBootstrapResult {
         await bootstrap(projectURL: projectURL)
     }
@@ -834,6 +847,13 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
         } catch {
             return []
         }
+    }
+
+    func adaScriptAnalysis(fileURL: URL, text: String) async -> EditorAdaScriptSourceAnalysis {
+        EditorAdaScriptSourceAnalysis(
+            diagnostics: EditorGravityLanguageService.diagnostics(workspace: gravityWorkspace, fileURL: fileURL, text: text),
+            semanticTokens: EditorGravityLanguageService.semanticTokens(text: text)
+        )
     }
 
     func completions(fileURL: URL, language: EditorSourceLanguage, text: String, position: EditorSourceLocation) async -> [EditorCompletionItem] {

@@ -17,6 +17,7 @@ struct EditorCenterWorkbench: View {
     let onApplyCompletion: ((EditorCompletionItem, EditorTextDocument) -> Void)?
     let onMoveCompletionSelection: ((EditorTextDocument, Int) -> Bool)?
     let onAcceptCompletion: ((EditorTextDocument) -> Bool)?
+    var onAcceptSnippetPlaceholder: ((EditorTextDocument, EditorSourceRange?) -> Bool)? = nil
     let onTextSelection: ((EditorTextDocument, EditorSourceRange?, String?) -> Void)?
     let onChatSelection: ((EditorTextDocument, EditorSourceRange, String) -> Void)?
     let sourceContextMenuItems: ((EditorTextDocument, EditorSourceLocation) -> [TextEditorContextMenuItem])?
@@ -444,6 +445,7 @@ extension EditorCenterWorkbench {
             onApplyCompletion: onApplyCompletion,
             onMoveCompletionSelection: onMoveCompletionSelection,
             onAcceptCompletion: onAcceptCompletion,
+            onAcceptSnippetPlaceholder: onAcceptSnippetPlaceholder,
             onTextSelection: onTextSelection,
             onChatSelection: onChatSelection,
             sourceContextMenuItems: sourceContextMenuItems,

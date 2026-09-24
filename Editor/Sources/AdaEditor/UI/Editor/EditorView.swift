@@ -54,17 +54,7 @@ enum AdaEngineStyleContent {
                 scene.physics.step(deltaTime)
             }
         }
-        """,
-        "src/Renderer.ada": """
-        render_pipeline MainRenderer {
-            colorAttachment = .hdr
-            depthTest = true
-
-            pass geometry {
-                shader = "Shaders/MainSurface.glsl"
-            }
-        }
-        """,
+        """
     ]
     static let defaultSceneModel = EditorSceneModel.default(projectName: "Main")
     static let defaultSceneContent =
@@ -103,12 +93,7 @@ enum AdaEngineStyleContent {
     static let inspectorScript = "DynamicBouncer.ada"
     static let inspectorScriptDescription = "Object bounces on contact"
     static let outputTabs = ["Problems", "Build", "Tests", "References", "Output", "Performance"]
-    static let logLines = [
-        "[12:04:11] Ada initialized — render backend ready.",
-        "[12:04:12] Loaded Main.ascn with 1 entity.",
-        "[12:04:14] AI optimization note: draw calls can be batched by material.",
-        "[12:04:16] Build completed with 0 problems.",
-    ]
+    static let logLines: [String] = []
 }
 
 struct EditorView: View {
@@ -427,6 +412,9 @@ private struct EditorWorkspaceRegion: View {
                             },
                             onAcceptCompletion: { document in
                                 viewModel.applySelectedCompletion(in: document)
+                            },
+                            onAcceptSnippetPlaceholder: { document, selection in
+                                viewModel.acceptSnippetPlaceholder(in: document, selection: selection)
                             },
                             onTextSelection: { document, range, text in
                                 viewModel.handleTextSelection(document: document, range: range, text: text)

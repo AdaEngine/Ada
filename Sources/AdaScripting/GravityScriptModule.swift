@@ -1,7 +1,7 @@
 import AdaScriptCompilerCore
 import Foundation
 
-public enum AdaScriptError: Error, Sendable, Equatable, CustomStringConvertible {
+public enum AdaScriptError: Error, Sendable, Equatable, CustomStringConvertible, LocalizedError {
     case compilation([String])
     case duplicateSourcePath(String)
     case importCycle([String])
@@ -34,6 +34,8 @@ public enum AdaScriptError: Error, Sendable, Equatable, CustomStringConvertible 
             "Unable to resolve Ada Script import '\(importPath)' from '\(source)'"
         }
     }
+
+    public var errorDescription: String? { description }
 }
 
 /// One source file embedded in an Ada Script module.

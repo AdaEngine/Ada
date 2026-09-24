@@ -158,7 +158,38 @@ extension TextEditorViewNode {
             return
         }
 
+        if inserted == "}", self.foldingStyle == .braces, self.insertClosingBrace() {
+            return
+        }
         self.replaceSelection(with: inserted)
+    }
+
+    private func insertClosingBrace() -> Bool {
+        guard !self.hasSelection else { return false }
+        let lines = self.lines()
+        let position = self.position(forOffset: self.caretOffset, lines: lines)
+        guard lines.indices.contains(position.line) else { return false }
+        let line = lines[position.line]
+        let prefix = line.text.prefix(position.column)
+        guard prefix.allSatisfy({ $0 == " " || $0 == "\t" }) else { return false }
+
+        var indentation = String(prefix)
+        if indentation.hasSuffix("\t") {
+            indentation.removeLast()
+        } else {
+            let spaces = indentation.reversed().prefix { $0 == " " }.count
+            indentation.removeLast(min(4, spaces))
+        }
+        let replacement = indentation + "}"
+        self.performEdit { [self] in
+            var newText = self.text
+            newText.replaceSubrange(self.index(forOffset: line.startOffset)..<self.index(forOffset: self.caretOffset), with: replacement)
+            self.text = newText
+            self.invalidateTextCaches()
+            self.setSelection(to: line.startOffset + replacement.count)
+            return true
+        }
+        return true
     }
 
     func insertNewlineWithIndentation() {
@@ -175,11 +206,15 @@ extension TextEditorViewNode {
             lineText.startIndex,
             offsetBy: min(max(0, position.column), lineText.count)
         )
-        let indentation = lineText[..<prefixEnd]
+        let prefix = lineText[..<prefixEnd]
+        var indentation = String(prefix
             .prefix { character in
                 character == " " || character == "\t"
-            }
-        self.replaceSelection(with: "\n" + String(indentation))
+            })
+        if self.foldingStyle == .braces, prefix.last(where: { !$0.isWhitespace }) == "{" {
+            indentation += indentation.contains("\t") ? "\t" : "    "
+        }
+        self.replaceSelection(with: "\n" + indentation)
     }
 
     func replaceSelection(with insertedText: String) {

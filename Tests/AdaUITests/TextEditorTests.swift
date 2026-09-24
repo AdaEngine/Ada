@@ -108,6 +108,37 @@ struct TextEditorTests {
         #expect(model.text == "\t    return value")
     }
 
+    @Test("Brace code editing indents the body and aligns a typed closing brace")
+    func textEditor_braceIndentation() throws {
+        final class Model {
+            var text = "class Main {\n    async func run() {"
+        }
+
+        let model = Model()
+        let tester = ViewTester {
+            TextEditor(
+                text: Binding(get: { model.text }, set: { model.text = $0 }),
+                foldingStyle: .braces
+            )
+            .font(.system(size: 12))
+            .frame(width: 500, height: 180)
+        }
+        .setSize(Size(width: 520, height: 200))
+        .performLayout()
+
+        let node = try #require(tester.sendMouseEvent(at: Point(100, 28), phase: .began) as? TextEditorViewNode)
+        tester.sendMouseEvent(at: Point(100, 28), phase: .ended)
+        node.setSelection(to: model.text.count)
+
+        tester.sendKeyEvent(.enter)
+        #expect(model.text == "class Main {\n    async func run() {\n        ")
+        tester.sendTextInput("await work()")
+        tester.sendKeyEvent(.enter)
+        tester.sendTextInput("}")
+        #expect(model.text == "class Main {\n    async func run() {\n        await work()\n    }")
+        #expect(node.caretOffset == model.text.count)
+    }
+
     @Test
     func textEditor_supportsCommandUndoAndRedo() {
         final class Model {
@@ -211,6 +242,47 @@ struct TextEditorTests {
         #expect(model.selectionMoves == [-1, 1])
         #expect(model.acceptedCompletionCount == 1)
         #expect(model.text == "value")
+    }
+
+    @Test
+    func textEditor_acceptsPlaceholderWithoutInsertingNewline() {
+        final class Model {
+            var text = "func name() {}"
+            var accepted = false
+            var selectedRange: TextEditorSourceRange?
+        }
+
+        let model = Model()
+        let tester = ViewTester {
+            TextEditor(
+                text: Binding(
+                    get: { model.text },
+                    set: { model.text = $0 }
+                ),
+                sourceInteraction: TextEditorSourceInteraction(
+                    onAcceptPlaceholder: { selection in
+                        model.accepted = true
+                        model.selectedRange = selection
+                        return true
+                    }
+                )
+            )
+            .font(.system(size: 12))
+            .frame(width: 360, height: 160)
+        }
+        .setSize(Size(width: 380, height: 180))
+        .performLayout()
+
+        let node = tester.sendMouseEvent(at: Point(100, 28), phase: .began, time: 0) as? TextEditorViewNode
+        tester.sendMouseEvent(at: Point(100, 28), phase: .ended, time: 0.01)
+        node?.selectionAnchor = 5
+        node?.selectionHead = 9
+        tester.sendKeyEvent(.enter, time: 0.02)
+
+        #expect(model.accepted)
+        #expect(model.selectedRange == TextEditorSourceRange(start: .init(line: 0, column: 5), end: .init(line: 0, column: 9)))
+        #expect(model.text == "func name() {}")
+        #expect(node?.caretOffset == 9)
     }
 
     @Test

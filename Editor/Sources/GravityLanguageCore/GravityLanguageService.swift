@@ -7,8 +7,18 @@ public struct GravityLanguageService: Sendable {
         self.hostConstructors = hostConstructors.sorted { $0.name < $1.name }
     }
 
-    public func analyze(text: String) -> GravityDocumentAnalysis {
-        GravityDocumentAnalyzer.parse(text).analysis
+    /// Analyzes source without compiling it. Workspace symbols keep imported project names resolvable.
+    public func analyze(text: String, workspaceSymbols: [GravitySymbol] = []) -> GravityDocumentAnalysis {
+        let parsed = GravityDocumentAnalyzer.parse(text)
+        var analysis = parsed.analysis
+        analysis.diagnostics += GravityUnresolvedValueAnalyzer.diagnostics(
+            tokens: parsed.tokens,
+            symbols: analysis.symbols,
+            workspaceSymbols: workspaceSymbols,
+            imports: analysis.imports,
+            hostConstructors: hostConstructors
+        )
+        return analysis
     }
 
     public func quickFixes(text: String, range: GravitySourceRange) -> [GravityQuickFix] {

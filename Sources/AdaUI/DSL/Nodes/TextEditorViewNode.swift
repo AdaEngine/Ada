@@ -291,7 +291,7 @@ final class TextEditorViewNode: ViewNode {
                 case .arrowDown:
                     self.sourceInteraction?.onMoveCompletionSelection?(1) == true
                 case .enter:
-                    self.sourceInteraction?.onAcceptCompletion?() == true
+                    self.acceptCompletionOrPlaceholder()
                 default:
                     false
                 }
@@ -365,6 +365,22 @@ final class TextEditorViewNode: ViewNode {
 
         self.notifyCaretChange()
         self.resetCaretBlink()
+    }
+
+    private func acceptCompletionOrPlaceholder() -> Bool {
+        if self.sourceInteraction?.onAcceptCompletion?() == true {
+            return true
+        }
+
+        let selection = self.hasSelection ? self.selectedSourceRange() : nil
+        let selectionEnd = self.selectionRange.upperBound
+        guard self.sourceInteraction?.onAcceptPlaceholder?(selection) == true else {
+            return false
+        }
+        self.setSelection(to: selectionEnd)
+        self.notifyCaretChange(requestsCompletion: false)
+        self.requestDisplay()
+        return true
     }
 
     override func update(_ deltaTime: AdaUtils.TimeInterval) {

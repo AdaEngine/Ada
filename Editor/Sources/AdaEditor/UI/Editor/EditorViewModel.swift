@@ -118,6 +118,8 @@ final class EditorViewModel {
     @ObservationIgnored
     var completionTask: Task<Void, Never>?
     @ObservationIgnored
+    var sourceAnalysisTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored
     var autosaveTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored
     let autosaveDelay: Duration
@@ -272,6 +274,7 @@ final class EditorViewModel {
         self.workbench.setDocumentEditedHandler { [weak self] documentID in
             self?.updateDebugSource(documentID: documentID)
             self?.scheduleAutosave(documentID: documentID)
+            self?.scheduleSourceAnalysis(documentID: documentID)
         }
         self.workbench.achievements = EditorAchievementBootstrap.center
         self.workbench.achievementResourceRoot = projectAssetsURL

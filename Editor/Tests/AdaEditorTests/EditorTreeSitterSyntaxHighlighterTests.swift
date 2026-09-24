@@ -62,6 +62,19 @@ struct EditorTreeSitterSyntaxHighlighterTests {
         #expect(tokens.contains(EditorCodeToken(text: ";", color: .purple)))
     }
 
+    @Test("AdaScript async and await are highlighted as keywords while editing")
+    func highlightsAsyncKeywords() {
+        let palette = EditorCodeColorPalette.dark
+        let tokens = EditorSyntaxHighlighter.tokens(
+            for: "async func run() { await work() }",
+            language: .ada,
+            palette: palette
+        )
+
+        #expect(tokens.contains(EditorCodeToken(text: "async", color: palette.keyword)))
+        #expect(tokens.contains(EditorCodeToken(text: "await", color: palette.keyword)))
+    }
+
     @Test("highlights Swift Package manifests with tree-sitter query captures")
     func highlightsSwiftPackageManifestsWithTreeSitterQueryCaptures() throws {
         var palette = EditorCodeColorPalette.dark

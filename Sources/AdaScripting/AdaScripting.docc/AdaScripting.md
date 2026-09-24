@@ -39,6 +39,7 @@ AdaEditor projects configure automatic script discovery by default. For an exist
 ### Essentials
 
 - <doc:GettingStartedWithAdaScript>
+- <doc:AdaScriptBasics>
 - <doc:AdaScriptLanguage>
 - <doc:AdaScriptAnnotations>
 - <doc:AdaScriptLibraries>

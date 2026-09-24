@@ -1,6 +1,8 @@
 # Ada Script Language
 
-Use Ada Script syntax with AdaEngine declaration annotations.
+Use Ada Script syntax with AdaEngine declaration annotations. New to the
+language? Start with <doc:AdaScriptBasics> for values, functions, types,
+properties, control flow, asynchronous work, and annotations.
 
 ## Source files
 
@@ -399,9 +401,9 @@ variables.
 
 ## Common language patterns
 
-Functions use `func`, parameters are comma-separated, and a returned value
-uses `return`. Code blocks use braces. Declare mutable local values with `var`;
-use `if`, `else`, and `for` for control flow. End statements with `;`.
+The syntax primer in <doc:AdaScriptBasics> covers functions, conditions,
+loops, structs, classes, static members, initializers, and accessors. In an ECS
+system, use those language features together with query bindings:
 
 ```ada
 func clampHealth(value, maximum) {

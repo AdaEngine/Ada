@@ -224,32 +224,46 @@ struct EditorNotificationSettings: View {
                         .accessibilityIdentifier("AdaEditor.Notifications.BackgroundDiagnostic")
                 }
             #endif
-            EditorSettingsToggleRow(title: "System notifications", isOn: center.preferences.systemEnabled) {
-                isRequestingPermission = true
-                Task {
-                    await center.setSystemEnabled(!center.preferences.systemEnabled)
-                    isRequestingPermission = false
+            Toggle("System notifications", isOn: Binding(
+                get: { center.preferences.systemEnabled },
+                set: { isOn in
+                    isRequestingPermission = true
+                    Task {
+                        await center.setSystemEnabled(isOn)
+                        isRequestingPermission = false
+                    }
                 }
-            }
+            ))
+            .toggleStyle(.editorSettings(colors: theme.editorColors))
             .disabled(isRequestingPermission)
             .accessibilityIdentifier("AdaEditor.Notifications.System")
             Text(center.authorizationStatus).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
-            EditorSettingsToggleRow(title: "Sound", isOn: center.preferences.soundEnabled) {
-                center.preferences.soundEnabled.toggle()
-                center.persist()
-            }
+            Toggle("Sound", isOn: Binding(
+                get: { center.preferences.soundEnabled },
+                set: { isOn in
+                    center.preferences.soundEnabled = isOn
+                    center.persist()
+                }
+            ))
+            .toggleStyle(.editorSettings(colors: theme.editorColors))
             .accessibilityIdentifier("AdaEditor.Notifications.Sound")
             Text("NOTIFICATION SOURCES").font(.system(size: 12, weight: .semibold)).padding(.top, 10)
             Text("Choose which events can send system notifications.")
                 .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
             VStack(spacing: 6) {
                 ForEach(EditorNotificationSource.allCases, id: \.self) { source in
-                    EditorSettingsToggleRow(title: source.rawValue, isOn: center.preferences.enabledSources.contains(source)) {
-                        if !center.preferences.enabledSources.insert(source).inserted {
-                            center.preferences.enabledSources.remove(source)
+                    Toggle(source.rawValue, isOn: Binding(
+                        get: { center.preferences.enabledSources.contains(source) },
+                        set: { isOn in
+                            if isOn {
+                                center.preferences.enabledSources.insert(source)
+                            } else {
+                                center.preferences.enabledSources.remove(source)
+                            }
+                            center.persist()
                         }
-                        center.persist()
-                    }
+                    ))
+                    .toggleStyle(.editorSettings(colors: theme.editorColors))
                     .accessibilityIdentifier("AdaEditor.Notifications.Source.\(source.rawValue)")
                 }
             }

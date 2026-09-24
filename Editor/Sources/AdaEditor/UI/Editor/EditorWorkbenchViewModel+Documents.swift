@@ -38,6 +38,8 @@ extension EditorWorkbenchViewModel {
                 }
                 self.updateTextDocument(id: documentID) { document in
                     document.content = newValue
+                    document.activeSnippetPlaceholder = nil
+                    document.focusedRange = nil
                     document.errorMessage = nil
                     document.isDirty = true
                     document.statusMessage = "Edited"

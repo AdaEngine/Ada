@@ -1,10 +1,43 @@
 @testable import AdaApp
 import AdaECS
 import AdaScripting
+import Foundation
 import Testing
 
 @Suite("Multi-file Gravity modules", .serialized)
 struct GravityScriptModuleTests {
+    @Test("Compiler errors retain their diagnostic text for the editor")
+    func compilationErrorDescription() {
+        let error = AdaScriptError.compilation(["Main.ada:5:30: Unknown identifier 'components'"])
+        #expect(error.localizedDescription == "Main.ada:5:30: Unknown identifier 'components'")
+    }
+
+    @Test("Compiler reports an undefined spawn argument with its source location")
+    func undefinedSpawnArgument() {
+        do {
+            _ = try AdaScriptPlugin(
+                sources: [AdaScriptSource(
+                    path: "Main.ada",
+                    source: """
+                        @system(scheduler: "update", id: "game.main")
+                        class MainSystem {
+                            func update(context: AdaSystemContext) {
+                                context.world.spawn(components)
+                            }
+                        }
+                        """
+                )],
+                name: "UndefinedSpawnArgument"
+            )
+            Issue.record("Expected an AdaScript compilation error")
+        } catch let error as AdaScriptError {
+            #expect(error.localizedDescription.contains("components"))
+            #expect(error.localizedDescription.contains("Main.ada:4:"))
+        } catch {
+            Issue.record("Expected AdaScriptError, got \(error)")
+        }
+    }
+
     @Test("Runs imported helpers and multiple system roots in one module")
     @MainActor
     func runsMultiFileModule() async throws {

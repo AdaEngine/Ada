@@ -192,7 +192,8 @@ extension EditorViewModel {
             updatedDocument.completionItems = []
             updatedDocument.completionPosition = nil
             updatedDocument.selectedCompletionIndex = 0
-            updatedDocument.focusedRange = EditorSourceRange(start: edit.caret, end: edit.caret)
+            updatedDocument.activeSnippetPlaceholder = edit.placeholder
+            updatedDocument.focusedRange = edit.placeholder ?? EditorSourceRange(start: edit.caret, end: edit.caret)
         }
         completionTask?.cancel()
         completionTask = nil
@@ -234,7 +235,7 @@ extension EditorViewModel {
         _ item: EditorCompletionItem,
         to text: String,
         at position: EditorSourceLocation
-    ) -> (text: String, caret: EditorSourceLocation)? {
+    ) -> (text: String, caret: EditorSourceLocation, placeholder: EditorSourceRange?)? {
         let lines = text.components(separatedBy: .newlines)
         guard lines.indices.contains(position.line) else {
             return nil
@@ -255,18 +256,44 @@ extension EditorViewModel {
         let line = updatedLines[range.start.line]
         let start = line.index(line.startIndex, offsetBy: range.start.character)
         let end = line.index(line.startIndex, offsetBy: range.end.character)
-        updatedLines[range.start.line].replaceSubrange(start..<end, with: item.insertText)
-        let insertedLines = item.insertText.components(separatedBy: .newlines)
-        let caret =
-            if insertedLines.count == 1 {
-                EditorSourceLocation(line: range.start.line, character: range.start.character + item.insertText.count)
-            } else {
-                EditorSourceLocation(line: range.start.line + insertedLines.count - 1, character: insertedLines.last?.count ?? 0)
-            }
+        let indentation = String(line[..<start].prefix { $0 == " " || $0 == "\t" })
+        let insertedLines = item.insertText.components(separatedBy: "\n")
+        let rawInsertion = insertedLines.enumerated()
+            .map { index, part in index == 0 ? part : indentation + part }
+            .joined(separator: "\n")
+        let snippet: (text: String, placeholder: EditorSourceRange?) = item.kind == .snippet
+            ? EditorSnippetPlaceholder.render(rawInsertion, at: range.start)
+            : (text: rawInsertion, placeholder: nil)
+        let insertion = snippet.text
+        updatedLines[range.start.line].replaceSubrange(start..<end, with: insertion)
+        let renderedLines = insertion.components(separatedBy: "\n")
+        let caret = EditorSourceLocation(
+            line: range.start.line + renderedLines.count - 1,
+            character: renderedLines.count == 1
+                ? range.start.character + (renderedLines.last?.count ?? 0)
+                : renderedLines.last?.count ?? 0
+        )
         return (
             updatedLines.joined(separator: "\n"),
-            caret
+            caret,
+            snippet.placeholder
         )
+    }
+
+    @discardableResult
+    func acceptSnippetPlaceholder(in document: EditorTextDocument, selection: EditorSourceRange?) -> Bool {
+        guard
+            let current = workbench.textDocument(id: document.id),
+            let placeholder = current.activeSnippetPlaceholder,
+            selection == placeholder
+        else {
+            return false
+        }
+        workbench.updateTextDocument(id: document.id) { updatedDocument in
+            updatedDocument.activeSnippetPlaceholder = nil
+            updatedDocument.focusedRange = EditorSourceRange(start: placeholder.end, end: placeholder.end)
+        }
+        return true
     }
 
     static func inferredCompletionRange(in line: String, at position: EditorSourceLocation) -> EditorSourceRange {
@@ -505,6 +532,27 @@ extension EditorViewModel {
         return lines.joined(separator: "\n")
     }
 
+    func scheduleSourceAnalysis(documentID: String) {
+        sourceAnalysisTasks[documentID]?.cancel()
+        guard let document = workbench.textDocument(id: documentID), document.language == .ada else {
+            sourceAnalysisTasks[documentID] = nil
+            return
+        }
+        let content = document.content
+        sourceAnalysisTasks[documentID] = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(150))
+            } catch {
+                return
+            }
+            guard let self, self.workbench.textDocument(id: documentID)?.content == content else {
+                return
+            }
+            self.refreshSemanticTokens(for: .text(document))
+            self.sourceAnalysisTasks[documentID] = nil
+        }
+    }
+
     func refreshSemanticTokens(for document: EditorWorkbenchDocument) {
         guard
             case let .text(textDocument) = document,
@@ -521,13 +569,25 @@ extension EditorViewModel {
             if let projectURL = self.projectURL {
                 await self.workspaceService.configureSourceWorkspace(projectURL: projectURL)
             }
+            let fileURL = URL(fileURLWithPath: absolutePath, isDirectory: false)
+            if textDocument.language == .ada {
+                let analysis = await self.workspaceService.adaScriptAnalysis(fileURL: fileURL, text: textDocument.content)
+                await MainActor.run {
+                    guard self.workbench.textDocument(id: textDocument.id)?.content == textDocument.content else {
+                        return
+                    }
+                    self.receiveSourceDiagnostics(analysis.diagnostics, uri: fileURL.standardizedFileURL.absoluteString)
+                    self.workbench.applySemanticTokens(analysis.semanticTokens, documentID: textDocument.id, source: textDocument.content)
+                }
+                return
+            }
             await self.workspaceService.setDiagnosticsHandler { [weak self] uri, diagnostics in
                 await MainActor.run {
                     self?.receiveSourceDiagnostics(diagnostics, uri: uri)
                 }
             }
             let tokens = await self.workspaceService.semanticTokens(
-                fileURL: URL(fileURLWithPath: absolutePath, isDirectory: false),
+                fileURL: fileURL,
                 language: textDocument.language,
                 text: textDocument.content
             )

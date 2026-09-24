@@ -11,6 +11,9 @@ struct GravityLanguageSemanticTests {
         let source = "async func requestConfirmation() { var answer = await wait_confirmation(); }"
         let analysis = service.analyze(text: source)
         #expect(analysis.symbols.contains { $0.name == "requestConfirmation" && $0.detail == "AdaScript async function" })
+        let tokens = service.semanticTokens(text: source)
+        #expect(tokens.contains { $0.kind == .keyword && $0.range.start.utf16Column == 0 })
+        #expect(tokens.contains { $0.kind == .keyword && $0.range.start.utf16Column == 48 })
         let completions = service.completions(text: "as", position: GravitySourcePosition(line: 0, utf16Column: 2))
         #expect(completions.contains { $0.label == "async func" })
     }
