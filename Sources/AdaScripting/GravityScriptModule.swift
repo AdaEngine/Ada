@@ -97,7 +97,6 @@ enum GravityScriptModuleResolver {
             )
         }
 
-        var globalAsyncNames = Set<String>()
         var nonSendableTypeNames = Set<String>()
         for path in orderedPaths {
             guard let source = sourceByPath[path] else {
@@ -116,19 +115,17 @@ enum GravityScriptModuleResolver {
                 continue
             }
             do {
-                let declarations = try AdaScriptAsyncLowerer.declarations(
+                let declarations = try AdaScriptAsyncDeclarationScanner.declarations(
                     in: source.source,
                     path: path,
                     nonSendableTypes: nonSendableTypeNames
                 )
                 asyncDeclarations += declarations
-                globalAsyncNames.formUnion(declarations.compactMap { $0.ownerType == nil ? $0.name : nil })
             } catch let error as AdaScriptAsyncSyntaxError {
                 throw AdaScriptError.invalidManifest(error.description)
             }
         }
 
-        let reachablePaths = Set(orderedPaths)
         var parsedSources: [String: ParsedSource] = [:]
         for path in sortedPaths {
             guard let source = sourceByPath[path] else {
@@ -141,20 +138,9 @@ enum GravityScriptModuleResolver {
                 throw AdaScriptError.invalidManifest(error.description)
             }
             let loweredAssetsSource = AdaScriptAssetsLowerer.lower(source: loweredViewSource)
-            let loweredAsyncSource: String
-            do {
-                loweredAsyncSource = try AdaScriptAsyncLowerer.lower(
-                    source: loweredAssetsSource,
-                    path: path,
-                    globalAsyncNames: reachablePaths.contains(path) ? globalAsyncNames : [],
-                    nonSendableTypes: reachablePaths.contains(path) ? nonSendableTypeNames : []
-                )
-            } catch let error as AdaScriptAsyncSyntaxError {
-                throw AdaScriptError.invalidManifest(error.description)
-            }
             let schemas = try AdaScriptSchemaParser.parse(sources: [source])
             let loweredComponentSource = AdaScriptComponentLowerer.lower(
-                source: loweredAsyncSource,
+                source: loweredAssetsSource,
                 schemas: schemas
             )
             let loweredSource = AdaScriptNetworkLowerer.lower(source: loweredComponentSource)

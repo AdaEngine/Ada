@@ -1298,7 +1298,9 @@ let package = Package(
 )
 
 package.dependencies += [
-    .package(
+    ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_LOCAL_PATH"].map {
+        .package(name: "gravity-lang", path: $0)
+    } ?? .package(
         url: "https://github.com/AdaEngine/gravity-lang.git",
         exact: "0.9.9"
     ),

@@ -25,6 +25,10 @@ Implemented and covered by focused tests in this worktree:
   validation across aliases, lists, returns, and one-shot results.
 - [x] AdaUI action continuation, view disposal, and view-generation retirement;
   Editor keyword, declaration, and completion support.
+- [x] Native `async`/`await` tokens, AST lowering, and direct-call effect checks
+  in the local `gravity-lang` branch. The AdaEngine runtime still owns task
+  scheduling and suspension policy. Cross-repository publication and the
+  dependency pin remain pending.
 
 Remaining before this ADR is fully implemented:
 
@@ -35,9 +39,8 @@ Remaining before this ADR is fully implemented:
 - [ ] Full static effect and borrowed-value analysis through aliases, map
   entries, and imported method declarations; typed result descriptors and
   source maps for generated async continuations.
-- [ ] Move the async syntax and effect representation into a versioned
-  `gravity-lang` parser/AST release. The Swift source lowerer is an interim
-  AdaScript adapter; the dependency is currently pinned to `0.9.9`.
+- [ ] Publish the tested `gravity-lang` compiler commit and pin AdaEngine to
+  that revision. The currently published dependency remains `0.9.9`.
 - [ ] Engine-owned, incremental snapshots of arbitrary ECS data, beyond the
   available bounded streaming writer.
 - [ ] A game time-scale resource, complete Editor diagnostics, and platform

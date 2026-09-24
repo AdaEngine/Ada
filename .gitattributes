@@ -34,3 +34,6 @@ Sources/miniaudio/** linguist-vendored
 Sources/msdf-atlas-gen/** linguist-vendored
 Sources/SPIRV-Cross/** linguist-vendored
 Sources/glslang/** linguist-vendored
+
+# Embedded upstream patches retain the original context whitespace.
+Documentation/ArchitectureDecisions/patches/*.patch whitespace=-trailing-space,-blank-at-eof

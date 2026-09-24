@@ -258,11 +258,15 @@ enum AdaScriptTaskPrelude {
 
         func complete(value) {
             if (done || cancelled) { return false; }
-            if (!__adaTasks.validateCapture([value])) { return false; }
+            if (!__adaTasks.validateCapture([value])) { cancel(); return false; }
             self.value = value;
             done = true;
             __adaTasks.wake();
             return true;
+        }
+
+        func capture(values) {
+            if (!__adaTasks.validateCapture(values)) { cancel(); }
         }
 
         func cancel() {
