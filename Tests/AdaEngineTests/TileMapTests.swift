@@ -1,4 +1,5 @@
-import AdaAssets
+@_spi(Internal) import AdaApp
+@_spi(Internal) import AdaAssets
 @testable import AdaCorePipelines
 import AdaECS
 @testable import AdaRender
@@ -17,14 +18,25 @@ struct TileMapTests {
         try Self.setupHeadlessRenderEngineIfNeeded()
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let mapURL = repositoryRoot.appendingPathComponent("Demos/MedievalArena/Assets/Maps/Arena.tilemap")
-        let handle = try await AssetsManager.load(TileMap.self, at: mapURL.path)
-        let map = try #require(handle.asset)
-        let sourceID = try #require(map.layers.first?.getCellTileSource(at: [-9, -5]))
-        let source = try #require(map.tileSet.sources[sourceID] as? TextureAtlasTileSource)
-        #expect(source.name == "Image palette")
-        #expect(source.getTexture(at: [1, 0]).width == 16)
-        #expect(map.tileSet.sources.count == 1)
+        let demoRoot = repositoryRoot.appendingPathComponent("Demos/MedievalArena")
+        let mapURL = demoRoot.appendingPathComponent("Assets/Maps/Arena.tilemap")
+        let scopeID = UUID()
+        try await AppWorldsExecutionContext.$currentID.withValue(scopeID) {
+            await AssetsManager.setProjectDirectories(ProjectDirectories(
+                source: demoRoot,
+                assetsDirectory: demoRoot.appendingPathComponent("Assets"),
+                userDataDirectory: demoRoot.appendingPathComponent("UserData"),
+                cacheDirectory: demoRoot.appendingPathComponent(".cache")
+            ))
+            let handle = try await AssetsManager.load(TileMap.self, at: mapURL.path)
+            let map = try #require(handle.asset)
+            let sourceID = try #require(map.layers.first?.getCellTileSource(at: [-9, -5]))
+            let source = try #require(map.tileSet.sources[sourceID] as? TextureAtlasTileSource)
+            #expect(source.name == "Image palette")
+            #expect(source.getTexture(at: [1, 0]).width == 16)
+            #expect(map.tileSet.sources.count == 1)
+        }
+        await AssetsManager.destroyScope(scopeID)
     }
 
     @Test

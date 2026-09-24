@@ -315,7 +315,8 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
                 }
                 .joined(separator: "\n")
             let binary = virtualMachine.loadGravityFile(
-                from: AdaScriptTaskPrelude.source + "\n"
+                from: AdaScriptStandardLibrary.source + "\n"
+                    + AdaScriptTaskPrelude.source + "\n"
                     + AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
                     + AdaScriptNetworkBridge.prelude(commands: networkCommands)
                     + module.entrySource + "\n" + factories + "\n" + getters

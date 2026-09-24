@@ -145,7 +145,9 @@ enum GravityScriptModuleResolver {
                 source: loweredAssetsSource,
                 schemas: schemas
             )
-            let loweredSource = AdaScriptNetworkLowerer.lower(source: loweredComponentSource)
+            let loweredSource = AdaScriptMathLowerer.lower(
+                source: AdaScriptNetworkLowerer.lower(source: loweredComponentSource)
+            )
             var scanner = AdaScriptSourceScanner(source: loweredSource, path: path)
             parsedSources[path] = try scanner.scan()
         }

@@ -473,7 +473,8 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
             .sorted()
         let generatedSource = (factories + getters).joined(separator: "\n")
         let binary = virtualMachine.loadGravityFile(
-            from: AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
+            from: AdaScriptStandardLibrary.source + "\n"
+                + AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
                 + module.entrySource
                 + "\n"
                 + generatedSource

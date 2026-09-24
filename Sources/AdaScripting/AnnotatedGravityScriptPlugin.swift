@@ -698,7 +698,8 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         virtualMachine.setValue(asyncHost, forKey: "__adaAsync")
 
         let binary = virtualMachine.loadGravityFile(
-            from: AdaScriptTaskPrelude.source + "\n"
+            from: AdaScriptStandardLibrary.source + "\n"
+                + AdaScriptTaskPrelude.source + "\n"
                 + AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
                 + AdaScriptNetworkBridge.prelude(commands: networkCommands)
                 + module.entrySource

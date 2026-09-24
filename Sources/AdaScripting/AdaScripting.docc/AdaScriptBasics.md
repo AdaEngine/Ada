@@ -70,13 +70,8 @@ Declare a function with `func`, pass arguments in parentheses, and use
 returns `null`.
 
 ```ada
-func clamp(value, minimum, maximum) {
-    if (value < minimum) { return minimum; }
-    if (value > maximum) { return maximum; }
-    return value;
-}
-
-var safeHealth = clamp(120, 0, 100); // 100
+func doubled(value) { return value * 2; }
+var next = doubled(5); // 10
 ```
 
 Parameters can have defaults and type annotations:
@@ -93,6 +88,30 @@ Annotations on parameters describe types for tooling; runtime calls still
 need values of the form the function expects. A helper function is ordinary
 code. An ECS callback such as `update(context)` runs only because its class is
 registered as a system.
+
+AdaScript provides `print(...)`, `put(...)`, `input(removeTrailingNewline = true)`,
+`nanotime()`, and `exit(code = 0)` as free functions. They forward to the
+corresponding `System` methods. `assert(condition, message = "Assertion failed")`
+stops the current script with a diagnostic when its condition is false.
+The `System` spellings remain available for existing scripts. Avoid `input`
+and `exit` in game callbacks because they block for console input or terminate
+the host process.
+
+AdaScript also supports `Math.clamp`, `Math.saturate`, `Math.addVector`,
+`Math.subtractVector`, `Math.scaleVector`, `Math.dot`, `Math.cross`,
+`Math.length`, `Math.normalize`, `Math.distance`, `Math.lerpVector`, and
+`Math.clampVector`. Vectors are lists of numbers;
+`cross` requires three components. Matrices are nonempty lists of equal-length
+rows. `Math.identityMatrix(size)`, `transposeMatrix(matrix)`,
+`multiplyMatrix(left, right)`, and `transformVector(matrix, vector)` use row-major
+order and treat vectors as columns:
+
+```ada
+var safeHealth = Math.clamp(120, 0, 100); // 100
+var point = [3.0, 4.0, 1.0];
+var translation = [[1.0, 0.0, 2.0], [0.0, 1.0, 5.0], [0.0, 0.0, 1.0]];
+var moved = Math.transformVector(translation, point); // [5.0, 9.0, 1.0]
+```
 
 ## Structs and classes
 

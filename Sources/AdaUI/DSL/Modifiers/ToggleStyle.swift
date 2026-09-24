@@ -3,6 +3,9 @@
 //  AdaEngine
 //
 
+import AdaText
+import AdaUtils
+
 /// A type that defines the appearance of a toggle.
 @_typeEraser(AnyToggleStyle)
 @MainActor public protocol ToggleStyle: Sendable {
