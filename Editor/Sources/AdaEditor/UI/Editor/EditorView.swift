@@ -376,6 +376,7 @@ private struct EditorWorkspaceRegion: View {
                     }
                 )
                 .frame(width: stripWidth, height: geometry.size.height)
+                .zIndex(1)
 
                 EditorWorkspaceView(
                     viewModel: viewModel,

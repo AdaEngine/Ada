@@ -8,6 +8,9 @@ final class EditorAppearanceSettings {
     static let shared = EditorAppearanceSettings()
     private static let glowKey = "AdaEditor.appearance.agentActivityGlowEnabled"
     private static let indentationMarkersKey = "AdaEditor.editor.showsIndentationMarkers"
+    private static let indentationGuidesKey = "AdaEditor.editor.showsIndentationGuides"
+    private static let tabMarkersKey = "AdaEditor.editor.showsTabMarkers"
+    private static let spaceMarkersKey = "AdaEditor.editor.showsSpaceMarkers"
     private static let accentKey = "AdaEditor.appearance.agentGlowAccent"
     private static let radiusKey = "AdaEditor.appearance.agentGlowRadius"
     private static let opacityKey = "AdaEditor.appearance.agentGlowOpacity"
@@ -22,14 +25,35 @@ final class EditorAppearanceSettings {
         didSet { defaults.set(agentActivityGlowEnabled, forKey: Self.glowKey) }
     }
 
+    var showsIndentationGuides: Bool {
+        didSet { defaults.set(showsIndentationGuides, forKey: Self.indentationGuidesKey) }
+    }
+
+    var showsTabMarkers: Bool {
+        didSet { defaults.set(showsTabMarkers, forKey: Self.tabMarkersKey) }
+    }
+
+    var showsSpaceMarkers: Bool {
+        didSet { defaults.set(showsSpaceMarkers, forKey: Self.spaceMarkersKey) }
+    }
+
     var showsIndentationMarkers: Bool {
-        didSet { defaults.set(showsIndentationMarkers, forKey: Self.indentationMarkersKey) }
+        get { showsIndentationGuides && showsTabMarkers && showsSpaceMarkers }
+        set {
+            showsIndentationGuides = newValue
+            showsTabMarkers = newValue
+            showsSpaceMarkers = newValue
+            defaults.set(newValue, forKey: Self.indentationMarkersKey)
+        }
     }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         agentActivityGlowEnabled = defaults.object(forKey: Self.glowKey) as? Bool ?? true
-        showsIndentationMarkers = defaults.object(forKey: Self.indentationMarkersKey) as? Bool ?? true
+        let legacyMarkers = defaults.object(forKey: Self.indentationMarkersKey) as? Bool ?? true
+        showsIndentationGuides = defaults.object(forKey: Self.indentationGuidesKey) as? Bool ?? legacyMarkers
+        showsTabMarkers = defaults.object(forKey: Self.tabMarkersKey) as? Bool ?? legacyMarkers
+        showsSpaceMarkers = defaults.object(forKey: Self.spaceMarkersKey) as? Bool ?? legacyMarkers
         let hex = defaults.string(forKey: Self.accentKey)
         agentGlowAccentHex = hex.flatMap { EditorInspectorColorValue(hexText: $0) == nil ? nil : $0 }
         radius = Self.clamp(defaults.object(forKey: Self.radiusKey) as? Double ?? Self.defaultRadius, to: 4...100, fallback: Self.defaultRadius)
@@ -83,12 +107,45 @@ struct EditorCodeDisplaySettings: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        Toggle("Show indentation marks", isOn: Binding(
-            get: { settings.showsIndentationMarkers },
-            set: { settings.showsIndentationMarkers = $0 }
-        ))
-        .toggleStyle(.editorSettings(colors: theme.editorColors))
-        .accessibilityIdentifier("AdaEditor.Settings.IndentationMarkers")
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("Show indentation marks", isOn: Binding(
+                get: { settings.showsIndentationMarkers },
+                set: { settings.showsIndentationMarkers = $0 }
+            ))
+            .toggleStyle(.editorSettings(colors: theme.editorColors))
+            .accessibilityIdentifier("AdaEditor.Settings.IndentationMarkers")
+
+            settingToggle(
+                "Indentation guides",
+                isOn: Binding(
+                    get: { settings.showsIndentationGuides },
+                    set: { settings.showsIndentationGuides = $0 }
+                ),
+                identifier: "IndentationGuides"
+            )
+            settingToggle(
+                "Tab markers",
+                isOn: Binding(
+                    get: { settings.showsTabMarkers },
+                    set: { settings.showsTabMarkers = $0 }
+                ),
+                identifier: "TabMarkers"
+            )
+            settingToggle(
+                "Space markers",
+                isOn: Binding(
+                    get: { settings.showsSpaceMarkers },
+                    set: { settings.showsSpaceMarkers = $0 }
+                ),
+                identifier: "SpaceMarkers"
+            )
+        }
+    }
+
+    private func settingToggle(_ title: String, isOn: Binding<Bool>, identifier: String) -> some View {
+        Toggle(title, isOn: isOn)
+            .toggleStyle(.editorSettings(colors: theme.editorColors))
+            .accessibilityIdentifier("AdaEditor.Settings.\(identifier)")
     }
 }
 

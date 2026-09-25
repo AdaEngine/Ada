@@ -1,5 +1,7 @@
 # AdaEngine DocC Theme
 
+The visual system is intentionally quiet: neutral surfaces, fine separators, compact navigation, and a restrained AdaEngine violet for links and focus. Light and dark appearances use the same structure and contrast hierarchy. API references and tutorials share the same flat surfaces and modest corner radii.
+
 The DocC archive is themed after generation so the source documentation stays compatible with standard DocC tooling.
 
 ```sh

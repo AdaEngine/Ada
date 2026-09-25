@@ -14,6 +14,7 @@ struct EditorRightToolStrip: View {
                     active: viewModel.isRightToolPresented(item),
                     theme: theme,
                     accent: item.identifier == "swiftPackageTasks" ? theme.editorColors.purple : nil,
+                    tooltipEdge: .right,
                     action: {
                         onSelectTool(item)
                     }

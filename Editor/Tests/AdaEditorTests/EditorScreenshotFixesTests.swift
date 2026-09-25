@@ -29,7 +29,7 @@ struct EditorScreenshotFixesTests {
         #expect(!model.handleInput(event(.changed, 4)))
         #expect(model.handleInput(event(.began, 1)))
         #expect(model.handleInput(event(.changed, 100)))
-        #expect(model.twoDZoom == 24)
+        #expect(model.twoDZoom == 150)
         #expect(!model.handleInput(event(.changed, .nan)))
         #expect(model.handleInput(event(.cancelled, 100)))
         #expect(model.handleInput(event(.began, 1)))

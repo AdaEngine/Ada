@@ -62,7 +62,12 @@ final class TextEditorViewNode: ViewNode {
     var sourceInteraction: TextEditorSourceInteraction?
     var showsLineNumbers: Bool
     var foldingStyle: TextEditorFoldingStyle
-    var showsIndentationMarkers: Bool
+    var showsIndentationGuides: Bool
+    var showsTabMarkers: Bool
+    var showsSpaceMarkers: Bool
+    var showsIndentationMarkers: Bool {
+        showsIndentationGuides || showsTabMarkers || showsSpaceMarkers
+    }
     var highlightsSelectedIdentifier: Bool
     var text: String
 
@@ -109,7 +114,9 @@ final class TextEditorViewNode: ViewNode {
         self.sourceInteraction = content.sourceInteraction
         self.showsLineNumbers = content.showsLineNumbers
         self.foldingStyle = content.foldingStyle
-        self.showsIndentationMarkers = content.showsIndentationMarkers
+        self.showsIndentationGuides = content.showsIndentationGuides
+        self.showsTabMarkers = content.showsTabMarkers
+        self.showsSpaceMarkers = content.showsSpaceMarkers
         self.highlightsSelectedIdentifier = content.highlightsSelectedIdentifier
         self.text = Self.normalizeInputText(content.text.wrappedValue)
         super.init(content: content)
@@ -164,7 +171,9 @@ final class TextEditorViewNode: ViewNode {
             self.collapsedFoldLines.removeAll()
             self.markNeedsLayout()
         }
-        self.showsIndentationMarkers = node.showsIndentationMarkers
+        self.showsIndentationGuides = node.showsIndentationGuides
+        self.showsTabMarkers = node.showsTabMarkers
+        self.showsSpaceMarkers = node.showsSpaceMarkers
         self.highlightsSelectedIdentifier = node.highlightsSelectedIdentifier
 
         let externalText = Self.normalizeInputText(node.textBinding.wrappedValue)
@@ -497,7 +506,10 @@ final class TextEditorViewNode: ViewNode {
                                 line: line,
                                 rowY: rowY,
                                 pointSize: pointSize,
-                                font: resolvedFont
+                                font: resolvedFont,
+                                showsIndentationGuides: self.showsIndentationGuides,
+                                showsTabMarkers: self.showsTabMarkers,
+                                showsSpaceMarkers: self.showsSpaceMarkers
                             )
                         }
                         self.drawLineText(

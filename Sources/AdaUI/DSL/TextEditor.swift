@@ -229,7 +229,9 @@ public struct TextEditor: View {
     let sourceInteraction: TextEditorSourceInteraction?
     let showsLineNumbers: Bool
     let foldingStyle: TextEditorFoldingStyle
-    let showsIndentationMarkers: Bool
+    let showsIndentationGuides: Bool
+    let showsTabMarkers: Bool
+    let showsSpaceMarkers: Bool
     let highlightsSelectedIdentifier: Bool
 
     public var body: some View {
@@ -241,7 +243,9 @@ public struct TextEditor: View {
                 sourceInteraction: sourceInteraction,
                 showsLineNumbers: showsLineNumbers,
                 foldingStyle: foldingStyle,
-                showsIndentationMarkers: showsIndentationMarkers,
+                showsIndentationGuides: showsIndentationGuides,
+                showsTabMarkers: showsTabMarkers,
+                showsSpaceMarkers: showsSpaceMarkers,
                 highlightsSelectedIdentifier: highlightsSelectedIdentifier
             )
         }
@@ -253,6 +257,10 @@ public struct TextEditor: View {
     ///   - placeholder: Text displayed when the editor is empty.
     ///   - text: Two-way binding for the editor content.
     ///   - showsLineNumbers: Whether the source-style gutter and line numbers are visible.
+    ///   - showsIndentationMarkers: Compatibility switch for all indentation guides and whitespace markers.
+    ///   - showsIndentationGuides: Whether to draw guides at each complete indentation level.
+    ///   - showsTabMarkers: Whether to mark leading tab characters.
+    ///   - showsSpaceMarkers: Whether to mark leading space characters.
     public init(
         _ placeholder: String = "",
         text: Binding<String>,
@@ -261,6 +269,9 @@ public struct TextEditor: View {
         showsLineNumbers: Bool = true,
         foldingStyle: TextEditorFoldingStyle = .none,
         showsIndentationMarkers: Bool = false,
+        showsIndentationGuides: Bool? = nil,
+        showsTabMarkers: Bool? = nil,
+        showsSpaceMarkers: Bool? = nil,
         highlightsSelectedIdentifier: Bool = false
     ) {
         self.placeholder = placeholder
@@ -269,7 +280,9 @@ public struct TextEditor: View {
         self.sourceInteraction = sourceInteraction
         self.showsLineNumbers = showsLineNumbers
         self.foldingStyle = foldingStyle
-        self.showsIndentationMarkers = showsIndentationMarkers
+        self.showsIndentationGuides = showsIndentationGuides ?? showsIndentationMarkers
+        self.showsTabMarkers = showsTabMarkers ?? showsIndentationMarkers
+        self.showsSpaceMarkers = showsSpaceMarkers ?? showsIndentationMarkers
         self.highlightsSelectedIdentifier = highlightsSelectedIdentifier
     }
 
@@ -278,6 +291,10 @@ public struct TextEditor: View {
     /// - Parameters:
     ///   - text: Two-way binding for the editor content.
     ///   - showsLineNumbers: Whether the source-style gutter and line numbers are visible.
+    ///   - showsIndentationMarkers: Compatibility switch for all indentation guides and whitespace markers.
+    ///   - showsIndentationGuides: Whether to draw guides at each complete indentation level.
+    ///   - showsTabMarkers: Whether to mark leading tab characters.
+    ///   - showsSpaceMarkers: Whether to mark leading space characters.
     public init(
         text: Binding<String>,
         tokenSpans: [TextEditorTokenSpan] = [],
@@ -285,6 +302,9 @@ public struct TextEditor: View {
         showsLineNumbers: Bool = true,
         foldingStyle: TextEditorFoldingStyle = .none,
         showsIndentationMarkers: Bool = false,
+        showsIndentationGuides: Bool? = nil,
+        showsTabMarkers: Bool? = nil,
+        showsSpaceMarkers: Bool? = nil,
         highlightsSelectedIdentifier: Bool = false
     ) {
         self.placeholder = ""
@@ -293,7 +313,9 @@ public struct TextEditor: View {
         self.sourceInteraction = sourceInteraction
         self.showsLineNumbers = showsLineNumbers
         self.foldingStyle = foldingStyle
-        self.showsIndentationMarkers = showsIndentationMarkers
+        self.showsIndentationGuides = showsIndentationGuides ?? showsIndentationMarkers
+        self.showsTabMarkers = showsTabMarkers ?? showsIndentationMarkers
+        self.showsSpaceMarkers = showsSpaceMarkers ?? showsIndentationMarkers
         self.highlightsSelectedIdentifier = highlightsSelectedIdentifier
     }
 }
@@ -308,7 +330,9 @@ struct TextEditorPrimitive: View, ViewNodeBuilder {
     let sourceInteraction: TextEditorSourceInteraction?
     let showsLineNumbers: Bool
     let foldingStyle: TextEditorFoldingStyle
-    let showsIndentationMarkers: Bool
+    let showsIndentationGuides: Bool
+    let showsTabMarkers: Bool
+    let showsSpaceMarkers: Bool
     let highlightsSelectedIdentifier: Bool
 
     func buildViewNode(in context: BuildContext) -> ViewNode {

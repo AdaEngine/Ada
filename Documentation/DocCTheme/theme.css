@@ -519,6 +519,232 @@ body[data-color-scheme] {
   box-shadow: none;
 }
 
+/* Minimal documentation surfaces */
+:root {
+  --ada-theme-background: #fff;
+  --ada-theme-surface: #fff;
+  --ada-theme-surface-elevated: #fafafa;
+  --ada-theme-border: #e5e5e5;
+  --ada-theme-shadow: none;
+  --ada-theme-hero: #fafafa;
+  --color-text: #171717;
+  --color-secondary-label: #737373;
+  --color-text-background: #fff;
+  --color-article-background: #fff;
+  --color-article-body-background: #fff;
+  --color-fill: #fff;
+  --color-fill-secondary: #fafafa;
+  --color-fill-tertiary: #f5f5f5;
+  --color-fill-quaternary: #eee;
+  --color-fill-gray: #525252;
+  --color-fill-gray-secondary: #737373;
+  --color-fill-gray-tertiary: #a3a3a3;
+  --color-fill-gray-quaternary: #e5e5e5;
+  --color-grid: #e5e5e5;
+  --colors-grid: var(--color-grid);
+  --color-link: #7040c5;
+  --color-standard-blue: #7040c5;
+  --color-focus-border-color: #8054d6;
+  --color-focus-color: rgb(112 64 197 / 16%);
+  --color-code-background: #fafafa;
+  --color-code-plain: #262626;
+  --color-card-background: #fff;
+  --color-card-shadow: transparent;
+  --color-navigator-item-hover: #f5f5f5;
+  --color-nav-background: rgb(255 255 255 / 92%);
+  --color-nav-solid-background: #fff;
+  --color-nav-stuck: rgb(255 255 255 / 94%);
+  --color-nav-uiblur-stuck: rgb(255 255 255 / 88%);
+  --color-nav-expanded: #fff;
+  --color-nav-uiblur-expanded: rgb(255 255 255 / 94%);
+  --color-syntax-keywords: #7040c5;
+  --color-syntax-attributes: #7040c5;
+  --color-syntax-other-type-names: #087f73;
+  --color-syntax-strings: #a34b18;
+  --color-syntax-numbers: #47731b;
+  --color-syntax-comments: #737373;
+  --color-syntax-marks: #737373;
+}
+
+body[data-color-scheme="dark"] {
+  --ada-theme-background: #090909;
+  --ada-theme-surface: #0f0f0f;
+  --ada-theme-surface-elevated: #141414;
+  --ada-theme-border: #262626;
+  --ada-theme-hero: #0f0f0f;
+  --color-text: #ededed;
+  --color-secondary-label: #a1a1a1;
+  --color-text-background: #090909;
+  --color-article-background: #090909;
+  --color-article-body-background: #090909;
+  --color-fill: #090909;
+  --color-fill-secondary: #111;
+  --color-fill-tertiary: #171717;
+  --color-fill-quaternary: #222;
+  --color-fill-gray: #d4d4d4;
+  --color-fill-gray-secondary: #a1a1a1;
+  --color-fill-gray-tertiary: #737373;
+  --color-fill-gray-quaternary: #262626;
+  --color-grid: #262626;
+  --colors-grid: var(--color-grid);
+  --color-link: #b794f6;
+  --color-standard-blue: #a78bfa;
+  --color-focus-border-color: #a78bfa;
+  --color-focus-color: rgb(167 139 250 / 24%);
+  --color-code-background: #111;
+  --color-code-plain: #e5e5e5;
+  --color-card-background: #0f0f0f;
+  --color-card-shadow: transparent;
+  --color-navigator-item-hover: #171717;
+  --color-nav-background: rgb(9 9 9 / 92%);
+  --color-nav-solid-background: #090909;
+  --color-nav-stuck: rgb(9 9 9 / 94%);
+  --color-nav-uiblur-stuck: rgb(9 9 9 / 88%);
+  --color-nav-expanded: #090909;
+  --color-nav-uiblur-expanded: rgb(9 9 9 / 94%);
+  --color-nav-dark-solid-background: #090909;
+  --color-nav-dark-stuck: rgb(9 9 9 / 94%);
+  --color-nav-dark-uiblur-stuck: rgb(9 9 9 / 88%);
+  --color-nav-dark-expanded: #090909;
+  --color-nav-dark-uiblur-expanded: rgb(9 9 9 / 94%);
+  --color-syntax-keywords: #c4a7ff;
+  --color-syntax-attributes: #c4a7ff;
+  --color-syntax-other-type-names: #5eead4;
+  --color-syntax-strings: #f0ab8d;
+  --color-syntax-numbers: #b6d99a;
+  --color-syntax-comments: #808080;
+  --color-syntax-marks: #a1a1a1;
+}
+
+@media (prefers-color-scheme: dark) {
+  body[data-color-scheme="auto"] {
+    --ada-theme-background: #090909;
+    --ada-theme-surface: #0f0f0f;
+    --ada-theme-surface-elevated: #141414;
+    --ada-theme-border: #262626;
+    --ada-theme-hero: #0f0f0f;
+    --color-text: #ededed;
+    --color-secondary-label: #a1a1a1;
+    --color-text-background: #090909;
+    --color-article-background: #090909;
+    --color-article-body-background: #090909;
+    --color-fill: #090909;
+    --color-fill-secondary: #111;
+    --color-fill-tertiary: #171717;
+    --color-fill-quaternary: #222;
+    --color-fill-gray: #d4d4d4;
+    --color-fill-gray-secondary: #a1a1a1;
+    --color-fill-gray-tertiary: #737373;
+    --color-fill-gray-quaternary: #262626;
+    --color-grid: #262626;
+    --colors-grid: var(--color-grid);
+    --color-link: #b794f6;
+    --color-standard-blue: #a78bfa;
+    --color-focus-border-color: #a78bfa;
+    --color-focus-color: rgb(167 139 250 / 24%);
+    --color-code-background: #111;
+    --color-code-plain: #e5e5e5;
+    --color-card-background: #0f0f0f;
+    --color-card-shadow: transparent;
+    --color-navigator-item-hover: #171717;
+    --color-nav-background: rgb(9 9 9 / 92%);
+    --color-nav-solid-background: #090909;
+    --color-nav-stuck: rgb(9 9 9 / 94%);
+    --color-nav-uiblur-stuck: rgb(9 9 9 / 88%);
+    --color-nav-expanded: #090909;
+    --color-nav-uiblur-expanded: rgb(9 9 9 / 94%);
+    --color-nav-dark-solid-background: #090909;
+    --color-nav-dark-stuck: rgb(9 9 9 / 94%);
+    --color-nav-dark-uiblur-stuck: rgb(9 9 9 / 88%);
+    --color-nav-dark-expanded: #090909;
+    --color-nav-dark-uiblur-expanded: rgb(9 9 9 / 94%);
+    --color-syntax-keywords: #c4a7ff;
+    --color-syntax-attributes: #c4a7ff;
+    --color-syntax-other-type-names: #5eead4;
+    --color-syntax-strings: #f0ab8d;
+    --color-syntax-numbers: #b6d99a;
+    --color-syntax-comments: #808080;
+    --color-syntax-marks: #a1a1a1;
+  }
+}
+
+html,
+body,
+.documentation-layout,
+.tutorials-overview,
+.tutorials-overview .learning-path,
+.tutorial {
+  background: var(--ada-theme-background) !important;
+}
+
+.documentation-layout-aside {
+  border-right: 1px solid var(--ada-theme-border);
+  background: var(--ada-theme-background) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.documentation-hero,
+.tutorials-overview .hero,
+.tutorial .tutorial-hero .hero {
+  border: 1px solid var(--ada-theme-border);
+  border-radius: 12px;
+  background: var(--ada-theme-surface) !important;
+  box-shadow: none;
+}
+
+.code-listing,
+.contenttable,
+aside,
+.tutorials-overview .chapter.tile,
+.tutorial .section > .intro-container,
+.tutorial .step {
+  border: 1px solid var(--ada-theme-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.navigator-card-item .head-wrapper,
+.technology-title,
+.sidenav-icon-wrapper,
+.quick-navigation-open,
+.filter__input {
+  border-radius: 6px !important;
+}
+
+.navigator-card-item.active .head-wrapper,
+.technology-title.router-link-exact-active {
+  box-shadow: inset 2px 0 var(--color-link);
+}
+
+.tutorials-overview .chapter .asset img,
+.tutorial .asset-container,
+.tutorial .code-preview {
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.tutorial .step::before {
+  border-color: var(--color-link);
+  background: var(--color-link);
+}
+
+.tutorial .button-cta,
+.tutorials-overview .button-cta {
+  border: 1px solid var(--ada-theme-border);
+  border-radius: 7px !important;
+  background: var(--ada-theme-surface-elevated) !important;
+  color: var(--color-text);
+  box-shadow: none;
+}
+
+.tutorial .button-cta:hover,
+.tutorials-overview .button-cta:hover {
+  border-color: var(--color-link);
+  background: var(--ada-theme-surface-elevated) !important;
+  box-shadow: none;
+}
+
 .tutorial .code-preview .filename,
 .tutorial .code-preview .header {
   background: var(--ada-theme-surface-elevated);
@@ -624,5 +850,41 @@ body[data-color-scheme] {
     width: 100%;
     padding: 30px 24px;
     border-radius: 15px;
+  }
+}
+
+/* Keep tutorial details aligned with the same restrained surface system. */
+.tutorial .step.focused,
+.tutorial .step:focus {
+  border-color: var(--color-focus-border-color);
+  background: var(--ada-theme-surface-elevated);
+}
+
+.tutorials-overview .chapter .topic:hover,
+.tutorials-overview .tutorials-navigation-link:hover,
+.tutorials-overview .tutorials-navigation-link.active {
+  background: var(--ada-theme-surface-elevated) !important;
+}
+
+.tutorial .call-to-action .row {
+  border-radius: 12px;
+  background: var(--ada-theme-surface);
+  box-shadow: none;
+}
+
+.tutorial .assessments,
+.tutorial .choice {
+  border-radius: 8px;
+  background: var(--ada-theme-surface);
+}
+
+@media only screen and (max-width: 735px) {
+  .documentation-hero,
+  .tutorials-overview .hero,
+  .tutorials-overview .chapter.tile,
+  .code-listing,
+  .contenttable,
+  aside {
+    border-radius: 8px !important;
   }
 }

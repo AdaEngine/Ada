@@ -17,6 +17,7 @@ enum EditorSceneViewportTool: String, CaseIterable {
 @MainActor
 final class EditorSceneViewportModel {
     static let twoDCameraDepth: Float = -10
+    private static let maximumTwoDZoom: Float = 150
 
     private weak var world: World?
     private var cameraEntityID: Entity.ID?
@@ -717,7 +718,7 @@ extension EditorSceneViewportModel {
             case .twoD:
                 let offset = Vector2(event.location.x - viewportSize.width * 0.5, viewportSize.height * 0.5 - event.location.y)
                 let worldAnchor = twoDCenter + offset / twoDZoom
-                twoDZoom = min(24, max(0.08, twoDZoom * factor))
+                twoDZoom = min(Self.maximumTwoDZoom, max(0.08, twoDZoom * factor))
                 twoDCenter = worldAnchor - offset / twoDZoom
             case .threeD:
                 threeDPosition += front3D * ((factor - 1) * 10)
@@ -736,7 +737,7 @@ extension EditorSceneViewportModel {
 
     func zoom2D(by delta: Float) {
         let factor = pow(Float(1.12), delta)
-        twoDZoom = min(24, max(0.08, twoDZoom * factor))
+        twoDZoom = min(Self.maximumTwoDZoom, max(0.08, twoDZoom * factor))
         applyCamera()
     }
 

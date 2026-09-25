@@ -105,7 +105,9 @@ extension EditorCodeFileView {
             tokenSpans: tokenSpans,
             sourceInteraction: sourceInteraction,
             foldingStyle: foldingStyle,
-            showsIndentationMarkers: appearanceSettings.showsIndentationMarkers && foldingStyle != .none,
+            showsIndentationGuides: appearanceSettings.showsIndentationGuides && foldingStyle != .none,
+            showsTabMarkers: appearanceSettings.showsTabMarkers && foldingStyle != .none,
+            showsSpaceMarkers: appearanceSettings.showsSpaceMarkers && foldingStyle != .none,
             highlightsSelectedIdentifier: true
         )
             .font(AdaEditorCodeFont.font(family: fontFamily, weight: fontWeight, size: fontSize))

@@ -76,21 +76,86 @@ func adaEditorStripButton(
     active: Bool,
     theme: Theme,
     accent: Color? = nil,
+    tooltipEdge: EditorToolStripTooltipEdge = .left,
     action: @escaping () -> Void = {}
 ) -> some View {
-    Button(action: action) {
-        Text(item.icon)
-            .font(AdaEditorMaterialSymbolFont.font(size: 21))
-            .frame(width: 34, height: 34)
-    }
-    .buttonStyle(
-        AdaEditorStripButtonStyle(
-            active: active,
-            theme: theme,
-            accent: accent
-        )
+    EditorToolStripButton(
+        item: item,
+        active: active,
+        theme: theme,
+        accent: accent,
+        tooltipEdge: tooltipEdge,
+        action: action
     )
-    .accessibilityIdentifier("AdaEditor.ToolStrip.\(item.identifier)")
+}
+
+enum EditorToolStripTooltipEdge: Equatable {
+    case left
+    case right
+}
+
+private struct EditorToolStripButton: View {
+    let item: EditorToolStripItem
+    let active: Bool
+    let theme: Theme
+    let accent: Color?
+    let tooltipEdge: EditorToolStripTooltipEdge
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(item.icon)
+                .font(AdaEditorMaterialSymbolFont.font(size: 21))
+                .frame(width: 34, height: 34)
+        }
+        .buttonStyle(
+            AdaEditorStripButtonStyle(
+                active: active,
+                theme: theme,
+                accent: accent
+            )
+        )
+        .overlay {
+            if isHovered {
+                HStack(spacing: 8) {
+                    if tooltipEdge == .left {
+                        tooltipLabel
+                        Spacer(minLength: 0)
+                    } else {
+                        Spacer(minLength: 0)
+                        tooltipLabel
+                    }
+                }
+                .frame(width: 220)
+                .offset(x: tooltipEdge == .left ? 135 : -135)
+                .zIndex(10)
+                .allowsHitTesting(false)
+            }
+        }
+        .onHover { isHovered = $0 }
+        .accessibilityIdentifier("AdaEditor.ToolStrip.\(item.identifier)")
+    }
+
+    private var tooltipLabel: some View {
+        Text(item.title)
+            .font(.system(size: 13))
+            .foregroundColor(theme.editorColors.text)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangleShape(cornerRadius: 5)
+                    .fill(theme.editorColors.surfaceElevated)
+            )
+            .overlay {
+                RoundedRectangleShape(cornerRadius: 5)
+                    .stroke(theme.editorColors.border, lineWidth: 1)
+            }
+            .accessibilityIdentifier("AdaEditor.ToolStrip.Tooltip.\(item.identifier)")
+    }
 }
 
 enum AdaEditorMaterialSymbolFont {

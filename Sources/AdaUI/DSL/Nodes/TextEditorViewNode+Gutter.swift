@@ -132,28 +132,90 @@ extension TextEditorViewNode {
         line: LineInfo,
         rowY: Float,
         pointSize: Float,
-        font: Font
+        font: Font,
+        showsIndentationGuides: Bool,
+        showsTabMarkers: Bool,
+        showsSpaceMarkers: Bool
     ) {
         let indentation = Array(line.text.prefix { $0 == " " || $0 == "\t" })
         guard !indentation.isEmpty else { return }
-        let centerY = rowY + self.lineHeight(for: pointSize) * 0.5
+        let lineHeight = self.lineHeight(for: pointSize)
+        let centerY = rowY + lineHeight * 0.5
         let color = self.environment.textEditorColors.gutter.opacity(0.75)
         var column = 0
         while column < indentation.count {
             let isTab = indentation[column] == "\t"
-            let isSpaceGroup = !isTab && column + 4 <= indentation.count && indentation[column..<(column + 4)].allSatisfy { $0 == " " }
-            let step = isTab ? 1 : (isSpaceGroup ? 4 : 1)
-            let startX = self.textRect().minX + self.caretXOffset(forColumn: column, in: line.text, font: font, pointSize: pointSize)
-            let endX = self.textRect().minX + self.caretXOffset(forColumn: column + step, in: line.text, font: font, pointSize: pointSize)
-            if isTab || isSpaceGroup {
-                let arrowX = max(startX + 3, endX - 8)
-                context.drawLine(start: Point(max(startX + 2, arrowX - 5), -centerY), end: Point(arrowX, -centerY), lineWidth: 1.8, color: color)
-                context.drawLine(start: Point(arrowX - 3, -centerY + 3), end: Point(arrowX, -centerY), lineWidth: 1.8, color: color)
-                context.drawLine(start: Point(arrowX, -centerY), end: Point(arrowX - 3, -centerY - 3), lineWidth: 1.8, color: color)
-                context.drawLine(start: Point(endX - 3, -centerY + 4), end: Point(endX - 3, -centerY - 4), lineWidth: 1.8, color: color)
+            let step: Int
+            if isTab {
+                step = 1
             } else {
-                context.drawRect(Rect(x: (startX + endX) * 0.5, y: centerY, width: 1.8, height: 1.8), color: color)
+                let remainingSpaces = indentation.dropFirst(column).prefix { $0 == " " }.count
+                step = remainingSpaces >= 4 ? 4 : remainingSpaces
             }
+
+            let startX = self.textRect().minX + self.caretXOffset(
+                forColumn: column,
+                in: line.text,
+                font: font,
+                pointSize: pointSize
+            )
+            let endX = self.textRect().minX + self.caretXOffset(
+                forColumn: column + step,
+                in: line.text,
+                font: font,
+                pointSize: pointSize
+            )
+
+            if showsIndentationGuides, isTab || step == 4 {
+                context.drawLine(
+                    start: Point(endX, -(rowY + 1)),
+                    end: Point(endX, -(rowY + lineHeight - 1)),
+                    lineWidth: 1,
+                    color: color.opacity(0.55)
+                )
+            }
+
+            if isTab, showsTabMarkers {
+                let arrowX = max(startX + 3, endX - 8)
+                context.drawLine(
+                    start: Point(max(startX + 2, arrowX - 5), -centerY),
+                    end: Point(arrowX, -centerY),
+                    lineWidth: 1.8,
+                    color: color
+                )
+                context.drawLine(
+                    start: Point(arrowX - 3, -centerY + 3),
+                    end: Point(arrowX, -centerY),
+                    lineWidth: 1.8,
+                    color: color
+                )
+                context.drawLine(
+                    start: Point(arrowX, -centerY),
+                    end: Point(arrowX - 3, -centerY - 3),
+                    lineWidth: 1.8,
+                    color: color
+                )
+            } else if !isTab, showsSpaceMarkers {
+                for spaceColumn in column..<(column + step) {
+                    let spaceStartX = self.textRect().minX + self.caretXOffset(
+                        forColumn: spaceColumn,
+                        in: line.text,
+                        font: font,
+                        pointSize: pointSize
+                    )
+                    let spaceEndX = self.textRect().minX + self.caretXOffset(
+                        forColumn: spaceColumn + 1,
+                        in: line.text,
+                        font: font,
+                        pointSize: pointSize
+                    )
+                    context.drawRect(
+                        Rect(x: (spaceStartX + spaceEndX) * 0.5, y: centerY, width: 1.8, height: 1.8),
+                        color: color
+                    )
+                }
+            }
+
             column += step
         }
     }
