@@ -250,6 +250,7 @@ public struct TextEditor: View {
                 highlightsSelectedIdentifier: highlightsSelectedIdentifier
             )
         }
+        .environment(\._scrollViewRespectsSafeArea, false)
     }
 
     /// Creates a text editor.

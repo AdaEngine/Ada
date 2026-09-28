@@ -9,6 +9,7 @@ import AdaAssets
 import AdaUtils
 import Foundation
 import Math
+import Synchronization
 
 /// An object that manages image data in your app.
 public struct Image: Sendable {
@@ -121,49 +122,67 @@ extension Image {
 
 extension Image {
     private enum LoadingError: LocalizedError {
-        case formatNotSupported(String)
         case readFileFailedAtPath(URL)
 
         var errorDescription: String? {
             switch self {
-            case let .formatNotSupported(format):
-                return "Image with format \"\(format)\" not supported."
             case let .readFileFailedAtPath(path):
                 return "Can't read file at path \(path.absoluteString)."
             }
         }
     }
 
-    private static let loaders: [ImageLoaderStrategy] = [
-        PNGImageSerializer()
-    ]
+    private static let decoders = Mutex<[any ImageDecoder]>([
+        PNGImageSerializer(),
+        RasterImageDecoder(),
+    ])
 
     public init(contentsOf file: URL) throws {
-        guard let loader = Self.loaders.first(where: { $0.canDecodeImage(with: file.pathExtension) }) else {
-            throw LoadingError.formatNotSupported(file.pathExtension)
-        }
-
         guard let data = FileSystem.current.readFile(at: file) else {
             throw LoadingError.readFileFailedAtPath(file)
         }
 
-        let image = try loader.decodeImage(from: data)
-
-        self.init(
-            width: image.width,
-            height: image.height,
-            data: image.data,
-            format: image.format
-        )
+        self = try Self.decode(from: data, fileExtension: file.pathExtension)
     }
 
-    /// Decode image from data.
-    /// - Parameter data: Image data.
-    /// - Returns: Decoded image.
+    /// Decodes an image by recognizing its encoded bytes.
     public static func decode(from data: Data) throws -> Image {
-        // FIXME: (Vlad) We should detect the format of the image.
-        let loader = PNGImageSerializer()
-        return try loader.decodeImage(from: data)
+        try decode(from: data, fileExtension: nil)
+    }
+
+    /// Decodes an image using an optional extension hint and content recognition.
+    ///
+    /// The hint is case insensitive. If it does not match the bytes, other registered
+    /// decoders are considered. Errors from a decoder that recognizes the bytes propagate.
+    public static func decode(from data: Data, fileExtension: String?) throws -> Image {
+        let candidates = decoders.withLock { Array($0.reversed()) }
+        let hint = fileExtension?.lowercased()
+        if let hint, !hint.isEmpty,
+           let decoder = candidates.first(where: {
+               $0.supportedExtensions.contains { $0.lowercased() == hint } && $0.canDecode(data)
+           }) {
+            return try decoder.decode(data)
+        }
+        if let decoder = candidates.first(where: { $0.canDecode(data) }) {
+            return try decoder.decode(data)
+        }
+        if let hint, !hint.isEmpty,
+           !candidates.contains(where: { $0.supportedExtensions.contains { $0.lowercased() == hint } }) {
+            throw ImageDecodingError.unsupportedFormat(hint)
+        }
+        throw ImageDecodingError.invalidData
+    }
+
+    /// Registers an image format decoder for every image loading entry point.
+    ///
+    /// Newer registrations take precedence among matching decoders. Registering the same concrete decoder type
+    /// replaces its previous instance. Registration is thread safe and does not invalidate
+    /// images already cached by `AssetsManager`. Decoders execute outside the registry lock.
+    public static func registerDecoder<D: ImageDecoder>(_ decoder: D) {
+        decoders.withLock { registered in
+            registered.removeAll { ObjectIdentifier(type(of: $0)) == ObjectIdentifier(D.self) }
+            registered.append(decoder)
+        }
     }
 }
 
@@ -176,7 +195,7 @@ extension Image: Asset {
     }
 
     public init(from assetDecoder: AssetDecoder) async throws {
-        let pathExt = assetDecoder.assetMeta.filePath.pathExtension
+        let pathExt = assetDecoder.assetMeta.filePath.pathExtension.lowercased()
 
         if pathExt.isEmpty || pathExt == "res" {
             let rep = try assetDecoder.decode(ImageRepresentation.self)
@@ -190,7 +209,7 @@ extension Image: Asset {
 
             self.samplerDescription = rep.sampler
         } else {
-            try self.init(contentsOf: assetDecoder.assetMeta.filePath)
+            self = try Self.decode(from: assetDecoder.assetData, fileExtension: pathExt)
         }
     }
 
@@ -212,7 +231,17 @@ extension Image: Asset {
     }
 
     public static func extensions() -> [String] {
-        ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp"]
+        let registered = decoders.withLock { $0 }
+        var result: [String] = []
+        for decoder in registered {
+            for fileExtension in decoder.supportedExtensions {
+                let normalized = fileExtension.lowercased()
+                if !normalized.isEmpty, !result.contains(normalized) {
+                    result.append(normalized)
+                }
+            }
+        }
+        return result
     }
 }
 

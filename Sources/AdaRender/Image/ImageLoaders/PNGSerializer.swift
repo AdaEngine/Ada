@@ -9,22 +9,23 @@ import Foundation
 import libpng
 
 /// An object that serialize png raw data to an ``Image``
-struct PNGImageSerializer: ImageLoaderStrategy {
+struct PNGImageSerializer: ImageDecoder {
     enum DecodingError: String, Error {
         case cannotReadFromMemmory
         case cannotFinishReading
         case notSupportedImageFormat = "Unsupported png format"
     }
 
-    // MARK: - ImageLoaderStrategy
+    let supportedExtensions = ["png"]
 
-    func canDecodeImage(with fileExtensions: String) -> Bool {
-        return fileExtensions == "png"
+    func canDecode(_ data: Data) -> Bool {
+        data.starts(with: [137, 80, 78, 71, 13, 10, 26, 10])
     }
 
-    func decodeImage(from data: Data) throws -> Image {
+    func decode(_ data: Data) throws -> Image {
         var pngImage = unsafe png_image()
         unsafe pngImage.version = png_uint_32(PNG_IMAGE_VERSION)
+        defer { unsafe png_image_free(&pngImage) }
 
         var isSuccess = unsafe data.withUnsafeBytes { bufferPtr in
             return unsafe png_image_begin_read_from_memory(&pngImage, bufferPtr.baseAddress, data.count) == 1
@@ -35,7 +36,6 @@ struct PNGImageSerializer: ImageLoaderStrategy {
         let format: Image.Format = .rgba8
 
         if !isSuccess {
-            unsafe png_image_free(&pngImage)
             throw DecodingError.cannotReadFromMemmory
         }
 

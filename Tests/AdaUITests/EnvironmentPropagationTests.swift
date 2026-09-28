@@ -229,6 +229,7 @@ struct EnvironmentPropagationTests {
         #expect(safeAreaInsets.leading == 8)
         #expect(safeAreaInsets.bottom == 301)
         #expect(safeAreaInsets.trailing == 6)
+        #expect(tester.containerView.viewTree.rootNode.environment.keyboardSafeAreaInset == 267)
     }
 
     @Test("keyboard occlusion does not shrink platform safe area")
@@ -243,6 +244,7 @@ struct EnvironmentPropagationTests {
 
         let safeAreaInsets = tester.containerView.viewTree.rootNode.environment.safeAreaInsets
         #expect(safeAreaInsets.bottom == 34)
+        #expect(tester.containerView.viewTree.rootNode.environment.keyboardSafeAreaInset == 0)
     }
 
     @Test("overlay title bar does not reserve root safe area")

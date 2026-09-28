@@ -351,7 +351,10 @@ import Math
 
         #if canImport(UIKit) && (os(iOS) || os(tvOS) || os(visionOS))
             private func findUIKitParentView() -> UIKit.UIView? {
-                return nil  // To be implemented
+                guard let window = owner?.window?.systemWindow as? UIKit.UIWindow else {
+                    return nil
+                }
+                return window.rootViewController?.view
             }
         #endif
 

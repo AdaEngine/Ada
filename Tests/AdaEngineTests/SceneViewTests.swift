@@ -144,9 +144,11 @@ struct SceneViewTests {
     func completedRenderTargets_keepStableDisplayTextureIdentity() async throws {
         unsafe RenderEngine.configurations.preferredBackend = .headless
 
+        var completedFrames: [ObjectIdentifier] = []
         let coordinator = SceneViewCoordinator(
             make: { _ in },
-            updateContent: { _, _ in }
+            updateContent: { _, _ in },
+            onFrameRendered: { completedFrames.append(ObjectIdentifier($0)) }
         )
         var displayTextureChangeCount = 0
         coordinator.renderTextureDidChange = {
@@ -172,6 +174,7 @@ struct SceneViewTests {
             return
         }
         let firstTarget = try #require(firstHandle.asset)
+        #expect(completedFrames.isEmpty)
         firstTarget.notifyRenderCompleted()
         for _ in 0..<50 where coordinator.renderTexture == nil {
             await Task.yield()
@@ -181,6 +184,7 @@ struct SceneViewTests {
         let displayIdentity = ObjectIdentifier(stableDisplayTexture)
         let firstBackingIdentity = ObjectIdentifier(stableDisplayTexture.gpuTexture)
         #expect(displayTextureChangeCount == 1)
+        #expect(completedFrames == [ObjectIdentifier(firstTarget)])
 
         coordinator.tick(0.016)
         let secondCamera = try #require(sceneViewCamera(in: appWorlds.main))
@@ -198,7 +202,11 @@ struct SceneViewTests {
         #expect(ObjectIdentifier(try #require(coordinator.renderTexture)) == displayIdentity)
         #expect(ObjectIdentifier(stableDisplayTexture.gpuTexture) != firstBackingIdentity)
         #expect(displayTextureChangeCount == 1)
+        #expect(completedFrames == [ObjectIdentifier(firstTarget), ObjectIdentifier(secondTarget)])
         coordinator.shutdown()
+        secondTarget.notifyRenderCompleted()
+        for _ in 0..<50 { await Task.yield() }
+        #expect(completedFrames.count == 2)
     }
 
     @Test

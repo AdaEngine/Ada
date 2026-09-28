@@ -88,7 +88,17 @@
         }
 
         override open var inputView: UIKit.UIView? {
-            showsKeyboard ? nil : UIKit.UIView(frame: .zero)
+            // A hosted UIKit text control must use the system keyboard even when
+            // the Metal view itself is in game-input mode.
+            showsKeyboard || hasNativeTextInputResponder ? nil : UIKit.UIView(frame: .zero)
+        }
+
+        private var hasNativeTextInputResponder: Bool {
+            @MainActor func containsTextInput(_ view: UIKit.UIView) -> Bool {
+                if view.isFirstResponder, view is any UIKeyInput { return true }
+                return view.subviews.contains { containsTextInput($0) }
+            }
+            return subviews.contains { containsTextInput($0) }
         }
 
         public var keyboardType: UIKeyboardType {

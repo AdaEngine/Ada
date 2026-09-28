@@ -372,7 +372,7 @@ extension EditorViewModel {
     }
 
     static func isImageAsset(_ url: URL) -> Bool {
-        ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp"].contains(url.pathExtension.lowercased())
+        Image.extensions().contains(url.pathExtension.lowercased())
     }
 
     static func isAudioAsset(_ url: URL) -> Bool {

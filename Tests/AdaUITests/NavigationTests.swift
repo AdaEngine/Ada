@@ -226,12 +226,14 @@ struct NavigationStackTests {
         touch(105, 300, .moved, contact: verticalContact)
         touch(105, 300, .ended, contact: verticalContact)
         #expect(model.path.count == 1)
+        tester.advanceFrame(deltaTime: 0.3)
 
         let shortContact = RID()
         touch(12, 210, .began, contact: shortContact)
         touch(65, 210, .moved, contact: shortContact)
         touch(65, 210, .ended, contact: shortContact)
         #expect(model.path.count == 1)
+        tester.advanceFrame(deltaTime: 0.3)
 
         let backContact = RID()
         touch(12, 210, .began, contact: backContact)
@@ -239,7 +241,9 @@ struct NavigationStackTests {
         touch(110, 214, .ended, contact: backContact)
 
         #expect(model.path.count == 1)
-        try await Task.sleep(for: .milliseconds(120))
+        for _ in 0..<50 where !model.path.isEmpty {
+            try await Task.sleep(for: .milliseconds(20))
+        }
         #expect(model.path.isEmpty)
         #expect(stack.presentation.isAnimating)
     }

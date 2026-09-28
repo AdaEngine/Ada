@@ -20,12 +20,18 @@ struct EditorAdaScriptProjectRuntimeView: View {
     let performanceSession = EditorGamePerformanceSession()
     private let artifact: EditorAdaScriptProjectBuildArtifact
     private let controls: EditorGameWindowControls?
+    private let previewCapture: EditorProjectPreviewCapture?
     private let entryView: AdaScriptView?
     private let scriptPlugin: AdaScriptPlugin?
 
-    init(artifact: EditorAdaScriptProjectBuildArtifact, controls: EditorGameWindowControls? = nil) throws {
+    init(
+        artifact: EditorAdaScriptProjectBuildArtifact,
+        controls: EditorGameWindowControls? = nil,
+        previewCapture: EditorProjectPreviewCapture? = nil
+    ) throws {
         self.artifact = artifact
         self.controls = controls
+        self.previewCapture = previewCapture
         EditorComponentRegistry.registerBuiltIns()
         self.entryView = try artifact.entry.view.map { identifier in
             try AdaScriptView(
@@ -48,7 +54,8 @@ struct EditorAdaScriptProjectRuntimeView: View {
                     make: { app in
                         configureRuntime(&app)
                     },
-                    updateContent: { _, _ in controls?.refresh() }
+                    updateContent: { _, _ in controls?.refresh() },
+                    onFrameRendered: { texture in previewCapture?.capture(texture) }
                 )
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
 

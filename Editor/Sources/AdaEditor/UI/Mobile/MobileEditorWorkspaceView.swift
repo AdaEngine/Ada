@@ -12,17 +12,13 @@ struct MobileEditorWorkspaceView: View {
     let pendingAttachmentNames: [String]
     let chatEvents: [EditorAgentEvent]
     let agentStatus: String?
-    let isAgentRunning: Bool
     let agentActivityState: EditorAgentActivityState
     let agentActivityID: String?
-    let playArtifact: EditorAdaScriptProjectBuildArtifact?
     let preparePlay: () -> Void
     let onOpenFile: (String) -> Void
-    let submitPrompt: () -> Void
+    let openPrompt: () -> Void
     let showReview: () -> Void
     let goBack: () -> Void
-    let pickFiles: () -> Void
-    let pickPhotos: () -> Void
 
     var body: some View {
         ZStack(anchor: .bottom) {
@@ -34,16 +30,16 @@ struct MobileEditorWorkspaceView: View {
         .overlay {
             EditorAgentActivityOverlay(state: agentActivityState, activityID: agentActivityID)
         }
-        .onChange(of: selection) { _, selected in
-            if selected == .play {
-                preparePlay()
-            }
-        }
     }
 
     @ViewBuilder
     private var activeContent: some View {
-        TabView(selection: _selection) {
+        TabView(selection: Binding(
+            get: { selection },
+            set: { tab in
+                if tab == .play { preparePlay() } else { selection = tab }
+            }
+        )) {
             Tab("Build", value: MobileEditorWorkspaceTab.build) {
                 MobileEditorBuildScreen(
                     project: project,
@@ -51,39 +47,15 @@ struct MobileEditorWorkspaceView: View {
                     attachmentNames: pendingAttachmentNames,
                     chatEvents: chatEvents,
                     agentStatus: agentStatus,
-                    isAgentRunning: isAgentRunning,
-                    submit: submitPrompt,
-                    showTemplates: goBack,
-                    pickFiles: pickFiles,
-                    pickPhotos: pickPhotos
+                    openPrompt: openPrompt,
+                    showTemplates: goBack
                 )
             }
             Tab("Files", value: MobileEditorWorkspaceTab.files) {
                 MobileEditorFilesScreen(project: project, onOpenFile: onOpenFile)
             }
             Tab("Play", value: MobileEditorWorkspaceTab.play, placement: .floating) {
-                if project.isExample {
-                    MobileEditorPreviewScreen(
-                        changeRequest: _changeRequest,
-                        isMarkingScene: _isMarkingScene,
-                        showReview: showReview
-                    )
-                } else if let playArtifact, let runtimeView = try? EditorAdaScriptProjectRuntimeView(artifact: playArtifact) {
-                    ZStack {
-                        runtimeView
-                        if playArtifact.report.systemCount == 0,
-                           (playArtifact.sceneModel?.entities.count ?? 0) <= 1 {
-                            Text("Create your first scene in Build")
-                                .font(MobileEditorFont.font(size: 15))
-                                .foregroundColor(theme.editorColors.muted)
-                                .allowsHitTesting(false)
-                        }
-                    }
-                } else {
-                    MobileEditorPlayEmptyScreen(message: agentStatus) {
-                        selection = .build
-                    }
-                }
+                EmptyView()
             }
         }
         .tabViewPosition(.bottom)
@@ -146,108 +118,30 @@ struct MobileEditorBuildScreen: View {
     let attachmentNames: [String]
     let chatEvents: [EditorAgentEvent]
     let agentStatus: String?
-    let isAgentRunning: Bool
-    let submit: () -> Void
+    let openPrompt: () -> Void
     let showTemplates: () -> Void
-    let pickFiles: () -> Void
-    let pickPhotos: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             if chatEvents.isEmpty {
-                Spacer()
-
                 ZStack {
-                    Text("What would you like\nto create today?")
-                        .font(MobileEditorFont.font(size: 27))
-                        .foregroundColor(theme.editorColors.text)
-                        .multilineTextAlignment(.center)
-                        .allowsHitTesting(false)
+                    VStack(spacing: 0) {
+                        Text("What would you like\nto create today?")
+                            .font(MobileEditorFont.font(size: 25))
+                            .foregroundColor(theme.editorColors.text)
+                            .multilineTextAlignment(.center)
+                            .padding(.bottom, 28)
+                        promptLauncher
+                        templatesButton
+                    }
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 170)
-
-                Spacer()
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             } else {
                 EditorAgentTranscript(events: chatEvents, sessionID: project.id.uuidString)
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                    .padding(.bottom, 16)
+                promptLauncher
             }
-
-            EditorAgentComposerSurface(
-                cornerRadius: 28,
-                horizontalInset: 16,
-                topInset: 13,
-                bottomInset: 11,
-                usesGlass: false
-            ) {
-                VStack(alignment: .leading, spacing: 12) {
-                    EditorAgentPromptEditor(
-                        text: _promptDraft,
-                        placeholder: project.prompt == nil ? "Create a game…" : "Describe your next change…",
-                        promptIdentifier: "AdaEditor.Mobile.BuildPrompt"
-                    )
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if !attachmentNames.isEmpty {
-                        Text(attachmentNames.joined(separator: ", "))
-                            .font(MobileEditorFont.font(size: 10))
-                            .foregroundColor(theme.editorColors.muted)
-                            .lineLimit(1)
-                    }
-
-                    HStack {
-                        Button(action: pickFiles) {
-                            Text("\u{E145}")
-                                .font(AdaEditorMaterialSymbolFont.font(size: 32))
-                                .foregroundColor(theme.editorColors.text)
-                                .frame(width: 48, height: 48)
-                        }
-                        .buttonStyle(DefaultButtonStyle())
-                        .accessibilityIdentifier("AdaEditor.Mobile.AddFiles")
-
-                        Button(action: pickPhotos) {
-                            Text("\u{E3F4}")
-                                .font(AdaEditorMaterialSymbolFont.font(size: 22))
-                                .foregroundColor(theme.editorColors.text)
-                                .frame(width: 44, height: 48)
-                        }
-                        .buttonStyle(DefaultButtonStyle())
-                        .accessibilityIdentifier("AdaEditor.Mobile.AddPhotos")
-
-                        Spacer()
-
-                        Button(action: submit) {
-                            Text("\u{E163}")
-                                .font(AdaEditorMaterialSymbolFont.font(size: 22))
-                                .foregroundColor(theme.editorColors.text)
-                                .frame(width: 48, height: 48)
-                        }
-                        .buttonStyle(DefaultButtonStyle())
-                        .disabled((promptDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachmentNames.isEmpty) || isAgentRunning)
-                        .accessibilityIdentifier("AdaEditor.Mobile.BuildSubmit")
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
-
-            if chatEvents.isEmpty {
-                Button(action: showTemplates) {
-                    Text("View templates")
-                        .font(MobileEditorFont.font(size: 13))
-                        .foregroundColor(theme.editorColors.text)
-                        .padding(.horizontal, 16)
-                        .frame(height: 32)
-                        .background(CapsuleShape().fill(theme.editorColors.surface))
-                        .overlay {
-                            CapsuleShape().stroke(theme.editorColors.border, lineWidth: 1)
-                                .allowsHitTesting(false)
-                        }
-                }
-                .buttonStyle(DefaultButtonStyle())
-                .accessibilityIdentifier("AdaEditor.Mobile.ViewTemplates")
-                .padding(.top, 28)
-            }
-
             if let agentStatus {
                 Text(agentStatus)
                     .font(MobileEditorFont.font(size: 12))
@@ -255,19 +149,73 @@ struct MobileEditorBuildScreen: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 16)
             }
-            if chatEvents.isEmpty {
-                Spacer()
-            } else {
-                Color.clear.frame(height: 70)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 26)
+        .padding(.bottom, 84)
+    }
+
+    private var promptLauncher: some View {
+        Button(action: openPrompt) {
+            EditorAgentComposerSurface(
+                cornerRadius: 24,
+                horizontalInset: 18,
+                topInset: 18,
+                bottomInset: 12
+            ) {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(hasDraft ? promptDraft : placeholder)
+                        .font(MobileEditorFont.font(size: 14))
+                        .foregroundColor(hasDraft ? theme.editorColors.text : theme.editorColors.muted)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if !attachmentNames.isEmpty {
+                        Text(attachmentNames.joined(separator: ", "))
+                            .font(MobileEditorFont.font(size: 10))
+                            .foregroundColor(theme.editorColors.muted)
+                            .lineLimit(1)
+                    }
+                    HStack(spacing: 18) {
+                        Text("\u{E145}")
+                            .font(AdaEditorMaterialSymbolFont.font(size: 25))
+                        Text("\u{E3F4}")
+                            .font(AdaEditorMaterialSymbolFont.font(size: 20))
+                        Spacer()
+                        MobileEditorPromptSymbol(kind: .microphone)
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(theme.editorColors.background.opacity(0.5)))
+                    }
+                    .foregroundColor(theme.editorColors.text)
+                }
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.bottom, 84)
-//        .background {
-//            MobileEditorDotGrid()
-//                .fill(Color.white.opacity(0.12))
-//                .allowsHitTesting(false)
-//        }
+        .buttonStyle(DefaultButtonStyle())
+        .frame(maxWidth: 320)
+        .accessibilityIdentifier("AdaEditor.Mobile.OpenPrompt")
+    }
+
+    private var templatesButton: some View {
+        Button(action: showTemplates) {
+            Text("View templates")
+                .font(MobileEditorFont.font(size: 13))
+                .foregroundColor(theme.editorColors.text)
+                .padding(.horizontal, 16)
+                .frame(height: 32)
+                .background(CapsuleShape().fill(theme.editorColors.surface))
+                .overlay {
+                    CapsuleShape().stroke(theme.editorColors.border, lineWidth: 1)
+                        .allowsHitTesting(false)
+                }
+        }
+        .buttonStyle(DefaultButtonStyle())
+        .accessibilityIdentifier("AdaEditor.Mobile.ViewTemplates")
+        .padding(.top, 22)
+    }
+
+    private var hasDraft: Bool { !promptDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    private var placeholder: String {
+        project.prompt == nil ? "Create a game…" : "Describe your next change…"
     }
 }
 

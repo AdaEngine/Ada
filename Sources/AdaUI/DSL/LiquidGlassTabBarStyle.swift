@@ -43,6 +43,7 @@ public struct LiquidGlassTabBarStyle: TabViewStyle {
 
 @MainActor
 private struct LiquidGlassTabBar: View {
+    @Environment(\.keyboardSafeAreaInset) private var keyboardSafeAreaInset
     let configuration: TabViewStyleConfiguration
     let style: LiquidGlassTabBarStyle
     @State private var isDragging = false
@@ -96,6 +97,7 @@ private struct LiquidGlassTabBar: View {
             ZStack(anchor: .bottom) {
                 configuration.content
                 tabBar.padding(.bottom, 20)
+                    .offset(y: keyboardSafeAreaInset)
             }
         }
     }

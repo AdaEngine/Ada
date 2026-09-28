@@ -1,5 +1,6 @@
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) import AdaUI
+import Foundation
 import Math
 import Testing
 
@@ -7,6 +8,19 @@ import Testing
 
 @Suite("Editor image asset preview")
 struct EditorImageAssetPreviewTests {
+    @Test("project tree recognizes formats registered with Image")
+    @MainActor
+    func imageFileClassification() {
+        for fileExtension in ["png", "jpg", "jpeg", "bmp", "tga", "TGA", "JPEG"] {
+            #expect(EditorViewModel.isImageAsset(URL(fileURLWithPath: "/Assets/image.\(fileExtension)")))
+        }
+        for fileExtension in ["gif", "tiff", "webp", "txt"] {
+            #expect(!EditorViewModel.isImageAsset(URL(fileURLWithPath: "/Assets/image.\(fileExtension)")))
+        }
+        Image.registerDecoder(EditorTestImageDecoder())
+        #expect(EditorViewModel.isImageAsset(URL(fileURLWithPath: "/Assets/image.editorimage")))
+    }
+
     @Test("formatting exposes useful image metadata")
     func metadataFormatting() {
         let document = makeImageDocument()
@@ -60,5 +74,17 @@ struct EditorImageAssetPreviewTests {
             modifiedAt: nil,
             errorMessage: nil
         )
+    }
+}
+
+private struct EditorTestImageDecoder: ImageDecoder {
+    let supportedExtensions = ["editorimage"]
+
+    func canDecode(_ data: Data) -> Bool {
+        data == Data("Editor test image".utf8)
+    }
+
+    func decode(_ data: Data) throws -> Image {
+        Image(width: 1, height: 1)
     }
 }

@@ -19,6 +19,37 @@ struct TextEditorTests {
     }
 
     @Test
+    func embeddedEditorDoesNotInsetTextByScreenOrKeyboardSafeAreas() throws {
+        var text = ""
+        let tester = ViewTester {
+            TextEditor("Write a prompt", text: Binding(get: { text }, set: { text = $0 }), showsLineNumbers: false)
+                .font(.system(size: 14))
+                .foregroundColor(.white)
+                .environment(\.safeAreaInsets, EdgeInsets(top: 151, leading: 0, bottom: 301, trailing: 0))
+                .frame(width: 360, height: 128)
+        }
+        .setSize(Size(width: 360, height: 128))
+        .performLayout()
+
+        let node = try #require(tester.sendMouseEvent(at: Point(20, 28), phase: .began) as? TextEditorViewNode)
+        tester.sendMouseEvent(at: Point(20, 28), phase: .ended)
+        tester.sendTextInput("Hello Привет")
+        tester.performLayout()
+
+        #expect(text == "Hello Привет")
+        let scroll = try #require(node.nearestScrollView())
+        #expect(!scroll.environment._scrollViewRespectsSafeArea)
+        #expect(node.visualAbsoluteContentRect().minY >= scroll.visualAbsoluteFrame().minY)
+        #expect(node.visualAbsoluteContentRect().minY + node.lineHeight(for: 14) <= scroll.visualAbsoluteFrame().maxY)
+        let context = UIGraphicsContext()
+        tester.containerView.viewTree.rootNode.draw(with: context)
+        #expect(context.getDrawCommands().contains { command in
+            if case .drawGlyph = command { return true }
+            return false
+        })
+    }
+
+    @Test
     func textEditor_canHideSourceLineNumbersForPlainMultilineInput() throws {
         var text = "Prompt"
         let tester = ViewTester {

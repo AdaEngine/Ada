@@ -38,6 +38,12 @@ extension EnvironmentValues {
     /// The safe area insets of the nearest container or screen.
     @Entry public var safeAreaInsets: EdgeInsets = EdgeInsets()
 
+    /// Extra bottom safe area reserved by the software keyboard beyond the screen's safe area.
+    @Entry public var keyboardSafeAreaInset: Float = 0
+
+    /// Embedded scrolling controls manage their own viewport rather than screen safe areas.
+    @Entry internal var _scrollViewRespectsSafeArea: Bool = true
+
     /// Insets reserved by platform window chrome that overlays app content.
     @Entry internal var navigationBarChromeInsets: EdgeInsets = EdgeInsets()
 }

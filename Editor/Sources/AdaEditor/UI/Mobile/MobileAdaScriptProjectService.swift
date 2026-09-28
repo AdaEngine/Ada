@@ -4,25 +4,25 @@ import SloppyRuntime
 
 @MainActor
 enum MobileAdaScriptProjectService {
-    private static let indexFileName = "projects.json"
 
     static func projectURL(for id: UUID) throws -> URL {
         try projectsDirectory().appendingPathComponent(id.uuidString, isDirectory: true)
     }
 
     static func loadProjects() -> [MobileEditorProject] {
-        guard let directory = try? projectsDirectory(),
-              let data = try? Data(contentsOf: directory.appendingPathComponent(indexFileName)),
-              let saved = try? JSONDecoder().decode([MobileEditorProject].self, from: data) else {
-            return [.forest]
-        }
-        return saved.contains(where: { $0.id == MobileEditorProject.forest.id })
-            ? saved : saved + [.forest]
+        (try? MobileEditorProjectStore(directory: projectsDirectory()).load()) ?? [.forest]
     }
 
     static func saveProjects(_ projects: [MobileEditorProject]) throws {
-        let data = try JSONEncoder().encode(projects)
-        try data.write(to: projectsDirectory().appendingPathComponent(indexFileName), options: .atomic)
+        try MobileEditorProjectStore(directory: projectsDirectory()).save(projects)
+    }
+
+    static func renameProject(id: UUID, to title: String) throws -> [MobileEditorProject] {
+        try MobileEditorProjectStore(directory: projectsDirectory()).rename(id: id, to: title)
+    }
+
+    static func deleteProject(id: UUID) throws -> [MobileEditorProject] {
+        try MobileEditorProjectStore(directory: projectsDirectory()).delete(id: id)
     }
 
     static func prepare(_ project: MobileEditorProject) throws -> URL {

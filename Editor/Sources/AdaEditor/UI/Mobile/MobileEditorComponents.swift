@@ -119,12 +119,9 @@ struct MobileEditorProjectPlaceholderImage: View {
     var body: some View {
         ZStack {
             theme.editorColors.surfaceElevated
-            Circle()
-                .fill(theme.editorColors.blue.opacity(0.12))
-                .frame(width: 72, height: 72)
-            Text("\u{E037}")
-                .font(AdaEditorMaterialSymbolFont.font(size: 34))
-                .foregroundColor(theme.editorColors.blue.opacity(0.8))
+            Text("Run your scene to create a preview")
+                .font(MobileEditorFont.font(size: 12))
+                .foregroundColor(theme.editorColors.muted)
         }
         .frame(height: height)
         .frame(maxWidth: .infinity)

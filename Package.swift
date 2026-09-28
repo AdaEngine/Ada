@@ -242,6 +242,7 @@ var adaRenderDependencies: [Target.Dependency] = [
     "SPIRV-Cross",
     "SPIRVCompiler",
     "libpng",
+    "CImageDecoder",
     .product(
         name: "Subprocess",
         package: "swift-subprocess",
@@ -968,6 +969,13 @@ targets += [
     // LibPNG
 
     .target(
+        name: "CImageDecoder",
+        exclude: ["README.md"],
+        sources: ["CImageDecoder.c"],
+        publicHeadersPath: "include"
+    ),
+
+    .target(
         name: "libpng",
         dependencies: [
             .product(name: "ZLib", package: "zlib"),
@@ -1235,9 +1243,13 @@ targets += [
     .testTarget(
         name: "AdaRenderTests",
         dependencies: [
+            "AdaAssets",
             "AdaRender",
             "Math",
             "AdaUtilsTesting"
+        ],
+        resources: [
+            .copy("Fixtures/Images")
         ]
     ),
     .testTarget(

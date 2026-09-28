@@ -7,20 +7,6 @@ import SloppyRuntime
 #error("AdaEditor iOS requires the SloppyRuntimePortable package. Set SLOPPY_RUNTIME_LOCAL_PATH to its checkout.")
 #endif
 
-struct MobileEditorProject: Codable, Identifiable, Hashable {
-    let id: UUID
-    var title: String
-    var prompt: String?
-    let isExample: Bool
-
-    static let forest = MobileEditorProject(
-        id: UUID(uuidString: "7B0A53A1-BCF6-40A9-9916-06AA92342509") ?? UUID(),
-        title: "Foxwood",
-        prompt: "Create a 2D platformer about a fox in an enchanted forest",
-        isExample: true
-    )
-}
-
 enum MobileEditorWorkspaceTab: Hashable {
     case build
     case files
@@ -31,12 +17,21 @@ private enum MobileEditorDestination: Hashable {
     case workspace(UUID)
     case settings
     case agentSettings
+    case projectSettings(UUID)
+    case sessions(UUID)
+    case session(UUID, String)
     case review(UUID)
 }
 
 private struct MobileEditorFilePresentation: Hashable {
     let project: MobileEditorProject
     let relativePath: String
+}
+
+private struct MobileEditorPlaySession {
+    let projectID: UUID
+    let artifact: EditorAdaScriptProjectBuildArtifact
+    let capture: EditorProjectPreviewCapture
 }
 
 struct MobileEditorRootView: View {
@@ -54,11 +49,15 @@ struct MobileEditorRootView: View {
     @State private var activeChatProjectID: UUID?
     @State private var agentStatus: String?
     @State private var isAgentRunning = false
+    @State private var runningProjectID: UUID?
     @State private var agentActivityState: EditorAgentActivityState = .idle
     @State private var agentActivityID: String?
-    @State private var playArtifact: EditorAdaScriptProjectBuildArtifact?
-    @State private var playProjectID: UUID?
+    @State private var playSession: MobileEditorPlaySession?
+    @State private var presentedPlayProject: MobileEditorProject?
+    @State private var providerModels = MobileEditorProviderModelStore()
+    @State private var isModelPickerPresented = false
     @State private var presentedFile: MobileEditorFilePresentation?
+    @State private var isPromptPresented = false
 
     private let logo = ProjectOpeningAssets.loadAdaEngineLogo()
 
@@ -92,6 +91,34 @@ struct MobileEditorRootView: View {
                 .navigate(for: MobileEditorDestination.self, destination: destination)
         }
         .background(theme.editorColors.background.ignoresSafeArea())
+        .fullScreenCover(isPresented: $isPromptPresented) {
+            MobileEditorPromptPanel(
+                text: $promptDraft,
+                attachmentNames: pendingPromptAttachments.map(\.lastPathComponent),
+                isAgentRunning: isAgentRunning,
+                pickFiles: pickAgentFiles,
+                pickPhotos: pickAgentPhotos,
+                submit: {
+                    isPromptPresented = false
+                    if let id = activeChatProjectID { submitPrompt(for: id) }
+                }
+            )
+        }
+        .fullScreenCover(item: $presentedPlayProject) { project in
+            MobileEditorPlayScreen(
+                project: project,
+                artifact: playSession?.projectID == project.id ? playSession?.artifact : nil,
+                capture: playSession?.projectID == project.id ? playSession?.capture : nil,
+                message: agentStatus,
+                isAgentRunning: isAgentRunning,
+                submitFeedback: { image, markup, text in
+                    try await submitGameFeedback(image: image, markup: markup, text: text, for: project.id)
+                }
+            )
+        }
+        .fullScreenCover(isPresented: $isModelPickerPresented) {
+            MobileEditorModelPickerScreen(modelStore: providerModels)
+        }
         .fullScreenCover(item: $presentedFile) { request in
             MobileEditorFileCover(project: request.project, relativePath: request.relativePath)
         }
@@ -111,22 +138,18 @@ struct MobileEditorRootView: View {
                     pendingAttachmentNames: pendingPromptAttachments.map(\.lastPathComponent),
                     chatEvents: chatEvents,
                     agentStatus: agentStatus,
-                    isAgentRunning: isAgentRunning,
                     agentActivityState: agentActivityState,
                     agentActivityID: agentActivityID,
-                    playArtifact: playProjectID == id ? playArtifact : nil,
                     preparePlay: { preparePlay(for: id) },
                     onOpenFile: { relativePath in
                         presentedFile = MobileEditorFilePresentation(project: project, relativePath: relativePath)
                     },
-                    submitPrompt: { submitPrompt(for: id) },
+                    openPrompt: { isPromptPresented = true },
                     showReview: {
                         acceptedExample = false
                         navigationPath.append(MobileEditorDestination.review(id))
                     },
-                    goBack: { navigationPath.removeLast() },
-                    pickFiles: pickAgentFiles,
-                    pickPhotos: pickAgentPhotos
+                    goBack: { navigationPath.removeLast() }
                 )
                 .navigationTitle(project.title)
                 .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
@@ -135,7 +158,7 @@ struct MobileEditorRootView: View {
                 .navigationBarColor(theme.editorColors.background)
                 .navigationBarTrailingItems {
                     Button {
-                        navigationPath.append(MobileEditorDestination.settings)
+                        navigationPath.append(MobileEditorDestination.projectSettings(id))
                     } label: {
                         Text("\u{E5D4}")
                             .foregroundColor(.white)
@@ -157,12 +180,57 @@ struct MobileEditorRootView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationBarColor(theme.editorColors.background)
         case .agentSettings:
-            MobileEditorAgentSettingsScreen()
+            MobileEditorAgentSettingsScreen(modelStore: providerModels) {
+                isModelPickerPresented = true
+            }
                 .navigationTitle("Providers")
                 .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
                 .navigationTitlePosition(.center)
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationBarColor(theme.editorColors.background)
+        case .projectSettings(let id):
+            if let project = projects.first(where: { $0.id == id }) {
+                MobileEditorProjectSettingsScreen(
+                    project: project,
+                    isBusy: runningProjectID == id,
+                    rename: { title in
+                        guard runningProjectID != id else { return }
+                        projects = try MobileAdaScriptProjectService.renameProject(id: id, to: title)
+                    },
+                    delete: {
+                        guard runningProjectID != id else { return }
+                        projects = try MobileAdaScriptProjectService.deleteProject(id: id)
+                        chatEvents = []
+                        activeChatProjectID = nil
+                        playSession?.capture.stop()
+                        playSession = nil
+                        navigationPath = NavigationPath()
+                    },
+                    showSessions: { navigationPath.append(MobileEditorDestination.sessions(id)) }
+                )
+                .navigationTitle("Project settings")
+                .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarColor(theme.editorColors.background)
+            }
+        case .sessions(let id):
+            if let directory = try? MobileAdaScriptProjectService.projectURL(for: id) {
+                MobileEditorSessionsScreen(workspaceURL: directory) { sessionID in
+                    navigationPath.append(MobileEditorDestination.session(id, sessionID))
+                }
+                .navigationTitle("Previous sessions")
+                .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarColor(theme.editorColors.background)
+            }
+        case .session(let id, let sessionID):
+            if let directory = try? MobileAdaScriptProjectService.projectURL(for: id) {
+                MobileEditorSessionDetailScreen(workspaceURL: directory, sessionID: sessionID)
+                    .navigationTitle("Conversation")
+                    .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarColor(theme.editorColors.background)
+            }
         case .review(let id):
             MobileEditorReviewScreen(accepted: $acceptedExample)
                 .navigationTitle("Changes")
@@ -201,22 +269,47 @@ struct MobileEditorRootView: View {
         chatEvents = []
         activeChatProjectID = project.id
         agentStatus = nil
-        playArtifact = nil
-        playProjectID = project.id
+        playSession?.capture.stop()
+        playSession = nil
         navigationPath.append(MobileEditorDestination.workspace(project.id))
         Task { @MainActor in await loadChat(for: project.id) }
     }
 
     private func preparePlay(for id: UUID) {
-        guard let project = projects.first(where: { $0.id == id }), !project.isExample else { return }
+        guard let project = projects.first(where: { $0.id == id }) else { return }
+        if project.isExample {
+            playSession?.capture.stop()
+            playSession = nil
+            presentedPlayProject = project
+            return
+        }
         do {
             let directory = try MobileAdaScriptProjectService.prepare(project)
-            playArtifact = try MobileAdaScriptProjectService.build(at: directory)
-            playProjectID = id
+            let artifact = try MobileAdaScriptProjectService.build(at: directory)
+            playSession?.capture.stop()
+            playSession = MobileEditorPlaySession(
+                projectID: id,
+                artifact: artifact,
+                capture: EditorProjectPreviewCapture(projectURL: directory)
+            )
+            presentedPlayProject = project
         } catch {
-            playArtifact = nil
+            playSession?.capture.stop()
+            playSession = nil
             agentStatus = error.localizedDescription
         }
+    }
+
+    private func submitGameFeedback(image: Image, markup: EditorGameScreenshotMarkup, text: String, for id: UUID) async throws {
+        guard !isAgentRunning, activeChatProjectID == id else { return }
+        let data = try await markup.pngData(for: image)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("game-feedback-\(UUID().uuidString).png")
+        try data.write(to: url, options: .atomic)
+        promptDraft = text
+        pendingPromptAttachments.append(url)
+        workspaceTab = .build
+        presentedPlayProject = nil
+        submitPrompt(for: id)
     }
 
     private func submitPrompt(for id: UUID) {
@@ -227,9 +320,11 @@ struct MobileEditorRootView: View {
         }
         let credentials = MobileSloppyCredentialStore.load()
         let codexCredentials = MobileCodexCredentialStore.load()
-        guard (credentials?.apiKey.isEmpty == false || codexCredentials != nil),
+        let usesCodex = credentials?.provider.map { $0 == .codex } ?? (codexCredentials != nil)
+        guard (usesCodex ? codexCredentials != nil : credentials?.apiKey.isEmpty == false),
               let credentials, !credentials.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            agentStatus = "Configure a provider and MODEL_ID in Settings."
+            agentStatus = nil
+            configureAgent()
             return
         }
         let workspaceURL: URL
@@ -270,13 +365,14 @@ struct MobileEditorRootView: View {
         ))
         agentStatus = "Agent is working…"
         isAgentRunning = true
+        runningProjectID = id
         agentActivityState = .working
         let activityID = UUID().uuidString
         agentActivityID = activityID
         let streamID = "stream-\(UUID().uuidString)"
         Task { @MainActor in
             do {
-                if let codexCredentials {
+                if usesCodex, let codexCredentials {
                     try await sloppyRuntime.configureCodex(
                         tokenProvider: { MobileCodexCredentialStore.load()?.accessToken ?? "" },
                         accountID: codexCredentials.accountID,
@@ -324,6 +420,7 @@ struct MobileEditorRootView: View {
             }
             await loadChat(for: id)
             isAgentRunning = false
+            runningProjectID = nil
         }
     }
 

@@ -7,8 +7,20 @@
 import Foundation
 import Testing
 
-@Suite("Image Texture Initialization")
+@Suite("Image Texture Initialization", .serialized)
 struct ImageTextureInitializationTests {
+
+    @Test(arguments: ["red.jpg", "pixels.bmp", "pixels.tga"])
+    func textureCanInitializeFromDecodedImage(fileName: String) throws {
+        try Self.setupHeadlessRenderEngineIfNeeded()
+        let url = try #require(Bundle.module.url(forResource: fileName, withExtension: nil, subdirectory: "Images"))
+        let image = try Image(contentsOf: url)
+        let texture = Texture2D(image: image)
+        let readback = Image(texture: texture)
+        #expect(texture.width == image.width)
+        #expect(texture.height == image.height)
+        #expect(readback.data == image.data)
+    }
 
     @Test
     func imageCanInitializeFromTexture2D() throws {

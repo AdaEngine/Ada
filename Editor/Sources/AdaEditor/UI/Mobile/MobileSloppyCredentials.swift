@@ -3,26 +3,34 @@ import Foundation
 import Security
 import UIKit
 
+enum MobileAgentProvider: String, Codable, Sendable {
+    case codex
+    case api
+}
+
 struct MobileSloppyCredentials: Codable, Sendable {
     var apiKey: String
     var model: String
     var apiURL: String
+    var provider: MobileAgentProvider?
 
     static let defaultAPIURL = "https://api.openai.com/v1"
 
-    init(apiKey: String = "", model: String = "", apiURL: String = Self.defaultAPIURL) {
+    init(apiKey: String = "", model: String = "", apiURL: String = Self.defaultAPIURL, provider: MobileAgentProvider? = nil) {
         self.apiKey = apiKey
         self.model = model
         self.apiURL = apiURL
+        self.provider = provider
     }
 
-    private enum CodingKeys: String, CodingKey { case apiKey, model, apiURL }
+    private enum CodingKeys: String, CodingKey { case apiKey, model, apiURL, provider }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         apiKey = try values.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
         model = try values.decodeIfPresent(String.self, forKey: .model) ?? ""
         apiURL = try values.decodeIfPresent(String.self, forKey: .apiURL) ?? Self.defaultAPIURL
+        provider = try values.decodeIfPresent(MobileAgentProvider.self, forKey: .provider)
     }
 }
 

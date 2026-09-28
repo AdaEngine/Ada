@@ -50,6 +50,36 @@ struct LiquidGlassTabBarStyleTests {
     }
 
     @Test
+    func bottomTabBarStaysAtScreenBottomWhenKeyboardAppears() throws {
+        let tester = ViewTester {
+            TabView(selection: Binding<Int>(get: { 0 }, set: { _ in })) {
+                Tab("Build", value: 0) {
+                    Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                Tab("Play", value: 1, placement: .floating) {
+                    Color.clear
+                }
+            }
+            .tabViewPosition(.bottom)
+            .tabViewStyle(LiquidGlassTabBarStyle())
+        }
+        .setSize(Size(width: 390, height: 844))
+        tester.containerView.safeAreaInsets = EdgeInsets(top: 59, leading: 0, bottom: 34, trailing: 0)
+        tester.performLayout()
+        let original = try #require(tester.findNodeByAccessibilityIdentifier("AdaUI.TabView.Floating.1")).visualAbsoluteFrame()
+
+        tester.containerView.keyboardOccludedHeight = 301
+        tester.performLayout()
+        let withKeyboard = try #require(tester.findNodeByAccessibilityIdentifier("AdaUI.TabView.Floating.1")).visualAbsoluteFrame()
+        #expect(abs(original.minY - withKeyboard.minY) < 0.5)
+
+        tester.containerView.keyboardOccludedHeight = 0
+        tester.performLayout()
+        let restored = try #require(tester.findNodeByAccessibilityIdentifier("AdaUI.TabView.Floating.1")).visualAbsoluteFrame()
+        #expect(abs(original.minY - restored.minY) < 0.5)
+    }
+
+    @Test
     func switchingTabsKeepsSelectedContentAndNavigationChrome() async throws {
         let root = LiquidGlassNavigationTabRoot()
         let tester = ViewTester(rootView: root)

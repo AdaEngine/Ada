@@ -250,6 +250,8 @@ extension View {
 /// A view that displays a root view and enables you to present additional views over the root view.
 ///
 /// Use `.navigate(for:destination:)` on child views to register destinations.
+/// Drag right from the leading edge to reveal the previous screen interactively.
+/// Releasing a short drag or cancelling the touch restores the current screen.
 ///
 /// ```swift
 /// NavigationStack {
@@ -313,6 +315,7 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
         static let backSwipeEdgeWidth: Float = 24
         static let backSwipeThreshold: Float = 72
         static let backSwipeMaximumVerticalDrift: Float = 56
+        static let backSwipeMinimumDistance: Float = 8
     }
 
     private struct NavigationBarState {
@@ -344,6 +347,12 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
     private var backSwipeContactID: RID?
     private var backSwipeFailed = false
     private var backSwipePopPending = false
+    private var backSwipePopTask: Task<Void, Never>?
+    private var backSwipeSettling = false
+
+    private var backSwipeBlocksInput: Bool {
+        backSwipeContactID != nil || backSwipePopPending || presentation.isInteractive || backSwipeSettling
+    }
 
     private lazy var dismissAction = DismissAction { [weak self] in
         self?.navigationContext.pop()
@@ -360,7 +369,9 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
     }
 
     override var transientEnvironmentChildren: [ViewNode] { inspectionChildNodes }
-    var inputContentNodes: [ViewNode] { [navigationBarNode, currentContentNode].compactMap { $0 } }
+    var inputContentNodes: [ViewNode] {
+        backSwipeBlocksInput ? [] : [navigationBarNode, currentContentNode].compactMap { $0 }
+    }
 
     init(
         inputs: _ViewInputs,
@@ -411,6 +422,10 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
         let pathChanged = renderedPath != nextPath
         if pathChanged {
             resetBackSwipe()
+            backSwipePopTask?.cancel()
+            backSwipePopTask = nil
+            backSwipePopPending = false
+            presentation.endInteractiveTransition(completing: false, animated: false)
         }
         let style: ViewPresentationTransition.Style = nextPath.count < renderedPath.count ? .pop : .push
         if let retained = retainedScreens[nextPath], newNode.canUpdate(retained) {
@@ -538,20 +553,21 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
     }
 
     override func performLayout() {
-        let placesContentBelowBar = reservedNavigationBarHeight > 0 && !Self.nodeConsumesTopSafeArea(currentContentNode)
-        let contentOriginY: Float = placesContentBelowBar ? reservedNavigationBarHeight : 0
-        let contentSize = Size(
-            width: frame.width,
-            height: max(0, frame.height - contentOriginY)
-        )
-        contentBounds = Rect(origin: Point(0, contentOriginY), size: contentSize)
-        presentation.layout(in: contentBounds)
+        contentBounds = contentLayoutBounds(for: currentContentNode)
+        presentation.layout(in: contentBounds, boundsForNode: contentLayoutBounds(for:))
         navigationBarNode?
             .place(
                 in: .zero,
                 anchor: .topLeading,
                 proposal: ProposedViewSize(width: frame.width, height: totalNavigationBarReservedHeight)
             )
+    }
+
+    private func contentLayoutBounds(for node: ViewNode) -> Rect {
+        let configuration = Self.navigationBarState(in: node).configuration
+        let placesBelowBar = !configuration.isHidden && !Self.nodeConsumesTopSafeArea(node)
+        let originY: Float = placesBelowBar ? totalNavigationBarReservedHeight : 0
+        return Rect(origin: Point(0, originY), size: Size(width: frame.width, height: max(0, frame.height - originY)))
     }
 
     override func updateEnvironment(_ environment: EnvironmentValues) {
@@ -606,8 +622,8 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
     }
 
     private static func nodeConsumesTopSafeArea(_ node: ViewNode) -> Bool {
-        if node is ScrollViewNode {
-            return true
+        if let scrollView = node as? ScrollViewNode {
+            return scrollView.environment._scrollViewRespectsSafeArea
         }
 
         if let modifier = node as? ViewModifierNode {
@@ -641,6 +657,9 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
         guard self.point(inside: point, with: event) else {
             return nil
         }
+        if backSwipeBlocksInput {
+            return self
+        }
         if let navigationBarNode {
             let barPoint = navigationBarNode.convert(point, from: self)
             if let hit = navigationBarNode.hitTest(barPoint, with: event) {
@@ -657,7 +676,7 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
         var context = context
         context.environment = environment
         context.translateBy(x: frame.origin.x, y: -frame.origin.y)
-        presentation.draw(with: context, in: contentBounds)
+        presentation.draw(with: context, in: Rect(origin: .zero, size: frame.size))
         navigationBarNode?.draw(with: context)
     }
 
@@ -667,6 +686,7 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
             rebuildContent(syncBinding: false)
         }
         presentation.update(deltaTime)
+        if !presentation.isInteractive, !presentation.isAnimating { backSwipeSettling = false }
         navigationBarNode?.update(deltaTime)
     }
 
@@ -691,6 +711,11 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
     override func didMove(to parent: ViewNode?) {
         super.didMove(to: parent)
         if parent == nil {
+            resetBackSwipe()
+            backSwipePopTask?.cancel()
+            backSwipePopTask = nil
+            backSwipePopPending = false
+            backSwipeSettling = false
             presentation.detach()
             navigationBarNode?.parent = nil
         } else {
@@ -700,17 +725,26 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
     }
 
     override func onMouseEvent(_ event: MouseEvent) {
+        guard !backSwipeBlocksInput else {
+            return
+        }
         currentContentNode.onMouseEvent(event)
         navigationBarNode?.onMouseEvent(event)
     }
 
     override func onReceiveEvent(_ event: any InputEvent) {
+        guard !backSwipeBlocksInput else {
+            return
+        }
         currentContentNode.onReceiveEvent(event)
         navigationBarNode?.onReceiveEvent(event)
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
-        if let touch = touches.first, handleBackSwipe(touch) {
+        if let touch = touches.first(where: { $0.contactID == backSwipeContactID }) ?? touches.first, handleBackSwipe(touch) {
+            return
+        }
+        guard !backSwipeBlocksInput else {
             return
         }
         currentContentNode.onTouchesEvent(touches)
@@ -720,6 +754,8 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
     private func shouldCaptureBackSwipe(at point: Point) -> Bool {
         !navigationContext.path.isEmpty
             && !presentation.isAnimating
+            && !presentation.isInteractive
+            && backSwipeContactID == nil
             && !backSwipePopPending
             && !Self.navigationBarState(in: currentContentNode).configuration.backButtonHidden
             && point.x >= 0
@@ -744,7 +780,9 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
             }
             if abs(point.y - start.y) > Constants.backSwipeMaximumVerticalDrift {
                 backSwipeFailed = true
+                presentation.endInteractiveTransition(completing: false)
             }
+            if !backSwipeFailed { updateBackSwipe(at: point, from: start) }
             return true
         case .ended:
             guard touch.contactID == backSwipeContactID, let start = backSwipeStartPoint else {
@@ -753,9 +791,17 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
             let shouldPop = !backSwipeFailed
                 && point.x - start.x >= Constants.backSwipeThreshold
                 && abs(point.y - start.y) <= Constants.backSwipeMaximumVerticalDrift
+            if !backSwipeFailed { updateBackSwipe(at: point, from: start) }
             resetBackSwipe()
-            if shouldPop {
+            if shouldPop, presentation.isInteractive {
+                // Without a settling animation, retain the outgoing native views
+                // until UIKit has finished dispatching this touch.
+                if !environment.animationsDisabled {
+                    presentation.endInteractiveTransition(completing: true)
+                }
                 scheduleBackSwipePop()
+            } else {
+                presentation.endInteractiveTransition(completing: false)
             }
             return true
         case .cancelled:
@@ -763,8 +809,42 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
                 return false
             }
             resetBackSwipe()
+            presentation.endInteractiveTransition(completing: false)
             return true
         }
+    }
+
+    private func updateBackSwipe(at point: Point, from start: Point) {
+        let distance = max(0, point.x - start.x)
+        if !presentation.isInteractive, distance >= Constants.backSwipeMinimumDistance,
+           distance > abs(point.y - start.y), frame.width > 0 {
+            var previousPath = renderedPath
+            previousPath.removeLast()
+            let inputs = Self.makeChildInputs(from: viewInputs, context: navigationContext, dismiss: dismissAction)
+            let updated: ViewNode
+            if let value = previousPath.topElement,
+               let destination = navigationContext.buildDestination(for: value, inputs: inputs) {
+                updated = destination
+            } else {
+                updated = contentBuilder(inputs)
+            }
+            let previous: ViewNode
+            if let retained = retainedScreens[previousPath], updated.canUpdate(retained) {
+                retained.update(from: updated)
+                previous = retained
+            } else {
+                previous = updated
+                retainedScreens[previousPath] = previous
+            }
+            let configuration = Self.navigationBarState(in: previous).configuration
+            let safeAreaHeight = !configuration.isHidden && Self.nodeConsumesTopSafeArea(previous) ? totalNavigationBarReservedHeight : 0
+            previous.updateEnvironment(makeContentInputs(reservingNavigationBarHeight: safeAreaHeight).environment)
+            presentation.beginInteractiveTransition(to: previous, style: .pop)
+            if let navigationBarNode { owner?.deactivateInput(in: navigationBarNode) }
+            backSwipeSettling = true
+            performLayout()
+        }
+        if frame.width > 0 { presentation.updateInteractiveTransition(progress: distance / frame.width) }
     }
 
     private func resetBackSwipe() {
@@ -779,21 +859,24 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
         }
         backSwipePopPending = true
         let expectedPath = navigationContext.path
-        Task { @MainActor [weak self] in
+        backSwipePopTask = Task { @MainActor [weak self] in
             do {
                 // UIKit must finish dispatching the touch before the current screen is removed.
                 try await Task.sleep(for: .milliseconds(80))
             } catch {
-                self?.backSwipePopPending = false
                 return
             }
             guard let self else {
                 return
             }
             self.backSwipePopPending = false
-            guard self.navigationContext.path == expectedPath else {
+            self.backSwipePopTask = nil
+            guard self.navigationContext.path == expectedPath, self.pathBinding.wrappedValue == expectedPath else {
+                self.navigationContext.replacePath(self.pathBinding.wrappedValue)
+                self.rebuildContent(syncBinding: false)
                 return
             }
+            self.presentation.endInteractiveTransition(completing: true)
             self.navigationContext.pop()
         }
     }

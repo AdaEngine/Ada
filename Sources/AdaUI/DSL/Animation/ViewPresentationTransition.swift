@@ -75,6 +75,14 @@ final class ViewPresentationTransition {
     private(set) var entries: [Entry] = []
     private(set) var selected: ViewNode?
     private var controller: UIAnimationController?
+    private struct InteractiveTransition {
+        let source: ViewNode
+        let destination: ViewNode
+        let style: Style
+        var progress: Float = 0
+    }
+    private var interactiveTransition: InteractiveTransition?
+    var isInteractive: Bool { interactiveTransition != nil }
     var isAnimating: Bool { controller?.isPlaying == true }
     var nodes: [ViewNode] { entries.map(\.node) }
 
@@ -89,6 +97,7 @@ final class ViewPresentationTransition {
         guard let host else {
             return
         }
+        if isInteractive { endInteractiveTransition(completing: false, animated: false) }
         controller?.stopAnimation()
         if let previous = selected { host.owner?.deactivateInput(in: previous) }
         selected = node
@@ -129,8 +138,67 @@ final class ViewPresentationTransition {
         invalidateDisplay()
     }
 
-    func layout(in bounds: Rect) {
+    /// Reveals a retained destination without changing the selected screen or path.
+    /// The caller owns the touch sequence and commits navigation only on completion.
+    func beginInteractiveTransition(to destination: ViewNode, style: Style) {
+        guard let host, let source = selected, source !== destination, !isAnimating, !isInteractive else {
+            return
+        }
+        host.owner?.deactivateInput(in: source)
+        interactiveTransition = InteractiveTransition(source: source, destination: destination, style: style)
+        let entry = Entry(node: destination, pose: style.insertion)
+        if style == .pop {
+            entries.insert(entry, at: 0)
+        } else {
+            entries.append(entry)
+        }
+        destination.parent = host
+        if let owner = host.owner { destination.updateViewOwner(owner) }
+        invalidateDisplay()
+    }
+
+    func updateInteractiveTransition(progress: Float) {
+        guard var transition = interactiveTransition else {
+            return
+        }
+        transition.progress = min(1, max(0, progress))
+        interactiveTransition = transition
         for entry in entries {
+            let from = entry.node === transition.source ? Pose() : transition.style.insertion
+            let to = entry.node === transition.source ? transition.style.removal : Pose()
+            entry.pose.animatableData = from.animatableData + (to.animatableData - from.animatableData) * transition.progress
+        }
+        invalidateDisplay()
+    }
+
+    /// Settles from the current finger-controlled pose, so release never restarts the transition.
+    func endInteractiveTransition(completing: Bool, animated: Bool = true) {
+        guard let transition = interactiveTransition, let host else {
+            return
+        }
+        interactiveTransition = nil
+        selected = completing ? transition.destination : transition.source
+        guard animated, host.owner != nil, !host.environment.animationsDisabled else {
+            finish()
+            return
+        }
+        let remaining = completing ? 1 - transition.progress : transition.progress
+        let controller = UIAnimationController(animation: .easeInOut(duration: TimeInterval(max(0.08, 0.28 * remaining))))
+        self.controller = controller
+        for entry in entries {
+            let target = entry.node === selected ? Pose() : (completing ? transition.style.removal : transition.style.insertion)
+            controller.addTweenAnimation(from: entry.pose, to: target, label: entry.node.id, environment: host.environment) { [weak self, weak entry] pose in
+                entry?.pose = pose
+                self?.invalidateDisplay()
+            }
+        }
+        controller.playAnimation()
+        invalidateDisplay()
+    }
+
+    func layout(in bounds: Rect, boundsForNode: ((ViewNode) -> Rect)? = nil) {
+        for entry in entries {
+            let bounds = boundsForNode?(entry.node) ?? bounds
             entry.node.performWithTransientAnimationController(nil) {
                 entry.node.place(in: Point(bounds.midX, bounds.midY), anchor: .center, proposal: ProposedViewSize(bounds.size))
             }
@@ -188,6 +256,7 @@ final class ViewPresentationTransition {
     func detach() {
         controller?.stopAnimation()
         controller = nil
+        interactiveTransition = nil
         entries.forEach { $0.node.parent = nil }
         entries.removeAll()
         selected = nil

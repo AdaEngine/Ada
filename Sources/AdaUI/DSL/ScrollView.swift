@@ -548,6 +548,9 @@ final class ScrollViewNode: LayoutViewContainerNode {
     }
 
     private func resolvedContentInsets() -> EdgeInsets {
+        guard environment._scrollViewRespectsSafeArea else {
+            return EdgeInsets()
+        }
         let safeAreaInsets = environment.safeAreaInsets
         return EdgeInsets(
             top: axis.contains(.vertical) ? safeAreaInsets.top : 0,

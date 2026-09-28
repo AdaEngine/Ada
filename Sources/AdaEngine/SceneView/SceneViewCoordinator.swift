@@ -47,6 +47,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
 
     private let makeClosure: @MainActor (inout AppWorlds) -> Void
     private let updateContentClosure: @MainActor (World, AdaUtils.TimeInterval) -> Void
+    private let onFrameRendered: (@MainActor (Texture2D) -> Void)?
     private let resizeApplyDelay: AdaUtils.TimeInterval = 0.08
     /// Common guaranteed 2D texture limit across the supported Metal and WebGPU device families.
     private let maximumRenderTextureDimension = 8_192
@@ -63,10 +64,12 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
 
     init(
         make: @escaping @MainActor (inout AppWorlds) -> Void,
-        updateContent: @escaping @MainActor (World, AdaUtils.TimeInterval) -> Void
+        updateContent: @escaping @MainActor (World, AdaUtils.TimeInterval) -> Void,
+        onFrameRendered: (@MainActor (Texture2D) -> Void)? = nil
     ) {
         self.makeClosure = make
         self.updateContentClosure = updateContent
+        self.onFrameRendered = onFrameRendered
         self.hostSubworldName = AppWorldName(rawValue: "SceneView.\(UUID().uuidString)")
     }
 
@@ -410,6 +413,9 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             } else if let frontRenderTexture {
                 renderTexture = Texture2DProxy(source: frontRenderTexture)
                 renderTextureDidChange?()
+            }
+            if let frontRenderTexture {
+                onFrameRendered?(frontRenderTexture)
             }
         }
         return didPublish
