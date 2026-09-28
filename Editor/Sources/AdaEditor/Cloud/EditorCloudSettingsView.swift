@@ -16,12 +16,12 @@ struct EditorCloudSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(account.accountID == nil ? "Sign in to Ada" : "Ada account")
+                Text(account.accountID == nil ? "Sign in to Ada Cloud" : "Ada Cloud account")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(theme.editorColors.text)
                 Text(
                     account.accountID == nil
-                        ? "Sync your editor settings and share web builds. Continue securely on the Ada website."
+                        ? "Connect Ada Studio to your Ada Cloud account. Continue securely in your browser."
                         : (!account.cloudServicesAvailable ? "Cloud Services will open soon." : account.pro ? "Pro · Web publishing enabled" : "Free · Editor settings sync")
                 )
                 .font(.system(size: 12))
@@ -29,10 +29,17 @@ struct EditorCloudSettingsView: View {
                 .lineLimit(3)
             }
             if account.accountID == nil {
-                actionButton(account.busy ? "Waiting for browser…" : "Sign in", primary: true, id: "SignIn") {
+                actionButton(account.busy ? "Waiting for browser…" : "Sign in with browser", primary: true, id: "SignIn") {
                     account.perform { try await account.signInOnWebsite() }
                 }
             } else {
+                if let accountID = account.accountID {
+                    Text("Signed in · \(accountID)")
+                        .font(.system(size: 12))
+                        .foregroundColor(theme.editorColors.text)
+                        .lineLimit(2)
+                        .accessibilityIdentifier("AdaEditor.Cloud.AccountIdentity")
+                }
                 if let date = account.expiresAt {
                     Text("Paid access until \(date.formatted())").font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
                 }

@@ -420,6 +420,11 @@ extension World {
         self.resources.removeResource(resource)
     }
 
+    /// Remove a resource when only its runtime type is known.
+    public func removeResource(_ resource: any Resource.Type) {
+        self.resources.removeResource(resource)
+    }
+
     /// Get a resource from the world.
     /// - Parameter resource: The resource to get.
     /// - Complexity: O(1)

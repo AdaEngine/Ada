@@ -67,6 +67,8 @@ public struct ScriptableObjectContext: Sendable {
         _ name: String = "",
         @ComponentsBuilder components: @escaping @Sendable () -> ComponentsBundle
     ) -> Entity.ID {
-        commands.spawn(name, components: components).entityId
+        let entityID = commands.spawn(name, components: components).entityId
+        world.getResource(SceneNavigator.self)?.trackSceneEntity(entityID)
+        return entityID
     }
 }

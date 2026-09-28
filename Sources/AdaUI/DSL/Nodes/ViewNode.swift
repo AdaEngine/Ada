@@ -158,9 +158,14 @@ class ViewNode: Identifiable {
     /// Set by `.environment()` / `.transformEnvironment()` modifiers via `_ViewInputs.pendingEnvironmentTransform`.
     /// Allows lazy re-derivation when the parent environment changes.
     var environmentTransform: ((inout EnvironmentValues) -> Void)?
+    var transactionTransform: ((inout Transaction) -> Void)?
 
     /// Contains position and size relative to parent view.
     private(set) var frame: Rect = .zero
+    private weak var frameAnimationController: UIAnimationController?
+    private var frameAnimationTarget: Rect?
+    // Outer nil means layout-only work; inner nil explicitly requests a snap.
+    private var pendingLayoutAnimation: UIAnimationController??
     private(set) var lastLayoutProposal: ProposedViewSize = .unspecified
     var transform: Transform3D = .identity
     private(set) var layoutProperties = LayoutProperties()
@@ -299,7 +304,12 @@ class ViewNode: Identifiable {
         []
     }
 
-    func performWithTransientAnimationController(_ animationController: UIAnimationController, _ operation: () -> Void) {
+    func recordLayoutAnimation(_ controller: UIAnimationController?) {
+        pendingLayoutAnimation = .some(environment.animationsDisabled ? nil : controller)
+        for child in transientEnvironmentChildren { child.recordLayoutAnimation(controller) }
+    }
+
+    func performWithTransientAnimationController(_ animationController: UIAnimationController?, _ operation: () -> Void) {
         let originalEnvironment = self.environment
         var animatedEnvironment = originalEnvironment
         animatedEnvironment.animationController = animationController
@@ -359,16 +369,28 @@ class ViewNode: Identifiable {
         )
 
         let newFrame = Rect(origin: offset, size: size)
+        let updateAnimation = pendingLayoutAnimation
+        pendingLayoutAnimation = nil
+        let layoutController = updateAnimation ?? (environment.animationController?.isPlaying == true ? environment.animationController : nil)
+        if updateAnimation != nil, layoutController == nil,
+           frameAnimationController?.isPlaying == true, frameAnimationTarget == newFrame {
+            return
+        }
         let oldFrame = self.frame
         let shouldPerformLayout = oldFrame != newFrame || needsLayoutPass
         let isNestedAnimatedLayout = isInsideAnimatedLayoutPass()
         let canAnimateInNestedLayout = canAnimateNestedFrameChange(from: oldFrame, to: newFrame)
 
         if participatesInFrameAnimation,
-            let animationController = self.environment.animationController,
+            let animationController = layoutController,
             self.frame != .zero,
             oldFrame != newFrame,
             !isNestedAnimatedLayout || canAnimateInNestedLayout {
+            if frameAnimationController !== animationController {
+                frameAnimationController?.removeAnimation(label: "frame-\(self.id)")
+                frameAnimationController = animationController
+            }
+            frameAnimationTarget = newFrame
             animationController.addTweenAnimation(
                 from: self.frame,
                 to: newFrame,
@@ -392,6 +414,11 @@ class ViewNode: Identifiable {
                 }
             )
         } else {
+            if updateAnimation != nil, layoutController == nil, frameAnimationTarget != newFrame {
+                frameAnimationController?.removeAnimation(label: "frame-\(self.id)")
+                frameAnimationController = nil
+                frameAnimationTarget = nil
+            }
             self.frame = newFrame
             if shouldPerformLayout {
                 UILayoutDebugCounters.recordPerformLayout()
@@ -469,19 +496,15 @@ class ViewNode: Identifiable {
     var uiSceneNodeID: String?
 
     func update(from newNode: ViewNode) {
+        pendingLayoutAnimation = .some(animationControllerForUpdate)
         self.markInspectionRedraw()
         let shouldInvalidateForEnvironmentChange = shouldInvalidateContent(forResolvedEnvironment: newNode.environment)
         self.environmentTransform = newNode.environmentTransform
+        self.transactionTransform = newNode.transactionTransform
         self.structuralIdentity = newNode.structuralIdentity
         self.accessibilityIdentifier = newNode.accessibilityIdentifier
         self.uiSceneNodeID = newNode.uiSceneNodeID
-        var resolvedEnvironment = newNode.environment
-        if !resolvedEnvironment.animationsDisabled,
-            resolvedEnvironment.animationController == nil,
-            let animationController = self.environment.animationController {
-            resolvedEnvironment.animationController = animationController
-        }
-        self.applyResolvedEnvironmentSilently(resolvedEnvironment)
+        self.applyResolvedEnvironmentSilently(newNode.environment)
         self.setContent(newNode.content)
         self.rebindStorages()
         if shouldInvalidateForEnvironmentChange {
@@ -932,6 +955,8 @@ protocol ViewOwner: AnyObject {
     func addTransientAnimationController(_ animationController: UIAnimationController)
 
     func enqueueLifecycleAction(_ action: @escaping @MainActor () -> Void)
+
+    func deactivateInput(in subtree: ViewNode)
 }
 
 extension UIGraphicsContext {

@@ -181,6 +181,7 @@ public struct GeometryReader<Content: View>: View, ViewNodeBuilder {
 
 /// A geometry reader view node.
 final class GeometryReaderViewNode<Content: View>: ViewContainerNode {
+    private var deferredTransaction: DeferredViewTransaction?
     /// The content proxy.
     private var contentProxy: (GeometryProxy) -> Content
     private var lastContentSignature: ContentSignature?
@@ -218,13 +219,9 @@ final class GeometryReaderViewNode<Content: View>: ViewContainerNode {
         self.structuralIdentity = geometryReaderNode.structuralIdentity
         self.accessibilityIdentifier = geometryReaderNode.accessibilityIdentifier
 
-        var resolvedEnvironment = geometryReaderNode.environment
-        if !resolvedEnvironment.animationsDisabled,
-            resolvedEnvironment.animationController == nil,
-            let animationController = self.environment.animationController {
-            resolvedEnvironment.animationController = animationController
-        }
-        self.applyResolvedEnvironmentSilently(resolvedEnvironment)
+        self.transactionTransform = geometryReaderNode.transactionTransform
+        self.applyResolvedEnvironmentSilently(geometryReaderNode.environment)
+        self.deferredTransaction = DeferredViewTransaction(for: self)
         self.setContent(geometryReaderNode.content)
 
         self.contentNeedsRebuild = true
@@ -237,6 +234,25 @@ final class GeometryReaderViewNode<Content: View>: ViewContainerNode {
     ///
     /// - Returns: The layout of the geometry reader view node.
     override func performLayout() {
+        if let transaction = deferredTransaction {
+            deferredTransaction = nil
+            transaction.perform(on: self) { performGeometryLayout() }
+            // Restoring the temporary animation environment is not a content
+            // change. Keep the measured geometry, but remember the restored
+            // environment revision so place() does not rebuild the body twice.
+            if let signature = lastContentSignature {
+                lastContentSignature = ContentSignature(
+                    frame: signature.frame,
+                    globalFrame: signature.globalFrame,
+                    environmentVersion: environment.version
+                )
+            }
+        } else {
+            performGeometryLayout()
+        }
+    }
+
+    private func performGeometryLayout() {
         let signature = self.currentContentSignature()
         if contentNeedsRebuild || lastContentSignature != signature {
             self.rebuildContent(for: signature)
@@ -271,6 +287,7 @@ final class GeometryReaderViewNode<Content: View>: ViewContainerNode {
     ///
     /// - Returns: The invalidated content of the geometry reader view node.
     override func invalidateContent() {
+        self.deferredTransaction = DeferredViewTransaction(for: self)
         self.contentNeedsRebuild = true
         self.markNeedsLayout()
         self.invalidateNearestLayer()
@@ -305,13 +322,22 @@ final class GeometryReaderViewNode<Content: View>: ViewContainerNode {
             let content = self.contentProxy(proxy)
             return Content._makeListView(_ViewGraphNode(value: content), inputs: _ViewListInputs(input: context)).outputs
         } onChange: { [weak self] in
+            let transaction = UITransactionContext.current
             Task { @MainActor in
-                self?.scheduleObservedContentInvalidation(revision: observationRevision)
+                self?.scheduleObservedContentInvalidation(revision: observationRevision, transaction: transaction)
             }
         }
         let nodes = outputs.map(\.node)
 
-        self.reconcileChildNodes(from: nodes)
+        if disablesAnimation {
+            var transaction = UITransactionContext.current ?? Transaction()
+            transaction.animation = nil
+            BindingAnimationTransaction.withController(nil, transaction: transaction) {
+                self.reconcileChildNodes(from: nodes)
+            }
+        } else {
+            self.reconcileChildNodes(from: nodes)
+        }
         self.lastContentSignature = signature
         self.contentNeedsRebuild = false
     }

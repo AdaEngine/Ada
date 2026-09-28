@@ -50,6 +50,19 @@ struct EditorInspectorColorValue: Equatable, Sendable {
         [red, green, blue, alpha].map(Self.format).joined(separator: ", ")
     }
 
+    var components: [Float] {
+        [red, green, blue, alpha]
+    }
+
+    func replacingComponent(at index: Int, with component: Float) -> Self {
+        var values = components
+        guard values.indices.contains(index) else {
+            return self
+        }
+        values[index] = component
+        return Self(red: values[0], green: values[1], blue: values[2], alpha: values[3])
+    }
+
     var hexString: String {
         String(
             format: "#%02X%02X%02X%02X",
@@ -68,7 +81,7 @@ struct EditorInspectorColorValue: Equatable, Sendable {
         min(max(value, 0), 1)
     }
 
-    private static func format(_ value: Float) -> String {
+    static func format(_ value: Float) -> String {
         let formatted = String(format: "%.3f", value)
         return
             formatted

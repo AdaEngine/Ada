@@ -2,10 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>AdaCloudAPIURL</key>
+	<string>$(ADA_CLOUD_API_URL)</string>
+	<key>AdaCloudProProductID</key>
+	<string>$(ADA_CLOUD_PRO_PRODUCT_ID)</string>
 	<key>AdaEditorDistribution</key>
 	<string>$(ADAEDITOR_DISTRIBUTION)</string>
 	<key>CFBundleDisplayName</key>
-	<string>AdaEngine</string>
+	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconFile</key>

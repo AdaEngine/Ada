@@ -38,6 +38,32 @@ extension EditorComponentRegistry {
                     cells.append(coordinates.compactMap { $0.doubleValue.map(Int.init) })
                 }
             }
+            var paletteLayers: [(name: String, zIndex: Int, isEnabled: Bool, cells: [[Int]])] = []
+            if case let .array(values) = payload["paletteLayers"] {
+                for value in values {
+                    guard case let .object(fields) = value else { continue }
+                    var layerCells: [[Int]] = []
+                    if case let .array(entries)? = fields["cells"] {
+                        for entry in entries {
+                            guard case let .array(coordinates) = entry else { continue }
+                            layerCells.append(coordinates.compactMap { $0.doubleValue.map(Int.init) })
+                        }
+                    }
+                    paletteLayers.append((
+                        name: fields["name"]?.stringValue ?? "Layer \(paletteLayers.count + 1)",
+                        zIndex: fields["zIndex"]?.doubleValue.map(Int.init) ?? paletteLayers.count,
+                        isEnabled: fields["isEnabled"]?.boolValue ?? true,
+                        cells: layerCells
+                    ))
+                }
+            }
+            for (index, layer) in paletteLayers.enumerated() {
+                let target = index == 0 ? tileMap.layers[0] : tileMap.createLayer()
+                target.name = layer.name
+                target.zIndex = layer.zIndex
+                target.isEnabled = layer.isEnabled
+            }
+            let cellsByLayer = paletteLayers.isEmpty ? nil : paletteLayers.map(\.cells)
             if case let .array(paths) = payload["atlasTextures"], !paths.isEmpty {
                 var images = try paths.map { path -> Image in
                     guard case let .string(value) = path else {
@@ -50,7 +76,7 @@ extension EditorComponentRegistry {
                         images.append(Image(width: first.width, height: first.height, color: color.colorValue ?? .white))
                     }
                 }
-                try tileMap.setImagePalette(images, cells: cells)
+                try tileMap.setImagePalette(images, cells: cells, cellsByLayer: cellsByLayer)
             } else if case let .array(colorValues) = payload["atlasColors"], !colorValues.isEmpty {
                 var atlas = Image(width: colorValues.count, height: 1, color: .white)
                 for (index, colorValue) in colorValues.enumerated() {
@@ -62,12 +88,14 @@ extension EditorComponentRegistry {
                     source.createTile(for: [index, 0])
                 }
                 let sourceID = tileMap.tileSet.addTileSource(source)
-                for cell in cells where cell.count >= 3 && colorValues.indices.contains(cell[2]) {
-                    tileMap.layers[0].setCell(
-                        at: [cell[0], cell[1]],
-                        sourceId: sourceID,
-                        atlasCoordinates: [cell[2], 0]
-                    )
+                for (layerIndex, layerCells) in (cellsByLayer ?? [cells]).enumerated() {
+                    for cell in layerCells where cell.count >= 3 && colorValues.indices.contains(cell[2]) {
+                        tileMap.layers[layerIndex].setCell(
+                            at: [cell[0], cell[1]],
+                            sourceId: sourceID,
+                            atlasCoordinates: [cell[2], 0]
+                        )
+                    }
                 }
             }
             if let path = payload["tileSetReference"]?.stringValue, !path.isEmpty {
@@ -88,7 +116,9 @@ extension EditorComponentRegistry {
                     }
                 }
                 let legacyCount = max(payload["atlasColors"]?.tileMapArrayCount ?? 0, payload["atlasTextures"]?.tileMapArrayCount ?? 0)
-                try tileMap.installTileSetPalette(linkedSet, palette: palette, cells: cells, firstPaletteIndex: legacyCount)
+                try tileMap.installTileSetPalette(
+                    linkedSet, palette: palette, cells: cells, firstPaletteIndex: legacyCount, cellsByLayer: cellsByLayer
+                )
             }
             return TileMapComponent(
                 tileMap: tileMap,

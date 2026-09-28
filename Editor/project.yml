@@ -59,7 +59,7 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AdaEngine
-        PRODUCT_NAME: AdaEngine
+        PRODUCT_NAME: "Ada Studio"
         PRODUCT_BUNDLE_IDENTIFIER: org.adaengine.editor
         ADA_CLOUD_API_URL: ""
         ADA_CLOUD_PRO_PRODUCT_ID: ""
@@ -79,6 +79,13 @@ targets:
         shell: /bin/zsh
         showEnvVars: false
         basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(BUILT_PRODUCTS_DIR)/AdaEditor
+          - $(BUILT_PRODUCTS_DIR)/AdaEditor_AdaEditor.bundle
+          - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaUI.bundle
+        # CodeSign must run after staging replaces the executable and resources.
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)
         script: |
           set -euo pipefail
 
@@ -86,6 +93,8 @@ targets:
           destination_binary="${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}"
           source_resources="${BUILT_PRODUCTS_DIR}/AdaEditor_AdaEditor.bundle"
           destination_resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AdaEditor_AdaEditor.bundle"
+          source_ui_resources="${BUILT_PRODUCTS_DIR}/AdaEngine_AdaUI.bundle"
+          destination_ui_resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AdaEngine_AdaUI.bundle"
 
           if [[ ! -x "${source_binary}" ]]; then
             echo "error: SwiftPM executable not found at ${source_binary}" >&2
@@ -96,11 +105,17 @@ targets:
             exit 1
           fi
 
+          if [[ ! -d "${source_ui_resources}" ]]; then
+            echo "error: AdaUI resource bundle not found at ${source_ui_resources}" >&2
+            exit 1
+          fi
+
           mkdir -p "${destination_binary:h}"
           /usr/bin/ditto "${source_binary}" "${destination_binary}"
           /bin/chmod +x "${destination_binary}"
           mkdir -p "${destination_resources:h}"
           /usr/bin/ditto "${source_resources}" "${destination_resources}"
+          /usr/bin/ditto "${source_ui_resources}" "${destination_ui_resources}"
   AdaEditor-Standalone:
     type: application
     platform: macOS
@@ -111,7 +126,7 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AdaEngine
-        PRODUCT_NAME: AdaEngine
+        PRODUCT_NAME: "Ada Studio"
         PRODUCT_BUNDLE_IDENTIFIER: org.adaengine.editor
         ADA_CLOUD_API_URL: ""
         ADA_CLOUD_PRO_PRODUCT_ID: ""
@@ -140,6 +155,13 @@ targets:
         shell: /bin/zsh
         showEnvVars: false
         basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(BUILT_PRODUCTS_DIR)/AdaEditor
+          - $(BUILT_PRODUCTS_DIR)/AdaEditor_AdaEditor.bundle
+          - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaUI.bundle
+        # CodeSign must run after staging replaces the executable and resources.
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)
         script: |
           set -euo pipefail
 
@@ -147,6 +169,8 @@ targets:
           destination_binary="${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}"
           source_resources="${BUILT_PRODUCTS_DIR}/AdaEditor_AdaEditor.bundle"
           destination_resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AdaEditor_AdaEditor.bundle"
+          source_ui_resources="${BUILT_PRODUCTS_DIR}/AdaEngine_AdaUI.bundle"
+          destination_ui_resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AdaEngine_AdaUI.bundle"
 
           if [[ ! -x "${source_binary}" ]]; then
             echo "error: SwiftPM executable not found at ${source_binary}" >&2
@@ -157,11 +181,17 @@ targets:
             exit 1
           fi
 
+          if [[ ! -d "${source_ui_resources}" ]]; then
+            echo "error: AdaUI resource bundle not found at ${source_ui_resources}" >&2
+            exit 1
+          fi
+
           mkdir -p "${destination_binary:h}"
           /usr/bin/ditto "${source_binary}" "${destination_binary}"
           /bin/chmod +x "${destination_binary}"
           mkdir -p "${destination_resources:h}"
           /usr/bin/ditto "${source_resources}" "${destination_resources}"
+          /usr/bin/ditto "${source_ui_resources}" "${destination_ui_resources}"
   AdaEditor-iPadOS:
     attributes:
       SystemCapabilities:
@@ -182,7 +212,7 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AdaEngine
-        PRODUCT_NAME: AdaEngine
+        PRODUCT_NAME: "Ada Studio"
         PRODUCT_BUNDLE_IDENTIFIER: org.adaengine.editor
         ADA_CLOUD_API_URL: ""
         ADA_CLOUD_PRO_PRODUCT_ID: ""
@@ -191,7 +221,7 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         DEVELOPMENT_TEAM: 8PYCRS3EA3
         CODE_SIGN_STYLE: Automatic
-        TARGETED_DEVICE_FAMILY: 2
+        TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: false
     dependencies:
       - package: AdaEditor
@@ -201,6 +231,13 @@ targets:
         shell: /bin/zsh
         showEnvVars: false
         basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(BUILT_PRODUCTS_DIR)/AdaEditor
+          - $(BUILT_PRODUCTS_DIR)/AdaEditor_AdaEditor.bundle
+          - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaUI.bundle
+        # CodeSign must run after staging replaces the executable and resources.
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)
         script: |
           set -euo pipefail
 
@@ -208,6 +245,8 @@ targets:
           destination_binary="${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}"
           source_resources="${BUILT_PRODUCTS_DIR}/AdaEditor_AdaEditor.bundle"
           destination_resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AdaEditor_AdaEditor.bundle"
+          source_ui_resources="${BUILT_PRODUCTS_DIR}/AdaEngine_AdaUI.bundle"
+          destination_ui_resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AdaEngine_AdaUI.bundle"
 
           if [[ ! -x "${source_binary}" ]]; then
             echo "error: SwiftPM executable not found at ${source_binary}" >&2
@@ -218,11 +257,17 @@ targets:
             exit 1
           fi
 
+          if [[ ! -d "${source_ui_resources}" ]]; then
+            echo "error: AdaUI resource bundle not found at ${source_ui_resources}" >&2
+            exit 1
+          fi
+
           mkdir -p "${destination_binary:h}"
           /usr/bin/ditto "${source_binary}" "${destination_binary}"
           /bin/chmod +x "${destination_binary}"
           mkdir -p "${destination_resources:h}"
           /usr/bin/ditto "${source_resources}" "${destination_resources}"
+          /usr/bin/ditto "${source_ui_resources}" "${destination_ui_resources}"
   AdaPlayer-iOS:
     type: application
     platform: iOS
@@ -233,7 +278,7 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AdaEngine
-        PRODUCT_NAME: AdaPlayer
+        PRODUCT_NAME: "Ada Remote Player"
         PRODUCT_BUNDLE_IDENTIFIER: org.adaengine.player
         ADA_CLOUD_API_URL: ""
         ADA_CLOUD_PRO_PRODUCT_ID: ""
@@ -252,6 +297,13 @@ targets:
         shell: /bin/zsh
         showEnvVars: false
         basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(BUILT_PRODUCTS_DIR)/AdaEditor
+          - $(BUILT_PRODUCTS_DIR)/AdaEditor_AdaEditor.bundle
+          - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaUI.bundle
+        # CodeSign must run after staging replaces the executable and resources.
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)
         script: |
           set -euo pipefail
 
@@ -259,6 +311,8 @@ targets:
           destination_binary="${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}"
           source_resources="${BUILT_PRODUCTS_DIR}/AdaEditor_AdaEditor.bundle"
           destination_resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AdaEditor_AdaEditor.bundle"
+          source_ui_resources="${BUILT_PRODUCTS_DIR}/AdaEngine_AdaUI.bundle"
+          destination_ui_resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AdaEngine_AdaUI.bundle"
 
           if [[ ! -x "${source_binary}" ]]; then
             echo "error: SwiftPM executable not found at ${source_binary}" >&2
@@ -269,11 +323,17 @@ targets:
             exit 1
           fi
 
+          if [[ ! -d "${source_ui_resources}" ]]; then
+            echo "error: AdaUI resource bundle not found at ${source_ui_resources}" >&2
+            exit 1
+          fi
+
           mkdir -p "${destination_binary:h}"
           /usr/bin/ditto "${source_binary}" "${destination_binary}"
           /bin/chmod +x "${destination_binary}"
           mkdir -p "${destination_resources:h}"
           /usr/bin/ditto "${source_resources}" "${destination_resources}"
+          /usr/bin/ditto "${source_ui_resources}" "${destination_ui_resources}"
 schemes:
   AdaEditor-macOS:
     build:
@@ -304,6 +364,13 @@ schemes:
       executable: AdaEditor-iPadOS
     archive:
       config: Release
+  AdaEditor-iPhoneOS:
+    build:
+      targets:
+        AdaEditor-iPadOS: all
+    run:
+      config: Release
+      executable: AdaEditor-iPadOS
   AdaEditor-Standalone:
     build:
       targets:

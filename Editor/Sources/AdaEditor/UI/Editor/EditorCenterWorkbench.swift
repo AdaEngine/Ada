@@ -29,6 +29,8 @@ struct EditorCenterWorkbench: View {
     let onHidePreview: (() -> Void)?
     let onShowPreviewBuildOutput: (() -> Void)?
     var debugger: EditorDebugger?
+    var projectItems: [EditorProjectSidebarViewModel.Item] = []
+    var onOpenProjectItem: ((EditorProjectSidebarViewModel.Item) -> Void)?
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
@@ -36,6 +38,7 @@ struct EditorCenterWorkbench: View {
     @State private var previewResizeState = EditorPreviewResizeState()
     @State private var draggedTabID: String?
     @State private var dropTargetTabID: String?
+    @State private var isFilesBrowserActive = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -56,6 +59,9 @@ struct EditorCenterWorkbench: View {
                 .fill(theme.editorColors.surfaceElevated)
         )
         .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+        .overlay {
+            adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
+        }
     }
 }
 
@@ -63,6 +69,7 @@ extension EditorCenterWorkbench {
     private var editorTabs: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 4) {
+                filesTab
                 ForEach(viewModel.openDocuments, id: \.id) { document in
                     editorTab(document, active: document.id == viewModel.activeDocumentID)
                 }
@@ -74,6 +81,34 @@ extension EditorCenterWorkbench {
         .background(theme.editorColors.surfaceElevated)
     }
 
+    private var filesTab: some View {
+        Button(action: { isFilesBrowserActive = true }) {
+            HStack(spacing: 7) {
+                Text("\u{E2C7}")
+                    .font(AdaEditorMaterialSymbolFont.font(size: 14))
+                    .foregroundColor(theme.editorColors.blue)
+                Text("Files")
+                    .font(.system(size: 12))
+                    .foregroundColor(isFilesBrowserActive ? theme.editorColors.text : theme.editorColors.muted)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+        }
+        .buttonStyle(DefaultButtonStyle())
+        .background(
+            RoundedRectangleShape(cornerRadius: 5)
+                .fill(isFilesBrowserActive ? theme.editorColors.surface : theme.editorColors.surfaceElevated)
+        )
+        .overlay {
+            RoundedRectangleShape(cornerRadius: 5)
+                .stroke(
+                    isFilesBrowserActive ? theme.editorColors.blue.opacity(0.72) : theme.editorColors.border.opacity(0.52),
+                    lineWidth: 1
+                )
+        }
+        .accessibilityIdentifier("AdaEditor.Tab.Files")
+    }
+
     private func editorTab(_ document: EditorWorkbenchDocument, active: Bool) -> some View {
         HStack(spacing: 0) {
             Button(action: {
@@ -81,12 +116,20 @@ extension EditorCenterWorkbench {
                     draggedTabID = nil
                     return
                 }
+                isFilesBrowserActive = false
                 onSelectDocument?(document.id) ?? viewModel.selectDocument(id: document.id)
             }) {
                 HStack(spacing: 7) {
-                    Text(tabIcon(for: document))
-                        .font(.system(size: 12))
-                        .foregroundColor(tabIconColor(for: document))
+                    if let language = textLanguage(for: document), let image = EditorLanguageLogo.image(for: language) {
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 14, height: 14)
+                    } else {
+                        Text(tabIcon(for: document))
+                            .font(AdaEditorMaterialSymbolFont.font(size: 14))
+                            .foregroundColor(tabIconColor(for: document))
+                    }
                     Text(tabTitle(for: document))
                         .font(.system(size: 12))
                         .foregroundColor(active ? theme.editorColors.text : theme.editorColors.muted)
@@ -126,8 +169,8 @@ extension EditorCenterWorkbench {
             )
 
             Button(action: { viewModel.closeDocument(id: document.id) }) {
-                Text("×")
-                    .font(.system(size: 12))
+                Text("\u{E5CD}")
+                    .font(AdaEditorMaterialSymbolFont.font(size: 12))
                     .foregroundColor(active ? theme.editorColors.text.opacity(0.75) : theme.editorColors.muted.opacity(0.70))
                     .frame(width: 18, height: 18)
                     .background(RoundedRectangleShape(cornerRadius: 4).fill(active ? theme.editorColors.surface.opacity(0.62) : Color.clear))
@@ -219,27 +262,34 @@ extension EditorCenterWorkbench {
     private func tabIcon(for document: EditorWorkbenchDocument) -> String {
         switch document {
         case .git:
-            return "±"
+            return "\u{E86F}"
         case .ui:
-            return "UI"
+            return "\u{E871}"
         case .scene:
-            return "#"
+            return "\u{E8F1}"
         case let .text(document):
-            return document.language == .swift ? "<>" : "{}"
+            return document.language == .swift ? "\u{E86F}" : "\u{E873}"
         case let .asset(document):
             switch document.kind {
             case .atlas,
                 .tileSource,
                 .tileMap:
-                return "▦"
+                return "\u{E8F1}"
             case .image:
-                return "□"
+                return "\u{E3F4}"
             case .audio:
-                return "~"
+                return "\u{EB82}"
             case .generic:
-                return "*"
+                return "\u{E8F0}"
             }
         }
+    }
+
+    private func textLanguage(for document: EditorWorkbenchDocument) -> EditorSourceLanguage? {
+        guard case let .text(document) = document else {
+            return nil
+        }
+        return document.language
     }
 
     private func tabTitle(for document: EditorWorkbenchDocument) -> String {
@@ -274,22 +324,29 @@ extension EditorCenterWorkbench {
 
     @ViewBuilder
     private func activeDocumentView(metrics _: AdaEngineStyleLayoutMetrics) -> some View {
-        switch viewModel.activeDocument {
-        case let .git(document):
-            EditorGitDiffView(document: document, workbench: viewModel)
-        case let .scene(document):
-            sceneDocumentEditor(document: document)
-        case let .ui(document):
-            EditorUISceneEditor(
-                model: viewModel.uiSceneModel(for: document, resourceRoot: sceneResourceRootURL, bindingCatalog: inspectorViewModel.scriptableObjectCatalog),
-                colorPalette: viewModel.codeColorPalette
-            )
-        case let .text(document):
-            textDocumentEditor(document: document)
-        case let .asset(document):
-            assetPreview(document: document)
-        case nil:
-            emptyWorkbench
+        if isFilesBrowserActive {
+            EditorFilesBrowserTab(items: projectItems) { item in
+                isFilesBrowserActive = false
+                onOpenProjectItem?(item)
+            }
+        } else {
+            switch viewModel.activeDocument {
+            case let .git(document):
+                EditorGitDiffView(document: document, workbench: viewModel)
+            case let .scene(document):
+                sceneDocumentEditor(document: document)
+            case let .ui(document):
+                EditorUISceneEditor(
+                    model: viewModel.uiSceneModel(for: document, resourceRoot: sceneResourceRootURL, bindingCatalog: inspectorViewModel.scriptableObjectCatalog),
+                    colorPalette: viewModel.codeColorPalette
+                )
+            case let .text(document):
+                textDocumentEditor(document: document)
+            case let .asset(document):
+                assetPreview(document: document)
+            case nil:
+                emptyWorkbench
+            }
         }
     }
 
@@ -509,8 +566,8 @@ extension EditorCenterWorkbench {
                     .foregroundColor(document.isDirty ? theme.editorColors.purple : theme.editorColors.muted)
             }
             Button(action: { viewModel.appendSceneLine(documentID: document.id) }) {
-                Text("+")
-                    .font(.system(size: 14))
+                Text("\u{E145}")
+                    .font(AdaEditorMaterialSymbolFont.font(size: 14))
                     .foregroundColor(theme.editorColors.text)
                     .frame(width: 26, height: 22)
                     .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surfaceElevated))
@@ -673,9 +730,9 @@ extension EditorCenterWorkbench {
                     }
                     Spacer()
                     Button(action: {}) {
-                        Text("›")
+                        Text("\u{E5CC}")
                     }
-                    .font(.system(size: 18))
+                    .font(AdaEditorMaterialSymbolFont.font(size: 18))
                     .foregroundColor(theme.editorColors.purple)
                     .frame(width: 30, height: 28)
                 }
@@ -739,8 +796,8 @@ private struct EditorPreviewPanel: View {
             }
             .buttonStyle(DefaultButtonStyle())
             Button(action: onHide) {
-                Text("×")
-                    .font(.system(size: 14))
+                Text("\u{E5CD}")
+                    .font(AdaEditorMaterialSymbolFont.font(size: 14))
                     .foregroundColor(theme.editorColors.muted)
                     .frame(width: 22, height: 22)
                     .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surfaceElevated))

@@ -183,7 +183,6 @@ struct AdaScriptRuntimeConfigurationTests {
         editorViewModel.projectMainSceneText = alternateScenePath
         settingsViewModel.runtimeSettings.plugins.preset = .game3D
         settingsViewModel.runtimeSettings.plugins.enable = [.physics2D]
-        settingsViewModel.runtimeDraft.view = "game.main"
         settingsViewModel.runtimeDraft.gravityX = "1.5"
         settingsViewModel.runtimeDraft.gravityY = "-12"
         settingsViewModel.runtimeDraft.windowTitle = "Configured Runtime"

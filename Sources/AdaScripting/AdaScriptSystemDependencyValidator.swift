@@ -11,10 +11,6 @@ enum AdaScriptSystemPlanBuilder {
         systemCapabilities: [AdaScriptSystemCapabilities]
     ) throws -> [AnnotatedSystemPlan] {
         let systemAnnotations = annotations.filter { $0.name == "system" }
-        guard !systemAnnotations.isEmpty else {
-            throw AdaScriptError.invalidManifest("Ada Script module must declare at least one @system class")
-        }
-
         let systemClassNames = Set(systemAnnotations.map(\.target.identifier))
         try validateAnnotationTargets(annotations, systemClassNames: systemClassNames)
         let plans = try systemAnnotations.map {

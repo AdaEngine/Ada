@@ -381,7 +381,7 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
                 return []
             }
             return [
-                .http(HTTPServerConfig(name: "AdaEditor Runtime", url: "http://127.0.0.1:2510/mcp"))
+                .http(HTTPServerConfig(name: "AdaEditor", url: EditorMCPServerAddress.url))
             ]
         }
 
@@ -796,12 +796,13 @@ enum EditorAgentPromptContext {
         let assets = project.paths.assets ?? "Assets"
         return """
             [AdaEditor Project Capabilities]
-            - Scene documents: *.ascn/*.scene/*.scn (YAML); edit them through project files and preserve schemaVersion.
+            - Scene documents: *.ascn/*.scene/*.scn (YAML); prefer editor.scene.get/apply/undo for open scenes so revisions and editor history are preserved.
             - Swift and Ada Script code: \(sources) (Swift: *.swift, Ada Script: *.ada).
             - Shaders: *.glsl/*.vert/*.frag/*.shader/*.metal under the project, commonly in \(assets).
             - Assets and project files: \(assets) and the project tree; project metadata is .ada/project.json.
-            - The AdaEditor Runtime MCP server exposes live worlds, entities, components, assets, render captures, UI, traces, and profiler data.
-            - After edits, run the narrowest relevant build or test and report failures precisely.
+            - AdaEditor MCP exposes scene, asset, build/test/play, output, Gravity LSP, runtime ECS, UI, render, trace, and profiler tools when project MCP is enabled.
+            - Use editor.gravity.diagnostics/completion/hover/definition for .ada and .gravity; positions use zero-based UTF-16 LSP coordinates.
+            - After edits, run the narrowest relevant build or test, poll editor.task.status, read editor.output.read, and report failures precisely.
             """
     }
 

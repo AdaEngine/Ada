@@ -33,8 +33,8 @@ struct EditorPreviewViewport: View {
     private var controls: some View {
         HStack(spacing: 2) {
             Button(action: { adjustZoom(by: -0.25) }) {
-                Text("−")
-                    .font(.system(size: 15))
+                Text("\u{E15B}")
+                    .font(AdaEditorMaterialSymbolFont.font(size: 15))
                     .frame(width: 26, height: 26)
             }
             .disabled(settings.zoom <= 0.25)
@@ -48,8 +48,8 @@ struct EditorPreviewViewport: View {
             .accessibilityIdentifier("AdaEditor.PreviewViewport.ZoomReset")
 
             Button(action: { adjustZoom(by: 0.25) }) {
-                Text("+")
-                    .font(.system(size: 15))
+                Text("\u{E145}")
+                    .font(AdaEditorMaterialSymbolFont.font(size: 15))
                     .frame(width: 26, height: 26)
             }
             .disabled(settings.zoom >= 3)

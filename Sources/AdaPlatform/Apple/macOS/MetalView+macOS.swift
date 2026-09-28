@@ -389,7 +389,7 @@
                 deltaY *= 0.03
             }
 
-            let mouseEvent = MouseEvent(
+            var mouseEvent = MouseEvent(
                 window: self.windowID,
                 button: .scrollWheel,
                 scrollDelta: Point(x: deltaX, y: deltaY),
@@ -398,6 +398,7 @@
                 modifierKeys: KeyModifier(modifiers: event.modifierFlags),
                 time: TimeInterval(event.timestamp)
             )
+            mouseEvent.hasPreciseScrollingDeltas = event.hasPreciseScrollingDeltas
 
             input?.wrappedValue.receiveEvent(mouseEvent)
         }

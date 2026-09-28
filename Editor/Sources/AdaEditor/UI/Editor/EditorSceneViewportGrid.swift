@@ -71,20 +71,22 @@ extension EditorSceneViewportModel {
 
         if minY <= 0 && maxY >= 0 {
             let y = worldToScreen(Vector2(0, 0), size: size).y
-            context.drawLine(
-                start: Vector2(0, y),
-                end: Vector2(size.width, y),
+            drawViewportLine(
+                from: Vector2(0, y),
+                to: Vector2(size.width, y),
                 lineWidth: 2,
-                color: theme.editorColors.blue.opacity(0.55 * opacity)
+                color: Color.fromHex(0xF44364).opacity(0.9 * opacity),
+                in: &context
             )
         }
         if minX <= 0 && maxX >= 0 {
             let x = worldToScreen(Vector2(0, 0), size: size).x
-            context.drawLine(
-                start: Vector2(x, 0),
-                end: Vector2(x, size.height),
+            drawViewportLine(
+                from: Vector2(x, 0),
+                to: Vector2(x, size.height),
                 lineWidth: 2,
-                color: theme.editorColors.purple.opacity(0.52 * opacity)
+                color: Color.fromHex(0x80D400).opacity(0.85 * opacity),
+                in: &context
             )
         }
     }
@@ -190,7 +192,7 @@ extension EditorSceneViewportModel {
             let isMajor = index.isMultiple(of: majorEvery)
             let color =
                 isAxis
-                ? theme.editorColors.purple.opacity(0.65 * opacity)
+                ? Color.fromHex(0x198AF8).opacity(0.94 * opacity)
                 : theme.editorColors.border.opacity((isMajor ? 0.40 : 0.22) * opacity)
             let width: Float = isAxis ? 2 : 1
             drawProjectedSegment(
@@ -212,7 +214,7 @@ extension EditorSceneViewportModel {
             let isMajor = index.isMultiple(of: majorEvery)
             let color =
                 isAxis
-                ? theme.editorColors.blue.opacity(0.70 * opacity)
+                ? Color.fromHex(0xF04463).opacity(0.94 * opacity)
                 : theme.editorColors.border.opacity((isMajor ? 0.40 : 0.22) * opacity)
             let width: Float = isAxis ? 2 : 1
             drawProjectedSegment(
@@ -226,6 +228,15 @@ extension EditorSceneViewportModel {
             index += 1
             z += step
         }
+
+        drawProjectedSegment(
+            from: Vector3(0, -extent, 0),
+            to: Vector3(0, extent, 0),
+            in: &context,
+            size: size,
+            lineWidth: 2,
+            color: Color.fromHex(0x80D400).opacity(0.94 * opacity)
+        )
     }
 
     func drawProjectedSegment(

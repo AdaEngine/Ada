@@ -100,6 +100,34 @@ struct NavigationStackTests {
     }
 
     @Test
+    func navigationStack_updatesDestinationWhenBoundPathChanges() async {
+        final class Model {
+            var path = NavigationPath()
+        }
+        let model = Model()
+        var destinationAppeared = false
+
+        let tester = ViewTester {
+            NavigationStack(path: Binding(get: { model.path }, set: { model.path = $0 })) {
+                Text("Root")
+                    .navigate(for: String.self) { _ in
+                        Text("Detail")
+                            .onAppear { destinationAppeared = true }
+                    }
+            }
+        }
+        .setSize(Size(width: 400, height: 400))
+        .performLayout()
+
+        model.path.append("detail")
+        tester.invalidateContent().performLayout()
+        await flushNavigationLifecycleActions()
+
+        #expect(destinationAppeared)
+        #expect(textNodes(in: tester.containerView.viewTree.rootNode).contains { $0.text == "Detail" })
+    }
+
+    @Test
     func navigationLink_pushesValueOnTap() async {
         var destinationAppeared = false
 
@@ -159,6 +187,61 @@ struct NavigationStackTests {
 
         #expect(stackNode?.navigationContext.path.isEmpty == true)
         #expect(rootAppeared)
+    }
+
+    @Test
+    func edgeSwipeBack_popsWithAnimation_onlyAfterHorizontalGesture() async throws {
+        final class Model {
+            var path: NavigationPath
+
+            init(path: NavigationPath) {
+                self.path = path
+            }
+        }
+
+        var initialPath = NavigationPath()
+        initialPath.append("detail")
+        let model = Model(path: initialPath)
+        let tester = ViewTester {
+            NavigationStack(path: Binding(get: { model.path }, set: { model.path = $0 })) {
+                Color.red
+                    .navigate(for: String.self) { _ in
+                        Color.blue
+                    }
+            }
+        }
+        .setSize(Size(width: 400, height: 400))
+        .performLayout()
+
+        let stack = try #require(navigationStackNodes(in: tester.containerView.viewTree.rootNode).first)
+        let window = RID()
+        func touch(_ x: Float, _ y: Float, _ phase: TouchEvent.Phase, contact: RID) {
+            tester.containerView.onTouchesEvent([
+                TouchEvent(window: window, location: Point(x, y), phase: phase, time: 0, contactID: contact)
+            ])
+        }
+
+        let verticalContact = RID()
+        touch(12, 210, .began, contact: verticalContact)
+        touch(105, 300, .moved, contact: verticalContact)
+        touch(105, 300, .ended, contact: verticalContact)
+        #expect(model.path.count == 1)
+
+        let shortContact = RID()
+        touch(12, 210, .began, contact: shortContact)
+        touch(65, 210, .moved, contact: shortContact)
+        touch(65, 210, .ended, contact: shortContact)
+        #expect(model.path.count == 1)
+
+        let backContact = RID()
+        touch(12, 210, .began, contact: backContact)
+        touch(110, 214, .moved, contact: backContact)
+        touch(110, 214, .ended, contact: backContact)
+
+        #expect(model.path.count == 1)
+        try await Task.sleep(for: .milliseconds(120))
+        #expect(model.path.isEmpty)
+        #expect(stack.presentation.isAnimating)
     }
 
     @Test

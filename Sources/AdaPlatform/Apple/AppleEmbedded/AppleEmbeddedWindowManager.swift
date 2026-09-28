@@ -368,6 +368,25 @@
             return rootViewController?.view
         }
 
+        #if os(iOS) && DEBUG
+            override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+                super.motionEnded(motion, with: event)
+
+                guard motion == .motionShake,
+                    let window = windowManager?.findWindow(for: self)
+                else {
+                    return
+                }
+
+                for container in window.uiInspectableContainers() {
+                    let mode: AdaUI.UIDebugOverlayMode = container.uiInspectionOverlayMode == .layoutBounds
+                        ? .off
+                        : .layoutBounds
+                    container.uiSetDebugOverlay(mode)
+                }
+            }
+        #endif
+
         // MARK: - UIPointerInteractionDelegate
 
         func pointerInteraction(_: UIPointerInteraction, styleFor _: UIPointerRegion) -> UIPointerStyle? {

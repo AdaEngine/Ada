@@ -31,7 +31,7 @@ final class EditorTileSourceEditorModel {
     var frames = "1"
     var duration = "1"
     var verticalAnimation = false
-    var zoom: Float = 2
+    var zoom: Float = 1
     var showGrid = true
 
     @ObservationIgnored private let url: URL?

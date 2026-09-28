@@ -233,6 +233,88 @@ struct EditorInspectorRefreshTests {
         #expect(editedValue == "41, 50, 60")
     }
 
+    @Test("Camera background uses separate RGBA fields and preserves other channels")
+    func cameraBackgroundChannels() throws {
+        var scene = EditorSceneModel.default(projectName: "Camera color")
+        let camera = scene.addEntity(template: .camera3D, parentID: scene.rootEntityID)
+        let inspector = EditorInspectorSidebarViewModel()
+        let viewport = EditorSceneViewportModel()
+        defer { viewport.disconnect() }
+        viewport.configure(sceneContent: try scene.encodedYAML(), onSelectionChanged: { inspector.selectEntity($0) }, onDocumentContentChanged: { _ in })
+        let colorField = try #require(inspector.selectedEntity?.components
+            .first { $0.typeName == EditorBuiltInComponentType.camera }?
+            .fields.first { $0.field.key == "backgroundColor" })
+        let original = EditorInspectorColorValue(colorField.value)
+        inspector.updateComponentField = { typeName, field, value in
+            scene.updateField(typeName: typeName, field: field, value: value, in: camera.id)
+        }
+
+        let container = UIContainerView(rootView: EditorInspectorSidebar(viewModel: inspector))
+        container.frame = Rect(x: 0, y: 0, width: 360, height: 600)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        let fieldID = "\(EditorBuiltInComponentType.camera).backgroundColor"
+        for channel in ["R", "G", "B", "A"] {
+            let selector = UINodeSelector.accessibilityIdentifier("AdaEditor.Inspector.ColorChannel.\(fieldID).\(channel)")
+            _ = try container.uiScrollToNode(matching: selector)
+        }
+
+        let green = UINodeSelector.accessibilityIdentifier("AdaEditor.Inspector.ColorChannel.\(fieldID).G")
+        _ = try container.uiTapNode(matching: green)
+        #expect(container.uiPerformTextEditingCommand(.selectAll))
+        for character in ["0", ".", "5"] {
+            container.onTextInputEvent(TextInputEvent(window: RID(), text: character, action: .insert, time: 0))
+            container.update(1.0 / 60.0)
+            container.layoutIfNeeded()
+        }
+        let payload = try #require(scene.entities.first { $0.id == camera.id }?.components[EditorBuiltInComponentType.camera])
+        let updated = EditorInspectorColorValue(colorField.field.displayValue(in: payload))
+        #expect(abs(updated.green - 0.5) < 0.001)
+        #expect(updated.red == original.red)
+        #expect(updated.blue == original.blue)
+        #expect(updated.alpha == original.alpha)
+
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Inspector.ColorMode.\(fieldID).HEX"))
+        container.update(1.0 / 60.0)
+        container.layoutIfNeeded()
+        #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Inspector.ColorChannel.\(fieldID).R")).isEmpty)
+    }
+
+    @Test("Y and Z axis fills remain in the Inspector draw list after scrolling")
+    func axisColorsSurviveScrolling() throws {
+        var scene = EditorSceneModel.default(projectName: "Axis colors")
+        _ = scene.addEntity(template: .camera3D, parentID: scene.rootEntityID)
+        let inspector = EditorInspectorSidebarViewModel()
+        let viewport = EditorSceneViewportModel()
+        defer { viewport.disconnect() }
+        viewport.configure(sceneContent: try scene.encodedYAML(), onSelectionChanged: { inspector.selectEntity($0) }, onDocumentContentChanged: { _ in })
+
+        let container = UIContainerView(rootView: EditorInspectorSidebar(viewModel: inspector))
+        container.frame = Rect(x: 0, y: 0, width: 360, height: 450)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+
+        for field in ["position", "scale"] {
+            for axis in ["Y", "Z"] {
+                let selector = UINodeSelector.accessibilityIdentifier("AdaEditor.Inspector.Axis.\(EditorBuiltInComponentType.transform).\(field).\(axis)")
+                _ = try container.uiScrollToNode(matching: selector)
+                container.update(1.0 / 60.0)
+                container.layoutIfNeeded()
+                let context = UIGraphicsContext()
+                container.draw(with: context)
+                let expectedColor = axis == "Y"
+                    ? Color(red: 0.24, green: 0.60, blue: 0.31)
+                    : Color(red: 0.22, green: 0.43, blue: 0.82)
+                #expect(context.getDrawCommands().contains { command in
+                    if case let .drawPath(_, _, .fill(color)) = command {
+                        return color == expectedColor
+                    }
+                    return false
+                })
+            }
+        }
+    }
+
     private func componentHeaders(in nodes: [UINodeSnapshot]) -> [UINodeSnapshot] {
         flatten(nodes)
             .filter {

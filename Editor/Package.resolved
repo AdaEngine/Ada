@@ -1,6 +1,24 @@
 {
-  "originHash" : "757774da20ac2aab340afb3afb31b8912ba1f6e6b6f7b2d63a229541bfded9aa",
+  "originHash" : "2193f5d48b4010d54f0cd059e18cf256e8bec00fd2cc462bd7331e910b13e046",
   "pins" : [
+    {
+      "identity" : "anylanguagemodel",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mattt/AnyLanguageModel.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "0626c0fb37ba2cbc23eddc4871aefa7e98dd6c70"
+      }
+    },
+    {
+      "identity" : "eventsource",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mattt/EventSource",
+      "state" : {
+        "revision" : "86b5096ac59ab46e66bd1f6377c604bc1dab0bc2",
+        "version" : "1.5.1"
+      }
+    },
     {
       "identity" : "gravity-lang",
       "kind" : "remoteSourceControl",
@@ -16,6 +34,15 @@
       "state" : {
         "revision" : "991755e698a7516eac571e6f6a65c04c907ce5ed",
         "version" : "0.59.0"
+      }
+    },
+    {
+      "identity" : "jsonschema",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mattt/JSONSchema",
+      "state" : {
+        "revision" : "4c6f2467d5bc72b062c7a9b7e4cd77a09635ea8b",
+        "version" : "1.3.1"
       }
     },
     {
@@ -84,7 +111,7 @@
     {
       "identity" : "swift-service-context",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-service-context",
+      "location" : "https://github.com/apple/swift-service-context.git",
       "state" : {
         "revision" : "d0997351b0c7779017f88e7a93bc30a1878d7f29",
         "version" : "1.3.0"

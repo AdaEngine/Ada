@@ -177,8 +177,11 @@ struct ViewVisibilityTests {
         tester.invalidateContent()
         await flushLifecycleActions()
 
-        #expect(tabADisappeared)
+        #expect(!tabADisappeared)
         #expect(tabBAppeared)
+        tester.advanceFrame(deltaTime: 0.3)
+        await flushLifecycleActions()
+        #expect(tabADisappeared)
     }
 
     @Test

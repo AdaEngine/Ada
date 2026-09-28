@@ -14,6 +14,9 @@ import Foundation
 #if canImport(UIKit)
     import UIKit
 #endif
+#if canImport(PhotosUI)
+    import PhotosUI
+#endif
 
 enum ProjectLocationPickerResult: Equatable, Sendable {
     case selected(URL)
@@ -212,6 +215,28 @@ enum ProjectOpenPicker {
     }
 
     @MainActor
+    static func presentAgentPhotoPicker(
+        completion: @escaping @MainActor (AssetFilePickerResult) -> Void
+    ) {
+        #if canImport(PhotosUI) && canImport(UIKit)
+            guard let presenter = activeViewController() else {
+                completion(.unavailable("AdaEditor has no active window from which to open Photos."))
+                return
+            }
+            var configuration = PHPickerConfiguration()
+            configuration.filter = .images
+            configuration.selectionLimit = 1
+            let picker = PHPickerViewController(configuration: configuration)
+            let delegate = AgentPhotoPickerDelegate(completion: completion)
+            activeAgentPhotoPickerDelegate = delegate
+            picker.delegate = delegate
+            presenter.present(picker, animated: true)
+        #else
+            completion(.unavailable("Photo selection is not supported on this platform."))
+        #endif
+    }
+
+    @MainActor
     static func presentBuildFilePicker(
         directoryURL: URL,
         completion: @escaping @MainActor (AssetFilePickerResult) -> Void
@@ -352,6 +377,10 @@ enum ProjectOpenPicker {
         private static var activeProjectPickerDelegate: ProjectDocumentPickerDelegate?
         @MainActor
         private static var activeAgentContextPickerDelegate: AgentContextDocumentPickerDelegate?
+#if canImport(PhotosUI)
+        @MainActor
+        private static var activeAgentPhotoPickerDelegate: AgentPhotoPickerDelegate?
+#endif
         @MainActor
         private static var activeProjectLocationPickerDelegate: ProjectLocationDocumentPickerDelegate?
         @MainActor
@@ -453,6 +482,53 @@ enum ProjectOpenPicker {
                 activeAgentContextPickerDelegate = nil
             }
         }
+
+#if canImport(PhotosUI)
+        @MainActor
+        private final class AgentPhotoPickerDelegate: NSObject, PHPickerViewControllerDelegate {
+            private let completion: @MainActor (AssetFilePickerResult) -> Void
+
+            init(completion: @escaping @MainActor (AssetFilePickerResult) -> Void) {
+                self.completion = completion
+            }
+
+            func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+                picker.dismiss(animated: true)
+                guard let provider = results.first?.itemProvider else {
+                    finish(with: .cancelled)
+                    return
+                }
+                let destinationDirectory = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("AdaEditorAgentPhotos", isDirectory: true)
+                let destinationName = UUID().uuidString
+                provider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { [weak self] sourceURL, error in
+                    guard let sourceURL, error == nil else {
+                        Task { @MainActor in
+                            self?.finish(with: .unavailable("The selected photo could not be loaded."))
+                        }
+                        return
+                    }
+                    do {
+                        try FileManager.default.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
+                        let destination = destinationDirectory
+                            .appendingPathComponent(destinationName)
+                            .appendingPathExtension(sourceURL.pathExtension.isEmpty ? "img" : sourceURL.pathExtension)
+                        try FileManager.default.copyItem(at: sourceURL, to: destination)
+                        Task { @MainActor in self?.finish(with: .selected([destination])) }
+                    } catch {
+                        Task { @MainActor in
+                            self?.finish(with: .unavailable("The selected photo could not be saved."))
+                        }
+                    }
+                }
+            }
+
+            private func finish(with result: AssetFilePickerResult) {
+                completion(result)
+                activeAgentPhotoPickerDelegate = nil
+            }
+        }
+#endif
 
         @MainActor
         private final class AtlasImageDocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {

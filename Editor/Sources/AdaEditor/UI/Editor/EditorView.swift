@@ -289,6 +289,7 @@ struct EditorView: View {
                 }
             }
             .onAppear {
+                EditorAgentMCPTools.shared.activate(viewModel)
                 viewModel.startProjectFileWatching()
                 EditorNotificationRouter.shared.attach(viewModel)
                 EditorMenuCommandRouter.shared.install(owner: viewModel) { [weak viewModel] command in
@@ -301,6 +302,7 @@ struct EditorView: View {
                 )
             }
             .onDisappear {
+                EditorAgentMCPTools.shared.deactivate(viewModel)
                 viewModel.playerSession.disconnect()
                 viewModel.playerPairingWindow?.close()
                 viewModel.playerPairingWindow = nil
@@ -366,18 +368,6 @@ private struct EditorWorkspaceRegion: View {
             let workspaceWidth = max(0, geometry.size.width - stripWidth * 2)
 
             ZStack(anchor: .topLeading) {
-                EditorLeftToolStrip(
-                    viewModel: viewModel,
-                    onSelectTopTool: { item in
-                        viewModel.activateLeftTopTool(item)
-                    },
-                    onSelectBottomTool: { item in
-                        viewModel.activateLeftBottomTool(item)
-                    }
-                )
-                .frame(width: stripWidth, height: geometry.size.height)
-                .zIndex(1)
-
                 EditorWorkspaceView(
                     viewModel: viewModel,
                     leftPanel: {
@@ -447,7 +437,11 @@ private struct EditorWorkspaceRegion: View {
                             onShowPreviewBuildOutput: {
                                 viewModel.showBuildOutput()
                             },
-                            debugger: viewModel.debugger
+                            debugger: viewModel.debugger,
+                            projectItems: viewModel.projectSidebar.items,
+                            onOpenProjectItem: { item in
+                                viewModel.openProjectItem(item)
+                            }
                         )
                         .frame(maxHeight: .infinity)
                     },
@@ -466,6 +460,17 @@ private struct EditorWorkspaceRegion: View {
                 )
                 .frame(width: workspaceWidth, height: geometry.size.height)
                 .offset(x: stripWidth)
+
+                EditorLeftToolStrip(
+                    viewModel: viewModel,
+                    onSelectTopTool: { item in
+                        viewModel.activateLeftTopTool(item)
+                    },
+                    onSelectBottomTool: { item in
+                        viewModel.activateLeftBottomTool(item)
+                    }
+                )
+                .frame(width: stripWidth, height: geometry.size.height)
 
                 EditorRightToolStrip(
                     viewModel: viewModel,

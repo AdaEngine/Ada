@@ -124,6 +124,9 @@ extension EditorViewModel {
                 for path in paths where !path.isEmpty {
                     self.reloadOpenProjectFile(relativePath: path)
                 }
+                if paths.contains(where: { $0.isEmpty || $0.lowercased().hasSuffix(".ada") }) {
+                    self.scheduleAdaScriptHotReload()
+                }
             }
             do {
                 try watcher.start()

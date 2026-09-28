@@ -463,6 +463,8 @@ extension EditorViewModel {
                     return
                 }
                 self.adaScriptRuntimeWindow = nil
+                self.adaScriptRuntimeControls = nil
+                self.adaScriptHotReloadTask?.cancel()
                 self.workspaceStatus = .ready
                 self.footer.setWorkspaceFooterTitle(self.workspaceStatus.title)
                 self.appendOutput("AdaScript project \(windowTitle) stopped.")
@@ -472,6 +474,7 @@ extension EditorViewModel {
             }
             window.showWindow(makeFocused: true)
             adaScriptRuntimeWindow = window
+            adaScriptRuntimeControls = controls
             workspaceStatus = .running("Run \(windowTitle)")
             footer.setWorkspaceFooterTitle(workspaceStatus.title)
             appendOutput("Running AdaScript project \(windowTitle) in a separate window scene.")

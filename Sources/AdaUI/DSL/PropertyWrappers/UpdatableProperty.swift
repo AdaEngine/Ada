@@ -73,35 +73,40 @@ class UpdatablePropertyStorage {
     ///
     /// - Returns: The property.
     func update() {
-        let animationController = BindingAnimationTransaction.currentController
-
         nodes.forEach { node in
-            if node.shouldNotifyAboutChanges {
-                Logger(label: "org.adaengine.AdaUI")
-                    .info("\(type(of: node.content)): \(propertyName) changed.")
+            node.withAncestorTransaction {
+                self.update(node)
             }
+        }
+    }
 
-            let isStateUpdate = self is AnyStateStorage
+    private func update(_ node: ViewNode) {
+        let animationController = BindingAnimationTransaction.currentController
+        if node.shouldNotifyAboutChanges {
+            Logger(label: "org.adaengine.AdaUI")
+                .info("\(type(of: node.content)): \(propertyName) changed.")
+        }
 
-            if let animationController {
-                node.performWithTransientAnimationController(animationController) {
-                    node.invalidateContent(propagateLayout: !isStateUpdate)
-                }
-                node.owner?.addTransientAnimationController(animationController)
-            } else {
+        let isStateUpdate = self is AnyStateStorage
+
+        if let animationController {
+            node.performWithTransientAnimationController(animationController) {
                 node.invalidateContent(propagateLayout: !isStateUpdate)
             }
+            node.owner?.addTransientAnimationController(animationController)
+        } else {
+            node.invalidateContent(propagateLayout: !isStateUpdate)
+        }
 
-            if let containerView = node.owner?.containerView {
-                // Content invalidation can change layout without changing the container frame.
-                // `setNeedsLayout()` schedules `layoutSubviews` → `place()` before the next draw;
-                // `setNeedsDisplay` alone only repaints with stale layout until something (e.g. resize) relayouts.
-                if isStateUpdate {
-                    node.markNeedsLayout()
-                    containerView.setNeedsDisplay(in: node.visualAbsoluteFrame())
-                } else {
-                    containerView.setNeedsLayout()
-                }
+        if let containerView = node.owner?.containerView {
+            // Content invalidation can change layout without changing the container frame.
+            // `setNeedsLayout()` schedules `layoutSubviews` → `place()` before the next draw;
+            // `setNeedsDisplay` alone only repaints with stale layout until something (e.g. resize) relayouts.
+            if isStateUpdate {
+                node.markNeedsLayout()
+                containerView.setNeedsDisplay(in: node.visualAbsoluteFrame())
+            } else {
+                containerView.setNeedsLayout()
             }
         }
     }

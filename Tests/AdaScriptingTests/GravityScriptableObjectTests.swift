@@ -8,6 +8,49 @@ import Testing
 
 @Suite("Gravity scriptable objects", .serialized)
 struct GravityScriptableObjectTests {
+    @Test("Hot reload rebinds a live scriptable object and retains its exported fields")
+    @MainActor
+    func reloadLiveObject() async throws {
+        let schema = AdaScriptObjectSchema(
+            identifier: "test.hot-scriptable-counter",
+            className: "HotCounter",
+            version: 1,
+            aliases: [],
+            fields: ["count": .int(0)]
+        )
+        func source(increment: Int) -> AdaScriptSource {
+            AdaScriptSource(path: "HotCounter.ada", source: """
+            @scriptable(id: "test.hot-scriptable-counter", version: 1)
+            class HotCounter {
+                @export var count = 0;
+                func update(context) { count += \(increment); }
+            }
+            """)
+        }
+        let original = source(increment: 1)
+        try AdaScriptObjectRegistration.register(schemas: [schema], sources: [original], moduleName: "HotCounter")
+        let script = try ScriptableObjectRegistry.make(named: schema.identifier)
+        let world = World(name: "Scriptable hot reload")
+        let app = AppWorlds(main: world)
+        InputPlugin().setup(in: app)
+        ScriptableObjectPlugin().setup(in: app)
+        world.spawn { ScriptableComponents(scripts: [script]) }
+        let plugin = try AdaScriptPlugin(sources: [original], name: "HotCounter")
+        plugin.setup(in: app)
+
+        await world.runScheduler(.update)
+        #expect(try encodedCount(script) == 1)
+
+        let replacement = source(increment: 5)
+        let candidate = try AdaScriptObjectRegistration.prepareReload(
+            schemas: [schema], sources: [replacement], moduleName: "HotCounter"
+        )
+        try await plugin.reload(sources: [replacement], in: app, scriptableObjects: candidate)
+        await world.runScheduler(.update)
+
+        #expect(try encodedCount(script) == 6)
+    }
+
     @Test("Runs lifecycle and round trips detached exported state")
     @MainActor
     func lifecycleAndCoding() async throws {

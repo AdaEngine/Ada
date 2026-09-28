@@ -216,6 +216,9 @@ extension EditorViewModel {
         refreshProjectFiles(logsRefresh: false)
         refreshSourceControl()
         reloadOpenProjectFile(relativePath: relativePath)
+        if relativePath.lowercased().hasSuffix(".ada") {
+            scheduleAdaScriptHotReload()
+        }
     }
 
     func reloadOpenProjectFile(relativePath: String) {

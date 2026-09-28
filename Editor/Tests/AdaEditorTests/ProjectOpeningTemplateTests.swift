@@ -86,7 +86,7 @@ struct ProjectOpeningTemplateTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("Demos/MedievalArena", isDirectory: true)
+            .appendingPathComponent("Editor/Tests/AdaEditorTests/Fixtures/MedievalArena", isDirectory: true)
         let project = try ProjectSystem.loadProject(at: projectURL)
         let artifact = try EditorAdaScriptProjectBuilder().prepare(project: project, at: projectURL)
         let view = try EditorAdaScriptProjectRuntimeView(artifact: artifact)

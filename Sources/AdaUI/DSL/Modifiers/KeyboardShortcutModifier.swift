@@ -64,6 +64,9 @@ enum KeyboardShortcutTargetFinder {
         if let button = node as? ButtonViewNode {
             return button.canBecomeFocused ? button : nil
         }
+        if let presentation = node as? PresentationInputProviding {
+            return presentation.inputContentNodes.lazy.compactMap { firstEnabledButton(in: $0) }.first
+        }
         if let root = node as? ViewRootNode {
             return firstEnabledButton(in: root.contentNode)
         }
@@ -151,7 +154,7 @@ final class KeyboardShortcutModifierNode: ViewModifierNode, KeyboardShortcutHand
 
     /// Returns `true` if the shortcut was handled (action ran).
     func handleShortcutIfNeeded(event: KeyEvent) -> Bool {
-        guard event.status == .down else {
+        guard event.status == .down, acceptsPresentationInput else {
             return false
         }
         guard event.keyCode == keyCode else {
@@ -243,7 +246,7 @@ final class KeyboardShortcutsModifierNode: ViewModifierNode, KeyboardShortcutHan
     }
 
     func handleShortcutIfNeeded(event: KeyEvent) -> Bool {
-        guard event.status == .down else {
+        guard event.status == .down, acceptsPresentationInput else {
             return false
         }
 

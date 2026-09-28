@@ -23,8 +23,7 @@ struct EditorAgentSidebar: View {
         )
         .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
         .overlay {
-            RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
-                .stroke(theme.editorColors.border, lineWidth: 1)
+            adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
         }
         .onAppear { viewModel.panelDidAppear() }
         .onDisappear { viewModel.panelDidDisappear() }
@@ -83,8 +82,8 @@ struct EditorAgentSidebar: View {
                     try? await viewModel.createSession()
                 }
             }) {
-                Text("+")
-                    .font(.system(size: 18))
+                Text("\u{E145}")
+                    .font(AdaEditorMaterialSymbolFont.font(size: 18))
                     .foregroundColor(theme.editorColors.text)
                     .frame(width: 30, height: 30)
             }
@@ -275,47 +274,43 @@ struct EditorAgentSidebar: View {
             contextPicker
             pendingAttachmentList
             autocompleteList
-            VStack(alignment: .leading, spacing: 4) {
-                EditorAgentPromptEditor(viewModel: viewModel)
+            EditorAgentComposerSurface {
+                VStack(alignment: .leading, spacing: 4) {
+                    EditorAgentPromptEditor(viewModel: viewModel)
 
-                HStack(spacing: 4) {
-                    compactComposerButton("+", active: showsContextPicker) {
-                        showsContextPicker.toggle()
-                    }
-                    .accessibilityIdentifier("AdaEditor.Agent.AddContext")
-                    ScrollView(.horizontal) {
-                        configurationControls
-                            .fixedSize(horizontal: true, vertical: false)
-                    }
-                    .frame(height: 34)
-                    if viewModel.isSending {
-                        EditorFlipLoadingIndicator(size: 12, color: theme.editorColors.blue)
-                            .accessibilityIdentifier("AdaEditor.Agent.SendingFlip")
-                        Button(action: { viewModel.interrupt() }) {
-                            Text("\u{E047}")
-                                .font(AdaEditorMaterialSymbolFont.font(size: 20))
-                                .foregroundColor(theme.editorColors.muted)
-                                .frame(width: 30, height: 30)
+                    HStack(spacing: 4) {
+                        compactComposerButton("+", active: showsContextPicker) {
+                            showsContextPicker.toggle()
+                        }
+                        .accessibilityIdentifier("AdaEditor.Agent.AddContext")
+                        ScrollView(.horizontal) {
+                            configurationControls
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .frame(height: 34)
+                        if viewModel.isSending {
+                            EditorFlipLoadingIndicator(size: 12, color: theme.editorColors.blue)
+                                .accessibilityIdentifier("AdaEditor.Agent.SendingFlip")
+                            Button(action: { viewModel.interrupt() }) {
+                                Text("\u{E047}")
+                                    .font(AdaEditorMaterialSymbolFont.font(size: 20))
+                                    .foregroundColor(theme.editorColors.muted)
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(DefaultButtonStyle())
+                        }
+                        Button(action: { viewModel.sendPrompt() }) {
+                            Text("\u{E5D8}")
+                                .font(AdaEditorMaterialSymbolFont.font(size: 22))
+                                .foregroundColor(theme.editorColors.background)
+                                .frame(width: 34, height: 34)
+                                .background(CircleShape().fill(theme.editorColors.text.opacity(viewModel.canSend ? 1 : 0.28)))
                         }
                         .buttonStyle(DefaultButtonStyle())
+                        .disabled(!viewModel.canSend)
+                        .accessibilityIdentifier("AdaEditor.Agent.Send")
                     }
-                    Button(action: { viewModel.sendPrompt() }) {
-                        Text("\u{E5D8}")
-                            .font(AdaEditorMaterialSymbolFont.font(size: 22))
-                            .foregroundColor(theme.editorColors.background)
-                            .frame(width: 34, height: 34)
-                            .background(CircleShape().fill(theme.editorColors.text.opacity(viewModel.canSend ? 1 : 0.28)))
-                    }
-                    .buttonStyle(DefaultButtonStyle())
-                    .disabled(!viewModel.canSend)
-                    .accessibilityIdentifier("AdaEditor.Agent.Send")
                 }
-            }
-            .padding(8)
-            .background(RoundedRectangleShape(cornerRadius: 10).fill(theme.editorColors.surface))
-            .overlay {
-                RoundedRectangleShape(cornerRadius: 10)
-                    .stroke(theme.editorColors.border.opacity(0.8), lineWidth: 1)
             }
             .accessibilityIdentifier("AdaEditor.Agent.Composer")
         }

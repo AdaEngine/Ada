@@ -4,6 +4,7 @@ import Foundation
 
 struct EditorDebugPanel: View {
     let debugger: EditorDebugger
+    @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
     @State private var selectedTab = "Console"
 
@@ -32,7 +33,10 @@ struct EditorDebugPanel: View {
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         }
         .background(theme.editorColors.surfaceElevated)
-        .mask(RoundedRectangleShape(cornerRadius: 12))
+        .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+        .overlay {
+            adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
+        }
         .overlay(anchor: .topLeading) {
             if let tooltip {
                 Text(tooltip)

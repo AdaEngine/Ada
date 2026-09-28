@@ -9,6 +9,10 @@ import AdaEngine
 import Foundation
 import Logging
 
+#if os(iOS)
+    import UIKit
+#endif
+
 #if canImport(AdaMCPPlugin)
     import AdaMCPPlugin
 #endif
@@ -18,9 +22,15 @@ enum AdaApplicationEntry {
     @MainActor static func main() async throws {
         if Bundle.main.bundleIdentifier == "org.adaengine.player" || CommandLine.arguments.contains("--ada-player") {
             try await AppRuntime.run(AdaPlayerApp())
-        } else {
-            try await AppRuntime.run(AdaEditorApp())
+            return
         }
+        #if os(iOS)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                try await AppRuntime.run(AdaEditorPhoneApp())
+                return
+            }
+        #endif
+        try await AppRuntime.run(AdaEditorApp())
     }
 }
 
@@ -39,14 +49,6 @@ struct AdaEditorApp: App {
             await notifications.start()
             EditorUpdateCenter.shared.start()
         }
-    }
-
-    private static var mcpPort: Int {
-        let value = CommandLine.arguments.first { $0.hasPrefix("--mcp-port=") }?.split(separator: "=").last
-        guard let value, let port = Int(value), (0...65535).contains(port) else {
-            return 2510
-        }
-        return port
     }
 
     var body: some AppScene {
@@ -72,16 +74,32 @@ struct AdaEditorApp: App {
                     configuration: .init(
                         enableHTTP: true,
                         enableStdio: true,
-                        host: "127.0.0.1",
-                        port: Self.mcpPort,
-                        endpoint: "/mcp",
+                        host: EditorMCPServerAddress.host,
+                        port: EditorMCPServerAddress.port,
+                        endpoint: EditorMCPServerAddress.endpoint,
                         serverName: "Ada Editor",
                         serverVersion: "0.1.0",
                         instructions: """
-                            Inspect and automate the live Ada Editor. Use world.list_worlds to select Main or a SceneView subworld,
-                            automation.capabilities for writable types, automation.run for YAML/JSON steps, logs.read for cursor-based logs,
-                            and profiler.live_snapshot for metrics. Runtime ECS changes are not saved to scene files.
-                            """
+                            Inspect and automate the live Ada Editor and its open project. Use editor.project.context and editor.scene.list_open
+                            to orient first. Use editor.scene.get before editor.scene.apply and pass the returned revision. Structured scene edits
+                            update the open document, enter Ada Editor undo history, and are saved through the editor's normal save/autosave path.
+                            Use editor.build.start/editor.test.start/editor.play.start for project tasks, editor.task.status to poll, and editor.output.read for logs.
+                            Use editor.gravity.* tools for project-aware Gravity LSP operations on .ada and .gravity files. Runtime ECS changes made with automation.run are not saved to scene files.
+                            """,
+                        additionalTools: {
+                            EditorAgentMCPTools.tools()
+                                + EditorAgentWorkspaceMCPTools.tools()
+                                + EditorAgentGravityMCPTools.tools()
+                        },
+                        additionalToolHandler: { name, arguments in
+                            if let result = EditorAgentMCPTools.shared.handle(name: name, arguments: arguments) {
+                                return result
+                            }
+                            if let result = EditorAgentWorkspaceMCPTools.shared.handle(name: name, arguments: arguments) {
+                                return result
+                            }
+                            return await EditorAgentGravityMCPTools.shared.handle(name: name, arguments: arguments)
+                        }
                     )
                 )
             )

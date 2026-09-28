@@ -18,7 +18,7 @@ struct TileMapTests {
         try Self.setupHeadlessRenderEngineIfNeeded()
         let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let demoRoot = repositoryRoot.appendingPathComponent("Demos/MedievalArena")
+        let demoRoot = repositoryRoot.appendingPathComponent("Tests/AdaEngineTests/Fixtures/MedievalArena")
         let mapURL = demoRoot.appendingPathComponent("Assets/Maps/Arena.tilemap")
         let scopeID = UUID()
         try await AppWorldsExecutionContext.$currentID.withValue(scopeID) {

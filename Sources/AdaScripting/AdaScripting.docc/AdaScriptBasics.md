@@ -312,6 +312,28 @@ values into the task. `Time.sleep` uses game time; `Time.sleepRealTime` uses a
 monotonic clock. Read <doc:AdaScriptLanguage> for asset operations, save
 results, cancellation, and task lifetimes.
 
+## Scene navigation
+
+With `ScenePlugin` installed, an AdaScript system or scriptable callback can
+request a level change through its scoped world context:
+
+```ada
+context.world.changeScene("@res://Scenes/Level02.ascn");
+context.world.reloadScene(); // Restart after game over.
+```
+
+Both calls return `Bool` to indicate whether the request was accepted. Scene
+loading happens asynchronously, and the prepared scene replaces the old one
+after an update pass. The current scene remains active if loading fails.
+`reloadScene()` loads a fresh copy of the active scene, recreating its entities
+and scene resources. Entities spawned through AdaScript world commands are
+tracked as part of that scene and removed on reload. Application resources
+and entities created outside the scene remain available across transitions.
+AdaScript tasks for the outgoing world are canceled and `@system` instances
+are recreated; module globals remain part of the application session.
+World contexts expire when their callback returns, so do not retain one in an
+async task.
+
 ## Annotations
 
 Annotations begin with `@` and attach metadata to a declaration. They are

@@ -72,8 +72,8 @@ struct EditorProjectSidebar: View {
                         onNewFile(nil)
                     }) {
                         HStack(spacing: 5) {
-                            Text("+")
-                                .font(.system(size: 14))
+                            Text("\u{E145}")
+                                .font(AdaEditorMaterialSymbolFont.font(size: 14))
                             Text("New")
                                 .font(.system(size: 11))
                         }
@@ -116,6 +116,9 @@ struct EditorProjectSidebar: View {
                 .fill(theme.editorColors.surfaceElevated)
         )
         .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+        .overlay {
+            adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
+        }
         #if canImport(AppKit) && os(macOS)
             .overlay {
                 EditorProjectFileDropTarget(isEnabled: projectRootItem != nil, onDrop: onDropFiles)
@@ -206,10 +209,17 @@ struct EditorProjectSidebar: View {
                     .font(AdaEditorMaterialSymbolFont.font(size: 16))
                     .foregroundColor(theme.editorColors.muted)
                     .frame(width: 16, height: 18)
-                Text(fileIcon(for: item))
-                    .font(AdaEditorMaterialSymbolFont.font(size: 17))
-                    .foregroundColor(iconColor(for: item))
-                    .frame(width: 18, height: 18)
+                if let language = textLanguage(for: item), let image = EditorLanguageLogo.image(for: language) {
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 18, height: 18)
+                } else {
+                    Text(fileIcon(for: item))
+                        .font(AdaEditorMaterialSymbolFont.font(size: 17))
+                        .foregroundColor(iconColor(for: item))
+                        .frame(width: 18, height: 18)
+                }
                 Text(item.title)
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(item.isActive ? theme.editorColors.text : theme.editorColors.muted)
@@ -315,6 +325,13 @@ struct EditorProjectSidebar: View {
         case .unsupported:
             return EditorProjectTreeIcon.description
         }
+    }
+
+    private func textLanguage(for item: EditorProjectSidebarViewModel.Item) -> EditorSourceLanguage? {
+        guard case let .text(language) = item.kind else {
+            return nil
+        }
+        return language
     }
 
     private func textFileIcon(for language: EditorSourceLanguage) -> String {

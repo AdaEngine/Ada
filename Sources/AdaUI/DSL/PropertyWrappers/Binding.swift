@@ -12,10 +12,21 @@ enum BindingAnimationTransaction {
     private(set) static var currentController: UIAnimationController?
 
     static func withAnimation<Result>(_ animation: Animation?, _ operation: () throws -> Result) rethrows -> Result {
+        try withTransaction(Transaction(animation: animation), operation)
+    }
+
+    static func withTransaction<Result>(_ transaction: Transaction?, _ operation: () throws -> Result) rethrows -> Result {
+        let controller = transaction.flatMap { value in
+            value.disablesAnimations ? nil : value.animation.map { UIAnimationController(animation: $0) }
+        }
+        return try withController(controller, transaction: transaction, operation)
+    }
+
+    static func withController<Result>(_ controller: UIAnimationController?, transaction: Transaction?, _ operation: () throws -> Result) rethrows -> Result {
         let previousController = currentController
-        currentController = animation.map { UIAnimationController(animation: $0) }
+        currentController = controller
         defer { currentController = previousController }
-        return try operation()
+        return try UITransactionContext.withValue(transaction, operation: operation)
     }
 }
 

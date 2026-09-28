@@ -37,6 +37,10 @@ final class EditorGameWindowControls {
     private(set) var windowSize: Size
 
     @ObservationIgnored private weak var window: UIWindow?
+    @ObservationIgnored private weak var appWorlds: AppWorlds?
+    @ObservationIgnored private var scriptPlugin: AdaScriptPlugin?
+    @ObservationIgnored private var activeSources: [AdaScriptSource] = []
+    @ObservationIgnored private var activeScriptableSchemas: [AdaScriptObjectSchema] = []
     @ObservationIgnored private weak var inspector: EditorInspectorSidebarViewModel?
     @ObservationIgnored private var onEntitySelected: (() -> Void)?
 
@@ -58,6 +62,45 @@ final class EditorGameWindowControls {
 
     func attach(world: World) {
         inspection.attach(world)
+    }
+
+    func attach(app: AppWorlds, scriptPlugin: AdaScriptPlugin?, sources: [AdaScriptSource], scriptableSchemas: [AdaScriptObjectSchema]) {
+        appWorlds = app
+        self.scriptPlugin = scriptPlugin
+        activeSources = sources
+        activeScriptableSchemas = scriptableSchemas
+    }
+
+    func reloadAdaScript(_ artifact: EditorAdaScriptProjectBuildArtifact) async throws -> Bool {
+        for _ in 0..<20 {
+            if appWorlds != nil, scriptPlugin != nil {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        guard let appWorlds, let scriptPlugin else {
+            throw EditorAdaScriptRuntimeError.runtimeNotReady
+        }
+        let sources = artifact.sources
+        guard sources.count != activeSources.count || zip(sources, activeSources).contains(where: { $0.path != $1.path || $0.source != $1.source }) else {
+            return false
+        }
+        guard artifact.scenePlayRuntime.schemas == activeScriptableSchemas else {
+            throw AdaScriptError.invalidManifest("AdaScript scriptable-object schemas require a game restart.")
+        }
+        let scriptableObjects = activeScriptableSchemas.isEmpty ? nil : try AdaScriptObjectRegistration.prepareReload(
+            schemas: activeScriptableSchemas,
+            sources: sources,
+            moduleName: artifact.moduleName
+        )
+        try await scriptPlugin.reload(
+            sources: sources,
+            in: appWorlds,
+            startupSystemIdentifier: artifact.entry.startupSystem,
+            scriptableObjects: scriptableObjects
+        )
+        activeSources = sources
+        return true
     }
 
     func refresh() {
@@ -82,7 +125,9 @@ final class EditorGameWindowControls {
     }
 
     func applySize() {
-        guard let size = selectedSize.size(projectSize: projectSize, customWidth: customWidth, customHeight: customHeight), let window else { return }
+        guard let size = selectedSize.size(projectSize: projectSize, customWidth: customWidth, customHeight: customHeight), let window else {
+            return
+        }
         window.frame.size = Size(width: size.width, height: size.height + EditorGameWindowToolbar.height)
         windowSize = size
     }
@@ -92,6 +137,10 @@ final class EditorGameWindowControls {
     }
 
     func finish() {
+        appWorlds = nil
+        scriptPlugin = nil
+        activeSources = []
+        activeScriptableSchemas = []
         inspector?.runtimeSelection = nil
         inspector?.isInspectingPlayMode = false
         inspection.reset()

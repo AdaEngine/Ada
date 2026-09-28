@@ -114,6 +114,7 @@ struct TabContainerTests {
 
         model.selected = 1
         tester.invalidateContent().performLayout()
+        tester.advanceFrame(deltaTime: 0.3)
 
         let after = tester.collectHitAccessibilityIdentifiers(in: rect)
         #expect(!after.contains("content-a"))
@@ -296,6 +297,7 @@ struct TabContainerTests {
 
         model.selected = .inbox
         tester.invalidateContent().performLayout()
+        tester.advanceFrame(deltaTime: 0.3)
 
         let after = tester.collectHitAccessibilityIdentifiers(in: rect)
         #expect(!after.contains("home-content"))
@@ -345,14 +347,17 @@ struct TabContainerTests {
 
         model.selected = .second
         tester.invalidateContent().performLayout()
+        tester.advanceFrame(deltaTime: 0.3)
         #expect(tester.collectHitAccessibilityIdentifiers(in: rect).contains("second-marker-A"))
 
         model.marker = "B"
         tester.invalidateContent().performLayout()
+        tester.advanceFrame(deltaTime: 0.3)
         #expect(tester.collectHitAccessibilityIdentifiers(in: rect).contains("second-marker-B"))
 
         model.selected = .first
         tester.invalidateContent().performLayout()
+        tester.advanceFrame(deltaTime: 0.3)
         #expect(tester.collectHitAccessibilityIdentifiers(in: rect).contains("first-marker-B"))
     }
 
@@ -388,6 +393,7 @@ struct TabContainerTests {
 
         model.selected = 1
         tester.invalidateContent().performLayout()
+        tester.advanceFrame(deltaTime: 0.3)
         #expect(tester.collectHitAccessibilityIdentifiers(in: rect).contains("legacy-content-b"))
     }
 }

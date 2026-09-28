@@ -544,7 +544,7 @@ struct EditorSettingsWindowView: View {
             agentSettings(viewModel.agent)
         } else if viewModel.selectedSection == .general, viewModel.editorViewModel == nil {
             VStack(alignment: .leading, spacing: 0) {
-                settingsGroup("CLOUD ACCOUNT") { EditorCloudSettingsView() }
+                settingsGroup("ADA CLOUD") { EditorCloudSettingsView() }
                 settingsGroup("APPEARANCE") { EditorAgentGlowSettings() }
                 settingsGroup("EDITOR DISPLAY") { EditorCodeDisplaySettings() }
             }
@@ -568,7 +568,7 @@ struct EditorSettingsWindowView: View {
 
     private var generalSettings: some View {
         VStack(alignment: .leading, spacing: 0) {
-            settingsGroup("CLOUD ACCOUNT") { EditorCloudSettingsView() }
+            settingsGroup("ADA CLOUD") { EditorCloudSettingsView() }
             settingsGroup("APPEARANCE") {
                 EditorAgentGlowSettings()
             }

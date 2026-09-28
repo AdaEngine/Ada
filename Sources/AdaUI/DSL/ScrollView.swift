@@ -188,7 +188,11 @@ final class ScrollViewNode: LayoutViewContainerNode {
     static let scrollTimeout: Float = 0.05
     static let springStiffness: Float = 400
     static let springDamping: Float = 40
-    static let rubberBandCoefficient: Float = 0.02
+    #if os(iOS)
+        static let rubberBandCoefficient: Float = 0.55
+    #else
+        static let rubberBandCoefficient: Float = 0.02
+    #endif
     static let animationThreshold: Float = 0.5
 
     private var lastScrollEvent: TimeInterval?

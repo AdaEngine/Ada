@@ -60,6 +60,8 @@
                 isMultipleTouchEnabled = true
                 let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
                 pinch.cancelsTouchesInView = false
+                pinch.delaysTouchesBegan = false
+                pinch.delaysTouchesEnded = false
                 addGestureRecognizer(pinch)
             #endif
             self.isPaused = true

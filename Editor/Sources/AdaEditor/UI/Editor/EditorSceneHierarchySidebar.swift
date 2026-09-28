@@ -107,11 +107,18 @@ struct EditorSceneHierarchySidebar: View {
                     .foregroundColor(theme.editorColors.muted)
                     .lineLimit(1)
                 Button(action: { onAddEntity(defaultParentID) }) {
-                    Text("+")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(theme.editorColors.blue)
-                        .frame(width: 28, height: 28)
-                        .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.14)))
+                    HStack(spacing: 0) {
+                        #if os(iOS)
+                        Text("\u{E145}")
+                            .font(AdaEditorMaterialSymbolFont.font(size: 18))
+                        #else
+                        Text("\u{E145}")
+                            .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                        #endif
+                    }
+                    .foregroundColor(theme.editorColors.blue)
+                    .frame(width: 28, height: 28)
+                    .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.14)))
                 }
                 .buttonStyle(DefaultButtonStyle())
                 .accessibilityIdentifier("AdaEditor.SceneHierarchy.AddEntity")

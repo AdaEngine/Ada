@@ -531,6 +531,10 @@ var targets: [Target] = [
             "AdaInput",
             "AdaEngineMacros",
         ],
+        resources: [
+            .copy("Assets/Icons"),
+            .copy("Assets/Shaders"),
+        ],
         swiftSettings: swiftSettings
     ),
     .adaTarget(
@@ -546,6 +550,7 @@ var targets: [Target] = [
         name: "AdaScene",
         dependencies: [
             "AdaApp",
+            "AdaAssets",
             "AdaECS",
             "AdaAnimation",
             "box2d",
@@ -1261,6 +1266,7 @@ targets += [
         name: "AdaSceneTests",
         dependencies: [
             "AdaApp",
+            "AdaAssets",
             "AdaScene",
             "AdaAnimation",
             "AdaECS",
@@ -1393,90 +1399,7 @@ private extension Target {
         )
     }
 
-    static func exampleTarget(
-        name: String,
-        path: String,
-    ) -> Target {
-        let sourcePath = "\(path)/\(name).swift"
-        let excludedExampleSources = (
-            try? FileManager.default
-                .subpathsOfDirectory(atPath: "Demos")
-                .filter { $0.hasSuffix(".swift") && $0 != sourcePath }
-        ) ?? []
-
-        return .executableTarget(
-            name: name,
-            dependencies: [
-                "AdaEngine"
-            ],
-            path: "Demos",
-            exclude: excludedExampleSources,
-            sources: [
-                sourcePath
-            ],
-            resources: [
-                .copy("Resources")
-            ],
-            packageAccess: false,
-            linkerSettings: wasmExecutableLinkerSettings
-        )
-    }
 }
-
-// MARK: - Examples
-
-let examplesTargets: [Target] = [
-    // MARK: 2d
-    .exampleTarget(name: "BunniesStressExample", path: "2d"),
-    .exampleTarget(name: "TransformEntChildrenExample", path: "2d"),
-    .exampleTarget(name: "CustomMaterialExample", path: "2d"),
-    .exampleTarget(name: "TransparencyExample", path: "2d"),
-    .exampleTarget(name: "Lighting2DExample", path: "2d"),
-    .exampleTarget(name: "ManySpritesExample", path: "2d"),
-    .exampleTarget(name: "LargeBox2DBenchmarkExample", path: "2d"),
-    .exampleTarget(name: "FrustumCullingExample", path: "2d"),
-    .exampleTarget(name: "Gravity2DExample", path: "2d"),
-    .exampleTarget(name: "ThrowingShapes2DExample", path: "2d"),
-    .exampleTarget(name: "Text2dExample", path: "2d"),
-    .exampleTarget(name: "SpriteExample", path: "2d"),
-    .exampleTarget(name: "WGSLExample", path: "2d"),
-
-    // MARK: Input
-    .exampleTarget(name: "GamepadExample", path: "Input"),
-
-    // MARK: Scene
-    .exampleTarget(name: "LoadSceneExample", path: "Scene"),
-    .exampleTarget(name: "LdtkTilemapExample", path: "Scene"),
-    .exampleTarget(name: "CustomTileMapExample", path: "Scene"),
-    .exampleTarget(name: "ScriptableComponentExample", path: "Scene"),
-
-    // MARK: Games
-    .exampleTarget(name: "BulletHellGameExample", path: "Games"),
-
-    // MARK: UI
-    .exampleTarget(name: "TextureMenuExample", path: "UI"),
-    .exampleTarget(name: "UITestSceneExample", path: "UI"),
-    .exampleTarget(name: "AnimatedTextRendererExample", path: "UI"),
-    .exampleTarget(name: "ButtonExample", path: "UI"),
-    .exampleTarget(name: "KanbanBoardExample", path: "UI"),
-    .exampleTarget(name: "TextFieldExample", path: "UI"),
-    .exampleTarget(name: "NativeViewExample", path: "UI"),
-    .exampleTarget(name: "SceneViewExample", path: "UI"),
-    .exampleTarget(name: "AdaptiveSceneViewExample", path: "UI"),
-
-    // MARK: Example
-    .exampleTarget(name: "SimpleCollideEventExample", path: "Events"),
-
-    // MARK: 3D
-    .exampleTarget(name: "Box3DPhysicsExample", path: "3d"),
-    .exampleTarget(name: "PBRMaterialShowcaseExample", path: "3d"),
-    .exampleTarget(name: "SimpleCubeExample", path: "3d"),
-    .exampleTarget(name: "LargePyramidBenchmarkExample", path: "3d"),
-]
-
-package.targets.append(contentsOf: examplesTargets)
-
-// MARK:  Examples -
 
 // MARK: - Traits
 

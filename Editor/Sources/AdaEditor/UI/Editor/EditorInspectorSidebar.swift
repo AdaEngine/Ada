@@ -270,7 +270,7 @@ struct EditorInspectorSidebar: View {
                 .font(.system(size: 10, weight: .bold))
                 .foregroundColor(.white)
                 .frame(width: 24, height: 32)
-                .background(RectangleShape().fill(axisColor(for: label)))
+                .background(RoundedRectangleShape(cornerRadius: 5).fill(axisColor(for: label)))
             if isEditable {
                 TextField("", text: text)
                     .font(.system(size: 11, weight: .bold))
@@ -288,7 +288,6 @@ struct EditorInspectorSidebar: View {
         }
         .frame(minWidth: 72, maxWidth: .infinity, minHeight: 32, maxHeight: 32, alignment: .leading)
         .background(RoundedRectangleShape(cornerRadius: 5).fill(isEditable ? theme.editorColors.surface : theme.editorColors.surfaceElevated))
-        .mask(RoundedRectangleShape(cornerRadius: 5))
         .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
     }
 
@@ -304,7 +303,7 @@ struct EditorInspectorSidebar: View {
             .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
     }
 
-    private func axisColor(for label: String) -> Color {
+    func axisColor(for label: String) -> Color {
         switch label {
         case "X": Color(red: 0.78, green: 0.24, blue: 0.28)
         case "Y": Color(red: 0.24, green: 0.60, blue: 0.31)

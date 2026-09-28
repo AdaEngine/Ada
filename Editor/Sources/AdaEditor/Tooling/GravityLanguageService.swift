@@ -80,7 +80,8 @@ struct EditorGravityLanguageService: Sendable {
             uri: definition.uri,
             filePath: fileURL?.path.removingPercentEncoding ?? fileURL?.path ?? definition.uri,
             range: editorRange(from: definition.range, in: targetText),
-            selectionRange: editorRange(from: definition.selectionRange, in: targetText)
+            selectionRange: editorRange(from: definition.selectionRange, in: targetText),
+            content: targetText
         )
     }
 
@@ -113,6 +114,17 @@ struct EditorGravityLanguageService: Sendable {
                     source: "adascript-lsp"
                 )
             }
+    }
+
+    static func editorLocation(lspLine: Int, utf16Character: Int, text: String) -> EditorSourceLocation {
+        editorPosition(
+            from: GravitySourcePosition(line: max(0, lspLine), utf16Column: max(0, utf16Character)),
+            in: text
+        )
+    }
+
+    static func lspPosition(from location: EditorSourceLocation, text: String) -> GravitySourcePosition {
+        lspPosition(from: location, in: text)
     }
 
     static func quickFixes(text: String, position: EditorSourceLocation) -> [EditorSourceQuickFix] {

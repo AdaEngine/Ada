@@ -9,13 +9,14 @@ final class ObservedContentInvalidations {
     private struct Entry {
         weak var node: ViewContainerNode?
         let revision: UInt64
+        let transaction: Transaction?
     }
 
     private var pending: [ObjectIdentifier: Entry] = [:]
     private var isScheduled = false
 
-    func enqueue(_ node: ViewContainerNode, revision: UInt64) {
-        pending[ObjectIdentifier(node)] = Entry(node: node, revision: revision)
+    func enqueue(_ node: ViewContainerNode, revision: UInt64, transaction: Transaction?) {
+        pending[ObjectIdentifier(node)] = Entry(node: node, revision: revision, transaction: transaction)
         guard !isScheduled else {
             return
         }
@@ -41,7 +42,15 @@ final class ObservedContentInvalidations {
         isScheduled = false
 
         for item in batch {
-            item.entry.node?.performObservedContentInvalidation(revision: item.entry.revision)
+            if let transaction = item.entry.transaction {
+                withTransaction(transaction) {
+                    item.entry.node?.performObservedContentInvalidation(revision: item.entry.revision)
+                }
+            } else {
+                UITransactionContext.withValue(nil) {
+                    item.entry.node?.performObservedContentInvalidation(revision: item.entry.revision)
+                }
+            }
         }
     }
 }

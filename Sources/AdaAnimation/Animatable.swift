@@ -102,7 +102,7 @@ public struct AnimatablePair<First: VectorArithmetic, Second: VectorArithmetic>:
 
     /// The magnitude squared of the animatable pair.
     public var magnitudeSquared: Double {
-        self.first.magnitudeSquared * self.second.magnitudeSquared
+        self.first.magnitudeSquared + self.second.magnitudeSquared
     }
 
     /// Subtract two animatable pairs.

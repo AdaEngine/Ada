@@ -7,7 +7,16 @@ extension EditorInspectorSidebar {
         return VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
                 colorPickerSwatch(fieldID: fieldID, value: colorValue, text: text)
-                editorTextField(text: colorTextBinding(fieldID: fieldID, mode: mode, value: colorValue, text: text))
+                if mode == .rgba {
+                    HStack(spacing: 4) {
+                        ForEach(0..<4, id: \.self) { index in
+                            colorChannelField(fieldID: fieldID, index: index, text: text)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    editorTextField(text: colorTextBinding(fieldID: fieldID, mode: mode, value: colorValue, text: text))
+                }
             }
             HStack(spacing: 4) {
                 colorModeButton(.rgba, fieldID: fieldID, selectedMode: mode)
@@ -40,7 +49,7 @@ extension EditorInspectorSidebar {
         #if (canImport(AppKit) && os(macOS)) || (canImport(UIKit) && os(iOS))
             Button(action: {
                 EditorPlatformColorPicker.present(value: value) { updatedValue in
-                    colorTextDrafts[fieldID] = nil
+                    clearColorDrafts(fieldID: fieldID)
                     text.wrappedValue = updatedValue.rgbaString
                 }
             }) {
@@ -57,6 +66,51 @@ extension EditorInspectorSidebar {
                 .frame(width: 30, height: 28)
                 .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
         #endif
+    }
+
+    private func colorChannelField(fieldID: String, index: Int, text: Binding<String>) -> some View {
+        let label = ["R", "G", "B", "A"][index]
+        return HStack(spacing: 2) {
+            Text(label)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(index == 3 ? theme.editorColors.muted : axisColor(for: ["X", "Y", "Z"][index]))
+                .frame(width: 11)
+            TextField("", text: colorChannelBinding(fieldID: fieldID, index: index, text: text))
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(theme.editorColors.text)
+                .textFieldStyle(PlainTextFieldStyle())
+                .multilineTextAlignment(.leading)
+        }
+        .padding(.horizontal, 4)
+        .frame(minWidth: 48, maxWidth: .infinity, minHeight: 28, maxHeight: 28, alignment: .leading)
+        .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surface))
+        .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
+        .accessibilityIdentifier("AdaEditor.Inspector.ColorChannel.\(fieldID).\(label)")
+    }
+
+    func colorChannelBinding(fieldID: String, index: Int, text: Binding<String>) -> Binding<String> {
+        let draftID = "\(fieldID).rgba.\(index)"
+        return Binding(
+            get: {
+                colorTextDrafts[draftID]
+                    ?? EditorInspectorColorValue.format(EditorInspectorColorValue(text.wrappedValue).components[index])
+            },
+            set: { updatedText in
+                colorTextDrafts[draftID] = updatedText
+                guard let component = Float(updatedText), component.isFinite else {
+                    return
+                }
+                let updated = EditorInspectorColorValue(text.wrappedValue).replacingComponent(at: index, with: component)
+                text.wrappedValue = updated.rgbaString
+            }
+        )
+    }
+
+    private func clearColorDrafts(fieldID: String) {
+        colorTextDrafts[fieldID] = nil
+        for index in 0..<4 {
+            colorTextDrafts["\(fieldID).rgba.\(index)"] = nil
+        }
     }
 
     func colorTextBinding(
@@ -89,7 +143,7 @@ extension EditorInspectorSidebar {
     func colorModeButton(_ mode: ColorFieldMode, fieldID: String, selectedMode: ColorFieldMode) -> some View {
         Button(action: {
             colorFieldModes[fieldID] = mode
-            colorTextDrafts[fieldID] = nil
+            clearColorDrafts(fieldID: fieldID)
         }) {
             Text(mode.title)
                 .font(.system(size: 9))
@@ -102,6 +156,7 @@ extension EditorInspectorSidebar {
                 )
         }
         .buttonStyle(DefaultButtonStyle())
+        .accessibilityIdentifier("AdaEditor.Inspector.ColorMode.\(fieldID).\(mode.title)")
     }
 
     func assetReferenceField(fieldID: String, value: String, text: Binding<String>) -> some View {

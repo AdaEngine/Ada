@@ -16,8 +16,17 @@ public protocol View {
     @ViewBuilder @MainActor @preconcurrency
     var body: Self.Body { get }
 
-    @MainActor @preconcurrency static func _makeView(_ view: _ViewGraphNode<Self>, inputs: _ViewInputs) -> _ViewOutputs
-    @MainActor @preconcurrency static func _makeListView(_ view: _ViewGraphNode<Self>, inputs: _ViewListInputs) -> _ViewListOutputs
+    @MainActor @preconcurrency
+    static func _makeView(
+        _ view: _ViewGraphNode<Self>,
+        inputs: _ViewInputs
+    ) -> _ViewOutputs
+
+    @MainActor @preconcurrency
+    static func _makeListView(
+        _ view: _ViewGraphNode<Self>,
+        inputs: _ViewListInputs
+    ) -> _ViewListOutputs
 }
 
 extension View {

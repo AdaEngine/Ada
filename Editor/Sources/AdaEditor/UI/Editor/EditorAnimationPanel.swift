@@ -19,6 +19,9 @@ struct EditorAnimationPanel: View {
                 .fill(theme.editorColors.surfaceElevated)
         }
         .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+        .overlay {
+            adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
+        }
         .accessibilityIdentifier("AdaEditor.Animator.Panel")
     }
 
@@ -188,7 +191,7 @@ struct EditorAnimationPanel: View {
             ForEach(clip.tracks, id: \.id) { track in
                 Button(action: { viewModel.animationPanel.selectTrack(track) }) {
                     HStack(spacing: 5) {
-                        Text("◆").font(.system(size: 8))
+                        Text("\u{EAD5}").font(AdaEditorMaterialSymbolFont.font(size: 10))
                         Text(track.property.title).font(.system(size: 10)).lineLimit(1)
                         Spacer()
                     }

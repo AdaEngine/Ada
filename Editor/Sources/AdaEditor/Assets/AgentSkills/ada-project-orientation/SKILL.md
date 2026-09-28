@@ -1,13 +1,14 @@
 ---
 name: ada-project-orientation
 description: Inspect an Ada project before coding, scene, asset, build, or debugging work.
-allowed-tools: files.read, files.write, terminal, world.list_worlds, ui.list_windows
+allowed-tools: files.read, files.write, terminal, editor.project.context, editor.scene.list_open, editor.asset.list, world.list_worlds, ui.list_windows
 ---
 
 # Ada Project Orientation
 
 Start from the project rather than assumptions.
 
+- Use `editor.project.context` to identify the open project and active document. Use `editor.scene.list_open` to find scene documents already open in the editor.
 - Read `.ada/project.json` first. Treat `build.system`, declared source and resource roots, runtime entry, plugins, and run destination as authoritative.
 - Use the term AdaScript in user-facing text. `adascript` is the canonical build-system value; `gravity` is legacy compatibility only.
 - Read a nearby `AGENTS.md`, project README, and relevant AdaEngine DocC before choosing an API or file format.

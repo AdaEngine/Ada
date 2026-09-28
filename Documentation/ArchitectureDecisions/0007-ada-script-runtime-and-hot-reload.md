@@ -4,7 +4,7 @@
 
 - Status: Accepted
 - Date: 2026-08-31
-- Implementation: Planned
+- Implementation: In progress (portable AdaEditor macOS game window supports source-compatible reload)
 
 ## Context
 

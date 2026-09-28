@@ -99,7 +99,7 @@ struct ImageSkinTests {
 
     @Test func designerMenuLoadsRealResources() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Demos/Resources/KenneyUI")
+            .appendingPathComponent("Tests/AdaUITests/Fixtures/KenneyUI")
         let resources = UISceneResources(rootURL: root)
         let url = root.appendingPathComponent("Menu.ui")
         let document = try resources.load(url)

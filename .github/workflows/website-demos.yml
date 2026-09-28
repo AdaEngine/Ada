@@ -1,21 +1,11 @@
-name: Website Demos
+name: Website demos on engine changes
 
 on:
   push:
     branches: [ main ]
     paths:
-      - 'Demos/**'
       - 'Package.swift'
       - 'Plugins/AdaWebExportPlugin/**'
-      - 'scripts/build-website-demos.mjs'
-      - '.github/workflows/website-demos.yml'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'Demos/**'
-      - 'Package.swift'
-      - 'Plugins/AdaWebExportPlugin/**'
-      - 'scripts/build-website-demos.mjs'
       - '.github/workflows/website-demos.yml'
   workflow_dispatch:
 
@@ -23,35 +13,14 @@ permissions:
   contents: read
 
 jobs:
-  validate-manifest:
-    runs-on: macos-26
-    steps:
-      - name: Setup Xcode version
-        uses: maxim-lobanov/setup-xcode@v1.6.0
-        with:
-          xcode-version: '26.1.1'
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Validate demo manifest
-        run: node scripts/build-website-demos.mjs --output dist/website-demos --skip-build
-
-      - name: Upload demo manifest preview
-        uses: actions/upload-artifact@v4
-        with:
-          name: website-demos-manifest
-          path: dist/website-demos/manifest.json
-
   notify-website:
-    needs: validate-manifest
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger website deployment
         env:
           GH_TOKEN: ${{ secrets.WEBSITE_ACCESS_TOKEN }}
-          ADAENGINE_REF: ${{ github.sha }}
+          ENGINE_REF: ${{ github.sha }}
         run: |
           if [[ -z "${GH_TOKEN}" ]]; then
             echo "::notice::Skipping website deployment notification because WEBSITE_ACCESS_TOKEN is not configured."
@@ -64,4 +33,4 @@ jobs:
             --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer ${GH_TOKEN}" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
-            --data "{\"event_type\":\"adaengine-demos-updated\",\"client_payload\":{\"ref\":\"${ADAENGINE_REF}\"}}"
+            --data "{\"event_type\":\"adaengine-demos-updated\",\"client_payload\":{\"engine_ref\":\"${ENGINE_REF}\",\"examples_ref\":\"main\"}}"

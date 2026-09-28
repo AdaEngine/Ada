@@ -56,6 +56,14 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
     public required init(from decoder: AssetDecoder) async throws {
         let fileContent = try decoder.decode(FileContent.self)
         self.tileSet = fileContent.tileSet ?? TileSet()
+        let paletteLayers = fileContent.paletteLayers ?? []
+        for (index, layer) in paletteLayers.enumerated() {
+            let target = index == 0 ? layers[0] : createLayer()
+            target.name = layer.name
+            target.zIndex = layer.zIndex
+            target.isEnabled = layer.isEnabled
+        }
+        let cellsByLayer = paletteLayers.isEmpty ? nil : paletteLayers.map(\.cells)
 
         if fileContent.atlasTextures?.isEmpty != false, let colors = fileContent.atlasColors, !colors.isEmpty {
             var atlas = Image(width: colors.count, height: 1, color: .white)
@@ -68,9 +76,9 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
                 source.createTile(for: [index, 0])
             }
             let sourceID = tileSet.addTileSource(source)
-            if let cells = fileContent.cells {
+            for (index, cells) in (cellsByLayer ?? [fileContent.cells ?? []]).enumerated() {
                 for cell in cells where cell.count >= 3 && colors.indices.contains(cell[2]) {
-                    layers[0].setCell(at: [cell[0], cell[1]], sourceId: sourceID, atlasCoordinates: [cell[2], 0])
+                    layers[index].setCell(at: [cell[0], cell[1]], sourceId: sourceID, atlasCoordinates: [cell[2], 0])
                 }
             }
         }
@@ -92,7 +100,7 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
                     images.append(Image(width: first.width, height: first.height, color: color))
                 }
             }
-            try setImagePalette(images, cells: fileContent.cells ?? [])
+            try setImagePalette(images, cells: fileContent.cells ?? [], cellsByLayer: cellsByLayer)
         }
 
         if let reference = fileContent.tileSetReference, !reference.isEmpty {
@@ -107,7 +115,8 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
                 linkedSet,
                 palette: fileContent.tileSetTiles ?? [],
                 cells: fileContent.cells ?? [],
-                firstPaletteIndex: max(fileContent.atlasColors?.count ?? 0, fileContent.atlasTextures?.count ?? 0)
+                firstPaletteIndex: max(fileContent.atlasColors?.count ?? 0, fileContent.atlasTextures?.count ?? 0),
+                cellsByLayer: cellsByLayer
             )
         }
 
@@ -149,13 +158,14 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
 
         let content = FileContent(
             layers: layers, tileSet: self.tileSet, atlasColors: nil, atlasTextures: nil,
-            tileSetReference: nil, tileSetTiles: nil, cells: nil
+            tileSetReference: nil, tileSetTiles: nil, cells: nil, paletteLayers: nil
         )
         try encoder.encode(content)
     }
 
     /// Install equal-sized tile images as one atlas, with cell indices matching image order.
-    public func setImagePalette(_ images: [Image], cells: [[Int]]) throws {
+    /// `cellsByLayer` paints the same palette into existing layers when supplied.
+    public func setImagePalette(_ images: [Image], cells: [[Int]], cellsByLayer: [[[Int]]]? = nil) throws {
         guard let first = images.first, first.width > 0, first.height > 0,
             images.allSatisfy({ $0.width == first.width && $0.height == first.height }) else {
             throw AssetDecodingError.decodingProblem("Tile palette images must have equal, nonzero dimensions.")
@@ -174,17 +184,21 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
             source.createTile(for: [index, 0])
         }
         let sourceID = tileSet.addTileSource(source)
-        for cell in cells where cell.count >= 3 && images.indices.contains(cell[2]) {
-            layers[0].setCell(at: [cell[0], cell[1]], sourceId: sourceID, atlasCoordinates: [cell[2], 0])
+        for (layerIndex, layerCells) in (cellsByLayer ?? [cells]).enumerated() where layers.indices.contains(layerIndex) {
+            for cell in layerCells where cell.count >= 3 && images.indices.contains(cell[2]) {
+                layers[layerIndex].setCell(at: [cell[0], cell[1]], sourceId: sourceID, atlasCoordinates: [cell[2], 0])
+            }
         }
     }
 
     /// Append palette tiles from an authored tile set while preserving the tile set asset itself.
+    /// `cellsByLayer` paints the same palette into existing layers when supplied.
     public func installTileSetPalette(
         _ linkedSet: TileSet,
         palette: [TileMapSourceTile],
         cells: [[Int]],
-        firstPaletteIndex: Int
+        firstPaletteIndex: Int,
+        cellsByLayer: [[[Int]]]? = nil
     ) throws {
         var copiedSources: [Int: Int] = [:]
         for tile in palette {
@@ -197,18 +211,23 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
                 copiedSources[tile.sourceID] = tileSet.addTileSource(try source.copyForTileMap())
             }
         }
-        for cell in cells where cell.count >= 3 {
-            let index = cell[2] - firstPaletteIndex
-            guard palette.indices.contains(index), let sourceID = copiedSources[palette[index].sourceID] else { continue }
-            layers[0].setCell(
-                at: [cell[0], cell[1]], sourceId: sourceID,
-                atlasCoordinates: PointInt(palette[index].atlasCoordinates)
-            )
+        for (layerIndex, layerCells) in (cellsByLayer ?? [cells]).enumerated() where layers.indices.contains(layerIndex) {
+            for cell in layerCells where cell.count >= 3 {
+                let index = cell[2] - firstPaletteIndex
+                guard palette.indices.contains(index), let sourceID = copiedSources[palette[index].sourceID] else { continue }
+                layers[layerIndex].setCell(
+                    at: [cell[0], cell[1]], sourceId: sourceID,
+                    atlasCoordinates: PointInt(palette[index].atlasCoordinates)
+                )
+            }
         }
     }
 
     /// Append individual images for a portable player that has no synchronous tile set asset loader.
-    public func installLinkedImagePalette(_ images: [Image], cells: [[Int]], firstPaletteIndex: Int) throws {
+    /// `cellsByLayer` paints the same palette into existing layers when supplied.
+    public func installLinkedImagePalette(
+        _ images: [Image], cells: [[Int]], firstPaletteIndex: Int, cellsByLayer: [[[Int]]]? = nil
+    ) throws {
         var sourceIDs: [Int] = []
         for image in images {
             guard image.width > 0, image.height > 0 else {
@@ -218,10 +237,12 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
             source.createTile(for: [0, 0])
             sourceIDs.append(tileSet.addTileSource(source))
         }
-        for cell in cells where cell.count >= 3 {
-            let index = cell[2] - firstPaletteIndex
-            guard sourceIDs.indices.contains(index) else { continue }
-            layers[0].setCell(at: [cell[0], cell[1]], sourceId: sourceIDs[index], atlasCoordinates: [0, 0])
+        for (layerIndex, layerCells) in (cellsByLayer ?? [cells]).enumerated() where layers.indices.contains(layerIndex) {
+            for cell in layerCells where cell.count >= 3 {
+                let index = cell[2] - firstPaletteIndex
+                guard sourceIDs.indices.contains(index) else { continue }
+                layers[layerIndex].setCell(at: [cell[0], cell[1]], sourceId: sourceIDs[index], atlasCoordinates: [0, 0])
+            }
         }
     }
 
@@ -325,6 +346,12 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
 
 extension TileMap {
     struct FileContent: Codable {
+        struct PaletteLayer: Codable {
+            let name: String
+            let zIndex: Int
+            let isEnabled: Bool
+            let cells: [[Int]]
+        }
         struct Layer: Codable {
             let name: String
             let id: Int
@@ -370,5 +397,6 @@ extension TileMap {
         let tileSetReference: String?
         let tileSetTiles: [TileMapSourceTile]?
         let cells: [[Int]]?
+        let paletteLayers: [PaletteLayer]?
     }
 }

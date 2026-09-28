@@ -31,6 +31,8 @@ class ViewModifierNode: ViewNode {
         super.didMove(to: parent)
         if parent == nil {
             contentNode.parent = nil
+        } else {
+            contentNode.parent = self
         }
     }
 

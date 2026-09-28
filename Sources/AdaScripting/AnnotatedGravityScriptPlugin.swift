@@ -2,6 +2,7 @@ import AdaApp
 @_spi(Scripting) import AdaECS
 import AdaInput
 import AdaMultiplayer
+import AdaScene
 import AdaScriptCompilerCore
 import Foundation
 import Gravity
@@ -18,19 +19,19 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     }
 
     public var diagnostics: [String] {
-        runtime.diagnostics
+        AdaScriptRuntimeCoordinator.lock.withLock { runtime.diagnostics }
     }
 
     /// Number of suspended or ready AdaScript tasks owned by this module.
     public var activeAsyncTaskCount: Int {
-        runtime.activeAsyncTaskCount
+        AdaScriptRuntimeCoordinator.lock.withLock { runtime.activeAsyncTaskCount }
     }
 
-    private let plans: [AnnotatedSystemPlan]
-    private let dataSchemas: [AdaScriptDataSchema]
-    private let networkCommands: [AdaScriptNetworkCommandSchema]
-    private let runtimeComponents: [RuntimeComponentDescriptor]
-    private let runtime: AnnotatedGravityRuntime
+    private var plans: [AnnotatedSystemPlan]
+    private var dataSchemas: [AdaScriptDataSchema]
+    private var networkCommands: [AdaScriptNetworkCommandSchema]
+    private var runtimeComponents: [RuntimeComponentDescriptor]
+    private var runtime: AnnotatedGravityRuntime
 
     public convenience init(contentsOf fileURL: URL) throws {
         try self.init(
@@ -129,6 +130,71 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         }
     }
 
+    /// Replaces the module's systems in a running world after the current frame finishes.
+    /// A failed candidate leaves the previous VM and scheduler registrations active.
+    @MainActor
+    public func reload(
+        sources: [AdaScriptSource],
+        in app: AppWorlds,
+        startupSystemIdentifier: String? = nil,
+        scriptableObjects: AdaScriptObjectReloadCandidate? = nil
+    ) async throws {
+        let candidate = try AdaScriptPlugin(
+            sources: sources,
+            name: name,
+            startupSystemIdentifier: startupSystemIdentifier
+        )
+        guard candidate.dataSchemas == dataSchemas, candidate.networkCommands == networkCommands else {
+            throw AdaScriptError.invalidManifest("AdaScript component, resource, and network schemas require a game restart.")
+        }
+        try await app.withExclusiveWorldAccess {
+            let prepared = try candidate.plans.map { plan in
+                try (plan, Self.prepare(plan, pluginIdentifier: name, world: app.main))
+            }
+            try scriptableObjects?.activate(in: app.main)
+            for scheduler in Set(plans.map(\.scheduler)) {
+                app.main.schedulers.removeSystem(AnnotatedGravityScriptSystem.self, for: scheduler)
+            }
+            app.main.schedulers.removeSystem(AdaScriptTaskPumpSystem.self, for: .update)
+            let worldID = "world:\(ObjectIdentifier(app.main).hashValue)"
+            runtime.cancelTasks(forWorld: worldID)
+            app.main.schedulers.addSystem(AdaScriptTaskPumpSystem(pluginIdentifier: name, runtime: candidate.runtime), for: .update)
+            for (plan, preparedSystem) in prepared {
+                app.main.schedulers.addSystem(
+                    AnnotatedGravityScriptSystem(
+                        pluginIdentifier: name,
+                        runtime: candidate.runtime,
+                        preparedSystem: preparedSystem
+                    ),
+                    for: plan.scheduler
+                )
+            }
+            plans = candidate.plans
+            dataSchemas = candidate.dataSchemas
+            networkCommands = candidate.networkCommands
+            runtimeComponents = candidate.runtimeComponents
+            AdaScriptRuntimeCoordinator.lock.withLock {
+                runtime = candidate.runtime
+            }
+            let startupSystems = prepared.filter { $0.0.scheduler == .startup }
+            if !startupSystems.isEmpty {
+                let reloadScheduler = SchedulerName(rawValue: "AdaScripting.ReloadStartup.\(name)")
+                for (_, preparedSystem) in startupSystems {
+                    app.main.schedulers.addSystem(
+                        AnnotatedGravityScriptSystem(
+                            pluginIdentifier: name,
+                            runtime: runtime,
+                            preparedSystem: preparedSystem
+                        ),
+                        for: reloadScheduler
+                    )
+                }
+                await app.main.runScheduler(reloadScheduler)
+                app.main.schedulers.removeSystem(AnnotatedGravityScriptSystem.self, for: reloadScheduler)
+            }
+        }
+    }
+
     @MainActor
     public func setup(in app: borrowing AppWorlds) {
         for descriptor in runtimeComponents {
@@ -189,6 +255,13 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             } catch {
                 runtime.appendDiagnostic(String(describing: error))
             }
+        }
+        let worldID = "world:\(ObjectIdentifier(app.main).hashValue)"
+        app.main.getResource(SceneNavigator.self)?.onSceneWillReplace { [weak self] in
+            guard let self else {
+                return
+            }
+            self.runtime.resetForSceneChange(plans: self.plans, worldID: worldID)
         }
     }
 
@@ -596,7 +669,7 @@ private struct AnnotatedGravityScriptSystem: System {
                 payloads: method.parameter.wrappedValue.commands(named: method.commandName)
             )
         }
-        let world = runtime.makeWorldBridge(commands: preparedSystem.commands)
+        let world = runtime.makeWorldBridge(commands: preparedSystem.commands, world: context.world)
         runtime.update(
             className: preparedSystem.className,
             systemIdentifier: preparedSystem.identifier,
@@ -816,6 +889,15 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         }
     }
 
+    func resetForSceneChange(plans: [AnnotatedSystemPlan], worldID: String) {
+        cancelTasks(forWorld: worldID)
+        do {
+            try instantiateSystems(plans)
+        } catch {
+            appendDiagnostic("Could not reset AdaScript systems for scene transition: \(error)")
+        }
+    }
+
     func makeQueryBridge(
         cursor: DynamicQueryCursor,
         componentAccesses: [AnnotatedComponentAccess]
@@ -871,13 +953,16 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         return GSValue(newArrayIn: virtualMachine, items: values)
     }
 
-    func makeWorldBridge(commands: Commands?) -> AnnotatedGravityWorldContext {
+    func makeWorldBridge(commands: Commands?, world: World) -> AnnotatedGravityWorldContext {
         AnnotatedGravityWorldContext.make(
+            world: world,
             commands: AnnotatedGravityCommandsBridge.make(
                 commands: commands,
+                navigator: world.getResource(SceneNavigator.self),
                 runtimeComponents: runtimeComponents,
                 reportDiagnostic: appendDiagnostic
-            )
+            ),
+            reportDiagnostic: appendDiagnostic
         )
     }
 

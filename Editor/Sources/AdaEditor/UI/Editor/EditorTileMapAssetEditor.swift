@@ -3,6 +3,7 @@
 struct EditorTileMapAssetEditor: View {
     let document: EditorAssetDocument
     @State private var model: EditorTileMapEditorModel
+    @State private var layerName = ""
     @Environment(\.theme) private var theme
 
     init(document: EditorAssetDocument, model: EditorTileMapEditorModel? = nil, onSave: (() -> Void)? = nil) {
@@ -125,14 +126,17 @@ struct EditorTileMapAssetEditor: View {
         let maxX = Int(ceil((size.width - origin.x) / cellWidth + 0.5))
         let minY = Int(floor((origin.y - size.height) / cellHeight - 0.5))
         let maxY = Int(ceil(origin.y / cellHeight + 0.5))
-        for y in minY...maxY {
-            for x in minX...maxX {
-                guard let color = model.color(atX: x, y: y) else { continue }
-                let rect = model.tileRect(atX: x, y: y, in: size)
-                if let index = model.tileIndex(atX: x, y: y), let texture = model.texture(at: index) {
-                    context.drawRect(rect, texture: texture, color: .white)
-                } else {
-                    context.drawRect(rect, color: color)
+        for (layerIndex, layer) in model.layers.enumerated() where layer.isEnabled {
+            for y in minY...maxY {
+                for x in minX...maxX {
+                    guard let index = model.tileIndex(atX: x, y: y, layer: layerIndex),
+                        index >= 0, index < model.paletteCount else { continue }
+                    let rect = model.tileRect(atX: x, y: y, in: size)
+                    if let texture = model.texture(at: index) {
+                        context.drawRect(rect, texture: texture, color: .white)
+                    } else {
+                        context.drawRect(rect, color: model.paletteColor(at: index))
+                    }
                 }
             }
         }
@@ -158,6 +162,44 @@ struct EditorTileMapAssetEditor: View {
 
     private var inspector: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Text("LAYERS  ·  BOTTOM TO TOP")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(theme.editorColors.muted)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 5) {
+                    ForEach(0..<model.layers.count, id: \.self) { index in
+                        toolbarButton(
+                            "\(model.layers[index].isEnabled ? "●" : "○")  \(model.layers[index].name)  (\(model.layers[index].cells.count))",
+                            selected: model.selectedLayer == index,
+                            id: "Layer.\(index)"
+                        ) {
+                            model.selectLayer(index)
+                            layerName = ""
+                        }
+                    }
+                }
+            }
+            .frame(height: 100)
+            HStack(spacing: 5) {
+                toolbarButton("+", id: "AddLayer") { model.addLayer() }
+                toolbarButton("−", id: "RemoveLayer") { model.removeSelectedLayer() }
+                toolbarButton("↑", id: "MoveLayerUp") { model.moveSelectedLayer(by: 1) }
+                toolbarButton("↓", id: "MoveLayerDown") { model.moveSelectedLayer(by: -1) }
+                toolbarButton(model.layers[model.selectedLayer].isEnabled ? "Hide" : "Show", id: "ToggleLayer") {
+                    model.toggleSelectedLayer()
+                }
+            }
+            HStack(spacing: 5) {
+                TextField("Rename selected layer", text: $layerName)
+                    .font(.system(size: 11))
+                    .textFieldStyle(PlainTextFieldStyle())
+                    .padding(6)
+                    .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.surface))
+                toolbarButton("Rename", id: "RenameLayer") {
+                    model.renameSelectedLayer(layerName)
+                    layerName = ""
+                }
+            }
             Text("PALETTE")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(theme.editorColors.muted)
@@ -213,7 +255,7 @@ struct EditorTileMapAssetEditor: View {
                 toolbarButton("+ Color", id: "AddColor") { model.addColor() }
             }
             .frame(height: 34)
-            Text("Left click paints · right click erases. Scroll to pan; pinch or ⌘/Ctrl + wheel to zoom.")
+            Text("Paint and erase affect the selected layer. Scroll to pan; pinch or ⌘/Ctrl + wheel to zoom.")
                 .font(.system(size: 10))
                 .foregroundColor(theme.editorColors.muted)
                 .lineLimit(4)
@@ -252,7 +294,7 @@ struct EditorTileMapAssetEditor: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
-            Text("\(model.map.cells.count) cells")
+            Text("\(model.map.cellCount) cells · \(model.layers.count) layers")
                 .foregroundColor(theme.editorColors.text)
             Text("Zoom \(Int(model.zoom * 100))%")
                 .foregroundColor(theme.editorColors.muted)

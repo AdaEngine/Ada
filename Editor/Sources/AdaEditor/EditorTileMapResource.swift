@@ -4,11 +4,30 @@ import Yams
 
 /// The paintable, palette-based form of a .tilemap asset.
 struct EditorTileMapResource: Codable, Equatable {
+    struct PaletteLayer: Codable, Equatable {
+        var name: String
+        var zIndex: Int
+        var isEnabled: Bool
+        var cells: [[Int]]
+    }
+
     var atlasColors: [Color]
     var atlasTextures: [String]? = nil
     var tileSetReference: String? = nil
     var tileSetTiles: [TileMapSourceTile]? = nil
+    /// Cells in older single-layer maps. New layered maps keep this empty.
     var cells: [[Int]]
+    /// Palette-indexed layers, distinct from the engine's source-ID-based `layers` format.
+    var paletteLayers: [PaletteLayer]? = nil
+
+    var effectiveLayers: [PaletteLayer] {
+        if let paletteLayers, !paletteLayers.isEmpty { return paletteLayers }
+        return [PaletteLayer(name: "Layer 1", zIndex: 0, isEnabled: true, cells: cells)]
+    }
+
+    var cellCount: Int { effectiveLayers.reduce(0) { $0 + $1.cells.count } }
+
+    var allCells: [[Int]] { effectiveLayers.flatMap(\.cells) }
 
     static func read(from url: URL) throws -> Self {
         try YAMLDecoder().decode(Self.self, from: String(contentsOf: url, encoding: .utf8))
@@ -30,6 +49,16 @@ struct EditorTileMapResource: Codable, Equatable {
             }),
             "cells": .array(cells.map { .array($0.map(EditorSceneValue.int)) }),
         ]
+        if let paletteLayers {
+            payload["paletteLayers"] = .array(paletteLayers.map { layer in
+                .object([
+                    "name": .string(layer.name),
+                    "zIndex": .int(layer.zIndex),
+                    "isEnabled": .bool(layer.isEnabled),
+                    "cells": .array(layer.cells.map { .array($0.map(EditorSceneValue.int)) }),
+                ])
+            })
+        }
         if let atlasTextures {
             payload["atlasTextures"] = .array(atlasTextures.map(EditorSceneValue.string))
         }

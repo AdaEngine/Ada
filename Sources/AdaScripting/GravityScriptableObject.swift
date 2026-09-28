@@ -5,7 +5,7 @@ import Foundation
 import Gravity
 import Logging
 
-public struct AdaScriptObjectSchema: Sendable {
+public struct AdaScriptObjectSchema: Equatable, Sendable {
     public let aliases: [String]
     public let bindings: [AdaScriptObjectBinding]
     public let className: String
@@ -30,8 +30,8 @@ public struct AdaScriptObjectSchema: Sendable {
     }
 }
 
-public struct AdaScriptObjectBinding: Sendable {
-    public enum Kind: Sendable {
+public struct AdaScriptObjectBinding: Equatable, Sendable {
+    public enum Kind: Equatable, Sendable {
         case component(required: Bool)
         case resource(optional: Bool)
     }
@@ -48,6 +48,20 @@ public struct AdaScriptObjectBinding: Sendable {
 }
 
 public enum AdaScriptObjectRegistration {
+    /// Compiles replacement scriptable objects without touching the running world.
+    @MainActor
+    public static func prepareReload(
+        schemas: [AdaScriptObjectSchema],
+        sources: [AdaScriptSource],
+        moduleName: String
+    ) throws -> AdaScriptObjectReloadCandidate {
+        try AdaScriptObjectReloadCandidate(
+            schemas: schemas,
+            sources: sources,
+            moduleName: moduleName
+        )
+    }
+
     @MainActor
     public static func register(
         schemas: [AdaScriptObjectSchema],
@@ -83,6 +97,55 @@ public enum AdaScriptObjectRegistration {
                     }
                 )
             )
+        }
+    }
+}
+
+/// A validated VM generation for scriptable objects, activated between frames.
+@MainActor
+public final class AdaScriptObjectReloadCandidate {
+    private let definitions: [String: GravityScriptableDefinition]
+    private let descriptors: [ScriptableObjectDescriptor]
+
+    // Shared with the registration factory in this file only.
+    // swiftlint:disable:next strict_fileprivate
+    fileprivate init(schemas: [AdaScriptObjectSchema], sources: [AdaScriptSource], moduleName _: String) throws {
+        let runtime = try GravityScriptableModuleRuntime(sources: sources, schemas: schemas)
+        let definitions = try schemas.map { try GravityScriptableDefinition(schema: $0, runtime: runtime) }
+        self.definitions = Dictionary(uniqueKeysWithValues: definitions.map { ($0.schema.identifier, $0) })
+        self.descriptors = definitions.map { definition in
+            let schema = definition.schema
+            return ScriptableObjectDescriptor(
+                identifier: schema.identifier,
+                version: schema.version,
+                aliases: schema.aliases,
+                declaredAccess: definition.declaredAccess,
+                exportedFields: schema.fields,
+                requiredComponents: definition.requiredComponents,
+                make: { GravityScriptableObject(definition: definition) },
+                decode: { decoder, encodedVersion in
+                    let object = try GravityScriptableObject(
+                        definition: definition,
+                        payload: GravityScriptablePayload.decode(from: decoder)
+                    )
+                    object.encodedSchemaVersion = encodedVersion
+                    return object
+                }
+            )
+        }
+    }
+
+    /// Publishes new factories and rebinds live objects while retaining exported fields.
+    public func activate(in world: World) throws {
+        try ScriptableObjectRegistry.replaceScriptDescriptors(descriptors)
+        for entity in world.getEntities() {
+            guard let scripts = world.get(ScriptableComponents.self, from: entity.id)?.scripts else { continue }
+            for script in scripts {
+                guard let object = script as? GravityScriptableObject,
+                    let definition = definitions[object.definition.schema.identifier]
+                else { continue }
+                object.replaceDefinition(definition)
+            }
         }
     }
 }
@@ -195,7 +258,9 @@ private enum ResolvedGravityScriptableBinding: @unchecked Sendable {
 private final class GravityScriptableObject: ScriptableObject, @unchecked Sendable {
     override var explicitTypeIdentifier: String? { definition.schema.identifier }
 
-    private let definition: GravityScriptableDefinition
+    // The reload candidate is the only other type allowed to inspect this definition.
+    // swiftlint:disable:next strict_fileprivate
+    fileprivate var definition: GravityScriptableDefinition
     private var instanceID: Foundation.UUID?
     private var payload: [String: ReflectedFieldValue]
 
@@ -292,6 +357,7 @@ private final class GravityScriptableObject: ScriptableObject, @unchecked Sendab
     }
 
     override func update(context: ScriptableObjectContext) {
+        if instanceID == nil { ready(context: context) }
         call(method: "update", context: context)
     }
 
@@ -300,6 +366,7 @@ private final class GravityScriptableObject: ScriptableObject, @unchecked Sendab
     }
 
     override func event(_ events: [any InputEvent], context: ScriptableObjectContext) {
+        if instanceID == nil { ready(context: context) }
         guard let instanceID else {
             return
         }
@@ -346,6 +413,17 @@ private final class GravityScriptableObject: ScriptableObject, @unchecked Sendab
         }
         payload = definition.runtime.snapshot(instanceID: instanceID, fields: definition.schema.fields.keys)
     }
+
+    @MainActor
+    // swiftlint:disable:next strict_fileprivate
+    fileprivate func replaceDefinition(_ next: GravityScriptableDefinition) {
+        if let instanceID {
+            refreshPayload()
+            definition.runtime.remove(instanceID: instanceID)
+            self.instanceID = nil
+        }
+        definition = next
+    }
 }
 
 @GSExportable("AdaScriptableContext")
@@ -366,10 +444,13 @@ private final class GravityScriptableLifecycleContext: @unchecked Sendable, AdaS
             entityID: context.entityID,
             worldID: String(describing: context.scriptingWorld.id),
             world: AnnotatedGravityWorldContext.make(
+                world: context.scriptingWorld,
                 commands: AnnotatedGravityCommandsBridge.make(
                     commands: context.scriptingCommands,
+                    navigator: context.scriptingWorld.getResource(SceneNavigator.self),
                     reportDiagnostic: reportDiagnostic
-                )
+                ),
+                reportDiagnostic: reportDiagnostic
             )
         )
     }

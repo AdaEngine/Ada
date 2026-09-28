@@ -170,8 +170,8 @@ struct EditorAddModifierDialog: View {
                         .lineLimit(2)
                 }
                 Spacer()
-                Text("+")
-                    .font(.system(size: 18))
+                Text("\u{E145}")
+                    .font(AdaEditorMaterialSymbolFont.font(size: 18))
                     .foregroundColor(theme.editorColors.blue)
                     .frame(width: 30, height: 30)
                     .background(CircleShape().fill(theme.editorColors.blue.opacity(0.12)))

@@ -10,7 +10,7 @@ struct AdaWebPlayerTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("Demos/MedievalArena", isDirectory: true)
+            .appendingPathComponent("Tests/AdaScriptCompilerCoreTests/Fixtures/MedievalArena", isDirectory: true)
         let project = try AdaWebPlayerProject.load(at: directory)
 
         #expect(project.profile == "scene")

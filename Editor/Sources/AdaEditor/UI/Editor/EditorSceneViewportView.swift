@@ -196,7 +196,11 @@ struct EditorSceneViewportView: View {
         app.addPlugin(RenderWorldPlugin())
         app.addPlugin(EventsPlugin())
         app.addPlugin(CameraPlugin())
-        app.addPlugin(AssetsPlugin(filePath: #filePath))
+        if let resourceRootURL {
+            app.addPlugin(AssetsPlugin(assetDirectory: resourceRootURL))
+        } else {
+            app.addPlugin(AssetsPlugin(filePath: #filePath))
+        }
         app.addPlugin(VisibilityPlugin())
         app.addPlugin(SpritePlugin())
         app.addPlugin(Mesh2DPlugin())
@@ -227,6 +231,11 @@ struct EditorSceneViewportView: View {
             viewportGridLayer
             viewportGizmoLayer
             viewportCoordinateRulerLayer
+            if displayMode == .threeD {
+                EditorSceneViewportOrientationCompass(viewportModel: viewportModel)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(12)
+            }
         }
         .allowsHitTesting(false)
     }
@@ -236,9 +245,11 @@ struct EditorSceneViewportView: View {
             Text(document.title)
                 .font(.system(size: 12))
                 .foregroundColor(theme.editorColors.text)
+            #if !os(iOS)
             Text(document.relativePath)
                 .font(.system(size: 11))
                 .foregroundColor(theme.editorColors.muted)
+            #endif
             Spacer()
             Text(isPlayingThisDocument ? "PLAY MODE" : "SCENE")
                 .font(.system(size: 10))

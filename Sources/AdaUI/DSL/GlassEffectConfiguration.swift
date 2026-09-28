@@ -47,9 +47,13 @@ public struct Glass: Sendable {
     /// Angular offset for the directional glare lobe in radians.
     public var glareDirectionOffset: Float = -0.24
     /// A Boolean value indicating whether the glass surface reacts to direct press interaction.
-    public var isInteractive: Bool = false
-    /// Scale applied while an interactive glass surface is pressed.
-    public var interactiveScale: Float = 1.06
+    /// Glass is interactive by default; use `.interactive(false)` to opt out.
+    public var isInteractive: Bool = true
+    /// Scale applied while a glass surface is pressed.
+    public var interactiveScale: Float = 1.08
+    /// Strength of the drag stretch and follow effect, from 0 (none) to 1 (full). Default: 0.5.
+    /// Press scale remains active when this is 0.
+    public var stretchStrength: Float = 0.25
 
     public init() {}
 }
@@ -241,10 +245,17 @@ extension Glass {
         return newValue
     }
 
-    public func interactive(_ isInteractive: Bool = true, scale: Float = 1.06) -> Glass {
+    public func interactive(_ isInteractive: Bool = true, scale: Float = 1.08) -> Glass {
         var newValue = self
         newValue.isInteractive = isInteractive
         newValue.interactiveScale = scale
+        return newValue
+    }
+
+    /// Sets how strongly this glass surface stretches and follows a drag.
+    public func stretchStrength(_ strength: Float) -> Glass {
+        var newValue = self
+        newValue.stretchStrength = min(max(strength, 0), 1)
         return newValue
     }
 }

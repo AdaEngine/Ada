@@ -1,7 +1,0 @@
-{
-  "schemaVersion": 1,
-  "runtimeAPI": 1,
-  "title": "AdaScript Pocket Counter",
-  "entryView": "PocketCounter",
-  "sources": ["Sources/Main.ada"]
-}

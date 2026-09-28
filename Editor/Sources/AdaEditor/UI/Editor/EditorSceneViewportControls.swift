@@ -13,16 +13,22 @@ struct EditorSceneViewportControls: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                Spacer()
+        VStack(alignment: .leading, spacing: 0) {
+            #if os(iOS)
+            ScrollView(.horizontal) {
                 controlsPill
-                Spacer()
+                    .padding(.horizontal, 8)
             }
-            .padding(.top, 24)
+            .frame(width: size.width, height: 42)
+            .padding(.top, displayMode == .twoD ? 38 : 24)
+            #else
+            controlsPill
+                .padding(.leading, 24)
+                .padding(.top, displayMode == .twoD ? 38 : 24)
+            #endif
             Spacer()
         }
-        .frame(width: size.width, height: size.height)
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
     }
 
     private var controlsPill: some View {
@@ -59,10 +65,11 @@ struct EditorSceneViewportControls: View {
             }
         }
         .padding(5)
-        .background(CapsuleShape().fill(theme.editorColors.surface.opacity(0.96)))
+        .background(CapsuleShape().fill(theme.editorColors.surface))
         .overlay {
             CapsuleShape().stroke(theme.editorColors.border.opacity(0.9), lineWidth: 1)
         }
+        .shadow(color: .black.opacity(0.38), radius: 9, x: 0, y: 5, shape: .capsule)
         .accessibilityIdentifier("AdaEditor.SceneViewport.Controls")
     }
 
@@ -94,10 +101,12 @@ struct EditorSceneViewportControls: View {
 
     private func pillLabel(_ title: String, symbol: String, active: Bool, color: Color?) -> some View {
         HStack(spacing: 4) {
+            #if !os(iOS)
             if !symbol.isEmpty {
                 Text(symbol)
                     .font(AdaEditorMaterialSymbolFont.font(size: 15))
             }
+            #endif
             Text(title)
                 .font(.system(size: 10))
         }

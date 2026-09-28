@@ -28,15 +28,23 @@ struct _OpacityView<Content: View>: ViewModifier, ViewNodeBuilder {
 
 final class OpacityViewNodeModifier: ViewModifierNode {
     var opacity: Float = 1
+    private var targetOpacity: Float?
+    private weak var propertyController: UIAnimationController?
 
     override func update(from newNode: ViewNode) {
-        let animationController = self.environment.animationController
+        let animationController = animationControllerForUpdate
         super.update(from: newNode)
 
         guard let node = newNode as? OpacityViewNodeModifier else {
             return
         }
 
+        guard node.opacity != (targetOpacity ?? opacity) else {
+            return
+        }
+        targetOpacity = node.opacity
+        propertyController?.removeAnimation(label: id)
+        propertyController = animationController
         if let animationController {
             animationController.addTweenAnimation(
                 from: TweenValue(animatableData: self.opacity),

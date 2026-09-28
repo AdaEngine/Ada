@@ -36,7 +36,7 @@ private struct EditorAgentMessageRowLayout: Layout {
 
 struct EditorAgentEventCard: View {
     let event: EditorAgentEvent
-    let viewModel: EditorAgentViewModel
+    let viewModel: EditorAgentViewModel?
 
     @Environment(\.theme) private var theme
 
@@ -222,7 +222,7 @@ struct EditorAgentEventCard: View {
             Text(markdown: permission.summary)
                 .font(.system(size: 12))
                 .foregroundColor(theme.editorColors.text)
-            if permission.state == .pending {
+            if permission.state == .pending, let viewModel {
                 HStack(spacing: 6) {
                     ForEach(permission.options, id: \.id) { option in
                         Button(action: { viewModel.resolvePermission(requestID: permission.id, optionID: option.id) }) {
@@ -329,8 +329,8 @@ struct EditorAgentAttachmentCard: View {
             }
             if let onRemove {
                 Button(action: onRemove) {
-                    Text("×")
-                        .font(.system(size: 11))
+                    Text("\u{E5CD}")
+                        .font(AdaEditorMaterialSymbolFont.font(size: 11))
                         .foregroundColor(theme.editorColors.muted)
                         .frame(width: 20, height: 20)
                 }

@@ -74,7 +74,7 @@ enum EditorAgentTranscriptEntry: Identifiable {
 struct EditorAgentActionsDisclosure: View {
     let id: String
     let events: [EditorAgentEvent]
-    let viewModel: EditorAgentViewModel
+    let viewModel: EditorAgentViewModel?
     @State private var isExpanded = false
     @Environment(\.theme) private var theme
 
@@ -112,16 +112,38 @@ struct EditorAgentActionsDisclosure: View {
 }
 
 struct EditorAgentTranscript: View {
-    let viewModel: EditorAgentViewModel
+    let viewModel: EditorAgentViewModel?
+    let standaloneEvents: [EditorAgentEvent]?
+    let standaloneSessionID: String?
     @State private var follower = EditorAgentTranscriptFollower()
     static let bottomID = "AdaEditor.Agent.Transcript.Bottom"
+
+    init(viewModel: EditorAgentViewModel) {
+        self.viewModel = viewModel
+        self.standaloneEvents = nil
+        self.standaloneSessionID = nil
+    }
+
+    init(events: [EditorAgentEvent], sessionID: String) {
+        self.viewModel = nil
+        self.standaloneEvents = events
+        self.standaloneSessionID = sessionID
+    }
+
+    private var events: [EditorAgentEvent] {
+        standaloneEvents ?? viewModel?.activeSession?.events ?? []
+    }
+
+    private var sessionID: String? {
+        standaloneSessionID ?? viewModel?.activeSession?.id
+    }
 
     var body: some View {
         GeometryReader { geometry in
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(EditorAgentTranscriptEntry.grouped(viewModel.activeSession?.events ?? [])) { entry in
+                        ForEach(EditorAgentTranscriptEntry.grouped(events)) { entry in
                             switch entry {
                             case let .event(event):
                                 EditorAgentEventCard(event: event, viewModel: viewModel)
@@ -139,10 +161,10 @@ struct EditorAgentTranscript: View {
                 .accessibilityIdentifier("AdaEditor.Agent.Transcript")
                 .background { EditorAgentTranscriptScrollDriver(follower: follower).allowsHitTesting(false) }
                 .onAppear { follower.appear(proxy) }
-                .onChange(of: viewModel.activeSession?.id) { _, _ in follower.request(proxy, force: true) }
-                .onChange(of: viewModel.activeSession?.events) { old, new in
-                    let oldUser = old?.last { $0.message?.role == .user }?.id
-                    let newUser = new?.last { $0.message?.role == .user }?.id
+                .onChange(of: sessionID) { _, _ in follower.request(proxy, force: true) }
+                .onChange(of: events) { old, new in
+                    let oldUser = old.last { $0.message?.role == .user }?.id
+                    let newUser = new.last { $0.message?.role == .user }?.id
                     follower.request(proxy, force: oldUser != newUser)
                 }
             }

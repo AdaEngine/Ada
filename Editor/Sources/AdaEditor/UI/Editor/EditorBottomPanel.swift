@@ -83,6 +83,9 @@ struct EditorBottomPanel: View {
                 .fill(theme.editorColors.surfaceElevated)
         }
         .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+        .overlay {
+            adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
+        }
     }
 
     @ViewBuilder

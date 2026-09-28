@@ -105,6 +105,12 @@ final class EditorViewModel {
     var previewBuildGeneration = 0
     @ObservationIgnored
     var adaScriptRuntimeWindow: UIWindow?
+    @ObservationIgnored
+    var adaScriptRuntimeControls: EditorGameWindowControls?
+    @ObservationIgnored
+    var adaScriptHotReloadTask: Task<Void, Never>?
+    @ObservationIgnored
+    var adaScriptHotReloadRevision = 0
     #if os(macOS)
         @ObservationIgnored
         var adaScriptWebServer: Process?
@@ -275,6 +281,9 @@ final class EditorViewModel {
             self?.updateDebugSource(documentID: documentID)
             self?.scheduleAutosave(documentID: documentID)
             self?.scheduleSourceAnalysis(documentID: documentID)
+            if self?.workbench.textDocument(id: documentID)?.relativePath.lowercased().hasSuffix(".ada") == true {
+                self?.scheduleAdaScriptHotReload()
+            }
         }
         self.workbench.achievements = EditorAchievementBootstrap.center
         self.workbench.achievementResourceRoot = projectAssetsURL

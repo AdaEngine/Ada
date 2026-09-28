@@ -11,6 +11,7 @@ enum EditorAgentSceneOperation: Codable, Equatable, Sendable {
     case setEntityEnabled(id: String, enabled: Bool)
     case reparentEntity(id: String, parentID: String?)
     case deleteEntity(id: String, children: EditorAgentSceneDeleteChildren)
+    case addComponent(entityID: String, typeName: String)
     case setComponent(entityID: String, typeName: String, payload: EditorComponentPayload)
     case removeComponent(entityID: String, typeName: String)
 }
@@ -201,6 +202,15 @@ final class EditorAgentSceneToolService {
         return try snapshot(relativePath: record.relativePath)
     }
 
+    func applying(operations: [EditorAgentSceneOperation], to source: EditorSceneModel) throws -> EditorSceneModel {
+        var model = source
+        for operation in operations {
+            try apply(operation, to: &model)
+        }
+        try validateHierarchy(model)
+        return model
+    }
+
     private func apply(_ operation: EditorAgentSceneOperation, to model: inout EditorSceneModel) throws {
         switch operation {
         case let .createEntity(requestedID, rawName, parentID, components):
@@ -275,6 +285,13 @@ final class EditorAgentSceneToolService {
                 }
             }
             model.entities[index].components[typeName] = payload
+
+        case let .addComponent(entityID, typeName):
+            _ = try entityIndex(entityID, in: model)
+            guard EditorComponentRegistry.descriptor(named: typeName) != nil else {
+                throw EditorAgentSceneToolError.componentUnavailable(typeName)
+            }
+            model.addComponent(typeName: typeName, to: entityID)
 
         case let .removeComponent(entityID, typeName):
             let index = try entityIndex(entityID, in: model)
@@ -380,7 +397,7 @@ final class EditorAgentSceneToolService {
 
     private static let sceneExtensions: Set<String> = ["ascn", "scene", "scn"]
 
-    private static func revision(for content: String) -> String {
+    static func revision(for content: String) -> String {
         var hash: UInt64 = 14_695_981_039_346_656_037
         for byte in content.utf8 {
             hash ^= UInt64(byte)

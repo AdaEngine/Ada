@@ -114,6 +114,19 @@ public extension AdaScriptTypeEnvironment {
         "$AdaWorldContext": members([
             property("commands", type: .named("$AdaCommands"), detail: "Scoped deferred world commands"),
             method(
+                "changeScene",
+                parameters: [.string],
+                returning: .bool,
+                detail: "changeScene(path) -> Bool — request a fresh scene for the next frame",
+                insertText: "changeScene(\"@res://Scenes/Level.ascn\")"
+            ),
+            method(
+                "reloadScene",
+                parameters: [],
+                returning: .bool,
+                detail: "reloadScene() -> Bool — restart the active scene from its source"
+            ),
+            method(
                 "spawn",
                 parameters: [.list(.any)],
                 returning: .int,

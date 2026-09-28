@@ -21,7 +21,6 @@ struct EditorScenePlayRuntime: Sendable {
     var moduleName: String
     var schemas: [AdaScriptObjectSchema]
     var sources: [AdaScriptSource]
-    var hasSystems: Bool
     var startupSystemIdentifier: String?
     var inputActions: [InputAction] = []
 
@@ -51,9 +50,6 @@ struct EditorScenePlayRuntime: Sendable {
     }
 
     func makeScriptPlugin() throws -> AdaScriptPlugin? {
-        guard hasSystems else {
-            return nil
-        }
         return try AdaScriptPlugin(
             sources: sources,
             name: moduleName,
@@ -82,14 +78,12 @@ enum EditorScriptableObjectCatalogLoader {
 
     static func makeResult(project: AdaProject, sources: [AdaScriptSource]) throws -> Result {
         let schemas = try AdaScriptSchemaParser.parseScriptables(sources: sources)
-        let hasSystems = try !AdaScriptSchemaParser.parseSystemCapabilities(sources: sources).isEmpty
         return Result(
             descriptors: schemas.map(makeEditorDescriptor).sorted { $0.name < $1.name },
             playRuntime: EditorScenePlayRuntime(
                 moduleName: project.runtime.moduleName,
                 schemas: schemas.map(makeRuntimeSchema),
                 sources: sources,
-                hasSystems: hasSystems,
                 startupSystemIdentifier: project.runtime.entry.startupSystem,
                 inputActions: project.inputActions
             )

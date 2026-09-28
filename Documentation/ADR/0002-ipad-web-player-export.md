@@ -2,7 +2,7 @@
 
 Статус: профили `views` (runtime API 1–2) и `scene` (runtime API 3).
 Описание первоначального прототипа API 1 сохранено ниже; расширение ресурсов
-описано в `Demos/WebPlayer/ShaderGallery/README.md`.
+описано в [AdaExamples/WebPlayer/ShaderGallery](https://github.com/AdaEngine/AdaExamples/tree/main/Examples/EngineDemos/Demos/WebPlayer/ShaderGallery/README.md).
 
 ## Профиль scene и запуск из AdaEditor
 
@@ -62,7 +62,7 @@ ADAENGINE_WEB_EXPORT=1 swift package --disable-sandbox \
   --swift-sdk swift-6.3.2-RELEASE_wasm
 
 swift run --scratch-path /tmp/ada-web-player-packager AdaWebPlayerPackager \
-  dist/web-player-template Demos/WebPlayer/Counter dist/pocket-counter
+  dist/web-player-template AdaExamples/Examples/EngineDemos/Demos/WebPlayer/Counter dist/pocket-counter
 
 cd dist/pocket-counter
 zip -r ../pocket-counter-itch.zip .

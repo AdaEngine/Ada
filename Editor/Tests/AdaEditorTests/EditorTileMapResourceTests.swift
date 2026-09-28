@@ -8,6 +8,76 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct EditorTileMapResourceTests {
+    @Test("Layers keep overlapping cells separate in the editor, scene, and asset decoder")
+    func layeredMap() async throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "LayeredTileMapTests")))
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let maps = root.appendingPathComponent("Maps")
+        try FileManager.default.createDirectory(at: maps, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = maps.appendingPathComponent("Layers.tilemap")
+        try EditorTileMapResource(atlasColors: [.red, .blue], cells: [[0, 0, 0]]).write(to: url)
+        let document = EditorAssetDocument(
+            id: "asset:Maps/Layers.tilemap", title: "Layers.tilemap", relativePath: "Maps/Layers.tilemap",
+            absolutePath: url.path, assetReference: "@res://Maps/Layers.tilemap", kind: .tileMap,
+            fileExtension: "tilemap", byteCount: nil, modifiedAt: nil, errorMessage: nil
+        )
+        let editor = EditorTileMapEditorModel(document: document)
+        editor.addLayer()
+        #expect(editor.selectedLayer == 1)
+        editor.renameSelectedLayer("Foreground")
+        editor.selectedColor = 1
+        editor.paint(at: Point(350, 300), in: Size(width: 700, height: 600))
+        editor.endStroke()
+        let saved = try EditorTileMapResource.read(from: url)
+        #expect(saved.cells.isEmpty)
+        #expect(saved.effectiveLayers.map(\.cells) == [[[0, 0, 0]], [[0, 0, 1]]])
+        #expect(saved.effectiveLayers.map(\.zIndex) == [0, 1])
+        #expect(saved.effectiveLayers[1].name == "Foreground")
+        editor.reload()
+        #expect(editor.tileIndex(atX: 0, y: 0, layer: 0) == 0)
+        #expect(editor.tileIndex(atX: 0, y: 0, layer: 1) == 1)
+        editor.erase(at: Point(350, 300), in: Size(width: 700, height: 600))
+        editor.endStroke()
+        #expect(try EditorTileMapResource.read(from: url).effectiveLayers.map(\.cells) == [[[0, 0, 0]], []])
+        editor.paint(at: Point(350, 300), in: Size(width: 700, height: 600))
+        editor.endStroke()
+        let container = UIContainerView(rootView: EditorTileMapAssetEditor(document: document, model: editor))
+        container.frame = Rect(x: 0, y: 0, width: 1_000, height: 700)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Layer.1"))
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.AddLayer"))
+
+        var scene = EditorSceneModel.default(projectName: "Layers")
+        let entity = scene.addEntity(template: .tileMap, parentID: scene.rootEntityID)
+        let index = try #require(scene.entities.firstIndex(where: { $0.id == entity.id }))
+        scene.entities[index].components[EditorBuiltInComponentType.tileMap]?["map"] = .string("@res://Maps/Layers.tilemap")
+        let world = World(name: "LayeredScene")
+        let result = EditorSceneFileLoader.load(model: scene, into: world, loadsScriptableObjects: false, resourceRootURL: root)
+        #expect(result.warnings.isEmpty, Comment(rawValue: result.warnings.joined(separator: "\n")))
+        let entityID = try #require(result.entitiesByEditorID[entity.id])
+        let runtime = try #require(world.get(TileMapComponent.self, from: entityID)?.tileMap)
+        #expect(runtime.layers.count == 2)
+        #expect(runtime.layers[0].getCellAtlasCoordinates(at: [0, 0]) == [0, 0])
+        #expect(runtime.layers[1].getCellAtlasCoordinates(at: [0, 0]) == [1, 0])
+        #expect(runtime.layers[1].zIndex == 1)
+        let handle = try await AssetsManager.load(TileMap.self, at: url.path)
+        let loaded = try #require(handle.asset)
+        #expect(loaded.layers.count == 2)
+        #expect(loaded.layers[1].getCellAtlasCoordinates(at: [0, 0]) == [1, 0])
+        editor.toggleSelectedLayer()
+        #expect(try EditorTileMapResource.read(from: url).effectiveLayers[1].isEnabled == false)
+        editor.moveSelectedLayer(by: -1)
+        #expect(editor.selectedLayer == 0)
+        #expect(try EditorTileMapResource.read(from: url).effectiveLayers[0].name == "Foreground")
+        editor.removeSelectedLayer()
+        #expect(try EditorTileMapResource.read(from: url).effectiveLayers.count == 1)
+    }
+
     @Test("TileMap asset decoder reads painted palette files")
     func assetDecoderLoadsMap() async throws {
         if unsafe RenderEngine.shared == nil {
@@ -220,7 +290,7 @@ struct EditorTileMapResourceTests {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let wall = tiles.appendingPathComponent("wall.png")
         try FileManager.default.copyItem(
-            at: repositoryRoot.appendingPathComponent("Demos/MedievalArena/Assets/Tiles/tile_0014.png"), to: wall
+            at: repositoryRoot.appendingPathComponent("Editor/Tests/AdaEditorTests/Fixtures/MedievalArena/Assets/Tiles/tile_0014.png"), to: wall
         )
         let sourceDocument = EditorAssetDocument(
             id: "asset:Tiles/Arena.tileset", title: "Arena.tileset", relativePath: "Tiles/Arena.tileset",
@@ -257,7 +327,7 @@ struct EditorTileMapResourceTests {
 
         let floor = tiles.appendingPathComponent("floor.png")
         try FileManager.default.copyItem(
-            at: repositoryRoot.appendingPathComponent("Demos/MedievalArena/Assets/Tiles/tile_0000.png"), to: floor
+            at: repositoryRoot.appendingPathComponent("Editor/Tests/AdaEditorTests/Fixtures/MedievalArena/Assets/Tiles/tile_0000.png"), to: floor
         )
         sourceEditor.addImages([floor])
         sourceEditor.createAllTiles()

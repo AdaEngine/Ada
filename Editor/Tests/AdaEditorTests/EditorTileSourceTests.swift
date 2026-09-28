@@ -132,12 +132,12 @@ struct EditorTileSourceTests {
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Preview"))
-        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Card.0"))
-        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Card.1"))
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Canvas"))
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Source.1"))
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Source.0"))
         #expect(model.selectedSource == 0)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.ZoomIn"))
-        #expect(model.zoom > 2)
+        #expect(model.zoom > 1)
         let inspector = UIContainerView(rootView: EditorContextualInspector(
             document: .asset(document),
             workbench: project.workbench,

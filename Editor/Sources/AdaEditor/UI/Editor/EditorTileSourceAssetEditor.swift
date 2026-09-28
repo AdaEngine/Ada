@@ -46,19 +46,41 @@ struct EditorTileSourceAssetEditor: View {
     private var preview: some View {
         if !model.sources.isEmpty {
             GeometryReader { geometry in
-                let columns = max(1, Int(geometry.size.width / 252))
-                ScrollView(.vertical) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(0..<((model.sources.count + columns - 1) / columns), id: \.self) { row in
-                            HStack(alignment: .top, spacing: 12) {
-                                ForEach(row * columns..<min((row + 1) * columns, model.sources.count), id: \.self) { index in
-                                    sourceCard(at: index)
-                                }
+                VStack(spacing: 0) {
+                    sourceStrip
+                    GeometryReader { canvas in
+                        if model.previews.indices.contains(model.selectedSource),
+                           let sourcePreview = model.previews[model.selectedSource] {
+                            let imageWidth = Float(sourcePreview.image.width)
+                            let imageHeight = Float(sourcePreview.image.height)
+                            let fitScale = min(
+                                max(1, Float(canvas.size.width) * 0.86) / imageWidth,
+                                max(1, Float(canvas.size.height) * 0.86) / imageHeight
+                            )
+                            let scale = min(model.zoom, fitScale)
+                            let displayWidth = imageWidth * scale
+                            let displayHeight = imageHeight * scale
+
+                            ZStack {
+                                sourcePreview.image.resizable().frame(width: displayWidth, height: displayHeight)
+                                grid(layout: sourcePreview.layout, scale: scale)
+                                    .frame(width: displayWidth, height: displayHeight)
                             }
+                            .frame(width: displayWidth, height: displayHeight)
+                            .accessibilityIdentifier("AdaEditor.TileSourceEditor.Canvas")
+                            .gesture(DragGesture(minimumDistance: 0).onEnded { value in
+                                selectTile(at: value.location, preview: sourcePreview, scale: scale)
+                            })
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            Text("Image preview unavailable")
+                                .font(.system(size: 12))
+                                .foregroundColor(theme.editorColors.muted)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     }
-                    .padding(16)
                 }
+                .frame(width: geometry.size.width, height: geometry.size.height)
             }
             .background(theme.editorColors.surface)
             .accessibilityIdentifier("AdaEditor.TileSourceEditor.Preview")
@@ -78,48 +100,48 @@ struct EditorTileSourceAssetEditor: View {
         }
     }
 
-    private func sourceCard(at index: Int) -> some View {
-        let selected = index == model.selectedSource
-        return VStack(alignment: .leading, spacing: 8) {
-            action(model.sourceName(at: index), id: "Source.\(index)") { model.selectSource(index) }
-            if model.previews.indices.contains(index), let preview = model.previews[index] {
-                let scale = min(model.zoom, min(208 / Float(preview.image.width), 180 / Float(preview.image.height)))
-                let imageWidth = Float(preview.image.width) * scale
-                let imageHeight = Float(preview.image.height) * scale
-                ZStack {
-                    preview.image.resizable().frame(width: imageWidth, height: imageHeight)
-                    if selected {
-                        grid(layout: preview.layout, scale: scale)
-                            .frame(width: imageWidth, height: imageHeight)
+    private var sourceStrip: some View {
+        VStack(spacing: 0) {
+            ScrollView(.horizontal) {
+                HStack(spacing: 6) {
+                    ForEach(model.sources.indices, id: \.self) { index in
+                        let selected = index == model.selectedSource
+                        Button {
+                            model.selectSource(index)
+                        } label: {
+                            Text(model.sourceName(at: index))
+                                .font(.system(size: 11, weight: selected ? .semibold : .regular))
+                                .foregroundColor(selected ? theme.editorColors.text : theme.editorColors.muted)
+                                .padding(.horizontal, 10)
+                                .frame(height: 28)
+                                .background(RoundedRectangleShape(cornerRadius: 5).fill(selected ? theme.editorColors.surfaceElevated : .clear))
+                        }
+                        .buttonStyle(DefaultButtonStyle())
+                        .accessibilityIdentifier("AdaEditor.TileSourceEditor.Source.\(index)")
                     }
                 }
-                .frame(width: imageWidth, height: imageHeight)
-                .gesture(DragGesture(minimumDistance: 0).onEnded { value in
-                    model.selectSource(index)
-                    let x = value.location.x / scale - Float(preview.layout.margin.width)
-                    let y = value.location.y / scale - Float(preview.layout.margin.height)
-                    guard x >= 0, y >= 0 else { return }
-                    let strideX = Float(preview.layout.tileSize.width + preview.layout.spacing.width)
-                    let strideY = Float(preview.layout.tileSize.height + preview.layout.spacing.height)
-                    guard x.truncatingRemainder(dividingBy: strideX) < Float(preview.layout.tileSize.width),
-                          y.truncatingRemainder(dividingBy: strideY) < Float(preview.layout.tileSize.height) else { return }
-                    model.selectTile([Int(x / strideX), Int(y / strideY)])
-                })
-            } else {
-                Text("Preview unavailable")
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.editorColors.muted)
+                .padding(.horizontal, 10)
             }
-            Spacer()
+            theme.editorColors.border.opacity(0.65).frame(height: 1)
         }
-        .padding(10)
-        .frame(width: 228, height: 246, alignment: .topLeading)
-        .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.surfaceElevated))
-        .overlay {
-            RoundedRectangleShape(cornerRadius: 6)
-                .stroke(selected ? theme.editorColors.blue : theme.editorColors.border, lineWidth: selected ? 2 : 1)
+        .frame(height: 40)
+    }
+
+    private func selectTile(at location: Point, preview: EditorTileSourcePreview, scale: Float) {
+        let x = location.x / scale - Float(preview.layout.margin.width)
+        let y = location.y / scale - Float(preview.layout.margin.height)
+        guard x >= 0, y >= 0 else {
+            return
         }
-        .accessibilityIdentifier("AdaEditor.TileSourceEditor.Card.\(index)")
+        let strideX = Float(preview.layout.tileSize.width + preview.layout.spacing.width)
+        let strideY = Float(preview.layout.tileSize.height + preview.layout.spacing.height)
+        guard
+            x.truncatingRemainder(dividingBy: strideX) < Float(preview.layout.tileSize.width),
+            y.truncatingRemainder(dividingBy: strideY) < Float(preview.layout.tileSize.height)
+        else {
+            return
+        }
+        model.selectTile([Int(x / strideX), Int(y / strideY)])
     }
 
     private func grid(layout: TileSourceImageDescriptor, scale: Float) -> some View {

@@ -78,15 +78,24 @@ final class TransformEffectViewNode<Value: VectorArithmetic>: ViewModifierNode {
     }
 
     private var localTransform = Transform3D.identity
+    private var targetValue: Value?
+    private weak var propertyController: UIAnimationController?
 
     override func update(from newNode: ViewNode) {
-        let animationController = self.environment.animationController
+        let animationController = animationControllerForUpdate
         super.update(from: newNode)
 
         guard let newNode = newNode as? Self else {
             return
         }
 
+        anchor = newNode.anchor
+        guard (newNode.value - (targetValue ?? value)).magnitudeSquared > 0 else {
+            return
+        }
+        targetValue = newNode.value
+        propertyController?.removeAnimation(label: id)
+        propertyController = animationController
         if let animationController {
             animationController.addTweenAnimation(
                 from: TweenValue(animatableData: self.value),

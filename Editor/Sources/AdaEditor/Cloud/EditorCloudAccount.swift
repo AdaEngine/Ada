@@ -15,9 +15,11 @@ import StoreKit
 @Observable
 final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContextProviding {
     static let shared = EditorCloudAccount()
-    var server =
-        ProcessInfo.processInfo.environment["ADA_CLOUD_API_URL"] ?? UserDefaults.standard
-        .string(forKey: "AdaEditor.cloud.server") ?? (Bundle.main.object(forInfoDictionaryKey: "AdaCloudAPIURL") as? String ?? "")
+    var server = EditorCloudConfiguration.server(
+        environment: ProcessInfo.processInfo.environment["ADA_CLOUD_API_URL"],
+        saved: UserDefaults.standard.string(forKey: "AdaEditor.cloud.server"),
+        bundled: Bundle.main.object(forInfoDictionaryKey: "AdaCloudAPIURL") as? String
+    )
     var status = ""
     var busy = false
     var accountID: String?
@@ -93,7 +95,7 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         else {
             throw CloudError.message("Unexpected sign-in website")
         }
-        status = "Complete sign-in on the Ada website."
+        status = "Complete sign-in on the Ada Cloud website."
         defer { authentication = nil }
         let callback = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
             let session = ASWebAuthenticationSession(url: authorizeURL, callbackURLScheme: "adaeditor") { url, error in

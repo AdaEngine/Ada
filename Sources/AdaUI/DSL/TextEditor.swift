@@ -228,6 +228,7 @@ public struct TextEditor: View {
     let tokenSpans: [TextEditorTokenSpan]
     let sourceInteraction: TextEditorSourceInteraction?
     let showsLineNumbers: Bool
+    let showsScrollIndicators: Bool
     let foldingStyle: TextEditorFoldingStyle
     let showsIndentationGuides: Bool
     let showsTabMarkers: Bool
@@ -235,7 +236,7 @@ public struct TextEditor: View {
     let highlightsSelectedIdentifier: Bool
 
     public var body: some View {
-        ScrollView([.horizontal, .vertical], showsIndicators: true) {
+        ScrollView([.horizontal, .vertical], showsIndicators: showsScrollIndicators) {
             TextEditorPrimitive(
                 placeholder: placeholder,
                 text: text,
@@ -257,6 +258,7 @@ public struct TextEditor: View {
     ///   - placeholder: Text displayed when the editor is empty.
     ///   - text: Two-way binding for the editor content.
     ///   - showsLineNumbers: Whether the source-style gutter and line numbers are visible.
+    ///   - showsScrollIndicators: Whether to draw scroll indicators while the editor scrolls.
     ///   - showsIndentationMarkers: Compatibility switch for all indentation guides and whitespace markers.
     ///   - showsIndentationGuides: Whether to draw guides at each complete indentation level.
     ///   - showsTabMarkers: Whether to mark leading tab characters.
@@ -267,6 +269,7 @@ public struct TextEditor: View {
         tokenSpans: [TextEditorTokenSpan] = [],
         sourceInteraction: TextEditorSourceInteraction? = nil,
         showsLineNumbers: Bool = true,
+        showsScrollIndicators: Bool = true,
         foldingStyle: TextEditorFoldingStyle = .none,
         showsIndentationMarkers: Bool = false,
         showsIndentationGuides: Bool? = nil,
@@ -279,6 +282,7 @@ public struct TextEditor: View {
         self.tokenSpans = tokenSpans
         self.sourceInteraction = sourceInteraction
         self.showsLineNumbers = showsLineNumbers
+        self.showsScrollIndicators = showsScrollIndicators
         self.foldingStyle = foldingStyle
         self.showsIndentationGuides = showsIndentationGuides ?? showsIndentationMarkers
         self.showsTabMarkers = showsTabMarkers ?? showsIndentationMarkers
@@ -291,6 +295,7 @@ public struct TextEditor: View {
     /// - Parameters:
     ///   - text: Two-way binding for the editor content.
     ///   - showsLineNumbers: Whether the source-style gutter and line numbers are visible.
+    ///   - showsScrollIndicators: Whether to draw scroll indicators while the editor scrolls.
     ///   - showsIndentationMarkers: Compatibility switch for all indentation guides and whitespace markers.
     ///   - showsIndentationGuides: Whether to draw guides at each complete indentation level.
     ///   - showsTabMarkers: Whether to mark leading tab characters.
@@ -300,6 +305,7 @@ public struct TextEditor: View {
         tokenSpans: [TextEditorTokenSpan] = [],
         sourceInteraction: TextEditorSourceInteraction? = nil,
         showsLineNumbers: Bool = true,
+        showsScrollIndicators: Bool = true,
         foldingStyle: TextEditorFoldingStyle = .none,
         showsIndentationMarkers: Bool = false,
         showsIndentationGuides: Bool? = nil,
@@ -312,6 +318,7 @@ public struct TextEditor: View {
         self.tokenSpans = tokenSpans
         self.sourceInteraction = sourceInteraction
         self.showsLineNumbers = showsLineNumbers
+        self.showsScrollIndicators = showsScrollIndicators
         self.foldingStyle = foldingStyle
         self.showsIndentationGuides = showsIndentationGuides ?? showsIndentationMarkers
         self.showsTabMarkers = showsTabMarkers ?? showsIndentationMarkers

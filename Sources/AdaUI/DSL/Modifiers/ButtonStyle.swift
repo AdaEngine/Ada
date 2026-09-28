@@ -108,7 +108,6 @@ public struct DefaultButtonStyle: ButtonStyle {
 public struct NavigationBarButtonStyle: ButtonStyle {
     private enum Constants {
         static let height: Float = 48
-        static let horizontalPadding: Float = 12
     }
 
     /// Initialize a new navigation bar button style.
@@ -124,9 +123,8 @@ public struct NavigationBarButtonStyle: ButtonStyle {
         let glass = isPressed ? Glass.interaction : (isHoveredOrFocused ? Glass.regular : Glass.regular)
 
         return configuration.label
-            .padding(.horizontal, Constants.horizontalPadding)
             .frame(minWidth: Constants.height, minHeight: Constants.height)
-            .glassEffect(glass, in: .capsule)
+            .glassEffect(glass.interactive().stretchStrength(0.25), in: .capsule)
             .animation(.linear(duration: 0.2), value: isPressed)
     }
 }
@@ -215,7 +213,10 @@ public struct GlassButtonStyle<S: Shape>: ButtonStyle, @unchecked Sendable {
                 )
             )
             .frame(minHeight: minHeight)
-            .glassEffect(glass(for: configuration, isEnabled: controlIsEnabled, isActiveOrFocused: activeOrFocused), in: shape)
+            .glassEffect(
+                glass(for: configuration, isEnabled: controlIsEnabled, isActiveOrFocused: activeOrFocused).interactive(scale: 1),
+                in: shape
+            )
             .overlay {
                 shape.stroke(borderColor, lineWidth: borderWidth)
             }

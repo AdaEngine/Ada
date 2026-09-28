@@ -13,10 +13,14 @@ public struct ScenePlugin: Plugin {
     public func setup(in app: AppWorlds) {
         EditorGizmo.registerComponent()
         SceneInstance.registerComponent()
+        if app.main.getResource(SceneNavigator.self) == nil {
+            app.main.insertResource(SceneNavigator(world: app.main))
+        }
         KeyframeAnimationPlugin().setup(in: app)
         if includesModel3D {
             Model3DPlugin().setup(in: app)
         }
         app.addSystem(DynamicSceneInitSystem.self)
+        app.addSystem(SceneNavigationSystem.self, on: .postUpdate)
     }
 }

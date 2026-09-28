@@ -72,18 +72,18 @@ public struct UIGraphicsContext: Sendable {
     /// Create graphics context.
     public init() {}
 
-    /// Appends the given transform to the context’s existing transform.
+    /// Appends the given transform in the context’s local coordinate space.
     /// - Parameter matrix: A transform to append to the existing transform.
     public mutating func concatenate(_ transform: Transform3D) {
-        self.transform = transform * self.transform
+        self.transform = self.transform * transform
     }
 
-    /// Moves subsequent drawing operations by an amount in each dimension.
+    /// Moves subsequent drawing operations in the current local coordinate space.
     /// - Parameter x: The amount to move in the horizontal direction.
     /// - Parameter y: The amount to move in the vertical direction.
     public mutating func translateBy(x: Float, y: Float) {
         let translationMatrix = Transform3D(translation: [x, y, 0])
-        self.transform = translationMatrix * self.transform
+        self.transform = self.transform * translationMatrix
     }
 
     /// Scales subsequent drawing operations by an amount in each dimension.
@@ -91,13 +91,13 @@ public struct UIGraphicsContext: Sendable {
     /// - Parameter y: The amount to scale in the vertical direction.
     public mutating func scaleBy(x: Float, y: Float) {
         let scaleMatrix = Transform3D(scale: [x, y, 1])
-        self.transform = scaleMatrix * self.transform
+        self.transform = self.transform * scaleMatrix
     }
 
     /// Rotates subsequent drawing operations by an angle.
     /// - Parameter angle: The amount to rotate.
     public mutating func rotate(by angle: Angle) {
-        self.transform = Transform3D(quat: Quat(axis: Vector3(0, 0, 1), angle: angle.radians)) * self.transform
+        self.transform = self.transform * Transform3D(quat: Quat(axis: Vector3(0, 0, 1), angle: angle.radians))
     }
 
     /// Clear any applied transform

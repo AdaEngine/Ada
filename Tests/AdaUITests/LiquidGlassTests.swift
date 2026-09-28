@@ -2,6 +2,7 @@ import Testing
 @testable import AdaUI
 @testable import AdaPlatform
 import AdaCorePipelines
+import AdaInput
 import AdaUtils
 import Math
 
@@ -15,6 +16,9 @@ struct LiquidGlassTests {
     @Test
     func regularClearAndIdentityExposeLiquidGlassDefaults() {
         let regular = Glass.regular
+        #expect(regular.isInteractive)
+        #expect(regular.interactiveScale == 1.08)
+        #expect(regular.stretchStrength == 0.5)
         #expect(regular.cornerRoundnessExponent == 4.8)
         #expect(regular.blurRadius == 14.0)
         #expect(regular.glassThickness == 6.0)
@@ -189,9 +193,16 @@ struct LiquidGlassTests {
         let initialContext = UIGraphicsContext()
         tester.containerView.viewTree.renderGraph(renderContext: initialContext)
         let initialTransform = try #require(initialContext.getDrawCommands().glassTransforms.first)
-
-        let hitNode = tester.sendMouseEvent(at: Point(100, 50), button: .left, phase: .began)
-        #expect(hitNode is GlassEffectViewNode)
+        let hitNode = tester.click(at: Point(100, 50))
+        #expect(hitNode is TextViewNode)
+        tester.containerView.onMouseEvent(MouseEvent(
+            window: .empty,
+            button: .left,
+            mousePosition: Point(100, 50),
+            phase: .began,
+            modifierKeys: [],
+            time: 0
+        ))
 
         let pressedContext = UIGraphicsContext()
         tester.containerView.viewTree.renderGraph(renderContext: pressedContext)
@@ -200,7 +211,17 @@ struct LiquidGlassTests {
         #expect(pressedTransform.x.x > initialTransform.x.x)
         #expect(pressedTransform.y.y > initialTransform.y.y)
 
-        tester.sendMouseEvent(at: Point(100, 50), button: .left, phase: .ended)
+        tester.containerView.onMouseEvent(MouseEvent(
+            window: .empty,
+            button: .left,
+            mousePosition: Point(100, 50),
+            phase: .ended,
+            modifierKeys: [],
+            time: 0.1
+        ))
+        for _ in 0..<120 {
+            tester.containerView.update(1 / 60)
+        }
 
         let releasedContext = UIGraphicsContext()
         tester.containerView.viewTree.renderGraph(renderContext: releasedContext)
@@ -211,11 +232,216 @@ struct LiquidGlassTests {
     }
 
     @Test
-    func regularGlassRemainsNonInteractive() throws {
+    func navigationButtonGlassStretchesWithCapturedTouch() throws {
+        var actionCount = 0
+        let tester = ViewTester {
+            Button("Back") { actionCount += 1 }
+                .buttonStyle(NavigationBarButtonStyle())
+        }
+        .setSize(Size(width: 220, height: 120))
+        .performLayout()
+
+        let initialContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: initialContext)
+        let initialTransform = try #require(initialContext.getDrawCommands().glassTransforms.first)
+        let navigationGlass = try #require(initialContext.getDrawCommands().glassConfigurations.first)
+        #expect(navigationGlass.stretchStrength == 1)
+
+        let start = Point(110, 60)
+        tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: start, phase: .began, time: 0)])
+
+        let pressedContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: pressedContext)
+        let pressedTransform = try #require(pressedContext.getDrawCommands().glassTransforms.first)
+
+        let dragged = Point(140, 60)
+        tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: dragged, phase: .moved, time: 0.1)])
+
+        let draggedContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: draggedContext)
+        let draggedTransform = try #require(draggedContext.getDrawCommands().glassTransforms.first)
+        #expect(draggedTransform.x.x > pressedTransform.x.x * 1.2)
+
+        let diagonal = Point(140, 85)
+        tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: diagonal, phase: .moved, time: 0.15)])
+        let diagonalContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: diagonalContext)
+        let diagonalTransform = try #require(diagonalContext.getDrawCommands().glassTransforms.first)
+        #expect(diagonalTransform != draggedTransform)
+        #expect(abs(diagonalTransform.x.y) > 0.01)
+
+        tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: diagonal, phase: .ended, time: 0.2)])
+        #expect(actionCount == 0)
+
+        let releaseContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: releaseContext)
+        let releaseTransform = try #require(releaseContext.getDrawCommands().glassTransforms.first)
+        #expect(releaseTransform != initialTransform)
+
+        tester.containerView.update(1 / 60)
+        let settlingContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: settlingContext)
+        let settlingTransform = try #require(settlingContext.getDrawCommands().glassTransforms.first)
+        #expect(settlingTransform != releaseTransform)
+        #expect(settlingTransform != initialTransform)
+
+        for _ in 0..<119 {
+            tester.containerView.update(1 / 60)
+        }
+        let releasedContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: releasedContext)
+        let releasedTransform = try #require(releasedContext.getDrawCommands().glassTransforms.first)
+        #expect(abs(releasedTransform.x.x - initialTransform.x.x) < 0.001)
+
+        tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: start, phase: .began, time: 1)])
+        tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: start, phase: .ended, time: 1.1)])
+        #expect(actionCount == 1)
+    }
+
+    @Test
+    func navigationButtonGlassFollowsMouseWithoutClickingOnDrag() throws {
+        var actionCount = 0
+        let tester = ViewTester {
+            Button("Back") { actionCount += 1 }
+                .buttonStyle(NavigationBarButtonStyle())
+        }
+        .setSize(Size(width: 220, height: 120))
+        .performLayout()
+
+        let initialContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: initialContext)
+        let initialTransform = try #require(initialContext.getDrawCommands().glassTransforms.first)
+
+        let start = Point(110, 60)
+        let dragged = Point(140, 80)
+        tester.sendMouseEvent(at: start, button: .left, phase: .began)
+        tester.sendMouseEvent(at: dragged, button: .left, phase: .changed)
+
+        let draggedContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: draggedContext)
+        let draggedTransform = try #require(draggedContext.getDrawCommands().glassTransforms.first)
+        #expect(draggedTransform != initialTransform)
+        #expect(abs(draggedTransform.x.y) > 0.01)
+
+        tester.sendMouseEvent(at: dragged, button: .left, phase: .ended)
+        #expect(actionCount == 0)
+
+        for _ in 0..<120 {
+            tester.containerView.update(1 / 60)
+        }
+        let releasedContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: releasedContext)
+        let releasedTransform = try #require(releasedContext.getDrawCommands().glassTransforms.first)
+        #expect(abs(releasedTransform.x.x - initialTransform.x.x) < 0.001)
+
+        tester.sendMouseEvent(at: start, button: .left, phase: .began)
+        tester.sendMouseEvent(at: start, button: .left, phase: .ended)
+        #expect(actionCount == 1)
+    }
+
+    @Test
+    func ordinaryGlassScalesAndLimitsLongDrag() throws {
+        let tester = ViewTester {
+            Text("Glass")
+                .frame(width: 64, height: 48)
+                .glassEffect(.regular)
+        }
+        .setSize(Size(width: 200, height: 120))
+        .performLayout()
+
+        let initialContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: initialContext)
+        let initialTransform = try #require(initialContext.getDrawCommands().glassTransforms.first)
+
+        let start = Point(100, 60)
+        tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: start, phase: .began, time: 0)])
+        let pressedContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: pressedContext)
+        let pressedTransform = try #require(pressedContext.getDrawCommands().glassTransforms.first)
+        #expect(pressedTransform.x.x > initialTransform.x.x)
+
+        let farAway = Point(4_000, 4_000)
+        tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: farAway, phase: .moved, time: 0.1)])
+        let draggedContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: draggedContext)
+        let draggedTransform = try #require(draggedContext.getDrawCommands().glassTransforms.first)
+        #expect(abs(draggedTransform.w.x - initialTransform.w.x) < 150)
+        #expect(abs(draggedTransform.w.y - initialTransform.w.y) < 150)
+        #expect(draggedTransform.x.x < initialTransform.x.x * 1.5)
+
+        tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: farAway, phase: .ended, time: 0.2)])
+        for _ in 0..<120 {
+            tester.containerView.update(1 / 60)
+        }
+        let releasedContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: releasedContext)
+        let releasedTransform = try #require(releasedContext.getDrawCommands().glassTransforms.first)
+        #expect(abs(releasedTransform.x.x - initialTransform.x.x) < 0.001)
+    }
+
+    @Test
+    func glassStretchStrengthTunesDragWithoutChangingPressScale() throws {
+        #expect(Glass.regular.stretchStrength(-1).stretchStrength == 0)
+        #expect(Glass.regular.stretchStrength(2).stretchStrength == 1)
+
+        func stretchedTransform(strength: Float) throws -> Transform3D {
+            let tester = ViewTester {
+                Text("Glass")
+                    .frame(width: 64, height: 48)
+                    .glassEffect(.regular.stretchStrength(strength))
+            }
+            .setSize(Size(width: 200, height: 120))
+            .performLayout()
+
+            tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: Point(100, 60), phase: .began, time: 0)])
+            tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: Point(135, 60), phase: .moved, time: 0.1)])
+            let context = UIGraphicsContext()
+            tester.containerView.viewTree.renderGraph(renderContext: context)
+            return try #require(context.getDrawCommands().glassTransforms.first)
+        }
+
+        let noStretch = try stretchedTransform(strength: 0)
+        let reduced = try stretchedTransform(strength: 0.25)
+        let regular = try stretchedTransform(strength: 0.5)
+        let full = try stretchedTransform(strength: 1)
+        #expect(noStretch.x.x > 1)
+        #expect(noStretch.x.x < reduced.x.x)
+        #expect(reduced.x.x < regular.x.x)
+        #expect(regular.x.x < full.x.x)
+    }
+
+    @Test
+    func glassAroundButtonRespondsWithoutStealingItsAction() throws {
+        var actionCount = 0
+        let tester = ViewTester {
+            Button("Open") { actionCount += 1 }
+                .frame(width: 120, height: 44)
+                .glassEffect(.regular)
+        }
+        .setSize(Size(width: 200, height: 100))
+        .performLayout()
+
+        let initialContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: initialContext)
+        let initialTransform = try #require(initialContext.getDrawCommands().glassTransforms.first)
+
+        let point = Point(100, 50)
+        tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: point, phase: .began, time: 0)])
+        let pressedContext = UIGraphicsContext()
+        tester.containerView.viewTree.renderGraph(renderContext: pressedContext)
+        let pressedTransform = try #require(pressedContext.getDrawCommands().glassTransforms.first)
+        #expect(pressedTransform.x.x > initialTransform.x.x)
+
+        tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: point, phase: .ended, time: 0.1)])
+        #expect(actionCount == 1)
+    }
+
+    @Test
+    func explicitlyNonInteractiveGlassRemainsStatic() throws {
         let tester = ViewTester {
             Text("Glass")
                 .frame(width: 120, height: 44)
-                .glassEffect(.regular, in: .rect(cornerRadius: 8))
+                .glassEffect(.regular.interactive(false), in: .rect(cornerRadius: 8))
         }
         .setSize(Size(width: 200, height: 100))
         .performLayout()
@@ -270,6 +496,15 @@ private extension [UIGraphicsContext.DrawCommand] {
         compactMap { command in
             if case let .drawGlassRect(transform, _, _, _) = command {
                 return transform
+            }
+            return nil
+        }
+    }
+
+    var glassConfigurations: [Glass] {
+        compactMap { command in
+            if case let .drawGlassRect(_, _, configuration, _) = command {
+                return configuration
             }
             return nil
         }

@@ -50,6 +50,9 @@ struct EditorSourceControlSidebar: View {
                 .fill(theme.editorColors.surfaceElevated)
         )
         .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+        .overlay {
+            adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
+        }
         .onAppear { viewModel.refreshSourceControl() }
         .accessibilityIdentifier("AdaEditor.Git.Sidebar")
     }

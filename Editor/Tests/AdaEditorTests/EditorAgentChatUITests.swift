@@ -172,6 +172,24 @@ struct EditorAgentChatUITests {
         #expect(EditorAgentProviderFailure.message(in: #"{"type":"error","message":"Example"}"#) == nil)
     }
 
+    @Test("Shared transcript renders persisted mobile messages without ACP state")
+    func standaloneTranscript() throws {
+        _ = makeContainer(EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService()))
+        let event = EditorAgentEvent(
+            id: "mobile-turn",
+            kind: .message,
+            message: EditorAgentMessage(
+                role: .user,
+                segments: [EditorAgentMessageSegment(kind: .text, text: "Build a fox game")]
+            )
+        )
+        let container = UIContainerView(rootView: EditorAgentTranscript(events: [event], sessionID: "mobile-project"))
+        container.frame = Rect(x: 0, y: 0, width: 360, height: 480)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Event.mobile-turn"))
+    }
+
     private func makeContainer(_ model: EditorAgentViewModel) -> UIContainerView<EditorAgentSidebar> {
         if unsafe RenderEngine.shared == nil {
             unsafe RenderEngine.configurations.preferredBackend = .headless

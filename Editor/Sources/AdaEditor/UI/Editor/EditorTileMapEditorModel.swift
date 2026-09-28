@@ -19,6 +19,7 @@ final class EditorTileMapEditorModel {
     private(set) var map = EditorTileMapResource(atlasColors: [], cells: [])
     private(set) var status = ""
     var selectedColor = 0
+    private(set) var selectedLayer = 0
     var tool: Tool = .paint
     var newColorHex = "FFFFFF"
     var zoom: Float = 1
@@ -35,7 +36,7 @@ final class EditorTileMapEditorModel {
     @ObservationIgnored private let assetReference: String?
     @ObservationIgnored private let onSave: (() -> Void)?
     @ObservationIgnored private var savedData: Data?
-    @ObservationIgnored private var paintedCells: [TileMapCoordinate: Int] = [:]
+    @ObservationIgnored private var paintedCells: [[TileMapCoordinate: Int]] = []
     @ObservationIgnored private var tileImages: [Image?] = []
     @ObservationIgnored private var tileTextures: [Texture2D?] = []
     @ObservationIgnored private var linkedImages: [Image?] = []
@@ -68,10 +69,14 @@ final class EditorTileMapEditorModel {
             map = try EditorTileMapResource.read(from: url)
             displayTileSize = Self.sceneTileSize(for: assetReference, mapURL: url) ?? Size(width: 24, height: 24)
             savedData = data
-            paintedCells.removeAll(keepingCapacity: true)
-            for cell in map.cells where cell.count >= 3 {
-                paintedCells[TileMapCoordinate(x: cell[0], y: cell[1])] = cell[2]
+            paintedCells = map.effectiveLayers.map { layer in
+                var cells: [TileMapCoordinate: Int] = [:]
+                for cell in layer.cells where cell.count >= 3 {
+                    cells[TileMapCoordinate(x: cell[0], y: cell[1])] = cell[2]
+                }
+                return cells
             }
+            selectedLayer = min(selectedLayer, paintedCells.count - 1)
             tileImages = (map.atlasTextures ?? []).map { path in
                 try? Image(contentsOf: URL(fileURLWithPath: path, relativeTo: url.deletingLastPathComponent()).standardizedFileURL)
             }
@@ -80,12 +85,12 @@ final class EditorTileMapEditorModel {
             lastPaintedCell = nil
             strokeChanged = false
             revision += 1
-            status = "\(map.cells.count) cells"
+            status = "\(map.cellCount) cells"
         } catch { status = error.localizedDescription }
     }
 
     func color(atX x: Int, y: Int) -> Color? {
-        guard let index = paintedCells[TileMapCoordinate(x: x, y: y)], index >= 0, index < paletteCount else { return nil }
+        guard let index = tileIndex(atX: x, y: y), index >= 0, index < paletteCount else { return nil }
         return paletteColor(at: index)
     }
 
@@ -104,7 +109,92 @@ final class EditorTileMapEditorModel {
     }
 
     func tileIndex(atX x: Int, y: Int) -> Int? {
-        paintedCells[TileMapCoordinate(x: x, y: y)]
+        tileIndex(atX: x, y: y, layer: selectedLayer)
+    }
+
+    func tileIndex(atX x: Int, y: Int, layer: Int) -> Int? {
+        guard paintedCells.indices.contains(layer) else { return nil }
+        return paintedCells[layer][TileMapCoordinate(x: x, y: y)]
+    }
+
+    var layers: [EditorTileMapResource.PaletteLayer] { map.effectiveLayers }
+
+    func selectLayer(_ index: Int) {
+        guard layers.indices.contains(index) else { return }
+        endStroke()
+        guard layers.indices.contains(index) else { return }
+        selectedLayer = index
+    }
+
+    func addLayer() {
+        endStroke()
+        var updated = map
+        var layers = updated.effectiveLayers
+        var suffix = layers.count + 1
+        while layers.contains(where: { $0.name == "Layer \(suffix)" }) { suffix += 1 }
+        layers.append(.init(name: "Layer \(suffix)", zIndex: layers.count, isEnabled: true, cells: []))
+        updated.cells = []
+        updated.paletteLayers = layers
+        guard save(updated) else { return }
+        selectedLayer = layers.count - 1
+        reload()
+    }
+
+    func removeSelectedLayer() {
+        guard layers.count > 1 else { return }
+        endStroke()
+        guard layers.count > 1 else { return }
+        var updated = map
+        var layers = updated.effectiveLayers
+        layers.remove(at: selectedLayer)
+        for index in layers.indices { layers[index].zIndex = index }
+        updated.paletteLayers = layers
+        updated.cells = []
+        guard save(updated) else { return }
+        selectedLayer = min(selectedLayer, layers.count - 1)
+        reload()
+    }
+
+    func moveSelectedLayer(by offset: Int) {
+        let destination = selectedLayer + offset
+        guard layers.indices.contains(destination) else { return }
+        endStroke()
+        guard layers.indices.contains(destination) else { return }
+        var updated = map
+        var layers = updated.effectiveLayers
+        layers.swapAt(selectedLayer, destination)
+        for index in layers.indices { layers[index].zIndex = index }
+        updated.paletteLayers = layers
+        updated.cells = []
+        guard save(updated) else { return }
+        selectedLayer = destination
+        reload()
+    }
+
+    func toggleSelectedLayer() {
+        endStroke()
+        guard layers.indices.contains(selectedLayer) else { return }
+        var updated = map
+        var layers = updated.effectiveLayers
+        layers[selectedLayer].isEnabled.toggle()
+        updated.paletteLayers = layers
+        updated.cells = []
+        guard save(updated) else { return }
+        reload()
+    }
+
+    func renameSelectedLayer(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        endStroke()
+        guard layers.indices.contains(selectedLayer) else { return }
+        var updated = map
+        var layers = updated.effectiveLayers
+        layers[selectedLayer].name = trimmed
+        updated.paletteLayers = layers
+        updated.cells = []
+        guard save(updated) else { return }
+        reload()
     }
 
     func texture(at index: Int) -> Texture2D? {
@@ -178,9 +268,14 @@ final class EditorTileMapEditorModel {
         guard strokeChanged else { return }
         strokeChanged = false
         var updated = map
-        updated.cells = paintedCells.sorted {
+        let cells = paintedCells[selectedLayer].sorted {
             $0.key.y == $1.key.y ? $0.key.x < $1.key.x : $0.key.y < $1.key.y
         }.map { [$0.key.x, $0.key.y, $0.value] }
+        if updated.paletteLayers == nil {
+            updated.cells = cells
+        } else {
+            updated.paletteLayers?[selectedLayer].cells = cells
+        }
         save(updated)
     }
 
@@ -231,7 +326,7 @@ final class EditorTileMapEditorModel {
     }
 
     func fitMap(in viewport: Size) {
-        guard let first = paintedCells.keys.first else {
+        guard let first = paintedCells.lazy.flatMap(\.keys).first else {
             panOffset = .zero
             zoom = 1
             return
@@ -240,7 +335,7 @@ final class EditorTileMapEditorModel {
         var maxX = first.x
         var minY = first.y
         var maxY = first.y
-        for cell in paintedCells.keys {
+        for cell in paintedCells.lazy.flatMap(\.keys) {
             minX = min(minX, cell.x)
             maxX = max(maxX, cell.x)
             minY = min(minY, cell.y)
@@ -350,7 +445,7 @@ final class EditorTileMapEditorModel {
                 return
             }
             if map.tileSetReference != nil, map.tileSetReference != reference,
-                map.cells.contains(where: { $0.count >= 3 && $0[2] >= legacyPaletteCount }) {
+                map.allCells.contains(where: { $0.count >= 3 && $0[2] >= legacyPaletteCount }) {
                 status = "Erase linked tiles before replacing this Tile Source."
                 return
             }
@@ -421,6 +516,16 @@ final class EditorTileMapEditorModel {
         for index in updated.cells.indices where updated.cells[index].count >= 3 && updated.cells[index][2] >= insertionIndex {
             updated.cells[index][2] += 1
         }
+        if var layers = updated.paletteLayers {
+            for layerIndex in layers.indices {
+                for cellIndex in layers[layerIndex].cells.indices
+                    where layers[layerIndex].cells[cellIndex].count >= 3
+                    && layers[layerIndex].cells[cellIndex][2] >= insertionIndex {
+                    layers[layerIndex].cells[cellIndex][2] += 1
+                }
+            }
+            updated.paletteLayers = layers
+        }
         guard save(updated) else { return }
         reload()
         selectedColor = insertionIndex
@@ -428,13 +533,14 @@ final class EditorTileMapEditorModel {
     }
 
     private func paintCell(_ cell: TileMapCoordinate, erasing: Bool) {
+        guard paintedCells.indices.contains(selectedLayer) else { return }
         if erasing {
-            guard paintedCells.removeValue(forKey: cell) != nil else { return }
+            guard paintedCells[selectedLayer].removeValue(forKey: cell) != nil else { return }
         } else {
             guard (0..<paletteCount).contains(selectedColor),
                 selectedColor < legacyPaletteCount || image(at: selectedColor) != nil,
-                paintedCells[cell] != selectedColor else { return }
-            paintedCells[cell] = selectedColor
+                paintedCells[selectedLayer][cell] != selectedColor else { return }
+            paintedCells[selectedLayer][cell] = selectedColor
         }
         strokeChanged = true
         revision += 1
@@ -453,7 +559,7 @@ final class EditorTileMapEditorModel {
             self.savedData = try Data(contentsOf: url)
             map = updated
             revision += 1
-            status = "Saved \(updated.cells.count) cells"
+            status = "Saved \(updated.cellCount) cells"
             onSave?()
             return true
         } catch { status = error.localizedDescription; return false }

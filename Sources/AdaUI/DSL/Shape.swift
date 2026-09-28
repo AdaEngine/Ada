@@ -163,6 +163,8 @@ public struct RoundedRectangle: Shape {
 /// A shape view node.
 @MainActor
 class ShapeViewNode<S: Shape>: ViewNode {
+    private var targetShapeData: S.AnimatableData?
+    private weak var propertyController: UIAnimationController?
     private var shape: S
     private var renderMode: ShapeRenderMode
     private var path: Path = Path()
@@ -213,15 +215,23 @@ class ShapeViewNode<S: Shape>: ViewNode {
 
         let startData = self.shape.animatableData
         let endData = otherNode.shape.animatableData
-        let animationController =
-            self.environment.animationController
-            ?? otherNode.environment.animationController
-            ?? nearestAnimationController()
+        let animationController = animationControllerForUpdate
 
         super.update(from: newNode)
 
         self.renderMode = otherNode.renderMode
 
+        guard (endData - (targetShapeData ?? startData)).magnitudeSquared > 0 else {
+            let presentationData = shape.animatableData
+            shape = otherNode.shape
+            shape.animatableData = presentationData
+            updatePath()
+            invalidateNearestLayer()
+            return
+        }
+        targetShapeData = endData
+        propertyController?.removeAnimation(label: "shape-\(id)")
+        propertyController = animationController
         if let animationController, (startData - endData).magnitudeSquared > 0 {
             self.shape = otherNode.shape
             self.shape.animatableData = startData

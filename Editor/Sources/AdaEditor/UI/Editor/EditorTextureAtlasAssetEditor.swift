@@ -504,8 +504,8 @@ struct EditorTextureAtlasAssetEditor: View {
             Button(
                 action: { model.removeImage(at: index) },
                 label: {
-                    Text("×")
-                        .font(.system(size: 13))
+                    Text("\u{E5CD}")
+                        .font(AdaEditorMaterialSymbolFont.font(size: 13))
                         .foregroundColor(theme.editorColors.muted)
                         .frame(width: 22, height: 22)
                 }

@@ -112,6 +112,26 @@ extension AppWorlds {
         return try operation()
     }
 
+    /// Runs an async tooling operation without allowing a frame to enter this world.
+    /// Use only for work that must cross an `await` at an engine safe point.
+    /// Do not call it from a running system, which would wait for its own frame.
+    public func withExclusiveWorldAccess<T>(_ operation: @MainActor () async throws -> T) async throws -> T {
+        while activeUpdates > 0 {
+            await withCheckedContinuation { updateWaiters.append($0) }
+        }
+        try Task.checkCancellation()
+        activeUpdates += 1
+        defer {
+            activeUpdates -= 1
+            if activeUpdates == 0 {
+                let waiters = updateWaiters
+                updateWaiters.removeAll(keepingCapacity: true)
+                for waiter in waiters { waiter.resume() }
+            }
+        }
+        return try await operation()
+    }
+
     /// Updates this world and its subworlds, serializing concurrent frame requests.
     public func update() async throws {
         while activeUpdates > 0 {

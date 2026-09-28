@@ -221,6 +221,15 @@ extension World {
             self.resourceIds[id] = nil
         }
 
+        mutating func removeResource(_ type: any Resource.Type) {
+            let id = ObjectIdentifier(type)
+            guard let componentId = resourceIds[id] else {
+                return
+            }
+            resourceData[componentId] = nil
+            resourceIds[id] = nil
+        }
+
         func getResourceData<T: Resource>(_: T.Type) -> ResourceData? {
             guard
                 let componentId = self.resourceIds[T.identifier],

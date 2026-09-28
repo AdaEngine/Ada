@@ -123,18 +123,17 @@ final class EditorPreviewHostView: UIView {
         if event.phase == .ended || event.phase == .cancelled {
             activeMouseEvent = nil
         }
-        previewView?
-            .onMouseEvent(
-                MouseEvent(
-                    window: event.window,
-                    button: event.button,
-                    scrollDelta: event.scrollDelta,
-                    mousePosition: previewPoint(from: event.mousePosition),
-                    phase: event.phase,
-                    modifierKeys: event.modifierKeys,
-                    time: event.time
-                )
-            )
+        var forwardedEvent = MouseEvent(
+            window: event.window,
+            button: event.button,
+            scrollDelta: event.scrollDelta,
+            mousePosition: previewPoint(from: event.mousePosition),
+            phase: event.phase,
+            modifierKeys: event.modifierKeys,
+            time: event.time
+        )
+        forwardedEvent.hasPreciseScrollingDeltas = event.hasPreciseScrollingDeltas
+        previewView?.onMouseEvent(forwardedEvent)
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {

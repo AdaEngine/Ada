@@ -23,7 +23,7 @@ extension EditorInspectorSidebar {
                 },
                 label: {
                     HStack(spacing: 6) {
-                        Text("+").font(.system(size: 15))
+                        Text("\u{E145}").font(AdaEditorMaterialSymbolFont.font(size: 15))
                         Text("Add Component").font(.system(size: 11))
                         Spacer()
                         Text("\u{E5CC}")
@@ -82,7 +82,8 @@ extension EditorInspectorSidebar {
             action: { viewModel.addScriptableObjectRequested(descriptor) },
             label: {
                 HStack(spacing: 6) {
-                    Text("+")
+                    Text("\u{E145}")
+                        .font(AdaEditorMaterialSymbolFont.font(size: 15))
                         .foregroundColor(theme.editorColors.purple)
                     Text(descriptor.name)
                         .foregroundColor(theme.editorColors.text)
@@ -318,8 +319,8 @@ private struct EditorAddComponentRow: View {
             componentIcon
             componentDescription
             Spacer()
-            Text("+")
-                .font(.system(size: 18))
+            Text("\u{E145}")
+                .font(AdaEditorMaterialSymbolFont.font(size: 18))
                 .foregroundColor(theme.editorColors.blue)
                 .frame(width: 30, height: 30)
                 .background(CircleShape().fill(theme.editorColors.blue.opacity(0.12)))

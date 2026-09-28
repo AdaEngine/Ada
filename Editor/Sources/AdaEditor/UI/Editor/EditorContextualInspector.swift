@@ -21,6 +21,9 @@ struct EditorContextualInspector: View {
         )
         .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .overlay {
+            adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
+        }
         .accessibilityIdentifier("AdaEditor.ContextualInspector")
     }
 

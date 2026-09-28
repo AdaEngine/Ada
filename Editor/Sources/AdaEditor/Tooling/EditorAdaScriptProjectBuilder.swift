@@ -73,7 +73,12 @@ struct EditorAdaScriptProjectBuilder {
         try prepare(project: project, at: projectURL).report
     }
 
-    func prepare(project: AdaProject, at projectURL: URL) throws -> EditorAdaScriptProjectBuildArtifact {
+    func prepare(
+        project: AdaProject,
+        at projectURL: URL,
+        sourceOverrides: [String: String] = [:],
+        validatesRuntime: Bool = true
+    ) throws -> EditorAdaScriptProjectBuildArtifact {
         guard project.build.system.isAdaScript else {
             throw EditorAdaScriptProjectBuildError.notAdaScriptProject(buildSystem: project.build.system.rawValue)
         }
@@ -84,6 +89,10 @@ struct EditorAdaScriptProjectBuilder {
         let sourceRoot = project.paths.sources ?? "Sources"
         let sources =
             try loadSources(at: projectURL.appendingPathComponent(sourceRoot, isDirectory: true))
+                .map { source in
+                    let projectPath = sourceRoot + "/" + source.path
+                    return AdaScriptSource(path: source.path, source: sourceOverrides[projectPath] ?? source.source)
+                }
             + AdaScriptLibraryLock.load(at: projectURL).loadSources(at: projectURL)
         guard !sources.isEmpty else {
             throw EditorAdaScriptProjectBuildError.noSources(path: sourceRoot)
@@ -99,7 +108,9 @@ struct EditorAdaScriptProjectBuilder {
             throw EditorAdaScriptProjectBuildError.typeChecking(error.description)
         }
         let unsupportedResources = dataSchemas.filter {
-            if case .resource = $0.kind { return true }
+            if case .resource = $0.kind {
+                return true
+            }
             return false
         }
         guard unsupportedResources.isEmpty else {
@@ -112,7 +123,12 @@ struct EditorAdaScriptProjectBuilder {
             sources: sources
         )
 
-        let preparedEntry = try prepareEntry(project: project, sources: sources, projectURL: projectURL)
+        let preparedEntry = try prepareEntry(
+            project: project,
+            sources: sources,
+            projectURL: projectURL,
+            validatesRuntime: validatesRuntime
+        )
         let plugins = try EditorAdaScriptRuntimePluginResolver.resolve(project.runtime.plugins)
         let entryDescription = [
             preparedEntry.entry.scene.map { "scene \($0)" },
@@ -149,7 +165,8 @@ struct EditorAdaScriptProjectBuilder {
     private func prepareEntry(
         project: AdaProject,
         sources: [AdaScriptSource],
-        projectURL: URL
+        projectURL: URL,
+        validatesRuntime: Bool
     ) throws -> PreparedAdaScriptRuntimeEntry {
         let entry = AdaProjectRuntimeEntry(
             scene: project.runtime.entry.scene?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
@@ -165,7 +182,7 @@ struct EditorAdaScriptProjectBuilder {
         }
 
         let systems = try AdaScriptSchemaParser.parseSystemCapabilities(sources: sources)
-        if !systems.isEmpty || entry.startupSystem != nil {
+        if validatesRuntime && (!systems.isEmpty || entry.startupSystem != nil) {
             try AdaScriptPlugin.validate(
                 sources: sources,
                 name: project.runtime.moduleName,

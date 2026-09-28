@@ -149,6 +149,30 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
     private weak var activePinchEventNode: ViewNode?
     /// Manages keyboard-driven focus traversal across focusable nodes.
     let focusManager = UIFocusManager()
+
+    func deactivateInput(in subtree: ViewNode) {
+        func belongsToSubtree(_ node: ViewNode?) -> Bool {
+            var current = node
+            while let node = current {
+                if node === subtree {
+                    return true
+                }
+                current = node.parent
+            }
+            return false
+        }
+        if belongsToSubtree(focusManager.focusedNode) { focusManager.focus(nil) }
+        if belongsToSubtree(activeMouseEventNode) {
+            activeMouseEventNode?.onMouseLeave()
+            activeMouseEventNode = nil
+        }
+        if belongsToSubtree(lastOnMouseEventNode) {
+            lastOnMouseEventNode?.onMouseLeave()
+            lastOnMouseEventNode = nil
+        }
+        activeTouchEventNodes = activeTouchEventNodes.filter { !belongsToSubtree($0.value.value) }
+        if belongsToSubtree(activePinchEventNode) { activePinchEventNode = nil }
+    }
     var hasFocusedInputNode: Bool {
         self.focusManager.focusedNode != nil
     }
@@ -215,11 +239,23 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
 
     private func routeMouseEvent(_ event: MouseEvent, to viewNode: ViewNode?) {
         if lastOnMouseEventNode !== viewNode {
+            forEachInteractiveGlassAncestor(of: lastOnMouseEventNode) { $0.cancelObservedMouseInteraction() }
             lastOnMouseEventNode?.onMouseLeave()
             lastOnMouseEventNode = viewNode
         }
 
+        forEachInteractiveGlassAncestor(of: viewNode) { $0.onMouseEvent(event) }
         viewNode?.onMouseEvent(event)
+    }
+
+    private func forEachInteractiveGlassAncestor(of node: ViewNode?, _ body: (GlassEffectViewNode) -> Void) {
+        var current = node?.parent
+        while let ancestor = current {
+            if let glass = ancestor as? GlassEffectViewNode, glass.respondsToInteraction {
+                body(glass)
+            }
+            current = ancestor.parent
+        }
     }
 
     @_spi(Internal)
@@ -348,6 +384,7 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
                     ?? viewTree.rootNode.hitTest(localPoint, with: touch)
             }
             inspectionLastHitTestNode = node
+            forEachInteractiveGlassAncestor(of: node) { $0.onTouchesEvent([touch]) }
             node?.onTouchesEvent([touch])
             if touch.phase == .ended || touch.phase == .cancelled {
                 activeTouchEventNodes.removeValue(forKey: touch.contactID)
@@ -390,6 +427,9 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
     }
 
     func addTransientAnimationController(_ animationController: UIAnimationController) {
+        guard !animationController.isDrivenByView else {
+            return
+        }
         if !transientAnimationControllers.contains(where: { $0 === animationController }) {
             transientAnimationControllers.append(animationController)
         }

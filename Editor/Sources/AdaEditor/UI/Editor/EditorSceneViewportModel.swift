@@ -36,7 +36,7 @@ final class EditorSceneViewportModel {
     var activeGizmoHandle: EditorTransformGizmo.Handle? { transformDrag?.interaction.handle }
 
     var twoDCenter = Vector2.zero
-    var twoDZoom: Float = 1
+    var twoDZoom: Float = maximumTwoDZoom
     var threeDPosition = Vector3(0, 6, -10)
     var threeDYaw: Float = 0
     var threeDPitch: Float = -0.42
@@ -44,6 +44,7 @@ final class EditorSceneViewportModel {
 
     private var lastPinchScale: Float?
     private var pressedKeys: Set<KeyCode> = []
+    private var depthGridEntityIDs: [Entity.ID] = []
     private var lastMousePosition: Point?
     private var mouseDownPosition: Point?
     private var transformDrag: TransformDrag?
@@ -118,6 +119,10 @@ final class EditorSceneViewportModel {
     func disconnect() {
         lastPinchScale = nil
         cancelTransformInspectorUpdate()
+        for entityID in depthGridEntityIDs {
+            world?.removeEntity(entityID, recursively: true)
+        }
+        depthGridEntityIDs.removeAll()
         world = nil
         cameraEntityID = nil
         entitiesByEditorID.removeAll()
@@ -187,6 +192,9 @@ final class EditorSceneViewportModel {
         endTransformDrag(cancelled: true)
         hoveredGizmoHandle = nil
         displayMode = mode
+        if let world {
+            EditorSceneViewportDepthGrid.setVisibility(mode == .threeD, entityIDs: depthGridEntityIDs, in: world)
+        }
         lastMousePosition = nil
         isTwoDPanning = false
         isThreeDRotating = false
@@ -213,6 +221,10 @@ final class EditorSceneViewportModel {
 
     func update(deltaTime: Float) -> Bool {
         var didChange = advancePerspectiveTransition(deltaTime: deltaTime)
+        if depthGridEntityIDs.isEmpty, let world, unsafe RenderEngine.shared != nil {
+            depthGridEntityIDs = EditorSceneViewportDepthGrid.install(in: world, isVisible: displayMode == .threeD)
+            didChange = !depthGridEntityIDs.isEmpty || didChange
+        }
         // SceneView creates its camera after the scene-loading callback. Bind it
         // on the first update where it exists, even if the user has not moved.
         if cameraEntityID == nil, cameraEntity() != nil {
@@ -263,7 +275,7 @@ final class EditorSceneViewportModel {
         if blend < 1 {
             draw2DGrid(in: &context, size: size, theme: theme, opacity: 1 - blend)
         }
-        if blend > 0 {
+        if blend > 0, blend < 1 {
             draw3DGrid(in: &context, size: size, theme: theme, opacity: blend)
         }
     }
@@ -277,6 +289,16 @@ final class EditorSceneViewportModel {
                 let radius = max(5, min(18, icon.size * 8))
                 let rect = Rect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)
                 context.fill(CircleShape().path(in: rect), with: color(for: icon, theme: theme).opacity(icon.isExplicit ? 0.86 : 0.58))
+            }
+            if displayMode == .threeD, !isPerspectiveTransitionActive {
+                EditorSceneViewportCameraGizmo.draw(
+                    in: &context,
+                    world: world,
+                    editorIDsByEntityID: editorIDsByEntityID,
+                    viewportModel: self,
+                    size: size,
+                    theme: theme
+                )
             }
         }
 
@@ -400,7 +422,7 @@ extension EditorSceneViewportModel {
     }
 
     func handle2DMouse(_ event: MouseEvent) -> Bool {
-        let wantsPan = event.button == .middle || (pressedKeys.contains(.space) && event.button == .left)
+        let wantsPan = event.button == .middle || event.button == .right || (pressedKeys.contains(.space) && event.button == .left)
 
         switch event.phase {
         case .began:
@@ -639,10 +661,15 @@ extension EditorSceneViewportModel {
     func handleScroll(_ event: MouseEvent) -> Bool {
         switch displayMode {
         case .twoD:
-            if event.modifierKeys.contains(.main) || event.modifierKeys.contains(.control) {
-                zoom2D(by: event.scrollDelta.y)
+            if event.hasPreciseScrollingDeltas {
+                if event.modifierKeys.contains(.main) || event.modifierKeys.contains(.control) {
+                    zoom2D(by: event.scrollDelta.y)
+                } else {
+                    pan2D(byScreenDelta: Vector2(event.scrollDelta.x, event.scrollDelta.y) * 72)
+                }
             } else {
-                pan2D(byScreenDelta: Vector2(event.scrollDelta.x, event.scrollDelta.y) * 72)
+                pan2D(byScreenDelta: Vector2(event.scrollDelta.x * 72, 0))
+                zoom2D(by: event.scrollDelta.y)
             }
         case .threeD:
             let speedMultiplier: Float = event.modifierKeys.contains(.shift) ? 4 : 1
@@ -838,6 +865,9 @@ extension EditorSceneViewportModel {
         environment.skybox.isEnabled = smoothPerspectiveBlend > 0
         environment.screenSpaceReflection.isEnabled = smoothPerspectiveBlend > 0
         cameraEntity.components += environment
+        if let world {
+            EditorSceneViewportDepthGrid.centerGrid(at: threeDPosition, entityIDs: depthGridEntityIDs, in: world)
+        }
     }
 
     func cameraState(for size: Size) -> CameraState {

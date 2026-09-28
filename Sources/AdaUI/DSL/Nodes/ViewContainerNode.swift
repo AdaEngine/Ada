@@ -88,8 +88,9 @@ class ViewContainerNode: ViewNode {
         let outputs = withObservationTracking {
             body(inputs)
         } onChange: { [weak self] in
+            let transaction = UITransactionContext.current
             Task { @MainActor in
-                self?.scheduleObservedContentInvalidation(revision: observationRevision)
+                self?.scheduleObservedContentInvalidation(revision: observationRevision, transaction: transaction)
             }
         }
         Self.observationTrackingDepth -= 1
@@ -103,18 +104,27 @@ class ViewContainerNode: ViewNode {
         return contentObservationRevision
     }
 
-    func scheduleObservedContentInvalidation(revision: UInt64) {
+    func scheduleObservedContentInvalidation(revision: UInt64, transaction: Transaction? = nil) {
         guard contentObservationRevision == revision else {
             return
         }
-        ObservedContentInvalidations.shared.enqueue(self, revision: revision)
+        ObservedContentInvalidations.shared.enqueue(self, revision: revision, transaction: transaction)
     }
 
     func performObservedContentInvalidation(revision: UInt64) {
         guard contentObservationRevision == revision else {
             return
         }
-        invalidateObservedContent()
+        withAncestorTransaction {
+            if let controller = BindingAnimationTransaction.currentController {
+                performWithTransientAnimationController(controller) {
+                    invalidateObservedContent()
+                }
+                owner?.addTransientAnimationController(controller)
+            } else {
+                invalidateObservedContent()
+            }
+        }
     }
 
     func invalidateObservedContent() {
@@ -392,6 +402,10 @@ class ViewContainerNode: ViewNode {
         if parent == nil {
             for node in nodes {
                 node.parent = nil
+            }
+        } else {
+            for node in nodes {
+                node.parent = self
             }
         }
     }

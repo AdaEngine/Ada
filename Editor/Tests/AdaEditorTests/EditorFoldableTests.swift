@@ -169,7 +169,7 @@ struct EditorFoldableTests {
 
     private var demoRoot: URL {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Demos/UnfoldTheWorld")
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Editor/Tests/AdaEditorTests/Fixtures/UnfoldTheWorld")
     }
 }
 

@@ -1,24 +1,74 @@
 @_spi(Scripting) import AdaECS
+import AdaScene
 import Gravity
 
 @GSExportable("AdaWorldContext")
 final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSendableBridge {
     let commands: AnnotatedGravityCommandsBridge
+    private let navigator: SceneNavigator?
+    private let reportDiagnostic: @Sendable (String) -> Void
+    private var isActive = true
 
     @GSExportableIgnore
-    static func make(commands: AnnotatedGravityCommandsBridge) -> AnnotatedGravityWorldContext {
-        AnnotatedGravityWorldContext(commands: commands)
+    static func make(
+        world: World,
+        commands: AnnotatedGravityCommandsBridge,
+        reportDiagnostic: @escaping @Sendable (String) -> Void
+    ) -> AnnotatedGravityWorldContext {
+        AnnotatedGravityWorldContext(
+            commands: commands,
+            navigator: world.getResource(SceneNavigator.self),
+            reportDiagnostic: reportDiagnostic
+        )
     }
 
-    private init(commands: AnnotatedGravityCommandsBridge) {
+    private init(
+        commands: AnnotatedGravityCommandsBridge,
+        navigator: SceneNavigator?,
+        reportDiagnostic: @escaping @Sendable (String) -> Void
+    ) {
         self.commands = commands
+        self.navigator = navigator
+        self.reportDiagnostic = reportDiagnostic
     }
 
     func spawn(_ components: GSValue) -> Int {
         commands.spawn(components)
     }
 
+    @discardableResult
+    func changeScene(_ path: String) -> Bool {
+        guard isActive else {
+            reportDiagnostic("World capability is no longer valid")
+            return false
+        }
+        guard let navigator else {
+            reportDiagnostic("Scene navigation requires ScenePlugin")
+            return false
+        }
+        navigator.requestReplaceScene(with: path, onFailure: reportDiagnostic)
+        return true
+    }
+
+    @discardableResult
+    func reloadScene() -> Bool {
+        guard isActive else {
+            reportDiagnostic("World capability is no longer valid")
+            return false
+        }
+        guard let navigator else {
+            reportDiagnostic("Scene navigation requires ScenePlugin")
+            return false
+        }
+        guard navigator.requestReloadScene(onFailure: reportDiagnostic) else {
+            reportDiagnostic("There is no active scene to reload")
+            return false
+        }
+        return true
+    }
+
     func invalidate() {
+        isActive = false
         commands.invalidate()
     }
 }
@@ -26,6 +76,7 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSenda
 @GSExportable("AdaCommands")
 final class AnnotatedGravityCommandsBridge: @unchecked Sendable, AdaScriptNonSendableBridge {
     private var commands: Commands?
+    private let navigator: SceneNavigator?
     private let reportDiagnostic: @Sendable (String) -> Void
     private let runtimeComponents: [String: RuntimeComponentDescriptor]
     private var isActive = true
@@ -33,11 +84,13 @@ final class AnnotatedGravityCommandsBridge: @unchecked Sendable, AdaScriptNonSen
     @GSExportableIgnore
     static func make(
         commands: Commands?,
+        navigator: SceneNavigator? = nil,
         runtimeComponents: [RuntimeComponentDescriptor] = [],
         reportDiagnostic: @escaping @Sendable (String) -> Void
     ) -> AnnotatedGravityCommandsBridge {
         AnnotatedGravityCommandsBridge(
             commands: commands,
+            navigator: navigator,
             runtimeComponents: runtimeComponents,
             reportDiagnostic: reportDiagnostic
         )
@@ -45,10 +98,12 @@ final class AnnotatedGravityCommandsBridge: @unchecked Sendable, AdaScriptNonSen
 
     private init(
         commands: Commands?,
+        navigator: SceneNavigator?,
         runtimeComponents: [RuntimeComponentDescriptor],
         reportDiagnostic: @escaping @Sendable (String) -> Void
     ) {
         self.commands = commands
+        self.navigator = navigator
         self.runtimeComponents = runtimeComponents.reduce(into: [:]) { result, descriptor in
             result[descriptor.name] = descriptor
             result[descriptor.stableID] = descriptor
@@ -100,7 +155,9 @@ final class AnnotatedGravityCommandsBridge: @unchecked Sendable, AdaScriptNonSen
         guard let commands else {
             return -1
         }
-        return commands.spawn(detachedComponents: components).entityId
+        let entityID = commands.spawn(detachedComponents: components).entityId
+        navigator?.trackSceneEntity(entityID)
+        return entityID
     }
 
     @discardableResult

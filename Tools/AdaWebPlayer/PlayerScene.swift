@@ -61,11 +61,19 @@ struct PlayerSceneDocument: Decodable, Sendable {
 }
 
 struct PlayerTileMap: Decodable, Sendable {
+    struct PaletteLayer: Decodable, Sendable {
+        let name: String
+        let zIndex: Int
+        let isEnabled: Bool
+        let cells: [[Int]]
+    }
+
     let atlasColors: [Color]
     let atlasTextures: [String]?
     let tileSetReference: String?
     let tileSetTiles: [TileMapSourceTile]?
     let cells: [[Int]]
+    let paletteLayers: [PaletteLayer]?
 }
 
 struct PlayerTileMapResource: Sendable {
@@ -143,15 +151,24 @@ struct PlayerSceneEntryPlugin: Plugin {
             }
             if let value = item.components.tileMap, let resource = tileMaps[value.map] {
                 let tileMap = TileMap()
+                let paletteLayers = resource.map.paletteLayers ?? []
+                for (index, layer) in paletteLayers.enumerated() {
+                    let target = index == 0 ? tileMap.layers[0] : tileMap.createLayer()
+                    target.name = layer.name
+                    target.zIndex = layer.zIndex
+                    target.isEnabled = layer.isEnabled
+                }
+                let cellsByLayer = paletteLayers.isEmpty ? nil : paletteLayers.map(\.cells)
                 do {
                     if !resource.images.isEmpty {
-                        try tileMap.setImagePalette(resource.images, cells: resource.map.cells)
+                        try tileMap.setImagePalette(resource.images, cells: resource.map.cells, cellsByLayer: cellsByLayer)
                     }
                     if !resource.linkedImages.isEmpty {
                         try tileMap.installLinkedImagePalette(
                             resource.linkedImages,
                             cells: resource.map.cells,
-                            firstPaletteIndex: max(resource.map.atlasColors.count, resource.map.atlasTextures?.count ?? 0)
+                            firstPaletteIndex: max(resource.map.atlasColors.count, resource.map.atlasTextures?.count ?? 0),
+                            cellsByLayer: cellsByLayer
                         )
                     }
                 } catch {

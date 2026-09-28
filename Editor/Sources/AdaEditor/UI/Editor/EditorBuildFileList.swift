@@ -16,7 +16,7 @@ struct EditorBuildFileList: View {
                 Button {
                     viewModel.presentBuildFilePicker(for: selection)
                 } label: {
-                    Text("+").font(.system(size: 16)).frame(width: 30, height: 28)
+                    Text("\u{E145}").font(AdaEditorMaterialSymbolFont.font(size: 16)).frame(width: 30, height: 28)
                 }
                 .buttonStyle(DefaultButtonStyle())
                 .accessibilityIdentifier("AdaEditor.Settings.\(selection.rawValue).Add")
@@ -38,7 +38,7 @@ struct EditorBuildFileList: View {
                         Button {
                             viewModel.removeBuildFile(path, from: selection)
                         } label: {
-                            Text("−").font(.system(size: 16)).frame(width: 30, height: 28)
+                            Text("\u{E15B}").font(AdaEditorMaterialSymbolFont.font(size: 16)).frame(width: 30, height: 28)
                         }
                         .buttonStyle(DefaultButtonStyle())
                         .accessibilityIdentifier("AdaEditor.Settings.\(selection.rawValue).Remove.\(path)")

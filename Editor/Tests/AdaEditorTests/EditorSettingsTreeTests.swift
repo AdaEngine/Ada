@@ -53,7 +53,7 @@ struct EditorSettingsTreeTests {
         #expect(model.showsPage("CONTEXT"))
         #expect(!model.showsPage("PERMISSIONS"))
         model.selectedSection = .general
-        #expect(model.selectedPage == "CLOUD ACCOUNT")
+        #expect(model.selectedPage == "ADA CLOUD")
         #expect(model.codeFontSize == 19)
     }
 
@@ -80,14 +80,14 @@ struct EditorSettingsTreeTests {
     @Test("Collapsible headers only change expansion, including during search")
     func headersDoNotNavigate() {
         let model = EditorSettingsWindowViewModel(editorViewModel: nil, selectedSection: .general)
-        #expect(model.selectedPage == "CLOUD ACCOUNT")
+        #expect(model.selectedPage == "ADA CLOUD")
         model.activateSection(.agent)
         #expect(model.collapsedSections.contains(.agent))
         #expect(model.selectedSection == .general)
-        #expect(model.selectedPage == "CLOUD ACCOUNT")
+        #expect(model.selectedPage == "ADA CLOUD")
         model.activateSection(.agent)
         #expect(!model.collapsedSections.contains(.agent))
-        #expect(model.selectedPage == "CLOUD ACCOUNT")
+        #expect(model.selectedPage == "ADA CLOUD")
         model.searchText = "agent"
         model.activateSection(.agent)
         #expect(model.collapsedSections.contains(.agent))
@@ -103,13 +103,17 @@ struct EditorSettingsTreeTests {
             RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "CloudSettingsLayout")))
         }
         let model = EditorSettingsWindowViewModel(editorViewModel: nil, selectedSection: .general)
+        model.searchText = "Ada Cloud"
+        #expect(model.filteredSections == [.general])
+        #expect(model.visiblePages(in: .general) == ["ADA CLOUD"])
+        model.searchText = ""
         let container = UIContainerView(rootView: EditorSettingsWindowView(viewModel: model).theme(.adaEditor))
         container.frame = Rect(x: 0, y: 0, width: 1000, height: 720)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
         let card = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Cloud.AccountCard"))
         let signIn = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Cloud.SignIn"))
-        let title = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.Group.CLOUD ACCOUNT"))
+        let title = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.Group.ADA CLOUD"))
         #expect(card.absoluteFrame.minY >= title.absoluteFrame.maxY)
         #expect(signIn.absoluteFrame.minY >= card.absoluteFrame.minY)
         #expect(signIn.absoluteFrame.maxY <= card.absoluteFrame.maxY)

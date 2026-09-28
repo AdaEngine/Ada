@@ -3,6 +3,15 @@ import Foundation
 import PackageDescription
 
 let adaMCPLocalPath = ProcessInfo.processInfo.environment["ADA_MCP_LOCAL_PATH"] ?? "../../AdaMCP"
+let sloppyRuntimeLocalPath = ProcessInfo.processInfo.environment["SLOPPY_RUNTIME_LOCAL_PATH"] ?? "../../Sloppy/Packages/SloppyRuntime"
+let sloppyRuntimeURL = URL(fileURLWithPath: sloppyRuntimeLocalPath, relativeTo: URL(fileURLWithPath: #filePath).deletingLastPathComponent()).standardizedFileURL
+let hasSloppyRuntime = FileManager.default.fileExists(atPath: sloppyRuntimeURL.appendingPathComponent("Package.swift").path)
+let sloppyRuntimePackage: [Package.Dependency] = hasSloppyRuntime
+    ? [.package(name: "SloppyRuntimePortable", path: sloppyRuntimeURL.path)]
+    : []
+let sloppyRuntimeTarget: [Target.Dependency] = hasSloppyRuntime
+    ? [.product(name: "SloppyRuntime", package: "SloppyRuntimePortable", condition: .when(platforms: [.iOS]))]
+    : []
 let adaMCPPackage: Package.Dependency =
     true /*ProcessInfo.processInfo.environment["ADA_MCP_LOCAL"] == "1"*/
     ? .package(name: "AdaMCP", path: adaMCPLocalPath)
@@ -37,7 +46,7 @@ let package = Package(
         .package(url: "https://github.com/swiftlang/swift-syntax", from: "602.0.0"),
         .package(url: "https://github.com/tree-sitter/swift-tree-sitter", from: "0.9.0"),
         .package(url: "https://github.com/alex-pinkus/tree-sitter-swift", branch: "with-generated-files"),
-    ],
+    ] + sloppyRuntimePackage,
     targets: [
         .target(
             name: "GravityLanguageCore",
@@ -90,7 +99,7 @@ let package = Package(
                 "Yams",
                 "AdaPackageManifestTool",
                 "GravityLanguageCore",
-            ],
+            ] + sloppyRuntimeTarget,
             exclude: [
                 "Platforms/iOS/Info.plist",
                 "Platforms/macOS/Info.plist",

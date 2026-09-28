@@ -96,10 +96,14 @@ extension Animation {
         Animation(LinearAnimation(duration: duration))
     }
 
-    /// Create a delay animation.
+    /// A smooth timing curve with zero velocity at both ends.
+    public static func easeInOut(duration: TimeInterval = 0.3) -> Animation {
+        Animation(EaseInOutAnimation(duration: duration))
+    }
+
+    /// Delays the start of this animation. Negative delays are treated as zero.
     public func delay(_ duration: TimeInterval) -> Animation {
-        let delay = Animation(DelayAnimation(duration: duration))
-        return Animation(CombineAnimation(left: delay, right: self))
+        Animation(DelayAnimation(base: self, duration: max(0, duration)))
     }
 
     /// Repeats this animation indefinitely.
@@ -110,48 +114,47 @@ extension Animation {
     }
 }
 
-/// A delay animation.
-struct DelayAnimation: CustomAnimation {
+private struct EaseInOutAnimation: CustomAnimation {
     let duration: TimeInterval
+    var finiteDuration: TimeInterval? { duration }
 
-    var finiteDuration: TimeInterval? {
-        duration
-    }
-
-    func animate<V: VectorArithmetic>(_ value: V, time: TimeInterval, context _: inout AnimationContext<V>) -> V? {
-        guard time < duration else {
+    func animate<V: VectorArithmetic>(_ value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? {
+        guard duration > 0, time < duration else {
             return nil
         }
-
-        return value.scaled(by: Double(time / duration))
+        let progress = max(0, time / duration)
+        return value.scaled(by: Double(progress * progress * (3 - 2 * progress)))
     }
 }
 
-/// A combine animation.
-struct CombineAnimation: CustomAnimation {
-    let left: Animation
-    let right: Animation
+/// Holds the initial value before evaluating the base animation in its own time domain.
+struct DelayAnimation: CustomAnimation {
+    let base: Animation
+    let duration: TimeInterval
 
     var finiteDuration: TimeInterval? {
-        switch (left.base.finiteDuration, right.base.finiteDuration) {
-        case let (.some(leftDuration), .some(rightDuration)):
-            return max(leftDuration, rightDuration)
-        default:
-            return nil
-        }
+        base.base.finiteDuration.map { duration + $0 }
     }
 
-    func animate<V>(_ value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? where V: VectorArithmetic {
-        if let value = left.base.animate(value, time: time, context: &context) {
-            return value
+    func animate<V: VectorArithmetic>(_ value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? {
+        guard time >= duration else {
+            return .zero
         }
 
-        return right.base.animate(value, time: time, context: &context)
+        return base.base.animate(value, time: time - duration, context: &context)
+    }
+
+    func velocity<V: VectorArithmetic>(_ value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? {
+        guard time >= duration else {
+            return .zero
+        }
+
+        return base.base.velocity(value, time: time - duration, context: &context)
     }
 
     func hash(into hasher: inout Hasher) {
-        hasher.combine(left.base)
-        hasher.combine(right.base)
+        hasher.combine(base.base)
+        hasher.combine(duration)
     }
 }
 

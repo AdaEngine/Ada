@@ -119,6 +119,31 @@ public enum ScriptableObjectRegistry {
         }
     }
 
+    /// Atomically replaces AdaScript factories for existing identifiers.
+    @MainActor
+    public static func replaceScriptDescriptors(_ descriptors: [ScriptableObjectDescriptor]) throws {
+        try lock.withLock {
+            for descriptor in descriptors {
+                guard let previous = unsafe descriptorsByName[descriptor.identifier],
+                    previous.runtimeType == nil,
+                    previous.aliases == descriptor.aliases,
+                    previous.version == descriptor.version,
+                    previous.declaredAccess == descriptor.declaredAccess,
+                    previous.exportedFields == descriptor.exportedFields,
+                    previous.requiredComponents == descriptor.requiredComponents
+                else {
+                    throw ScriptableObjectCodingError.duplicateIdentifier(descriptor.identifier)
+                }
+            }
+            for descriptor in descriptors {
+                unsafe descriptorsByName[descriptor.identifier] = descriptor
+                for alias in descriptor.aliases {
+                    unsafe descriptorsByName[alias] = descriptor
+                }
+            }
+        }
+    }
+
     public static func descriptor(named name: String) -> ScriptableObjectDescriptor? {
         lock.withLock { unsafe descriptorsByName[name] }
     }

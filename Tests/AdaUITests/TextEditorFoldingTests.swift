@@ -64,11 +64,35 @@ struct TextEditorFoldingTests {
         #expect(node.sourceLine(atDisplayRow: 2) == 3)
 
         var commands = UIGraphicsContext()
-        node.drawIndentationMarkers(in: &commands, line: node.lines()[1], rowY: 0, pointSize: 12, font: .system(size: 12))
+        node.drawIndentationMarkers(
+            in: &commands,
+            line: node.lines()[1],
+            rowY: 0,
+            pointSize: 12,
+            font: .system(size: 12),
+            showsIndentationGuides: false,
+            showsTabMarkers: true,
+            showsSpaceMarkers: false
+        )
         #expect(commands.getDrawCommands().contains { command in
-            if case .drawLine = command { return true }
+            if case .drawLine = command {
+                return true
+            }
             return false
         })
+
+        var hiddenMarkers = UIGraphicsContext()
+        node.drawIndentationMarkers(
+            in: &hiddenMarkers,
+            line: node.lines()[1],
+            rowY: 0,
+            pointSize: 12,
+            font: .system(size: 12),
+            showsIndentationGuides: false,
+            showsTabMarkers: false,
+            showsSpaceMarkers: false
+        )
+        #expect(hiddenMarkers.getDrawCommands().isEmpty)
 
         node.setSelection(to: node.lines()[2].startOffset)
         node.ensureCaretVisibleIfNeeded()

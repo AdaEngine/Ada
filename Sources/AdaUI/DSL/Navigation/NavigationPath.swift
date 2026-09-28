@@ -10,7 +10,7 @@
 /// The path is a value type and AdaUI mutates it on the UI actor through
 /// bindings/state. `AnyHashable` does not express Sendable, so the conformance is
 /// unchecked and relies on the stored values being UI-bound navigation data.
-public struct NavigationPath: @unchecked Sendable {
+public struct NavigationPath: @unchecked Sendable, Hashable {
     private var elements: [AnyHashable] = []
 
     /// The number of elements in this path.
@@ -33,6 +33,10 @@ public struct NavigationPath: @unchecked Sendable {
             return
         }
         elements.removeLast(min(k, elements.count))
+    }
+
+    func isPrefix(of other: Self) -> Bool {
+        elements.count <= other.elements.count && other.elements.starts(with: elements)
     }
 
     /// The top-most (last) element of the path, or nil if empty.

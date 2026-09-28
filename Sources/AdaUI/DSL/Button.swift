@@ -141,7 +141,12 @@ final class ButtonViewNode: ViewModifierNode {
     private var body: (Button.State, EnvironmentValues) -> StyledButtonContent
 
     private var state: Button.State = .normal
+    private var activeTouchID: RID?
     private var touchStartLocation: Point?
+    private var currentTouchLocation: Point?
+    private var mouseStartLocation: Point?
+    private var currentMouseLocation: Point?
+    private var didMoveOutsideMouseTapSlop = false
     private var didMoveOutsideTapSlop = false
     private weak var activeTouchScrollView: ScrollViewNode?
 
@@ -167,6 +172,7 @@ final class ButtonViewNode: ViewModifierNode {
     override func invalidateContent() {
         self.reconcileContentNode()
         self.performLayout()
+        self.syncInteractiveGlass()
         owner?.containerView?.setNeedsDisplay(in: absoluteFrame())
     }
 
@@ -190,6 +196,7 @@ final class ButtonViewNode: ViewModifierNode {
         super.update(from: otherNode)
         self.reconcileContentNode()
         self.performLayout()
+        self.syncInteractiveGlass()
         owner?.containerView?.setNeedsDisplay(in: absoluteFrame())
     }
 
@@ -223,19 +230,38 @@ final class ButtonViewNode: ViewModifierNode {
 
         let previousState = state
         switch event.phase {
-        case .began,
-            .changed:
-            state.insert(.highlighted)
-
-            switch event.button {
-            case .left:
+        case .began:
+            if event.button == .left {
+                mouseStartLocation = event.mousePosition
+                currentMouseLocation = event.mousePosition
+                didMoveOutsideMouseTapSlop = false
                 state.insert(.selected)
                 state.remove(.highlighted)
-            default:
-                break
+            } else {
+                state.insert(.highlighted)
+            }
+        case .changed:
+            if event.button == .left, let mouseStartLocation {
+                currentMouseLocation = event.mousePosition
+                let dx = event.mousePosition.x - mouseStartLocation.x
+                let dy = event.mousePosition.y - mouseStartLocation.y
+                if dx * dx + dy * dy > Self.tapMovementToleranceSquared {
+                    didMoveOutsideMouseTapSlop = true
+                    state.remove(.selected)
+                    state.remove(.highlighted)
+                }
+            } else if event.button == .none {
+                mouseStartLocation = nil
+                currentMouseLocation = nil
+                didMoveOutsideMouseTapSlop = false
+                state.remove(.selected)
+                state.insert(.highlighted)
             }
         case .ended:
-            let shouldInvokeAction = event.button == .left && state.contains(.selected)
+            mouseStartLocation = nil
+            currentMouseLocation = nil
+            let shouldInvokeAction = event.button == .left && state.contains(.selected) && !didMoveOutsideMouseTapSlop
+            didMoveOutsideMouseTapSlop = false
             state.remove(.selected)
             state.remove(.highlighted)
 
@@ -243,38 +269,54 @@ final class ButtonViewNode: ViewModifierNode {
                 self.action()
             }
         case .cancelled:
+            mouseStartLocation = nil
+            currentMouseLocation = nil
+            didMoveOutsideMouseTapSlop = false
             state.remove(.selected)
             state.remove(.highlighted)
         }
 
         self.invalidateContentIfStateChanged(from: previousState)
+        self.syncInteractiveGlass()
     }
 
     override func onMouseLeave() {
+        mouseStartLocation = nil
+        currentMouseLocation = nil
+        didMoveOutsideMouseTapSlop = false
         let previousState = state
         state.remove(.selected)
         state.remove(.highlighted)
         self.invalidateContentIfStateChanged(from: previousState)
+        self.syncInteractiveGlass()
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
         guard self.state.isEnabled && self.environment.isEnabled else {
             return
         }
-        guard let touch = touches.first else {
+        guard let touch = touches.first(where: { event in
+            if let activeTouchID {
+                return event.contactID == activeTouchID
+            }
+            return event.phase == .began
+        }) else {
             return
         }
 
         let previousState = state
         switch touch.phase {
         case .began:
+            activeTouchID = touch.contactID
             touchStartLocation = touch.location
+            currentTouchLocation = touch.location
             didMoveOutsideTapSlop = false
             activeTouchScrollView = nearestScrollView()
             activeTouchScrollView?.onTouchesEvent(touches)
             state.insert(.highlighted)
             state.insert(.selected)
         case .moved:
+            currentTouchLocation = touch.location
             activeTouchScrollView?.onTouchesEvent(touches)
             if let touchStartLocation {
                 let dx = touch.location.x - touchStartLocation.x
@@ -291,6 +333,8 @@ final class ButtonViewNode: ViewModifierNode {
             state.remove(.selected)
             state.remove(.highlighted)
             touchStartLocation = nil
+            activeTouchID = nil
+            currentTouchLocation = nil
             didMoveOutsideTapSlop = false
             activeTouchScrollView = nil
             if shouldInvokeAction {
@@ -301,11 +345,14 @@ final class ButtonViewNode: ViewModifierNode {
             state.remove(.selected)
             state.remove(.highlighted)
             touchStartLocation = nil
+            activeTouchID = nil
+            currentTouchLocation = nil
             didMoveOutsideTapSlop = false
             activeTouchScrollView = nil
         }
 
         self.invalidateContentIfStateChanged(from: previousState)
+        self.syncInteractiveGlass()
     }
 
     /// Invoked by ``keyboardShortcut`` when this button is the first enabled button in the subtree.
@@ -332,6 +379,22 @@ final class ButtonViewNode: ViewModifierNode {
             return
         }
         self.invalidateContent()
+    }
+
+    private func syncInteractiveGlass() {
+        let start = touchStartLocation ?? mouseStartLocation
+        let location = currentTouchLocation ?? currentMouseLocation
+
+        func updateGlass(in node: ViewNode) {
+            if let glass = node as? GlassEffectViewNode {
+                glass.setButtonInteraction(start: start, location: location)
+            }
+            for child in node.transientEnvironmentChildren where !(child is ButtonViewNode) {
+                updateGlass(in: child)
+            }
+        }
+
+        updateGlass(in: contentNode)
     }
 
     private func reconcileContentNode() {

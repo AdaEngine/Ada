@@ -1,5 +1,11 @@
 @_spi(AdaEngine) import AdaEngine
 
+@MainActor
+func adaEditorPanelBorder(theme: Theme, cornerRadius: Float) -> some View {
+    RoundedRectangleShape(cornerRadius: cornerRadius)
+        .stroke(theme.editorColors.border, lineWidth: 1)
+}
+
 enum AdaEditorTitleFont {
     private static let resource: FontResource? = {
         guard
@@ -113,6 +119,7 @@ private struct EditorToolStripButton: View {
         .buttonStyle(
             AdaEditorStripButtonStyle(
                 active: active,
+                hovered: isHovered,
                 theme: theme,
                 accent: accent
             )
@@ -164,27 +171,42 @@ enum AdaEditorMaterialSymbolFont {
         0xE001,
         0xE034,
         0xE037,
+        0xE045,
         0xE047,
         0xE0CA,
+        0xE0F0,
         0xE145,
+        0xE14C,
         0xE14D,
         0xE15A,
         0xE15B,
+        0xE157,
+        0xE163,
         0xE166,
         0xE256,
         0xE258,
         0xE25A,
         0xE264,
+        0xE24B,
         0xE2C7,
         0xE2C8,
+        0xE30F,
         0xE322,
+        0xE3A5,
+        0xE3AF,
+        0xE3B6,
         0xE3B7,
         0xE3E7,
         0xE3F4,
+        0xE429,
         0xE48F,
+        0xE5CA,
+        0xE5CB,
         0xE5CC,
         0xE5CD,
+        0xE5CE,
         0xE5CF,
+        0xE5D4,
         0xE5D8,
         0xE5DA,
         0xE5DB,
@@ -208,10 +230,12 @@ enum AdaEditorMaterialSymbolFont {
         0xE8F0,
         0xE8F1,
         0xE8F4,
+        0xE8F5,
         0xE8FF,
         0xE913,
         0xE97A,
         0xEA23,
+        0xEAD5,
         0xEB82,
         0xEB8E,
         0xEF42,
@@ -222,7 +246,7 @@ enum AdaEditorMaterialSymbolFont {
     private static let resource: FontResource? = {
         guard
             let fontURL = Foundation.Bundle.editor.url(
-                forResource: "MaterialSymbolsRounded-Regular",
+                forResource: "MaterialSymbolsRounded-Bold",
                 withExtension: "ttf",
                 subdirectory: "Assets/Fonts"
             )
@@ -249,6 +273,7 @@ enum AdaEditorMaterialSymbolFont {
 
 private struct AdaEditorStripButtonStyle: ButtonStyle {
     let active: Bool
+    let hovered: Bool
     let theme: Theme
     let accent: Color?
 
@@ -256,10 +281,11 @@ private struct AdaEditorStripButtonStyle: ButtonStyle {
         let colors = theme.editorColors
         let accentColor = accent ?? colors.blue
         let isHighlighted = configuration.state.isHighlighted || configuration.state.isSelected
+        let backgroundColor = hovered || isHighlighted ? colors.surfaceElevated : (active ? accentColor.opacity(0.20) : Color.clear)
 
         return configuration.label
-            .foregroundColor(active ? accentColor : (isHighlighted ? colors.text : colors.muted))
+            .foregroundColor(active ? accentColor : (hovered || isHighlighted ? colors.text : colors.muted))
             .frame(width: 34, height: 34)
-            .background(RoundedRectangleShape(cornerRadius: 7).fill(active ? accentColor.opacity(0.20) : (isHighlighted ? colors.surfaceElevated : Color.clear)))
+            .background(RoundedRectangleShape(cornerRadius: 7).fill(backgroundColor))
     }
 }

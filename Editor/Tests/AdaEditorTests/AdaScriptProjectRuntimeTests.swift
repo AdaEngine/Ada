@@ -21,7 +21,7 @@ struct AdaScriptProjectRuntimeTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("Demos/MedievalArena", isDirectory: true)
+            .appendingPathComponent("Editor/Tests/AdaEditorTests/Fixtures/MedievalArena", isDirectory: true)
         let previousManager = UIWindowManager.shared
         let windowManager = AdaScriptRuntimeTestWindowManager()
         UIWindowManager.setShared(windowManager)
@@ -67,6 +67,10 @@ struct AdaScriptProjectRuntimeTests {
             storageURL: rootURL.appendingPathComponent("projects.json")
         )
         .createProject(named: "RuntimeGame", at: rootURL, template: .adaScript)
+        let projectURL = URL(fileURLWithPath: project.path, isDirectory: true)
+        var settings = try ProjectSystem.loadProject(at: projectURL)
+        settings.runtime.entry.view = nil
+        try ProjectSystem.saveProject(settings, at: projectURL)
 
         let previousManager = UIWindowManager.shared
         let windowManager = AdaScriptRuntimeTestWindowManager()

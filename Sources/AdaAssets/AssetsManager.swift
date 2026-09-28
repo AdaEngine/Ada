@@ -146,6 +146,23 @@ public struct AssetsManager: Resource {
         return handle
     }
 
+    /// Decode a new asset instance without using or updating the asset cache.
+    /// Use this for mutable templates whose runtime state must be recreated, such as a scene restart.
+    @AssetActor
+    public static func loadFresh<A: Asset>(_: A.Type, at path: String) async throws -> A {
+        try validateVirtualPath(path)
+        let processedPath = processPath(path)
+        guard !processedPath.url.pathExtension.isEmpty else {
+            throw AssetError.notExistAtPath(processedPath.url.path)
+        }
+        if shouldCheckAssetFileExistence {
+            guard FileSystem.current.itemExists(at: processedPath.url) else {
+                throw AssetError.notExistAtPath(processedPath.url.path)
+            }
+        }
+        return try await load(from: processedPath, originalPath: path, bundle: nil)
+    }
+
     /// Load a resource with block current thread and saving it to memory cache.
     /// It may be useful to load resource without concurrent context.
     ///

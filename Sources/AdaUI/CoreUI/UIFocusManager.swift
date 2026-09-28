@@ -69,7 +69,9 @@ final class UIFocusManager {
             result.append(node)
         }
 
-        if let rootNode = node as? ViewRootNode {
+        if let presentation = node as? PresentationInputProviding {
+            for child in presentation.inputContentNodes { collectFocusableNodes(from: child, into: &result) }
+        } else if let rootNode = node as? ViewRootNode {
             collectFocusableNodes(from: rootNode.contentNode, into: &result)
         } else if let container = node as? ViewContainerNode {
             for child in container.nodes {

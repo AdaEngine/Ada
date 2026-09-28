@@ -102,6 +102,15 @@ struct MyGame: App {
 
 Rebuilding the target after adding, removing, renaming, or editing an `.ada` file refreshes the generated source.
 
+In a portable AdaScript project running in AdaEditor's macOS game window, edits
+to `.ada` files hot reload after a short pause, including unsaved editor buffers.
+The current ECS world remains active. A failed candidate leaves the last valid
+code running and reports the error in Output. System instances and ordinary
+script globals restart, and startup systems run once for the new version;
+exported scriptable-object fields survive. Changes to
+component, resource, network, or scriptable-object schemas require restarting
+the game.
+
 The same generated source contains native backing structs and registration for
 scalar `@component` and `@resource` declarations. Because these declarations
 change Swift layout, adding or editing their stored fields requires rebuilding

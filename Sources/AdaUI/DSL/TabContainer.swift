@@ -363,82 +363,74 @@ private enum TabViewConstants {
 /// A node that transparently delegates all rendering and event handling to a
 /// mutable target node. Used by custom `TabViewStyle` implementations to embed
 /// the currently-selected tab content anywhere in their view hierarchy.
-final class TabContentProxyNode: ViewNode {
-    init() {
-        super.init(content: EmptyView())
-    }
+final class TabContentProxyNode: ViewNode, PresentationInputProviding {
+    var inputContentNodes: [ViewNode] { target.map { [$0] } ?? [] }
+    private(set) lazy var presentation = ViewPresentationTransition(host: self)
+
+    init() { super.init(content: EmptyView()) }
 
     var target: ViewNode? {
         didSet {
-            oldValue?.parent = nil
-            if let target {
-                target.parent = self
-                if let owner {
-                    target.updateViewOwner(owner)
-                }
+            guard oldValue !== target else {
+                return
             }
+            presentation.setContent(target, style: .tabs, animated: oldValue != nil)
             performLayout()
-            invalidateNearestLayer()
-            owner?.containerView?.setNeedsDisplay(in: absoluteFrame())
         }
     }
+
+    override var transientEnvironmentChildren: [ViewNode] { presentation.nodes }
 
     override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
         target?.sizeThatFits(proposal) ?? proposal.replacingUnspecifiedDimensions()
     }
 
     override func performLayout() {
-        guard let target else {
-            return
-        }
-        target.place(
-            in: Point(x: frame.width * 0.5, y: frame.height * 0.5),
-            anchor: .center,
-            proposal: ProposedViewSize(width: frame.width, height: frame.height)
-        )
+        presentation.layout(in: Rect(origin: .zero, size: frame.size))
     }
 
     override func draw(with context: UIGraphicsContext) {
-        var ctx = context
-        ctx.environment = environment
-        ctx.translateBy(x: frame.origin.x, y: -frame.origin.y)
-        target?.draw(with: ctx)
+        var context = context
+        context.environment = environment
+        context.translateBy(x: frame.origin.x, y: -frame.origin.y)
+        presentation.draw(with: context, in: Rect(origin: .zero, size: frame.size))
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        guard self.point(inside: point, with: event), let target else {
-            return nil
-        }
-        let targetPoint = target.convert(point, from: self)
-        return target.hitTest(targetPoint, with: event)
+        presentation.hitTest(point, event: event, in: Rect(origin: .zero, size: frame.size))
     }
 
-    override func update(_ deltaTime: TimeInterval) {
-        target?.update(deltaTime)
-    }
+    override func update(_ deltaTime: TimeInterval) { presentation.update(deltaTime) }
 
     override func updateViewOwner(_ owner: ViewOwner) {
         super.updateViewOwner(owner)
-        target?.updateViewOwner(owner)
+        presentation.nodes.forEach { $0.updateViewOwner(owner) }
     }
 
     override func updateEnvironment(_ environment: EnvironmentValues) {
         super.updateEnvironment(environment)
-        target?.updateEnvironment(environment)
+        presentation.nodes.forEach { $0.updateEnvironment(environment) }
     }
 
-    override func findNodeById(_ id: AnyHashable) -> ViewNode? {
-        target?.findNodeById(id)
-    }
+    override func findNodeById(_ id: AnyHashable) -> ViewNode? { target?.findNodeById(id) }
 
     override func findNodyByAccessibilityIdentifier(_ identifier: String) -> ViewNode? {
         target?.findNodyByAccessibilityIdentifier(identifier)
+    }
+
+    override func didMove(to parent: ViewNode?) {
+        super.didMove(to: parent)
+        if parent == nil {
+            presentation.detach()
+        } else {
+            presentation.setContent(target, style: .tabs, animated: false)
+        }
     }
 }
 
 // MARK: - TabViewNode
 
-final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
+final class TabViewNode<Selection: Hashable, Content: View>: ViewNode, PresentationInputProviding {
     private var elements: [TabBarElement]
     private var selectionBinding: Binding<Selection>
     private var position: TabViewPosition
@@ -448,7 +440,8 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
     private var contentNode: ViewNode
     private var cachedContentNodes: [AnyHashable: ViewNode] = [:]
     private var tabViewStyleTypeName: String
-    private let contentProxy = TabContentProxyNode()
+    let contentProxy = TabContentProxyNode()
+    private var renderedSelection: AnyHashable
 
     private var tabBarHeight: Float { TabViewConstants.tabBarHeight }
     private var tabBarWidth: Float { TabViewConstants.tabBarWidth }
@@ -462,7 +455,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         self.viewInputs = inputs
 
         let selected = AnyHashable(tabView.selection.wrappedValue)
-        let isCustom = !(inputs.environment.tabViewStyle is DefaultTabViewStyle)
+        self.renderedSelection = selected
 
         self.tabViewStyleTypeName = String(describing: type(of: inputs.environment.tabViewStyle))
         self.tabBarNode = Self.buildStyledTabBar(
@@ -483,12 +476,8 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
 
         self.cachedContentNodes[selected] = self.contentNode
         self.tabBarNode.parent = self
-        if isCustom {
-            contentProxy.parent = self
-            contentProxy.target = self.contentNode
-        } else {
-            self.contentNode.parent = self
-        }
+        contentProxy.parent = self
+        contentProxy.target = self.contentNode
 
         let weakSelf = WeakBox(self)
         self.tabBarNode = Self.buildStyledTabBar(
@@ -505,6 +494,17 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
     }
 
     override var canBecomeFocused: Bool { false }
+    var inputContentNodes: [ViewNode] { transientEnvironmentChildren }
+
+    override var transientEnvironmentChildren: [ViewNode] {
+        isCustomStyle ? [tabBarNode] : [tabBarNode, contentProxy]
+    }
+
+    override func didMove(to parent: ViewNode?) {
+        super.didMove(to: parent)
+        tabBarNode.parent = parent == nil ? nil : self
+        if !isCustomStyle { contentProxy.parent = parent == nil ? nil : self }
+    }
 
     override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
         let width = proposal.width ?? 300
@@ -548,7 +548,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
                 proposal: ProposedViewSize(width: frame.width, height: tabBarHeight)
             )
             let contentHeight = max(0, frame.height - tabBarHeight)
-            contentNode.place(
+            contentProxy.place(
                 in: Point(x: frame.width * 0.5, y: tabBarHeight + contentHeight * 0.5),
                 anchor: .center,
                 proposal: ProposedViewSize(width: frame.width, height: contentHeight)
@@ -556,7 +556,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
 
         case .bottom:
             let contentHeight = max(0, frame.height - tabBarHeight)
-            contentNode.place(
+            contentProxy.place(
                 in: Point(x: frame.width * 0.5, y: contentHeight * 0.5),
                 anchor: .center,
                 proposal: ProposedViewSize(width: frame.width, height: contentHeight)
@@ -574,7 +574,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
                 proposal: ProposedViewSize(width: tabBarWidth, height: frame.height)
             )
             let contentWidth = max(0, frame.width - tabBarWidth)
-            contentNode.place(
+            contentProxy.place(
                 in: Point(x: tabBarWidth + contentWidth * 0.5, y: frame.height * 0.5),
                 anchor: .center,
                 proposal: ProposedViewSize(width: contentWidth, height: frame.height)
@@ -582,7 +582,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
 
         case .right:
             let contentWidth = max(0, frame.width - tabBarWidth)
-            contentNode.place(
+            contentProxy.place(
                 in: Point(x: contentWidth * 0.5, y: frame.height * 0.5),
                 anchor: .center,
                 proposal: ProposedViewSize(width: contentWidth, height: frame.height)
@@ -666,6 +666,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         case .left: contentEnv.safeAreaInsets.leading = 0
         case .right: contentEnv.safeAreaInsets.trailing = 0
         }
+        contentProxy.updateEnvironment(contentEnv)
         // Keep offscreen cached tabs lazy: propagating environment through every cached
         // subtree on each layout/env tick makes tab switches scale with the total number
         // of visited tabs instead of only the visible one.
@@ -677,9 +678,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
     override func updateViewOwner(_ owner: ViewOwner) {
         super.updateViewOwner(owner)
         tabBarNode.updateViewOwner(owner)
-        if isCustomStyle {
-            contentProxy.updateViewOwner(owner)
-        }
+        contentProxy.updateViewOwner(owner)
         for cachedNode in cachedContentNodes.values {
             cachedNode.updateViewOwner(owner)
         }
@@ -699,8 +698,8 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         guard !isCustomStyle else {
             return nil
         }
-        let contentPoint = contentNode.convert(point, from: self)
-        return contentNode.hitTest(contentPoint, with: event)
+        let contentPoint = contentProxy.convert(point, from: self)
+        return contentProxy.hitTest(contentPoint, with: event)
     }
 
     override func draw(with context: UIGraphicsContext) {
@@ -714,15 +713,16 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         } else {
             tabBarNode.draw(with: ctx)
             drawSeparator(with: ctx)
-            contentNode.draw(with: ctx)
+            contentProxy.draw(with: ctx)
         }
     }
 
     override func update(_ deltaTime: TimeInterval) {
+        if renderedSelection != AnyHashable(selectionBinding.wrappedValue) { updateSelectionOnly() }
         tabBarNode.update(deltaTime)
         // For custom styles, content is updated through the proxy inside tabBarNode.
         if !isCustomStyle {
-            contentNode.update(deltaTime)
+            contentProxy.update(deltaTime)
         }
     }
 
@@ -786,12 +786,14 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         // the parent State owner → body re-evaluation → TabViewNode.update(from:) →
         // updateSelectionOnly(). The explicit rebuildAll() that used to follow was redundant.
         selectionBinding.wrappedValue = typedValue
+        if renderedSelection != value { updateSelectionOnly() }
     }
 
     /// Fast path: only selection changed, no structural change to elements.
     /// Updates tab bar button states and swaps the content node without rebuilding nodes.
     private func updateSelectionOnly() {
         let selected = AnyHashable(selectionBinding.wrappedValue)
+        renderedSelection = selected
         var contentEnv = environment
         switch position {
         case .top: contentEnv.safeAreaInsets.top = 0
@@ -828,15 +830,8 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
         let wasAlreadyCached = cachedContentNodes[selected] != nil
         let newContentNode = getOrCreateContentNode(for: selected)
         if contentNode !== newContentNode {
-            if !isCustomStyle {
-                contentNode.parent = nil
-            }
             contentNode = newContentNode
-            if isCustomStyle {
-                contentProxy.target = newContentNode
-            } else {
-                contentNode.parent = self
-            }
+            contentProxy.target = newContentNode
         }
 
         // Offscreen cached tabs no longer receive environment updates eagerly, so the
@@ -872,21 +867,15 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode {
 
     private func rebuildAll() {
         let selected = AnyHashable(selectionBinding.wrappedValue)
+        renderedSelection = selected
         let weakSelf = WeakBox(self)
 
         rebuildTabBar(selected: selected, onSelect: { value in weakSelf.value?.selectTab(value) })
 
         let newContentNode = getOrCreateContentNode(for: selected)
         if contentNode !== newContentNode {
-            if !isCustomStyle {
-                contentNode.parent = nil
-            }
             contentNode = newContentNode
-            if isCustomStyle {
-                contentProxy.target = newContentNode
-            } else {
-                contentNode.parent = self
-            }
+            contentProxy.target = newContentNode
         }
         var contentEnv = environment
         switch position {

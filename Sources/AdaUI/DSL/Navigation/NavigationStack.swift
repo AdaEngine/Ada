@@ -37,6 +37,10 @@ final class NavigationContext {
         onPathChanged?()
     }
 
+    func replacePath(_ newPath: NavigationPath) {
+        path = newPath
+    }
+
     func registerDestination<D: Hashable>(
         for type: D.Type,
         builder: @escaping (D, _ViewInputs) -> ViewNode
@@ -262,11 +266,13 @@ public struct NavigationStack<Content: View>: View, ViewNodeBuilder {
 
     let pathBinding: Binding<NavigationPath>
     let content: () -> Content
+    let ownsPath: Bool
 
     /// Creates a navigation stack with a bound path.
     public init(path: Binding<NavigationPath>, @ViewBuilder content: @escaping () -> Content) {
         self.pathBinding = path
         self.content = content
+        self.ownsPath = false
     }
 
     /// Creates a navigation stack with internal path state.
@@ -277,6 +283,7 @@ public struct NavigationStack<Content: View>: View, ViewNodeBuilder {
             set: { localPath = $0 }
         )
         self.content = content
+        self.ownsPath = true
     }
 
     func buildViewNode(in context: BuildContext) -> ViewNode {
@@ -285,6 +292,7 @@ public struct NavigationStack<Content: View>: View, ViewNodeBuilder {
             inputs: context,
             pathBinding: pathBinding,
             navigationContext: navContext,
+            ownsPath: ownsPath,
             contentBuilder: { inputs in
                 let view = content()
                 return Content._makeView(_ViewGraphNode(value: view), inputs: inputs).node
@@ -299,9 +307,12 @@ public struct NavigationStack<Content: View>: View, ViewNodeBuilder {
 
 // MARK: - NavigationStackNode
 
-final class NavigationStackNode: ViewNode {
+final class NavigationStackNode: ViewNode, PresentationInputProviding {
     private enum Constants {
         static let navigationBarHeight: Float = 92
+        static let backSwipeEdgeWidth: Float = 24
+        static let backSwipeThreshold: Float = 72
+        static let backSwipeMaximumVerticalDrift: Float = 56
     }
 
     private struct NavigationBarState {
@@ -317,12 +328,22 @@ final class NavigationStackNode: ViewNode {
     }
 
     private var pathBinding: Binding<NavigationPath>
+    private var ownsPath: Bool
     private(set) var navigationContext: NavigationContext
     private var viewInputs: _ViewInputs
     private var contentBuilder: (_ViewInputs) -> ViewNode
     private var currentContentNode: ViewNode
     private var navigationBarNode: NavigationBarNode?
     private var reservedNavigationBarHeight: Float = 0
+    private var renderedPath = NavigationPath()
+    private var retainedScreens: [NavigationPath: ViewNode] = [:]
+    private(set) lazy var presentation = ViewPresentationTransition(host: self)
+    private var contentBounds: Rect = .zero
+    private var isReconciling = false
+    private var backSwipeStartPoint: Point?
+    private var backSwipeContactID: RID?
+    private var backSwipeFailed = false
+    private var backSwipePopPending = false
 
     private lazy var dismissAction = DismissAction { [weak self] in
         self?.navigationContext.pop()
@@ -335,16 +356,21 @@ final class NavigationStackNode: ViewNode {
 
     /// Visible subtrees exposed to AdaUI inspection and automation.
     var inspectionChildNodes: [ViewNode] {
-        [navigationBarNode, currentContentNode].compactMap { $0 }
+        [navigationBarNode].compactMap { $0 } + presentation.nodes
     }
+
+    override var transientEnvironmentChildren: [ViewNode] { inspectionChildNodes }
+    var inputContentNodes: [ViewNode] { [navigationBarNode, currentContentNode].compactMap { $0 } }
 
     init(
         inputs: _ViewInputs,
         pathBinding: Binding<NavigationPath>,
         navigationContext: NavigationContext,
+        ownsPath: Bool = false,
         contentBuilder: @escaping (_ViewInputs) -> ViewNode
     ) {
         self.pathBinding = pathBinding
+        self.ownsPath = ownsPath
         self.navigationContext = navigationContext
         self.viewInputs = inputs
         self.contentBuilder = contentBuilder
@@ -355,16 +381,18 @@ final class NavigationStackNode: ViewNode {
 
         super.init(content: AnyView(EmptyView()))
         currentContentNode.parent = self
+        retainedScreens[NavigationPath()] = currentContentNode
+        presentation.setContent(currentContentNode, style: .push, animated: false)
         syncNavigationBar()
 
         // If the path already has values (e.g. binding was pre-populated),
         // switch to the appropriate destination now that it's been registered.
         if !navigationContext.path.isEmpty {
-            rebuildContent()
+            rebuildContent(syncBinding: false)
         }
     }
 
-    func rebuildContent() {
+    func rebuildContent(syncBinding: Bool = true) {
         let childInputs = Self.makeChildInputs(
             from: viewInputs,
             context: navigationContext,
@@ -379,17 +407,22 @@ final class NavigationStackNode: ViewNode {
             newNode = contentBuilder(childInputs)
         }
 
-        if newNode.canUpdate(currentContentNode) {
-            currentContentNode.update(from: newNode)
-        } else {
-            currentContentNode.parent = nil
-            currentContentNode = newNode
-            currentContentNode.parent = self
-
-            if let owner {
-                currentContentNode.updateViewOwner(owner)
-            }
+        let nextPath = navigationContext.path
+        let pathChanged = renderedPath != nextPath
+        if pathChanged {
+            resetBackSwipe()
         }
+        let style: ViewPresentationTransition.Style = nextPath.count < renderedPath.count ? .pop : .push
+        if let retained = retainedScreens[nextPath], newNode.canUpdate(retained) {
+            retained.update(from: newNode)
+            currentContentNode = retained
+        } else {
+            currentContentNode = newNode
+            retainedScreens[nextPath] = newNode
+        }
+        renderedPath = nextPath
+        retainedScreens = retainedScreens.filter { $0.key.isPrefix(of: nextPath) }
+        presentation.setContent(currentContentNode, style: style, animated: pathChanged)
 
         currentContentNode.updateEnvironment(childInputs.environment)
         syncNavigationBar()
@@ -397,7 +430,9 @@ final class NavigationStackNode: ViewNode {
         owner?.containerView?.setNeedsDisplay(in: absoluteFrame())
         performLayout()
 
-        pathBinding.wrappedValue = navigationContext.path
+        if syncBinding {
+            pathBinding.wrappedValue = navigationContext.path
+        }
     }
 
     private static func makeChildInputs(
@@ -498,7 +533,8 @@ final class NavigationStackNode: ViewNode {
     // MARK: - ViewNode overrides
 
     override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
-        currentContentNode.sizeThatFits(proposal)
+        let contentSize = currentContentNode.sizeThatFits(proposal)
+        return Size(width: proposal.width ?? contentSize.width, height: proposal.height ?? contentSize.height)
     }
 
     override func performLayout() {
@@ -508,12 +544,8 @@ final class NavigationStackNode: ViewNode {
             width: frame.width,
             height: max(0, frame.height - contentOriginY)
         )
-        let proposal = ProposedViewSize(contentSize)
-        currentContentNode.place(
-            in: Point(x: contentSize.width * 0.5, y: contentOriginY + contentSize.height * 0.5),
-            anchor: .center,
-            proposal: proposal
-        )
+        contentBounds = Rect(origin: Point(0, contentOriginY), size: contentSize)
+        presentation.layout(in: contentBounds)
         navigationBarNode?
             .place(
                 in: .zero,
@@ -537,11 +569,16 @@ final class NavigationStackNode: ViewNode {
             return
         }
 
-        super.update(from: other)
-        pathBinding = other.pathBinding
+        isReconciling = true
+        defer { isReconciling = false }
+        if !ownsPath || !other.ownsPath { pathBinding = other.pathBinding }
+        ownsPath = other.ownsPath
+        let boundPath = pathBinding.wrappedValue
         viewInputs = other.viewInputs
         contentBuilder = other.contentBuilder
-        rebuildContent()
+        navigationContext.replacePath(boundPath)
+        super.update(from: other)
+        rebuildContent(syncBinding: false)
     }
 
     private static func navigationBarState(in node: ViewNode) -> NavigationBarState {
@@ -588,7 +625,7 @@ final class NavigationStackNode: ViewNode {
 
     override func updateViewOwner(_ owner: ViewOwner) {
         super.updateViewOwner(owner)
-        currentContentNode.updateViewOwner(owner)
+        presentation.nodes.forEach { $0.updateViewOwner(owner) }
         navigationBarNode?.updateViewOwner(owner)
     }
 
@@ -602,20 +639,26 @@ final class NavigationStackNode: ViewNode {
                 return hit
             }
         }
-        let newPoint = currentContentNode.convert(point, from: self)
-        return currentContentNode.hitTest(newPoint, with: event)
+        if event is TouchEvent, shouldCaptureBackSwipe(at: point) {
+            return self
+        }
+        return presentation.hitTest(point, event: event, in: contentBounds)
     }
 
     override func draw(with context: UIGraphicsContext) {
         var context = context
         context.environment = environment
         context.translateBy(x: frame.origin.x, y: -frame.origin.y)
-        currentContentNode.draw(with: context)
+        presentation.draw(with: context, in: contentBounds)
         navigationBarNode?.draw(with: context)
     }
 
     override func update(_ deltaTime: TimeInterval) {
-        currentContentNode.update(deltaTime)
+        if navigationContext.path != pathBinding.wrappedValue {
+            navigationContext.replacePath(pathBinding.wrappedValue)
+            rebuildContent(syncBinding: false)
+        }
+        presentation.update(deltaTime)
         navigationBarNode?.update(deltaTime)
     }
 
@@ -630,14 +673,21 @@ final class NavigationStackNode: ViewNode {
     }
 
     override func invalidateContent() {
-        rebuildContent()
+        guard !isReconciling else {
+            return
+        }
+        navigationContext.replacePath(pathBinding.wrappedValue)
+        rebuildContent(syncBinding: false)
     }
 
     override func didMove(to parent: ViewNode?) {
         super.didMove(to: parent)
         if parent == nil {
-            currentContentNode.parent = nil
+            presentation.detach()
             navigationBarNode?.parent = nil
+        } else {
+            presentation.setContent(currentContentNode, style: .push, animated: false)
+            navigationBarNode?.parent = self
         }
     }
 
@@ -652,8 +702,92 @@ final class NavigationStackNode: ViewNode {
     }
 
     override func onTouchesEvent(_ touches: Set<TouchEvent>) {
+        if let touch = touches.first, handleBackSwipe(touch) {
+            return
+        }
         currentContentNode.onTouchesEvent(touches)
         navigationBarNode?.onTouchesEvent(touches)
+    }
+
+    private func shouldCaptureBackSwipe(at point: Point) -> Bool {
+        !navigationContext.path.isEmpty
+            && !presentation.isAnimating
+            && !backSwipePopPending
+            && !Self.navigationBarState(in: currentContentNode).configuration.backButtonHidden
+            && point.x >= 0
+            && point.x <= Constants.backSwipeEdgeWidth
+            && point.y >= reservedNavigationBarHeight
+    }
+
+    private func handleBackSwipe(_ touch: TouchEvent) -> Bool {
+        let point = touch.location - absoluteFrame().origin
+        switch touch.phase {
+        case .began:
+            guard shouldCaptureBackSwipe(at: point) else {
+                return false
+            }
+            backSwipeStartPoint = point
+            backSwipeContactID = touch.contactID
+            backSwipeFailed = false
+            return true
+        case .moved:
+            guard touch.contactID == backSwipeContactID, let start = backSwipeStartPoint else {
+                return false
+            }
+            if abs(point.y - start.y) > Constants.backSwipeMaximumVerticalDrift {
+                backSwipeFailed = true
+            }
+            return true
+        case .ended:
+            guard touch.contactID == backSwipeContactID, let start = backSwipeStartPoint else {
+                return false
+            }
+            let shouldPop = !backSwipeFailed
+                && point.x - start.x >= Constants.backSwipeThreshold
+                && abs(point.y - start.y) <= Constants.backSwipeMaximumVerticalDrift
+            resetBackSwipe()
+            if shouldPop {
+                scheduleBackSwipePop()
+            }
+            return true
+        case .cancelled:
+            guard touch.contactID == backSwipeContactID else {
+                return false
+            }
+            resetBackSwipe()
+            return true
+        }
+    }
+
+    private func resetBackSwipe() {
+        backSwipeStartPoint = nil
+        backSwipeContactID = nil
+        backSwipeFailed = false
+    }
+
+    private func scheduleBackSwipePop() {
+        guard !backSwipePopPending else {
+            return
+        }
+        backSwipePopPending = true
+        let expectedPath = navigationContext.path
+        Task { @MainActor [weak self] in
+            do {
+                // UIKit must finish dispatching the touch before the current screen is removed.
+                try await Task.sleep(for: .milliseconds(80))
+            } catch {
+                self?.backSwipePopPending = false
+                return
+            }
+            guard let self else {
+                return
+            }
+            self.backSwipePopPending = false
+            guard self.navigationContext.path == expectedPath else {
+                return
+            }
+            self.navigationContext.pop()
+        }
     }
 }
 
@@ -897,6 +1031,8 @@ final class NavigationBarNode: ViewNode {
             for node in childNodes {
                 node.parent = nil
             }
+        } else {
+            for node in childNodes { node.parent = self }
         }
     }
 
@@ -953,9 +1089,7 @@ final class NavigationBarNode: ViewNode {
         let view = Button(action: {
             action.perform()
         }, label: {
-            Text("<")
-                .font(.system(size: 24))
-                .foregroundColor(.white)
+            NavigationBackButtonIcon()
                 .frame(width: Constants.controlHeight, height: Constants.controlHeight)
         })
         let node = Button._makeView(_ViewGraphNode(value: view), inputs: navigationBarItemInputs()).node
@@ -967,9 +1101,7 @@ final class NavigationBarNode: ViewNode {
         let view = Button(action: { [weak navigationContext] in
             navigationContext?.pop()
         }, label: {
-            Text("<")
-                .font(.system(size: 24))
-                .foregroundColor(.white)
+            NavigationBackButtonIcon()
                 .frame(width: Constants.controlHeight, height: Constants.controlHeight)
         })
         return Button._makeView(_ViewGraphNode(value: view), inputs: navigationBarItemInputs()).node

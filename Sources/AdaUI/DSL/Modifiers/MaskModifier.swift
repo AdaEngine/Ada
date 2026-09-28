@@ -34,6 +34,8 @@ private struct MaskShapeModifier<Content: View, S: Shape>: ViewModifier, ViewNod
 
 @MainActor
 private final class MaskShapeViewNode<S: Shape>: ViewModifierNode {
+    private var targetShapeData: S.AnimatableData?
+    private weak var propertyController: UIAnimationController?
     private var shape: S
     private var path = Path()
 
@@ -55,13 +57,21 @@ private final class MaskShapeViewNode<S: Shape>: ViewModifierNode {
 
         let startData = self.shape.animatableData
         let endData = otherNode.shape.animatableData
-        let animationController =
-            self.environment.animationController
-            ?? otherNode.environment.animationController
-            ?? nearestAnimationController()
+        let animationController = animationControllerForUpdate
 
         super.update(from: newNode)
 
+        guard (endData - (targetShapeData ?? startData)).magnitudeSquared > 0 else {
+            let presentationData = shape.animatableData
+            shape = otherNode.shape
+            shape.animatableData = presentationData
+            updatePath()
+            invalidateNearestLayer()
+            return
+        }
+        targetShapeData = endData
+        propertyController?.removeAnimation(label: "mask-shape-\(id)")
+        propertyController = animationController
         if let animationController, (startData - endData).magnitudeSquared > 0 {
             self.shape = otherNode.shape
             self.shape.animatableData = startData

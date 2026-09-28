@@ -80,7 +80,7 @@ class AnimatedViewNode<Value: Equatable>: ViewModifierNode {
     var currentValue: Value
     private var animation: Animation?
     private var animationController: UIAnimationController?
-    private var transientAnimationController: UIAnimationController?
+    private var retiringControllers: [UIAnimationController] = []
 
     override var participatesInFrameAnimation: Bool {
         false
@@ -96,6 +96,7 @@ class AnimatedViewNode<Value: Equatable>: ViewModifierNode {
         self.currentValue = value
         self.animation = animation
         self.animationController = animationController
+        self.animationController?.isDrivenByView = true
         super.init(contentNode: contentNode, content: content)
     }
 
@@ -111,29 +112,42 @@ class AnimatedViewNode<Value: Equatable>: ViewModifierNode {
             return
         }
 
-        let valueChanged = node.currentValue != self.currentValue
-
-        if node.animationController == nil {
-            self.animationController = nil
-        } else if self.animationController == nil {
-            self.animationController = node.animationController
+        let valueChanged = node.currentValue != currentValue
+        var transaction = UITransactionContext.current ?? Transaction()
+        var controller = BindingAnimationTransaction.currentController
+        if valueChanged, transaction.disablesAnimations || environment.animationsDisabled {
+            animationController?.stopAnimation()
+            animationController = nil
+            controller = nil
         }
-
-        super.update(from: newNode)
-
-        self.animation = node.animation
-
-        if valueChanged {
-            self.currentValue = node.currentValue
-            if let nextAnimationController = node.animationController,
-                let animationController = self.animationController,
-                nextAnimationController !== animationController {
-                self.transientAnimationController = nextAnimationController
-                nextAnimationController.playAnimation()
+        if valueChanged, !transaction.disablesAnimations, !environment.animationsDisabled {
+            transaction.animation = node.animation
+            if animationController?.animation != node.animation {
+                if let previous = animationController, previous.isPlaying {
+                    if node.animation == nil { previous.stopAnimation() } else { retiringControllers.append(previous) }
+                }
+                animationController = node.animation.map { UIAnimationController(animation: $0) }
+                animationController?.isDrivenByView = true
             }
-            self.animationController?.playAnimation()
-            self.contentNode.markNeedsLayout()
-            self.markNeedsLayout()
+            controller = animationController
+        }
+        animation = node.animation
+        currentValue = node.currentValue
+        // Reconciliation must use the mounted controller, not the temporary
+        // controller created while evaluating the new view value.
+        node.animationController = animationController
+        node.updateEnvironment(node.environment)
+        if !valueChanged, UITransactionContext.current == nil {
+            super.update(from: node)
+        } else {
+            BindingAnimationTransaction.withController(controller, transaction: transaction) {
+                super.update(from: node)
+            }
+        }
+        if valueChanged {
+            controller?.playAnimation()
+            contentNode.markNeedsLayout()
+            markNeedsLayout()
             owner?.containerView?.setNeedsLayout()
         }
     }
@@ -148,14 +162,11 @@ class AnimatedViewNode<Value: Equatable>: ViewModifierNode {
             needsAnotherFrame = true
         }
 
-        if let transientAnimationController {
-            if transientAnimationController.isPlaying {
-                transientAnimationController.update(deltaTime)
-                needsAnotherFrame = true
-            } else {
-                self.transientAnimationController = nil
-            }
+        for controller in retiringControllers where controller.isPlaying {
+            controller.update(deltaTime)
+            needsAnotherFrame = true
         }
+        retiringControllers.removeAll { !$0.isPlaying }
 
         if needsAnotherFrame {
             // Runtime redraws are pull-driven via `needsDisplay` / `needsLayout`.
