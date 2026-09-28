@@ -61,15 +61,6 @@ struct MobileEditorProjectsScreen: View {
             .padding(.bottom, 28)
         }
         .background(theme.editorColors.background)
-        .overlay(anchor: .bottom) {
-            LinearGradient(
-                colors: [.clear, .clear, theme.editorColors.background],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 76)
-            .allowsHitTesting(false)
-        }
         .safeAreaPadding(.top, -72)
     }
 
@@ -80,6 +71,8 @@ struct MobileEditorProjectsScreen: View {
             VStack(alignment: .leading, spacing: 12) {
                 if project.isExample {
                     MobileEditorForestImage(height: 160)
+                } else {
+                    MobileEditorProjectPlaceholderImage(height: 160)
                 }
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -95,10 +88,8 @@ struct MobileEditorProjectsScreen: View {
                         .font(AdaEditorMaterialSymbolFont.font(size: 16))
                         .foregroundColor(theme.editorColors.blue)
                 }
-                .padding(.horizontal, project.isExample ? 0 : 17)
-                .padding(.vertical, project.isExample ? 0 : 17)
             }
-            .background(project.isExample ? theme.editorColors.background : theme.editorColors.surface)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(DefaultButtonStyle())
         .accessibilityIdentifier("AdaEditor.Mobile.Project.\(project.id)")
@@ -113,10 +104,9 @@ struct MobileEditorSettingsScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                MobileEditorSectionHeading(eyebrow: "Ada Editor", title: "Settings")
                 EditorCloudSettingsView()
                 Button(action: configureAgent) {
-                    settingsRow("Agent", detail: agentSettingsSummary)
+                    settingsRow("Agent", detail: agentSettingsSummary, showsChevron: true)
                 }
                 .buttonStyle(DefaultButtonStyle())
                 .accessibilityIdentifier("AdaEditor.Mobile.ConfigureAgent")
@@ -128,19 +118,27 @@ struct MobileEditorSettingsScreen: View {
             .padding(.bottom, 28)
         }
         .background(theme.editorColors.background)
+        .safeAreaPadding(.top, -72)
     }
 
-    private func settingsRow(_ title: String, detail: String) -> some View {
+    private func settingsRow(_ title: String, detail: String, showsChevron: Bool = false) -> some View {
         MobileEditorCard {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title)
-                    .font(MobileEditorFont.font(size: 16))
-                    .foregroundColor(theme.editorColors.text)
-                Text(detail)
-                    .font(MobileEditorFont.font(size: 13))
-                    .foregroundColor(theme.editorColors.muted)
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(MobileEditorFont.font(size: 16))
+                        .foregroundColor(theme.editorColors.text)
+                    Text(detail)
+                        .font(MobileEditorFont.font(size: 13))
+                        .foregroundColor(theme.editorColors.muted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if showsChevron {
+                    Text("\u{E5CC}")
+                        .font(AdaEditorMaterialSymbolFont.font(size: 18))
+                        .foregroundColor(theme.editorColors.muted)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(17)
         }
     }
@@ -177,7 +175,9 @@ struct MobileEditorAgentSettingsScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                MobileEditorSectionHeading(eyebrow: "Providers", title: "OpenAI")
+                Text("OpenAI")
+                    .font(MobileEditorFont.font(size: 31))
+                    .foregroundColor(theme.editorColors.text)
                 MobileEditorCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Codex authorization")
@@ -283,6 +283,7 @@ struct MobileEditorAgentSettingsScreen: View {
             .padding(.bottom, 32)
         }
         .background(theme.editorColors.background)
+        .safeAreaPadding(.top, -72)
         .onDisappear {
             authorizationTask?.cancel()
             authorizationBrowser.dismiss()

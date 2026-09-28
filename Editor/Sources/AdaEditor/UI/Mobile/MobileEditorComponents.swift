@@ -111,4 +111,28 @@ struct MobileEditorForestImage: View {
         }
     }
 }
+
+struct MobileEditorProjectPlaceholderImage: View {
+    @Environment(\.theme) private var theme
+    let height: Float
+
+    var body: some View {
+        ZStack {
+            theme.editorColors.surfaceElevated
+            Circle()
+                .fill(theme.editorColors.blue.opacity(0.12))
+                .frame(width: 72, height: 72)
+            Text("\u{E037}")
+                .font(AdaEditorMaterialSymbolFont.font(size: 34))
+                .foregroundColor(theme.editorColors.blue.opacity(0.8))
+        }
+        .frame(height: height)
+        .frame(maxWidth: .infinity)
+        .mask(RoundedRectangleShape(cornerRadius: 18))
+        .overlay {
+            RoundedRectangleShape(cornerRadius: 18)
+                .stroke(theme.editorColors.border.opacity(0.7), lineWidth: 1)
+        }
+    }
+}
 #endif

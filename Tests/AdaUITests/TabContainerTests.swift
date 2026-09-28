@@ -44,6 +44,39 @@ private struct TabContainerTestStyle: TabViewStyle {
     }
 }
 
+private struct StatefulTabContainerTestStyle: TabViewStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        StatefulTabContainerTestBody(configuration: configuration)
+    }
+}
+
+private struct StatefulTabContainerTestBody: View {
+    let configuration: TabViewStyleConfiguration
+    @State private var interactionCount = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                ForEach(configuration.tabs) { tab in
+                    Button {
+                        tab.action()
+                        interactionCount += 1
+                    } label: {
+                        Text(tab.label ?? "TAB")
+                            .frame(width: 80, height: 40)
+                    }
+                    .accessibilityIdentifier("stateful-tab-\(tab.id)")
+                }
+            }
+            if let selected = configuration.tabs.first(where: { $0.isSelected }) {
+                Text("Selected \(selected.id), interactions \(interactionCount)")
+                    .accessibilityIdentifier("stateful-selected-\(selected.id)")
+            }
+            configuration.content
+        }
+    }
+}
+
 private enum TabContainerEnvironmentValue: Hashable {
     case first
     case second
@@ -359,6 +392,42 @@ struct TabContainerTests {
         tester.invalidateContent().performLayout()
         tester.advanceFrame(deltaTime: 0.3)
         #expect(tester.collectHitAccessibilityIdentifiers(in: rect).contains("first-marker-B"))
+    }
+
+    @Test
+    func statefulCustomStyle_updatesSelectionAndKeepsContentDuringInteractions() throws {
+        final class Model { var selected = 0 }
+        let model = Model()
+        let tester = ViewTester {
+            TabView(selection: Binding(get: { model.selected }, set: { model.selected = $0 })) {
+                Tab("First", value: 0) {
+                    Text("First content").accessibilityIdentifier("stateful-content-0")
+                }
+                Tab("Second", value: 1) {
+                    Text("Second content").accessibilityIdentifier("stateful-content-1")
+                }
+                Tab("Third", value: 2) {
+                    Text("Third content").accessibilityIdentifier("stateful-content-2")
+                }
+            }
+            .tabViewStyle(StatefulTabContainerTestStyle())
+            .frame(width: 320, height: 180)
+        }
+        .setSize(Size(width: 320, height: 180))
+        .performLayout()
+
+        let rect = Rect(origin: .zero, size: Size(width: 320, height: 180))
+        #expect(tester.collectHitAccessibilityIdentifiers(in: rect).contains("stateful-content-0"))
+        for selected in [1, 2, 0, 2, 1, 0] {
+            let point = try #require(tester.findHitPoint(forAccessibilityIdentifier: "stateful-tab-\(selected)", in: rect))
+            tester.sendMouseEvent(at: point, phase: .began)
+            tester.sendMouseEvent(at: point, phase: .ended)
+            tester.advanceFrame(deltaTime: 0.4).performLayout()
+
+            #expect(model.selected == selected)
+            #expect(tester.findNodeByAccessibilityIdentifier("stateful-selected-\(selected)") != nil)
+            #expect(tester.collectHitAccessibilityIdentifiers(in: rect).contains("stateful-content-\(selected)"))
+        }
     }
 
     // MARK: - Backward compatibility (deprecated TabContainer)

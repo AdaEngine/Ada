@@ -32,6 +32,15 @@ public enum TabLabelStyle: Sendable {
     case regular
 }
 
+/// The preferred placement of a tab in styles that support a separate floating button.
+public enum TabPlacement: Sendable {
+    /// Display the tab in the main tab bar.
+    case bar
+    /// Display the tab as a separate button alongside the main tab bar.
+    /// Styles without floating-button support display it as a regular tab.
+    case floating
+}
+
 // MARK: - TabViewStyleConfiguration
 
 /// The properties of a tab view style.
@@ -44,6 +53,8 @@ public struct TabViewStyleConfiguration {
         public let label: String?
         /// The image of the tab, if any.
         public let image: Image?
+        /// The preferred placement of this tab.
+        public let placement: TabPlacement
         /// Whether this tab is currently selected.
         public let isSelected: Bool
         /// Call to select this tab.
@@ -119,6 +130,7 @@ enum TabBarElement {
         label: String?,
         image: Image?,
         value: AnyHashable,
+        placement: TabPlacement,
         makeContent: @MainActor (_ViewInputs) -> ViewNode
     )
     case sectionHeader(String)
@@ -144,6 +156,7 @@ public struct Tab<Value: Hashable, Content: View>: View, ViewNodeBuilder {
     let label: String?
     let image: Image?
     let value: Value
+    let placement: TabPlacement
     let content: () -> Content
 
     /// Creates a tab with a text label, optional image, and content.
@@ -151,11 +164,13 @@ public struct Tab<Value: Hashable, Content: View>: View, ViewNodeBuilder {
         _ label: String,
         image: Image? = nil,
         value: Value,
+        placement: TabPlacement = .bar,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.label = label
         self.image = image
         self.value = value
+        self.placement = placement
         self.content = content
     }
 
@@ -163,11 +178,13 @@ public struct Tab<Value: Hashable, Content: View>: View, ViewNodeBuilder {
     public init(
         image: Image,
         value: Value,
+        placement: TabPlacement = .bar,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.label = nil
         self.image = image
         self.value = value
+        self.placement = placement
         self.content = content
     }
 
@@ -185,7 +202,7 @@ extension Tab: _TabItem {
         let makeContent: @MainActor (_ViewInputs) -> ViewNode = { inputs in
             Content._makeView(_ViewGraphNode(value: contentClosure()), inputs: inputs).node
         }
-        return [.tab(label: label, image: image, value: hashableValue, makeContent: makeContent)]
+        return [.tab(label: label, image: image, value: hashableValue, placement: placement, makeContent: makeContent)]
     }
 }
 
@@ -802,7 +819,9 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode, Presentat
         case .right: contentEnv.safeAreaInsets.trailing = 0
         }
 
-        if let defaultBarNode = tabBarNode as? LayoutViewContainerNode {
+        // Custom styles with @State also have a LayoutViewContainerNode root.
+        // Choose the update path by style rather than by the container's type.
+        if !isCustomStyle, let defaultBarNode = tabBarNode as? LayoutViewContainerNode {
             // Default style: update selection state on existing tab bar buttons in-place (no rebuild)
             for node in defaultBarNode.nodes {
                 guard let button = node as? TabItemButtonNode else {
@@ -898,7 +917,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode, Presentat
 
     private func getOrCreateContentNode(for value: AnyHashable) -> ViewNode {
         for element in elements {
-            if case let .tab(_, _, v, makeContent) = element, v == value {
+            if case let .tab(_, _, v, _, makeContent) = element, v == value {
                 if let cached = cachedContentNodes[value] {
                     let newNode = makeContent(viewInputs)
                     cached.update(from: newNode)
@@ -917,7 +936,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode, Presentat
     private static func tabValues(from elements: [TabBarElement]) -> Set<AnyHashable> {
         Set(
             elements.compactMap { elem -> AnyHashable? in
-                if case let .tab(_, _, v, _) = elem {
+                if case let .tab(_, _, v, _, _) = elem {
                     return v
                 }
                 return nil
@@ -940,13 +959,14 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode, Presentat
             return buildTabBar(elements: elements, selected: selected, position: position, inputs: inputs, onSelect: onSelect)
         }
         let tabs = elements.compactMap { element -> TabViewStyleConfiguration.Tab? in
-            guard case let .tab(label, image, value, _) = element else {
+            guard case let .tab(label, image, value, placement, _) = element else {
                 return nil
             }
             return TabViewStyleConfiguration.Tab(
                 id: value,
                 label: label,
                 image: image,
+                placement: placement,
                 isSelected: value == selected,
                 action: { onSelect(value) }
             )
@@ -989,7 +1009,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode, Presentat
         var nodes: [ViewNode] = []
         for element in elements {
             switch element {
-            case let .tab(label, image, value, _):
+            case let .tab(label, image, value, _, _):
                 let button = TabItemButton(
                     label: label,
                     image: image,
@@ -1022,7 +1042,7 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode, Presentat
         inputs: _ViewInputs
     ) -> ViewNode {
         for element in elements {
-            if case let .tab(_, _, value, makeContent) = element, value == selected {
+            if case let .tab(_, _, value, _, makeContent) = element, value == selected {
                 return makeContent(inputs)
             }
         }

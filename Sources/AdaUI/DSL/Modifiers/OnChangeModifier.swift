@@ -51,8 +51,11 @@ final class OnChangeModifierViewNode<T: Equatable>: ViewModifierNode {
         self.onChangeAction = node.onChangeAction
 
         if node.currentStoredValue != self.currentStoredValue {
-            onChangeAction(self.currentStoredValue, node.currentStoredValue)
+            let previousValue = self.currentStoredValue
+            // Actions can update state and synchronously re-enter this node.
+            // Commit the observed value before notifying to avoid duplicate callbacks.
             self.currentStoredValue = node.currentStoredValue
+            onChangeAction(previousValue, node.currentStoredValue)
         }
     }
 }

@@ -120,13 +120,26 @@ public struct NavigationBarButtonStyle: ButtonStyle {
     public func makeBody(configuration: Configuration) -> some View {
         let isPressed = configuration.isSelected
         let isHoveredOrFocused = configuration.isHighlighted || configuration.state.contains(.focused)
-        let glass = isPressed ? Glass.interaction : (isHoveredOrFocused ? Glass.regular : Glass.regular)
+        let glass = isPressed ? Glass.interaction : (isHoveredOrFocused ? Glass.regular : Glass.clear.glareIntensity(1.2))
 
         return configuration.label
             .frame(minWidth: Constants.height, minHeight: Constants.height)
             .glassEffect(glass.interactive().stretchStrength(0.25), in: .capsule)
             .animation(.linear(duration: 0.2), value: isPressed)
     }
+
+    static let clearGlass: Glass = {
+        var glass = Glass.clear
+        glass.blurRadius = 1
+        glass.glassTintStrength = 0.12
+        glass.edgeShadowStrength = 0.20
+        glass.glassThickness = 48
+        glass.refractiveIndex = 1.58
+        glass.dispersionStrength = 0.90
+        glass.fresnelIntensity = 0.98
+        glass.glareIntensity = 0.92
+        return glass
+    }()
 }
 
 private enum GlassButtonStyleDefaults {

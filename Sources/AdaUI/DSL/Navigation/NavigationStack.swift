@@ -620,6 +620,14 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
             }
         }
 
+        // Active tab pages are exposed through presentation nodes, including
+        // the content proxy embedded in a custom style.
+        if !(node is NavigationStackNode), let presentation = node as? any PresentationInputProviding {
+            return presentation.inputContentNodes.contains { child in
+                nodeConsumesTopSafeArea(child)
+            }
+        }
+
         return false
     }
 

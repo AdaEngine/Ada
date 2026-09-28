@@ -308,7 +308,7 @@ class ViewContainerNode: ViewNode {
 
         for newNode in newNodes {
             if let id = nodeIdentity(newNode), let oldNode = oldNodesById.removeValue(forKey: id) {
-                if newNode.canUpdate(oldNode) {
+                if canReuse(oldNode, with: newNode) {
                     reconciledNodes.append(reuse(oldNode, with: newNode))
                     reusedNodeIDs.insert(ObjectIdentifier(oldNode))
                 } else {
@@ -337,7 +337,7 @@ class ViewContainerNode: ViewNode {
         var prefixEnd = 0
         while prefixEnd < oldNodes.count,
             prefixEnd < newNodes.count,
-            newNodes[prefixEnd].canUpdate(oldNodes[prefixEnd]) {
+            canReuse(oldNodes[prefixEnd], with: newNodes[prefixEnd]) {
             let oldNode = oldNodes[prefixEnd]
             resolvedNodes[prefixEnd] = reuse(oldNode, with: newNodes[prefixEnd])
             reusedNodeIDs.insert(ObjectIdentifier(oldNode))
@@ -348,7 +348,7 @@ class ViewContainerNode: ViewNode {
         var newSuffixIndex = newNodes.count - 1
         while oldSuffixIndex >= prefixEnd,
             newSuffixIndex >= prefixEnd,
-            newNodes[newSuffixIndex].canUpdate(oldNodes[oldSuffixIndex]) {
+            canReuse(oldNodes[oldSuffixIndex], with: newNodes[newSuffixIndex]) {
             let oldNode = oldNodes[oldSuffixIndex]
             resolvedNodes[newSuffixIndex] = reuse(oldNode, with: newNodes[newSuffixIndex])
             reusedNodeIDs.insert(ObjectIdentifier(oldNode))
@@ -374,7 +374,17 @@ class ViewContainerNode: ViewNode {
         return (node as? IDViewNodeModifier)?.identifier
     }
 
+    private func canReuse(_ oldNode: ViewNode, with newNode: ViewNode) -> Bool {
+        oldNode === newNode || newNode.canUpdate(oldNode)
+    }
+
     private func reuse(_ oldNode: ViewNode, with newNode: ViewNode) -> ViewNode {
+        // Content proxies can return the mounted node during a body rebuild.
+        // Retain its identity without updating it from itself or detaching it.
+        guard oldNode !== newNode else {
+            oldNode.parent = self
+            return oldNode
+        }
         // Only leaves are measured here. Measuring every reused container would
         // recursively walk its subtree at every level and turn reconciliation
         // into O(nodeCount * depth) work.

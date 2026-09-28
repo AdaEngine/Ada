@@ -66,7 +66,7 @@ struct MobileEditorRootView: View {
         NavigationStack(path: $navigationPath) {
             MobileEditorProjectsScreen(projects: projects, create: createProject, open: openProject)
                 .navigationTitle("Ada Studio")
-                .navigationTitleFont(MobileEditorFont.navigationFont(size: 20))
+                .navigationTitleFont(MobileEditorFont.navigationFont(size: 24))
                 .navigationTitlePosition(.leading)
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationBarColor(theme.editorColors.background)
@@ -75,7 +75,7 @@ struct MobileEditorRootView: View {
                         logo
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 25, height: 25)
+                            .frame(width: 32, height: 32)
                     }
                 }
                 .navigationBarTrailingItems {

@@ -87,10 +87,21 @@ struct EditorCloudSettingsView: View {
                     .lineLimit(4).accessibilityIdentifier("AdaEditor.Cloud.Status")
             }
         }
+#if os(iOS)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, account.accountID == nil ? 8 : 16)
+#else
         .padding(16)
+#endif
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .topLeading)
+#if os(iOS)
+        .background(RoundedRectangleShape(cornerRadius: 18).fill(theme.editorColors.surface))
+        .overlay { RoundedRectangleShape(cornerRadius: 18).stroke(theme.editorColors.border.opacity(0.7), lineWidth: 1) }
+#else
         .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surface))
         .overlay { RoundedRectangleShape(cornerRadius: 8).stroke(theme.editorColors.border, lineWidth: 1) }
+#endif
         .accessibilityIdentifier("AdaEditor.Cloud.AccountCard")
         .onAppear { Self.installSync() }
     }
@@ -101,6 +112,23 @@ struct EditorCloudSettingsView: View {
                 action()
             }
         } label: {
+#if os(iOS)
+            HStack {
+                Text(title)
+                    .font(.system(size: 16))
+                    .foregroundColor(primary ? .white : theme.editorColors.text)
+                Spacer(minLength: 0)
+                Text("\u{E5CC}")
+                    .font(AdaEditorMaterialSymbolFont.font(size: 20))
+                    .foregroundColor(primary ? .white : theme.editorColors.text)
+            }
+            .padding(.horizontal, 18)
+            .frame(height: 52)
+            .frame(maxWidth: .infinity)
+            .background(RoundedRectangleShape(cornerRadius: 15).fill(primary ? theme.editorColors.blue : theme.editorColors.background))
+            .overlay { RoundedRectangleShape(cornerRadius: 15).stroke(primary ? theme.editorColors.blue : theme.editorColors.border, lineWidth: 1) }
+            .opacity(account.busy ? 0.6 : 1)
+#else
             Text(title).font(.system(size: 12))
                 .foregroundColor(primary ? .white : theme.editorColors.text)
                 .padding(.horizontal, 14)
@@ -108,6 +136,7 @@ struct EditorCloudSettingsView: View {
                 .background(RoundedRectangleShape(cornerRadius: 6).fill(primary ? theme.editorColors.blue : theme.editorColors.background))
                 .overlay { RoundedRectangleShape(cornerRadius: 6).stroke(primary ? theme.editorColors.blue : theme.editorColors.border, lineWidth: 1) }
                 .opacity(account.busy ? 0.6 : 1)
+#endif
         }
         .buttonStyle(DefaultButtonStyle())
         .accessibilityIdentifier("AdaEditor.Cloud.\(id)")

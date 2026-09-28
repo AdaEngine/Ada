@@ -17,7 +17,8 @@
 
     final class AppleEmbeddedWindowManager: UIWindowManager {
         private let screenManager: any ScreenManager
-        private var isUIKitReady = false
+        private(set) var isUIKitReady = false
+        private var pendingWindowCreations: [AdaUI.UIWindow] = []
         private var pendingWindows: [(window: AdaUI.UIWindow, isFocused: Bool)] = []
         var pendingSceneWindows: [String: (window: AdaUI.UIWindow, isFocused: Bool)] = [:]
         var cancelledSceneRequestTokens: Set<String> = []
@@ -30,6 +31,12 @@
 
         func sceneDidConnect(_ windowScene: UIWindowScene, requestToken: String? = nil) {
             isUIKitReady = true
+
+            let pendingCreations = pendingWindowCreations
+            pendingWindowCreations.removeAll()
+            for window in pendingCreations {
+                createNativeWindow(for: window, scene: windowScene)
+            }
 
             if destroySceneIfRequestWasCancelled(requestToken, windowScene: windowScene) {
                 return
@@ -55,15 +62,32 @@
             let pending = pendingWindows
             pendingWindows.removeAll()
             for entry in pending {
-                presentWindow(entry.window, isFocused: entry.isFocused, scene: windowScene)
+                if entry.window.configuration.scenePresentation == .new {
+                    requestNewScene(for: entry.window, isFocused: entry.isFocused)
+                } else {
+                    presentWindow(entry.window, isFocused: entry.isFocused, scene: windowScene)
+                }
             }
         }
 
         override func createWindow(for window: AdaUI.UIWindow) {
+            // WindowPlugin runs before UIApplicationMain. UIKit's gesture environment
+            // does not exist yet, so even constructing a UIView/UIWindow here is unsafe.
+            guard isUIKitReady else {
+                if !pendingWindowCreations.contains(where: { $0 === window }) {
+                    pendingWindowCreations.append(window)
+                }
+                return
+            }
+
+            createNativeWindow(for: window, scene: activeWindowScene())
+        }
+
+        private func createNativeWindow(for window: AdaUI.UIWindow, scene connectedScene: UIWindowScene?) {
             let scene =
                 window.configuration.scenePresentation == .new
                 ? nil
-                : activeWindowScene()
+                : connectedScene
             let screen = scene?.screen ?? UIScreen.main
             let sceneBounds = scene?.coordinateSpace.bounds ?? screen.bounds
             let frame = sceneBounds.toEngineRect
@@ -108,17 +132,19 @@
 
         // - TODO: (Vlad) I'm not really sure, that we should make window unfocused
         override func showWindow(_ window: AdaUI.UIWindow, isFocused: Bool) {
+            guard isUIKitReady else {
+                pendingWindows.removeAll { $0.window === window }
+                pendingWindows.append((window: window, isFocused: isFocused))
+                return
+            }
+
             if window.configuration.scenePresentation == .new,
                 (window.systemWindow as? UIKit.UIWindow)?.windowScene == nil {
                 requestNewScene(for: window, isFocused: isFocused)
                 return
             }
 
-            guard !isUIKitReady else {
-                presentWindow(window, isFocused: isFocused, scene: nil)
-                return
-            }
-            pendingWindows.append((window: window, isFocused: isFocused))
+            presentWindow(window, isFocused: isFocused, scene: nil)
         }
 
         func presentWindow(_ window: AdaUI.UIWindow, isFocused: Bool, scene: UIWindowScene?) {
@@ -155,6 +181,13 @@
         }
 
         override func closeWindow(_ window: AdaUI.UIWindow) {
+            if pendingWindowCreations.contains(where: { $0 === window }) {
+                pendingWindowCreations.removeAll { $0 === window }
+                pendingWindows.removeAll { $0.window === window }
+                window.windowDidDisappear()
+                return
+            }
+
             guard let nsWindow = window.systemWindow as? UIKit.UIWindow else {
                 fatalError("System window not exist.")
             }

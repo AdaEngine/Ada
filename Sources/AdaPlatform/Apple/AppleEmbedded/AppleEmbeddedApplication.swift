@@ -119,7 +119,10 @@
         }
 
         @objc private func update() {
-            guard let appWorlds = self.appWorlds else {
+            guard let appWorlds = self.appWorlds,
+                let windowManager = self.windowManager as? AppleEmbeddedWindowManager,
+                windowManager.isUIKitReady
+            else {
                 return
             }
             self.configureDisplayLinkFrameRate()
