@@ -15,8 +15,6 @@ struct MobileEditorProjectPreviewImage: View {
                     .frame(height: height)
                     .frame(maxWidth: .infinity)
                     .mask(RoundedRectangleShape(cornerRadius: 18))
-            } else if project.isExample {
-                MobileEditorForestImage(height: height)
             } else {
                 MobileEditorProjectPlaceholderImage(height: height)
             }

@@ -75,7 +75,7 @@ struct MobileEditorPlayScreen: View {
                 .background(CapsuleShape().fill(theme.editorColors.surface))
             }
             .buttonStyle(DefaultButtonStyle())
-            .disabled(isCapturing || isAgentRunning || (!project.isExample && capture == nil))
+            .disabled(isCapturing || isAgentRunning || capture == nil)
             .accessibilityIdentifier("AdaEditor.Mobile.CaptureGameFeedback")
         }
         .padding(.horizontal, 12)
@@ -84,11 +84,7 @@ struct MobileEditorPlayScreen: View {
 
     @ViewBuilder
     private var game: some View {
-        if project.isExample, let image = MobileEditorAssets.forestPreview {
-            image.resizable().scaledToFit()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.black)
-        } else if let artifact, let runtime = try? EditorAdaScriptProjectRuntimeView(artifact: artifact, previewCapture: capture) {
+        if let artifact, let runtime = try? EditorAdaScriptProjectRuntimeView(artifact: artifact, previewCapture: capture) {
             runtime.id(runtimeID)
         } else {
             MobileEditorPlayEmptyScreen(message: message) { dismiss() }
@@ -97,10 +93,6 @@ struct MobileEditorPlayScreen: View {
 
     private func captureFrame() {
         captureError = nil
-        if project.isExample {
-            screenshot = MobileEditorAssets.forestPreview
-            return
-        }
         guard let capture else { return }
         isCapturing = true
         capture.requestFrame { image in

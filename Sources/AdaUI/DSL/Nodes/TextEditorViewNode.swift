@@ -48,7 +48,7 @@ final class TextEditorViewNode: ViewNode {
         static let minimumHeight: Float = 120
         static let placeholderOpacity: Float = 0.45
         static let maxUndoDepth = 128
-        static let caretLineWidth: Float = 1.5
+        static let caretLineWidth: Float = 3
         static let caretBlinkInterval: AdaUtils.TimeInterval = 1.15
         static let tapMovementToleranceSquared: Float = 36
         static let doubleTapMovementToleranceSquared: Float = 100
@@ -539,14 +539,17 @@ final class TextEditorViewNode: ViewNode {
                     let caretLineText = lines.indices.contains(caretPosition.line) ? lines[caretPosition.line].text : ""
                     let caretX = textRect.minX + self.caretXOffset(forColumn: caretPosition.column, in: caretLineText, font: resolvedFont, pointSize: pointSize)
                     let caretY = contentRect.minY + Float(self.displayRow(forLine: caretPosition.line)) * lineHeight
-                    codeContext.drawRect(
-                        Rect(
+                    let caretPath = RoundedRectangleShape(cornerRadius: Constants.caretLineWidth * 0.5).path(
+                        in: Rect(
                             x: caretX - Constants.caretLineWidth * 0.5,
                             y: caretY,
                             width: Constants.caretLineWidth,
                             height: lineHeight
-                        ),
-                        color: self.environment.accentColor
+                        )
+                    )
+                    codeContext.fill(
+                        caretPath,
+                        with: self.environment.theme.textInsertionPointColor ?? self.environment.accentColor
                     )
                 }
             }

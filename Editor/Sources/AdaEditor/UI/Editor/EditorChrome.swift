@@ -246,7 +246,7 @@ enum AdaEditorMaterialSymbolFont {
     private static let resource: FontResource? = {
         guard
             let fontURL = Foundation.Bundle.editor.url(
-                forResource: "MaterialSymbolsRounded-Bold",
+                forResource: "MaterialSymbolsRounded-Regular",
                 withExtension: "ttf",
                 subdirectory: "Assets/Fonts"
             )

@@ -10,7 +10,7 @@ enum MobileAdaScriptProjectService {
     }
 
     static func loadProjects() -> [MobileEditorProject] {
-        (try? MobileEditorProjectStore(directory: projectsDirectory()).load()) ?? [.forest]
+        (try? MobileEditorProjectStore(directory: projectsDirectory()).load()) ?? []
     }
 
     static func saveProjects(_ projects: [MobileEditorProject]) throws {

@@ -12,8 +12,8 @@ struct MobileEditorPromptPanel: View {
 
     let attachmentNames: [String]
     let isAgentRunning: Bool
-    let pickFiles: () -> Void
-    let pickPhotos: () -> Void
+    let pickFiles: @MainActor () -> Void
+    let pickPhotos: @MainActor () -> Void
     let submit: () -> Void
 
     private static let promptIdentifier = "AdaEditor.Mobile.BuildPrompt"
@@ -26,13 +26,14 @@ struct MobileEditorPromptPanel: View {
                 Button(action: close) {
                     Color.black.opacity(0.48)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .ignoresSafeArea()
                 }
                 .buttonStyle(DefaultButtonStyle())
                 .accessibilityIdentifier("AdaEditor.Mobile.DismissPromptBackdrop")
 
                 panel(height: max(180, isExpanded ? geometry.size.height - 24 : min(300, geometry.size.height - 24)))
                     .frame(maxWidth: 620)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 16)
                     .padding(.bottom, 12)
             }
         }
@@ -44,7 +45,7 @@ struct MobileEditorPromptPanel: View {
     }
 
     private func panel(height: Float) -> some View {
-        EditorAgentComposerSurface(cornerRadius: 28, horizontalInset: 16, topInset: 8, bottomInset: 12) {
+        EditorAgentComposerSurface(cornerRadius: 28, horizontalInset: 16, topInset: 8, bottomInset: 12, usesGlass: true) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Spacer()
@@ -65,13 +66,7 @@ struct MobileEditorPromptPanel: View {
                 }
 
                 HStack {
-                    Text("Create with Ada")
-                        .font(MobileEditorFont.font(size: 14))
-                        .foregroundColor(theme.editorColors.muted)
                     Spacer()
-                    controlButton(identifier: "AdaEditor.Mobile.ExpandPrompt", action: toggleExpansion) {
-                        MobileEditorPromptSymbol(kind: isExpanded ? .collapse : .expand)
-                    }
                     iconButton("\u{E5CD}", identifier: "AdaEditor.Mobile.ClosePrompt", action: close)
                 }
 
@@ -80,7 +75,7 @@ struct MobileEditorPromptPanel: View {
                         .font(MobileEditorFont.font(size: 16))
                         .foregroundColor(theme.editorColors.text)
                         .textEditorColors(TextEditorColors(
-                            background: theme.editorColors.surface,
+                            background: .clear,
                             border: .clear,
                             focusedBorder: .clear,
                             gutter: .clear,
@@ -114,13 +109,13 @@ struct MobileEditorPromptPanel: View {
                         .lineLimit(2)
                 }
                 HStack(spacing: 8) {
-                    iconButton("\u{E145}", identifier: "AdaEditor.Mobile.AddFiles") {
+                    iconButton("\u{E145}", identifier: "AdaEditor.Mobile.AddAttachment") {
                         dictation.stop()
-                        pickFiles()
-                    }
-                    iconButton("\u{E3F4}", identifier: "AdaEditor.Mobile.AddPhotos") {
-                        dictation.stop()
-                        pickPhotos()
+                        focusTask?.cancel()
+                        ProjectOpenPicker.presentAgentAttachmentSourcePicker(
+                            pickFiles: pickFiles,
+                            pickPhotos: pickPhotos
+                        )
                     }
                     if dictation.isRecording || dictation.isStarting {
                         Text(dictation.isStarting ? "Starting…" : "Listening…")
@@ -208,7 +203,7 @@ struct MobileEditorPromptPanel: View {
                 guard let window = UIWindowManager.shared?.activeWindow else { continue }
                 for container in window.uiInspectableContainers() {
                     guard let prompt = try? container.uiNode(matching: .accessibilityIdentifier(Self.promptIdentifier)),
-                          let editor = prompt.firstFocusableDescendant else { continue }
+                          let editor = container.uiHitTest(at: Point(prompt.absoluteFrame.minX + 12, prompt.absoluteFrame.minY + 12))?.node else { continue }
                     if (try? container.uiFocusNode(matching: .runtimeID(editor.runtimeId))) != nil {
                         return
                     }

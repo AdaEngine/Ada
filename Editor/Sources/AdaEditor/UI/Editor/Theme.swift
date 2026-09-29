@@ -35,6 +35,7 @@ extension Theme {
     static var adaEditor: Theme {
         var theme = Theme()
         theme.editorColors = .dark
+        theme.textInsertionPointColor = .white
         return theme
     }
 }

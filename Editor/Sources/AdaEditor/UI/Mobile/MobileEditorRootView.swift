@@ -20,7 +20,6 @@ private enum MobileEditorDestination: Hashable {
     case projectSettings(UUID)
     case sessions(UUID)
     case session(UUID, String)
-    case review(UUID)
 }
 
 private struct MobileEditorFilePresentation: Hashable {
@@ -41,17 +40,24 @@ struct MobileEditorRootView: View {
     @State private var workspaceTab: MobileEditorWorkspaceTab = .build
     @State private var promptDraft = ""
     @State private var pendingPromptAttachments: [URL] = []
-    @State private var changeRequest = ""
-    @State private var isMarkingScene = false
-    @State private var acceptedExample = false
     @State private var sloppyRuntime = SloppyRuntimeHost()
-    @State private var chatEvents: [EditorAgentEvent] = []
-    @State private var activeChatProjectID: UUID?
-    @State private var agentStatus: String?
-    @State private var isAgentRunning = false
-    @State private var runningProjectID: UUID?
-    @State private var agentActivityState: EditorAgentActivityState = .idle
-    @State private var agentActivityID: String?
+    @State private var chatState = MobileEditorChatState()
+    private var chatEvents: [EditorAgentEvent] {
+        get { chatState.events }
+        nonmutating set { chatState.events = newValue }
+    }
+    private var activeChatProjectID: UUID? {
+        get { chatState.activeProjectID }
+        nonmutating set { chatState.activeProjectID = newValue }
+    }
+    private var agentStatus: String? {
+        get { chatState.status }
+        nonmutating set { chatState.status = newValue }
+    }
+    private var isAgentRunning: Bool { chatState.runningProjectID != nil }
+    private var runningProjectID: UUID? { chatState.runningProjectID }
+    private var agentActivityState: EditorAgentActivityState { chatState.activity }
+    private var agentActivityID: String? { chatState.activityID }
     @State private var playSession: MobileEditorPlaySession?
     @State private var presentedPlayProject: MobileEditorProject?
     @State private var providerModels = MobileEditorProviderModelStore()
@@ -91,7 +97,7 @@ struct MobileEditorRootView: View {
                 .navigate(for: MobileEditorDestination.self, destination: destination)
         }
         .background(theme.editorColors.background.ignoresSafeArea())
-        .fullScreenCover(isPresented: $isPromptPresented) {
+        .fullScreenCover(isPresented: $isPromptPresented, transition: .opacity) {
             MobileEditorPromptPanel(
                 text: $promptDraft,
                 attachmentNames: pendingPromptAttachments.map(\.lastPathComponent),
@@ -133,8 +139,6 @@ struct MobileEditorRootView: View {
                     project: project,
                     selection: $workspaceTab,
                     promptDraft: $promptDraft,
-                    changeRequest: $changeRequest,
-                    isMarkingScene: $isMarkingScene,
                     pendingAttachmentNames: pendingPromptAttachments.map(\.lastPathComponent),
                     chatEvents: chatEvents,
                     agentStatus: agentStatus,
@@ -144,12 +148,7 @@ struct MobileEditorRootView: View {
                     onOpenFile: { relativePath in
                         presentedFile = MobileEditorFilePresentation(project: project, relativePath: relativePath)
                     },
-                    openPrompt: { isPromptPresented = true },
-                    showReview: {
-                        acceptedExample = false
-                        navigationPath.append(MobileEditorDestination.review(id))
-                    },
-                    goBack: { navigationPath.removeLast() }
+                    openPrompt: { isPromptPresented = true }
                 )
                 .navigationTitle(project.title)
                 .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
@@ -157,15 +156,17 @@ struct MobileEditorRootView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationBarColor(theme.editorColors.background)
                 .navigationBarTrailingItems {
-                    Button {
-                        navigationPath.append(MobileEditorDestination.projectSettings(id))
-                    } label: {
-                        Text("\u{E5D4}")
-                            .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
-                            .environment(\.font, AdaEditorMaterialSymbolFont.font(size: 25))
+                    if !isPromptPresented {
+                        Button {
+                            navigationPath.append(MobileEditorDestination.projectSettings(id))
+                        } label: {
+                            Text("\u{E5D4}")
+                                .foregroundColor(.white)
+                                .frame(width: 40, height: 40)
+                                .environment(\.font, AdaEditorMaterialSymbolFont.font(size: 25))
+                        }
+                        .accessibilityIdentifier("AdaEditor.Mobile.WorkspaceSettings")
                     }
-                    .accessibilityIdentifier("AdaEditor.Mobile.WorkspaceSettings")
                 }
             } else {
                 Text("Project unavailable")
@@ -231,14 +232,6 @@ struct MobileEditorRootView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .navigationBarColor(theme.editorColors.background)
             }
-        case .review(let id):
-            MobileEditorReviewScreen(accepted: $acceptedExample)
-                .navigationTitle("Changes")
-                .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
-                .navigationTitlePosition(.center)
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationBarColor(theme.editorColors.background)
-                .id(id)
         }
     }
 
@@ -246,8 +239,7 @@ struct MobileEditorRootView: View {
         let project = MobileEditorProject(
             id: UUID(),
             title: "New Game \(projects.count)",
-            prompt: nil,
-            isExample: false
+            prompt: nil
         )
         do {
             _ = try MobileAdaScriptProjectService.prepare(project)
@@ -264,11 +256,7 @@ struct MobileEditorRootView: View {
         workspaceTab = .build
         promptDraft = ""
         pendingPromptAttachments = []
-        changeRequest = ""
-        isMarkingScene = false
-        chatEvents = []
-        activeChatProjectID = project.id
-        agentStatus = nil
+        chatState.open(project.id)
         playSession?.capture.stop()
         playSession = nil
         navigationPath.append(MobileEditorDestination.workspace(project.id))
@@ -277,12 +265,6 @@ struct MobileEditorRootView: View {
 
     private func preparePlay(for id: UUID) {
         guard let project = projects.first(where: { $0.id == id }) else { return }
-        if project.isExample {
-            playSession?.capture.stop()
-            playSession = nil
-            presentedPlayProject = project
-            return
-        }
         do {
             let directory = try MobileAdaScriptProjectService.prepare(project)
             let artifact = try MobileAdaScriptProjectService.build(at: directory)
@@ -363,12 +345,7 @@ struct MobileEditorRootView: View {
                 segments: [EditorAgentMessageSegment(kind: .text, text: outgoingPrompt)]
             )
         ))
-        agentStatus = "Agent is working…"
-        isAgentRunning = true
-        runningProjectID = id
-        agentActivityState = .working
-        let activityID = UUID().uuidString
-        agentActivityID = activityID
+        chatState.begin(id)
         let streamID = "stream-\(UUID().uuidString)"
         Task { @MainActor in
             do {
@@ -394,7 +371,7 @@ struct MobileEditorRootView: View {
                     },
                     onText: { text in
                         await MainActor.run {
-                            guard activeChatProjectID == id, !text.isEmpty else { return }
+                            guard !text.isEmpty else { return }
                             let event = EditorAgentEvent(
                                 id: streamID,
                                 kind: .message,
@@ -403,33 +380,28 @@ struct MobileEditorRootView: View {
                                     segments: [EditorAgentMessageSegment(kind: .text, text: text)]
                                 )
                             )
-                            if let index = chatEvents.firstIndex(where: { $0.id == streamID }) {
-                                chatEvents[index] = event
-                            } else {
-                                chatEvents.append(event)
-                            }
+                            chatState.record(event, for: id)
                         }
+                    },
+                    onActivity: { activity in
+                        await MainActor.run { MobileSloppyChatAdapter.record(activity, for: id, in: chatState) }
                     }
                 )
+                chatState.setStatus("Checking the AdaScript build…", for: id)
                 _ = try MobileAdaScriptProjectService.build(at: workspaceURL)
-                agentStatus = "AdaScript build succeeded"
-                agentActivityState = .completed
+                chatState.finish(id, succeeded: true, status: "AdaScript build succeeded")
             } catch {
-                agentStatus = error.localizedDescription
-                agentActivityState = .failed
+                chatState.finish(id, succeeded: false, status: error.localizedDescription)
             }
             await loadChat(for: id)
-            isAgentRunning = false
-            runningProjectID = nil
         }
     }
 
     private func loadChat(for id: UUID) async {
         do {
             let directory = try MobileAdaScriptProjectService.projectURL(for: id)
-            let messages = try await sloppyRuntime.messages(workspaceURL: directory)
-            guard activeChatProjectID == id else { return }
-            chatEvents = MobileSloppyChatAdapter.events(from: messages)
+            let events = try await MobileEditorSessionStore(workspaceURL: directory).events()
+            chatState.load(events, for: id)
         } catch {
             if activeChatProjectID == id {
                 agentStatus = error.localizedDescription

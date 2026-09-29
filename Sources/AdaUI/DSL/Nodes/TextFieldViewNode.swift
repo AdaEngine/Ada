@@ -29,7 +29,7 @@ final class TextFieldViewNode: ViewNode {
         static let maxUndoDepth: Int = 128
         static let caretPadding: Float = 0
         static let minimumCaretHeight: Float = 15
-        static let caretLineWidth: Float = 2.5
+        static let caretLineWidth: Float = 3
         static let caretBlinkInterval: AdaUtils.TimeInterval = 1.15
         static let tapMovementToleranceSquared: Float = 36
         static let doubleTapMovementToleranceSquared: Float = 100
@@ -426,14 +426,17 @@ final class TextFieldViewNode: ViewNode {
                 let caretHeight = max(0, caretRange.upperBound - caretRange.lowerBound)
                 if caretHeight > 0 {
                     let caretWidth = max(1, Constants.caretLineWidth)
-                    clipped.drawRect(
-                        Rect(
+                    let caretPath = RoundedRectangleShape(cornerRadius: caretWidth * 0.5).path(
+                        in: Rect(
                             x: caretX - caretWidth * 0.5,
                             y: -caretRange.upperBound,
                             width: caretWidth,
                             height: caretHeight
-                        ),
-                        color: self.environment.accentColor
+                        )
+                    )
+                    clipped.fill(
+                        caretPath,
+                        with: self.environment.theme.textInsertionPointColor ?? self.environment.accentColor
                     )
                 }
             }

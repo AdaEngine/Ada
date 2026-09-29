@@ -130,6 +130,9 @@ struct EditorAgentTranscript: View {
         self.standaloneSessionID = sessionID
     }
 
+    var contentInsets = EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
+    var scrollContentInsets: EdgeInsets?
+
     private var events: [EditorAgentEvent] {
         standaloneEvents ?? viewModel?.activeSession?.events ?? []
     }
@@ -141,7 +144,7 @@ struct EditorAgentTranscript: View {
     var body: some View {
         GeometryReader { geometry in
             ScrollViewReader { proxy in
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: true, contentInsets: scrollContentInsets) {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(EditorAgentTranscriptEntry.grouped(events)) { entry in
                             switch entry {
@@ -151,12 +154,12 @@ struct EditorAgentTranscript: View {
                                 EditorAgentActionsDisclosure(id: id, events: events, viewModel: viewModel)
                             }
                         }
-                        Color.clear.frame(height: 1)
+                        Color.clear.frame(height: contentInsets.bottom + 1)
                             .id(Self.bottomID)
                             .accessibilityIdentifier(Self.bottomID)
                     }
-                    .frame(width: max(0, geometry.size.width - 20), alignment: .leading)
-                    .padding(10)
+                    .frame(width: max(0, geometry.size.width - contentInsets.leading - contentInsets.trailing), alignment: .leading)
+                    .padding(EdgeInsets(top: contentInsets.top, leading: contentInsets.leading, bottom: 0, trailing: contentInsets.trailing))
                 }
                 .accessibilityIdentifier("AdaEditor.Agent.Transcript")
                 .background { EditorAgentTranscriptScrollDriver(follower: follower).allowsHitTesting(false) }

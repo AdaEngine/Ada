@@ -126,6 +126,9 @@ protocol NavigationSplitDestinationRegistering: AnyObject {
 }
 
 extension EnvironmentValues {
+    /// The navigation bar's contribution to the content's top safe area.
+    /// Use this as scroll content padding to start below the bar while scrolling underneath it.
+    @Entry public var navigationBarContentInset: Float = 0
     @Entry var navigationContext: NavigationContext?
     @Entry internal var navigationSplitCompactBackAction: NavigationSplitCompactBackAction?
     @Entry internal var navigationSplitColumnContext: NavigationSplitColumnContext?
@@ -473,6 +476,7 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
         if height > 0 {
             inputs.environment.safeAreaInsets.top += height
         }
+        inputs.environment.navigationBarContentInset = height
         return inputs
     }
 

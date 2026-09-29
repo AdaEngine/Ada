@@ -27,7 +27,7 @@ extension ViewNode {
 @MainActor
 final class ViewPresentationTransition {
     enum Style {
-        case push, pop, tabs, sheet, cover
+        case push, pop, tabs, sheet, cover, fade
 
         var insertion: Pose {
             switch self {
@@ -36,6 +36,7 @@ final class ViewPresentationTransition {
             case .tabs: Pose(scale: 0.96, opacity: 0)
             case .sheet: Pose(y: 0.05, scale: 0.94, opacity: 0)
             case .cover: Pose(y: 1)
+            case .fade: Pose(opacity: 0)
             }
         }
 
@@ -44,7 +45,7 @@ final class ViewPresentationTransition {
             case .push: Pose(x: -0.25, opacity: 0.7)
             case .pop: Pose(x: 1)
             case .tabs: Pose(scale: 1.04, opacity: 0)
-            case .sheet, .cover: insertion
+            case .sheet, .cover, .fade: insertion
             }
         }
     }
@@ -219,23 +220,30 @@ final class ViewPresentationTransition {
         if !controller.isPlaying { finish() }
     }
 
-    func draw(with context: UIGraphicsContext, in bounds: Rect) {
-        var path = Path()
-        path.addRect(bounds)
+    func draw(with context: UIGraphicsContext, in bounds: Rect, clipsToBounds: Bool = true) {
         var context = context
-        context.clip(to: path) { clipped in
-            for entry in entries {
-                var drawing = clipped
-                let center = Point(entry.node.frame.midX, entry.node.frame.midY)
-                drawing.translateBy(x: center.x + entry.pose.x * bounds.width, y: -center.y - entry.pose.y * bounds.height)
-                drawing.concatenate(Transform3D(scale: Vector3(entry.pose.scale, entry.pose.scale, 1)))
-                drawing.translateBy(x: -center.x, y: center.y)
-                drawing.opacity *= entry.pose.opacity
-                entry.node.draw(with: drawing)
-                // The UI renderer batches quads and glyphs separately. End the
-                // screen's batch before drawing the next screen's background.
-                drawing.commitDraw()
+        if clipsToBounds {
+            var path = Path()
+            path.addRect(bounds)
+            context.clip(to: path) { clipped in
+                drawEntries(with: clipped, in: bounds)
             }
+        } else {
+            drawEntries(with: context, in: bounds)
+        }
+    }
+
+    private func drawEntries(with context: UIGraphicsContext, in bounds: Rect) {
+        for entry in entries {
+            var drawing = context
+            let center = Point(entry.node.frame.midX, entry.node.frame.midY)
+            drawing.translateBy(x: center.x + entry.pose.x * bounds.width, y: -center.y - entry.pose.y * bounds.height)
+            drawing.concatenate(Transform3D(scale: Vector3(entry.pose.scale, entry.pose.scale, 1)))
+            drawing.translateBy(x: -center.x, y: center.y)
+            drawing.opacity *= entry.pose.opacity
+            entry.node.draw(with: drawing)
+            // Commit each retained screen before the next screen's background.
+            drawing.commitDraw()
         }
     }
 

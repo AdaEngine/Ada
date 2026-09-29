@@ -215,6 +215,33 @@ enum ProjectOpenPicker {
     }
 
     @MainActor
+    static func presentAgentAttachmentSourcePicker(
+        pickFiles: @escaping @MainActor () -> Void,
+        pickPhotos: @escaping @MainActor () -> Void
+    ) {
+        #if canImport(UIKit)
+            guard let presenter = activeViewController() else {
+                return
+            }
+            let picker = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+            picker.addAction(UIAlertAction(title: "Files", style: .default) { _ in
+                presenter.dismiss(animated: true, completion: pickFiles)
+            })
+            picker.addAction(UIAlertAction(title: "Photos", style: .default) { _ in
+                presenter.dismiss(animated: true, completion: pickPhotos)
+            })
+            picker.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            if let popover = picker.popoverPresentationController {
+                popover.sourceView = presenter.view
+                popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.maxY - 80, width: 1, height: 1)
+            }
+            presenter.present(picker, animated: true)
+        #else
+            pickFiles()
+        #endif
+    }
+
+    @MainActor
     static func presentAgentPhotoPicker(
         completion: @escaping @MainActor (AssetFilePickerResult) -> Void
     ) {

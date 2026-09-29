@@ -25,7 +25,6 @@ struct MobileEditorAgentSettingsScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                MobileEditorSectionHeading(eyebrow: "AI CONNECTIONS", title: "Providers")
                 Text("Connect an account, then choose a model for your projects.")
                     .font(MobileEditorFont.font(size: 13))
                     .foregroundColor(theme.editorColors.muted)

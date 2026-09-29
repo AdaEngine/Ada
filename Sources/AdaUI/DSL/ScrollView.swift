@@ -17,16 +17,20 @@ public struct ScrollView<Content: View>: View, ViewNodeBuilder {
 
     let axis: Axis
     let showsIndicators: Bool
+    let contentInsets: EdgeInsets?
     let content: () -> Content
 
     /// Creates a scroll view, optionally showing viewport indicators when content overflows.
+    /// `contentInsets` overrides automatic safe-area insets inside the scroll content.
     public init(
         _ axis: Axis = .vertical,
         showsIndicators: Bool = false,
+        contentInsets: EdgeInsets? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.axis = axis
         self.showsIndicators = showsIndicators
+        self.contentInsets = contentInsets
         self.content = content
     }
 
@@ -34,6 +38,7 @@ public struct ScrollView<Content: View>: View, ViewNodeBuilder {
         let node = ScrollViewNode(layout: ZStackLayout(anchor: .topLeading), content: content)
         node.axis = self.axis
         node.showsIndicators = self.showsIndicators
+        node.contentInsets = self.contentInsets
         node.updateEnvironment(context.environment)
         context.environment.scrollViewProxy?.subsribe(node)
         node.invalidateContent()
@@ -47,6 +52,7 @@ public struct ScrollView<Content: View>: View, ViewNodeBuilder {
 final class ScrollViewNode: LayoutViewContainerNode {
     var axis: Axis = .vertical
     var showsIndicators = false
+    var contentInsets: EdgeInsets?
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
@@ -55,6 +61,7 @@ final class ScrollViewNode: LayoutViewContainerNode {
         }
         axis = scroll.axis
         showsIndicators = scroll.showsIndicators
+        contentInsets = scroll.contentInsets
     }
 
     override var isClipping: Bool {
@@ -134,6 +141,11 @@ final class ScrollViewNode: LayoutViewContainerNode {
         )
 
         if let childHit = super.hitTest(contentPoint, with: event) {
+            // Static text has no touch action. Capture its drag in the scroll view,
+            // while buttons, editors and gesture nodes keep their own hit targets.
+            if event is TouchEvent, childHit is TextViewNode {
+                return self
+            }
             return childHit
         }
 
@@ -548,6 +560,7 @@ final class ScrollViewNode: LayoutViewContainerNode {
     }
 
     private func resolvedContentInsets() -> EdgeInsets {
+        if let contentInsets { return contentInsets }
         guard environment._scrollViewRespectsSafeArea else {
             return EdgeInsets()
         }
@@ -569,7 +582,8 @@ final class ScrollViewNode: LayoutViewContainerNode {
         context.popClipRect()
         context.translateBy(x: contentOffset.x + frame.origin.x, y: -contentOffset.y - frame.origin.y)
         for rect in scrollIndicatorRects {
-            context.drawRect(rect, color: .white.opacity(0.45))
+            let shape = RoundedRectangleShape(cornerRadius: min(rect.width, rect.height) * 0.5)
+            context.fill(shape.path(in: rect), with: .white.opacity(0.45))
         }
     }
 

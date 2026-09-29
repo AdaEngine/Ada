@@ -202,6 +202,47 @@ struct EditorAgentChatUITests {
         return container
     }
 
+    @Test("Agent history scrolls inside the sidebar while the header and composer stay fixed")
+    func sidebarHistoryScrolls() async throws {
+        let model = EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())
+        model.activeSession = EditorAgentSession(title: "History")
+        model.activeSession?.events = (0..<30).map { index in
+            EditorAgentEvent(
+                id: "history-\(index)",
+                kind: .message,
+                message: .init(role: .assistant, segments: [.init(kind: .text, text: "Message \(index)\nSecond line\nThird line")])
+            )
+        }
+        let container = makeContainer(model)
+        for _ in 0..<4 {
+            await Task.yield()
+            container.layoutIfNeeded()
+            container.update(1 / 60)
+        }
+        let transcript = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Transcript")).absoluteFrame
+        let header = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Header")).absoluteFrame
+        let composer = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Composer")).absoluteFrame
+        let marker = UINodeSelector.accessibilityIdentifier("AdaEditor.Agent.Event.history-20")
+        let before = try container.uiNode(matching: marker).absoluteFrame.minY
+        #expect(transcript.minY >= header.maxY)
+        #expect(transcript.maxY <= composer.minY)
+        for phase in [MouseEvent.Phase.began, .ended] {
+            container.onMouseEvent(MouseEvent(
+                window: .empty,
+                button: .scrollWheel,
+                scrollDelta: phase == .began ? Point(0, 3) : .zero,
+                mousePosition: Point(transcript.midX, transcript.midY),
+                phase: phase,
+                modifierKeys: [],
+                time: 0
+            ))
+        }
+        container.update(1 / 60)
+        #expect(try container.uiNode(matching: marker).absoluteFrame.minY > before)
+        #expect(try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Header")).absoluteFrame == header)
+        #expect(try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Composer")).absoluteFrame == composer)
+    }
+
     @Test("narrow composer keeps attachment and send controls visible without a skills button")
     func narrowComposer() async throws {
         let model = EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())

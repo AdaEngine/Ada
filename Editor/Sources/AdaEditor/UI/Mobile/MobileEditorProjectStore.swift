@@ -4,14 +4,7 @@ struct MobileEditorProject: Codable, Identifiable, Hashable {
     let id: UUID
     var title: String
     var prompt: String?
-    let isExample: Bool
 
-    static let forest = MobileEditorProject(
-        id: UUID(uuidString: "7B0A53A1-BCF6-40A9-9916-06AA92342509") ?? UUID(),
-        title: "Foxwood",
-        prompt: "Create a 2D platformer about a fox in an enchanted forest",
-        isExample: true
-    )
 }
 
 struct MobileEditorProjectStore {
@@ -20,8 +13,10 @@ struct MobileEditorProjectStore {
     private var indexURL: URL { directory.appendingPathComponent("projects.json") }
 
     func load() throws -> [MobileEditorProject] {
-        guard FileManager.default.fileExists(atPath: indexURL.path) else { return [.forest] }
+        guard FileManager.default.fileExists(atPath: indexURL.path) else { return [] }
+        // Hide the retired bundled sample without deleting any on-device files.
         return try JSONDecoder().decode([MobileEditorProject].self, from: Data(contentsOf: indexURL))
+            .filter { $0.id.uuidString != "7B0A53A1-BCF6-40A9-9916-06AA92342509" }
     }
 
     func save(_ projects: [MobileEditorProject]) throws {

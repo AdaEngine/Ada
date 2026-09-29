@@ -31,8 +31,7 @@ public protocol UIWindowDragRegionResolving: AnyObject {
 }
 
 /// A container view that contains a view tree.
-public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInputContainer, UIInspectionOverlayStateProviding, UIMousePassthroughEventReceiving,
-    UIWindowDragRegionResolving {
+public final class UIContainerView<Content: View>: UIView, ViewOwner {
     /// The container view of the container view.
     var containerView: UIView? {
         return self
@@ -176,12 +175,6 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
     var hasFocusedInputNode: Bool {
         self.focusManager.focusedNode != nil
     }
-    var inspectionFocusedNode: ViewNode? {
-        self.focusManager.focusedNode
-    }
-    var inspectionHitTestNode: ViewNode? {
-        self.inspectionLastHitTestNode
-    }
 
     // MARK: - Keyboard shortcuts (before focused key dispatch)
 
@@ -256,21 +249,6 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner, FocusedInp
             }
             current = ancestor.parent
         }
-    }
-
-    @_spi(Internal)
-    public func uiReceivePassthroughMouseMoved(_ event: MouseEvent) {
-        onMouseEvent(event)
-    }
-
-    @_spi(Internal)
-    public func uiAllowsWindowDrag(at windowPoint: Point, with event: MouseEvent) -> Bool {
-        let localPoint = self.convert(windowPoint, from: self.window)
-        guard let node = self.viewTree.rootNode.hitTest(localPoint, with: event) else {
-            return true
-        }
-
-        return !node.blocksWindowDrag
     }
 
     override public func onKeyEvent(_ event: KeyEvent) {
@@ -549,6 +527,37 @@ extension ViewNode {
         default:
             return false
         }
+    }
+}
+
+extension UIContainerView: FocusedInputContainer {}
+
+extension UIContainerView: UIInspectionOverlayStateProviding {
+    var inspectionFocusedNode: ViewNode? {
+        self.focusManager.focusedNode
+    }
+    
+    var inspectionHitTestNode: ViewNode? {
+        self.inspectionLastHitTestNode
+    }
+}
+
+extension UIContainerView: UIMousePassthroughEventReceiving {
+    @_spi(Internal)
+    public func uiReceivePassthroughMouseMoved(_ event: MouseEvent) {
+        onMouseEvent(event)
+    }
+}
+
+extension UIContainerView: UIWindowDragRegionResolving {
+    @_spi(Internal)
+    public func uiAllowsWindowDrag(at windowPoint: Point, with event: MouseEvent) -> Bool {
+        let localPoint = self.convert(windowPoint, from: self.window)
+        guard let node = self.viewTree.rootNode.hitTest(localPoint, with: event) else {
+            return true
+        }
+
+        return !node.blocksWindowDrag
     }
 }
 

@@ -104,6 +104,56 @@ struct PresentationTransitionTests {
         #expect(retained?.parent == nil)
     }
 
+    @Test(arguments: [false, true])
+    func opacityCoverDoesNotMaskSafeAreaBackground(presented: Bool) throws {
+        let model = TransitionModel()
+        let tester = ViewTester {
+            Color.red.fullScreenCover(isPresented: model.showBinding, transition: .opacity) {
+                Color.black.ignoresSafeArea()
+            }.accessibilityIdentifier("hidden-opacity-modal")
+        }.setSize(Size(width: 400, height: 300)).performLayout()
+        let host = try #require(tester.findNodeByAccessibilityIdentifier("hidden-opacity-modal") as? FullScreenCoverNode)
+        model.show = presented
+        tester.advanceFrame(deltaTime: 0.3)
+        let context = UIGraphicsContext()
+        host.draw(with: context)
+        #expect(!context.getDrawCommands().isEmpty)
+        #expect(!context.getDrawCommands().contains { command in
+            if case .pushClipPath = command {
+                return true
+            }
+            return false
+        })
+    }
+
+    @Test
+    func opacityCoverFadesInPlaceAndRetainsInputBarrierUntilDismissed() throws {
+        let model = TransitionModel()
+        let tester = ViewTester {
+            Color.red.fullScreenCover(isPresented: model.showBinding, transition: .opacity) {
+                Color.black.ignoresSafeArea()
+            }.accessibilityIdentifier("opacity-modal")
+        }.setSize(Size(width: 400, height: 300)).performLayout()
+        let host = try #require(tester.findNodeByAccessibilityIdentifier("opacity-modal") as? FullScreenCoverNode)
+        model.show = true
+        tester.advanceFrame(deltaTime: 0)
+        let entry = try #require(host.presentation.entries.first)
+        #expect(entry.pose.opacity == 0)
+        #expect(entry.pose.x == 0 && entry.pose.y == 0 && entry.pose.scale == 1)
+        tester.advanceFrame(deltaTime: 0.14)
+        #expect(entry.pose.opacity > 0 && entry.pose.opacity < 1)
+        #expect(entry.pose.y == 0 && entry.pose.scale == 1)
+        tester.advanceFrame(deltaTime: 0.14)
+        #expect(entry.pose.opacity == 1)
+        model.show = false
+        tester.advanceFrame(deltaTime: 0.14)
+        #expect(entry.pose.opacity > 0 && entry.pose.opacity < 1)
+        #expect(entry.pose.y == 0 && entry.pose.scale == 1)
+        #expect(tester.click(at: Point(10, 10)) === host)
+        tester.advanceFrame(deltaTime: 0.3)
+        #expect(host.presentation.nodes.isEmpty)
+    }
+
     @Test
     func explicitNilTransactionDisablesNavigationTransition() throws {
         let model = TransitionModel()

@@ -85,33 +85,6 @@ struct MobileEditorSectionHeading: View {
     }
 }
 
-struct MobileEditorForestImage: View {
-    @Environment(\.theme) private var theme
-    let height: Float
-
-    var body: some View {
-        ZStack {
-            theme.editorColors.surfaceElevated
-            if let image = MobileEditorAssets.forestPreview {
-                image
-                    .resizable()
-                    .aspectRatio(1.4, contentMode: .fill)
-            } else {
-                Text("Foxwood")
-                    .font(MobileEditorFont.font(size: 24))
-                    .foregroundColor(theme.editorColors.text)
-            }
-        }
-        .frame(height: height)
-        .frame(maxWidth: .infinity)
-        .mask(RoundedRectangleShape(cornerRadius: 18))
-        .overlay {
-            RoundedRectangleShape(cornerRadius: 18)
-                .stroke(theme.editorColors.border.opacity(0.7), lineWidth: 1)
-        }
-    }
-}
-
 struct MobileEditorProjectPlaceholderImage: View {
     @Environment(\.theme) private var theme
     let height: Float

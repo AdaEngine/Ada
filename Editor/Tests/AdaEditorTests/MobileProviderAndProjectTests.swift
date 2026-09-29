@@ -98,11 +98,27 @@ private final class CatalogStubProtocol: URLProtocol, @unchecked Sendable {
 @MainActor
 struct MobileProjectManagementTests {
     @Test
+    func newProjectLibraryIsEmptyAndRetiredSampleIsHiddenWithoutDeletingFiles() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = MobileEditorProjectStore(directory: directory)
+        #expect(try store.load().isEmpty)
+        let sampleID = try #require(UUID(uuidString: "7B0A53A1-BCF6-40A9-9916-06AA92342509"))
+        let sample = MobileEditorProject(id: sampleID, title: "Bundled sample", prompt: nil)
+        let user = MobileEditorProject(id: UUID(), title: "My game", prompt: nil)
+        let sampleDirectory = directory.appendingPathComponent(sampleID.uuidString)
+        try FileManager.default.createDirectory(at: sampleDirectory, withIntermediateDirectories: true)
+        try store.save([sample, user])
+        #expect(try store.load() == [user])
+        #expect(FileManager.default.fileExists(atPath: sampleDirectory.path))
+    }
+
+    @Test
     func renamePersistsIndexAndMetadataWithoutMovingFiles() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = MobileEditorProjectStore(directory: directory)
-        let project = MobileEditorProject(id: UUID(), title: "Original", prompt: "Existing prompt", isExample: false)
+        let project = MobileEditorProject(id: UUID(), title: "Original", prompt: "Existing prompt")
         try store.save([project])
         let projectURL = directory.appendingPathComponent(project.id.uuidString)
         try FileManager.default.createDirectory(at: projectURL.appendingPathComponent("Sources"), withIntermediateDirectories: true)
@@ -124,13 +140,14 @@ struct MobileProjectManagementTests {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = MobileEditorProjectStore(directory: directory)
-        let other = MobileEditorProject(id: UUID(), title: "Keep", prompt: nil, isExample: false)
-        try store.save([.forest, other])
-        let deletedURL = directory.appendingPathComponent(MobileEditorProject.forest.id.uuidString)
+        let other = MobileEditorProject(id: UUID(), title: "Keep", prompt: nil)
+        let deleted = MobileEditorProject(id: UUID(), title: "Remove", prompt: nil)
+        try store.save([deleted, other])
+        let deletedURL = directory.appendingPathComponent(deleted.id.uuidString)
         let keptURL = directory.appendingPathComponent(other.id.uuidString)
         try FileManager.default.createDirectory(at: deletedURL.appendingPathComponent(".ada/workspace/agents"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: keptURL, withIntermediateDirectories: true)
-        #expect(try store.delete(id: MobileEditorProject.forest.id) == [other])
+        #expect(try store.delete(id: deleted.id) == [other])
         #expect(!FileManager.default.fileExists(atPath: deletedURL.path))
         #expect(FileManager.default.fileExists(atPath: keptURL.path))
         #expect(try store.load() == [other])

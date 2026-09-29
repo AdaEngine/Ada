@@ -109,7 +109,13 @@ struct EditorAgentEventCard: View {
     private func segmentView(_ segment: EditorAgentMessageSegment) -> some View {
         switch segment.kind {
         case .text:
-            if let failure = EditorAgentProviderFailure.message(in: segment.text ?? "") {
+            if isUser {
+                Text(verbatim: segment.text ?? "")
+                    .font(.system(size: 14))
+                    .foregroundColor(theme.editorColors.text)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let failure = EditorAgentProviderFailure.message(in: segment.text ?? "") {
                 Text(verbatim: failure)
                     .font(.system(size: 14))
                     .foregroundColor(.red)

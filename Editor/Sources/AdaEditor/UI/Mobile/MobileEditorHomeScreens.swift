@@ -75,7 +75,7 @@ struct MobileEditorProjectsScreen: View {
                         Text(project.title)
                             .font(MobileEditorFont.font(size: 18))
                             .foregroundColor(theme.editorColors.text)
-                        Text(project.isExample ? "Example project · Open Build" : "Draft · Open Build")
+                        Text("Open Build")
                             .font(MobileEditorFont.font(size: 13))
                             .foregroundColor(theme.editorColors.muted)
                     }
@@ -107,7 +107,7 @@ struct MobileEditorSettingsScreen: View {
                 .buttonStyle(DefaultButtonStyle())
                 .accessibilityIdentifier("AdaEditor.Mobile.ConfigureAgent")
                 settingsRow("Projects", detail: "Projects and sessions are saved on this device")
-                settingsRow("Game Preview", detail: "A demo scene is available for now")
+                settingsRow("Game Preview", detail: "Run the scene from your project")
             }
             .padding(.horizontal, 22)
             .padding(.top, 24)

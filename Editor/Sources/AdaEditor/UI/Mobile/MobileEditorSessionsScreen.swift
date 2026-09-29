@@ -1,6 +1,7 @@
 #if os(iOS)
 @_spi(AdaEngine) import AdaEngine
 import Foundation
+import Protocols
 import SloppyRuntime
 
 struct MobileEditorSessionSummary: Identifiable, Sendable {
@@ -39,6 +40,12 @@ actor MobileEditorSessionStore {
             guard !text.isEmpty else { return nil }
             return SloppyChatMessage(id: event.id, role: role, text: text, createdAt: event.createdAt)
         }
+    }
+
+    func events(id: String? = nil) throws -> [EditorAgentEvent] {
+        guard let sessionID = try id ?? list().first?.id else { return [] }
+        let detail = try AgentSessionFileStore(agentsRootURL: agentsURL).loadSession(agentID: "mobile", sessionID: sessionID)
+        return MobileSloppyChatAdapter.events(from: detail.events)
     }
 }
 
@@ -110,10 +117,10 @@ struct MobileEditorSessionDetailScreen: View {
         .onAppear {
             loadTask = Task { @MainActor in
                 do {
-                    let messages = try await MobileEditorSessionStore(workspaceURL: workspaceURL).messages(id: sessionID)
+                    let loaded = try await MobileEditorSessionStore(workspaceURL: workspaceURL).events(id: sessionID)
                     try Task.checkCancellation()
-                    events = MobileSloppyChatAdapter.events(from: messages)
-                    status = messages.isEmpty ? "This session has no messages." : ""
+                    events = loaded
+                    status = loaded.isEmpty ? "This session has no messages." : ""
                 } catch { if !Task.isCancelled { status = error.localizedDescription } }
             }
         }

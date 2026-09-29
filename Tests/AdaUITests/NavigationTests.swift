@@ -291,6 +291,56 @@ struct NavigationStackTests {
     }
 
     @Test
+    func navigationStack_explicitScrollInsetsKeepTheViewportUnderTheBar() throws {
+        let tester = ViewTester {
+            NavigationStack {
+                ScrollView(contentInsets: .zero) {
+                    Color.red.frame(width: 320, height: 640)
+                        .accessibilityIdentifier("first-content")
+                }
+                .navigationTitle("Chat")
+            }
+        }
+        .setSize(Size(width: 400, height: 400))
+        .performLayout()
+
+        let scroll = try #require(firstScrollView(in: tester.containerView.viewTree.rootNode))
+        let content = try #require(tester.findNodeByAccessibilityIdentifier("first-content"))
+        #expect(scroll.absoluteFrame().minY == 0)
+        #expect(scroll.frame.height == 400)
+        #expect(content.absoluteFrame().minY == scroll.absoluteFrame().minY)
+    }
+
+    @Test
+    func navigationStack_customContentInsetsClearTheBarAndScrollUnderIt() throws {
+        struct ScrollContent: View {
+            @Environment(\.navigationBarContentInset) private var barInset
+
+            var body: some View {
+                ScrollView(contentInsets: EdgeInsets(top: barInset, leading: 0, bottom: 0, trailing: 0)) {
+                    Color.red.frame(width: 320, height: 640)
+                        .accessibilityIdentifier("first-content")
+                }
+                .navigationTitle("Chat")
+            }
+        }
+
+        let tester = ViewTester {
+            NavigationStack { ScrollContent() }
+        }
+        .setSize(Size(width: 400, height: 400))
+        .performLayout()
+
+        let scroll = try #require(firstScrollView(in: tester.containerView.viewTree.rootNode))
+        let content = try #require(tester.findNodeByAccessibilityIdentifier("first-content"))
+        #expect(scroll.absoluteFrame().minY == 0)
+        #expect(content.absoluteFrame().minY == 92)
+        tester.sendMouseEvent(at: Point(80, 120), button: .scrollWheel, phase: .changed, scrollDelta: Point(0, -1), time: 0)
+        #expect(scroll.contentOffset.y > 0)
+        #expect(content.calculateVisibleFrame().minY < 92)
+    }
+
+    @Test
     func navigationStack_nestedScrollContentExtendsUnderNavigationBar() throws {
         let tester = ViewTester {
             NavigationStack {

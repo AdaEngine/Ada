@@ -31,7 +31,7 @@ struct EditorAgentComposerSurface<Content: View>: View {
     var body: some View {
         if usesGlass {
             surface
-                .glassEffect(.regular.tint(Color.white.opacity(0.025)), in: .rect(cornerRadius: cornerRadius))
+                .glassEffect(.regular.tint(Color.white.opacity(0.025)).interactive(false), in: .rect(cornerRadius: cornerRadius))
         } else {
             surface
         }
@@ -42,7 +42,7 @@ struct EditorAgentComposerSurface<Content: View>: View {
             .padding(.horizontal, horizontalInset)
             .padding(.top, topInset)
             .padding(.bottom, bottomInset)
-            .background(RoundedRectangleShape(cornerRadius: cornerRadius).fill(theme.editorColors.surface))
+            .background(RoundedRectangleShape(cornerRadius: cornerRadius).fill(theme.editorColors.surface.opacity(usesGlass ? 0.12 : 1)))
             .overlay {
                 RoundedRectangleShape(cornerRadius: cornerRadius)
                     .stroke(theme.editorColors.border, lineWidth: 1)

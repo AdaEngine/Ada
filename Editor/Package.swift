@@ -10,7 +10,10 @@ let sloppyRuntimePackage: [Package.Dependency] = hasSloppyRuntime
     ? [.package(name: "SloppyRuntimePortable", path: sloppyRuntimeURL.path)]
     : []
 let sloppyRuntimeTarget: [Target.Dependency] = hasSloppyRuntime
-    ? [.product(name: "SloppyRuntime", package: "SloppyRuntimePortable", condition: .when(platforms: [.iOS]))]
+    ? [
+        .product(name: "SloppyRuntime", package: "SloppyRuntimePortable", condition: .when(platforms: [.iOS])),
+        .product(name: "Protocols", package: "SloppyRuntimePortable", condition: .when(platforms: [.iOS])),
+    ]
     : []
 let adaMCPPackage: Package.Dependency =
     true /*ProcessInfo.processInfo.environment["ADA_MCP_LOCAL"] == "1"*/

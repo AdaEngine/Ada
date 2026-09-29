@@ -7,8 +7,6 @@ struct MobileEditorWorkspaceView: View {
     let project: MobileEditorProject
     @Binding var selection: MobileEditorWorkspaceTab
     @Binding var promptDraft: String
-    @Binding var changeRequest: String
-    @Binding var isMarkingScene: Bool
     let pendingAttachmentNames: [String]
     let chatEvents: [EditorAgentEvent]
     let agentStatus: String?
@@ -17,8 +15,6 @@ struct MobileEditorWorkspaceView: View {
     let preparePlay: () -> Void
     let onOpenFile: (String) -> Void
     let openPrompt: () -> Void
-    let showReview: () -> Void
-    let goBack: () -> Void
 
     var body: some View {
         ZStack(anchor: .bottom) {
@@ -47,8 +43,8 @@ struct MobileEditorWorkspaceView: View {
                     attachmentNames: pendingAttachmentNames,
                     chatEvents: chatEvents,
                     agentStatus: agentStatus,
-                    openPrompt: openPrompt,
-                    showTemplates: goBack
+                    isWorking: agentActivityState == .working,
+                    openPrompt: openPrompt
                 )
             }
             Tab("Files", value: MobileEditorWorkspaceTab.files) {
@@ -60,7 +56,7 @@ struct MobileEditorWorkspaceView: View {
         }
         .tabViewPosition(.bottom)
         .tabViewStyle(LiquidGlassTabBarStyle(
-            backgroundColor: theme.editorColors.surface,
+            backgroundColor: theme.editorColors.surface.opacity(0.12),
             borderColor: theme.editorColors.border,
             selectedColor: theme.editorColors.text,
             unselectedColor: theme.editorColors.muted,
@@ -74,85 +70,73 @@ struct MobileEditorWorkspaceView: View {
         ))
     }
 }
-private struct MobileEditorDotGrid: Shape {
-    typealias AnimatableData = EmptyAnimatableData
-
-    func path(in rect: Rect) -> Path {
-        var path = Path()
-        let spacing: Float = 22
-        var x: Float = 10
-        while x < rect.width {
-            var y: Float = 10
-            while y < rect.height {
-                path.addEllipse(in: Rect(x: x, y: y, width: 1.2, height: 1.2))
-                y += spacing
-            }
-            x += spacing
-        }
-        return path
-    }
-}
-
-private struct MobileEditorIdeaHalo: Shape {
-    typealias AnimatableData = EmptyAnimatableData
-
-    func path(in rect: Rect) -> Path {
-        var path = Path()
-        for index in 0..<1_400 {
-            let x = Float((index * 239) % 1_397) / 1_397
-            let y = Float((index * 577) % 1_391) / 1_391
-            let dx = (x - 0.5) * 1.3
-            let dy = (y - 0.5) * 1.8
-            let distance = dx * dx + dy * dy
-            guard distance > 0.04, distance < 0.38 else { continue }
-            path.addEllipse(in: Rect(x: x * rect.width, y: y * rect.height, width: 0.75, height: 0.75))
-        }
-        return path
-    }
-}
-
 struct MobileEditorBuildScreen: View {
     @Environment(\.theme) private var theme
+    @Environment(\.navigationBarContentInset) private var navigationBarContentInset
     let project: MobileEditorProject
     @Binding var promptDraft: String
     let attachmentNames: [String]
     let chatEvents: [EditorAgentEvent]
     let agentStatus: String?
+    let isWorking: Bool
     let openPrompt: () -> Void
-    let showTemplates: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(anchor: .bottom) {
             if chatEvents.isEmpty {
-                ZStack {
-                    VStack(spacing: 0) {
-                        Text("What would you like\nto create today?")
-                            .font(MobileEditorFont.font(size: 25))
-                            .foregroundColor(theme.editorColors.text)
-                            .multilineTextAlignment(.center)
-                            .padding(.bottom, 28)
-                        promptLauncher
-                        templatesButton
-                    }
+                VStack(spacing: 24) {
+                    Text("What would you like\nto create today?")
+                        .font(MobileEditorFont.font(size: 25))
+                        .foregroundColor(theme.editorColors.text)
+                        .multilineTextAlignment(.center)
+                    promptLauncher
+                        .padding(.horizontal, 16)
                 }
-                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.bottom, 100)
             } else {
-                EditorAgentTranscript(events: chatEvents, sessionID: project.id.uuidString)
-                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                    .padding(.bottom, 16)
-                promptLauncher
-            }
-            if let agentStatus {
-                Text(agentStatus)
-                    .font(MobileEditorFont.font(size: 12))
-                    .foregroundColor(theme.editorColors.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 16)
+                transcript
+                LinearGradient(
+                    colors: [theme.editorColors.background.opacity(0), theme.editorColors.background.opacity(0.35)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 240)
+                .allowsHitTesting(false)
+                VStack(spacing: 8) {
+                    if let agentStatus {
+                        HStack(spacing: 6) {
+                            if isWorking {
+                                Circle().fill(theme.editorColors.blue).frame(width: 6, height: 6)
+                            }
+                            Text(agentStatus)
+                        }
+                            .font(MobileEditorFont.font(size: 11))
+                            .foregroundColor(theme.editorColors.muted)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if isWorking {
+                        Text("You can switch screens while Ada works.")
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.editorColors.muted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    promptLauncher
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 100)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 26)
-        .padding(.bottom, 84)
+    }
+
+    private var transcript: some View {
+        var transcript = EditorAgentTranscript(events: chatEvents, sessionID: project.id.uuidString)
+        transcript.contentInsets = EdgeInsets(top: 0, leading: 16, bottom: agentStatus == nil ? 220 : 260, trailing: 16)
+        transcript.scrollContentInsets = EdgeInsets(top: navigationBarContentInset, leading: 0, bottom: 0, trailing: 0)
+        return transcript
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
     }
 
     private var promptLauncher: some View {
@@ -160,10 +144,11 @@ struct MobileEditorBuildScreen: View {
             EditorAgentComposerSurface(
                 cornerRadius: 24,
                 horizontalInset: 18,
-                topInset: 18,
-                bottomInset: 12
+                topInset: 14,
+                bottomInset: 12,
+                usesGlass: true
             ) {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 12) {
                     Text(hasDraft ? promptDraft : placeholder)
                         .font(MobileEditorFont.font(size: 14))
                         .foregroundColor(hasDraft ? theme.editorColors.text : theme.editorColors.muted)
@@ -178,8 +163,8 @@ struct MobileEditorBuildScreen: View {
                     HStack(spacing: 18) {
                         Text("\u{E145}")
                             .font(AdaEditorMaterialSymbolFont.font(size: 25))
-                        Text("\u{E3F4}")
-                            .font(AdaEditorMaterialSymbolFont.font(size: 20))
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(theme.editorColors.background.opacity(0.5)))
                         Spacer()
                         MobileEditorPromptSymbol(kind: .microphone)
                             .frame(width: 36, height: 36)
@@ -190,26 +175,8 @@ struct MobileEditorBuildScreen: View {
             }
         }
         .buttonStyle(DefaultButtonStyle())
-        .frame(maxWidth: 320)
+        .frame(maxWidth: .infinity)
         .accessibilityIdentifier("AdaEditor.Mobile.OpenPrompt")
-    }
-
-    private var templatesButton: some View {
-        Button(action: showTemplates) {
-            Text("View templates")
-                .font(MobileEditorFont.font(size: 13))
-                .foregroundColor(theme.editorColors.text)
-                .padding(.horizontal, 16)
-                .frame(height: 32)
-                .background(CapsuleShape().fill(theme.editorColors.surface))
-                .overlay {
-                    CapsuleShape().stroke(theme.editorColors.border, lineWidth: 1)
-                        .allowsHitTesting(false)
-                }
-        }
-        .buttonStyle(DefaultButtonStyle())
-        .accessibilityIdentifier("AdaEditor.Mobile.ViewTemplates")
-        .padding(.top, 22)
     }
 
     private var hasDraft: Bool { !promptDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

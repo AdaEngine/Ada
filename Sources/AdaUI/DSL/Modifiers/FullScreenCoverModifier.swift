@@ -9,6 +9,14 @@ import AdaInput
 import AdaUtils
 import Math
 
+/// The animation used to insert and dismiss a full-screen modal.
+public enum FullScreenCoverTransition: Sendable {
+    /// Moves the modal up from the bottom edge.
+    case slide
+    /// Fades the modal in place without translating or scaling it.
+    case opacity
+}
+
 extension View {
     /// Presents a modal view that covers as much of the screen as possible.
     ///
@@ -28,9 +36,10 @@ extension View {
     /// ```
     public func fullScreenCover<Overlay: View>(
         isPresented: Binding<Bool>,
+        transition: FullScreenCoverTransition = .slide,
         @ViewBuilder content: @escaping () -> Overlay
     ) -> some View {
-        modifier(FullScreenCoverModifier(content: self, isPresented: isPresented, overlay: content, style: .cover))
+        modifier(FullScreenCoverModifier(content: self, isPresented: isPresented, overlay: content, style: transition == .opacity ? .fade : .cover))
     }
 
     /// Presents a modal view when a bound optional item contains a value.
@@ -40,6 +49,7 @@ extension View {
     /// item binding back to `nil`.
     public func fullScreenCover<Item: Hashable, Content: View>(
         item: Binding<Item?>,
+        transition: FullScreenCoverTransition = .slide,
         @ViewBuilder content: @escaping (Item) -> Content
     ) -> some View {
         let isPresented = Binding<Bool>(
@@ -53,7 +63,7 @@ extension View {
             }
         )
 
-        return fullScreenCover(isPresented: isPresented) {
+        return fullScreenCover(isPresented: isPresented, transition: transition) {
             if let item = item.wrappedValue {
                 content(item).id(item)
             }
@@ -109,7 +119,7 @@ final class FullScreenCoverNode: ViewModifierNode, PresentationInputProviding {
     private var overlayBuilder: (_ViewInputs) -> ViewNode
     private var overlayNode: ViewNode?
     private var viewInputs: _ViewInputs
-    private let style: ViewPresentationTransition.Style
+    private var style: ViewPresentationTransition.Style
     private(set) lazy var presentation = ViewPresentationTransition(host: self)
     private var overlayBounds: Rect = .zero
     private lazy var dismissAction = DismissAction { [weak self] in
@@ -202,12 +212,21 @@ final class FullScreenCoverNode: ViewModifierNode, PresentationInputProviding {
         context.environment = environment
         context.translateBy(x: frame.origin.x, y: -frame.origin.y)
         contentNode.draw(with: context)
+        guard !presentation.nodes.isEmpty else {
+            return
+        }
         if style == .sheet, !presentation.entries.isEmpty {
             var backdrop = context
             backdrop.opacity *= 0.35 * (presentation.entries.map { $0.pose.opacity }.max() ?? 0)
             backdrop.drawRect(Rect(origin: .zero, size: frame.size), color: .black)
         }
-        presentation.draw(with: context, in: Rect(origin: .zero, size: frame.size))
+        // Opacity modals do not move or scale. Preserve backgrounds extending
+        // into safe areas instead of masking them to the content viewport.
+        presentation.draw(
+            with: context,
+            in: Rect(origin: .zero, size: frame.size),
+            clipsToBounds: style != .fade
+        )
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
@@ -240,6 +259,7 @@ final class FullScreenCoverNode: ViewModifierNode, PresentationInputProviding {
         }
         isPresented = other.isPresented
         overlayBuilder = other.overlayBuilder
+        style = other.style
         rebuildOverlay(refresh: true)
     }
 
