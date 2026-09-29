@@ -29,7 +29,7 @@ private struct MobileEditorFilePresentation: Hashable {
 
 private struct MobileEditorPlaySession {
     let projectID: UUID
-    let artifact: EditorAdaScriptProjectBuildArtifact
+    let runtime: EditorAdaScriptProjectRuntimeSession
     let capture: EditorProjectPreviewCapture
 }
 
@@ -113,7 +113,7 @@ struct MobileEditorRootView: View {
         .fullScreenCover(item: $presentedPlayProject) { project in
             MobileEditorPlayScreen(
                 project: project,
-                artifact: playSession?.projectID == project.id ? playSession?.artifact : nil,
+                runtimeSession: playSession?.projectID == project.id ? playSession?.runtime : nil,
                 capture: playSession?.projectID == project.id ? playSession?.capture : nil,
                 message: agentStatus,
                 isAgentRunning: isAgentRunning,
@@ -253,14 +253,16 @@ struct MobileEditorRootView: View {
     }
 
     private func openProject(_ project: MobileEditorProject) {
-        workspaceTab = .build
-        promptDraft = ""
-        pendingPromptAttachments = []
-        chatState.open(project.id)
-        playSession?.capture.stop()
-        playSession = nil
-        navigationPath.append(MobileEditorDestination.workspace(project.id))
-        Task { @MainActor in await loadChat(for: project.id) }
+        withTransaction(Transaction()) {
+            workspaceTab = .build
+            promptDraft = ""
+            pendingPromptAttachments = []
+            chatState.open(project.id)
+            playSession?.capture.stop()
+            playSession = nil
+            navigationPath.append(MobileEditorDestination.workspace(project.id))
+            Task { @MainActor in await loadChat(for: project.id) }
+        }
     }
 
     private func preparePlay(for id: UUID) {
@@ -268,13 +270,13 @@ struct MobileEditorRootView: View {
         do {
             let directory = try MobileAdaScriptProjectService.prepare(project)
             let artifact = try MobileAdaScriptProjectService.build(at: directory)
+            let capture = EditorProjectPreviewCapture(projectURL: directory)
+            let runtime = try EditorAdaScriptProjectRuntimeSession(artifact: artifact, previewCapture: capture)
             playSession?.capture.stop()
-            playSession = MobileEditorPlaySession(
-                projectID: id,
-                artifact: artifact,
-                capture: EditorProjectPreviewCapture(projectURL: directory)
-            )
-            presentedPlayProject = project
+            withTransaction(Transaction()) {
+                playSession = MobileEditorPlaySession(projectID: id, runtime: runtime, capture: capture)
+                presentedPlayProject = project
+            }
         } catch {
             playSession?.capture.stop()
             playSession = nil

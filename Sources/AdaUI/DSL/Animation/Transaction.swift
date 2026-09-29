@@ -1,7 +1,7 @@
 import AdaAnimation
 import Synchronization
 
-/// Animation policy for one state update. Unlike environment values, a transaction
+/// Animation policy for a group of state updates. Unlike environment values, a transaction
 /// is discarded when the update ends, and is captured by deferred observation work.
 public struct Transaction: Sendable {
     public var animation: Animation?
@@ -36,6 +36,7 @@ enum UITransactionContext {
 }
 
 /// Performs state changes using the supplied animation policy.
+/// State values change immediately; affected views rebuild once when the closure finishes.
 @MainActor
 public func withTransaction<Result>(_ transaction: Transaction, _ body: () throws -> Result) rethrows -> Result {
     try BindingAnimationTransaction.withTransaction(transaction, body)

@@ -99,7 +99,7 @@ extension System {
     }
 
     public var systemIdentifier: String {
-        String(reflecting: Self.self)
+        TypeNameCache.name(for: Self.self)
     }
 }
 

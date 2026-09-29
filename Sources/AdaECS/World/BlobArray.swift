@@ -65,7 +65,13 @@ public struct BlobArray: Sendable {
             ),
             deinitializer: deinitializer
         )
-        self.label = String(describing: T.self)
+        // This label is only used when inspecting storage in a debugger. Type
+        // reflection must not delay every resource allocation in release builds.
+        #if DEBUG
+            self.label = String(describing: T.self)
+        #else
+            self.label = nil
+        #endif
     }
 }
 

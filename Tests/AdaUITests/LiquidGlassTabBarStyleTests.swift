@@ -123,6 +123,45 @@ struct LiquidGlassTabBarStyleTests {
     }
 
     @Test
+    func draggingRetainsLensOpticsAndRepeatedlySelectsContent() throws {
+        let root = LiquidGlassNavigationTabRoot(thirdTabPlacement: .floating)
+        let tester = ViewTester(rootView: root).setSize(Size(width: 320, height: 480)).performLayout()
+        let selector = try #require(tester.findNodeByAccessibilityIdentifier("AdaUI.TabView.GlassSelector"))
+        let lens = try #require(findGlass(in: selector))
+
+        for target in [1, 0, 1, 0] {
+            let start = Point(82 + Float(root.selected) * 78, 426)
+            let direction: Float = target == 1 ? 1 : -1
+            tester.sendMouseEvent(at: start, phase: .began, time: 0)
+            tester.sendMouseEvent(at: Point(start.x + direction * 20, start.y), phase: .changed, time: 0.3)
+            tester.advanceFrame(deltaTime: 0.4).performLayout()
+
+            #expect(lens.configuration.blurRadius == 1)
+            #expect(lens.configuration.refractiveIndex == 1.28)
+            #expect(lens.configuration.dispersionStrength == 0.90)
+            #expect(lens.configuration.fresnelIntensity == 0.98)
+            #expect(lens.configuration.glareIntensity == 0.92)
+            #expect(tester.findNodeByAccessibilityIdentifier("AdaUI.TabView.GlassSelector") === selector)
+
+            let end = Point(start.x + direction * 78, start.y)
+            tester.sendMouseEvent(at: end, phase: .changed, time: 0.5)
+            tester.sendMouseEvent(at: end, phase: .ended, time: 0.6)
+            tester.advanceFrame(deltaTime: 0.4).performLayout()
+            #expect(root.selected == target)
+            #expect(tester.findNodeByAccessibilityIdentifier("glass-content-\(target)") != nil)
+            #expect(lens.configuration.blurRadius == Glass.regular.blurRadius)
+        }
+    }
+
+    private func findGlass(in node: ViewNode) -> GlassEffectViewNode? {
+        if let glass = node as? GlassEffectViewNode { return glass }
+        for child in node.transientEnvironmentChildren {
+            if let glass = findGlass(in: child) { return glass }
+        }
+        return nil
+    }
+
+    @Test
     func floatingTabSelectsItsContentAndReturnsToMainTabs() async throws {
         let root = LiquidGlassNavigationTabRoot(thirdTabPlacement: .floating)
         let tester = ViewTester(rootView: root)

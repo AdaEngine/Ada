@@ -46,17 +46,52 @@ private struct LiquidGlassTabBar: View {
     @Environment(\.keyboardSafeAreaInset) private var keyboardSafeAreaInset
     let configuration: TabViewStyleConfiguration
     let style: LiquidGlassTabBarStyle
+
+    @ViewBuilder
+    var body: some View {
+        switch configuration.position {
+        case .top:
+            ZStack(anchor: .top) {
+                configuration.content
+                LiquidGlassTabBarControls(configuration: configuration, style: style).padding(.top, 20)
+            }
+        case .bottom, .left, .right:
+            ZStack(anchor: .bottom) {
+                configuration.content
+                LiquidGlassTabBarControls(configuration: configuration, style: style).padding(.bottom, 20)
+                    .offset(y: keyboardSafeAreaInset)
+            }
+        }
+    }
+}
+
+@MainActor
+private final class LiquidGlassTabInteraction {
+    var dragOriginIndex = 0
+    var lastDragSample: (position: Float, time: ContinuousClock.Instant)?
+    var lastVelocitySample: ContinuousClock.Instant?
+    var velocityDecayTask: Task<Void, Never>?
+
+    func stop() {
+        velocityDecayTask?.cancel()
+        velocityDecayTask = nil
+        lastDragSample = nil
+        lastVelocitySample = nil
+    }
+}
+
+@MainActor
+private struct LiquidGlassTabBarControls: View {
+    let configuration: TabViewStyleConfiguration
+    let style: LiquidGlassTabBarStyle
     @State private var isDragging = false
     @State private var dragOffset: Float = 0
     @State private var edgePull: Float = 0
-    @State private var dragOriginIndex = 0
     @State private var selectorRelease = 0
     @State private var glassPhase: Float = 0
     @State private var lensPhase: Float = 0
     @State private var selectorVelocity: Float = 0
-    @State private var lastDragSample: (position: Float, time: ContinuousClock.Instant)?
-    @State private var lastVelocitySample: ContinuousClock.Instant?
-    @State private var velocityDecayTask: Task<Void, Never>?
+    @State private var interaction = LiquidGlassTabInteraction()
 
     private let tabWidth: Float = 76
     private let tabSpacing: Float = 2
@@ -74,7 +109,7 @@ private struct LiquidGlassTabBar: View {
         selectorInset * 2 + Float(tabs.count) * tabWidth + Float(max(0, tabs.count - 1)) * tabSpacing
     }
     private var selectorCenterX: Float {
-        let index = isDragging ? dragOriginIndex : selectedIndex
+        let index = isDragging ? interaction.dragOriginIndex : selectedIndex
         return selectorInset + Float(index) * (tabWidth + tabSpacing) + tabWidth * 0.5 + (isDragging ? dragOffset : 0)
     }
     private var edgeStretch: Float { min(abs(edgePull) / 36, 1) * glassPhase }
@@ -85,22 +120,7 @@ private struct LiquidGlassTabBar: View {
         return (edgePull < 0 ? -1 : 1) * extraWidth * 0.5 + edgePull * 0.10
     }
 
-    @ViewBuilder
-    var body: some View {
-        switch configuration.position {
-        case .top:
-            ZStack(anchor: .top) {
-                configuration.content
-                tabBar.padding(.top, 20)
-            }
-        case .bottom, .left, .right:
-            ZStack(anchor: .bottom) {
-                configuration.content
-                tabBar.padding(.bottom, 20)
-                    .offset(y: keyboardSafeAreaInset)
-            }
-        }
-    }
+    var body: some View { tabBar }
 
     private var tabBar: some View {
         HStack(spacing: 12) {
@@ -178,11 +198,8 @@ private struct LiquidGlassTabBar: View {
             }
         }
         .onDisappear {
-            velocityDecayTask?.cancel()
-            velocityDecayTask = nil
+            interaction.stop()
             selectorVelocity = 0
-            lastDragSample = nil
-            lastVelocitySample = nil
         }
     }
 
@@ -204,6 +221,7 @@ private struct LiquidGlassTabBar: View {
         .animation(Animation(LiquidGlassTabBarBounce()), value: selectedIndex)
         .animation(Animation(LiquidGlassTabBarBounce()), value: selectorRelease)
         .allowsHitTesting(false)
+        .accessibilityIdentifier("AdaUI.TabView.GlassSelector")
     }
 
     private var activeLensGlass: Glass {
@@ -288,83 +306,91 @@ private struct LiquidGlassTabBar: View {
     }
 
     private func beginDrag(from index: Int) {
-        guard !isDragging else { return }
-        dragOriginIndex = index
-        dragOffset = 0
-        edgePull = 0
-        isDragging = true
-        lastDragSample = (selectorCenterX + edgeStretchOffset, .now)
-        transitionGlass(to: 1)
+        withTransaction(Transaction()) {
+            guard !isDragging else { return }
+            interaction.dragOriginIndex = index
+            dragOffset = 0
+            edgePull = 0
+            isDragging = true
+            interaction.lastDragSample = (selectorCenterX + edgeStretchOffset, .now)
+            transitionGlass(to: 1)
+        }
     }
 
     private func updateDrag(_ value: DragGesture.Value, from index: Int) {
-        if !isDragging {
-            guard index == selectedIndex, abs(value.translation.width) > 3 else { return }
-            beginDrag(from: index)
-        }
-        guard dragOriginIndex == index else { return }
+        withTransaction(Transaction()) {
+            if !isDragging {
+                guard index == selectedIndex, abs(value.translation.width) > 3 else { return }
+                beginDrag(from: index)
+            }
+            guard interaction.dragOriginIndex == index else { return }
 
-        let step = tabWidth + tabSpacing
-        let minimumOffset = -Float(dragOriginIndex) * step
-        let maximumOffset = Float(tabs.count - 1 - dragOriginIndex) * step
-        dragOffset = min(maximumOffset, max(minimumOffset, value.translation.width))
-        let overflow = value.translation.width - dragOffset
-        edgePull = overflow * edgePullLimit / (edgePullLimit + abs(overflow))
+            let step = tabWidth + tabSpacing
+            let minimumOffset = -Float(interaction.dragOriginIndex) * step
+            let maximumOffset = Float(tabs.count - 1 - interaction.dragOriginIndex) * step
+            dragOffset = min(maximumOffset, max(minimumOffset, value.translation.width))
+            let overflow = value.translation.width - dragOffset
+            edgePull = overflow * edgePullLimit / (edgePullLimit + abs(overflow))
 
-        let now = ContinuousClock.now
-        let position = selectorCenterX + edgeStretchOffset
-        if let sample = lastDragSample {
-            let elapsed = sample.time.duration(to: now).components
-            let seconds = Float(elapsed.seconds) + Float(elapsed.attoseconds) * 1e-18
-            guard seconds >= 0.004 else { return }
-            let speed = abs(position - sample.position) / seconds
-            recordSelectorVelocity(selectorVelocity * 0.25 + speed * 0.75)
+            let now = ContinuousClock.now
+            let position = selectorCenterX + edgeStretchOffset
+            if let sample = interaction.lastDragSample {
+                let elapsed = sample.time.duration(to: now).components
+                let seconds = Float(elapsed.seconds) + Float(elapsed.attoseconds) * 1e-18
+                guard seconds >= 0.004 else { return }
+                let speed = abs(position - sample.position) / seconds
+                recordSelectorVelocity(selectorVelocity * 0.25 + speed * 0.75)
+            }
+            interaction.lastDragSample = (position, now)
         }
-        lastDragSample = (position, now)
     }
 
     private func finishDrag(_ value: DragGesture.Value, from index: Int) {
-        updateDrag(value, from: index)
-        if isDragging, dragOriginIndex == index {
-            let step = tabWidth + tabSpacing
-            let targetIndex = min(tabs.count - 1, max(0, index + Int((dragOffset / step).rounded())))
-            isDragging = false
-            dragOffset = 0
-            edgePull = 0
-            lastDragSample = nil
-            transitionGlass(to: 0)
-            selectorRelease += 1
-            tabs[targetIndex].action()
-            return
-        }
+        withTransaction(Transaction()) {
+            updateDrag(value, from: index)
+            if isDragging, interaction.dragOriginIndex == index {
+                let step = tabWidth + tabSpacing
+                let targetIndex = min(tabs.count - 1, max(0, index + Int((dragOffset / step).rounded())))
+                isDragging = false
+                dragOffset = 0
+                edgePull = 0
+                interaction.lastDragSample = nil
+                transitionGlass(to: 0)
+                selectorRelease += 1
+                tabs[targetIndex].action()
+                return
+            }
 
-        guard abs(value.translation.width) < 8, abs(value.translation.height) < 8 else { return }
-        tabs[index].action()
+            guard abs(value.translation.width) < 8, abs(value.translation.height) < 8 else { return }
+            tabs[index].action()
+        }
     }
 
     private func recordSelectorVelocity(_ speed: Float) {
-        selectorVelocity = min(speed, 3_000)
-        lastVelocitySample = .now
-        guard velocityDecayTask == nil else { return }
+        withTransaction(Transaction()) {
+            selectorVelocity = min(speed, 3_000)
+            interaction.lastVelocitySample = .now
+            guard interaction.velocityDecayTask == nil else { return }
 
-        velocityDecayTask = Task { @MainActor in
-            var previousTick = ContinuousClock.now
-            while !Task.isCancelled, selectorVelocity > 1 {
-                do {
-                    try await Task.sleep(for: .milliseconds(16))
-                } catch {
-                    return
+            interaction.velocityDecayTask = Task { @MainActor in
+                var previousTick = ContinuousClock.now
+                while !Task.isCancelled, selectorVelocity > 1 {
+                    do {
+                        try await Task.sleep(for: .milliseconds(16))
+                    } catch {
+                        return
+                    }
+                    let now = ContinuousClock.now
+                    if let sample = interaction.lastVelocitySample, sample.duration(to: now) >= .milliseconds(40) {
+                        let elapsed = previousTick.duration(to: now).components
+                        let seconds = Float(elapsed.seconds) + Float(elapsed.attoseconds) * 1e-18
+                        selectorVelocity *= Float(exp(-14 * Double(seconds)))
+                    }
+                    previousTick = now
                 }
-                let now = ContinuousClock.now
-                if let sample = lastVelocitySample, sample.duration(to: now) >= .milliseconds(40) {
-                    let elapsed = previousTick.duration(to: now).components
-                    let seconds = Float(elapsed.seconds) + Float(elapsed.attoseconds) * 1e-18
-                    selectorVelocity *= Float(exp(-14 * Double(seconds)))
-                }
-                previousTick = now
+                selectorVelocity = 0
+                interaction.velocityDecayTask = nil
             }
-            selectorVelocity = 0
-            velocityDecayTask = nil
         }
     }
 

@@ -89,7 +89,13 @@ struct ProjectOpeningTemplateTests {
             .appendingPathComponent("Editor/Tests/AdaEditorTests/Fixtures/MedievalArena", isDirectory: true)
         let project = try ProjectSystem.loadProject(at: projectURL)
         let artifact = try EditorAdaScriptProjectBuilder().prepare(project: project, at: projectURL)
-        let view = try EditorAdaScriptProjectRuntimeView(artifact: artifact)
+        let session = try EditorAdaScriptProjectRuntimeSession(artifact: artifact)
+        let view = session.view
+        for _ in 0..<5 {
+            #expect(session.view.performanceSession === view.performanceSession)
+        }
+        try session.restart()
+        #expect(session.view.performanceSession !== view.performanceSession)
         let scene = try #require(artifact.sceneModel)
         let world = World(name: "Medieval Arena Play validation")
         let loaded = EditorSceneFileLoader.load(

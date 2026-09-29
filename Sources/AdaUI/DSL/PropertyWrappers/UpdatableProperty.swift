@@ -74,13 +74,17 @@ class UpdatablePropertyStorage {
     /// - Returns: The property.
     func update() {
         nodes.forEach { node in
+            if self is AnyStateStorage, let batch = StateUpdateBatch.current {
+                batch.enqueue(node, storage: self)
+                return
+            }
             node.withAncestorTransaction {
-                self.update(node)
+                self.performUpdate(node)
             }
         }
     }
 
-    private func update(_ node: ViewNode) {
+    func performUpdate(_ node: ViewNode) {
         let animationController = BindingAnimationTransaction.currentController
         if node.shouldNotifyAboutChanges {
             Logger(label: "org.adaengine.AdaUI")

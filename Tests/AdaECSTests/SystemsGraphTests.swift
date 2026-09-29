@@ -8,6 +8,16 @@ import Testing
 
 @Suite("Systems graph identity")
 struct SystemsGraphTests {
+    @Test("Default identifiers retain the qualified type name across worlds")
+    func defaultIdentifierMatchesTypeDependencies() {
+        let expected = String(reflecting: DependentIdentifierSystem.self)
+        for _ in 0..<10 {
+            let system = DependentIdentifierSystem(world: World())
+            #expect(system.systemIdentifier == expected)
+            #expect(system.systemIdentifier == DependentIdentifierSystem.swiftName)
+        }
+    }
+
     @Test("Type dependencies resolve custom system identifiers")
     func typeDependenciesResolveCustomIdentifiers() {
         var graph = SystemsGraph()

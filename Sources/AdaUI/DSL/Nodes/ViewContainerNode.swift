@@ -28,7 +28,7 @@ class ViewContainerNode: ViewNode {
 
     /// Builder method returns a new children.
     private var body: ((_ViewListInputs) -> _ViewListOutputs)?
-    private var contentObservationRevision: UInt64 = 0
+    private(set) var contentObservationRevision: UInt64 = 0
     private var hasBuiltContent = false
     private var hasDeferredInitialContentBuild = false
 

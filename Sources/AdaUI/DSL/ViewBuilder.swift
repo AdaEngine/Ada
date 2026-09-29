@@ -24,7 +24,9 @@
 
     /// Passes a single view written as a child view through unmodified.
     @_alwaysEmitIntoClient
-    public static func buildBlock<each Content>(_ content: repeat each Content) -> ViewTuple<(repeat each Content)> where repeat each Content: View {
+    public static func buildBlock<each Content>(
+        _ content: repeat each Content
+    ) -> ViewTuple<(repeat each Content)> where repeat each Content: View {
         return ViewTuple(value: (repeat each content))
     }
 

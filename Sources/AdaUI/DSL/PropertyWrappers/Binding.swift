@@ -16,10 +16,20 @@ enum BindingAnimationTransaction {
     }
 
     static func withTransaction<Result>(_ transaction: Transaction?, _ operation: () throws -> Result) rethrows -> Result {
+        if StateUpdateBatch.current != nil,
+           transaction?.animation == nil,
+           UITransactionContext.current?.animation == nil,
+           transaction?.disablesAnimations == UITransactionContext.current?.disablesAnimations {
+            return try operation()
+        }
+        // Finish the enclosing policy before entering a different animation scope.
+        StateUpdateBatch.current?.flush()
         let controller = transaction.flatMap { value in
             value.disablesAnimations ? nil : value.animation.map { UIAnimationController(animation: $0) }
         }
-        return try withController(controller, transaction: transaction, operation)
+        return try withController(controller, transaction: transaction) {
+            try StateUpdateBatch.withUpdates(operation)
+        }
     }
 
     static func withController<Result>(_ controller: UIAnimationController?, transaction: Transaction?, _ operation: () throws -> Result) rethrows -> Result {

@@ -12,7 +12,7 @@ struct MobileEditorPlayScreen: View {
     @State private var captureTimeout: Task<Void, Never>?
 
     let project: MobileEditorProject
-    let artifact: EditorAdaScriptProjectBuildArtifact?
+    let runtimeSession: EditorAdaScriptProjectRuntimeSession?
     let capture: EditorProjectPreviewCapture?
     let message: String?
     let isAgentRunning: Bool
@@ -61,8 +61,16 @@ struct MobileEditorPlayScreen: View {
             MobileEditorPlayControl(symbol: "\u{E5D5}", identifier: "RestartPlay") {
                 capture?.cancelFrameRequest()
                 captureTimeout?.cancel()
-                isCapturing = false
-                runtimeID = UUID()
+                do {
+                    try runtimeSession?.restart()
+                    withTransaction(Transaction()) {
+                        isCapturing = false
+                        captureError = nil
+                        runtimeID = UUID()
+                    }
+                } catch {
+                    captureError = error.localizedDescription
+                }
             }
             Button(action: captureFrame) {
                 HStack(spacing: 6) {
@@ -84,7 +92,7 @@ struct MobileEditorPlayScreen: View {
 
     @ViewBuilder
     private var game: some View {
-        if let artifact, let runtime = try? EditorAdaScriptProjectRuntimeView(artifact: artifact, previewCapture: capture) {
+        if let runtime = runtimeSession?.view {
             runtime.id(runtimeID)
         } else {
             MobileEditorPlayEmptyScreen(message: message) { dismiss() }

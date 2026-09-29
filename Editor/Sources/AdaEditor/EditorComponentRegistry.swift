@@ -217,6 +217,8 @@ struct EditorComponentDescriptor: @unchecked Sendable {
 }
 
 enum EditorComponentRegistry {
+    @MainActor private static var hasRegisteredBuiltIns = false
+
     static var descriptors: [EditorComponentDescriptor] {
         let overrideNames = Set(overrideDescriptors.map(\.typeName))
         let reflectedDescriptors =
@@ -255,6 +257,7 @@ enum EditorComponentRegistry {
 
     @MainActor
     static func registerBuiltIns() {
+        guard !hasRegisteredBuiltIns else { return }
         DisplayLayout.registerRuntimeType()
         RuntimeTypeRegistry.registerComponent(CompanionPanel.self, names: ["CompanionPanel"])
         RuntimeTypeRegistry.registerComponent(
@@ -301,6 +304,7 @@ enum EditorComponentRegistry {
         ComponentReflectionRegistry.register(LightOccluder2D.componentDescriptor)
         ComponentReflectionRegistry.register(LightModulate2D.componentDescriptor)
         ComponentReflectionRegistry.register(SceneInstance.componentDescriptor)
+        hasRegisteredBuiltIns = true
     }
 
     static func descriptor(named typeName: String) -> EditorComponentDescriptor? {
