@@ -21,8 +21,16 @@ actor MobileEditorSessionStore {
 
     func list() throws -> [MobileEditorSessionSummary] {
         guard FileManager.default.fileExists(atPath: agentsURL.appendingPathComponent("mobile").path) else { return [] }
-        return try AgentSessionFileStore(agentsRootURL: agentsURL).listSessions(agentID: "mobile").map {
-            MobileEditorSessionSummary(id: $0.id, title: $0.title, updatedAt: $0.updatedAt, messageCount: $0.messageCount, preview: $0.lastMessagePreview ?? "")
+        let store = AgentSessionFileStore(agentsRootURL: agentsURL)
+        return try store.listSessions(agentID: "mobile").map { summary in
+            let detail = try store.loadSession(agentID: "mobile", sessionID: summary.id)
+            let messages = MobileSloppyChatAdapter.events(from: detail.events).compactMap(\.message)
+            let title = messages.first(where: { $0.role == .user })?.segments.first?.text ?? summary.title
+            let preview = messages.last?.segments.first?.text ?? ""
+            return MobileEditorSessionSummary(
+                id: summary.id, title: String(title.prefix(80)), updatedAt: summary.updatedAt,
+                messageCount: messages.count, preview: String(preview.prefix(200))
+            )
         }
     }
 
@@ -36,8 +44,10 @@ actor MobileEditorSessionStore {
             case .assistant: role = .assistant
             case .system: return nil
             }
-            let text = message.segments.compactMap(\.text).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { return nil }
+            let rawText = message.segments.compactMap(\.text).joined(separator: "\n")
+            guard let text = role == .user ? MobileEditorAgentContext.visibleText(rawText)
+                : rawText.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
             return SloppyChatMessage(id: event.id, role: role, text: text, createdAt: event.createdAt)
         }
     }

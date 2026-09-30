@@ -24,6 +24,8 @@ struct EditorAdaScriptProjectRuntimeView: View {
     private let entryView: AdaScriptView?
     private let scriptPlugin: AdaScriptPlugin?
 
+    var diagnostics: [String] { scriptPlugin?.diagnostics ?? [] }
+
     init(
         artifact: EditorAdaScriptProjectBuildArtifact,
         controls: EditorGameWindowControls? = nil,
@@ -172,7 +174,7 @@ struct EditorAdaScriptProjectRuntimeView: View {
     }
 }
 
-private struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
+struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
     let sceneModel: EditorSceneModel
     let assetsDirectory: URL
 

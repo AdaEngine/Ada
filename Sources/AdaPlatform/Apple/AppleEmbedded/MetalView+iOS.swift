@@ -159,7 +159,8 @@
                     location: Point(Float(point.x), Float(point.y)),
                     phase: .began,
                     time: TimeInterval(event?.timestamp ?? 0),
-                    contactID: contactID
+                    contactID: contactID,
+                    tapCount: touch.tapCount
                 )
 
                 input?.wrappedValue.receiveEvent(touchEvent)
@@ -178,7 +179,8 @@
                     location: Point(Float(point.x), Float(point.y)),
                     phase: .moved,
                     time: TimeInterval(event?.timestamp ?? 0),
-                    contactID: contactID
+                    contactID: contactID,
+                    tapCount: touch.tapCount
                 )
 
                 input?.wrappedValue.receiveEvent(touchEvent)
@@ -197,7 +199,8 @@
                     location: Point(Float(point.x), Float(point.y)),
                     phase: .cancelled,
                     time: TimeInterval(event?.timestamp ?? 0),
-                    contactID: contactID
+                    contactID: contactID,
+                    tapCount: touch.tapCount
                 )
 
                 input?.wrappedValue.receiveEvent(touchEvent)
@@ -217,7 +220,8 @@
                     location: Point(Float(point.x), Float(point.y)),
                     phase: .ended,
                     time: TimeInterval(event?.timestamp ?? 0),
-                    contactID: contactID
+                    contactID: contactID,
+                    tapCount: touch.tapCount
                 )
 
                 input?.wrappedValue.receiveEvent(touchEvent)

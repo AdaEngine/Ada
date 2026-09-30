@@ -22,7 +22,8 @@ struct EditorProjectPersistenceTests {
         let project = try store.createProject(
             named: "Migrated Game",
             at: currentDocumentsURL,
-            template: .adaScript
+            template: .adaScript,
+            asPackage: true
         )
         let stalePath =
             rootURL

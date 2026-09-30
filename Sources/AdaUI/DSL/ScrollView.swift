@@ -18,19 +18,28 @@ public struct ScrollView<Content: View>: View, ViewNodeBuilder {
     let axis: Axis
     let showsIndicators: Bool
     let contentInsets: EdgeInsets?
+    let respectsSafeArea: Bool
+    let extendsUnderNavigationBar: Bool
     let content: () -> Content
 
     /// Creates a scroll view, optionally showing viewport indicators when content overflows.
     /// `contentInsets` overrides automatic safe-area insets inside the scroll content.
+    /// Set `respectsSafeArea` to false to omit automatic device safe-area content insets.
+    /// `extendsUnderNavigationBar` keeps the viewport behind navigation chrome and reserves its height inside scrolling content.
+    /// Combine both options to scroll under the bar without counting the host's device safe area again.
     public init(
         _ axis: Axis = .vertical,
         showsIndicators: Bool = false,
         contentInsets: EdgeInsets? = nil,
+        respectsSafeArea: Bool = true,
+        extendsUnderNavigationBar: Bool = false,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.axis = axis
         self.showsIndicators = showsIndicators
         self.contentInsets = contentInsets
+        self.respectsSafeArea = respectsSafeArea
+        self.extendsUnderNavigationBar = extendsUnderNavigationBar
         self.content = content
     }
 
@@ -39,6 +48,8 @@ public struct ScrollView<Content: View>: View, ViewNodeBuilder {
         node.axis = self.axis
         node.showsIndicators = self.showsIndicators
         node.contentInsets = self.contentInsets
+        node.respectsSafeArea = self.respectsSafeArea
+        node.extendsUnderNavigationBar = self.extendsUnderNavigationBar
         node.updateEnvironment(context.environment)
         context.environment.scrollViewProxy?.subsribe(node)
         node.invalidateContent()
@@ -53,6 +64,8 @@ final class ScrollViewNode: LayoutViewContainerNode {
     var axis: Axis = .vertical
     var showsIndicators = false
     var contentInsets: EdgeInsets?
+    var respectsSafeArea = true
+    var extendsUnderNavigationBar = false
 
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
@@ -62,6 +75,8 @@ final class ScrollViewNode: LayoutViewContainerNode {
         axis = scroll.axis
         showsIndicators = scroll.showsIndicators
         contentInsets = scroll.contentInsets
+        respectsSafeArea = scroll.respectsSafeArea
+        extendsUnderNavigationBar = scroll.extendsUnderNavigationBar
     }
 
     override var isClipping: Bool {
@@ -561,7 +576,10 @@ final class ScrollViewNode: LayoutViewContainerNode {
 
     private func resolvedContentInsets() -> EdgeInsets {
         if let contentInsets { return contentInsets }
-        guard environment._scrollViewRespectsSafeArea else {
+        if extendsUnderNavigationBar, !respectsSafeArea || !environment._scrollViewRespectsSafeArea {
+            return EdgeInsets(top: axis.contains(.vertical) ? environment.navigationBarContentInset : 0, leading: 0, bottom: 0, trailing: 0)
+        }
+        guard respectsSafeArea && environment._scrollViewRespectsSafeArea else {
             return EdgeInsets()
         }
         let safeAreaInsets = environment.safeAreaInsets

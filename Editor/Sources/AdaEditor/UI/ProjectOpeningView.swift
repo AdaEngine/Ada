@@ -228,6 +228,18 @@ struct ProjectOpeningView: View {
             launcherSectionButton(.templates)
             launcherSectionButton(.samples)
 
+            #if os(iOS)
+                LauncherSidebarTooltipButton("Mobile agent") {
+                    MobileEditorWindowLauncher.open()
+                } label: {
+                    Text("\u{E65F}")
+                        .font(AdaEditorMaterialSymbolFont.font(size: 22))
+                        .foregroundColor(.white)
+                        .frame(width: 58, height: 34)
+                }
+                .accessibilityIdentifier("AdaEditor.Launcher.MobileAgent")
+            #endif
+
             Spacer()
 
             LauncherSidebarTooltipButton("Settings") {

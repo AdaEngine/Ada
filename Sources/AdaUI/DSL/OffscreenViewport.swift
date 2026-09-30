@@ -213,7 +213,7 @@ private final class OffscreenViewportNode: ViewNode {
     override func onMouseEvent(_ event: MouseEvent) {
         guard isInteractive else { return }
         let localPosition = viewportLocalPosition(event.mousePosition)
-        let localEvent = MouseEvent(
+        var localEvent = MouseEvent(
             window: event.window,
             button: event.button,
             scrollDelta: event.scrollDelta,
@@ -222,6 +222,7 @@ private final class OffscreenViewportNode: ViewNode {
             modifierKeys: event.modifierKeys,
             time: event.time
         )
+        localEvent.hasPreciseScrollingDeltas = event.hasPreciseScrollingDeltas
 
         if event.phase == .began {
             activateViewport()

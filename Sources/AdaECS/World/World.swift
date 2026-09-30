@@ -169,10 +169,15 @@ extension World {
         self.schedulers.append(scheduler)
     }
 
-    /// Run a specific scheduler.
-    /// - Parameter scheduler: Scheduler name.
-    /// - Parameter deltaTime: Time interval since last update.
+    /// Runs a scheduler using its normal wall clock.
+    /// - Parameter schedulerName: Scheduler to execute.
     public func runScheduler(_ schedulerName: SchedulerName) async {
+        await runScheduler(schedulerName, deltaTime: nil)
+    }
+
+    /// Runs a scheduler with a fixed step for simulation, or wall time when nil.
+    /// Invalid or negative steps are treated as zero.
+    public func runScheduler(_ schedulerName: SchedulerName, deltaTime: AdaUtils.TimeInterval?) async {
         await AdaTrace.span(
             lazyName: "World.runScheduler.\(schedulerName.rawValue)",
             attributes: [
@@ -182,7 +187,7 @@ extension World {
             ]
         ) {
             await self.schedulers.getScope(for: schedulerName) {
-                await $0.run(world: self)
+                await $0.run(world: self, deltaTime: deltaTime)
             }
         }
     }

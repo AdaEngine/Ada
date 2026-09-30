@@ -18,7 +18,7 @@ extension EditorProjectStore {
             throw CocoaError(.fileNoSuchFile)
         }
         let url = resolveProjectURL(for: references[index])
-        #if os(iOS) || os(tvOS) || os(visionOS)
+        #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS)
             let accessing = url.startAccessingSecurityScopedResource()
             defer {
                 if accessing {
@@ -90,6 +90,11 @@ extension EditorProjectStore {
     /// from Files or iCloud Drive, while `documentsRelativePath` keeps app-owned projects
     /// independent of that transient UUID.
     public func resolveProjectURL(for project: EditorProjectReference) -> URL {
+        #if os(macOS)
+            if let bookmarkedURL = bookmarkedProjectURL(for: project) {
+                return bookmarkedURL
+            }
+        #endif
         if let relativePath = validatedDocumentsRelativePath(
             project.documentsRelativePath ?? Self.legacyDocumentsRelativePath(from: project.path)
         ), let documentsDirectoryURL {
@@ -97,26 +102,40 @@ extension EditorProjectStore {
         }
 
         #if os(iOS) || os(tvOS) || os(visionOS)
-            if let bookmarkData = project.bookmarkData {
-                var isStale = false
-                if let bookmarkedURL = try? URL(
-                    resolvingBookmarkData: bookmarkData,
-                    options: [],
-                    relativeTo: nil,
-                    bookmarkDataIsStale: &isStale
-                ) {
-                    return bookmarkedURL.standardizedFileURL
-                }
+            if let bookmarkedURL = bookmarkedProjectURL(for: project) {
+                return bookmarkedURL
             }
         #endif
 
         return URL(fileURLWithPath: project.path, isDirectory: true).standardizedFileURL
     }
 
+    private func bookmarkedProjectURL(for project: EditorProjectReference) -> URL? {
+        #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS)
+            guard let bookmarkData = project.bookmarkData else {
+                return nil
+            }
+            var isStale = false
+            #if os(macOS)
+                let options: URL.BookmarkResolutionOptions = [.withSecurityScope, .withoutUI]
+            #else
+                let options: URL.BookmarkResolutionOptions = []
+            #endif
+            return try? URL(resolvingBookmarkData: bookmarkData, options: options, relativeTo: nil, bookmarkDataIsStale: &isStale)
+        #else
+            return nil
+        #endif
+    }
+
     func restoringProjectLocation(_ project: EditorProjectReference) -> EditorProjectReference {
         var restoredProject = project
         let resolvedURL = resolveProjectURL(for: project)
-        restoredProject.path = resolvedURL.path
+        let storedURL = URL(fileURLWithPath: project.path, isDirectory: true)
+        // Bookmark resolution canonicalizes aliases such as /var -> /private/var.
+        // Keep the existing path and UI identity when it still names the same folder.
+        if resolvedURL.resolvingSymlinksInPath().path != storedURL.resolvingSymlinksInPath().path {
+            restoredProject.path = resolvedURL.path
+        }
         if restoredProject.documentsRelativePath == nil {
             restoredProject.documentsRelativePath =
                 documentsRelativePath(for: resolvedURL)
@@ -152,7 +171,9 @@ extension EditorProjectStore {
     }
 
     func makeBookmarkData(for projectURL: URL) -> Data? {
-        #if os(iOS) || os(tvOS) || os(visionOS)
+        #if os(macOS)
+            return try? projectURL.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
+        #elseif os(iOS) || os(tvOS) || os(visionOS)
             return try? projectURL.bookmarkData(
                 options: [],
                 includingResourceValuesForKeys: nil,

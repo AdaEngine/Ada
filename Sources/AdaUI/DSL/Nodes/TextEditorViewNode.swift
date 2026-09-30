@@ -61,6 +61,9 @@ final class TextEditorViewNode: ViewNode {
     var tokenSpans: [TextEditorTokenSpan]
     var sourceInteraction: TextEditorSourceInteraction?
     var showsLineNumbers: Bool
+    var wrapsLines: Bool
+    var wrappedRowsCache: WrappedRowsCache?
+    var appliedAutofocusRequestID: Int?
     var foldingStyle: TextEditorFoldingStyle
     var showsIndentationGuides: Bool
     var showsTabMarkers: Bool
@@ -76,6 +79,8 @@ final class TextEditorViewNode: ViewNode {
     var isSourceCursorActive = false
     var isSelectingWithMouse = false
     var isSelectingWithTouch = false
+    var showsTouchSelectionHandles = false
+    var touchSession: TouchSession?
     var gutterTouchLine: Int?
     var foldTouchLine: Int?
     var foldMouseLine: Int?
@@ -113,6 +118,7 @@ final class TextEditorViewNode: ViewNode {
         self.tokenSpans = content.tokenSpans
         self.sourceInteraction = content.sourceInteraction
         self.showsLineNumbers = content.showsLineNumbers
+        self.wrapsLines = content.wrapsLines
         self.foldingStyle = content.foldingStyle
         self.showsIndentationGuides = content.showsIndentationGuides
         self.showsTabMarkers = content.showsTabMarkers
@@ -134,7 +140,7 @@ final class TextEditorViewNode: ViewNode {
         let lineHeight = self.lineHeight(for: pointSize)
         let lines = self.lines()
         let displayedLines = self.displayedLines()
-        let maxLineCharacterCount = max(displayedLines.map { lines[$0].text.count }.max() ?? 0, self.placeholder.count, 1)
+        let maxLineCharacterCount = wrapsLines ? 1 : max(displayedLines.map { lines[$0].text.count }.max() ?? 0, self.placeholder.count, 1)
         let maxLineWidth = Float(maxLineCharacterCount) * self.characterAdvance(for: pointSize)
         let ideal = Size(
             width: max(Constants.minimumWidth, Constants.horizontalInset * 2 + self.gutterInset + maxLineWidth),
@@ -149,7 +155,17 @@ final class TextEditorViewNode: ViewNode {
             result.height = ideal.height
         }
 
+        if wrapsLines, result.width.isFinite {
+            result.height = max(Constants.minimumHeight, Constants.verticalInset * 2 + lineHeight * Float(wrappedRows(width: result.width).count))
+            if let height = proposal.height, height.isFinite { result.height = height }
+        }
         return result
+    }
+
+    override func performLayout() {
+        super.performLayout()
+        if wrapsLines { ensureCaretVisibleIfNeeded() }
+        requestAutofocusIfNeeded()
     }
 
     override func update(from newNode: ViewNode) {
@@ -164,6 +180,11 @@ final class TextEditorViewNode: ViewNode {
         self.tokenSpans = node.tokenSpans
         self.sourceInteraction = node.sourceInteraction
         self.showsLineNumbers = node.showsLineNumbers
+        if wrapsLines != node.wrapsLines {
+            wrapsLines = node.wrapsLines
+            wrappedRowsCache = nil
+            markNeedsLayout()
+        }
         if self.foldingStyle != node.foldingStyle {
             self.foldingStyle = node.foldingStyle
             self.foldRangesCache = nil
@@ -201,6 +222,7 @@ final class TextEditorViewNode: ViewNode {
     override func onFocusChanged(isFocused: Bool) { self.updateTextEditorFocus(isFocused) }
 
     override func onMouseEvent(_ event: MouseEvent) {
+        self.showsTouchSelectionHandles = false
         if self.handleSourceInteractionMouseEvent(event) {
             return
         }
@@ -393,6 +415,7 @@ final class TextEditorViewNode: ViewNode {
     }
 
     override func update(_ deltaTime: AdaUtils.TimeInterval) {
+        advanceTouchHold(deltaTime)
         guard self.isFocused else {
             return
         }
@@ -413,6 +436,11 @@ final class TextEditorViewNode: ViewNode {
         var context = context
         context.environment = environment
         super.draw(with: context)
+
+        if wrapsLines {
+            drawWrappedText(with: context)
+            return
+        }
 
         let bounds = Rect(x: 0, y: 0, width: self.frame.width, height: self.frame.height)
         let viewportBounds = self.viewportChromeRect()
@@ -569,5 +597,6 @@ final class TextEditorViewNode: ViewNode {
                 )
             }
         }
+        self.drawTouchSelectionHandles(in: &context)
     }
 }

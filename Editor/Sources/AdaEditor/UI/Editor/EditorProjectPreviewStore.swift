@@ -61,6 +61,9 @@ final class EditorProjectPreviewCapture {
     private var saveTask: Task<Void, Never>?
     private var isStopped = false
     private var frameRequest: (@MainActor (Image) -> Void)?
+    private var frameRequestID: UUID?
+    private var frameFailure: (@MainActor (any Error) -> Void)?
+    private var frameTimeout: Task<Void, Never>?
 
     init(projectURL: URL) {
         store = EditorProjectPreviewStore(projectURL: projectURL)
@@ -106,12 +109,64 @@ final class EditorProjectPreviewCapture {
     }
 
     func cancelFrameRequest() {
+        failFrameRequest(CancellationError())
+    }
+
+    /// Waits for a completed GPU frame. Closing Play or cancelling resumes the waiter.
+    func nextFrame() async throws -> Image {
+        guard !isStopped, frameRequest == nil else { throw FrameError.unavailable }
+        let id = UUID()
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                frameRequestID = id
+                frameFailure = { continuation.resume(throwing: $0) }
+                requestFrame { [weak self] image in
+                    guard let self, self.frameRequestID == id else { return }
+                    self.frameFailure = nil
+                    self.frameRequestID = nil
+                    self.frameTimeout?.cancel()
+                    self.frameTimeout = nil
+                    continuation.resume(returning: image)
+                }
+                frameTimeout = Task { @MainActor [weak self] in
+                    do { try await Task.sleep(for: .seconds(3)) } catch { return }
+                    guard let self, self.frameRequestID == id else { return }
+                    self.failFrameRequest(FrameError.timeout)
+                }
+            }
+        } onCancel: {
+            // Cancellation callbacks cannot await the UI actor; the ID protects newer requests.
+            Task { @MainActor [weak self] in
+                guard let self, self.frameRequestID == id else { return }
+                self.cancelFrameRequest()
+            }
+        }
+    }
+
+    private func failFrameRequest(_ error: any Error) {
+        let failure = frameFailure
+        frameFailure = nil
+        frameRequestID = nil
+        frameTimeout?.cancel()
+        frameTimeout = nil
         frameRequest = nil
+        failure?(error)
+    }
+
+    private enum FrameError: LocalizedError {
+        case unavailable, timeout
+        var errorDescription: String? {
+            switch self {
+            case .unavailable: "Play is stopped or another frame capture is pending."
+            case .timeout: "No completed game frame arrived within three seconds."
+            }
+        }
     }
 
     func stop() {
         isStopped = true
-        frameRequest = nil
+        cancelFrameRequest()
         saveTask?.cancel()
         saveTask = nil
     }

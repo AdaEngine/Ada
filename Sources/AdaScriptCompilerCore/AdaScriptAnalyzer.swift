@@ -193,8 +193,11 @@ private extension ModuleAnalyzer {
                 )
                 continue
             }
-            if token.text == "for" {
-                inferLoopBinding(at: index, upperBound: bodyRange.upperBound, tokens: document.tokens, scope: &scope, inferredTypes: &inferredTypes)
+            if token.text == "for", inferLoopBinding(at: index, upperBound: bodyRange.upperBound, tokens: document.tokens, scope: &scope, inferredTypes: &inferredTypes) {
+                // The loop header's `var` is already typed from its collection. Do not
+                // analyze it again as an uninitialized local and erase that type.
+                index += document.tokens[index + 2].text == "var" ? 3 : 2
+                continue
             }
             if token.text == "return" {
                 let valueRange = statementExpressionRange(after: index, upperBound: bodyRange.upperBound, tokens: document.tokens)
@@ -370,9 +373,9 @@ private extension ModuleAnalyzer {
         tokens: [AdaScriptAnalysisToken],
         scope: inout [String: Binding],
         inferredTypes: inout [String: AdaScriptType]
-    ) {
+    ) -> Bool {
         guard index + 4 < upperBound, tokens[index + 1].text == "(" else {
-            return
+            return false
         }
         let variableIndex = tokens[index + 2].text == "var" ? index + 3 : index + 2
         let inIndex = variableIndex + 1
@@ -382,7 +385,7 @@ private extension ModuleAnalyzer {
             tokens[variableIndex].kind == .identifier,
             tokens[inIndex].text == "in"
         else {
-            return
+            return false
         }
         let collectionType = resolveExpressionType(collectionIndex..<(collectionIndex + 1), tokens: tokens, scope: scope)
         let elementType: AdaScriptType =
@@ -393,6 +396,7 @@ private extension ModuleAnalyzer {
             }
         scope[tokens[variableIndex].text] = Binding(isConstrained: false, type: elementType)
         inferredTypes[tokens[variableIndex].text] = elementType
+        return true
     }
 
     private func queryType(for binding: AdaScriptBindingSyntax) -> AdaScriptType? {

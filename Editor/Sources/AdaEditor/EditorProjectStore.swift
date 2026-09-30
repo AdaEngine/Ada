@@ -197,7 +197,15 @@ public struct EditorProjectStore {
 
     @discardableResult
     public func openProject(at projectURL: URL, openedAt: Date = Date()) throws -> EditorProjectReference {
-        let project = try ProjectSystem.validateProjectLayout(at: projectURL, fileManager: fileManager)
+        #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS)
+            let accessing = projectURL.startAccessingSecurityScopedResource()
+            defer {
+                if accessing {
+                    projectURL.stopAccessingSecurityScopedResource()
+                }
+            }
+        #endif
+        let project = try projectForOpening(at: projectURL)
         try distribution.validate(buildSystem: project.build.system)
         if project.build.system == .swiftpm {
             _ = try ensureAdaEngineDependency(at: projectURL)
@@ -210,20 +218,20 @@ public struct EditorProjectStore {
     @discardableResult
     public func rememberProject(at projectURL: URL, name: String? = nil, openedAt: Date = Date()) throws -> EditorProjectReference {
         var projects = try loadProjects()
-        let standardizedPath = projectURL.standardizedFileURL.path
+        let resolvedPath = projectURL.resolvingSymlinksInPath().path
+        let existingProject = projects.first { URL(fileURLWithPath: $0.path).resolvingSymlinksInPath().path == resolvedPath }
+        let standardizedPath = existingProject?.path ?? projectURL.standardizedFileURL.path
         let displayName = name ?? projectURL.lastPathComponent
-        let existingID = projects.first(where: { $0.path == standardizedPath })?.id
-        let existingBookmark = projects.first(where: { $0.path == standardizedPath })?.bookmarkData
         let reference = EditorProjectReference(
-            id: existingID ?? UUID().uuidString,
+            id: existingProject?.id ?? UUID().uuidString,
             name: displayName,
             path: standardizedPath,
             lastOpenedAt: openedAt,
-            bookmarkData: makeBookmarkData(for: projectURL) ?? existingBookmark,
-            documentsRelativePath: documentsRelativePath(for: projectURL)
+            bookmarkData: makeBookmarkData(for: projectURL) ?? existingProject?.bookmarkData,
+            documentsRelativePath: documentsRelativePath(for: projectURL) ?? existingProject?.documentsRelativePath
         )
 
-        projects.removeAll { $0.path == standardizedPath }
+        projects.removeAll { URL(fileURLWithPath: $0.path).resolvingSymlinksInPath().path == resolvedPath }
         projects.insert(reference, at: 0)
         try saveProjects(projects)
         return reference

@@ -213,9 +213,9 @@ public extension AdaScriptTypeEnvironment {
             property("r", type: .float, detail: "Red component"),
         ]),
         "Transform": members([
-            property("position", type: .named("Vector3"), detail: "World position"),
-            property("rotation", type: .named("Quaternion"), detail: "World rotation"),
-            property("scale", type: .named("Vector3"), detail: "World scale"),
+            property("position", type: .list(.float), detail: "Position [x, y, z]; edit a local list and assign it back to transform.position"),
+            property("rotation", type: .list(.float), detail: "Rotation quaternion [x, y, z, w]; edit a local list and assign it back"),
+            property("scale", type: .list(.float), detail: "Scale [x, y, z]; edit a local list and assign it back to transform.scale"),
         ]),
         "View": members([
             viewMethod("accessibilityIdentifier", detail: "Set an AdaUI accessibility identifier"),

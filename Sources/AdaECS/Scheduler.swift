@@ -265,7 +265,17 @@ public struct Scheduler: Sendable {
     /// Run the scheduler.
     /// - Parameter world: The world to run the scheduler on.
     public mutating func run(world: World) async {
-        let now = Time.absolute
+        await run(world: world, deltaTime: nil)
+    }
+
+    /// Runs systems with an explicit time step for simulation tools. Passing nil uses wall time.
+    public mutating func run(world: World, deltaTime suppliedDelta: AdaUtils.TimeInterval?) async {
+        let now: LongTimeInterval
+        if let suppliedDelta {
+            now = self.lastUpdate + LongTimeInterval(suppliedDelta.isFinite ? max(0, suppliedDelta) : 0)
+        } else {
+            now = Time.absolute
+        }
         let deltaTime = TimeInterval(max(0, now - self.lastUpdate))
         self.lastUpdate = now
 

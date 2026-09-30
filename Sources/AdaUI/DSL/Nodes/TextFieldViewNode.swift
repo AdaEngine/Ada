@@ -50,6 +50,10 @@ final class TextFieldViewNode: ViewNode {
     private var isFocused: Bool = false
     private var isSelectingWithMouse: Bool = false
     private var isSelectingWithTouch: Bool = false
+    private var showsTouchSelectionHandles = false
+    private var touchSelectionDrag: TextSelectionHandleDrag?
+    private var activeSelectionTouch: TouchEvent?
+    private var isDoubleTouchTap = false
     private var horizontalOffset: Float = 0
     private var wrapsTextToWidth: Bool = false
     private var caretVisible: Bool = true
@@ -144,6 +148,9 @@ final class TextFieldViewNode: ViewNode {
     override func onFocusChanged(isFocused: Bool) {
         self.isFocused = isFocused
         if !isFocused {
+            self.showsTouchSelectionHandles = false
+            self.touchSelectionDrag = nil
+            self.activeSelectionTouch = nil
             self.isSelectingWithMouse = false
             self.isSelectingWithTouch = false
             self.mousePressStartPoint = nil
@@ -160,6 +167,7 @@ final class TextFieldViewNode: ViewNode {
     }
 
     override func onMouseEvent(_ event: MouseEvent) {
+        self.showsTouchSelectionHandles = false
         self.owner?.window?.windowManager.setCursorShape(.iBeam)
 
         let shouldHandleSelectionEvent: Bool =
@@ -227,6 +235,16 @@ final class TextFieldViewNode: ViewNode {
         guard let touch = touches.min(by: { $0.time < $1.time }) else {
             return
         }
+        if touch.phase == .began {
+            guard self.activeSelectionTouch == nil else {
+                return
+            }
+            self.activeSelectionTouch = touch
+        } else {
+            guard self.activeSelectionTouch?.contactID == touch.contactID else {
+                return
+            }
+        }
 
         let localPoint = self.convertPointFromRoot(touch.location)
         let contentRect = self.textContentRect()
@@ -240,31 +258,55 @@ final class TextFieldViewNode: ViewNode {
         case .began:
             self.isSelectingWithTouch = true
             self.touchPressStartPoint = localPoint
-            self.setSelection(to: caretOffset)
+            if let handle = self.touchSelectionHandles()?.hitTest(localPoint) {
+                self.touchSelectionDrag = TextSelectionHandleDrag(handle: handle, range: self.selectionRange, point: localPoint)
+                self.clearTapCandidate()
+            } else {
+                self.isDoubleTouchTap = touch.tapCount == 2 || self.isDoubleTap(at: localPoint, time: touch.time)
+                self.showsTouchSelectionHandles = true
+                if self.isDoubleTouchTap {
+                    self.selectWord(at: caretOffset)
+                    self.clearTapCandidate()
+                    #if canImport(UIKit)
+                        self.showEditMenu(at: localPoint)
+                    #endif
+                } else {
+                    self.setSelection(to: caretOffset)
+                }
+            }
             self.ensureCaretVisibleIfNeeded()
             self.requestDisplay()
         case .moved:
             guard self.isSelectingWithTouch else {
                 return
             }
-            self.selectionHead = caretOffset
+            if self.isDoubleTouchTap, self.isTap(at: localPoint, start: self.touchPressStartPoint) {
+                return
+            }
+            self.updateTouchSelection(at: localPoint, caretOffset: caretOffset)
             self.clampSelectionToBounds()
             self.ensureCaretVisibleIfNeeded()
             self.requestDisplay()
         case .ended,
             .cancelled:
+            let wasHandleDrag = self.touchSelectionDrag != nil
             self.isSelectingWithTouch = false
-            self.selectionHead = caretOffset
+            if touch.phase == .ended, !self.isTap(at: localPoint, start: self.touchPressStartPoint) {
+                self.updateTouchSelection(at: localPoint, caretOffset: caretOffset)
+            }
             self.clampSelectionToBounds()
             self.ensureCaretVisibleIfNeeded()
             self.requestDisplay()
 
-            if touch.phase == .ended, self.isTap(at: localPoint, start: self.touchPressStartPoint) {
+            if touch.phase == .ended, !wasHandleDrag, !self.isDoubleTouchTap, self.isTap(at: localPoint, start: self.touchPressStartPoint) {
                 self.handleTapCompletion(at: localPoint, time: touch.time, caretOffset: caretOffset)
             } else {
                 self.clearTapCandidate()
             }
             self.touchPressStartPoint = nil
+            self.touchSelectionDrag = nil
+            self.activeSelectionTouch = nil
+            self.isDoubleTouchTap = false
         }
 
         self.resetCaretBlink()
@@ -440,6 +482,49 @@ final class TextFieldViewNode: ViewNode {
                     )
                 }
             }
+        }
+        // The knobs extend above/below the text clip, but stay inside the control.
+        context.clip(to: self.visualAbsoluteFrame()) { clipped in
+            var clipped = clipped
+            self.touchSelectionHandles()?.draw(in: &clipped, color: self.environment.accentColor)
+        }
+    }
+}
+
+extension TextFieldViewNode {
+    func touchSelectionHandles() -> TextSelectionHandles? {
+        guard self.isFocused, self.hasSelection, self.showsTouchSelectionHandles else {
+            return nil
+        }
+        let content = self.textContentRect()
+        self.refreshInteractiveTextLayoutIfPossible(size: content.size)
+        let range = self.caretVerticalRange(contentHeight: content.height)
+        let verticalOffset = Self.verticalTextOffset(for: self.textLayout, height: content.height)
+        let pointSize = self.resolvedFontPointSize()
+        let horizontalOffset = self.wrapsTextToWidth ? 0 : self.horizontalOffset
+        func caret(at offset: Int) -> Rect {
+            Rect(
+                x: content.minX + self.widthForOffset(offset, pointSize: pointSize) - horizontalOffset,
+                y: content.minY - verticalOffset - range.upperBound,
+                width: Constants.caretLineWidth,
+                height: range.upperBound - range.lowerBound
+            )
+        }
+        return TextSelectionHandles(
+            start: TextSelectionHandle(edge: .start, caret: caret(at: self.selectionRange.lowerBound)),
+            end: TextSelectionHandle(edge: .end, caret: caret(at: self.selectionRange.upperBound))
+        )
+    }
+
+    private func updateTouchSelection(at point: Point, caretOffset: Int) {
+        if let drag = self.touchSelectionDrag {
+            let content = self.textContentRect()
+            let horizontalOffset = self.wrapsTextToWidth ? 0 : self.horizontalOffset
+            let x = drag.caretPoint(for: point).x - content.minX + horizontalOffset
+            self.selectionAnchor = drag.fixedOffset
+            self.selectionHead = drag.movingOffset(self.closestOffset(for: x, pointSize: self.resolvedFontPointSize()), textCount: self.text.count)
+        } else {
+            self.selectionHead = caretOffset
         }
     }
 }
@@ -809,11 +894,11 @@ extension TextFieldViewNode {
             for index in 0..<(caretStops.count - 1) {
                 let middle = (caretStops[index] + caretStops[index + 1]) * 0.5
                 if x < middle {
-                    return self.characterOffset(forScalarOffset: index)
+                    return min(index, self.text.count)
                 }
             }
 
-            return self.characterOffset(forScalarOffset: caretStops.count - 1)
+            return min(caretStops.count - 1, self.text.count)
         }
 
         guard !self.text.isEmpty else {
@@ -842,8 +927,8 @@ extension TextFieldViewNode {
     func widthForOffset(_ offset: Int, pointSize: Float) -> Float {
         let clamped = max(0, min(offset, self.text.count))
         if let caretStops = self.layoutCaretStops(), !caretStops.isEmpty {
-            let scalarOffset = self.scalarOffset(forCharacterOffset: clamped)
-            let safeIndex = max(0, min(scalarOffset, caretStops.count - 1))
+            // Unshaped layout emits one glyph per Character, including combined emoji.
+            let safeIndex = min(clamped, caretStops.count - 1)
             return caretStops[safeIndex]
         }
         return Float(clamped) * self.characterAdvance(for: pointSize)
@@ -911,41 +996,6 @@ extension TextFieldViewNode {
         }
 
         return stops
-    }
-
-    func scalarOffset(forCharacterOffset offset: Int) -> Int {
-        let clamped = max(0, min(offset, self.text.count))
-        if clamped == 0 {
-            return 0
-        }
-
-        let index = self.text.index(self.text.startIndex, offsetBy: clamped)
-        return self.text[..<index].unicodeScalars.count
-    }
-
-    func characterOffset(forScalarOffset offset: Int) -> Int {
-        let clamped = max(0, min(offset, self.text.unicodeScalars.count))
-        if clamped == 0 {
-            return 0
-        }
-
-        var scalarCount = 0
-        var characterCount = 0
-
-        for character in self.text {
-            let count = character.unicodeScalars.count
-            if scalarCount + count > clamped {
-                break
-            }
-
-            scalarCount += count
-            characterCount += 1
-            if scalarCount == clamped {
-                break
-            }
-        }
-
-        return characterCount
     }
 
     func makeTextAttributes(font: Font, color: Color) -> TextAttributeContainer {

@@ -10,6 +10,20 @@ import Synchronization
 
 /// Texture atlas keyed by string names (for packed UI assets). Distinct from grid-based ``TextureAtlas``.
 public final class NamedTextureAtlas: Asset, @unchecked Sendable {
+    /// CPU packing output, available to authoring tools without allocating a GPU texture.
+    public struct PackedImages: Sendable {
+        public let image: Image
+        public let regions: [String: AtlasRegion]
+    }
+
+    /// Packs named source pixels using the same algorithm as the `.atlas` asset loader.
+    public static func packImages(_ images: [String: Image], descriptor: Descriptor) throws -> PackedImages {
+        let result = try NamedTextureAtlasPacker.pack(
+            images.keys.sorted().compactMap { key in images[key].map { NamedTextureAtlasPacker.Input(key: key, image: $0) } },
+            descriptor: descriptor
+        )
+        return PackedImages(image: result.image, regions: result.entriesByKey)
+    }
     public private(set) var texture: Texture2D
 
     public private(set) var entriesByKey: [String: AtlasRegion]

@@ -97,8 +97,8 @@ struct EditorProjectStoreTests {
         }
     }
 
-    @Test("open existing requires Ada metadata")
-    func openRequiresAdaMetadata() throws {
+    @Test("open existing SwiftPM project creates missing Ada metadata")
+    func openCreatesAdaMetadata() throws {
         let rootURL = try makeEditorStoreTemporaryDirectory(named: "EditorProjectStoreMissingMetadata")
         defer { removeEditorStoreTemporaryDirectory(rootURL) }
 
@@ -106,13 +106,10 @@ struct EditorProjectStoreTests {
         try createSwiftPMManifest(at: projectURL)
         let store = EditorProjectStore(storageURL: rootURL.appendingPathComponent("projects.json"))
 
-        do {
-            _ = try store.openProject(at: projectURL)
-            Issue.record("Expected openProject to throw")
-        } catch let error as ProjectSystemError {
-            #expect(error == .metadataFileMissing(path: ".ada/project.json"))
-            #expect(error.recoverySuggestion.contains("New Project"))
-        }
+        let reference = try store.openProject(at: projectURL)
+        #expect(reference.path == projectURL.standardizedFileURL.path)
+        #expect(try ProjectSystem.loadProject(at: projectURL).build.system == .swiftpm)
+        #expect(ProjectSystem.isAdaProject(at: projectURL))
     }
 
     @Test("view model reports actionable validation diagnostics for invalid project folder")

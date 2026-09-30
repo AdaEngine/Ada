@@ -117,6 +117,43 @@ final class EditorTileMapEditorModel {
         return paintedCells[layer][TileMapCoordinate(x: x, y: y)]
     }
 
+    /// Visits enabled layers in compositing order. Sparse maps examine populated cells;
+    /// dense maps examine only the viewport, whichever has fewer candidates.
+    @discardableResult
+    func visitVisibleTiles(in viewport: Size, _ visit: (Int, Int, Int) -> Void) -> Int {
+        guard viewport.width > 0, viewport.height > 0, cellWidth > 0, cellHeight > 0 else { return 0 }
+        let origin = canvasOrigin(in: viewport)
+        let minX = Int(floor(-origin.x / cellWidth - 0.5))
+        let maxX = Int(ceil((viewport.width - origin.x) / cellWidth + 0.5))
+        let minY = Int(floor((origin.y - viewport.height) / cellHeight - 0.5))
+        let maxY = Int(ceil(origin.y / cellHeight + 0.5))
+        let visibleCount = (Double(maxX) - Double(minX) + 1) * (Double(maxY) - Double(minY) + 1)
+        let paletteCount = self.paletteCount
+        var candidates = 0
+        for (layerIndex, layer) in layers.enumerated() where layer.isEnabled {
+            guard paintedCells.indices.contains(layerIndex) else { continue }
+            // Do not copy the dictionary: a live stroke mutates this same storage.
+            if Double(paintedCells[layerIndex].count) <= visibleCount {
+                for (cell, index) in paintedCells[layerIndex] {
+                    candidates += 1
+                    guard cell.x >= minX, cell.x <= maxX, cell.y >= minY, cell.y <= maxY,
+                        index >= 0, index < paletteCount else { continue }
+                    visit(cell.x, cell.y, index)
+                }
+            } else {
+                for y in minY...maxY {
+                    for x in minX...maxX {
+                        candidates += 1
+                        guard let index = paintedCells[layerIndex][TileMapCoordinate(x: x, y: y)],
+                            index >= 0, index < paletteCount else { continue }
+                        visit(x, y, index)
+                    }
+                }
+            }
+        }
+        return candidates
+    }
+
     var layers: [EditorTileMapResource.PaletteLayer] { map.effectiveLayers }
 
     func selectLayer(_ index: Int) {

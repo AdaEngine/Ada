@@ -1,5 +1,5 @@
 import Foundation
-import GravityLanguageCore
+@testable import GravityLanguageCore
 import GravityLanguageServerProtocol
 import Testing
 
@@ -92,19 +92,20 @@ struct GravityLanguageServerTests {
         #expect(update.replacementRange.start == GravitySourcePosition(line: 6, utf16Column: 11))
 
         let querySource = """
-            @query(Transform)
-            var movers;
-            func update(context) {
-                for (var entity in movers) {
-                    entity.i
+            @system class Movement {
+                @query(Transform) var movers;
+                func update(context) {
+                    for (var entity in movers) {
+                        entity.id;
+                    }
                 }
             }
             """
         let queryItems = service.completions(
             text: querySource,
-            position: GravitySourcePosition(line: 4, utf16Column: 16)
+            position: GravitySourcePosition(line: 4, utf16Column: 20)
         )
-        #expect(queryItems.contains { $0.label == "id" })
+        #expect(queryItems.contains { $0.label == "id" }, "\(GravityDocumentAnalyzer.parse(querySource).inferredTypes) at \(querySource)")
     }
 
     @Test("Completion uses symbols from real workspace files")

@@ -1,20 +1,27 @@
 #if os(iOS)
 @_spi(AdaEngine) import AdaEngine
 import AdaUtils
+import Foundation
 
 struct MobileEditorWorkspaceView: View {
     @Environment(\.theme) private var theme
+    @Environment(\.navigationBarContentInset) private var navigationBarContentInset
     let project: MobileEditorProject
     @Binding var selection: MobileEditorWorkspaceTab
     @Binding var promptDraft: String
-    let pendingAttachmentNames: [String]
+    let isComposerPresented: Bool
+    let pendingAttachments: [URL]
     let chatEvents: [EditorAgentEvent]
+    let sessionID: String
+    let previousSession: MobileEditorChatSessionReference?
+    let resumePreviousSession: () -> Void
     let agentStatus: String?
     let agentActivityState: EditorAgentActivityState
     let agentActivityID: String?
     let preparePlay: () -> Void
     let onOpenFile: (String) -> Void
     let openPrompt: () -> Void
+    let openVoice: () -> Void
 
     var body: some View {
         ZStack(anchor: .bottom) {
@@ -23,6 +30,27 @@ struct MobileEditorWorkspaceView: View {
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .mask(RectangleShape())
         .background(theme.editorColors.background)
+        .overlay(anchor: .topLeading) {
+            if selection == .build, let previousSession {
+                Button(action: resumePreviousSession) {
+                    HStack(spacing: 7) {
+                        Text("\u{E5C4}").font(AdaEditorMaterialSymbolFont.font(size: 17))
+                        Text("Back to \(previousSession.title)")
+                            .font(MobileEditorFont.font(size: 12))
+                            .lineLimit(1)
+                    }
+                    .foregroundColor(theme.editorColors.text)
+                    .padding(.horizontal, 12)
+                    .frame(height: 38)
+                    .background(Capsule().fill(theme.editorColors.surface))
+                }
+                .buttonStyle(DefaultButtonStyle())
+                .disabled(agentActivityState == .working)
+                .accessibilityIdentifier("AdaEditor.Mobile.BackToSession")
+                .padding(.horizontal, 16)
+                .padding(.top, navigationBarContentInset + 8)
+            }
+        }
         .overlay {
             EditorAgentActivityOverlay(state: agentActivityState, activityID: agentActivityID)
         }
@@ -40,11 +68,15 @@ struct MobileEditorWorkspaceView: View {
                 MobileEditorBuildScreen(
                     project: project,
                     promptDraft: _promptDraft,
-                    attachmentNames: pendingAttachmentNames,
+                    isComposerPresented: isComposerPresented,
+                    attachmentURLs: pendingAttachments,
                     chatEvents: chatEvents,
+                    sessionID: sessionID,
+                    previousSession: previousSession,
                     agentStatus: agentStatus,
                     isWorking: agentActivityState == .working,
-                    openPrompt: openPrompt
+                    openPrompt: openPrompt,
+                    openVoice: openVoice
                 )
             }
             Tab("Files", value: MobileEditorWorkspaceTab.files) {
@@ -75,115 +107,147 @@ struct MobileEditorBuildScreen: View {
     @Environment(\.navigationBarContentInset) private var navigationBarContentInset
     let project: MobileEditorProject
     @Binding var promptDraft: String
-    let attachmentNames: [String]
+    let isComposerPresented: Bool
+    let attachmentURLs: [URL]
     let chatEvents: [EditorAgentEvent]
+    let sessionID: String
+    let previousSession: MobileEditorChatSessionReference?
     let agentStatus: String?
     let isWorking: Bool
     let openPrompt: () -> Void
+    let openVoice: () -> Void
 
     var body: some View {
-        ZStack(anchor: .bottom) {
-            if chatEvents.isEmpty {
-                VStack(spacing: 24) {
-                    Text("What would you like\nto create today?")
-                        .font(MobileEditorFont.font(size: 25))
-                        .foregroundColor(theme.editorColors.text)
-                        .multilineTextAlignment(.center)
-                    promptLauncher
-                        .padding(.horizontal, 16)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.bottom, 100)
-            } else {
-                transcript
-                LinearGradient(
-                    colors: [theme.editorColors.background.opacity(0), theme.editorColors.background.opacity(0.35)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 240)
-                .allowsHitTesting(false)
-                VStack(spacing: 8) {
-                    if let agentStatus {
-                        HStack(spacing: 6) {
-                            if isWorking {
-                                Circle().fill(theme.editorColors.blue).frame(width: 6, height: 6)
+        GeometryReader { geometry in
+            ZStack(anchor: .bottom) {
+                if chatEvents.isEmpty {
+                    VStack(spacing: 24) {
+                        Text("What would you like\nto create today?")
+                            .font(MobileEditorFont.font(size: 25))
+                            .foregroundColor(theme.editorColors.text)
+                            .multilineTextAlignment(.center)
+                        promptLauncher
+                            .frame(width: max(0, min(620, geometry.size.width - 32)))
+                            .padding(.horizontal, 16)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.bottom, 100)
+                } else {
+                    transcript
+                    LinearGradient(
+                        colors: [theme.editorColors.background.opacity(0), theme.editorColors.background.opacity(0.35)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 240)
+                    .allowsHitTesting(false)
+                    VStack(spacing: 8) {
+                        if let agentStatus {
+                            HStack(spacing: 6) {
+                                if isWorking {
+                                    Circle().fill(theme.editorColors.blue).frame(width: 6, height: 6)
+                                }
+                                Text(agentStatus)
                             }
-                            Text(agentStatus)
+                                .font(MobileEditorFont.font(size: 11))
+                                .foregroundColor(theme.editorColors.muted)
+                                .lineLimit(2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                            .font(MobileEditorFont.font(size: 11))
-                            .foregroundColor(theme.editorColors.muted)
-                            .lineLimit(2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if isWorking {
+                            Text("You can switch screens while Ada works.")
+                                .font(.system(size: 11))
+                                .foregroundColor(theme.editorColors.muted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        promptLauncher
+                            .frame(width: max(0, min(620, geometry.size.width - 32)))
                     }
-                    if isWorking {
-                        Text("You can switch screens while Ada works.")
-                            .font(.system(size: 11))
-                            .foregroundColor(theme.editorColors.muted)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    promptLauncher
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 100)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 100)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var transcript: some View {
-        var transcript = EditorAgentTranscript(events: chatEvents, sessionID: project.id.uuidString)
-        transcript.contentInsets = EdgeInsets(top: 0, leading: 16, bottom: agentStatus == nil ? 220 : 260, trailing: 16)
+        var transcript = EditorAgentTranscript(events: chatEvents, sessionID: sessionID)
+        transcript.contentInsets = EdgeInsets(top: previousSession == nil ? 0 : 54, leading: 16, bottom: agentStatus == nil ? 220 : 260, trailing: 16)
         transcript.scrollContentInsets = EdgeInsets(top: navigationBarContentInset, leading: 0, bottom: 0, trailing: 0)
         return transcript
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
     }
 
     private var promptLauncher: some View {
-        Button(action: openPrompt) {
-            EditorAgentComposerSurface(
-                cornerRadius: 24,
-                horizontalInset: 18,
-                topInset: 14,
-                bottomInset: 12,
-                usesGlass: true
-            ) {
-                VStack(alignment: .leading, spacing: 12) {
+        MobileEditorPromptLauncher(
+            promptDraft: _promptDraft,
+            placeholder: project.prompt == nil ? "Create a game…" : "Describe your next change…",
+            attachmentURLs: attachmentURLs,
+            isWorking: isWorking,
+            openPrompt: openPrompt,
+            openVoice: openVoice
+        )
+        .opacity(isComposerPresented ? 0 : 1)
+        .allowsHitTesting(!isComposerPresented)
+    }
+}
+
+private struct MobileEditorPromptLauncher: View {
+    @Environment(\.theme) private var theme
+    @Binding var promptDraft: String
+    let placeholder: String
+    let attachmentURLs: [URL]
+    let isWorking: Bool
+    let openPrompt: () -> Void
+    let openVoice: () -> Void
+
+    var body: some View {
+        EditorAgentComposerSurface(
+            cornerRadius: 24,
+            horizontalInset: 18,
+            topInset: 14,
+            bottomInset: 12,
+            usesGlass: true
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                Button(action: openPrompt) {
                     Text(hasDraft ? promptDraft : placeholder)
                         .font(MobileEditorFont.font(size: 14))
                         .foregroundColor(hasDraft ? theme.editorColors.text : theme.editorColors.muted)
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    if !attachmentNames.isEmpty {
-                        Text(attachmentNames.joined(separator: ", "))
-                            .font(MobileEditorFont.font(size: 10))
-                            .foregroundColor(theme.editorColors.muted)
-                            .lineLimit(1)
-                    }
-                    HStack(spacing: 18) {
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(DefaultButtonStyle())
+                .accessibilityIdentifier("AdaEditor.Mobile.OpenPrompt")
+                if !attachmentURLs.isEmpty {
+                    MobileEditorAttachmentPreviews(urls: attachmentURLs)
+                }
+                HStack(spacing: 18) {
+                    Button(action: openPrompt) {
                         Text("\u{E145}")
                             .font(AdaEditorMaterialSymbolFont.font(size: 25))
-                            .frame(width: 36, height: 36)
-                            .background(Circle().fill(theme.editorColors.background.opacity(0.5)))
-                        Spacer()
-                        MobileEditorPromptSymbol(kind: .microphone)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 44, height: 44)
                             .background(Circle().fill(theme.editorColors.background.opacity(0.5)))
                     }
-                    .foregroundColor(theme.editorColors.text)
+                    .accessibilityIdentifier("AdaEditor.Mobile.OpenPromptAttachments")
+                    Spacer()
+                    Button(action: openVoice) {
+                        MobileEditorVoiceOrb(activity: isWorking ? .working : .idle)
+                            .frame(width: 52, height: 52)
+                            .allowsHitTesting(false)
+                    }
+                    .buttonStyle(DefaultButtonStyle())
+                    .accessibilityIdentifier("AdaEditor.Mobile.OpenVoice")
                 }
+                .foregroundColor(theme.editorColors.text)
             }
         }
-        .buttonStyle(DefaultButtonStyle())
-        .frame(maxWidth: .infinity)
-        .accessibilityIdentifier("AdaEditor.Mobile.OpenPrompt")
+        .frame(minWidth: 0, maxWidth: .infinity)
     }
 
     private var hasDraft: Bool { !promptDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-
-    private var placeholder: String {
-        project.prompt == nil ? "Create a game…" : "Describe your next change…"
-    }
 }
 
 struct MobileEditorPlayEmptyScreen: View {

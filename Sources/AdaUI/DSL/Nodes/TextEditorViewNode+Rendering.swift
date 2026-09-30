@@ -478,8 +478,8 @@ extension TextEditorViewNode {
             return Float(clamped) * self.characterAdvance(for: pointSize)
         }
 
-        let scalarOffset = Self.scalarOffset(forCharacterOffset: clamped, in: lineText)
-        let safeIndex = max(0, min(scalarOffset, caretStops.count - 1))
+        // Unshaped layout emits one glyph per Character, including combined emoji.
+        let safeIndex = min(clamped, caretStops.count - 1)
         return caretStops[safeIndex]
     }
 
@@ -500,11 +500,11 @@ extension TextEditorViewNode {
         for index in 0..<(caretStops.count - 1) {
             let middle = (caretStops[index] + caretStops[index + 1]) * 0.5
             if x < middle {
-                return Self.characterOffset(forScalarOffset: index, in: lineText)
+                return min(index, lineText.count)
             }
         }
 
-        return Self.characterOffset(forScalarOffset: caretStops.count - 1, in: lineText)
+        return min(caretStops.count - 1, lineText.count)
     }
 
     func lineHeight(for pointSize: Float) -> Float {
@@ -541,7 +541,7 @@ extension TextEditorViewNode {
         return frameCenterY - textCenterY
     }
 
-    private func layoutCaretStops(for lineText: String, font: Font?, pointSize: Float) -> [Float]? {
+    func layoutCaretStops(for lineText: String, font: Font?, pointSize: Float) -> [Float]? {
         guard let font else {
             return nil
         }
@@ -570,40 +570,5 @@ extension TextEditorViewNode {
         }
 
         return stops.isEmpty ? [0] : stops
-    }
-
-    private static func scalarOffset(forCharacterOffset offset: Int, in text: String) -> Int {
-        let clamped = max(0, min(offset, text.count))
-        if clamped == 0 {
-            return 0
-        }
-
-        let index = text.index(text.startIndex, offsetBy: clamped)
-        return text[..<index].unicodeScalars.count
-    }
-
-    private static func characterOffset(forScalarOffset offset: Int, in text: String) -> Int {
-        let clamped = max(0, min(offset, text.unicodeScalars.count))
-        if clamped == 0 {
-            return 0
-        }
-
-        var scalarCount = 0
-        var characterCount = 0
-
-        for character in text {
-            let count = character.unicodeScalars.count
-            if scalarCount + count > clamped {
-                break
-            }
-
-            scalarCount += count
-            characterCount += 1
-            if scalarCount == clamped {
-                break
-            }
-        }
-
-        return characterCount
     }
 }

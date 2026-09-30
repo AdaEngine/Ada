@@ -19,9 +19,10 @@ enum MobileSloppyChatAdapter {
             if message.segments.allSatisfy({ $0.kind == .thinking }) {
                 return EditorAgentEvent(id: event.id, kind: .runStatus, createdAt: event.createdAt, title: "Thinking")
             }
-            let text = message.segments.filter { $0.kind == .text }.compactMap(\.text).joined(separator: "\n")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { return nil }
+            let rawText = message.segments.filter { $0.kind == .text }.compactMap(\.text).joined(separator: "\n")
+            guard let text = message.role == .user ? MobileEditorAgentContext.visibleText(rawText)
+                : rawText.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
             return EditorAgentEvent(
                 id: event.id, kind: .message, createdAt: event.createdAt,
                 message: EditorAgentMessage(
@@ -58,15 +59,16 @@ enum MobileSloppyChatAdapter {
     }
 
     static func events(from messages: [SloppyChatMessage]) -> [EditorAgentEvent] {
-        messages.map { message in
-            EditorAgentEvent(
+        messages.compactMap { message in
+            guard let text = message.role == .user ? MobileEditorAgentContext.visibleText(message.text) : message.text else { return nil }
+            return EditorAgentEvent(
                 id: message.id,
                 kind: .message,
                 createdAt: message.createdAt,
                 message: EditorAgentMessage(
                     id: message.id,
                     role: message.role == .user ? .user : .assistant,
-                    segments: [EditorAgentMessageSegment(kind: .text, text: message.text)],
+                    segments: [EditorAgentMessageSegment(kind: .text, text: text)],
                     createdAt: message.createdAt
                 )
             )

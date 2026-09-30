@@ -229,6 +229,7 @@ public struct TextEditor: View {
     let sourceInteraction: TextEditorSourceInteraction?
     let showsLineNumbers: Bool
     let showsScrollIndicators: Bool
+    let wrapsLines: Bool
     let foldingStyle: TextEditorFoldingStyle
     let showsIndentationGuides: Bool
     let showsTabMarkers: Bool
@@ -236,13 +237,14 @@ public struct TextEditor: View {
     let highlightsSelectedIdentifier: Bool
 
     public var body: some View {
-        ScrollView([.horizontal, .vertical], showsIndicators: showsScrollIndicators) {
+        ScrollView(wrapsLines ? [.vertical] : [.horizontal, .vertical], showsIndicators: showsScrollIndicators) {
             TextEditorPrimitive(
                 placeholder: placeholder,
                 text: text,
                 tokenSpans: tokenSpans,
                 sourceInteraction: sourceInteraction,
                 showsLineNumbers: showsLineNumbers,
+                wrapsLines: wrapsLines,
                 foldingStyle: foldingStyle,
                 showsIndentationGuides: showsIndentationGuides,
                 showsTabMarkers: showsTabMarkers,
@@ -258,6 +260,7 @@ public struct TextEditor: View {
     /// - Parameters:
     ///   - placeholder: Text displayed when the editor is empty.
     ///   - text: Two-way binding for the editor content.
+    ///   - wrapsLines: Wraps long lines at the viewport width without inserting newlines in the bound text. Defaults to horizontal scrolling.
     ///   - showsLineNumbers: Whether the source-style gutter and line numbers are visible.
     ///   - showsScrollIndicators: Whether to draw scroll indicators while the editor scrolls.
     ///   - showsIndentationMarkers: Compatibility switch for all indentation guides and whitespace markers.
@@ -276,7 +279,8 @@ public struct TextEditor: View {
         showsIndentationGuides: Bool? = nil,
         showsTabMarkers: Bool? = nil,
         showsSpaceMarkers: Bool? = nil,
-        highlightsSelectedIdentifier: Bool = false
+        highlightsSelectedIdentifier: Bool = false,
+        wrapsLines: Bool = false
     ) {
         self.placeholder = placeholder
         self.text = text
@@ -284,6 +288,7 @@ public struct TextEditor: View {
         self.sourceInteraction = sourceInteraction
         self.showsLineNumbers = showsLineNumbers
         self.showsScrollIndicators = showsScrollIndicators
+        self.wrapsLines = wrapsLines
         self.foldingStyle = foldingStyle
         self.showsIndentationGuides = showsIndentationGuides ?? showsIndentationMarkers
         self.showsTabMarkers = showsTabMarkers ?? showsIndentationMarkers
@@ -295,6 +300,7 @@ public struct TextEditor: View {
     ///
     /// - Parameters:
     ///   - text: Two-way binding for the editor content.
+    ///   - wrapsLines: Wraps long lines at the viewport width without inserting newlines in the bound text. Defaults to horizontal scrolling.
     ///   - showsLineNumbers: Whether the source-style gutter and line numbers are visible.
     ///   - showsScrollIndicators: Whether to draw scroll indicators while the editor scrolls.
     ///   - showsIndentationMarkers: Compatibility switch for all indentation guides and whitespace markers.
@@ -312,7 +318,8 @@ public struct TextEditor: View {
         showsIndentationGuides: Bool? = nil,
         showsTabMarkers: Bool? = nil,
         showsSpaceMarkers: Bool? = nil,
-        highlightsSelectedIdentifier: Bool = false
+        highlightsSelectedIdentifier: Bool = false,
+        wrapsLines: Bool = false
     ) {
         self.placeholder = ""
         self.text = text
@@ -320,6 +327,7 @@ public struct TextEditor: View {
         self.sourceInteraction = sourceInteraction
         self.showsLineNumbers = showsLineNumbers
         self.showsScrollIndicators = showsScrollIndicators
+        self.wrapsLines = wrapsLines
         self.foldingStyle = foldingStyle
         self.showsIndentationGuides = showsIndentationGuides ?? showsIndentationMarkers
         self.showsTabMarkers = showsTabMarkers ?? showsIndentationMarkers
@@ -337,6 +345,7 @@ struct TextEditorPrimitive: View, ViewNodeBuilder {
     let tokenSpans: [TextEditorTokenSpan]
     let sourceInteraction: TextEditorSourceInteraction?
     let showsLineNumbers: Bool
+    let wrapsLines: Bool
     let foldingStyle: TextEditorFoldingStyle
     let showsIndentationGuides: Bool
     let showsTabMarkers: Bool
@@ -349,6 +358,16 @@ struct TextEditorPrimitive: View, ViewNodeBuilder {
 }
 
 extension View {
+    /// Focuses the editor after its first layout and when `requestID` changes, without inspecting the view tree.
+    public func textEditorAutofocus(_ enabled: Bool = true, requestID: Int = 0) -> some View {
+        environment(\._textEditorAutofocus, enabled)
+            .environment(\._textEditorFocusRequestID, requestID)
+    }
+
+    /// Lets a host consume rich clipboard content before the editor inserts plain text.
+    public func onTextEditorPaste(_ handler: @escaping @MainActor () -> Bool) -> some View {
+        environment(\.textEditorPasteHandler, handler)
+    }
     /// Sets colors for text editors within this view.
     public func textEditorColors(_ colors: TextEditorColors) -> some View {
         self.environment(\.textEditorColors, colors)
@@ -356,5 +375,8 @@ extension View {
 }
 
 extension EnvironmentValues {
+    @Entry var _textEditorAutofocus: Bool = false
+    @Entry var _textEditorFocusRequestID: Int = 0
+    @Entry public var textEditorPasteHandler: (@MainActor () -> Bool)? = nil
     @Entry public var textEditorColors: TextEditorColors = .standard
 }

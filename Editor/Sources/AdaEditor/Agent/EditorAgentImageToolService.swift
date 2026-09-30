@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(ImageIO)
+    import ImageIO
+#endif
 
 #if canImport(FoundationNetworking)
     import FoundationNetworking
@@ -139,7 +142,15 @@ actor EditorAgentImageToolService {
         try validateConfiguration()
         let configuration = project.ai.imageGeneration
         let sourceURL = try resolvedSourceURL(sourcePath)
-        let sourceData = try Data(contentsOf: sourceURL)
+        #if canImport(CoreGraphics) && canImport(ImageIO)
+            let sourceData = try EditorImageAttachment.pngData(at: sourceURL)
+            let uploadName = sourceURL.deletingPathExtension().lastPathComponent + ".png"
+            let uploadType = "image/png"
+        #else
+            let sourceData = try Data(contentsOf: sourceURL)
+            let uploadName = sourceURL.lastPathComponent
+            let uploadType = Self.mimeType(forExtension: sourceURL.pathExtension)
+        #endif
         let apiKey = try await credentials.apiKey()
         let boundary = "AdaEditor-\(UUID().uuidString)"
         var request = URLRequest(url: endpointBaseURL.appendingPathComponent("images/edits"))
@@ -157,8 +168,8 @@ actor EditorAgentImageToolService {
                 "output_format": configuration.outputFormat,
             ],
             imageData: sourceData,
-            fileName: sourceURL.lastPathComponent,
-            mimeType: Self.mimeType(forExtension: sourceURL.pathExtension)
+            fileName: uploadName,
+            mimeType: uploadType
         )
         return try await perform(request, destinationPath: destinationPath, allowsOverwrite: allowsOverwrite)
     }
@@ -189,6 +200,9 @@ actor EditorAgentImageToolService {
             throw EditorAgentImageToolError.invalidBase64Image
         }
         try Self.validate(imageData, outputFormat: configuration.outputFormat)
+        guard allowsOverwrite || !fileManager.fileExists(atPath: destination.url.path) else {
+            throw EditorAgentImageToolError.destinationExists(destination.relativePath)
+        }
         try fileManager.createDirectory(at: destination.url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try imageData.write(to: destination.url, options: [.atomic])
 
@@ -259,6 +273,17 @@ actor EditorAgentImageToolService {
         guard valid else {
             throw EditorAgentImageToolError.invalidImageFormat(outputFormat)
         }
+        #if canImport(ImageIO)
+            guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+                  let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+                  let width = properties[kCGImagePropertyPixelWidth as String] as? Int,
+                  let height = properties[kCGImagePropertyPixelHeight as String] as? Int,
+                  (1...4096).contains(width), (1...4096).contains(height),
+                  data.count <= 24 * 1024 * 1024,
+                  CGImageSourceCreateImageAtIndex(source, 0, nil) != nil else {
+                throw EditorAgentImageToolError.invalidImageFormat(outputFormat)
+            }
+        #endif
     }
 
     private static func mimeType(forExtension fileExtension: String) -> String {

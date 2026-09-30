@@ -1,3 +1,5 @@
+import Foundation
+
 public struct AdaScriptCompilerSource: Hashable, Sendable {
     public let path: String
     public let source: String
@@ -339,7 +341,7 @@ func humanizedAdaScriptViewTitle(_ name: String) -> String {
     return result
 }
 
-public enum AdaScriptSchemaError: Error, Equatable, CustomStringConvertible {
+public enum AdaScriptSchemaError: Error, Equatable, CustomStringConvertible, LocalizedError {
     case duplicateID(String)
     case duplicateName(String)
     case duplicateToolID(String)
@@ -357,4 +359,6 @@ public enum AdaScriptSchemaError: Error, Equatable, CustomStringConvertible {
             "Invalid Ada Script schema in '\(path)': \(message)"
         }
     }
+
+    public var errorDescription: String? { description }
 }

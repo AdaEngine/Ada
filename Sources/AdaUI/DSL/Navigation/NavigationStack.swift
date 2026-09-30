@@ -627,7 +627,7 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
 
     private static func nodeConsumesTopSafeArea(_ node: ViewNode) -> Bool {
         if let scrollView = node as? ScrollViewNode {
-            return scrollView.environment._scrollViewRespectsSafeArea
+            return scrollView.extendsUnderNavigationBar || (scrollView.respectsSafeArea && scrollView.environment._scrollViewRespectsSafeArea)
         }
 
         if let modifier = node as? ViewModifierNode {

@@ -8,7 +8,6 @@
 import AdaUtils
 import Math
 
-// TODO: (Vlad) Number of taps?
 // TODO: (Vlad) finger index?
 // TODO: (Vlad) Angles?
 // TODO: (Vlad) radius of pressure?
@@ -38,11 +37,15 @@ public struct TouchEvent: InputEvent {
 
     public let time: TimeInterval
 
-    public init(window: RID, location: Point, phase: Phase, time: TimeInterval, contactID: RID? = nil) {
+    /// Number of successive taps recognized by the platform for this contact.
+    public let tapCount: Int
+
+    public init(window: RID, location: Point, phase: Phase, time: TimeInterval, contactID: RID? = nil, tapCount: Int = 1) {
         self.location = location
         self.phase = phase
         self.contactID = contactID ?? window
         self.window = window
         self.time = time
+        self.tapCount = tapCount
     }
 }

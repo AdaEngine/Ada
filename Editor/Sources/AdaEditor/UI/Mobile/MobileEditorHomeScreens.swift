@@ -9,7 +9,7 @@ struct MobileEditorProjectsScreen: View {
     let open: (MobileEditorProject) -> Void
 
     var body: some View {
-        ScrollView {
+        MobileEditorPageScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 9) {
                     Text("Your Worlds")
@@ -61,7 +61,6 @@ struct MobileEditorProjectsScreen: View {
             .padding(.bottom, 28)
         }
         .background(theme.editorColors.background)
-        .safeAreaPadding(.top, -72)
     }
 
     private func projectCard(_ project: MobileEditorProject) -> some View {
@@ -98,7 +97,7 @@ struct MobileEditorSettingsScreen: View {
     let configureAgent: () -> Void
 
     var body: some View {
-        ScrollView {
+        MobileEditorPageScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 EditorCloudSettingsView()
                 Button(action: configureAgent) {
@@ -114,7 +113,6 @@ struct MobileEditorSettingsScreen: View {
             .padding(.bottom, 28)
         }
         .background(theme.editorColors.background)
-        .safeAreaPadding(.top, -72)
     }
 
     private func settingsRow(_ title: String, detail: String, showsChevron: Bool = false) -> some View {

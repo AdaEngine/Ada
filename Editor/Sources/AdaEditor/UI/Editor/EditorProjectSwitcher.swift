@@ -62,16 +62,12 @@ final class EditorProjectSwitcherViewModel {
             return nil
         }
         let resolvedURL = store.resolveProjectURL(for: project)
-        #if canImport(UIKit)
-            return projectForOpening(at: ProjectOpenPicker.retainSecurityScopedAccess(to: resolvedURL))
-        #else
-            return projectForOpening(at: resolvedURL)
-        #endif
+        return projectForOpening(at: ProjectOpenPicker.retainSecurityScopedAccess(to: resolvedURL))
     }
 
     func projectForOpening(at url: URL) -> EditorProjectReference? {
         do {
-            let project = try store.openProject(at: url)
+            let project = try store.openProject(at: ProjectOpenPicker.retainSecurityScopedAccess(to: url))
             dismiss()
             return project
         } catch let error as ProjectSystemError {
@@ -140,6 +136,7 @@ struct EditorProjectSwitcherPanel: View {
             RoundedRectangleShape(cornerRadius: 10)
                 .stroke(theme.editorColors.border, lineWidth: 1)
         }
+        .shadow(color: .black.opacity(0.4), radius: 10, y: 5, shape: .roundedRectangle(cornerRadius: 10))
         .accessibilityIdentifier(Self.accessibilityIdentifier)
     }
 

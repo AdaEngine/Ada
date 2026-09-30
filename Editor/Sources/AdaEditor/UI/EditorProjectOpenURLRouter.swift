@@ -64,10 +64,6 @@ final class EditorProjectOpenURLRouter {
 
     private func openProject(at url: URL, with viewModel: ProjectOpeningViewModel) {
         let projectURL = ProjectOpenPicker.projectDirectoryURL(fromPickerSelection: url)
-        #if canImport(UIKit)
-            viewModel.openProject(at: ProjectOpenPicker.retainSecurityScopedAccess(to: projectURL))
-        #else
-            viewModel.openProject(at: projectURL)
-        #endif
+        viewModel.openProject(at: ProjectOpenPicker.retainSecurityScopedAccess(to: projectURL))
     }
 }

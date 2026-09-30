@@ -377,7 +377,7 @@ final class ProjectOpeningViewModel {
 
     func openProject(at url: URL) {
         existingProjectPath = url.path
-        openProject(atPath: url.path, openInEditor: true)
+        openProject(at: ProjectOpenPicker.retainSecurityScopedAccess(to: url), openInEditor: true)
     }
 
     func openSelectedProject() {
@@ -559,11 +559,7 @@ extension ProjectOpeningViewModel {
 
     private func retainedProjectURL(for project: EditorProjectReference) -> URL {
         let projectURL = store.resolveProjectURL(for: project)
-        #if canImport(UIKit)
-            return ProjectOpenPicker.retainSecurityScopedAccess(to: projectURL)
-        #else
-            return projectURL
-        #endif
+        return ProjectOpenPicker.retainSecurityScopedAccess(to: projectURL)
     }
 }
 

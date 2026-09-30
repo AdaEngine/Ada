@@ -10,6 +10,7 @@ import UIKit
 final class MobileEditorPromptDictation {
     private(set) var isStarting = false
     private(set) var isRecording = false
+    private(set) var audioLevel: Float = 0
     private(set) var errorMessage: String?
 
     private let audioEngine = AVAudioEngine()
@@ -23,7 +24,7 @@ final class MobileEditorPromptDictation {
     private var interruptionObserver: NSObjectProtocol?
     private var backgroundObserver: NSObjectProtocol?
 
-    func start(onTranscript: @escaping @MainActor (String) -> Void) {
+    func start(initialText: String = "", onTranscript: @escaping @MainActor (String) -> Void) {
         stop()
         errorMessage = nil
         isStarting = true
@@ -50,7 +51,9 @@ final class MobileEditorPromptDictation {
                 return
             }
             do {
-                try self.beginRecognition(id: id, onTranscript: onTranscript)
+                try self.beginRecognition(id: id) { transcript in
+                    onTranscript(initialText.isEmpty ? transcript : initialText + " " + transcript)
+                }
             } catch {
                 self.fail(error.localizedDescription)
             }
@@ -81,6 +84,7 @@ final class MobileEditorPromptDictation {
         backgroundObserver = nil
         isStarting = false
         isRecording = false
+        audioLevel = 0
     }
 
     private func beginRecognition(id: UUID, onTranscript: @escaping @MainActor (String) -> Void) throws {
@@ -106,7 +110,13 @@ final class MobileEditorPromptDictation {
         let sink = MobileEditorDictationAudioSink(request: request)
         audioSink = sink
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, _ in
-            sink.append(buffer)
+            let level = sink.append(buffer)
+            Task { @MainActor [weak self] in
+                guard let self, self.sessionID == id else {
+                    return
+                }
+                self.audioLevel = level
+            }
         }
         hasAudioTap = true
         recognitionTask = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
@@ -161,10 +171,18 @@ private final class MobileEditorDictationAudioSink: @unchecked Sendable {
         self.request = request
     }
 
-    func append(_ buffer: AVAudioPCMBuffer) {
+    func append(_ buffer: AVAudioPCMBuffer) -> Float {
         lock.lock()
         defer { lock.unlock() }
         request?.append(buffer)
+        // AVAudioEngine keeps this channel memory alive for the tap callback.
+        guard let samples = unsafe buffer.floatChannelData?[0], buffer.frameLength > 0 else {
+            return 0
+        }
+        var sum: Float = 0
+        for index in 0..<Int(buffer.frameLength) { sum += unsafe samples[index] * samples[index] }
+        let rms = sqrt(sum / Float(buffer.frameLength))
+        return rms.isFinite ? min(max(rms * 8, 0), 1) : 0
     }
 
     func finish() {

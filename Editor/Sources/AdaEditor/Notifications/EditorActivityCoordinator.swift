@@ -29,6 +29,7 @@ final class EditorActivityCoordinator {
                 var item = item
                 if !item.state.isTerminal {
                     item.state = .interrupted
+                    item.finishedAt = item.updatedAt ?? item.startedAt
                     item.detail = "Interrupted when the application exited."
                 }
                 return item
@@ -49,8 +50,13 @@ final class EditorActivityCoordinator {
     }
 
     func attachBackground(_ background: any EditorBackgroundExecution, to id: String) {
-        guard let activity = all.first(where: { $0.id == id }), activity.state == .running else {
+        guard let activity = all.first(where: { $0.id == id }) else {
             background.finish(success: false)
+            return
+        }
+        guard activity.state == .running else {
+            background.update(activity)
+            background.finish(success: activity.state == .completed)
             return
         }
         backgrounds[id] = background
@@ -62,6 +68,7 @@ final class EditorActivityCoordinator {
             return
         }
         all[index].detail = detail
+        all[index].updatedAt = Date()
         if let completed, let total, total > 0 {
             all[index].completedUnits = max(0, min(completed, total))
             all[index].totalUnits = total
@@ -122,7 +129,9 @@ final class EditorActivityCoordinator {
         }
         all[index].state = state
         all[index].detail = detail
+        all[index].finishedAt = Date()
         cancellations.removeValue(forKey: id)
+        backgrounds[id]?.update(all[index])
         backgrounds.removeValue(forKey: id)?.finish(success: state == .completed)
         resolveAttention(id)
         let item = all[index]
@@ -146,12 +155,12 @@ final class EditorActivityCoordinator {
         center?.persist()
     }
 
-    func cancel(_ id: String, interrupted: Bool = false) {
+    func cancel(_ id: String, interrupted: Bool = false, detail: String = "") {
         guard let cancel = cancellations[id] else {
             return
         }
         cancel()
-        finish(id, state: interrupted ? .interrupted : .cancelled)
+        finish(id, state: interrupted ? .interrupted : .cancelled, detail: detail.isEmpty ? "Operation stopped." : detail)
     }
 
     private func resolveAttention(_ id: String) {

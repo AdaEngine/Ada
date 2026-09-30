@@ -12,6 +12,15 @@ enum EditorProjectTreeIcon {
     static let image = "\u{E3F4}"
     static let audioFile = "\u{EB82}"
     static let scene = "\u{F720}"
+    static let tileSet = "\u{E8F1}"
+    static let tileMap = "\u{E55B}"
+    static let atlas = "\u{E3B6}"
+    static let font = "\u{E167}"
+    static let material = "\u{E40A}"
+    static let mesh = "\u{E3A5}"
+    static let shader = "\u{E65F}"
+    static let ui = "\u{E871}"
+    static let configuration = "\u{E8B8}"
 
     static let allSymbols = [
         chevronRight,
@@ -24,6 +33,15 @@ enum EditorProjectTreeIcon {
         image,
         audioFile,
         scene,
+        tileSet,
+        tileMap,
+        atlas,
+        font,
+        material,
+        mesh,
+        shader,
+        ui,
+        configuration,
     ]
 }
 
@@ -309,22 +327,10 @@ struct EditorProjectSidebar: View {
     }
 
     private func fileIcon(for item: EditorProjectSidebarViewModel.Item) -> String {
-        switch item.kind {
-        case .folder:
+        if item.isFolder {
             return viewModel.isCollapsed(item) ? EditorProjectTreeIcon.folder : EditorProjectTreeIcon.folderOpen
-        case .scene:
-            return EditorProjectTreeIcon.scene
-        case let .text(language):
-            return textFileIcon(for: language)
-        case .image:
-            return EditorProjectTreeIcon.image
-        case .audio:
-            return EditorProjectTreeIcon.audioFile
-        case .genericAsset:
-            return EditorProjectTreeIcon.description
-        case .unsupported:
-            return EditorProjectTreeIcon.description
         }
+        return EditorProjectFileAppearance.resolve(for: item).symbol
     }
 
     private func textLanguage(for item: EditorProjectSidebarViewModel.Item) -> EditorSourceLanguage? {
@@ -334,41 +340,7 @@ struct EditorProjectSidebar: View {
         return language
     }
 
-    private func textFileIcon(for language: EditorSourceLanguage) -> String {
-        switch language {
-        case .json,
-            .yaml:
-            return EditorProjectTreeIcon.code
-        case .markdown,
-            .plainText:
-            return EditorProjectTreeIcon.article
-        case .packageManifest,
-            .swift,
-            .ada,
-            .c,
-            .cpp,
-            .glsl,
-            .wgsl,
-            .metal:
-            return EditorProjectTreeIcon.code
-        }
-    }
-
     private func iconColor(for item: EditorProjectSidebarViewModel.Item) -> Color {
-        switch item.kind {
-        case .scene:
-            return theme.editorColors.purple
-        case .text:
-            return theme.editorColors.blue
-        case .image:
-            return theme.editorColors.blue
-        case .audio:
-            return theme.editorColors.purple
-        case .genericAsset:
-            return theme.editorColors.text.opacity(0.72)
-        case .folder,
-            .unsupported:
-            return theme.editorColors.muted
-        }
+        EditorProjectFileAppearance.resolve(for: item).color(in: theme.editorColors)
     }
 }

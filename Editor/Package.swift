@@ -3,6 +3,8 @@ import Foundation
 import PackageDescription
 
 let adaMCPLocalPath = ProcessInfo.processInfo.environment["ADA_MCP_LOCAL_PATH"] ?? "../../AdaMCP"
+let adaMCPURL = URL(fileURLWithPath: adaMCPLocalPath, relativeTo: URL(fileURLWithPath: #filePath).deletingLastPathComponent()).standardizedFileURL
+let hasAdaMCP = FileManager.default.fileExists(atPath: adaMCPURL.appendingPathComponent("Package.swift").path)
 let sloppyRuntimeLocalPath = ProcessInfo.processInfo.environment["SLOPPY_RUNTIME_LOCAL_PATH"] ?? "../../Sloppy/Packages/SloppyRuntime"
 let sloppyRuntimeURL = URL(fileURLWithPath: sloppyRuntimeLocalPath, relativeTo: URL(fileURLWithPath: #filePath).deletingLastPathComponent()).standardizedFileURL
 let hasSloppyRuntime = FileManager.default.fileExists(atPath: sloppyRuntimeURL.appendingPathComponent("Package.swift").path)
@@ -15,9 +17,8 @@ let sloppyRuntimeTarget: [Target.Dependency] = hasSloppyRuntime
         .product(name: "Protocols", package: "SloppyRuntimePortable", condition: .when(platforms: [.iOS])),
     ]
     : []
-let adaMCPPackage: Package.Dependency =
-    true /*ProcessInfo.processInfo.environment["ADA_MCP_LOCAL"] == "1"*/
-    ? .package(name: "AdaMCP", path: adaMCPLocalPath)
+let adaMCPPackage: Package.Dependency = hasAdaMCP
+    ? .package(name: "AdaMCP", path: adaMCPURL.path)
     : .package(url: "https://github.com/AdaEngine/AdaMCP.git", branch: "main")
 
 let package = Package(

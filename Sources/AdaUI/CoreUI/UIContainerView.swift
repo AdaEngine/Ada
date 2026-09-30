@@ -324,6 +324,10 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner {
         }
     }
 
+    func requestFocus(for node: ViewNode) {
+        updateFocusedNode(with: node)
+    }
+
     private func findFocusableNode(from node: ViewNode?) -> ViewNode? {
         var currentNode = node
         while let current = currentNode {
@@ -355,7 +359,10 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner {
                 if let node {
                     activeTouchEventNodes[touch.contactID] = WeakBox(node)
                 }
-                updateFocusedNode(with: node)
+                // Editors decide between a tap/long press and scrolling before requesting focus.
+                if !(node is TextEditorViewNode) {
+                    updateFocusedNode(with: node)
+                }
             } else {
                 node =
                     activeTouchEventNodes[touch.contactID]?.value

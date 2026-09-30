@@ -100,6 +100,10 @@ extension TextEditorViewNode {
     }
 
     func moveCaretVertically(delta: Int, extendSelection: Bool) {
+        if wrapsLines {
+            moveWrappedCaretVertically(delta: delta, extendSelection: extendSelection)
+            return
+        }
         let lines = self.lines()
         let position = self.position(forOffset: self.caretOffset, lines: lines)
         let displayed = self.displayedLines()
@@ -316,6 +320,9 @@ extension TextEditorViewNode {
     }
 
     func pasteText() {
+        if environment.textEditorPasteHandler?() == true {
+            return
+        }
         guard let pasted = UIClipboard.getString(), !pasted.isEmpty else {
             return
         }

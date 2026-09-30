@@ -4,7 +4,6 @@ import SloppyRuntime
 
 @MainActor
 enum MobileAdaScriptProjectService {
-
     static func projectURL(for id: UUID) throws -> URL {
         try projectsDirectory().appendingPathComponent(id.uuidString, isDirectory: true)
     }
@@ -56,21 +55,12 @@ enum MobileAdaScriptProjectService {
     }
 
     static func build(at directory: URL) throws -> EditorAdaScriptProjectBuildArtifact {
-        let project = try ProjectSystem.validateProjectLayout(at: directory)
-        try ProjectSystem.validateRunCompatibility(of: project, at: directory, destination: .iPadOS)
-        return try EditorAdaScriptProjectBuilder().prepare(project: project, at: directory)
+        try EditorMobileAgentToolService(projectURL: directory).buildArtifact()
     }
 
     static func buildForAgent(at directory: URL) -> SloppyBuildResult {
-        do {
-            let artifact = try build(at: directory)
-            return SloppyBuildResult(
-                ok: true,
-                summary: "AdaScript build succeeded: \(artifact.report.sourceCount) source file(s), \(artifact.report.systemCount) system(s)."
-            )
-        } catch {
-            return SloppyBuildResult(ok: false, summary: error.localizedDescription)
-        }
+        let result = EditorMobileAgentToolService(projectURL: directory).build()
+        return SloppyBuildResult(ok: result.ok, summary: result.payload)
     }
 
     private static func projectsDirectory() throws -> URL {

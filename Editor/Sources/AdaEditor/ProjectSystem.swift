@@ -43,14 +43,15 @@ public enum ProjectSystem {
     public static func loadProject(at projectURL: URL, fileManager: FileManager = .default) throws(ProjectSystemError) -> AdaProject {
         let metadataURL = metadataURL(forProjectAt: projectURL)
 
-        guard fileManager.fileExists(atPath: metadataURL.path) else {
-            throw .metadataFileMissing(path: ProjectSystemPath.metadataFile)
-        }
-
         let data: Data
         do {
             data = try Data(contentsOf: metadataURL)
         } catch {
+            let cocoaError = error as NSError
+            if cocoaError.domain == NSCocoaErrorDomain,
+                cocoaError.code == CocoaError.fileReadNoSuchFile.rawValue || cocoaError.code == CocoaError.fileNoSuchFile.rawValue {
+                throw .metadataFileMissing(path: ProjectSystemPath.metadataFile)
+            }
             throw .fileReadFailed(path: ProjectSystemPath.metadataFile, message: error.localizedDescription)
         }
 
@@ -103,6 +104,22 @@ public enum ProjectSystem {
             throw .fileWriteFailed(path: ProjectSystemPath.metadataFile, message: error.localizedDescription)
         }
 
+        return project
+    }
+
+    /// Initializes imported project metadata without replacing an existing file, including during concurrent opens.
+    static func createProjectIfMissing(_ project: AdaProject, at projectURL: URL, fileManager: FileManager) throws(ProjectSystemError) -> AdaProject {
+        try validate(project)
+        do {
+            try fileManager.createDirectory(at: projectURL.appendingPathComponent(metadataDirectoryName), withIntermediateDirectories: true)
+            try encode(project).write(to: metadataURL(forProjectAt: projectURL), options: [.withoutOverwriting])
+        } catch {
+            let cocoaError = error as NSError
+            if cocoaError.domain == NSCocoaErrorDomain, cocoaError.code == CocoaError.fileWriteFileExists.rawValue {
+                return try loadProject(at: projectURL, fileManager: fileManager)
+            }
+            throw .fileWriteFailed(path: ProjectSystemPath.metadataFile, message: error.localizedDescription)
+        }
         return project
     }
 
@@ -911,7 +928,7 @@ public enum ProjectSystemError: Error, Equatable, Sendable {
         case .sourceDirectoryMissing:
             "Create the source directory declared by paths.sources and add at least one .ada file."
         case .fileReadFailed:
-            "Check file permissions and make sure the project metadata is readable."
+            "Choose the project folder again using Open Project to renew access, or check file permissions."
         case .fileWriteFailed:
             "Check folder permissions and available disk space, then try again."
         case .invalidJSON:

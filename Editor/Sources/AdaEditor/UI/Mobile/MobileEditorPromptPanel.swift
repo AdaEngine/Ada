@@ -7,18 +7,20 @@ struct MobileEditorPromptPanel: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var text: String
     @State private var isExpanded = false
-    @State private var dictation = MobileEditorPromptDictation()
-    @State private var focusTask: Task<Void, Never>?
+    @State private var focusRequestID = 0
 
-    let attachmentNames: [String]
+    let attachmentURLs: [URL]
+    let removeAttachment: (URL) -> Void
+    let pasteImages: @MainActor () -> Bool
     let isAgentRunning: Bool
     let pickFiles: @MainActor () -> Void
     let pickPhotos: @MainActor () -> Void
     let submit: () -> Void
+    let openVoice: () -> Void
 
     private static let promptIdentifier = "AdaEditor.Mobile.BuildPrompt"
     private var hasText: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    private var canSend: Bool { (hasText || !attachmentNames.isEmpty) && !isAgentRunning }
+    private var canSend: Bool { (hasText || !attachmentURLs.isEmpty) && !isAgentRunning }
 
     var body: some View {
         GeometryReader { geometry in
@@ -32,15 +34,10 @@ struct MobileEditorPromptPanel: View {
                 .accessibilityIdentifier("AdaEditor.Mobile.DismissPromptBackdrop")
 
                 panel(height: max(180, isExpanded ? geometry.size.height - 24 : min(300, geometry.size.height - 24)))
-                    .frame(maxWidth: 620)
+                    .frame(width: max(0, min(620, geometry.size.width - 32)))
                     .padding(.horizontal, 16)
                     .padding(.bottom, 12)
             }
-        }
-        .onAppear { focusPrompt() }
-        .onDisappear {
-            focusTask?.cancel()
-            dictation.stop()
         }
     }
 
@@ -58,9 +55,11 @@ struct MobileEditorPromptPanel: View {
                     .buttonStyle(DefaultButtonStyle())
                     .accessibilityIdentifier("AdaEditor.Mobile.PromptGrabber")
                     .gesture(DragGesture(minimumDistance: 12).onEnded { value in
-                        if value.translation.height < -20 { isExpanded = true }
-                        if value.translation.height > 20 { isExpanded = false }
-                        focusPrompt()
+                        withTransaction(Transaction()) {
+                            if value.translation.height < -20 { isExpanded = true }
+                            if value.translation.height > 20 { isExpanded = false }
+                            focusRequestID &+= 1
+                        }
                     })
                     Spacer()
                 }
@@ -71,7 +70,9 @@ struct MobileEditorPromptPanel: View {
                 }
 
                 ZStack(anchor: .topLeading) {
-                    TextEditor(text: _text, showsLineNumbers: false, showsScrollIndicators: isExpanded)
+                    TextEditor(text: _text, showsLineNumbers: false, showsScrollIndicators: true, wrapsLines: true)
+                        .textEditorAutofocus(requestID: focusRequestID)
+                        .onTextEditorPaste(pasteImages)
                         .font(MobileEditorFont.font(size: 16))
                         .foregroundColor(theme.editorColors.text)
                         .textEditorColors(TextEditorColors(
@@ -96,56 +97,29 @@ struct MobileEditorPromptPanel: View {
                 }
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 40, maxHeight: .infinity)
 
-                if !attachmentNames.isEmpty {
-                    Text(attachmentNames.joined(separator: ", "))
-                        .font(MobileEditorFont.font(size: 11))
-                        .foregroundColor(theme.editorColors.muted)
-                        .lineLimit(1)
-                }
-                if let error = dictation.errorMessage {
-                    Text(error)
-                        .font(MobileEditorFont.font(size: 11))
-                        .foregroundColor(theme.editorColors.muted)
-                        .lineLimit(2)
+                if !attachmentURLs.isEmpty {
+                    MobileEditorAttachmentPreviews(urls: attachmentURLs, remove: removeAttachment)
                 }
                 HStack(spacing: 8) {
                     iconButton("\u{E145}", identifier: "AdaEditor.Mobile.AddAttachment") {
-                        dictation.stop()
-                        focusTask?.cancel()
                         ProjectOpenPicker.presentAgentAttachmentSourcePicker(
                             pickFiles: pickFiles,
                             pickPhotos: pickPhotos
                         )
                     }
-                    if dictation.isRecording || dictation.isStarting {
-                        Text(dictation.isStarting ? "Starting…" : "Listening…")
-                            .font(MobileEditorFont.font(size: 12))
-                            .foregroundColor(theme.editorColors.muted)
-                    }
                     Spacer()
-                    if dictation.isRecording || dictation.isStarting || !hasText {
-                        controlButton(identifier: "AdaEditor.Mobile.DictatePrompt", action: {
-                            if dictation.isRecording || dictation.isStarting {
-                                dictation.stop()
-                            } else {
-                                dictation.start { text = $0 }
-                            }
-                            focusPrompt()
-                        }) {
-                            if dictation.isRecording || dictation.isStarting {
-                                Text("\u{E047}").font(AdaEditorMaterialSymbolFont.font(size: 24))
-                            } else {
-                                MobileEditorPromptSymbol(kind: .microphone)
-                            }
-                        }
+                    controlButton(identifier: "AdaEditor.Mobile.DictatePrompt", action: {
+                        openVoice()
+                    }) {
+                        MobileEditorVoiceOrb()
+                            .frame(width: 44, height: 44)
+                            .allowsHitTesting(false)
                     }
-                    if hasText || !attachmentNames.isEmpty {
+                    if hasText || !attachmentURLs.isEmpty {
                         Button {
                             guard canSend else {
                                 return
                             }
-                            dictation.stop()
-                            focusTask?.cancel()
                             submit()
                         } label: {
                             Text("\u{E163}")
@@ -184,31 +158,13 @@ struct MobileEditorPromptPanel: View {
     }
 
     private func close() {
-        focusTask?.cancel()
-        dictation.stop()
         dismiss()
     }
 
     private func toggleExpansion() {
-        isExpanded.toggle()
-        focusPrompt()
-    }
-
-    /// Wait for the modal's first layout, then focus the real AdaUI editor node.
-    private func focusPrompt() {
-        focusTask?.cancel()
-        focusTask = Task { @MainActor in
-            for _ in 0..<10 {
-                do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
-                guard let window = UIWindowManager.shared?.activeWindow else { continue }
-                for container in window.uiInspectableContainers() {
-                    guard let prompt = try? container.uiNode(matching: .accessibilityIdentifier(Self.promptIdentifier)),
-                          let editor = container.uiHitTest(at: Point(prompt.absoluteFrame.minX + 12, prompt.absoluteFrame.minY + 12))?.node else { continue }
-                    if (try? container.uiFocusNode(matching: .runtimeID(editor.runtimeId))) != nil {
-                        return
-                    }
-                }
-            }
+        withTransaction(Transaction()) {
+            isExpanded.toggle()
+            focusRequestID &+= 1
         }
     }
 }

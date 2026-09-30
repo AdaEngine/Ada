@@ -1,11 +1,19 @@
 import Foundation
 import Observation
 
+struct MobileEditorChatSessionReference: Equatable, Sendable {
+    let id: String
+    let title: String
+}
+
 /// Project conversations belong to the app, so navigation cannot cancel or replace a running turn.
 @MainActor
 @Observable
 final class MobileEditorChatState {
     private struct Conversation {
+        var sessionID = "session-\(UUID().uuidString.lowercased())"
+        var previousSession: MobileEditorChatSessionReference?
+        var didCheckPreviousSession = false
         var events: [EditorAgentEvent] = []
         var status: String?
         var activity: EditorAgentActivityState = .idle
@@ -35,9 +43,41 @@ final class MobileEditorChatState {
 
     var activity: EditorAgentActivityState { activeProjectID.flatMap { conversations[$0]?.activity } ?? .idle }
     var activityID: String? { activeProjectID.flatMap { conversations[$0]?.activityID } }
+    var previousSession: MobileEditorChatSessionReference? { activeProjectID.flatMap { conversations[$0]?.previousSession } }
 
     func open(_ id: UUID) {
         activeProjectID = id
+        if conversations[id] == nil { conversations[id] = Conversation() }
+    }
+
+    func sessionID(for id: UUID) -> String {
+        if conversations[id] == nil { conversations[id] = Conversation() }
+        return conversations[id, default: Conversation()].sessionID
+    }
+
+    func needsPreviousSession(for id: UUID) -> Bool {
+        !(conversations[id]?.didCheckPreviousSession ?? false)
+    }
+
+    func setPreviousSession(_ session: MobileEditorChatSessionReference?, for id: UUID, sessionID: String) {
+        guard conversations[id]?.sessionID == sessionID,
+              conversations[id]?.didCheckPreviousSession == false else { return }
+        conversations[id]?.previousSession = session
+        conversations[id]?.didCheckPreviousSession = true
+    }
+
+    @discardableResult
+    func resumePreviousSession(for id: UUID, expectedSessionID: String, events: [EditorAgentEvent]) -> Bool {
+        guard runningProjectID != id, var conversation = conversations[id],
+              conversation.sessionID == expectedSessionID, let previous = conversation.previousSession else { return false }
+        conversation.sessionID = previous.id
+        conversation.previousSession = nil
+        conversation.events = events
+        conversation.status = nil
+        conversation.activity = .idle
+        conversation.activityID = nil
+        conversations[id] = conversation
+        return true
     }
 
     func begin(_ id: UUID) {
@@ -69,8 +109,11 @@ final class MobileEditorChatState {
         if runningProjectID == id { runningProjectID = nil }
     }
 
-    func load(_ events: [EditorAgentEvent], for id: UUID) {
-        guard runningProjectID != id else { return }
+    func load(_ events: [EditorAgentEvent], for id: UUID, sessionID: String? = nil) {
+        guard runningProjectID != id,
+              sessionID == nil || conversations[id]?.sessionID == sessionID else {
+            return
+        }
         conversations[id, default: Conversation()].events = events
     }
 }

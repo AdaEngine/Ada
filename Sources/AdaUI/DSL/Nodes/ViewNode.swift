@@ -957,6 +957,8 @@ protocol ViewOwner: AnyObject {
     func enqueueLifecycleAction(_ action: @escaping @MainActor () -> Void)
 
     func deactivateInput(in subtree: ViewNode)
+
+    func requestFocus(for node: ViewNode)
 }
 
 extension UIGraphicsContext {

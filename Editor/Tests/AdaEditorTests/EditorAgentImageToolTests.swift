@@ -1,3 +1,4 @@
+import AdaEngine
 import Foundation
 import Testing
 
@@ -97,7 +98,8 @@ struct EditorAgentImageToolTests {
         let request = try #require(await client.recordedRequests().first)
         #expect(request.url?.path == "/v1/images/edits")
         let httpBody = try #require(request.httpBody)
-        let body = try #require(String(bytes: httpBody, encoding: .utf8))
+        let body = String(decoding: httpBody, as: UTF8.self)
+        #expect(httpBody.range(of: validPNGData) != nil)
         #expect(body.contains("name=\"image\"; filename=\"source.png\""))
         #expect(body.contains("Add a gold outline"))
 
@@ -133,7 +135,14 @@ struct EditorAgentImageToolTests {
     }
 
     private var validPNGData: Data {
-        Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x00])
+        #if canImport(CoreGraphics) && canImport(ImageIO)
+        do { return try EditorImageAttachment.encodePNG(Image(width: 2, height: 2, color: .white)) } catch {
+            Issue.record(error)
+            return Data()
+        }
+        #else
+        return Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x00])
+        #endif
     }
 
     private func makeFixture(named name: String) throws -> (projectURL: URL, project: AdaProject) {

@@ -23,7 +23,7 @@ struct MobileEditorAgentSettingsScreen: View {
     @State private var authorizationTask: Task<Void, Never>?
 
     var body: some View {
-        ScrollView {
+        MobileEditorPageScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 Text("Connect an account, then choose a model for your projects.")
                     .font(MobileEditorFont.font(size: 13))
@@ -122,6 +122,27 @@ struct MobileEditorAgentSettingsScreen: View {
                         .disabled(apiKey.isEmpty)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(17)
+                }
+
+                MobileEditorCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Image generation").font(MobileEditorFont.navigationFont(size: 20))
+                        Text("Generate and edit game textures with an OpenAI API key. Codex sign-in handles image understanding; image generation uses a separate API key.")
+                            .font(MobileEditorFont.font(size: 12))
+                            .foregroundColor(theme.editorColors.muted)
+                        Button("Set image API key") {
+                            MobileSloppyAPIKeyPrompt.present(currentValue: "") { key in
+                                Task { @MainActor in
+                                    do {
+                                        try await EditorOpenAIImageCredentialStore().save(key)
+                                        statusMessage = key.isEmpty ? "Image API key removed" : "Image API key saved securely"
+                                    } catch { statusMessage = error.localizedDescription }
+                                }
+                            }
+                        }
+                        .accessibilityIdentifier("AdaEditor.Mobile.ImageAPIKey")
+                    }
                     .padding(17)
                 }
 

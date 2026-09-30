@@ -8,15 +8,27 @@ import AdaUtils
 import Math
 
 extension TextEditorViewNode {
+    struct TouchSession {
+        enum Mode { case pending, scrolling, selecting }
+        var mode: Mode = .pending
+        let start: TouchEvent
+        let caretOffset: Int
+        var latest: TouchEvent
+        var heldFor: AdaUtils.TimeInterval = 0
+        var handleDrag: TextSelectionHandleDrag?
+    }
+
+    static var touchSelectionDelay: AdaUtils.TimeInterval { 0.45 }
+
     func updateTextEditorFocus(_ isFocused: Bool) {
         self.isFocused = isFocused
         if !isFocused {
+            showsTouchSelectionHandles = false
             self.isSelectingWithMouse = false
-            self.isSelectingWithTouch = false
+            if let session = touchSession { cancelScrollForTouch(session.latest) }
+            resetTouchSession()
             self.mousePressStartPoint = nil
-            self.touchPressStartPoint = nil
             self.foldMouseLine = nil
-            self.foldTouchLine = nil
             self.clearTapCandidate()
         }
         self.caretVisible = isFocused
@@ -29,43 +41,155 @@ extension TextEditorViewNode {
         guard let touch = touches.min(by: { $0.time < $1.time }) else {
             return
         }
+        if touch.phase == .began {
+            // Keep one stable contact; another finger must not restart selection.
+            guard touchSession == nil else {
+                return
+            }
+            let local = convertPointFromRoot(touch.location)
+            if let handle = touchSelectionHandles()?.hitTest(local) {
+                // Stop any scroll inertia before capturing a selection grip.
+                nearestScrollView()?.onTouchesEvent([touch])
+                cancelScrollForTouch(touch)
+                var session = TouchSession(start: touch, caretOffset: closestOffset(to: local), latest: touch)
+                session.mode = .selecting
+                session.handleDrag = TextSelectionHandleDrag(handle: handle, range: selectionRange, point: local)
+                touchSession = session
+                isSelectingWithTouch = true
+                clearTapCandidate()
+                return
+            }
+            touchPressStartPoint = touch.location
+            foldTouchLine = foldLine(at: local)
+            gutterTouchLine = gutterLine(at: local)
+            touchSession = TouchSession(start: touch, caretOffset: closestOffset(to: local), latest: touch)
+            nearestScrollView()?.onTouchesEvent([touch])
+            if foldTouchLine == nil, gutterTouchLine == nil,
+               touch.tapCount == 2 || isDoubleTap(at: touch.location, time: touch.time) {
+                beginLongPressSelection()
+            }
+            return
+        }
+        guard let session = touchSession, session.start.contactID == touch.contactID else {
+            return
+        }
+        touchSession?.latest = touch
 
-        let localPoint = self.convertPointFromRoot(touch.location)
-        if touch.phase == .began, let line = self.foldLine(at: localPoint) {
-            self.foldTouchLine = line
+        if session.mode == .pending, touch.phase != .cancelled {
+            let elapsed = max(session.heldFor, touch.time - session.start.time)
+            if elapsed >= Self.touchSelectionDelay {
+                beginLongPressSelection()
+            } else if !isTap(at: touch.location, start: session.start.location) {
+                touchSession?.mode = .scrolling
+                clearTapCandidate()
+                foldTouchLine = nil
+                gutterTouchLine = nil
+            }
+        }
+
+        switch touchSession?.mode {
+        case .scrolling:
+            nearestScrollView()?.onTouchesEvent([touch])
+        case .selecting:
+            if (touch.phase == .moved || touch.phase == .ended),
+               session.handleDrag != nil || !isTap(at: touch.location, start: session.start.location) {
+                let local = convertPointFromRoot(touch.location)
+                if let drag = session.handleDrag {
+                    selectionAnchor = drag.fixedOffset
+                    selectionHead = drag.movingOffset(closestOffset(to: drag.caretPoint(for: local)), textCount: text.count)
+                } else {
+                    selectionHead = closestOffset(to: local)
+                }
+                refreshTouchSelection()
+            }
+        case .pending:
+            if touch.phase == .ended {
+                cancelScrollForTouch(touch)
+                finishTouchTap(touch)
+            } else if touch.phase == .cancelled {
+                cancelScrollForTouch(touch)
+            }
+        case nil: break
+        }
+        if touch.phase == .ended || touch.phase == .cancelled {
+            resetTouchSession()
+        }
+    }
+
+    /// Recognition uses UI updates as well as event timestamps, so a stationary hold works.
+    func advanceTouchHold(_ deltaTime: AdaUtils.TimeInterval) {
+        guard touchSession?.mode == .pending, deltaTime.isFinite, deltaTime > 0 else {
             return
         }
-        if let line = self.foldTouchLine {
-            if touch.phase == .ended, self.foldLine(at: localPoint) == line {
-                self.toggleFold(at: line)
-            }
-            if touch.phase == .ended || touch.phase == .cancelled {
-                self.foldTouchLine = nil
-            }
+        // A resumed application's large frame delta must not turn a new touch into a hold.
+        touchSession?.heldFor += min(deltaTime, 0.1)
+        if let session = touchSession, session.heldFor >= Self.touchSelectionDelay {
+            beginLongPressSelection()
+        }
+    }
+
+    private func beginLongPressSelection() {
+        guard let session = touchSession, session.mode == .pending else {
             return
         }
-        if touch.phase == .began, let line = gutterLine(at: localPoint) {
-            gutterTouchLine = line
+        cancelScrollForTouch(session.latest)
+        touchSession?.mode = .selecting
+        isSelectingWithTouch = true
+        showsTouchSelectionHandles = true
+        foldTouchLine = nil
+        gutterTouchLine = nil
+        clearTapCandidate()
+        owner?.requestFocus(for: self)
+        selectWord(at: session.caretOffset)
+        refreshTouchSelection()
+    }
+
+    private func finishTouchTap(_ touch: TouchEvent) {
+        let local = convertPointFromRoot(touch.location)
+        if let line = foldTouchLine {
+            if foldLine(at: local) == line { toggleFold(at: line) }
             return
         }
         if let line = gutterTouchLine {
-            if touch.phase == .ended {
-                if gutterLine(at: localPoint) == line {
-                    sourceInteraction?.onGutterClick?(line)
-                }
-                gutterTouchLine = nil
-            } else if touch.phase == .cancelled {
-                gutterTouchLine = nil
-            }
+            if gutterLine(at: local) == line { sourceInteraction?.onGutterClick?(line) }
             return
         }
-        let caretOffset = self.closestOffset(to: localPoint)
-        self.updateTouchSelection(
-            phase: touch.phase,
-            localPoint: localPoint,
-            time: touch.time,
-            caretOffset: caretOffset
-        )
+        owner?.requestFocus(for: self)
+        let offset = closestOffset(to: local)
+        setSelection(to: offset)
+        showsTouchSelectionHandles = true
+        // Compare contacts in root space: revealing the caret can move the editor between taps.
+        handleTapCompletion(at: touch.location, time: touch.time, caretOffset: offset)
+        refreshTouchSelection()
+    }
+
+    private func refreshTouchSelection() {
+        preferredColumn = nil
+        clampSelectionToBounds()
+        notifyCaretChange(requestsCompletion: false)
+        ensureCaretVisibleIfNeeded()
+        resetCaretBlink()
+        requestDisplay()
+    }
+
+    private func cancelScrollForTouch(_ touch: TouchEvent) {
+        nearestScrollView()?.onTouchesEvent([
+            TouchEvent(
+                window: touch.window,
+                location: touch.location,
+                phase: .cancelled,
+                time: touch.time,
+                contactID: touch.contactID
+            )
+        ])
+    }
+
+    private func resetTouchSession() {
+        touchSession = nil
+        isSelectingWithTouch = false
+        touchPressStartPoint = nil
+        foldTouchLine = nil
+        gutterTouchLine = nil
     }
 
     func handleTextEditorMouseLeave() {
@@ -73,55 +197,5 @@ extension TextEditorViewNode {
         self.notifySourceHover(nil)
         self.resetSourceCursorIfNeeded()
         self.resetTextCursorIfNeeded()
-    }
-
-    private func updateTouchSelection(
-        phase: TouchEvent.Phase,
-        localPoint: Point,
-        time: AdaUtils.TimeInterval,
-        caretOffset: Int
-    ) {
-        switch phase {
-        case .began:
-            self.isSelectingWithTouch = true
-            self.touchPressStartPoint = localPoint
-            self.setSelection(to: caretOffset)
-        case .moved:
-            guard self.isSelectingWithTouch else {
-                return
-            }
-            self.selectionHead = caretOffset
-        case .ended,
-            .cancelled:
-            self.finishTouchSelection(
-                phase: phase,
-                localPoint: localPoint,
-                time: time,
-                caretOffset: caretOffset
-            )
-        }
-
-        self.preferredColumn = nil
-        self.clampSelectionToBounds()
-        self.notifyCaretChange(requestsCompletion: false)
-        self.ensureCaretVisibleIfNeeded()
-        self.resetCaretBlink()
-        self.requestDisplay()
-    }
-
-    private func finishTouchSelection(
-        phase: TouchEvent.Phase,
-        localPoint: Point,
-        time: AdaUtils.TimeInterval,
-        caretOffset: Int
-    ) {
-        self.isSelectingWithTouch = false
-        if !self.isTap(at: localPoint, start: self.touchPressStartPoint) {
-            self.selectionHead = caretOffset
-            self.clearTapCandidate()
-        } else if phase == .ended {
-            self.handleTapCompletion(at: localPoint, time: time, caretOffset: caretOffset)
-        }
-        self.touchPressStartPoint = nil
     }
 }

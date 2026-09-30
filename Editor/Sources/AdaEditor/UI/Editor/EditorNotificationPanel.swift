@@ -55,8 +55,12 @@ struct EditorNotificationOverlay: View {
                             EditorNotificationCard(item: item, center: center)
                         }
                     }
+                    .padding(.all, 20)
                 }
-                .frame(width: width, height: min(height, Float(center.toasts.count) * 150))
+                .frame(
+                    width: min(width + 40, max(0, size.width - 16)),
+                    height: center.toasts.isEmpty ? 0 : min(height, Float(center.toasts.count) * 150 + 40)
+                )
             }
         }
         .padding(.trailing, 8)
@@ -118,6 +122,7 @@ struct EditorNotificationOverlay: View {
         .foregroundColor(theme.editorColors.text)
         .background(RoundedRectangleShape(cornerRadius: 10).fill(theme.editorColors.background))
         .overlay { RoundedRectangleShape(cornerRadius: 10).stroke(theme.editorColors.border, lineWidth: 1) }
+        .shadow(color: .black.opacity(0.4), radius: 10, y: 5, shape: .roundedRectangle(cornerRadius: 10))
     }
 
     private var eventList: some View {
@@ -202,6 +207,7 @@ struct EditorNotificationCard: View {
         .padding(.all, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surface))
+        .shadow(color: .black.opacity(0.4), radius: 10, y: 5, shape: .roundedRectangle(cornerRadius: 8))
         .onMiddleClick { center.dismiss(item.id) }
         .onHover { center.setHovered(item.id, $0) }
         .onDisappear { center.setHovered(item.id, false) }

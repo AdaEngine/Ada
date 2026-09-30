@@ -99,7 +99,7 @@ enum ProjectOpenPicker {
                 return nil
             }
 
-            return projectDirectoryURL(fromPickerSelection: selectedURL)
+            return retainSecurityScopedAccess(to: projectDirectoryURL(fromPickerSelection: selectedURL))
         #else
             return nil
         #endif
@@ -128,7 +128,7 @@ enum ProjectOpenPicker {
                 completion(.unavailable("The system picker did not return a selected folder."))
                 return
             }
-            completion(.selected(projectLocationURL(fromPickerSelection: selectedURL)))
+            completion(.selected(retainSecurityScopedAccess(to: projectLocationURL(fromPickerSelection: selectedURL))))
         #elseif canImport(UIKit)
             guard let presenter = activeViewController() else {
                 completion(.unavailable("AdaEditor has no active window from which to open Files."))
@@ -414,8 +414,6 @@ enum ProjectOpenPicker {
         private static var activeAtlasImagePickerDelegate: AtlasImageDocumentPickerDelegate?
         @MainActor
         private static var activeBuildFilePickerDelegate: BuildFileDocumentPickerDelegate?
-        @MainActor
-        private static var securityScopedAccesses: [String: SecurityScopedURLAccess] = [:]
 
         @MainActor
         private static func activeViewController() -> UIViewController? {
@@ -605,18 +603,27 @@ enum ProjectOpenPicker {
             }
         }
 
-        @MainActor
-        static func retainSecurityScopedAccess(to url: URL) -> URL {
-            let standardizedURL = url.standardizedFileURL
-            let key = standardizedURL.path
-            if securityScopedAccesses[key] == nil {
-                securityScopedAccesses[key] = SecurityScopedURLAccess(url: standardizedURL)
-            }
-            return standardizedURL
-        }
+    #endif
 
+    @MainActor
+    static func retainSecurityScopedAccess(to url: URL) -> URL {
+        #if canImport(AppKit) || canImport(UIKit)
+            let key = url.standardizedFileURL.path
+            if securityScopedAccesses[key] == nil {
+                let access = SecurityScopedURLAccess(url: url)
+                if access.isAccessing {
+                    securityScopedAccesses[key] = access
+                }
+            }
+        #endif
+        return url
+    }
+
+    #if canImport(AppKit) || canImport(UIKit)
+        @MainActor
+        private static var securityScopedAccesses: [String: SecurityScopedURLAccess] = [:]
         private final class SecurityScopedURLAccess {
-            private let isAccessing: Bool
+            let isAccessing: Bool
             private let url: URL
 
             init(url: URL) {

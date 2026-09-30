@@ -12,6 +12,7 @@ struct EditorScreenshotFixesTests {
     @Test("pinch zoom preserves the world point under the fingers and uses cumulative scale")
     func pinchAnchorsAndClampsZoom() {
         let model = EditorSceneViewportModel()
+        model.twoDZoom = 1
         model.setViewportSize(Size(width: 800, height: 600))
         let point = Point(600, 200)
         let window = RID()
@@ -35,6 +36,52 @@ struct EditorScreenshotFixesTests {
         #expect(model.handleInput(event(.began, 1)))
         #expect(model.handleInput(event(.ended, 0.0001)))
         #expect(model.twoDZoom == 0.08)
+    }
+
+    @Test("trackpad scroll pans both 2D axes at the current zoom without zooming")
+    func trackpadScrollPansBothAxes() {
+        let model = EditorSceneViewportModel()
+        model.twoDZoom = 1
+        model.setViewportSize(Size(width: 800, height: 600))
+        let window = RID()
+        let location = Point(400, 300)
+        #expect(model.handleInput(PinchEvent(window: window, location: location, scale: 1, phase: .began, time: 0)))
+        #expect(model.handleInput(PinchEvent(window: window, location: location, scale: 2, phase: .ended, time: 1)))
+
+        for phase in [MouseEvent.Phase.began, .changed, .ended] {
+            var scroll = MouseEvent(
+                window: window,
+                button: .scrollWheel,
+                scrollDelta: Point(0.5, -1),
+                mousePosition: location,
+                phase: phase,
+                modifierKeys: [],
+                time: 2
+            )
+            scroll.hasPreciseScrollingDeltas = true
+            #expect(model.handleInput(scroll))
+            #expect(model.twoDZoom == 2)
+        }
+        #expect(model.twoDCenter == Vector2(-54, -108))
+        #expect(model.worldToScreen(.zero, size: model.viewportSize) == Point(508, 84))
+    }
+
+    @Test("mouse wheel keeps 2D zoom behavior")
+    func mouseWheelZooms() {
+        let model = EditorSceneViewportModel()
+        model.twoDZoom = 1
+        let center = model.twoDCenter
+        #expect(model.handleInput(MouseEvent(
+            window: RID(),
+            button: .scrollWheel,
+            scrollDelta: Point(0, 1),
+            mousePosition: Point(400, 300),
+            phase: .changed,
+            modifierKeys: [],
+            time: 0
+        )))
+        #expect(abs(model.twoDZoom - 1.12) < 0.0001)
+        #expect(model.twoDCenter == center)
     }
 
     @Test("ruler tick positions follow camera pan and zoom")

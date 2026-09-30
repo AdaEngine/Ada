@@ -1,6 +1,8 @@
 #if os(iOS)
 @_spi(AdaEngine) import AdaEngine
 import Foundation
+import Protocols
+import UIKit
 #if canImport(SloppyRuntime)
 import SloppyRuntime
 #else
@@ -16,7 +18,11 @@ enum MobileEditorWorkspaceTab: Hashable {
 private enum MobileEditorDestination: Hashable {
     case workspace(UUID)
     case settings
+    case activity
     case agentSettings
+    case providers
+    case agentSkills
+    case agentSkill(String)
     case projectSettings(UUID)
     case sessions(UUID)
     case session(UUID, String)
@@ -38,10 +44,14 @@ struct MobileEditorRootView: View {
     @State private var navigationPath: NavigationPath = NavigationPath()
     @State private var projects: [MobileEditorProject] = MobileAdaScriptProjectService.loadProjects()
     @State private var workspaceTab: MobileEditorWorkspaceTab = .build
-    @State private var promptDraft = ""
+    @State private var promptDraft = MobileEditorPromptDraft()
     @State private var pendingPromptAttachments: [URL] = []
+    @State private var didPrepareImageQA = false
+    @State private var didPrepareBackgroundQA = false
+    @State private var didPrepareVoiceLayoutQA = false
     @State private var sloppyRuntime = SloppyRuntimeHost()
     @State private var chatState = MobileEditorChatState()
+    @State private var agentOperation: MobileEditorAgentOperation?
     private var chatEvents: [EditorAgentEvent] {
         get { chatState.events }
         nonmutating set { chatState.events = newValue }
@@ -61,9 +71,11 @@ struct MobileEditorRootView: View {
     @State private var playSession: MobileEditorPlaySession?
     @State private var presentedPlayProject: MobileEditorProject?
     @State private var providerModels = MobileEditorProviderModelStore()
+    @State private var harness = MobileAgentHarnessStore()
     @State private var isModelPickerPresented = false
     @State private var presentedFile: MobileEditorFilePresentation?
     @State private var isPromptPresented = false
+    @State private var isVoicePresented = false
 
     private let logo = ProjectOpeningAssets.loadAdaEngineLogo()
 
@@ -84,29 +96,99 @@ struct MobileEditorRootView: View {
                     }
                 }
                 .navigationBarTrailingItems {
-                    Button {
-                        navigationPath.append(MobileEditorDestination.settings)
-                    } label: {
-                        Text("\u{E8B8}")
-                            .foregroundColor(theme.editorColors.text)
-                            .frame(width: 40, height: 40)
-                            .environment(\.font, AdaEditorMaterialSymbolFont.font(size: 24))
+                    HStack(spacing: 8) {
+                        Button { navigationPath.append(MobileEditorDestination.activity) } label: {
+                            Text("\u{E7F4}")
+                                .foregroundColor(theme.editorColors.text)
+                                .frame(width: 40, height: 40)
+                                .font(AdaEditorMaterialSymbolFont.font(size: 24))
+                        }
+                        .accessibilityIdentifier("AdaEditor.Mobile.ActivityButton")
+                        Button {
+                            navigationPath.append(MobileEditorDestination.settings)
+                        } label: {
+                            Text("\u{E8B8}")
+                                .foregroundColor(theme.editorColors.text)
+                                .frame(width: 40, height: 40)
+                                .environment(\.font, AdaEditorMaterialSymbolFont.font(size: 24))
+                        }
+                        .accessibilityIdentifier("AdaEditor.Mobile.Settings")
                     }
-                    .accessibilityIdentifier("AdaEditor.Mobile.Settings")
                 }
                 .navigate(for: MobileEditorDestination.self, destination: destination)
         }
         .background(theme.editorColors.background.ignoresSafeArea())
+        .onAppear {
+            installMobileNotifications()
+            #if DEBUG && targetEnvironment(simulator)
+            if !didPrepareVoiceLayoutQA, CommandLine.arguments.contains("--mobile-voice-layout-qa"), let project = projects.first {
+                didPrepareVoiceLayoutQA = true
+                openProject(project)
+                Task { @MainActor in
+                    await Task.yield()
+                    isVoicePresented = true
+                }
+            }
+            if CommandLine.arguments.contains("--mobile-session-restart-qa") {
+                do {
+                    let project = try MobileEditorSessionRestartQA.prepare()
+                    if !projects.contains(where: { $0.id == project.id }) {
+                        projects.insert(project, at: 0)
+                        try MobileAdaScriptProjectService.saveProjects(projects)
+                    }
+                } catch { agentStatus = error.localizedDescription }
+            }
+            prepareImagePasteQA()
+            if !didPrepareBackgroundQA, CommandLine.arguments.contains("--mobile-background-agent-qa") {
+                didPrepareBackgroundQA = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(2))
+                    MobileEditorBackgroundAgentQA.start()
+                    navigationPath.append(MobileEditorDestination.activity)
+                }
+            }
+            #endif
+        }
         .fullScreenCover(isPresented: $isPromptPresented, transition: .opacity) {
             MobileEditorPromptPanel(
-                text: $promptDraft,
-                attachmentNames: pendingPromptAttachments.map(\.lastPathComponent),
+                text: promptDraft.binding,
+                attachmentURLs: pendingPromptAttachments,
+                removeAttachment: { url in pendingPromptAttachments.removeAll { $0 == url } },
+                pasteImages: pasteAgentImages,
                 isAgentRunning: isAgentRunning,
                 pickFiles: pickAgentFiles,
                 pickPhotos: pickAgentPhotos,
                 submit: {
                     isPromptPresented = false
                     if let id = activeChatProjectID { submitPrompt(for: id) }
+                },
+                openVoice: {
+                    isPromptPresented = false
+                    Task { @MainActor in
+                        await Task.yield()
+                        isVoicePresented = true
+                    }
+                }
+            )
+        }
+        .fullScreenCover(isPresented: $isVoicePresented, transition: .opacity) {
+            MobileEditorVoicePanel(
+                text: promptDraft.binding,
+                events: chatEvents,
+                isAgentRunning: isAgentRunning,
+                agentStatus: agentStatus,
+                agentActivity: agentActivityState,
+                submit: {
+                    guard let id = activeChatProjectID else { return false }
+                    submitPrompt(for: id)
+                    return isAgentRunning
+                },
+                openKeyboard: {
+                    isVoicePresented = false
+                    Task { @MainActor in
+                        await Task.yield()
+                        isPromptPresented = true
+                    }
                 }
             )
         }
@@ -138,9 +220,13 @@ struct MobileEditorRootView: View {
                 MobileEditorWorkspaceView(
                     project: project,
                     selection: $workspaceTab,
-                    promptDraft: $promptDraft,
-                    pendingAttachmentNames: pendingPromptAttachments.map(\.lastPathComponent),
+                    promptDraft: promptDraft.binding,
+                    isComposerPresented: isPromptPresented || isVoicePresented,
+                    pendingAttachments: pendingPromptAttachments,
                     chatEvents: chatEvents,
+                    sessionID: chatState.sessionID(for: id),
+                    previousSession: chatState.previousSession,
+                    resumePreviousSession: { Task { @MainActor in await resumePreviousSession(for: id) } },
                     agentStatus: agentStatus,
                     agentActivityState: agentActivityState,
                     agentActivityID: agentActivityID,
@@ -148,7 +234,8 @@ struct MobileEditorRootView: View {
                     onOpenFile: { relativePath in
                         presentedFile = MobileEditorFilePresentation(project: project, relativePath: relativePath)
                     },
-                    openPrompt: { isPromptPresented = true }
+                    openPrompt: { isPromptPresented = true },
+                    openVoice: { isVoicePresented = true }
                 )
                 .navigationTitle(project.title)
                 .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
@@ -156,16 +243,27 @@ struct MobileEditorRootView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationBarColor(theme.editorColors.background)
                 .navigationBarTrailingItems {
-                    if !isPromptPresented {
-                        Button {
-                            navigationPath.append(MobileEditorDestination.projectSettings(id))
-                        } label: {
-                            Text("\u{E5D4}")
-                                .foregroundColor(.white)
-                                .frame(width: 40, height: 40)
-                                .environment(\.font, AdaEditorMaterialSymbolFont.font(size: 25))
+                    HStack(spacing: 8) {
+                        if runningProjectID == id, !isVoicePresented {
+                            Button { agentOperation?.cancel() } label: {
+                                Text("\u{E047}")
+                                    .foregroundColor(theme.editorColors.text)
+                                    .frame(width: 40, height: 40)
+                                    .font(AdaEditorMaterialSymbolFont.font(size: 24))
+                            }
+                            .accessibilityIdentifier("AdaEditor.Mobile.StopAgent")
                         }
-                        .accessibilityIdentifier("AdaEditor.Mobile.WorkspaceSettings")
+                        if !isPromptPresented, !isVoicePresented {
+                            Button {
+                                navigationPath.append(MobileEditorDestination.projectSettings(id))
+                            } label: {
+                                Text("\u{E5D4}")
+                                    .foregroundColor(.white)
+                                    .frame(width: 40, height: 40)
+                                    .environment(\.font, AdaEditorMaterialSymbolFont.font(size: 25))
+                            }
+                            .accessibilityIdentifier("AdaEditor.Mobile.WorkspaceSettings")
+                        }
                     }
                 }
             } else {
@@ -180,7 +278,25 @@ struct MobileEditorRootView: View {
                 .navigationTitlePosition(.center)
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationBarColor(theme.editorColors.background)
+        case .activity:
+            MobileEditorActivityScreen()
+                .navigationTitle("Activity")
+                .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarColor(theme.editorColors.background)
         case .agentSettings:
+            MobileEditorHarnessScreen(
+                store: harness,
+                isBusy: isAgentRunning,
+                showProviders: { navigationPath.append(MobileEditorDestination.providers) },
+                showSkills: { navigationPath.append(MobileEditorDestination.agentSkills) }
+            )
+                .navigationTitle("Agent")
+                .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
+                .navigationTitlePosition(.center)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarColor(theme.editorColors.background)
+        case .providers:
             MobileEditorAgentSettingsScreen(modelStore: providerModels) {
                 isModelPickerPresented = true
             }
@@ -189,6 +305,22 @@ struct MobileEditorRootView: View {
                 .navigationTitlePosition(.center)
                 .navigationBarTitleDisplayMode(.inline)
                 .navigationBarColor(theme.editorColors.background)
+        case .agentSkills:
+            MobileEditorSkillsScreen(store: harness, isBusy: isAgentRunning) {
+                navigationPath.append(MobileEditorDestination.agentSkill($0))
+            }
+                .navigationTitle("Skills")
+                .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarColor(theme.editorColors.background)
+        case .agentSkill(let id):
+            if let skill = (MobileAgentHarnessSkill.builtIns + harness.settings.installedSkills).first(where: { $0.id == id }) {
+                MobileEditorSkillDetailScreen(skill: skill)
+                    .navigationTitle(skill.name)
+                    .navigationTitleFont(MobileEditorFont.navigationFont(size: 18))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarColor(theme.editorColors.background)
+            }
         case .projectSettings(let id):
             if let project = projects.first(where: { $0.id == id }) {
                 MobileEditorProjectSettingsScreen(
@@ -255,13 +387,13 @@ struct MobileEditorRootView: View {
     private func openProject(_ project: MobileEditorProject) {
         withTransaction(Transaction()) {
             workspaceTab = .build
-            promptDraft = ""
+            promptDraft.text = ""
             pendingPromptAttachments = []
             chatState.open(project.id)
             playSession?.capture.stop()
             playSession = nil
             navigationPath.append(MobileEditorDestination.workspace(project.id))
-            Task { @MainActor in await loadChat(for: project.id) }
+            Task { @MainActor in await findPreviousSession(for: project.id) }
         }
     }
 
@@ -289,7 +421,7 @@ struct MobileEditorRootView: View {
         let data = try await markup.pngData(for: image)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("game-feedback-\(UUID().uuidString).png")
         try data.write(to: url, options: .atomic)
-        promptDraft = text
+        promptDraft.text = text
         pendingPromptAttachments.append(url)
         workspaceTab = .build
         presentedPlayProject = nil
@@ -297,7 +429,7 @@ struct MobileEditorRootView: View {
     }
 
     private func submitPrompt(for id: UUID) {
-        let value = promptDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = promptDraft.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (!value.isEmpty || !pendingPromptAttachments.isEmpty), !isAgentRunning,
               let index = projects.firstIndex(where: { $0.id == id }) else {
             return
@@ -319,8 +451,15 @@ struct MobileEditorRootView: View {
             return
         }
         let attachmentPaths: [String]
+        let imageInputs: [SloppyImageInput]
         do {
             attachmentPaths = try savePromptAttachments(into: workspaceURL)
+            imageInputs = try attachmentPaths.compactMap { path in
+                let url = workspaceURL.appendingPathComponent(path)
+                guard EditorImageAttachment.extensions.contains(url.pathExtension.lowercased()) else { return nil }
+                return SloppyImageInput(data: try EditorImageAttachment.pngData(at: url), relativePath: path)
+            }
+            try SloppyRuntimeHost.validateImages(imageInputs)
         } catch {
             agentStatus = error.localizedDescription
             return
@@ -338,7 +477,7 @@ struct MobileEditorRootView: View {
             agentStatus = error.localizedDescription
             return
         }
-        promptDraft = ""
+        promptDraft.text = ""
         pendingPromptAttachments = []
         chatEvents.append(EditorAgentEvent(
             kind: .message,
@@ -348,9 +487,53 @@ struct MobileEditorRootView: View {
             )
         ))
         chatState.begin(id)
+        let sessionID = chatState.sessionID(for: id)
+        let runSettings = harness.settings
         let streamID = "stream-\(UUID().uuidString)"
-        Task { @MainActor in
-            do {
+        let operation = MobileEditorAgentOperation(projectID: id)
+        agentOperation = operation
+        operation.start(
+            projectName: projects[index].title,
+            requestBackground: { activityID, coordinator in
+                if #available(iOS 26.0, *) {
+                    EditorContinuedProcessing.shared.request(for: activityID, coordinator: coordinator, onUnavailable: operation.backgroundUnavailable)
+                } else {
+                    coordinator.update(activityID, detail: "Connecting to the model…", backgroundStatus: "Background agent execution requires iOS/iPadOS 26.")
+                    operation.backgroundUnavailable("Background agent execution requires iOS/iPadOS 26. Keep the app open for this request.")
+                }
+            },
+            work: {
+                let toolService = EditorMobileAgentToolService(
+                    projectURL: workspaceURL,
+                    liveDiagnostics: { playSession?.projectID == id ? (playSession?.runtime.view.diagnostics ?? []) : [] },
+                    startPlay: {
+                        guard UIApplication.shared.applicationState == .active else {
+                            throw NSError(domain: "AdaEditor.MobilePlay", code: 2, userInfo: [NSLocalizedDescriptionKey: "Play rendering requires the foreground. Use editor.runtime tools in the background, then capture Play after reopening the app."])
+                        }
+                        preparePlay(for: id)
+                        guard playSession?.projectID == id else {
+                            throw NSError(domain: "AdaEditor.MobilePlay", code: 1, userInfo: [NSLocalizedDescriptionKey: agentStatus ?? "Play could not start."])
+                        }
+                    },
+                    imageCredentials: MobileEditorImageCredentials(),
+                    imageAnalyzer: { urls, question in
+                        let images = try urls.map { SloppyImageInput(data: try EditorImageAttachment.pngData(at: $0)) }
+                        return try await sloppyRuntime.analyzeImages(images, question: question)
+                    },
+                    capturePlay: {
+                        try Task.checkCancellation()
+                        guard UIApplication.shared.applicationState == .active else {
+                            throw NSError(domain: "AdaEditor.MobilePlay", code: 2, userInfo: [NSLocalizedDescriptionKey: "Play capture requires the foreground. Use editor.runtime tools while the app is in the background."])
+                        }
+                        guard playSession?.projectID == id, let capture = playSession?.capture else {
+                            throw CocoaError(.featureUnsupported)
+                        }
+                        let image = try await capture.nextFrame()
+                        return try EditorImageAttachment.encodePNG(image)
+                    }
+                )
+                defer { toolService.finish() }
+                sloppyRuntime = SloppyRuntimeHost(additionalTools: try MobileEditorAgentToolBridge.definitions())
                 if usesCodex, let codexCredentials {
                     try await sloppyRuntime.configureCodex(
                         tokenProvider: { MobileCodexCredentialStore.load()?.accessToken ?? "" },
@@ -362,48 +545,158 @@ struct MobileEditorRootView: View {
                 } else {
                     try await sloppyRuntime.configureOpenAI(apiKey: credentials.apiKey, model: credentials.model, apiURL: credentials.apiURL)
                 }
-                _ = try await sloppyRuntime.send(
-                    prompt: outgoingPrompt,
-                    sessionID: id.uuidString,
-                    workspaceURL: workspaceURL,
-                    build: {
-                        await MainActor.run {
-                            MobileAdaScriptProjectService.buildForAgent(at: workspaceURL)
-                        }
-                    },
-                    onText: { text in
-                        await MainActor.run {
-                            guard !text.isEmpty else { return }
-                            let event = EditorAgentEvent(
-                                id: streamID,
-                                kind: .message,
-                                message: EditorAgentMessage(
-                                    role: .assistant,
-                                    segments: [EditorAgentMessageSegment(kind: .text, text: text)]
+                operation.completedStep()
+                var turnPrompt = MobileEditorAgentContext.prompt(runSettings.prompt(outgoingPrompt), visiblePrompt: outgoingPrompt)
+                for attempt in 0...runSettings.repairAttempts {
+                    try Task.checkCancellation()
+                    let responseStreamID = attempt == 0 ? streamID : "repair-\(UUID().uuidString)"
+                    _ = try await sloppyRuntime.send(
+                        prompt: turnPrompt,
+                        sessionID: sessionID,
+                        workspaceURL: workspaceURL,
+                        build: {
+                            await MainActor.run {
+                                guard !Task.isCancelled else { return SloppyBuildResult(ok: false, summary: "Agent stopped.") }
+                                let result = toolService.build()
+                                return SloppyBuildResult(ok: result.ok, summary: result.payload)
+                            }
+                        },
+                        onText: { text in
+                            await MainActor.run {
+                                guard !Task.isCancelled, !text.isEmpty else { return }
+                                operation.update("Writing the response…")
+                                let event = EditorAgentEvent(
+                                    id: responseStreamID,
+                                    kind: .message,
+                                    message: EditorAgentMessage(
+                                        role: .assistant,
+                                        segments: [EditorAgentMessageSegment(kind: .text, text: text)]
+                                    )
                                 )
-                            )
-                            chatState.record(event, for: id)
-                        }
-                    },
-                    onActivity: { activity in
-                        await MainActor.run { MobileSloppyChatAdapter.record(activity, for: id, in: chatState) }
+                                chatState.record(event, for: id)
+                            }
+                        },
+                        onActivity: { activity in
+                            await MainActor.run {
+                                guard !Task.isCancelled else { return }
+                                MobileSloppyChatAdapter.record(activity, for: id, in: chatState)
+                                switch activity {
+                                case .thinking: operation.update("Thinking…")
+                                case .toolStarted(let tool): operation.update("Using \(tool)…")
+                                case .toolFinished(let tool, let succeeded):
+                                    if !succeeded { operation.failedTool(tool) }
+                                    operation.completedStep()
+                                    operation.update("Agent is working…")
+                                }
+                            }
+                        },
+                        additionalToolHandler: { request in
+                            guard !Task.isCancelled else {
+                                return ToolInvocationResult(tool: request.tool, ok: false, error: ToolErrorPayload(code: "cancelled", message: "Agent stopped.", retryable: false))
+                            }
+                            let result = await MobileEditorAgentToolBridge.invoke(request, service: toolService)
+                            if !result.ok, let error = result.error {
+                                await MainActor.run { operation.reportError(error.message, tool: request.tool) }
+                            }
+                            return result
+                        },
+                        maxToolRounds: runSettings.maxToolRounds,
+                        images: attempt == 0 ? imageInputs : [],
+                        persistedSessionID: sessionID
+                    )
+                    try Task.checkCancellation()
+                    operation.completedStep()
+                    operation.update("Checking AdaScript and project scenes…")
+                    chatState.setStatus("Checking AdaScript and project scenes…", for: id)
+                    let validation = await toolService.validatePrototype()
+                    try Task.checkCancellation()
+                    operation.completedStep()
+                    if validation.ok {
+                        if runSettings.opensPreview, UIApplication.shared.applicationState == .active { preparePlay(for: id) }
+                        return .init(succeeded: true, detail: "AdaScript, scenes and simulation validated")
                     }
-                )
-                chatState.setStatus("Checking the AdaScript build…", for: id)
-                _ = try MobileAdaScriptProjectService.build(at: workspaceURL)
-                chatState.finish(id, succeeded: true, status: "AdaScript build succeeded")
-            } catch {
-                chatState.finish(id, succeeded: false, status: error.localizedDescription)
+                    operation.reportError(validation.payload)
+                    if attempt == runSettings.repairAttempts {
+                        return .init(succeeded: false, detail: validation.payload)
+                    }
+                    operation.update("Repairing build errors…")
+                    chatState.setStatus("Repairing build errors…", for: id)
+                    let repairPrompt = """
+                    [Automatic validation feedback]
+                    The final project validation failed. Fix the errors with the available editor tools, then rebuild.
+                    Do not repeat the previous completion claim. Read editor.output.read, diagnostics and the relevant documentation.
+                    \(validation.payload)
+                    """
+                    turnPrompt = MobileEditorAgentContext.prompt(runSettings.prompt(repairPrompt), visiblePrompt: "")
+                }
+                return .init(succeeded: false, detail: "The agent could not validate the project.")
+            },
+            finished: { state, detail in
+                chatState.finish(id, succeeded: state == .completed, status: detail)
+                await loadChat(for: id, sessionID: sessionID)
+                if state != .completed, chatState.sessionID(for: id) == sessionID {
+                    chatState.record(EditorAgentEvent(kind: .runStatus, title: detail, isSuccessful: false), for: id)
+                }
             }
-            await loadChat(for: id)
+        )
+    }
+
+    private func installMobileNotifications() {
+        let center = EditorNotificationCenter.shared
+        EditorSystemNotifications.shared.install(on: center)
+        center.onAction = { action in
+            guard let projectID = action.projectID.flatMap(UUID.init(uuidString:)),
+                  let project = projects.first(where: { $0.id == projectID }) else {
+                EditorNotificationRouter.shared.receive(action)
+                return
+            }
+            presentedFile = nil
+            if UIDevice.current.userInterfaceIdiom == .pad { MobileEditorWindowLauncher.open() }
+            presentedPlayProject = nil
+            isPromptPresented = false
+            isVoicePresented = false
+            navigationPath = NavigationPath()
+            workspaceTab = .build
+            openProject(project)
+        }
+        Task { await center.start() }
+    }
+
+    private func findPreviousSession(for id: UUID) async {
+        guard chatState.needsPreviousSession(for: id) else { return }
+        let sessionID = chatState.sessionID(for: id)
+        do {
+            let directory = try MobileAdaScriptProjectService.projectURL(for: id)
+            let previous = try await MobileEditorSessionStore(workspaceURL: directory).list()
+                .first { $0.id != sessionID && $0.messageCount > 0 }
+            chatState.setPreviousSession(previous.map { .init(id: $0.id, title: $0.title) }, for: id, sessionID: sessionID)
+        } catch {
+            if activeChatProjectID == id { agentStatus = error.localizedDescription }
         }
     }
 
-    private func loadChat(for id: UUID) async {
+    private func resumePreviousSession(for id: UUID) async {
+        guard runningProjectID != id, activeChatProjectID == id,
+              let previous = chatState.previousSession else { return }
+        let sessionID = chatState.sessionID(for: id)
         do {
             let directory = try MobileAdaScriptProjectService.projectURL(for: id)
-            let events = try await MobileEditorSessionStore(workspaceURL: directory).events()
-            chatState.load(events, for: id)
+            let events = try await MobileEditorSessionStore(workspaceURL: directory).events(id: previous.id)
+            guard activeChatProjectID == id,
+                  chatState.resumePreviousSession(for: id, expectedSessionID: sessionID, events: events) else { return }
+            promptDraft.text = ""
+            pendingPromptAttachments = []
+            workspaceTab = .build
+        } catch {
+            if activeChatProjectID == id { agentStatus = error.localizedDescription }
+        }
+    }
+
+    private func loadChat(for id: UUID, sessionID: String) async {
+        do {
+            let directory = try MobileAdaScriptProjectService.projectURL(for: id)
+            let events = try await MobileEditorSessionStore(workspaceURL: directory).events(id: sessionID)
+            chatState.load(events, for: id, sessionID: sessionID)
         } catch {
             if activeChatProjectID == id {
                 agentStatus = error.localizedDescription
@@ -412,7 +705,48 @@ struct MobileEditorRootView: View {
     }
 
     private func configureAgent() {
+        isVoicePresented = false
         navigationPath.append(MobileEditorDestination.agentSettings)
+    }
+
+    #if DEBUG && targetEnvironment(simulator)
+    private func prepareImagePasteQA() {
+        let codeQA = CommandLine.arguments.contains("--mobile-code-touch-qa")
+        guard !didPrepareImageQA, codeQA || CommandLine.arguments.contains("--mobile-image-paste-qa") else { return }
+        didPrepareImageQA = true
+        do {
+            let project = MobileEditorProject(id: UUID(), title: codeQA ? "Code Touch QA" : "Image Paste QA", prompt: nil)
+            let directory = try MobileAdaScriptProjectService.prepare(project)
+            projects.insert(project, at: 0)
+            if codeQA {
+                let source = (0..<200).map { "// Line \($0): swipe to scroll; long press then drag to select." }.joined(separator: "\n")
+                try source.write(to: directory.appendingPathComponent("Sources/Game.ada"), atomically: true, encoding: .utf8)
+            } else {
+                try MobileEditorImagePaste.seedPreviewQA()
+            }
+            openProject(project)
+            Task { @MainActor in
+                await Task.yield()
+                if codeQA {
+                    presentedFile = MobileEditorFilePresentation(project: project, relativePath: "Sources/Game.ada")
+                } else {
+                    isPromptPresented = true
+                }
+            }
+        } catch { agentStatus = error.localizedDescription }
+    }
+    #endif
+
+    private func pasteAgentImages() -> Bool {
+        do {
+            let urls = try MobileEditorImagePaste.files()
+            guard !urls.isEmpty else { return false }
+            pendingPromptAttachments.append(contentsOf: urls)
+            return true
+        } catch {
+            agentStatus = error.localizedDescription
+            return true
+        }
     }
 
     private func pickAgentFiles() {

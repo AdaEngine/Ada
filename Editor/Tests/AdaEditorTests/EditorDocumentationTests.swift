@@ -38,11 +38,11 @@ struct EditorDocumentationTests {
         model.searchText = "  MOVEMENT deltaTime  "
         #expect(model.filteredArticles.contains { $0.id == "AdaScripting" })
         model.select("AdaScripting")
-        model.select("AdaScriptViews")
+        model.select("GettingStartedWithAdaScript")
         model.goBack()
         #expect(model.selectedID == "AdaScripting")
         model.goForward()
-        #expect(model.selectedID == "AdaScriptViews")
+        #expect(model.selectedID == "GettingStartedWithAdaScript")
         model.goBack()
         model.select("Building")
         #expect(model.forwardHistory.isEmpty)
@@ -57,7 +57,7 @@ struct EditorDocumentationTests {
             let model = EditorDocumentationViewModel()
             let window = EditorDocumentationWindowController.makeWindow(viewModel: model)
             defer { window.close() }
-            #expect(window.title == "AdaEngine Documentation")
+            #expect(window.title == "Ada Documentation")
             #expect(window.contentViewController is NSHostingController<EditorDocumentationView>)
             #expect(window.minSize.width == 760)
             model.select("AdaScripting")
@@ -70,10 +70,10 @@ struct EditorDocumentationTests {
         func nativeReaderReusesWindowAndRoutesClose() throws {
             _ = NSApplication.shared
             #expect(EditorDocumentationWindowController.open())
-            let window = try #require(NSApp.windows.first { $0.title == "AdaEngine Documentation" && $0.isVisible })
+            let window = try #require(NSApp.windows.first { $0.title == "Ada Documentation" && $0.isVisible })
             defer { window.close() }
             #expect(EditorDocumentationWindowController.open())
-            #expect(NSApp.windows.filter { $0.title == "AdaEngine Documentation" && $0.isVisible }.count == 1)
+            #expect(NSApp.windows.filter { $0.title == "Ada Documentation" && $0.isVisible }.count == 1)
             // The test runner has no foreground key window. Supply the actual reader window as the routing target.
             #expect(EditorDocumentationWindowController.handleMenuCommand(.closeEditor, keyWindow: nil) == nil)
             #expect(EditorDocumentationWindowController.handleMenuCommand(.closeEditor, keyWindow: window) == true)

@@ -98,6 +98,42 @@ struct OffscreenViewportTests {
     }
 
     @Test
+    func scrollEvent_preservesTrackpadPrecisionAndLocalCoordinates() throws {
+        let delegate = MockViewportDelegate()
+        let tester = ViewTester {
+            OffscreenViewportView(delegate: delegate).padding(20)
+        }
+        .setSize(Size(width: 400, height: 300))
+        .performLayout()
+        let window = RID()
+
+        for isPrecise in [true, false] {
+            var event = MouseEvent(
+                window: window,
+                button: .scrollWheel,
+                scrollDelta: Point(0.5, -1.5),
+                mousePosition: Point(100, 80),
+                phase: .changed,
+                modifierKeys: [.shift],
+                time: 1
+            )
+            event.hasPreciseScrollingDeltas = isPrecise
+            tester.containerView.onMouseEvent(event)
+        }
+
+        let events = delegate.receivedInputEvents.compactMap { $0 as? MouseEvent }
+        #expect(events.map(\.hasPreciseScrollingDeltas) == [true, false])
+        let event = try #require(events.first)
+        #expect(event.button == .scrollWheel)
+        #expect(event.mousePosition == Point(80, 60))
+        #expect(event.scrollDelta == Point(0.5, -1.5))
+        #expect(event.modifierKeys == [.shift])
+        #expect(event.phase == .changed)
+        #expect(event.window == window)
+        #expect(event.time == 1)
+    }
+
+    @Test
     func containerCreatesDelegate_onlyOnce() {
         var factoryCallCount = 0
         let delegate = MockViewportDelegate()

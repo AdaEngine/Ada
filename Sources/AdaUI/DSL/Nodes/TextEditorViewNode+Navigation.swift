@@ -39,6 +39,7 @@ extension TextEditorViewNode {
 
     func invalidateTextCaches() {
         self.lineCache = nil
+        self.wrappedRowsCache = nil
         self.textLayoutCache.removeAll(keepingCapacity: true)
         self.foldRangesCache = nil
         self.displayedLinesCache = nil
@@ -76,6 +77,9 @@ extension TextEditorViewNode {
     }
 
     func closestOffset(to point: Point) -> Int {
+        if wrapsLines {
+            return closestWrappedOffset(to: point)
+        }
         let lines = self.lines()
         let textRect = self.textRect()
         let pointSize = self.resolvedFontPointSize()
@@ -173,6 +177,9 @@ extension TextEditorViewNode {
     }
 
     func caretRect() -> Rect {
+        if wrapsLines {
+            return wrappedCaretRect()
+        }
         let lines = self.lines()
         let position = self.position(forOffset: self.caretOffset, lines: lines)
         let pointSize = self.resolvedFontPointSize()

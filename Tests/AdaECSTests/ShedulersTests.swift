@@ -10,6 +10,19 @@ import Testing
 
 @Suite
 struct SchedulersTests {
+    @Test("Explicit simulation steps set the real system delta and advance elapsed time")
+    func deterministicClock() async throws {
+        let world = World()
+        world.insertResource(SchedulerClockProbe())
+        world.addSystem(recordClockSystem.self, on: .test)
+        await world.runScheduler(.test, deltaTime: 0.25)
+        await world.runScheduler(.test, deltaTime: 0.125)
+        await world.runScheduler(.test, deltaTime: -1)
+        let probe = try #require(world.getResource(SchedulerClockProbe.self))
+        #expect(probe.deltas == [0.25, 0.125, 0])
+        #expect(probe.elapsed == [0.25, 0.375, 0.375])
+    }
+
     @Test
     func `default scheduler uses multi threaded executor on supported platforms`() {
         let scheduler = Scheduler(name: .test)
@@ -47,6 +60,17 @@ struct SchedulersTests {
         let marker = try #require(world.getResource(CheckSystemMarker.self))
         #expect(marker.value == 1, "CheckSystem should exists for Tests scheduler")
     }
+}
+
+struct SchedulerClockProbe: Resource {
+    var deltas: [Float] = []
+    var elapsed: [Float] = []
+}
+
+@System
+func recordClock(_ probe: ResMut<SchedulerClockProbe>, _ delta: Res<DeltaTime>, _ elapsed: Res<ElapsedTime>) {
+    probe.deltas.append(delta.deltaTime)
+    probe.elapsed.append(elapsed.elapsedTime)
 }
 
 struct CheckSystemMarker: Resource {

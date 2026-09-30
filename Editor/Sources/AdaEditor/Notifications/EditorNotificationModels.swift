@@ -62,7 +62,21 @@ struct EditorOperationActivity: Codable, Equatable, Identifiable, Sendable {
     var completedUnits: Int64?
     var totalUnits: Int64?
     var startedAt: Date = Date()
+    var updatedAt: Date?
+    var finishedAt: Date?
     var backgroundStatus: String?
+
+    func elapsedText(at now: Date = Date()) -> String {
+        let seconds = Int(max(0, (finishedAt ?? now).timeIntervalSince(startedAt)))
+        return seconds >= 3600
+            ? String(format: "%d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60)
+            : String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+
+    func systemSubtitle(at now: Date = Date()) -> String {
+        let phase = state == .running ? detail : "\(state.rawValue.capitalized) · \(detail)"
+        return "\(elapsedText(at: now)) · \(phase)"
+    }
 
     var fractionCompleted: Double? {
         guard let completedUnits, let totalUnits, totalUnits > 0 else {
