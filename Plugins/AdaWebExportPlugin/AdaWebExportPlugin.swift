@@ -8,6 +8,9 @@ import PackagePlugin
 
 @main
 struct AdaWebExportPlugin: CommandPlugin {
+    // Runtime files belong to the plugin package, including when used by a dependent game.
+    private static var assetsDirectory: URL { URL(fileURLWithPath: #filePath).deletingLastPathComponent() }
+
     func performCommand(context: PluginContext, arguments: [String]) async throws {
         let options: ExportOptions
         do {
@@ -226,6 +229,10 @@ struct AdaWebExportPlugin: CommandPlugin {
         let wasmOutput = options.outputDirectory.appending(component: "\(options.product).wasm", directoryHint: .notDirectory)
         try replaceItem(at: wasmOutput, with: wasm)
 
+        try replaceItem(
+            at: options.outputDirectory.appending(component: "engine-audio.js"),
+            with: Self.assetsDirectory.appending(components: "Runtime", "engine-audio.js")
+        )
         if options.product == "AdaWebPlayer" {
             try "{\"runtimeAPI\":3,\"profile\":\"universal\"}".write(
                 to: options.outputDirectory.appending(component: "ada-web-player.json"),
@@ -1394,6 +1401,7 @@ private func indexHTML(product: String) -> String {
 
 private func mainJS(product: String) -> String {
     """
+    import './engine-audio.js';
     \(product == "AdaWebPlayer" ? "import './player-audio.js';" : "")
     import { WASI, File, OpenFile, ConsoleStdout, PreopenDirectory, Directory } from "./browser-wasi-shim/dist/index.js";
     import { createInstantiator } from "./bridge-js.js";
