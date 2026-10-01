@@ -1,13 +1,13 @@
 <p align="center">
-  <a href="https://adaengine.github.io">
+  <a href="https://adaengine.org">
     <img src="Assets/ae_github_logo.png" alt="Ada logo">
   </a>
 </p>
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/AdaEngine/AdaEngine/blob/main/LICENSE)
-[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FAdaEngine%2FAdaEngine%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/AdaEngine/AdaEngine)
-[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FAdaEngine%2FAdaEngine%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/AdaEngine/AdaEngine)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/AdaEngine/AdaEngine)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/AdaEngine/Ada/blob/main/LICENSE)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FAdaEngine%2FAdaEngine%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/AdaEngine/Ada)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FAdaEngine%2FAdaEngine%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/AdaEngine/Ada)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/AdaEngine/Ada)
 
 
 ## What is Ada?
@@ -15,8 +15,8 @@
 Ada is a game engine fully written in Swift. The main idea is to encourage Swift developers to use this game engine to create fast and impressive games and user interfaces using Swift as their main language. We hope that Ada can become as popular in the GameDev community as Rust and C# are.
 
 <p align="center">
-  <a href="https://adaengine.github.io">
-    <img src="Assets/ada-editor.png" width="700" alt="AdaEditor screenshot">
+  <a href="https://adaengine.org">
+    <img src="Assets/ada-editor.png" width="700" alt="Ada Studio">
   </a>
 </p>
 
@@ -64,7 +64,7 @@ If you want to discuss this library or have a question about how to use it to so
 problem, there are a number of places you can discuss with fellow
 
   * For long-form discussions, we recommend the
-    [discussions](http://github.com/AdaEngine/AdaEngine/discussions) tab of this
+    [discussions](http://github.com/AdaEngine/Ada/discussions) tab of this
     repo.
 
 ## 👨‍💻 Contributing to Ada
