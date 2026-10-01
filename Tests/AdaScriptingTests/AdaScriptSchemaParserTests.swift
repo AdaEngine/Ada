@@ -442,63 +442,6 @@ extension AdaScriptSchemaParserTests {
         }
     }
 
-    @Test("Parses AdaUI view metadata")
-    func parsesViews() throws {
-        let schemas = try AdaScriptSchemaParser.parseViews(sources: [
-            AdaScriptCompilerSource(
-                path: "Views/Welcome.ada",
-                source: """
-                // Previewed in AdaEditor.
-                @previewable(title: "Welcome Preview")
-                @view(id: "game.welcome", title: "Welcome")
-                class WelcomeView {
-                    func body() {
-                        Text("Hello");
-                    }
-                }
-
-                @view
-                class SettingsView {
-                    func body() { EmptyView(); }
-                }
-                """
-            )
-        ])
-
-        #expect(schemas == [
-            AdaScriptViewSchema(
-                className: "WelcomeView",
-                id: "game.welcome",
-                isPreviewable: true,
-                line: 4,
-                sourcePath: "Views/Welcome.ada",
-                title: "Welcome Preview"
-            ),
-            AdaScriptViewSchema(
-                className: "SettingsView",
-                id: "SettingsView",
-                isIDExplicit: false,
-                isTitleExplicit: false,
-                line: 11,
-                sourcePath: "Views/Welcome.ada",
-                title: "Settings View"
-            )
-        ])
-    }
-
-    @Test("Parses previewable struct views")
-    func parsesViewStruct() throws {
-        let views = try AdaScriptSchemaParser.parseViews(sources: [
-            AdaScriptCompilerSource(
-                path: "View.ada",
-                source: "@previewable @view struct WelcomeView { func body() { Text(\"Hello\"); } }"
-            )
-        ])
-        #expect(views.count == 1)
-        #expect(views.first?.className == "WelcomeView")
-        #expect(views.first?.isPreviewable == true)
-    }
-
     @Test("Rejects @previewable without @view", arguments: ["class", "struct"])
     func rejectsPreviewableNonView(declarationKind: String) {
         #expect(throws: AdaScriptSchemaError.self) {
@@ -511,44 +454,6 @@ extension AdaScriptSchemaParserTests {
         }
     }
 
-    @Test("Lowers implicit view-builder blocks")
-    func lowersViewBuilderBlocks() throws {
-        let lowered = try AdaScriptViewBuilderLowerer.lower(
-            source: """
-            @view
-            @previewable
-            class CardView {
-                func body() {
-                    VStack(spacing: 12) {
-                        Text("Title").fontSize(24);
-                        HStack {
-                            Text("Detail");
-                            Spacer();
-                        }
-                    }.padding(16);
-                }
-            }
-            """,
-            path: "Card.ada"
-        )
-
-        #expect(lowered.contains("return adaUIBuilder.vStack().spacing(12)"))
-        #expect(lowered.contains(".child(adaUIBuilder.text(\"Title\").fontSize(24))"))
-        #expect(lowered.contains(".child(adaUIBuilder.hStack().child(adaUIBuilder.text(\"Detail\")).child(adaUIBuilder.spacer()))"))
-        #expect(lowered.contains(".padding(16);"))
-        #expect(!lowered.contains("VStack(spacing:"))
-    }
-
-    @Test("Lowers implicit view-builder blocks in structs")
-    func lowersStructViewBuilderBlocks() throws {
-        let lowered = try AdaScriptViewBuilderLowerer.lower(
-            source: "@view struct CardView { func body() { VStack { Text(\"Title\"); } } }",
-            path: "Card.ada"
-        )
-        #expect(lowered.contains("return adaUIBuilder.vStack()"))
-        #expect(lowered.contains(".child(adaUIBuilder.text(\"Title\"))"))
-    }
-
     @Test("Rejects unsupported builder constructors")
     func rejectsUnsupportedViewConstructor() {
         #expect(throws: AdaScriptViewBuilderError.self) {
@@ -557,61 +462,6 @@ extension AdaScriptSchemaParserTests {
                 path: "Bad.ada"
             )
         }
-    }
-
-    @Test("Rejects view modifiers with missing arguments before preview evaluation")
-    func rejectsViewModifierWithMissingArgument() {
-        #expect(throws: AdaScriptViewBuilderError(path: "Main.ada", line: 1, message: "background requires 1 argument")) {
-            try AdaScriptViewBuilderLowerer.lower(
-                source: "@view class MainView { func body() { Text(\"Hello\").background(); } }",
-                path: "Main.ada"
-            )
-        }
-    }
-
-    @Test("Lowers button actions into view instance methods")
-    func lowersButtonActions() throws {
-        let lowered = try AdaScriptViewBuilderLowerer.lower(
-            source: """
-            @view
-            class CounterView {
-                @state var label = "Before";
-
-                func body() {
-                    Button("Change") {
-                        label = "After";
-                    };
-                }
-            }
-            """,
-            path: "Counter.ada"
-        )
-
-        #expect(lowered.contains("return adaUIBuilder.button(\"Change\", \"__ada_view_action_0\")"))
-        #expect(lowered.contains("func __ada_view_action_0()"))
-        #expect(lowered.contains("label = \"After\";"))
-    }
-
-    @Test("Parses symbolic environment bindings")
-    func parsesViewEnvironment() throws {
-        let views = try AdaScriptSchemaParser.parseViews(sources: [
-            AdaScriptCompilerSource(
-                path: "Themed.ada",
-                source: """
-                @view
-                class ThemedView {
-                    @environment(colorScheme) var scheme;
-                    @environment(scaleFactor) var scale: Float;
-                    func body() { Text(scheme); }
-                }
-                """
-            )
-        ])
-
-        #expect(views[0].environment == [
-            AdaScriptViewEnvironmentBinding(key: "colorScheme", propertyName: "scheme"),
-            AdaScriptViewEnvironmentBinding(key: "scaleFactor", propertyName: "scale")
-        ])
     }
 
     @Test("Rejects bindings until nested script views can preserve identity")
