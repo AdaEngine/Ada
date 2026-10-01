@@ -8,7 +8,7 @@ import PackagePlugin
 
 @main
 struct AdaWebExportPlugin: CommandPlugin {
-    // Support files belong to the plugin package, not to the exported game.
+    // Runtime files belong to the plugin package, including when used by a dependent game.
     private static var assetsDirectory: URL { URL(fileURLWithPath: #filePath).deletingLastPathComponent() }
 
     func performCommand(context: PluginContext, arguments: [String]) async throws {

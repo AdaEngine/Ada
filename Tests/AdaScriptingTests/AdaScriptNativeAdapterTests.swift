@@ -1,6 +1,6 @@
 #if canImport(GravityAOT)
 import AdaAnimation
-@testable import AdaApp
+@_spi(Internal) @testable import AdaApp
 @testable import AdaAssets
 @_spi(Scripting) import AdaECS
 import AdaInput
@@ -92,58 +92,62 @@ struct AdaScriptNativeAdapterTests {
     @Test("Native asset calls retain typed handles and save through AdaAssets")
     @MainActor
     func nativeAssets() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("NativeScriptAssets-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: root) }
-        AssetsManager.registerAssetType(NativeScriptAsset.self)
-        await AssetsManager.setProjectDirectories(
-            ProjectDirectories(
-                source: root,
-                assetsDirectory: root.appendingPathComponent("Assets"),
-                userDataDirectory: root.appendingPathComponent("User"),
-                cacheDirectory: root.appendingPathComponent("Cache")
+        try await AppWorldsExecutionContext.$currentID.withValue(UUID()) {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("NativeScriptAssets-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: root) }
+            AssetsManager.registerAssetType(NativeScriptAsset.self)
+            await AssetsManager.setProjectDirectories(
+                ProjectDirectories(
+                    source: root,
+                    assetsDirectory: root.appendingPathComponent("Assets"),
+                    userDataDirectory: root.appendingPathComponent("User"),
+                    cacheDirectory: root.appendingPathComponent("Cache")
+                )
             )
-        )
-        try await AssetsManager.save(NativeScriptAsset(value: "native assets"), at: "@res://probe.nativeasset")
-        let pointer = try #require(ada_native_hosts_get_module())
-        let module = unsafe try NativeModule(module: pointer)
-        let instance = try module.makeInstance(type: "HostProbe")
-        let scope = NativeCallbackScope()
-        let assets = NativeAssetsHost(store: NativeAssetStore(), scope: scope)
-        let value = try module.invoke(instance, method: "save", arguments: [.null], globals: ["__adaAssets": .host(assets)])
-        #expect(value.literal == .string("@res://probe.nativeasset"))
-        let saved = try await AssetsManager.load(NativeScriptAsset.self, at: "@user://copy.nativeasset")
-        #expect(saved.asset.value == "native assets")
-        scope.isActive = false
-        #expect(throws: AdaScriptError.self) { try assets.call("load", arguments: [.string("@res://probe.nativeasset")]) }
+            try await AssetsManager.save(NativeScriptAsset(value: "native assets"), at: "@res://probe.nativeasset")
+            let pointer = try #require(ada_native_hosts_get_module())
+            let module = unsafe try NativeModule(module: pointer)
+            let instance = try module.makeInstance(type: "HostProbe")
+            let scope = NativeCallbackScope()
+            let assets = NativeAssetsHost(store: NativeAssetStore(), scope: scope)
+            let value = try module.invoke(instance, method: "save", arguments: [.null], globals: ["__adaAssets": .host(assets)])
+            #expect(value.literal == .string("@res://probe.nativeasset"))
+            let saved = try await AssetsManager.load(NativeScriptAsset.self, at: "@user://copy.nativeasset")
+            #expect(saved.asset.value == "native assets")
+            scope.isActive = false
+            #expect(throws: AdaScriptError.self) { try assets.call("load", arguments: [.string("@res://probe.nativeasset")]) }
+        }
     }
 
     @Test("Native async assets publish detached results after their callback scope ends")
     @MainActor
     func nativeAsyncAssets() async throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("NativeAsyncAsset-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: root) }
-        AssetsManager.registerAssetType(NativeScriptAsset.self)
-        await AssetsManager.setProjectDirectories(ProjectDirectories(source: root, assetsDirectory: root.appendingPathComponent("Assets"),
-            userDataDirectory: root.appendingPathComponent("User"), cacheDirectory: root.appendingPathComponent("Cache")))
-        try await AssetsManager.save(NativeScriptAsset(value: "async native asset"), at: "@res://probe.nativeasset")
-        let pointer = try #require(ada_native_async_get_module())
-        let module = unsafe try NativeModule(module: pointer)
-        let runtime = NativeAsyncRuntime(module: module)
-        let probe = try module.makeInstance(type: "NativeAsyncProbe")
-        let scope = NativeCallbackScope()
-        let assets = NativeAssetsHost(store: NativeAssetStore(), scope: scope, asyncRuntime: runtime)
-        let globals = runtime.globals.merging(["__adaAssets": .host(assets)]) { _, value in value }
-        guard case .task(let task) = try module.invoke(probe, method: "load", arguments: [.string("@res://probe.nativeasset")], globals: globals) else {
-            Issue.record("Expected async asset task"); return
-        }
-        scope.isActive = false
-        for _ in 0..<200 {
-            if case .completed(let value) = try module.poll(task, globals: runtime.globals) {
-                #expect(value.literal == .string("@res://probe.nativeasset")); return
+        try await AppWorldsExecutionContext.$currentID.withValue(UUID()) {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("NativeAsyncAsset-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: root) }
+            AssetsManager.registerAssetType(NativeScriptAsset.self)
+            await AssetsManager.setProjectDirectories(ProjectDirectories(source: root, assetsDirectory: root.appendingPathComponent("Assets"),
+                userDataDirectory: root.appendingPathComponent("User"), cacheDirectory: root.appendingPathComponent("Cache")))
+            try await AssetsManager.save(NativeScriptAsset(value: "async native asset"), at: "@res://probe.nativeasset")
+            let pointer = try #require(ada_native_async_get_module())
+            let module = unsafe try NativeModule(module: pointer)
+            let runtime = NativeAsyncRuntime(module: module)
+            let probe = try module.makeInstance(type: "NativeAsyncProbe")
+            let scope = NativeCallbackScope()
+            let assets = NativeAssetsHost(store: NativeAssetStore(), scope: scope, asyncRuntime: runtime)
+            let globals = runtime.globals.merging(["__adaAssets": .host(assets)]) { _, value in value }
+            guard case .task(let task) = try module.invoke(probe, method: "load", arguments: [.string("@res://probe.nativeasset")], globals: globals) else {
+                Issue.record("Expected async asset task"); return
             }
-            try await Task.sleep(for: .milliseconds(1))
+            scope.isActive = false
+            for _ in 0..<200 {
+                if case .completed(let value) = try module.poll(task, globals: runtime.globals) {
+                    #expect(value.literal == .string("@res://probe.nativeasset")); return
+                }
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            Issue.record("Native async asset did not complete")
         }
-        Issue.record("Native async asset did not complete")
     }
 
     @Test("Native scene imports expand prefabs and prepare camera render components")

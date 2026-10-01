@@ -2758,5 +2758,133 @@
         "links": []
       }
     ]
+  },
+  {
+    "id": "NativeAOT",
+    "title": "Native AdaScript (experimental)",
+    "section": "AdaScript",
+    "source": "Sources/AdaScripting/AdaScripting.docc/Guides/NativeAOT.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Compile supported AdaScript into native code with Gravity, then install metadata\nand callbacks through `AdaScriptNativePlugin`. Gravity owns C11 generation, the\nC ABI and native memory. AdaEngine owns world capabilities and the ECS adapters.\nNative execution does not use Gravity bytecode or fall back to the VM.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Development dependency",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The pinned Gravity revision includes `GravityAOT` for ordinary engine and Editor\nbuilds. To develop the compiler or run export tests against a local checkout:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "export ADAENGINE_GRAVITY_PACKAGE_PATH=/Users/vlad-prusakov/Developer/gravity-lang-aot",
+        "language": "sh",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The Editor package explicitly depends on `GravityAOT` and `CGravity`. A packaged\nEditor also needs access to the engine checkout, Python, make, Clang and Swift.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Automatic Editor export",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For an AdaScript project, choose **Build → Export AdaScript to macOS…** or\n**Build → Export AdaScript to Web…**. Documents are saved before exporting.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The exporter loads project and locked library sources, performs type checking,\nprepares native host conveniences and calls Gravity's `tools/aot_build.py`.\nIt creates the native archive, C accessor target, game executable package,\nresource bundle and detached scene payloads. It checks the generated module's\nmetadata, component/resource bindings and startup-system configuration before building the player. macOS\nexports include an `.app`; Web exports invoke the existing `export-web` plugin\nfor the engine/game WASM, JavaScript loader and resource manifests.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Outputs go to `Exports/macOS` or `Exports/Web`. Compilation and packaging happen\nin an unpublished directory. Failed exports preserve previous output. An\nexisting directory is replaced only if it has the native-export marker. The\narchive and generated SwiftPM package remain available alongside the player.\nRebuild that package with `ADAENGINE_GRAVITY_PACKAGE_PATH` set to the same checkout.\nThe `.a` in the package is a host-platform archive; Web builds compile its C\nsource for the WASI target rather than linking the host archive.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Web uses Swift 6.3.2 and `swift-6.3.2-RELEASE_wasm` by default. The generated package pins JavaScriptKit 0.53 for the engine's current Swan binding. Override with\n`ADA_WEB_SWIFT_EXECUTABLE` and `ADA_WEB_SWIFT_SDK`. Exporting does not publish a\nwebsite, sign an app, create an XCFramework or deploy to an iOS device.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Runtime capabilities",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• `@component` and `@replicated_component` structs register world-local native\n  schemas. Queries reuse the existing dynamic cursor and resolve with/without\n  filters; component writes update normal ECS change ticks.\n• `@resource` declarations use `AdaScriptNativeResources`. `autoInsert: true`\n  supplies missing defaults. Registered Swift resources use reflected access;\n  `@resource(Input)` supplies the existing input-action snapshot.\n• `@system` installs native callbacks in the declared scheduler. Before/after\n  dependencies and an explicit startup system are validated. Structural commands\n  declare deferred world access; source-defined resources use one conservative\n  write-access carrier.\n• `context.world` supports spawn, insert, remove, despawn, changeScene and\n  reloadScene. Structural mutations use `Commands`, and scene-spawned entities\n  are tracked by `SceneNavigator` for replacement/reload.\n• Native component constructors use registered engine constructor descriptors.\n  Editor preparation resolves named arguments and defaults to those descriptors.\n• `Assets.load`, typed loads/preloads and saves use AdaAssets handles and its\n  scoped cache. Web player assets preload asynchronously during plugin setup;\n  callbacks can then resolve cached references synchronously. Uncached Web loads\n  and Web filesystem saves report errors. `Assets.loadAsync` and typed async loads\n  run through the same cache without blocking callbacks. Native async saves use\n  AdaAssets on supported filesystems and report a detached failure result on Web.\n• Typed commands and replicated schemas register in the existing multiplayer\n  registry. Native systems send through its outgoing queue, bind received\n  commands, and dispatch RPC handlers with the authenticated source. Editor\n  preparation retains declarations while adapting RPC parameter metadata.\n  Networking requires source schema metadata through the plugin's `sources`\n  initializer argument and `MultiplayerPlugin` installed first.\n• `async`/`await` execute compiled coroutines. `Tasks.start`, `Tasks.promise`,\n  `Tasks.nextFrame`, `Time.sleep` (game time) and `Time.sleepRealTime` work in\n  native systems and scriptable objects. Locals, expression temporaries and loop\n  cursors survive suspension. Each owner resumes inside its declared scheduler\n  or lifecycle access. Removing an owner, replacing a scene or stopping the plugin\n  cancels pending tasks and operations; task count, resume count and execution fuel\n  are bounded.\n• `@scriptable` supplies native ready/update/fixedUpdate/event/destroy callbacks,\n  required components, exported state and the existing Codable registry envelope.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Exported scenes preserve hierarchy and prefabs, persist camera settings while rebuilding transient camera render components, and resolve tile map handles after asynchronous asset preloading. Transform position/scale animations are serialized\nas versioned `KeyframeClip` JSON, including interpolation curves and once/loop/\nping-pong modes, and restored as `KeyframeAnimator` components. Nested prefabs\npreserve their clips.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The exported player installs the project's input actions, feature plugins,\nphysics configuration and scene entry. macOS multiplayer uses LocalTCPTransport;\nWeb accepts the existing browser-lobby session and CloudWebSocketTransport, or\nruns solo with InMemoryTransport when no lobby session is supplied.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Host capabilities expire after the synchronous callback. World/resource/input\nhandles and component drafts cannot be used after suspension. A receiver can\nread freshly rebound declared resources; aliases to earlier callback capabilities\nfail with a stale-handle error. Explicit `@nonsendable` values are rejected at\nsuspension, including values nested in objects/lists. Timer/asset operation results\nare detached and may survive suspension. The Gravity\nfacade serializes native storage and host callbacks with a per-module lock and\nkeeps code owners alive for all metadata reads. Its default allocation limit is\n64 MiB. Detached Swift operation handles are traced from live native owners and\ntask frames so per-frame timers remain bounded; C arena garbage collection and\nnative hot reload are not implemented.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Limits and validation",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This remains an experimental compiler subset. Unsupported Gravity constructs,\nAdaScript views/tools remain unavailable and fail explicitly.\nNo unsupported construct silently switches to interpreted execution.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Movement.ada` validates native ECS/lifecycle integration.\n`HostAdapters.ada` goes through the native source preparation step and validates\nworld commands, Input, constructor capabilities and multiplayer round trips.\n`Async.ada` validates coroutine state, native promises, clocks, cancellation,\nborrowed capability expiry and scriptable lifecycle. Gravity executes the same\nasync C host proof under sanitizers and in freestanding WASM with no VM imports.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "ADAENGINE_DISABLE_SWAN=1 swift test --filter AdaScriptNative",
+        "language": "sh",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Editor export tests run a real multi-source AOT compiler, link and execute its\narchive from a C host, detach scene payloads, parse the generated player and\ncheck that failure preserves the old export. Separate app/browser validation is\nneeded for rendering and deployment evidence. Browser AudioPlugin uses a\nminiaudio mixer with its device disabled and sends copied Float32 PCM to Web Audio.\nThe export bundles `engine-audio.js` for every product. Output waits for a trusted\npointer/key gesture to resume AudioContext; mixing does not advance while output\nis suspended. WAV data and playback copies use independent owned decoders.\nCloud relay Host/Peer acceptance remains separate validation work.",
+        "level": 0,
+        "links": []
+      }
+    ]
   }
 ]
