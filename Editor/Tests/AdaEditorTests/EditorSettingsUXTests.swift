@@ -55,6 +55,24 @@ struct EditorSettingsUXTests {
         }
     }
 
+    @Test("Sloppy invite remains usable with a local agent and every catalog filter")
+    func sloppyInviteSettings() throws {
+        let catalog = EditorAgentCatalogViewModel()
+        catalog.discovered = [EditorDiscoveredAgent(id: "sloppy-acp", name: "Sloppy", path: "/bin/sloppy")]
+        catalog.query = "Codex"
+        var presentations = 0
+        let container = UIContainerView(rootView: EditorSloppyInviteSettingsView(catalog: catalog, presentInvite: { _ in
+            presentations += 1
+        }).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 360, height: 300)
+        container.layoutIfNeeded()
+        for filter in EditorAgentCatalogViewModel.Filter.allCases {
+            catalog.filter = filter
+            _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agents.SloppyInvite"))
+        }
+        #expect(presentations == 3)
+    }
+
     @Test("Notification switches change preferences and persist after reload")
     func notificationSwitches() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("notification-settings-\(UUID().uuidString).json")

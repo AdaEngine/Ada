@@ -233,6 +233,46 @@ struct EditorTileMapResourceTests {
         #expect(model.zoom > zoomBeforePinch)
     }
 
+    @Test("Painting tracks the live canvas size after repeated resize and pan")
+    func paintingAfterRelayout() throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "TileMapRelayoutTests")))
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("Resize.tilemap")
+        try EditorTileMapResource(atlasColors: [.red], cells: []).write(to: url)
+        let document = EditorAssetDocument(
+            id: "resize", title: "Resize.tilemap", relativePath: "Resize.tilemap", absolutePath: url.path,
+            assetReference: "@res://Resize.tilemap", kind: .tileMap, fileExtension: "tilemap",
+            byteCount: nil, modifiedAt: nil, errorMessage: nil
+        )
+        let model = EditorTileMapEditorModel(document: document)
+        let container = UIContainerView(rootView: HStack(spacing: 0) {
+            Color.clear.frame(width: 180)
+            EditorTileMapAssetEditor(document: document, model: model)
+        })
+        for size in [Size(width: 1000, height: 700), Size(width: 1200, height: 800), Size(width: 900, height: 650)] {
+            container.frame = Rect(origin: .zero, size: size)
+            container.bounds.size = size
+            container.layoutIfNeeded()
+            model.pan(by: Size(width: 12, height: -12))
+            model.endPan()
+            let frame = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Canvas")).absoluteFrame
+            let rect = model.tileRect(atX: 1, y: 1, in: frame.size)
+            let pointer = Point(x: frame.minX + rect.midX, y: frame.minY + rect.midY)
+            for phase in [MouseEvent.Phase.began, .ended] {
+                container.onMouseEvent(MouseEvent(
+                    window: .empty, button: .left, mousePosition: pointer,
+                    phase: phase, modifierKeys: [], time: 0
+                ))
+            }
+            #expect(try EditorTileMapResource.read(from: url).cells == [[1, 1, 0]])
+        }
+    }
+
     @Test("Tilemap preview uses the referenced scene's world tile size")
     func sceneTileSize() throws {
         if unsafe RenderEngine.shared == nil {

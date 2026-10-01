@@ -16,11 +16,13 @@ struct MobileEditorAgentSettingsScreen: View {
         nonmutating set { modelStore.apiKey = newValue }
     }
     @State private var statusMessage = ""
+    @State private var imageAPIKey = ""
     @State private var deviceCode: MobileCodexDeviceCode?
     @State private var isCodeCopied = false
     @State private var isAuthorizing = false
     @State private var authorizationBrowser = MobileCodexAuthorizationBrowser()
     @State private var authorizationTask: Task<Void, Never>?
+    @State private var sloppyInvites = EditorAgentCatalogViewModel()
 
     var body: some View {
         MobileEditorPageScrollView {
@@ -30,6 +32,10 @@ struct MobileEditorAgentSettingsScreen: View {
                     .foregroundColor(theme.editorColors.muted)
 
                 modelSelection
+                MobileEditorCard {
+                    EditorSloppyInviteSettingsView(catalog: sloppyInvites)
+                        .padding(17)
+                }
                 MobileEditorCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Codex authorization")
@@ -100,20 +106,7 @@ struct MobileEditorAgentSettingsScreen: View {
                             .font(MobileEditorFont.navigationFont(size: 20))
                             .foregroundColor(theme.editorColors.text)
                         settingsField("API URL", placeholder: MobileSloppyCredentials.defaultAPIURL, text: Binding(get: { apiURL }, set: { apiURL = $0 }))
-                        Button(action: updateAPIKey) {
-                            HStack {
-                                Text(apiKey.isEmpty ? "Set API key" : "API key saved securely")
-                                    .foregroundColor(theme.editorColors.text)
-                                Spacer()
-                                Text(apiKey.isEmpty ? "Add" : "Change")
-                                    .foregroundColor(theme.editorColors.blue)
-                            }
-                            .font(MobileEditorFont.font(size: 14))
-                            .padding(.horizontal, 12)
-                            .frame(height: 44)
-                            .background(RoundedRectangleShape(cornerRadius: 10).fill(theme.editorColors.background))
-                            .overlay { RoundedRectangleShape(cornerRadius: 10).stroke(theme.editorColors.border, lineWidth: 1) }
-                        }
+                        apiKeyButton(isConfigured: !apiKey.isEmpty, emptyTitle: "Set API key", action: updateAPIKey)
 
                         MobileEditorPrimaryButton(title: "Choose API model") {
                             switchProvider(to: .api)
@@ -127,22 +120,16 @@ struct MobileEditorAgentSettingsScreen: View {
 
                 MobileEditorCard {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Image generation").font(MobileEditorFont.navigationFont(size: 20))
+                        Text("Image generation")
+                            .font(MobileEditorFont.navigationFont(size: 20))
+                            .foregroundColor(theme.editorColors.text)
                         Text("Generate and edit game textures with an OpenAI API key. Codex sign-in handles image understanding; image generation uses a separate API key.")
                             .font(MobileEditorFont.font(size: 12))
                             .foregroundColor(theme.editorColors.muted)
-                        Button("Set image API key") {
-                            MobileSloppyAPIKeyPrompt.present(currentValue: "") { key in
-                                Task { @MainActor in
-                                    do {
-                                        try await EditorOpenAIImageCredentialStore().save(key)
-                                        statusMessage = key.isEmpty ? "Image API key removed" : "Image API key saved securely"
-                                    } catch { statusMessage = error.localizedDescription }
-                                }
-                            }
-                        }
+                        apiKeyButton(isConfigured: !imageAPIKey.isEmpty, emptyTitle: "Set image API key", action: updateImageAPIKey)
                         .accessibilityIdentifier("AdaEditor.Mobile.ImageAPIKey")
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(17)
                 }
 
@@ -159,12 +146,45 @@ struct MobileEditorAgentSettingsScreen: View {
             .padding(.bottom, 32)
         }
         .background(theme.editorColors.background)
-        .onAppear { reloadModels() }
+        .onAppear {
+            reloadModels()
+            Task { @MainActor in
+                do {
+                    imageAPIKey = try await EditorOpenAIImageCredentialStore().apiKey()
+                } catch EditorImageCredentialError.missingAPIKey {
+                    imageAPIKey = ""
+                } catch {
+                    statusMessage = error.localizedDescription
+                }
+            }
+        }
         .onDisappear {
             modelStore.cancel()
             authorizationTask?.cancel()
             authorizationBrowser.dismiss()
         }
+    }
+
+    private func apiKeyButton(isConfigured: Bool, emptyTitle: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(isConfigured ? "API key saved securely" : emptyTitle)
+                    .foregroundColor(theme.editorColors.text)
+                Spacer()
+                Text(isConfigured ? "Change" : "Add")
+                    .foregroundColor(theme.editorColors.blue)
+            }
+            .font(MobileEditorFont.font(size: 14))
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            .background(RoundedRectangleShape(cornerRadius: 10).fill(theme.editorColors.background))
+            .overlay {
+                RoundedRectangleShape(cornerRadius: 10)
+                    .stroke(theme.editorColors.border, lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+        }
+        .buttonStyle(DefaultButtonStyle())
     }
 
     private func settingsField(_ title: String, placeholder: String, text: Binding<String>) -> some View {
@@ -236,6 +256,20 @@ struct MobileEditorAgentSettingsScreen: View {
             switchProvider(to: .api)
             saveProvider()
             reloadModels()
+        }
+    }
+
+    private func updateImageAPIKey() {
+        MobileSloppyAPIKeyPrompt.present(currentValue: imageAPIKey) { key in
+            Task { @MainActor in
+                do {
+                    try await EditorOpenAIImageCredentialStore().save(key)
+                    imageAPIKey = key
+                    statusMessage = key.isEmpty ? "Image API key removed" : "Image API key saved securely"
+                } catch {
+                    statusMessage = error.localizedDescription
+                }
+            }
         }
     }
 

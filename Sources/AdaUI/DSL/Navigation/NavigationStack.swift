@@ -488,6 +488,11 @@ final class NavigationStackNode: ViewNode, PresentationInputProviding {
         navigationBarChromeTopInset + Constants.navigationBarHeight
     }
 
+    /// Descendant scroll nodes can resolve chrome after deferred page construction.
+    var scrollContentNavigationInset: Float {
+        Self.navigationBarState(in: currentContentNode).configuration.isHidden ? 0 : totalNavigationBarReservedHeight
+    }
+
     private func syncNavigationBar() {
         var state = Self.navigationBarState(in: currentContentNode)
         let configuration = state.configuration

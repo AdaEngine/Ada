@@ -39,6 +39,7 @@ final class EditorWorkbenchViewModel {
     @ObservationIgnored var uiExportTask: Task<Void, Never>?
     @ObservationIgnored var uiSceneModels: [String: EditorUISceneModel] = [:]
     @ObservationIgnored var tileSourceModels: [String: EditorTileSourceEditorModel] = [:]
+    @ObservationIgnored var tileMapModels: [String: EditorTileMapEditorModel] = [:]
     @ObservationIgnored var sceneUndoHistory: [String: [EditorSceneDocument]] = [:]
     @ObservationIgnored var sceneRedoHistory: [String: [EditorSceneDocument]] = [:]
     var selectedPreviewID: String?
@@ -227,6 +228,7 @@ final class EditorWorkbenchViewModel {
         openDocuments.remove(at: closingIndex)
         uiSceneModels.removeValue(forKey: documentID)
         tileSourceModels.removeValue(forKey: documentID)
+        tileMapModels.removeValue(forKey: documentID)
         sceneUndoHistory.removeValue(forKey: documentID)
         sceneRedoHistory.removeValue(forKey: documentID)
 
@@ -258,6 +260,7 @@ final class EditorWorkbenchViewModel {
         openDocuments.removeAll { discardedIDSet.contains($0.id) }
         uiSceneModels = uiSceneModels.filter { !discardedIDSet.contains($0.key) }
         tileSourceModels = tileSourceModels.filter { !discardedIDSet.contains($0.key) }
+        tileMapModels = tileMapModels.filter { !discardedIDSet.contains($0.key) }
         sceneUndoHistory = sceneUndoHistory.filter { !discardedIDSet.contains($0.key) }
         sceneRedoHistory = sceneRedoHistory.filter { !discardedIDSet.contains($0.key) }
         navigationHistory.removeAll { discardedIDSet.contains($0) }

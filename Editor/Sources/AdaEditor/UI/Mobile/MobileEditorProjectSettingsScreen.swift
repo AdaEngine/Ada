@@ -21,7 +21,7 @@ struct MobileEditorProjectSettingsScreen: View {
     }
 
     var body: some View {
-        ScrollView {
+        MobileEditorPageScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 MobileEditorCard {
                     VStack(alignment: .leading, spacing: 14) {

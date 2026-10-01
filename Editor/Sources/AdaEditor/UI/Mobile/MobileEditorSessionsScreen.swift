@@ -68,7 +68,7 @@ struct MobileEditorSessionsScreen: View {
     let open: (String) -> Void
 
     var body: some View {
-        ScrollView {
+        MobileEditorPageScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 if !status.isEmpty {
                     Text(status).font(MobileEditorFont.font(size: 14)).foregroundColor(theme.editorColors.muted)
@@ -120,7 +120,7 @@ struct MobileEditorSessionDetailScreen: View {
             if !status.isEmpty {
                 Text(status).font(MobileEditorFont.font(size: 14)).foregroundColor(theme.editorColors.muted).padding(22)
             }
-            EditorAgentTranscript(events: events, sessionID: sessionID)
+            transcript
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.editorColors.background)
@@ -135,6 +135,13 @@ struct MobileEditorSessionDetailScreen: View {
             }
         }
         .onDisappear { loadTask?.cancel() }
+    }
+
+    private var transcript: some View {
+        var view = EditorAgentTranscript(events: events, sessionID: sessionID)
+        view.scrollRespectsSafeArea = false
+        view.scrollExtendsUnderNavigationBar = true
+        return view
     }
 }
 #endif

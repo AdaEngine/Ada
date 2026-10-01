@@ -7,6 +7,19 @@ private struct TileMapCoordinate: Hashable {
     let y: Int
 }
 
+extension EditorWorkbenchViewModel {
+    func tileMapModel(for document: EditorAssetDocument) -> EditorTileMapEditorModel {
+        if let model = tileMapModels[document.id] {
+            return model
+        }
+        let model = EditorTileMapEditorModel(document: document, onSave: { [weak self] in
+            self?.tileMapResourceRevision &+= 1
+        })
+        tileMapModels[document.id] = model
+        return model
+    }
+}
+
 @Observable
 @MainActor
 final class EditorTileMapEditorModel {
@@ -26,6 +39,7 @@ final class EditorTileMapEditorModel {
     var showGrid = true
     private(set) var panOffset = Point.zero
     private(set) var revision = 0
+    private(set) var paletteRevision = 0
     private(set) var displayTileSize = Size(width: 24, height: 24)
     private(set) var tileSetStatus = "Link a Tile Source to add authored textures."
 
@@ -84,6 +98,7 @@ final class EditorTileMapEditorModel {
             reloadLinkedTiles()
             lastPaintedCell = nil
             strokeChanged = false
+            paletteRevision += 1
             revision += 1
             status = "\(map.cellCount) cells"
         } catch { status = error.localizedDescription }
@@ -567,6 +582,41 @@ final class EditorTileMapEditorModel {
         reload()
         selectedColor = insertionIndex
         tool = .paint
+    }
+
+    /// Only legacy colors can be removed here; authored textures belong to their Tile Source.
+    var canRemoveSelectedColor: Bool {
+        map.atlasColors.indices.contains(selectedColor) && image(at: selectedColor) == nil
+    }
+
+    func removeSelectedColor() {
+        guard canRemoveSelectedColor else { return }
+        endStroke()
+        guard canRemoveSelectedColor else { return }
+        let removed = selectedColor
+        var updated = map
+        updated.atlasColors.remove(at: removed)
+        if var textures = updated.atlasTextures, textures.indices.contains(removed) {
+            textures.remove(at: removed)
+            updated.atlasTextures = textures
+        }
+        func remap(_ cells: [[Int]]) -> [[Int]] {
+            cells.compactMap { cell in
+                guard cell.count >= 3, cell[2] != removed else { return nil }
+                var result = cell
+                if result[2] > removed { result[2] -= 1 }
+                return result
+            }
+        }
+        updated.cells = remap(updated.cells)
+        if var layers = updated.paletteLayers {
+            for index in layers.indices { layers[index].cells = remap(layers[index].cells) }
+            updated.paletteLayers = layers
+        }
+        guard save(updated) else { return }
+        reload()
+        selectedColor = min(removed, max(0, paletteCount - 1))
+        status = "Removed color and its painted cells from all layers."
     }
 
     private func paintCell(_ cell: TileMapCoordinate, erasing: Bool) {

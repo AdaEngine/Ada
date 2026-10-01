@@ -3,6 +3,7 @@
 struct EditorTileMapSidebar: View {
     let model: EditorTileMapEditorModel
     @State private var layerName = ""
+    @State private var pendingColorRemoval: Int?
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -104,6 +105,20 @@ struct EditorTileMapSidebar: View {
                 .font(.system(size: 12, weight: .regular))
                 .foregroundColor(theme.editorColors.text)
                 .lineLimit(1)
+            if pendingColorRemoval == model.selectedColor && model.canRemoveSelectedColor {
+                HStack(spacing: 6) {
+                    action("Delete on all layers", id: "ConfirmRemoveColor") {
+                        model.removeSelectedColor()
+                        pendingColorRemoval = nil
+                    }
+                    action("Cancel", id: "CancelRemoveColor") { pendingColorRemoval = nil }
+                }
+            } else {
+                action("Remove color…", id: "RemoveColor") { pendingColorRemoval = model.selectedColor }
+                    .disabled(!model.canRemoveSelectedColor)
+            }
+            Text("Erase cells: eraser tool or right-drag. Remove color also clears its cells on all layers.")
+                .font(.system(size: 11)).foregroundColor(theme.editorColors.muted).lineLimit(3)
             ScrollView(showsIndicators: true) {
                 LazyVStack(0..<((model.paletteCount + 2) / 3), id: \.self, spacing: 6, estimatedRowHeight: 80, overscan: 2) { row in
                     HStack(spacing: 6) {
@@ -136,7 +151,7 @@ struct EditorTileMapSidebar: View {
             VStack(spacing: 5) {
                 ZStack {
                     RoundedRectangleShape(cornerRadius: 4).fill(model.paletteColor(at: index))
-                    if let image = model.image(at: index) { image.resizable() }
+                    EditorTileMapPalettePreview(model: model, index: index)
                 }
                 .frame(width: 48, height: 48)
                 HStack(spacing: 4) {
@@ -178,6 +193,23 @@ struct EditorTileMapSidebar: View {
         .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surface))
         .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border, lineWidth: 1) }
         .accessibilityIdentifier("AdaEditor.TileMapEditor.\(id)")
+    }
+}
+
+private struct EditorTileMapPalettePreview: View {
+    let model: EditorTileMapEditorModel
+    let index: Int
+
+    var body: some View {
+        // Texture storage is not observed; only palette reloads replace it.
+        // Painting and changing the selection keep these GPU resources intact.
+        _ = model.paletteRevision
+        let texture = model.texture(at: index)
+        return Canvas { context, size in
+            if let texture {
+                context.drawRect(Rect(origin: .zero, size: size), texture: texture, color: .white)
+            }
+        }
     }
 }
 

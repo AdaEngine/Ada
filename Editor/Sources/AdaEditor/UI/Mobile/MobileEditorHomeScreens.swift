@@ -105,8 +105,6 @@ struct MobileEditorSettingsScreen: View {
                 }
                 .buttonStyle(DefaultButtonStyle())
                 .accessibilityIdentifier("AdaEditor.Mobile.ConfigureAgent")
-                settingsRow("Projects", detail: "Projects and sessions are saved on this device")
-                settingsRow("Game Preview", detail: "Run the scene from your project")
             }
             .padding(.horizontal, 22)
             .padding(.top, 24)

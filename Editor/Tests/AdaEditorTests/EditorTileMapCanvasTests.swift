@@ -83,6 +83,72 @@ struct EditorTileMapCanvasTests {
         }
     }
 
+    @Test("Removing a palette color clears its cells on every layer and reindexes surviving colors")
+    func removeColor() throws {
+        let fixture = try fixture(layers: [
+            .init(name: "Ground", zIndex: 0, isEnabled: true, cells: [[0, 0, 0], [1, 0, 1]]),
+            .init(name: "Top", zIndex: 1, isEnabled: false, cells: [[2, 0, 0], [3, 0, 1]])
+        ])
+        defer { try? FileManager.default.removeItem(at: fixture.url.deletingLastPathComponent()) }
+        let model = fixture.model
+        model.removeSelectedColor()
+        let saved = try EditorTileMapResource.read(from: fixture.url)
+        #expect(saved.atlasColors == [.blue])
+        #expect(saved.effectiveLayers.map(\.cells) == [[[1, 0, 0]], [[3, 0, 0]]])
+        #expect(model.selectedColor == 0)
+        model.removeSelectedColor()
+        #expect(model.paletteCount == 0)
+        #expect(model.layers.allSatisfy { $0.cells.isEmpty })
+        #expect(!model.canRemoveSelectedColor)
+        model.removeSelectedColor()
+        #expect(try EditorTileMapResource.read(from: fixture.url).atlasColors.isEmpty)
+    }
+
+    @Test("Ruler glyphs retain their point size while the map zooms and pans")
+    func rulerGlyphSize() throws {
+        let fixture = try fixture(layers: [.init(name: "Ground", zIndex: 0, isEnabled: true, cells: [])])
+        defer { try? FileManager.default.removeItem(at: fixture.url.deletingLastPathComponent()) }
+        let model = fixture.model
+        for zoom: Float in [0.25, 1, 4] {
+            model.setZoom(zoom)
+            model.pan(by: Size(width: 120, height: -80))
+            model.endPan()
+            let container = UIContainerView(rootView: EditorTileMapCanvas(model: model))
+            container.frame = Rect(x: 0, y: 0, width: 1000, height: 700)
+            container.bounds.size = container.frame.size
+            container.layoutIfNeeded()
+            let context = UIGraphicsContext()
+            container.viewTree.rootNode.draw(with: context)
+            var glyphCount = 0
+            for command in context.getDrawCommands() {
+                switch command {
+                case let .drawGlyph(glyph, transform, _):
+                    glyphCount += 1
+                    #expect(glyph.attributes.font.pointSize == 9)
+                    #expect(glyph.size.height < 16)
+                    #expect(transform.scale.x == 1)
+                    #expect(transform.scale.y == 1)
+                    let topLeft = transform * Vector4(glyph.position.x, glyph.position.w, 0, 1)
+                    let bottomRight = transform * Vector4(glyph.position.z, glyph.position.y, 0, 1)
+                    #expect(topLeft.x >= 0)
+                    #expect(bottomRight.x <= container.frame.width)
+                    #expect(-topLeft.y >= 0)
+                    #expect(-bottomRight.y <= container.frame.height)
+                case let .drawText(layout, transform, _):
+                    // Cover the layout command too: rectangle scaling caused the regression.
+                    glyphCount += layout.textLines.reduce(0) { count, line in
+                        count + line.reduce(0) { $0 + $1.count }
+                    }
+                    #expect(transform.scale.x == 1)
+                    #expect(transform.scale.y == 1)
+                default:
+                    break
+                }
+            }
+            #expect(glyphCount > 2)
+        }
+    }
+
     private enum CanvasTestError: Error { case missingLayer }
 
     private func fixture(layers: [EditorTileMapResource.PaletteLayer]) throws -> (model: EditorTileMapEditorModel, url: URL) {

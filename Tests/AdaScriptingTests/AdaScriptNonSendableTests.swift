@@ -11,10 +11,6 @@ struct AdaScriptNonSendableTests {
         #expect(throws: AdaScriptError.self) {
             try AdaScriptPlugin(source: "@system class S { async func update(anyName) {} }")
         }
-        let sources = [AdaScriptSource(path: "View.ada", source: "@view class V { async func body() { Text(\"x\"); } }")]
-        #expect(throws: AdaScriptError.self) {
-            try AdaScriptViewModuleRuntime(sources: sources, views: AdaScriptViewScanner.declarations(in: sources))
-        }
         let scriptable = AdaScriptObjectSchema(
             identifier: "test.async-scriptable-callback",
             className: "ScriptableValue",

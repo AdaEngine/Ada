@@ -11,15 +11,11 @@ struct MobileEditorFilesScreen: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        ScrollView {
+        MobileEditorPageScrollView {
             fileList
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 .padding(.bottom, 112)
-        }
-        .transformEnvironment(\.safeAreaInsets) { insets in
-            // Reserve the workspace header once, including after a cover is dismissed.
-            insets.top = 112
         }
         .background(theme.editorColors.background)
         .onAppear { refreshFiles() }

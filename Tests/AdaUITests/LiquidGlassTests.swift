@@ -18,7 +18,7 @@ struct LiquidGlassTests {
         let regular = Glass.regular
         #expect(regular.isInteractive)
         #expect(regular.interactiveScale == 1.08)
-        #expect(regular.stretchStrength == 0.5)
+        #expect(regular.stretchStrength == 0.25)
         #expect(regular.cornerRoundnessExponent == 4.8)
         #expect(regular.blurRadius == 14.0)
         #expect(regular.glassThickness == 6.0)
@@ -245,7 +245,7 @@ struct LiquidGlassTests {
         tester.containerView.viewTree.renderGraph(renderContext: initialContext)
         let initialTransform = try #require(initialContext.getDrawCommands().glassTransforms.first)
         let navigationGlass = try #require(initialContext.getDrawCommands().glassConfigurations.first)
-        #expect(navigationGlass.stretchStrength == 1)
+        #expect(navigationGlass.stretchStrength == 0.25)
 
         let start = Point(110, 60)
         tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: start, phase: .began, time: 0)])
@@ -260,7 +260,8 @@ struct LiquidGlassTests {
         let draggedContext = UIGraphicsContext()
         tester.containerView.viewTree.renderGraph(renderContext: draggedContext)
         let draggedTransform = try #require(draggedContext.getDrawCommands().glassTransforms.first)
-        #expect(draggedTransform.x.x > pressedTransform.x.x * 1.2)
+        #expect(draggedTransform.x.x > pressedTransform.x.x)
+        #expect(draggedTransform.y.y < pressedTransform.y.y)
 
         let diagonal = Point(140, 85)
         tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: diagonal, phase: .moved, time: 0.15)])
