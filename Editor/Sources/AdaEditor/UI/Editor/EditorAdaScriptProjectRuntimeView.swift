@@ -1,4 +1,5 @@
 @_spi(AdaEngine) import AdaEngine
+import AdaMultiplayer
 import Foundation
 
 enum EditorAdaScriptRuntimeError: Error, LocalizedError {
@@ -23,6 +24,7 @@ struct EditorAdaScriptProjectRuntimeView: View {
     private let previewCapture: EditorProjectPreviewCapture?
     private let entryView: AdaScriptView?
     private let scriptPlugin: AdaScriptPlugin?
+    @State private var overlaySession = EditorSceneUIOverlaySession()
 
     var diagnostics: [String] { scriptPlugin?.diagnostics ?? [] }
 
@@ -35,6 +37,10 @@ struct EditorAdaScriptProjectRuntimeView: View {
         self.controls = controls
         self.previewCapture = previewCapture
         EditorComponentRegistry.registerBuiltIns()
+        // Scriptable UI resolves resource types before the world's plugins start.
+        if artifact.plugins.contains(.multiplayer) {
+            AdaScriptMultiplayerState.registerRuntimeType()
+        }
         self.entryView = try artifact.entry.view.map { identifier in
             try AdaScriptView(
                 sources: artifact.sources,
@@ -56,10 +62,18 @@ struct EditorAdaScriptProjectRuntimeView: View {
                     make: { app in
                         configureRuntime(&app)
                     },
-                    updateContent: { _, _ in controls?.refresh() },
+                    updateContent: { world, _ in
+                        overlaySession.prepare(world)
+                        controls?.refresh()
+                    },
                     onFrameRendered: { texture in previewCapture?.capture(texture) }
                 )
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+
+                ForEach(overlaySession.views) { overlay in
+                    EditorSceneUIOverlaySurface(content: overlay.view)
+                        .allowsHitTesting(controls?.inputEnabled ?? true)
+                }
 
                 if let entryView {
                     entryView

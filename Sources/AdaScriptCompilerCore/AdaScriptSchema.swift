@@ -11,6 +11,7 @@ extension Parser {
                 try parseStruct(annotations: annotations, output: &output)
                 continue
             }
+            if annotations.contains(where: { $0.name == "rpc" }) { _ = match("async") }
             if match("func") {
                 if let rpc = annotations.first(where: { $0.name == "rpc" }) {
                     guard annotations.count == 1 else {
@@ -292,6 +293,7 @@ extension Parser {
             if depth == 1 {
                 let annotations = try parseAnnotations()
                 if let rpc = annotations.first(where: { $0.name == "rpc" }) {
+                    _ = match("async")
                     guard annotations.count == 1, match("func") else {
                         throw error("@rpc in \(systemName) must annotate a method")
                     }

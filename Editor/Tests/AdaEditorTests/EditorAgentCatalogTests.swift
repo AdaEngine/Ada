@@ -68,13 +68,14 @@ struct EditorAgentCatalogTests {
         }
     }
 
-    @Test("invite option disappears when a local Sloppy ACP provider is available")
+    @Test("invalid Sloppy invites report errors without creating an account")
     @MainActor
-    func sloppyInviteVisibility() {
+    func invalidSloppyInvite() async {
         let catalog = EditorAgentCatalogViewModel()
-        #expect(catalog.showsSloppyInvite)
-        catalog.discovered = [EditorDiscoveredAgent(id: "sloppy-acp", name: "Sloppy", path: "/bin/sloppy")]
-        #expect(!catalog.showsSloppyInvite)
+        await catalog.registerSloppyInvite(server: "https://sloppy.example.com", invite: "slp_mesh_invalid", name: "Test", login: "test", password: "password")
+        #expect(catalog.registeredSloppy == nil)
+        #expect(!catalog.isBusy)
+        #expect(catalog.status.contains("slp_inv_"))
     }
 
     #if os(macOS)
@@ -290,8 +291,6 @@ struct EditorAgentCatalogTests {
             let refresh = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agents.Refresh"))
             let addLocal = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agents.AddLocal.local"))
             let install = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agents.Install.registry"))
-            let sloppyInvite = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agents.SloppyInvite"))
-            #expect(sloppyInvite.absoluteFrame.width > 0)
             for button in [refresh, addLocal, install] {
                 #expect(button.absoluteFrame.height <= 32)
                 #expect(button.absoluteFrame.width < 180)

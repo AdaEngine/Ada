@@ -174,7 +174,8 @@ struct MobileEditorBuildScreen: View {
     private var transcript: some View {
         var transcript = EditorAgentTranscript(events: chatEvents, sessionID: sessionID)
         transcript.contentInsets = EdgeInsets(top: previousSession == nil ? 0 : 54, leading: 16, bottom: agentStatus == nil ? 220 : 260, trailing: 16)
-        transcript.scrollContentInsets = EdgeInsets(top: navigationBarContentInset, leading: 0, bottom: 0, trailing: 0)
+        transcript.scrollRespectsSafeArea = false
+        transcript.scrollExtendsUnderNavigationBar = true
         return transcript
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
     }

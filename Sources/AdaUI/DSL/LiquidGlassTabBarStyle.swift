@@ -120,6 +120,16 @@ private struct LiquidGlassTabBarControls: View {
         return (edgePull < 0 ? -1 : 1) * extraWidth * 0.5 + edgePull * 0.10
     }
 
+    #if WASM
+    // Limit opaque substitutions in Swift 6.3.2's WASM SIL generator. The
+    // controls, glass effects and gestures are shared with the native style.
+    var body: AnyView {
+        AnyView(HStack(spacing: 12) {
+            if !tabs.isEmpty { AnyView(mainTabBar) }
+            ForEach(floatingTabs) { tab in AnyView(floatingTab(tab)) }
+        }.frame(maxWidth: .infinity, alignment: .center))
+    }
+    #else
     var body: some View { tabBar }
 
     private var tabBar: some View {
@@ -133,6 +143,7 @@ private struct LiquidGlassTabBarControls: View {
         }
         .frame(maxWidth: .infinity, alignment: .center)
     }
+    #endif
 
     private func floatingTab(_ tab: TabViewStyleConfiguration.Tab) -> some View {
         Button(action: tab.action) {

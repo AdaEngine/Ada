@@ -708,6 +708,8 @@ struct EditorSettingsWindowView: View {
     private func agentSettings(_ agent: EditorAgentViewModel) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             if viewModel.showsPage("AGENTS") {
+                EditorSloppyInviteSettingsView(catalog: agent.catalog)
+                    .padding(.bottom, 20)
                 EditorAgentCatalogView(agent: agent, showsToolbar: false)
             }
             settingsGroup("ACP CONNECTION") {

@@ -726,6 +726,10 @@ extension EditorViewModel {
             } else {
                 runSelectedTarget()
             }
+        case .exportNativeMacOS:
+            exportAdaScriptNativeGame(web: false)
+        case .exportNativeWeb:
+            exportAdaScriptNativeGame(web: true)
         case .runTests:
             runTests()
         case .stop:

@@ -577,7 +577,7 @@ final class ScrollViewNode: LayoutViewContainerNode {
     private func resolvedContentInsets() -> EdgeInsets {
         if let contentInsets { return contentInsets }
         if extendsUnderNavigationBar, !respectsSafeArea || !environment._scrollViewRespectsSafeArea {
-            return EdgeInsets(top: axis.contains(.vertical) ? environment.navigationBarContentInset : 0, leading: 0, bottom: 0, trailing: 0)
+            return EdgeInsets(top: axis.contains(.vertical) ? resolvedNavigationInset() : 0, leading: 0, bottom: 0, trailing: 0)
         }
         guard respectsSafeArea && environment._scrollViewRespectsSafeArea else {
             return EdgeInsets()
@@ -589,6 +589,17 @@ final class ScrollViewNode: LayoutViewContainerNode {
             bottom: axis.contains(.vertical) ? safeAreaInsets.bottom : 0,
             trailing: axis.contains(.horizontal) ? safeAreaInsets.trailing : 0
         )
+    }
+
+    private func resolvedNavigationInset() -> Float {
+        var ancestor = parent
+        while let node = ancestor {
+            if let navigation = node as? NavigationStackNode {
+                return navigation.scrollContentNavigationInset
+            }
+            ancestor = node.parent
+        }
+        return environment.navigationBarContentInset
     }
 
     override func draw(with context: UIGraphicsContext) {

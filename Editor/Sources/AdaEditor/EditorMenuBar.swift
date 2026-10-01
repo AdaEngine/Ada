@@ -18,7 +18,7 @@ enum EditorMenuCommand: CaseIterable {
     case undo, redo, cut, copy, paste, selectAll, findInFile, findInProject
     case navigateBack, navigateForward, showProjectNavigator, showInspector, showBuildOutput, showProblems, enterFullScreen
     case refreshProjectFiles, revealProject, openProjectInTerminal, showProjectSettings, showProjectDependencies, showPackageTasks
-    case build, run, runTests, stop, clean, updateDependencies
+    case build, run, runTests, stop, clean, updateDependencies, exportNativeMacOS, exportNativeWeb
     case showPreview, rebuildPreview, closeEditorTab, closeAllEditorTabs, increaseCodeFontSize, decreaseCodeFontSize, resetCodeFontSize
     case minimizeWindow, zoomWindow, bringAllToFront, showDocumentation, showSourceRepository
 }
@@ -213,6 +213,8 @@ enum EditorMenuBar {
                 item("Build Project", command: .build, key: .b),
                 item("Run", command: .run, key: .r),
                 item("Run Tests", command: .runTests, key: .u),
+                item("Export AdaScript to macOS…", command: .exportNativeMacOS),
+                item("Export AdaScript to Web…", command: .exportNativeWeb),
                 item("Stop", command: .stop, key: .period),
                 MenuItem.separator,
                 item("Clean Build Artifacts", command: .clean, key: .k, modifiers: [.main, .shift]),

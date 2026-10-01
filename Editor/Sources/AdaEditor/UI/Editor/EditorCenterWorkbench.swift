@@ -357,9 +357,7 @@ extension EditorCenterWorkbench {
             EditorTileSourceAssetEditor(document: document, model: viewModel.tileSourceModel(for: document))
                 .id(document.id)
         case .tileMap:
-            EditorTileMapAssetEditor(document: document, onSave: {
-                viewModel.tileMapResourceRevision &+= 1
-            })
+            EditorTileMapAssetEditor(document: document, model: viewModel.tileMapModel(for: document))
                 .id(document.id)
         case .atlas:
             EditorTextureAtlasAssetEditor(document: document)

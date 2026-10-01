@@ -28,10 +28,8 @@ final class EditorAgentCatalogViewModel {
         self.sloppyInvites = sloppyInvites
     }
 
-    var showsSloppyInvite: Bool {
-        !discovered.contains { $0.name == "Sloppy" }
-            && !installed.contains { $0.name == "Sloppy" }
-            && (query.isEmpty || "Sloppy invite".localizedCaseInsensitiveContains(query))
+    func loadSloppyAccount() async {
+        registeredSloppy = await sloppyInvites.registeredAccounts().first
     }
 
     func registerSloppyInvite(server: String, invite: String, name: String, login: String, password: String) async {
@@ -41,8 +39,7 @@ final class EditorAgentCatalogViewModel {
         do {
             let credentials = try await sloppyInvites.register(server: server, invite: invite, name: name, login: login, password: password)
             registeredSloppy = EditorSloppyAccount(serverURL: credentials.serverURL, login: credentials.login)
-            status = "Sloppy account \(credentials.login) registered at \(credentials.serverURL.host ?? "server"). "
-                + "Session saved in Keychain. Install Sloppy locally and enable ACP Server to use it in Agent Chat."
+            status = "Sloppy account \(credentials.login) registered at \(credentials.serverURL.host ?? "server"). Session saved in Keychain."
         } catch {
             reportError(error.localizedDescription)
         }

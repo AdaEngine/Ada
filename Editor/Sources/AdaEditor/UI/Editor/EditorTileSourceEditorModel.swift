@@ -31,8 +31,69 @@ final class EditorTileSourceEditorModel {
     var frames = "1"
     var duration = "1"
     var verticalAnimation = false
-    var zoom: Float = 1
+    private(set) var zoom: Float = 1
+    private(set) var panOffset: Point = .zero
+    @ObservationIgnored private var lastPanPosition: Point?
+    @ObservationIgnored private var lastPinchScale: Float?
     var showGrid = true
+
+    func setZoom(_ value: Float, around location: Point = .zero, in viewport: Size = .zero) {
+        guard value.isFinite, location.x.isFinite, location.y.isFinite else { return }
+        let next = min(16, max(0.25, value))
+        let ratio = next / zoom
+        let offset = Point(location.x - viewport.width / 2, location.y - viewport.height / 2)
+        panOffset = Point(offset.x - (offset.x - panOffset.x) * ratio, offset.y - (offset.y - panOffset.y) * ratio)
+        zoom = next
+    }
+
+    func handleScroll(_ event: MouseEvent, at location: Point, in viewport: Size) {
+        guard event.button == .scrollWheel, event.scrollDelta.x.isFinite, event.scrollDelta.y.isFinite else { return }
+        if event.hasPreciseScrollingDeltas && !event.modifierKeys.contains(.main) && !event.modifierKeys.contains(.control) {
+            panOffset = Point(panOffset.x + event.scrollDelta.x * 72, panOffset.y + event.scrollDelta.y * 72)
+        } else {
+            if !event.hasPreciseScrollingDeltas { panOffset.x += event.scrollDelta.x * 72 }
+            setZoom(zoom * pow(1.12, event.scrollDelta.y), around: location, in: viewport)
+        }
+    }
+
+    func handlePinch(_ event: PinchEvent, at location: Point, in viewport: Size) {
+        guard event.scale.isFinite, event.scale > 0 else { return }
+        if event.phase == .began {
+            lastPinchScale = 1
+            lastPanPosition = nil
+        }
+        guard let previous = lastPinchScale else { return }
+        if event.phase != .cancelled {
+            setZoom(zoom * event.scale / previous, around: location, in: viewport)
+        }
+        lastPinchScale = event.phase == .ended || event.phase == .cancelled ? nil : event.scale
+    }
+
+    func handleSecondaryDrag(_ event: MouseEvent) {
+        guard event.button == .right else { return }
+        switch event.phase {
+        case .began:
+            lastPanPosition = event.mousePosition
+        case .changed, .ended:
+            if let previous = lastPanPosition {
+                let delta = event.mousePosition - previous
+                if delta.x.isFinite, delta.y.isFinite {
+                    panOffset = Point(panOffset.x + delta.x, panOffset.y + delta.y)
+                }
+                lastPanPosition = event.mousePosition
+            }
+            if event.phase == .ended { lastPanPosition = nil }
+        case .cancelled:
+            lastPanPosition = nil
+        }
+    }
+
+    func resetViewport() {
+        zoom = 1
+        panOffset = .zero
+        lastPanPosition = nil
+        lastPinchScale = nil
+    }
 
     @ObservationIgnored private let url: URL?
     @ObservationIgnored private var root: [String: Any] = [:]
@@ -101,6 +162,7 @@ final class EditorTileSourceEditorModel {
     }
 
     func selectSource(_ index: Int) {
+        if selectedSource != index { resetViewport() }
         selectedSource = index
         selectedTile = nil
         image = nil

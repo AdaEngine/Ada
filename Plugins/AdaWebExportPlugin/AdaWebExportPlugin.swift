@@ -66,8 +66,8 @@ struct AdaWebExportPlugin: CommandPlugin {
                 "-Xcc",
                 "-include",
                 "-Xcc",
-                context.package.directoryURL.appending(
-                    components: "Plugins", "AdaWebExportPlugin", "Compatibility", "AdaScriptWASI.h"
+                Self.assetsDirectory.appending(
+                    components: "Compatibility", "AdaScriptWASI.h"
                 ).path()
             ],
             workingDirectory: context.package.directoryURL
@@ -84,6 +84,7 @@ struct AdaWebExportPlugin: CommandPlugin {
             options: options,
             package: context.package,
             packageDirectory: context.package.directoryURL,
+            checkouts: buildDirectory.appending(component: "checkouts"),
             shaderTranspiler: try context.tool(named: "AdaShaderTranspilerTool").url
         )
 
@@ -221,6 +222,7 @@ struct AdaWebExportPlugin: CommandPlugin {
         options: ExportOptions,
         package: Package,
         packageDirectory: URL,
+        checkouts: URL,
         shaderTranspiler: URL
     ) throws {
         let fileManager = FileManager.default
@@ -241,11 +243,11 @@ struct AdaWebExportPlugin: CommandPlugin {
             )
             try replaceItem(
                 at: options.outputDirectory.appending(component: "player-audio.js"),
-                with: packageDirectory.appending(components: "Plugins", "AdaWebExportPlugin", "Runtime", "player-audio.js")
+                with: Self.assetsDirectory.appending(components: "Runtime", "player-audio.js")
             )
             try replaceItem(
                 at: options.outputDirectory.appending(component: "player-lobby.js"),
-                with: packageDirectory.appending(components: "Plugins", "AdaWebExportPlugin", "Runtime", "player-lobby.js")
+                with: Self.assetsDirectory.appending(components: "Runtime", "player-lobby.js")
             )
         }
 
@@ -264,7 +266,7 @@ struct AdaWebExportPlugin: CommandPlugin {
             outputDirectory: options.outputDirectory,
             packageDirectory: packageDirectory,
             shaderTranspiler: shaderTranspiler,
-            requiresAllShaders: options.product == "AdaWebPlayer"
+            requiresAllShaders: ["AdaWebPlayer", "AdaNativeGame"].contains(options.product)
         )
         resourceManifest.append(contentsOf: generatedShaders)
         resourceManifest.sort { $0.path < $1.path }
@@ -281,13 +283,14 @@ struct AdaWebExportPlugin: CommandPlugin {
             }
             try fileManager.copyItem(at: assetsSource, to: assetsDestination)
         }
-        let runtime = try javascriptKitRuntime(packageDirectory: packageDirectory)
+        let runtime = try javascriptKitRuntime(checkouts: checkouts)
         try replaceItem(
             at: options.outputDirectory.appending(component: "runtime.mjs", directoryHint: .notDirectory),
             with: runtime
         )
         try writeBridgeJSRuntime(
             packageDirectory: packageDirectory,
+            checkouts: checkouts,
             to: options.outputDirectory.appending(component: "bridge-js.js", directoryHint: .notDirectory)
         )
         try copyBrowserWASIShim(packageDirectory: packageDirectory, to: options.outputDirectory)
@@ -336,8 +339,8 @@ struct AdaWebExportPlugin: CommandPlugin {
 
     private func copyBrowserWASIShim(packageDirectory: URL, to outputDirectory: URL) throws {
         let fileManager = FileManager.default
-        let shimSourceDirectory = packageDirectory.appending(
-            components: "Plugins", "AdaWebExportPlugin", "BrowserWASIShim",
+        let shimSourceDirectory = Self.assetsDirectory.appending(
+            components: "BrowserWASIShim",
             directoryHint: .isDirectory
         )
         let shimDestinationDirectory = outputDirectory.appending(component: "browser-wasi-shim", directoryHint: .isDirectory)
@@ -486,8 +489,8 @@ struct AdaWebExportPlugin: CommandPlugin {
         outputDirectory: URL,
         packageDirectory: URL
     ) throws -> [ResourceManifestEntry]? {
-        let cacheRoot = packageDirectory.appending(
-            components: "Plugins", "AdaWebExportPlugin", "Runtime", "WGSLCache",
+        let cacheRoot = Self.assetsDirectory.appending(
+            components: "Runtime", "WGSLCache",
             directoryHint: .isDirectory
         )
         guard
@@ -639,10 +642,14 @@ struct AdaWebExportPlugin: CommandPlugin {
             components: ".build", "plugins", "WebGPUTintPlugin", "outputs", "bin", .tintBinaryPlatform, .tintBinaryName,
             directoryHint: .notDirectory
         )
-        guard FileManager.default.isExecutableFile(atPath: executable.path()) else {
-            return nil
+        if FileManager.default.isExecutableFile(atPath: executable.path()) { return executable }
+        // SwiftPM 6 uses plugins/outputs/<package>/<plugin> for dependent plugins.
+        let plugins = packageDirectory.appending(components: ".build", "plugins")
+        guard let files = FileManager.default.enumerator(at: plugins, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { return nil }
+        return files.compactMap { $0 as? URL }.first {
+            $0.lastPathComponent == .tintBinaryName && $0.pathComponents.contains("WebGPUTintPlugin")
+                && FileManager.default.isExecutableFile(atPath: $0.path())
         }
-        return executable
     }
 
     private func findExecutableInPATH(named name: String) -> URL? {
@@ -764,14 +771,14 @@ struct AdaWebExportPlugin: CommandPlugin {
         return bundleName.split(separator: "_").last.map(String.init) ?? bundleName
     }
 
-    private func javascriptKitRuntime(packageDirectory: URL) throws -> URL {
+    private func javascriptKitRuntime(checkouts: URL) throws -> URL {
         let candidates = [
-            packageDirectory.appending(
-                components: ".build", "checkouts", "JavaScriptKit", "Plugins", "PackageToJS", "Templates", "runtime.mjs",
+            checkouts.appending(
+                components: "JavaScriptKit", "Plugins", "PackageToJS", "Templates", "runtime.mjs",
                 directoryHint: .notDirectory
             ),
-            packageDirectory.appending(
-                components: ".build", "checkouts", "javascriptkit", "Plugins", "PackageToJS", "Templates", "runtime.mjs",
+            checkouts.appending(
+                components: "javascriptkit", "Plugins", "PackageToJS", "Templates", "runtime.mjs",
                 directoryHint: .notDirectory
             )
         ]
@@ -781,8 +788,8 @@ struct AdaWebExportPlugin: CommandPlugin {
         throw ExportError.javascriptKitRuntimeNotFound
     }
 
-    private func writeBridgeJSRuntime(packageDirectory: URL, to output: URL) throws {
-        guard let skeleton = bridgeJSSkeleton(packageDirectory: packageDirectory) else {
+    private func writeBridgeJSRuntime(packageDirectory: URL, checkouts: URL, to output: URL) throws {
+        guard let skeleton = bridgeJSSkeleton(checkouts: checkouts) else {
             try """
             export async function createInstantiator() {
               return {
@@ -795,12 +802,12 @@ struct AdaWebExportPlugin: CommandPlugin {
             return
         }
 
-        if try cachedBridgeJSRuntime(packageDirectory: packageDirectory, skeleton: skeleton, output: output) {
+        if try cachedBridgeJSRuntime(checkouts: checkouts, skeleton: skeleton, output: output) {
             Diagnostics.remark("Reused verified BridgeJS runtime for the Web Player")
             return
         }
 
-        let bridgeJSPackage = try bridgeJSPackageDirectory(packageDirectory: packageDirectory)
+        let bridgeJSPackage = try bridgeJSPackageDirectory(checkouts: checkouts)
         let bridgeJSTool = try bridgeJSToolExecutable(
             bridgeJSPackage: bridgeJSPackage,
             packageDirectory: packageDirectory
@@ -813,9 +820,9 @@ struct AdaWebExportPlugin: CommandPlugin {
         )
     }
 
-    private func cachedBridgeJSRuntime(packageDirectory: URL, skeleton: URL, output: URL) throws -> Bool {
-        let cacheRoot = packageDirectory.appending(
-            components: "Plugins", "AdaWebExportPlugin", "Runtime", "BridgeJSCache",
+    private func cachedBridgeJSRuntime(checkouts: URL, skeleton: URL, output: URL) throws -> Bool {
+        let cacheRoot = Self.assetsDirectory.appending(
+            components: "Runtime", "BridgeJSCache",
             directoryHint: .isDirectory
         )
         guard
@@ -825,7 +832,7 @@ struct AdaWebExportPlugin: CommandPlugin {
             let expectedSkeleton = UInt64(manifest.skeletonFNV64, radix: 16),
             let expectedRuntime = UInt64(manifest.runtimeFNV64, radix: 16),
             let skeletonBytes = FileManager.default.contents(atPath: skeleton.path()),
-            let runtime = try? javascriptKitRuntime(packageDirectory: packageDirectory),
+            let runtime = try? javascriptKitRuntime(checkouts: checkouts),
             let runtimeBytes = FileManager.default.contents(atPath: runtime.path()),
             cachedFNV64(skeletonBytes) == expectedSkeleton,
             cachedFNV64(runtimeBytes) == expectedRuntime
@@ -851,28 +858,28 @@ struct AdaWebExportPlugin: CommandPlugin {
         let runtimeFNV64: String
     }
 
-    private func bridgeJSSkeleton(packageDirectory: URL) -> URL? {
+    private func bridgeJSSkeleton(checkouts: URL) -> URL? {
         let candidates = [
-            packageDirectory.appending(
-                components: ".build", "checkouts", "swan", "Sources", "WebGPU", "Wasm", "Generated", "JavaScript", "BridgeJS.json",
+            checkouts.appending(
+                components: "swan", "Sources", "WebGPU", "Wasm", "Generated", "JavaScript", "BridgeJS.json",
                 directoryHint: .notDirectory
             ),
-            packageDirectory.appending(
-                components: ".build", "checkouts", "Swan", "Sources", "WebGPU", "Wasm", "Generated", "JavaScript", "BridgeJS.json",
+            checkouts.appending(
+                components: "Swan", "Sources", "WebGPU", "Wasm", "Generated", "JavaScript", "BridgeJS.json",
                 directoryHint: .notDirectory
             )
         ]
         return candidates.first(where: { FileManager.default.fileExists(atPath: $0.path()) })
     }
 
-    private func bridgeJSPackageDirectory(packageDirectory: URL) throws -> URL {
+    private func bridgeJSPackageDirectory(checkouts: URL) throws -> URL {
         let candidates = [
-            packageDirectory.appending(
-                components: ".build", "checkouts", "JavaScriptKit", "Plugins", "BridgeJS",
+            checkouts.appending(
+                components: "JavaScriptKit", "Plugins", "BridgeJS",
                 directoryHint: .isDirectory
             ),
-            packageDirectory.appending(
-                components: ".build", "checkouts", "javascriptkit", "Plugins", "BridgeJS",
+            checkouts.appending(
+                components: "javascriptkit", "Plugins", "BridgeJS",
                 directoryHint: .isDirectory
             )
         ]
@@ -881,8 +888,8 @@ struct AdaWebExportPlugin: CommandPlugin {
         }
 
         let swanDirectoryCandidates = [
-            packageDirectory.appending(components: ".build", "checkouts", "swan", directoryHint: .isDirectory),
-            packageDirectory.appending(components: ".build", "checkouts", "Swan", directoryHint: .isDirectory)
+            checkouts.appending(components: "swan", directoryHint: .isDirectory),
+            checkouts.appending(components: "Swan", directoryHint: .isDirectory)
         ]
         let swanDirectory = swanDirectoryCandidates.first(where: { FileManager.default.fileExists(atPath: $0.path()) })
         if let swanDirectory {

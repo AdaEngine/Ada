@@ -26,6 +26,13 @@ let isWebExportEnabled: Bool = {
     return webExportValue.map(enabledValues.contains) == true
 }()
 
+// AOT development uses Gravity's canonical ABI and facade before its release pin
+// is published. Normal builds keep the existing immutable Gravity revision.
+let gravityDevelopmentPath = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"]
+let gravityAOTDependencies: [Target.Dependency] = gravityDevelopmentPath == nil ? [] : [
+    .product(name: "GravityAOT", package: "gravity-lang")
+]
+
 #if canImport(Darwin)
 import Darwin.C
 
@@ -389,10 +396,12 @@ var targets: [Target] = [
             "AdaECS",
             "AdaInput",
             "AdaMultiplayer",
+            "AdaRender",
+            "AdaTilemap",
             "AdaScene",
             "AdaUI",
             .product(name: "Gravity", package: "gravity-lang")
-        ],
+        ] + gravityAOTDependencies,
         swiftSettings: swiftSettings
     ),
     .adaTarget(
@@ -765,6 +774,7 @@ targets.append(
 // MARK: Build Plugins
 if isWGPUEnabled {
 
+    products.append(.plugin(name: "WebGPUTintPlugin", targets: ["WebGPUTintPlugin"]))
     targets.append(
         .plugin(
             name: "WebGPUTintPlugin",
@@ -1193,7 +1203,7 @@ targets += [
         dependencies: [
             "AdaScriptCompilerCore", "AdaScripting", "AdaApp", "AdaECS", "AdaInput", "AdaMultiplayer", "AdaRender", "AdaScene", "AdaSprite", "AdaTransform", "AdaUI", "Math",
             .product(name: "Yams", package: "Yams"),
-        ],
+        ] + (gravityDevelopmentPath == nil ? [] : ["AdaScriptAOTFixture"]),
     ),
     .testTarget(
         name: "AdaAssetsTests",
@@ -1319,11 +1329,23 @@ let package = Package(
     cxxLanguageStandard: .cxx17
 )
 
-package.dependencies += [
-    .package(
+if let gravityDevelopmentPath {
+    package.dependencies.append(.package(name: "gravity-lang", path: gravityDevelopmentPath))
+    package.targets.append(.target(
+        name: "AdaScriptAOTFixture",
+        dependencies: [.product(name: "CGravity", package: "gravity-lang")],
+        path: "Tests/AdaScriptAOTFixture",
+        exclude: ["Movement.ada", "HostAdapters.ada", "Async.ada"],
+        publicHeadersPath: "include"
+    ))
+} else {
+    package.dependencies.append(.package(
         url: "https://github.com/AdaEngine/gravity-lang.git",
         revision: "24695757a0ba5638b3633004a2166b7878c116de"
-    ),
+    ))
+}
+
+package.dependencies += [
     .package(url: "https://github.com/apple/swift-collections", from: "1.3.0"),
     .package(url: "https://github.com/apple/swift-log", from: "1.8.0"),
     .package(url: "https://github.com/apple/swift-distributed-tracing", from: "1.0.0"),

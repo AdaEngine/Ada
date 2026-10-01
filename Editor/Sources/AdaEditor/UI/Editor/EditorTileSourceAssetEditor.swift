@@ -32,11 +32,12 @@ struct EditorTileSourceAssetEditor: View {
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(theme.editorColors.text)
             Spacer()
-            action("−", id: "ZoomOut") { model.zoom = max(0.25, model.zoom / 1.5) }
+            action("−", id: "ZoomOut") { model.setZoom(model.zoom / 1.5) }
             Text("\(Int(model.zoom * 100))%")
                 .font(.system(size: 10))
                 .foregroundColor(theme.editorColors.muted)
-            action("+", id: "ZoomIn") { model.zoom = min(16, model.zoom * 1.5) }
+            action("+", id: "ZoomIn") { model.setZoom(model.zoom * 1.5) }
+            action("Fit", id: "Fit") { model.resetViewport() }
             action(model.showGrid ? "Hide grid" : "Show grid", id: "Grid") { model.showGrid.toggle() }
             action("Reload", id: "Reload") { model.reload() }
         }
@@ -57,7 +58,7 @@ struct EditorTileSourceAssetEditor: View {
                                 max(1, Float(canvas.size.width) * 0.86) / imageWidth,
                                 max(1, Float(canvas.size.height) * 0.86) / imageHeight
                             )
-                            let scale = min(model.zoom, fitScale)
+                            let scale = min(1, fitScale) * model.zoom
                             let displayWidth = imageWidth * scale
                             let displayHeight = imageHeight * scale
 
@@ -69,9 +70,25 @@ struct EditorTileSourceAssetEditor: View {
                             .frame(width: displayWidth, height: displayHeight)
                             .accessibilityIdentifier("AdaEditor.TileSourceEditor.Canvas")
                             .gesture(DragGesture(minimumDistance: 0).onEnded { value in
-                                selectTile(at: value.location, preview: sourcePreview, scale: scale)
+                                let local = canvasLocalPoint(value.location, in: canvas)
+                                let origin = Point(
+                                    (canvas.size.width - displayWidth) / 2 + model.panOffset.x,
+                                    (canvas.size.height - displayHeight) / 2 + model.panOffset.y
+                                )
+                                selectTile(at: Point(local.x - origin.x, local.y - origin.y), preview: sourcePreview, scale: scale)
                             })
+                            .offset(x: model.panOffset.x, y: model.panOffset.y)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .mask(RectangleShape())
+                            .onPointerNavigation(
+                                scroll: { event in
+                                    model.handleScroll(event, at: canvasLocalPoint(event.mousePosition, in: canvas), in: canvas.size)
+                                },
+                                pinch: { event in
+                                    model.handlePinch(event, at: canvasLocalPoint(event.location, in: canvas), in: canvas.size)
+                                },
+                                secondaryDrag: { model.handleSecondaryDrag($0) }
+                            )
                         } else {
                             Text("Image preview unavailable")
                                 .font(.system(size: 12))
@@ -125,6 +142,11 @@ struct EditorTileSourceAssetEditor: View {
             theme.editorColors.border.opacity(0.65).frame(height: 1)
         }
         .frame(height: 40)
+    }
+
+    private func canvasLocalPoint(_ windowPoint: Point, in geometry: GeometryProxy) -> Point {
+        let frame = geometry.frame(in: .global)
+        return Point(windowPoint.x - frame.minX, windowPoint.y - frame.minY)
     }
 
     private func selectTile(at location: Point, preview: EditorTileSourcePreview, scale: Float) {

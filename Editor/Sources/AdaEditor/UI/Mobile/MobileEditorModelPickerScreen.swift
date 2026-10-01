@@ -13,7 +13,7 @@ struct MobileEditorModelPickerScreen: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            MobileEditorPageScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     providerControl
                     searchField

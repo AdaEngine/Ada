@@ -76,6 +76,53 @@ extension World {
         return unsafe readPointer(UnsafeRawPointer(pointer))
     }
 
+    /// Reads one reflected component field within the caller's declared ECS access scope.
+    @_spi(Scripting)
+    public func readComponentField(
+        component: ComponentId,
+        entity: Entity.ID,
+        field: ReflectedComponentField
+    ) -> ReflectedFieldValue? {
+        guard let location = entities.entities[entity] else {
+            return nil
+        }
+        let chunk = archetypes.archetypes[location.archetypeId].chunks.chunks[location.chunkIndex]
+        guard
+            let data = chunk.componentsData[component],
+            let base = unsafe data.data.buffer.pointer.baseAddress,
+            let read = unsafe field.readPointer
+        else { return nil }
+        let pointer = unsafe base.advanced(by: location.chunkRow * data.data.layout.size)
+        return unsafe read(UnsafeRawPointer(pointer))
+    }
+
+    /// Writes a reflected component field and updates its change tick without a structural mutation.
+    @_spi(Scripting)
+    @discardableResult
+    public func writeComponentField(
+        component: ComponentId,
+        entity: Entity.ID,
+        field: ReflectedComponentField,
+        value: ReflectedFieldValue
+    ) -> Bool {
+        guard field.accepts(value), let location = entities.entities[entity] else {
+            return false
+        }
+        let chunk = archetypes.archetypes[location.archetypeId].chunks.chunks[location.chunkIndex]
+        guard
+            let data = chunk.componentsData[component],
+            let base = unsafe data.data.buffer.pointer.baseAddress,
+            let ticks = unsafe data.changeTicks.buffer.pointer.baseAddress?.assumingMemoryBound(to: Tick.self),
+            let write = unsafe field.writePointer
+        else { return false }
+        let pointer = unsafe base.advanced(by: location.chunkRow * data.data.layout.size)
+        guard unsafe write(pointer, value) else {
+            return false
+        }
+        unsafe ticks.advanced(by: location.chunkRow).pointee = currentTick
+        return true
+    }
+
     @_spi(Scripting)
     @discardableResult
     public func writeResourceField(

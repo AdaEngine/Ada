@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "glslHashes": {
     "AdaEngine_AdaCorePipelines.resources/Shaders/FullScreenShader.glsl": "91be5eef0fb28f63",
     "AdaEngine_AdaCorePipelines.resources/Shaders/circle.glsl": "198eaa60e6d4f5a0",
@@ -21,8 +20,10 @@
     "AdaEngine_AdaSprite.resources/Assets/light2d_directional.glsl": "713c8511c1415559",
     "AdaEngine_AdaSprite.resources/Assets/light2d_point.glsl": "13c76962b87eadb8",
     "AdaEngine_AdaSprite.resources/Assets/sprite.glsl": "1280d156547dea7a",
-    "AdaEngine_AdaText.resources/Assets/text.glsl": "4468e05457453672"
+    "AdaEngine_AdaText.resources/Assets/text.glsl": "4468e05457453672",
+    "AdaEngine_AdaUI.resources/Shaders/ui_shadow.glsl": "2adae5127d4132b7"
   },
+  "schemaVersion": 1,
   "wgslPaths": [
     "AdaEngine_AdaCorePipelines.resources/Shaders/FullScreenShader.frag.wgsl",
     "AdaEngine_AdaCorePipelines.resources/Shaders/FullScreenShader.vert.wgsl",
@@ -55,6 +56,7 @@
     "AdaEngine_AdaSprite.resources/Assets/sprite.frag.wgsl",
     "AdaEngine_AdaSprite.resources/Assets/sprite.vert.wgsl",
     "AdaEngine_AdaText.resources/Assets/text.frag.wgsl",
-    "AdaEngine_AdaText.resources/Assets/text.vert.wgsl"
+    "AdaEngine_AdaText.resources/Assets/text.vert.wgsl",
+    "AdaEngine_AdaUI.resources/Shaders/ui_shadow.frag.wgsl"
   ]
 }

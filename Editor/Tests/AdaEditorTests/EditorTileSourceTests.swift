@@ -155,6 +155,74 @@ struct EditorTileSourceTests {
         #expect(reloaded.tiles.count == model.tiles.count)
     }
 
+    @Test @MainActor
+    func viewportNavigationPreservesAnchorAndSelection() throws {
+        try setupRenderer()
+        let fixture = try fixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let model = EditorTileSourceEditorModel(document: fixture.document)
+        model.addImages([fixture.png])
+        model.selectTile([0, 0])
+        let original = try Data(contentsOf: fixture.file)
+        let viewport = Size(width: 800, height: 600)
+        let anchor = Point(600, 400)
+        model.setZoom(2, around: anchor, in: viewport)
+        #expect(model.zoom == 2)
+        #expect(model.panOffset == Point(-200, -100))
+        model.setZoom(1, around: anchor, in: viewport)
+        #expect(model.panOffset == .zero)
+        model.setZoom(.nan, around: anchor, in: viewport)
+        #expect(model.zoom == 1)
+        model.setZoom(100, around: anchor, in: viewport)
+        #expect(model.zoom == 16)
+        model.setZoom(0, around: anchor, in: viewport)
+        #expect(model.zoom == 0.25)
+        model.handleSecondaryDrag(MouseEvent(window: .empty, button: .right, mousePosition: Point(20, 30), phase: .began, modifierKeys: [], time: 0))
+        let start = model.panOffset
+        model.handleSecondaryDrag(MouseEvent(window: .empty, button: .right, mousePosition: Point(50, 70), phase: .changed, modifierKeys: [], time: 0))
+        #expect(model.panOffset == Point(start.x + 30, start.y + 40))
+        model.handleSecondaryDrag(MouseEvent(window: .empty, button: .right, mousePosition: Point(50, 70), phase: .cancelled, modifierKeys: [], time: 0))
+        let end = model.panOffset
+        model.handleSecondaryDrag(MouseEvent(window: .empty, button: .right, mousePosition: Point(90, 90), phase: .changed, modifierKeys: [], time: 0))
+        #expect(model.panOffset == end)
+        #expect(model.selectedTile == [0, 0])
+        #expect(try Data(contentsOf: fixture.file) == original)
+    }
+
+    @Test @MainActor
+    func canvasReceivesNavigationEvents() throws {
+        try setupRenderer()
+        let fixture = try fixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let model = EditorTileSourceEditorModel(document: fixture.document)
+        model.addImages([fixture.png])
+        let original = try Data(contentsOf: fixture.file)
+        let container = UIContainerView(rootView: EditorTileSourceAssetEditor(document: fixture.document, model: model))
+        container.frame = Rect(x: 0, y: 0, width: 1000, height: 800)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        let canvas = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Canvas"))
+        let frame = canvas.absoluteFrame
+        let point = Point(frame.midX, frame.midY)
+        container.onMouseEvent(MouseEvent(window: .empty, button: .scrollWheel, scrollDelta: Point(0, 1), mousePosition: point, phase: .changed, modifierKeys: [], time: 0))
+        #expect(abs(model.zoom - 1.12) < 0.001)
+        container.onReceiveEvent(PinchEvent(window: .empty, location: point, scale: 1, phase: .began, time: 0))
+        container.onReceiveEvent(PinchEvent(window: .empty, location: point, scale: 2, phase: .changed, time: 0))
+        #expect(abs(model.zoom - 2.24) < 0.001)
+        container.onReceiveEvent(PinchEvent(window: .empty, location: point, scale: 2, phase: .ended, time: 0))
+        let start = model.panOffset
+        container.onMouseEvent(MouseEvent(window: .empty, button: .right, mousePosition: point, phase: .began, modifierKeys: [], time: 0))
+        let end = Point(point.x + 40, point.y + 20)
+        container.onMouseEvent(MouseEvent(window: .empty, button: .right, mousePosition: end, phase: .changed, modifierKeys: [], time: 0))
+        container.onMouseEvent(MouseEvent(window: .empty, button: .right, mousePosition: end, phase: .ended, modifierKeys: [], time: 0))
+        #expect(model.panOffset == Point(start.x + 40, start.y + 20))
+        #expect(model.selectedTile == nil)
+        #expect(try Data(contentsOf: fixture.file) == original)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.Fit"))
+        #expect(model.zoom == 1)
+        #expect(model.panOffset == .zero)
+    }
+
     @Test func gridExcludesPartialCells() {
         let descriptor = TileSourceImageDescriptor(path: "sheet.png", tileSize: [16, 16], margin: [2, 2], spacing: [1, 1])
         #expect(descriptor.gridSize(imageSize: [54, 37]) == [3, 2])

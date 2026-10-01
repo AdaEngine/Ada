@@ -132,6 +132,8 @@ struct EditorAgentTranscript: View {
 
     var contentInsets = EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
     var scrollContentInsets: EdgeInsets?
+    var scrollRespectsSafeArea = true
+    var scrollExtendsUnderNavigationBar = false
 
     private var events: [EditorAgentEvent] {
         standaloneEvents ?? viewModel?.activeSession?.events ?? []
@@ -144,7 +146,13 @@ struct EditorAgentTranscript: View {
     var body: some View {
         GeometryReader { geometry in
             ScrollViewReader { proxy in
-                ScrollView(.vertical, showsIndicators: true, contentInsets: scrollContentInsets) {
+                ScrollView(
+                    .vertical,
+                    showsIndicators: true,
+                    contentInsets: scrollContentInsets,
+                    respectsSafeArea: scrollRespectsSafeArea,
+                    extendsUnderNavigationBar: scrollExtendsUnderNavigationBar
+                ) {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(EditorAgentTranscriptEntry.grouped(events)) { entry in
                             switch entry {

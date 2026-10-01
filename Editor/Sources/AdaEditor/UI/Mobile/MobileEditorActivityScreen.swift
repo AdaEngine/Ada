@@ -8,7 +8,7 @@
         @Environment(\.theme) private var theme
 
         var body: some View {
-            ScrollView(showsIndicators: true) {
+            MobileEditorPageScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(center.activities.all.prefix(20)) { activity in
                         VStack(alignment: .leading, spacing: 8) {

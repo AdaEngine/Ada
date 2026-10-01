@@ -22,6 +22,7 @@
         private var commandQueue: MTLCommandQueue
 
         private(set) var renderDevice: RenderDevice
+        private let localRenderDevice: RenderDevice
 
         init() {
             self.context = Context()
@@ -35,16 +36,20 @@
                 commandQueue: self.commandQueue,
                 context: self.context
             )
+            guard let resourceQueue = self.context.physicalDevice.makeCommandQueue() else {
+                preconditionFailure("Metal failed to create a local command queue.")
+            }
+            self.localRenderDevice = MetalRenderDevice(
+                device: self.context.physicalDevice,
+                commandQueue: resourceQueue
+            )
         }
 
         func createLocalRenderDevice() -> RenderDevice {
-            guard let commandQueue = self.context.physicalDevice.makeCommandQueue() else {
-                preconditionFailure("Metal failed to create a local command queue.")
-            }
-            return MetalRenderDevice(
-                device: self.context.physicalDevice,
-                commandQueue: commandQueue
-            )
+            // Resource factories are stateless and Metal supports concurrent resource
+            // creation. Retain this context-free device and its queue for the backend's
+            // lifetime instead of synchronously finalizing a queue per texture upload.
+            self.localRenderDevice
         }
 
         func createWindow(_ windowId: WindowID, for surface: RenderSurface, size: SizeInt) throws {
