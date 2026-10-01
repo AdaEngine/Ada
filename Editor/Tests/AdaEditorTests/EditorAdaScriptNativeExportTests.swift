@@ -12,7 +12,12 @@ struct EditorAdaScriptNativeExportTests {
     func archiveAndScenes() async throws {
         let engine = URL(fileURLWithPath: #filePath).resolvingSymlinksInPath().deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
-        let gravity = try #require(ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"])
+        let override = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"].map { URL(fileURLWithPath: $0) }
+        let gravityCandidates = override.map { [$0] } ?? [
+            engine.appendingPathComponent("Editor/.build/checkouts/gravity-lang"),
+            engine.appendingPathComponent(".build/checkouts/gravity-lang"),
+        ]
+        let gravity = try #require(gravityCandidates.first { FileManager.default.fileExists(atPath: $0.appendingPathComponent("tools/aot_build.py").path) })
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("AdaNativeExport-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root.appendingPathComponent("Sources"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: root.appendingPathComponent("Assets"), withIntermediateDirectories: true)
@@ -43,9 +48,9 @@ struct EditorAdaScriptNativeExportTests {
         try model.encodedYAML().write(to: root.appendingPathComponent("Assets/Scene.ascn"), atomically: true, encoding: .utf8)
         var options = EditorAdaScriptNativeExportOptions(
             destination: ProcessInfo.processInfo.environment["ADA_AOT_EXPORT_WEB"] == "1" ? .web : .macOS,
-            gravityRoot: URL(fileURLWithPath: gravity),
+            gravityRoot: gravity,
             engineRoot: engine,
-            swiftExecutable: "/Users/vlad-prusakov/Library/Developer/Toolchains/swift-6.3.2-RELEASE.xctoolchain/usr/bin/swift"
+            swiftExecutable: ProcessInfo.processInfo.environment["ADA_WEB_SWIFT_EXECUTABLE"] ?? "/usr/bin/swift"
         )
         options.buildsPlayer = ProcessInfo.processInfo.environment["ADA_AOT_EXPORT_BUILD_PLAYER"] == "1"
         options.configuration = .debug

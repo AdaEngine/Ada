@@ -26,10 +26,9 @@ let isWebExportEnabled: Bool = {
     return webExportValue.map(enabledValues.contains) == true
 }()
 
-// AOT development uses Gravity's canonical ABI and facade before its release pin
-// is published. Normal builds keep the existing immutable Gravity revision.
+// Local compiler development can override the pinned native-capable Gravity revision.
 let gravityDevelopmentPath = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"]
-let gravityAOTDependencies: [Target.Dependency] = gravityDevelopmentPath == nil ? [] : [
+let gravityAOTDependencies: [Target.Dependency] = [
     .product(name: "GravityAOT", package: "gravity-lang")
 ]
 
@@ -1203,7 +1202,7 @@ targets += [
         dependencies: [
             "AdaScriptCompilerCore", "AdaScripting", "AdaApp", "AdaECS", "AdaInput", "AdaMultiplayer", "AdaRender", "AdaScene", "AdaSprite", "AdaTransform", "AdaUI", "Math",
             .product(name: "Yams", package: "Yams"),
-        ] + (gravityDevelopmentPath == nil ? [] : ["AdaScriptAOTFixture"]),
+        ] + ["AdaScriptAOTFixture"],
     ),
     .testTarget(
         name: "AdaAssetsTests",
@@ -1331,19 +1330,20 @@ let package = Package(
 
 if let gravityDevelopmentPath {
     package.dependencies.append(.package(name: "gravity-lang", path: gravityDevelopmentPath))
-    package.targets.append(.target(
-        name: "AdaScriptAOTFixture",
-        dependencies: [.product(name: "CGravity", package: "gravity-lang")],
-        path: "Tests/AdaScriptAOTFixture",
-        exclude: ["Movement.ada", "HostAdapters.ada", "Async.ada"],
-        publicHeadersPath: "include"
-    ))
 } else {
     package.dependencies.append(.package(
         url: "https://github.com/AdaEngine/gravity-lang.git",
-        revision: "24695757a0ba5638b3633004a2166b7878c116de"
+        revision: "5ea76d1bea1cc0c9b1b6fbea5125a118908ab9e5"
     ))
 }
+
+package.targets.append(.target(
+    name: "AdaScriptAOTFixture",
+    dependencies: [.product(name: "CGravity", package: "gravity-lang")],
+    path: "Tests/AdaScriptAOTFixture",
+    exclude: ["Movement.ada", "HostAdapters.ada", "Async.ada"],
+    publicHeadersPath: "include"
+))
 
 package.dependencies += [
     .package(url: "https://github.com/apple/swift-collections", from: "1.3.0"),

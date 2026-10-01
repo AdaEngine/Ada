@@ -7,15 +7,14 @@ Native execution does not use Gravity bytecode or fall back to the VM.
 
 ## Development dependency
 
-The pinned Gravity revision does not ship `GravityAOT` yet. Build AdaEngine and
-standalone macOS AdaEditor with the local AOT checkout:
+The pinned Gravity revision includes `GravityAOT` for ordinary engine and Editor
+builds. To develop the compiler or run export tests against a local checkout:
 
 ```sh
 export ADAENGINE_GRAVITY_PACKAGE_PATH=/Users/vlad-prusakov/Developer/gravity-lang-aot
 ```
 
-The Editor package explicitly depends on `GravityAOT` and `CGravity` in this
-configuration. Default builds keep the pinned Gravity dependency. A packaged
+The Editor package explicitly depends on `GravityAOT` and `CGravity`. A packaged
 Editor also needs access to the engine checkout, Python, make, Clang and Swift.
 
 ## Automatic Editor export

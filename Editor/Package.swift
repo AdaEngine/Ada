@@ -22,8 +22,9 @@ let adaMCPPackage: Package.Dependency = hasAdaMCP
     : .package(url: "https://github.com/AdaEngine/AdaMCP.git", branch: "main")
 
 let gravityAOTPath = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"]
-let gravityAOTPackage: [Package.Dependency] = gravityAOTPath.map { [.package(name: "gravity-lang", path: $0)] } ?? []
-let gravityAOTTarget: [Target.Dependency] = gravityAOTPath == nil ? [] : [.product(name: "GravityAOT", package: "gravity-lang"), .product(name: "CGravity", package: "gravity-lang")]
+let gravityAOTPackage: [Package.Dependency] = gravityAOTPath.map { [.package(name: "gravity-lang", path: $0)] }
+    ?? [.package(url: "https://github.com/AdaEngine/gravity-lang.git", revision: "5ea76d1bea1cc0c9b1b6fbea5125a118908ab9e5")]
+let gravityAOTTarget: [Target.Dependency] = [.product(name: "GravityAOT", package: "gravity-lang"), .product(name: "CGravity", package: "gravity-lang")]
 
 let package = Package(
     name: "AdaEditor",

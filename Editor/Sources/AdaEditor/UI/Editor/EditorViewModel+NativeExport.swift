@@ -25,9 +25,13 @@ extension EditorViewModel {
                 let settings = try ProjectSystem.loadProject(at: projectURL)
                 let engine = URL(fileURLWithPath: #filePath).resolvingSymlinksInPath().deletingLastPathComponent().deletingLastPathComponent()
                     .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-                let gravityRoot = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"].map { URL(fileURLWithPath: $0) }
-                    ?? engine.deletingLastPathComponent().appendingPathComponent("gravity-lang-aot", isDirectory: true)
-                guard FileManager.default.fileExists(atPath: gravityRoot.appendingPathComponent("tools/aot_build.py").path) else {
+                let override = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"].map { URL(fileURLWithPath: $0) }
+                let candidates = override.map { [$0] } ?? [
+                    engine.deletingLastPathComponent().appendingPathComponent("gravity-lang-aot", isDirectory: true),
+                    engine.appendingPathComponent(".build/checkouts/gravity-lang", isDirectory: true),
+                    engine.appendingPathComponent("Editor/.build/checkouts/gravity-lang", isDirectory: true),
+                ]
+                guard let gravityRoot = candidates.first(where: { FileManager.default.fileExists(atPath: $0.appendingPathComponent("tools/aot_build.py").path) }) else {
                     throw EditorPreviewBuildFailure(message: "Set ADAENGINE_GRAVITY_PACKAGE_PATH to a Gravity checkout with tools/aot_build.py.")
                 }
                 let toolchain = await SwiftToolchainLocator.locate()
@@ -65,7 +69,7 @@ extension EditorViewModel {
             adaScriptWebExportRunner = nil
         }
         #else
-        appendOutput("Native export requires standalone macOS AdaEditor built with ADAENGINE_GRAVITY_PACKAGE_PATH pointing to a Gravity AOT checkout.")
+        appendOutput("Native export requires standalone macOS AdaEditor with Gravity AOT.")
         #endif
     }
 }
