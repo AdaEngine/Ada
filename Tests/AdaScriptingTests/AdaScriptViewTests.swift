@@ -1,268 +1,78 @@
-@testable import AdaRender
+import AdaScriptCompilerCore
 @testable import AdaScripting
 @testable import AdaUI
-import Math
 import Testing
 
+/// ADR-0016 keeps every AdaScript UI entry point unavailable until the redesign ships.
 @MainActor
-@Suite("Ada Script views", .serialized)
+@Suite("AdaScript views are unavailable", .serialized)
 struct AdaScriptViewTests {
-    init() async throws {
-        if unsafe RenderEngine.shared == nil {
-            unsafe RenderEngine.configurations.preferredBackend = .headless
-            try RenderEngine.setupRenderEngine()
-        }
-    }
+    private let diagnostic = "AdaUI views in AdaScript are temporarily unavailable."
 
-    @Test("Builds a native AdaUI hierarchy from @view")
-    func buildsNativeViewHierarchy() throws {
-        let view = try AdaScriptView(
-            sources: [
-                AdaScriptSource(
-                    path: "Views/Welcome.ada",
-                    source: """
-                    @view
-                    class WelcomeView {
-                        func body() {
-                            VStack(spacing: 12) {
-                                Text("Hello from Ada Script").fontSize(28);
-                                HStack {
-                                    Text("Native AdaUI");
-                                    Spacer();
-                                    Divider();
-                                }
-                            }
-                            .padding(24)
-                            .background("#20232aff")
-                            .accessibilityIdentifier("welcome-root");
-                        }
-                    }
-                    """
-                )
-            ],
-            identifier: "WelcomeView"
-        )
-        let container = UIContainerView(rootView: view)
-        container.frame.size = Size(width: 480, height: 320)
-        container.layoutSubviews()
-
-        let root = try #require(container.uiTreeRoots().first)
-        #expect(flatten(root).contains { $0.accessibilityIdentifier == "welcome-root" })
-        #expect(flatten(root).filter { $0.viewType.contains("AdaUI.Text") }.count == 2)
-    }
-
-    @Test("Integer and decimal font sizes produce the same laid out text")
-    func integerFontSizePreservesTextLayout() throws {
-        let view = try AdaScriptView(
-            sources: [
-                AdaScriptSource(
-                    path: "Views/Numeric.ada",
-                    source: """
-                    @view
-                    class NumericView {
-                        func body() {
-                            VStack(spacing: 12) {
-                                Text("Hello").fontSize(28);
-                                Text("Hello").fontSize(28.0);
-                                Text("Plain");
-                            }
-                            .padding(24);
-                        }
-                    }
-                    """
-                )
-            ],
-            identifier: "NumericView"
-        )
-        let container = UIContainerView(rootView: view)
-        container.frame.size = Size(width: 280, height: 180)
-        container.layoutSubviews()
-
-        let root = try #require(container.uiTreeRoots().first)
-        let textNodes = flatten(root).filter { $0.viewType.contains("AdaUI.Text") }
-        #expect(textNodes.count == 3)
-        guard textNodes.count == 3 else {
-            return
-        }
-
-        let integerNode = textNodes[0]
-        let decimalNode = textNodes[1]
-        let plainNode = textNodes[2]
-        #expect(integerNode.frame.height > 0)
-        #expect(integerNode.absoluteFrame.size == decimalNode.absoluteFrame.size)
-        #expect(integerNode.absoluteFrame.height > plainNode.absoluteFrame.height)
-        #expect(decimalNode.absoluteFrame.minY > integerNode.absoluteFrame.maxY)
-        #expect(plainNode.absoluteFrame.minY > decimalNode.absoluteFrame.maxY)
-
-        let nativeText = try #require(findTextNode(in: container.viewTree.rootNode))
-        #expect(nativeText.environment.font?.pointSize == 28)
-        let context = UIGraphicsContext()
-        nativeText.draw(with: context)
-        #expect(context.getDrawCommands().contains { command in
-            guard case let .drawGlyph(glyph, _, _) = command else { return false }
-            return glyph.position.z > glyph.position.x && glyph.position.w > glyph.position.y
-        })
-    }
-
-    @Test("Numeric modifiers preserve integer and fractional values", arguments: [false, true])
-    func numericModifiersPreserveValues(fractional: Bool) throws {
-        func literal(_ value: Int) -> String { "\(value)" + (fractional ? ".5" : "") }
-        let sources = [AdaScriptSource(path: "Numeric.ada", source: """
-        @view class NumericView {
-            func body() {
-                VStack(spacing: \(literal(12))) {
-                    Text("Hello").fontSize(\(literal(28))).padding(\(literal(24)))
-                        .frame(\(literal(120)), \(literal(80))).opacity(\(fractional ? "0.5" : "1"));
-                    Spacer(\(literal(16)));
-                };
-            }
+    @Test("Class and struct views are rejected by the scanner", arguments: ["class", "struct"])
+    func rejectsViewDeclarations(kind: String) {
+        let sources = [AdaScriptSource(path: "View.ada", source: """
+        @view @previewable
+        \(kind) ExampleView {
+            @state var label = "Before";
+            @environment(colorScheme) var scheme;
+            func body() { Text(label).fontSize(28); }
         }
         """)]
-        let runtime = try AdaScriptViewModuleRuntime(
-            sources: sources,
-            views: AdaScriptViewScanner.declarations(in: sources)
-        )
-        let storage = try runtime.makeStorage(identifier: "NumericView")
-        try storage.updateEnvironment([:])
-        let model = try #require(storage.model)
-        guard case let .vStack(children, spacing) = model.content else {
-            Issue.record("Expected a VStack from the script")
-            return
+        #expect(throws: AdaScriptSchemaError.invalid(path: "View.ada", message: diagnostic)) {
+            try AdaScriptViewScanner.declarations(in: sources)
         }
-        try #require(children.count == 2)
-        let fraction: Float = fractional ? 0.5 : 0
-        #expect(spacing == 12 + fraction)
-        #expect(children[0].style.fontSize == 28 + fraction)
-        #expect(children[0].style.padding == 24 + fraction)
-        #expect(children[0].style.width == 120 + fraction)
-        #expect(children[0].style.height == 80 + fraction)
-        #expect(children[0].style.opacity == (fractional ? 0.5 : 1))
-        guard case let .spacer(minLength) = children[1].content else {
-            Issue.record("Expected a Spacer from the script")
-            return
-        }
-        #expect(minLength == 16 + fraction)
     }
 
-    @Test("Requires body() to return a view value")
-    func rejectsInvalidBody() {
-        #expect(throws: AdaScriptError.self) {
-            try AdaScriptView(
-                sources: [
-                    AdaScriptSource(
-                        path: "Invalid.ada",
-                        source: "@view class InvalidView { func body() { return 42; } }"
-                    )
-                ],
-                identifier: "InvalidView"
+    @Test("The builder lowerer reports the disabled feature at its source location")
+    func rejectsViewLowering() {
+        #expect(throws: AdaScriptViewBuilderError(path: "View.ada", line: 2, message: diagnostic)) {
+            try AdaScriptViewBuilderLowerer.lower(
+                source: "// View source\n@view class ExampleView { func body() { Text(\"Hello\"); } }",
+                path: "View.ada"
             )
         }
     }
 
-    @Test("State survives actions and invalidates the native view")
-    func stateSurvivesButtonAction() throws {
-        let view = try AdaScriptView(
-            sources: [
-                AdaScriptSource(
-                    path: "Counter.ada",
-                    source: """
-                    @view
-                    class CounterView {
-                        @state var label = "Before";
-
-                        func body() {
-                            VStack {
-                                Text(label);
-                                Button("Change") {
-                                    label = "After";
-                                }.accessibilityIdentifier("change-label");
-                            };
-                        }
-                    }
-                    """
-                )
-            ],
-            identifier: "CounterView"
-        )
-        let container = UIContainerView(rootView: view)
-        container.frame.size = Size(width: 320, height: 200)
-        container.layoutSubviews()
-
-        #expect(textValues(in: container.viewTree.rootNode).contains("Before"))
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier("change-label"))
-        container.layoutSubviews()
-        #expect(textValues(in: container.viewTree.rootNode).contains("After"))
-    }
-
-    @Test("Struct view state survives actions and invalidates the native view")
-    func structViewStateSurvivesButtonAction() throws {
-        let view = try AdaScriptView(
-            sources: [
-                AdaScriptSource(path: "Counter.ada", source: """
-                    @view
-                    struct CounterView {
-                        @state var label = "Before";
-                        func body() {
-                            VStack {
-                                Text(label);
-                                Button("Change") { label = "After"; }
-                                    .accessibilityIdentifier("change-label");
-                            };
-                        }
-                    }
-                    """)
-            ],
-            identifier: "CounterView"
-        )
-        let container = UIContainerView(rootView: view)
-        container.frame.size = Size(width: 320, height: 200)
-        container.layoutSubviews()
-
-        #expect(textValues(in: container.viewTree.rootNode).contains("Before"))
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier("change-label"))
-        container.layoutSubviews()
-        #expect(textValues(in: container.viewTree.rootNode).contains("After"))
-    }
-
-    @Test("Environment values are rebound before body evaluation")
-    func environmentValuesAreBound() throws {
-        let view = try AdaScriptView(
-            sources: [
-                AdaScriptSource(
-                    path: "Themed.ada",
-                    source: """
-                    @view
-                    class ThemedView {
-                        @environment(colorScheme) var scheme;
-                        func body() { Text(scheme); }
-                    }
-                    """
-                )
-            ],
-            identifier: "ThemedView"
-        )
-        let container = UIContainerView(rootView: view.preferredColorScheme(.dark))
-        container.frame.size = Size(width: 320, height: 200)
-        container.layoutSubviews()
-
-        #expect(textValues(in: container.viewTree.rootNode).contains("dark"))
-    }
-
-    private func flatten(_ root: UINodeSnapshot) -> [UINodeSnapshot] {
-        [root] + root.children.flatMap(flatten)
-    }
-
-    private func textValues(in node: ViewNode) -> [String] {
-        var values: [String] = []
-        if let text = node.content as? Text {
-            values.append(text.plainText)
+    @Test("Source-backed views and validation reject before compiling script code")
+    func rejectsSourceBackedViews() {
+        let sources = [AdaScriptSource(path: "View.ada", source: "invalid script that must never be compiled")]
+        #expect(throws: AdaScriptError.invalidManifest(diagnostic)) {
+            try AdaScriptView(sources: sources, identifier: "ExampleView")
         }
-        values += node.transientEnvironmentChildren.flatMap(textValues)
-        return values
+        #expect(throws: AdaScriptError.invalidManifest(diagnostic)) {
+            try AdaScriptView.validate(sources: sources, identifier: "ExampleView")
+        }
     }
 
-    private func findTextNode(in node: ViewNode) -> TextViewNode? {
-        if let textNode = node as? TextViewNode { return textNode }
-        return node.transientEnvironmentChildren.lazy.compactMap { findTextNode(in: $0) }.first
+    @Test("Registry entry points remain unavailable even with supplied metadata")
+    func rejectsRegistryEntryPoints() {
+        let metadata = AdaScriptViewMetadata(className: "ExampleView", identifier: "ExampleView", title: "Example")
+        #expect(throws: AdaScriptError.invalidManifest(diagnostic)) {
+            try AdaScriptViewRegistry.register(
+                views: [metadata],
+                sources: [AdaScriptSource(path: "View.ada", source: "invalid script")],
+                moduleName: "DisabledViewTest"
+            )
+        }
+        #expect(throws: AdaScriptError.invalidManifest(diagnostic)) {
+            try AdaScriptViewRegistry.makeView(identifier: "ExampleView")
+        }
+        #expect(throws: AdaScriptError.invalidManifest(diagnostic)) {
+            try AdaScriptViewRegistry.makeStorage(identifier: "ExampleView")
+        }
+    }
+
+    @Test("The compatibility view displays the unavailable diagnostic")
+    func compatibilityViewDisplaysDiagnostic() throws {
+        let text = try #require(AdaScriptView("ExampleView").body as? Text)
+        #expect(text.plainText == diagnostic)
+    }
+
+    @Test("Script UI components reject before reading a source file")
+    func rejectsScriptUIComponent() {
+        #expect(throws: UIDiagnostic(diagnostic)) {
+            try UIComponent(script: "Missing.ada", identifier: "ExampleView")
+        }
     }
 }

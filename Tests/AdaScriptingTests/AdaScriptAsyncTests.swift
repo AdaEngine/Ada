@@ -1,6 +1,7 @@
 @_spi(Internal) import AdaApp
 import AdaAssets
 import AdaECS
+import AdaScriptCompilerCore
 @testable import AdaScripting
 import Foundation
 import Testing
@@ -403,9 +404,9 @@ struct AdaScriptAsyncTests {
         }
     }
 
-    @Test("A UI action resumes after confirmation without blocking the view")
+    @Test("View confirmation tasks remain unavailable")
     @MainActor
-    func resumesViewActionAfterConfirmation() async throws {
+    func rejectsViewConfirmationTask() {
         let sources = [
             AdaScriptSource(path: "Confirmation.ada", source: """
             @view class ConfirmationView {
@@ -425,35 +426,19 @@ struct AdaScriptAsyncTests {
             }
             """)
         ]
-        let runtime = try AdaScriptViewModuleRuntime(sources: sources, views: AdaScriptViewScanner.declarations(in: sources))
-        let storage = try runtime.makeStorage(identifier: "ConfirmationView")
-        try storage.updateEnvironment([:])
-        try storage.perform(action: "ask")
-        for _ in 0..<30 {
-            await Task.yield()
-            try storage.updateEnvironment([:])
-            if case .text("waiting") = storage.model?.content { break }
-        }
-        guard case .text("waiting") = storage.model?.content else {
-            Issue.record("Confirmation coroutine did not suspend")
-            return
-        }
-        try storage.perform(action: "confirm")
-        try storage.perform(action: "confirm")
-        for _ in 0..<30 {
-            await Task.yield()
-            try storage.updateEnvironment([:])
-            if case .text("confirmed") = storage.model?.content { break }
-        }
-        guard case .text("confirmed") = storage.model?.content else {
-            Issue.record("Confirmation coroutine did not resume")
-            return
+        // Supply metadata directly so this exercises runtime rejection independently of the scanner.
+        let metadata = AdaScriptViewMetadata(className: "ConfirmationView", identifier: "ConfirmationView", title: "Disabled")
+        #expect(throws: AdaScriptSchemaError.invalid(
+            path: "Confirmation.ada",
+            message: "AdaUI views in AdaScript are temporarily unavailable."
+        )) {
+            try AdaScriptViewModuleRuntime(sources: sources, views: [metadata])
         }
     }
 
-    @Test("Disposing a view cancels its suspended tasks")
+    @Test("View-owned suspended tasks remain unavailable")
     @MainActor
-    func cancelsViewOwnedTasks() async throws {
+    func rejectsViewOwnedTasks() {
         let sources = [
             AdaScriptSource(path: "Pending.ada", source: """
             @view class PendingView {
@@ -464,21 +449,19 @@ struct AdaScriptAsyncTests {
             }
             """)
         ]
-        let runtime = try AdaScriptViewModuleRuntime(sources: sources, views: AdaScriptViewScanner.declarations(in: sources))
-        var storage: AdaScriptViewStorage? = try runtime.makeStorage(identifier: "PendingView")
-        try storage?.updateEnvironment([:])
-        try storage?.perform(action: "ask")
-        #expect(runtime.activeTaskCount > 0)
-        weak var weakStorage = storage
-        storage = nil
-        for _ in 0..<10 where weakStorage != nil { await Task.yield() }
-        #expect(weakStorage == nil)
-        #expect(runtime.activeTaskCount == 0)
+        // Supply metadata directly so this exercises runtime rejection independently of the scanner.
+        let metadata = AdaScriptViewMetadata(className: "PendingView", identifier: "PendingView", title: "Disabled")
+        #expect(throws: AdaScriptSchemaError.invalid(
+            path: "Pending.ada",
+            message: "AdaUI views in AdaScript are temporarily unavailable."
+        )) {
+            try AdaScriptViewModuleRuntime(sources: sources, views: [metadata])
+        }
     }
 
-    @Test("Retiring a view generation discards its coroutine")
+    @Test("View generation tasks remain unavailable")
     @MainActor
-    func cancelsRetiredViewTasks() throws {
+    func rejectsViewGenerationTasks() {
         let sources = [
             AdaScriptSource(path: "Reload.ada", source: """
             @view class ReloadView {
@@ -489,14 +472,14 @@ struct AdaScriptAsyncTests {
             }
             """)
         ]
-        let runtime = try AdaScriptViewModuleRuntime(sources: sources, views: AdaScriptViewScanner.declarations(in: sources))
-        let storage = try runtime.makeStorage(identifier: "ReloadView")
-        try storage.updateEnvironment([:])
-        try storage.perform(action: "begin")
-        #expect(runtime.activeTaskCount == 1)
-        runtime.retire()
-        #expect(runtime.activeTaskCount == 0)
-        #expect(throws: AdaScriptError.self) { try storage.perform(action: "begin") }
+        // Supply metadata directly so this exercises runtime rejection independently of the scanner.
+        let metadata = AdaScriptViewMetadata(className: "ReloadView", identifier: "ReloadView", title: "Disabled")
+        #expect(throws: AdaScriptSchemaError.invalid(
+            path: "Reload.ada",
+            message: "AdaUI views in AdaScript are temporarily unavailable."
+        )) {
+            try AdaScriptViewModuleRuntime(sources: sources, views: [metadata])
+        }
     }
 
     @Test("A query row cannot be used after suspension")

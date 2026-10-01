@@ -202,7 +202,7 @@
       },
       {
         "kind": "text",
-        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• visionOS Windowed Mode",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• visionOS Windowed Mode",
         "level": 0,
         "links": [
           {
@@ -216,6 +216,10 @@
           {
             "title": "AdaUI View Identity",
             "destination": "AdaUIIdentity"
+          },
+          {
+            "title": "Loading images and adding formats",
+            "destination": "ImageDecoders"
           },
           {
             "title": "visionOS Windowed Mode",
@@ -1040,6 +1044,12 @@
       {
         "kind": "text",
         "text": "Rebuilding the target after adding, removing, renaming, or editing an `.ada` file refreshes the generated source.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In a portable AdaScript project running in AdaEditor's macOS game window, edits\nto `.ada` files hot reload after a short pause, including unsaved editor buffers.\nThe current ECS world remains active. A failed candidate leaves the last valid\ncode running and reports the error in Output. System instances and ordinary\nscript globals restart, and startup systems run once for the new version;\nexported scriptable-object fields survive. Changes to\ncomponent, resource, network, or scriptable-object schemas require restarting\nthe game.",
         "level": 0,
         "links": []
       },
@@ -1972,6 +1982,80 @@
     ]
   },
   {
+    "id": "ImageDecoders",
+    "title": "Loading images and adding formats",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/Developers/ImageDecoders.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Load PNG, JPEG (`jpg` or `jpeg`), BMP and TGA images as CPU pixels using\n`Image`, or load a GPU texture through `Texture2D`:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\n\nlet image = try await AssetsManager.load(Image.self, at: \"@res://Textures/ground.tga\")\nlet texture = try await AssetsManager.load(Texture2D.self, at: \"@res://Textures/ground.tga\")",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Image(contentsOf:)`, `Image.decode(from:)` and `AssetsManager` use the same\ndecoder registry. File extensions are case insensitive and act as hints;\nthe encoded bytes identify the format. Built-in decoders produce RGBA8 pixels.\nTGA decoding includes indexed colors, RLE, alpha and top- or bottom-origin rows.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Registering another raster format",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Implement `ImageDecoder` when another file format should produce an ordinary\n`Image`. This example defines a tiny custom format: four signature bytes,\none byte each for width and height, then RGBA8 pixels in row-major order.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\nimport Foundation\n\nstruct RawRGBAImageDecoder: ImageDecoder {\n    let supportedExtensions = [\"rawrgba\"]\n\n    func canDecode(_ data: Data) -> Bool {\n        data.starts(with: [65, 68, 65, 73]) // \"ADAI\"\n    }\n\n    func decode(_ data: Data) throws -> Image {\n        let bytes = Array(data)\n        guard canDecode(data), bytes.count >= 6 else {\n            throw ImageDecodingError.invalidData\n        }\n        let width = Int(bytes[4])\n        let height = Int(bytes[5])\n        guard width > 0, height > 0, bytes.count == 6 + width * height * 4 else {\n            throw ImageDecodingError.invalidData\n        }\n        return Image(width: width, height: height, data: Data(bytes.dropFirst(6)))\n    }\n}\n\nImage.registerDecoder(RawRGBAImageDecoder())\nlet image = try await AssetsManager.load(Image.self, at: \"@res://Sprites/player.rawrgba\")",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Register before loading assets or building the editor's project tree. The editor\nclassifies image files using `Image.extensions()`, which reflects the registry.\nExtensions are returned lowercase and without duplicates.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Registry access is synchronized. Decoder callbacks execute outside the lock\nand may run concurrently, so implementations must protect their own mutable state.\nNewer registrations take precedence among matching decoders. Registering the\nsame concrete decoder type replaces its previous instance; already cached assets\nare unaffected. A decoder's error propagates once it recognizes the input.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Registration adds decoding only; it does not add an image encoder. WebP, GIF,\nTIFF, HDR/EXR and KTX2 are not built-in raster decoders.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Adding a different resource type",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use `Asset` and `AssetsManager.registerAssetType` for resources with a different\nruntime structure, such as an Aseprite animation containing frames, durations\nand tags. A custom asset type does not automatically extend the formats accepted\nby `Image`. GPU texture containers with mipmaps or compressed blocks should\npreserve those contents through a dedicated texture asset/loading path.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
     "id": "AdaScriptAnnotations",
     "title": "AdaScript Annotation Reference",
     "section": "AdaScript",
@@ -2456,6 +2540,30 @@
             "destination": "AdaScriptLanguage"
           }
         ]
+      },
+      {
+        "kind": "heading",
+        "text": "Scene navigation",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "With `ScenePlugin` installed, an AdaScript system or scriptable callback can\nrequest a level change through its scoped world context:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "context.world.changeScene(\"@res://Scenes/Level02.ascn\");\ncontext.world.reloadScene(); // Restart after game over.",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Both calls return `Bool` to indicate whether the request was accepted. Scene\nloading happens asynchronously, and the prepared scene replaces the old one\nafter an update pass. The current scene remains active if loading fails.\n`reloadScene()` loads a fresh copy of the active scene, recreating its entities\nand scene resources. Entities spawned through AdaScript world commands are\ntracked as part of that scene and removed on reload. Application resources\nand entities created outside the scene remain available across transitions.\nAdaScript tasks for the outgoing world are canceled and `@system` instances\nare recreated; module globals remain part of the application session.\nWorld contexts expire when their callback returns, so do not retain one in an\nasync task.",
+        "level": 0,
+        "links": []
       },
       {
         "kind": "heading",
