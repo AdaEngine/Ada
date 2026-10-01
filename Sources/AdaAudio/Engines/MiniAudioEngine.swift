@@ -28,69 +28,20 @@ struct MiniAudioEngine: AudioEngine, @unchecked Sendable {
         world.getResource(Self.self)
     }
 
-    @unsafe
-    private final class Engine {
-        var enginePtr: UnsafeMutablePointer<ma_engine> = unsafe .allocate(
-            capacity: MemoryLayout.size(ofValue: ma_engine.self)
-        )
+    private let engine: MiniAudioStorage
 
-        init() throws {
-            var config = unsafe ma_engine_config_init()
-            unsafe config.channels = 2
-            #if WASM
-                unsafe config.noDevice = ma_bool32(MA_TRUE)
-                unsafe config.sampleRate = 48_000
-            #endif
-            let result = unsafe ma_engine_init(&config, enginePtr)
-            if result != MA_SUCCESS {
-                throw AudioError.engineInitializationFailed
-            }
-        }
-
-        deinit {
-            unsafe ma_engine_uninit(enginePtr)
-        }
-    }
-
-    private let engine: Engine
-
-    init() throws {
-        unsafe self.engine = try Engine()
+    init(headless: Bool = false) throws {
+        unsafe engine = try MiniAudioStorage(headless: headless)
     }
 
     // MARK: - AudioEngine
 
-    func start() throws {
-        #if WASM
-            return
-        #else
-            let result = unsafe ma_engine_start(engine.enginePtr)
-            if result != MA_SUCCESS {
-                throw MAError.failed("Failed to start", result)
-            }
-        #endif
-    }
+    func start() throws { unsafe try engine.start() }
+    func stop() throws { unsafe try engine.stop() }
+    func update(_: AdaUtils.TimeInterval) { unsafe engine.update() }
 
-    func stop() throws {
-        #if WASM
-            return
-        #else
-            let result = unsafe ma_engine_stop(engine.enginePtr)
-            if result != MA_SUCCESS {
-                throw MAError.failed("Failed to stop", result)
-            }
-        #endif
-    }
-
-    func update(_: AdaUtils.TimeInterval) {}
-
-    func makeSound(from url: URL) throws -> Sound {
-        unsafe try MiniSound(from: url, engine: engine.enginePtr)
-    }
-
-    func makeSound(from data: Data) throws -> Sound {
-        unsafe try MiniSound(from: data, engine: engine.enginePtr)
-    }
+    func makeSound(from url: URL) throws -> Sound { unsafe try MiniSound(from: url, engine: engine) }
+    func makeSound(from data: Data) throws -> Sound { unsafe try MiniSound(from: data, engine: engine) }
 
     func makeMicrophoneCapture(configuration: AudioCaptureConfiguration) throws -> AudioCaptureSession {
         #if WASM
@@ -105,7 +56,7 @@ struct MiniAudioEngine: AudioEngine, @unchecked Sendable {
             fatalError("[MiniAudioEngine] Listener not found")
         }
 
-        return unsafe MiniAudioEngineListener(engine: engine.enginePtr, listenerIndex: UInt32(index))
+        return unsafe MiniAudioEngineListener(engine: engine, listenerIndex: UInt32(index))
     }
 }
 
@@ -113,11 +64,13 @@ struct MiniAudioEngine: AudioEngine, @unchecked Sendable {
 
 @unsafe
 final class MiniAudioEngineListener: AudioEngineListener, @unchecked Sendable {
+    private let owner: MiniAudioStorage
     private let engine: UnsafeMutablePointer<ma_engine>
     let listenerIndex: UInt32
 
-    init(engine: UnsafeMutablePointer<ma_engine>, listenerIndex: UInt32) {
-        unsafe self.engine = engine
+    init(engine: MiniAudioStorage, listenerIndex: UInt32) {
+        unsafe self.owner = engine
+        unsafe self.engine = engine.enginePtr
         unsafe self.listenerIndex = listenerIndex
     }
 
@@ -208,47 +161,44 @@ final class MiniSound: Sound {
 
     private var completionHandler: (() -> Void)?
 
-    private var sound: UnsafeMutablePointer<ma_sound>? = unsafe .allocate(capacity: MemoryLayout.size(ofValue: ma_sound.self))
+    private let sound: UnsafeMutablePointer<ma_sound>
+    private let engineOwner: MiniAudioStorage
+    private let memorySource: MiniAudioMemorySource?
 
-    init(from fileURL: URL, engine: UnsafeMutablePointer<ma_engine>!) throws {
+    init(from fileURL: URL, engine: MiniAudioStorage) throws {
+        let pointer = UnsafeMutablePointer<ma_sound>.allocate(capacity: 1)
         let flags = MA_SOUND_FLAG_DECODE.rawValue | MA_SOUND_FLAG_NO_SPATIALIZATION.rawValue
-        let result = unsafe fileURL.path.withCString { pFilePath in
-            unsafe ma_sound_init_from_file(engine, pFilePath, UInt32(flags), nil, nil, sound)
+        let result = fileURL.path.withCString { path in
+            ma_sound_init_from_file(engine.enginePtr, path, UInt32(flags), nil, nil, pointer)
         }
-        if result != MA_SUCCESS {
-            throw AudioError.soundInitializationFailed
+        guard result == MA_SUCCESS else {
+            pointer.deallocate(); throw MAError.failed("Sound initialization failed", result)
         }
+        sound = pointer; engineOwner = engine; memorySource = nil
     }
 
-    init(from data: Data, engine: UnsafeMutablePointer<ma_engine>!) throws {
-        var data = data
-        let flags = MA_SOUND_FLAG_DECODE.rawValue | MA_SOUND_FLAG_NO_SPATIALIZATION.rawValue
-        let result = unsafe data.withUnsafeMutableBytes { ptr in
-            guard let baseAddress = ptr.baseAddress else {
-                return MA_INVALID_ARGS
-            }
-            return unsafe ma_sound_init_from_data_source(engine, baseAddress, UInt32(flags), nil, sound)
+    init(from data: Data, engine: MiniAudioStorage) throws {
+        let source = try MiniAudioMemorySource(data: data)
+        let pointer = UnsafeMutablePointer<ma_sound>.allocate(capacity: 1)
+        let result = ma_sound_init_from_data_source(engine.enginePtr, UnsafeMutableRawPointer(source.decoder),
+            UInt32(MA_SOUND_FLAG_NO_SPATIALIZATION.rawValue), nil, pointer)
+        guard result == MA_SUCCESS else {
+            pointer.deallocate(); throw MAError.failed("Sound initialization failed", result)
         }
-
-        if result != MA_SUCCESS {
-            throw AudioError.soundInitializationFailed
-        }
+        sound = pointer; engineOwner = engine; memorySource = source
     }
 
     private init(prototype: MiniSound) throws {
-        let engine = unsafe ma_sound_get_engine(prototype.sound)
-        let result = unsafe ma_sound_init_copy(engine, prototype.sound, 0, nil, sound)
-
-        if result != MA_SUCCESS {
-            throw AudioError.soundInitializationFailed
-        }
+        let pointer = UnsafeMutablePointer<ma_sound>.allocate(capacity: 1)
+        let result = ma_sound_init_copy(prototype.engineOwner.enginePtr, prototype.sound, 0, nil, pointer)
+        guard result == MA_SUCCESS else { pointer.deallocate(); throw MAError.failed("Sound copy failed", result) }
+        sound = pointer; engineOwner = prototype.engineOwner; memorySource = nil
     }
 
-    deinit {
-        unsafe ma_sound_uninit(sound)
-    }
+    deinit { ma_sound_uninit(sound); sound.deallocate() }
 
     func copy() throws -> Sound {
+        if let memorySource { return unsafe try MiniSound(from: memorySource.encodedData, engine: engineOwner) }
         return unsafe try MiniSound(prototype: self)
     }
 

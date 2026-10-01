@@ -34,9 +34,9 @@ public struct AudioPlugin: Plugin {
         }
     }
 
-    public func destroy(for _: borrowing AppWorlds) {
+    public func destroy(for app: borrowing AppWorlds) {
         do {
-            unsafe try AudioServer.shared.stop()
+            try app.main.getResource(AudioServer.self)?.stop()
         } catch {
             logger.error("Failed to destroy AudioServer with error: \(error)")
         }
@@ -112,6 +112,7 @@ public struct AudioSystem {
                 audioReceiver.audioListener = audioServer.engine.getAudioListener(at: 0)
             }
         }
+        audioServer.update(0)
     }
 }
 

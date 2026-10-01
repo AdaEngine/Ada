@@ -474,9 +474,13 @@ var targets: [Target] = [
             "AdaTransform",
             "miniaudio",
             "Math",
-            .product(name: "Atomics", package: "swift-atomics")
+            .product(name: "Atomics", package: "swift-atomics"),
+            .product(name: "JavaScriptKit", package: "JavaScriptKit", condition: .when(platforms: [.wasi]))
         ],
-        swiftSettings: swiftSettings
+        // Swift's Clang importer must see the same miniaudio layout as its C target.
+        swiftSettings: swiftSettings + [
+            .unsafeFlags(["-Xcc", "-DMA_NO_DEVICE_IO", "-Xcc", "-DMA_NO_THREADING"], .when(platforms: [.wasi]))
+        ]
     ),
     .adaTarget(
         name: "AdaTransform",
