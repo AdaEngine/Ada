@@ -21,6 +21,11 @@ let adaMCPPackage: Package.Dependency = hasAdaMCP
     ? .package(name: "AdaMCP", path: adaMCPURL.path)
     : .package(url: "https://github.com/AdaEngine/AdaMCP.git", branch: "main")
 
+let gravityAOTPath = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"]
+let gravityAOTPackage: [Package.Dependency] = gravityAOTPath.map { [.package(name: "gravity-lang", path: $0)] }
+    ?? [.package(url: "https://github.com/AdaEngine/gravity-lang.git", revision: "5ea76d1bea1cc0c9b1b6fbea5125a118908ab9e5")]
+let gravityAOTTarget: [Target.Dependency] = [.product(name: "GravityAOT", package: "gravity-lang"), .product(name: "CGravity", package: "gravity-lang")]
+
 let package = Package(
     name: "AdaEditor",
     defaultLocalization: "en",
@@ -50,7 +55,7 @@ let package = Package(
         .package(url: "https://github.com/swiftlang/swift-syntax", from: "602.0.0"),
         .package(url: "https://github.com/tree-sitter/swift-tree-sitter", from: "0.9.0"),
         .package(url: "https://github.com/alex-pinkus/tree-sitter-swift", branch: "with-generated-files"),
-    ] + sloppyRuntimePackage,
+    ] + sloppyRuntimePackage + gravityAOTPackage,
     targets: [
         .target(
             name: "GravityLanguageCore",
@@ -103,7 +108,7 @@ let package = Package(
                 "Yams",
                 "AdaPackageManifestTool",
                 "GravityLanguageCore",
-            ] + sloppyRuntimeTarget,
+            ] + sloppyRuntimeTarget + gravityAOTTarget,
             exclude: [
                 "Platforms/iOS/Info.plist",
                 "Platforms/macOS/Info.plist",

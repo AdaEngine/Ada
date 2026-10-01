@@ -83,6 +83,48 @@ enum EditorSceneFileLoader {
     }
 
     @MainActor
+    static func resolvedComponentPayload(
+        typeName: String, payload: EditorComponentPayload, sourceURL: URL?, resourceRootURL: URL?
+    ) throws -> EditorComponentPayload {
+        var resolvedPayload = payload
+        if typeName == EditorBuiltInComponentType.tileMap,
+            let reference = payload["map"]?.stringValue,
+            !reference.isEmpty {
+            guard let mapURL = resolveTileMapReference(reference, relativeTo: sourceURL, resourceRootURL: resourceRootURL) else {
+                throw EditorTileMapReferenceError.invalid(reference)
+            }
+            let resource = try EditorTileMapResource.read(from: mapURL)
+            resolvedPayload.merge(resource.componentPayload) { _, resource in resource }
+            if let paths = resource.atlasTextures {
+                resolvedPayload["atlasTextures"] = .array(paths.map { path in
+                    let url = URL(fileURLWithPath: path, relativeTo: mapURL.deletingLastPathComponent()).standardizedFileURL
+                    return .string(url.path)
+                })
+            }
+            if let tileSetReference = resource.tileSetReference {
+                let tileSetURL: URL
+                if tileSetReference.hasPrefix("@res://"), let resourceRootURL {
+                    tileSetURL = resourceRootURL.appendingPathComponent(String(tileSetReference.dropFirst("@res://".count))).standardizedFileURL
+                } else {
+                    tileSetURL = URL(fileURLWithPath: tileSetReference, relativeTo: mapURL.deletingLastPathComponent()).standardizedFileURL
+                }
+                let resolvedTileSetURL = tileSetURL.resolvingSymlinksInPath().standardizedFileURL
+                if tileSetReference.hasPrefix("@res://"), let resourceRootURL {
+                    let rootPath = resourceRootURL.resolvingSymlinksInPath().standardizedFileURL.path
+                    guard resolvedTileSetURL.path.hasPrefix(rootPath + "/") else {
+                        throw EditorTileMapReferenceError.invalid(tileSetReference)
+                    }
+                }
+                guard resolvedTileSetURL.pathExtension == "tileset", FileManager.default.fileExists(atPath: resolvedTileSetURL.path) else {
+                    throw EditorTileMapReferenceError.invalid(tileSetReference)
+                }
+                resolvedPayload["tileSetReference"] = .string(resolvedTileSetURL.path)
+            }
+        }
+        return resolvedPayload
+    }
+
+    @MainActor
     private static func registerEditorSceneComponents(loadsScriptableObjects: Bool) {
         EditorComponentRegistry.registerBuiltIns()
         EditorGizmo.registerComponent()
@@ -134,41 +176,9 @@ enum EditorSceneFileLoader {
                 }
 
                 do {
-                    var resolvedPayload = componentPayload
-                    if componentName == EditorBuiltInComponentType.tileMap,
-                        let reference = componentPayload["map"]?.stringValue,
-                        !reference.isEmpty {
-                        guard let mapURL = resolveTileMapReference(reference, relativeTo: sourceURL, resourceRootURL: resourceRootURL) else {
-                            throw EditorTileMapReferenceError.invalid(reference)
-                        }
-                        let resource = try EditorTileMapResource.read(from: mapURL)
-                        resolvedPayload.merge(resource.componentPayload) { _, resource in resource }
-                        if let paths = resource.atlasTextures {
-                            resolvedPayload["atlasTextures"] = .array(paths.map { path in
-                                let url = URL(fileURLWithPath: path, relativeTo: mapURL.deletingLastPathComponent()).standardizedFileURL
-                                return .string(url.path)
-                            })
-                        }
-                        if let tileSetReference = resource.tileSetReference {
-                            let tileSetURL: URL
-                            if tileSetReference.hasPrefix("@res://"), let resourceRootURL {
-                                tileSetURL = resourceRootURL.appendingPathComponent(String(tileSetReference.dropFirst("@res://".count))).standardizedFileURL
-                            } else {
-                                tileSetURL = URL(fileURLWithPath: tileSetReference, relativeTo: mapURL.deletingLastPathComponent()).standardizedFileURL
-                            }
-                            let resolvedTileSetURL = tileSetURL.resolvingSymlinksInPath().standardizedFileURL
-                            if tileSetReference.hasPrefix("@res://"), let resourceRootURL {
-                                let rootPath = resourceRootURL.resolvingSymlinksInPath().standardizedFileURL.path
-                                guard resolvedTileSetURL.path.hasPrefix(rootPath + "/") else {
-                                    throw EditorTileMapReferenceError.invalid(tileSetReference)
-                                }
-                            }
-                            guard resolvedTileSetURL.pathExtension == "tileset", FileManager.default.fileExists(atPath: resolvedTileSetURL.path) else {
-                                throw EditorTileMapReferenceError.invalid(tileSetReference)
-                            }
-                            resolvedPayload["tileSetReference"] = .string(resolvedTileSetURL.path)
-                        }
-                    }
+                    let resolvedPayload = try resolvedComponentPayload(
+                        typeName: componentName, payload: componentPayload, sourceURL: sourceURL, resourceRootURL: resourceRootURL
+                    )
                     if let component = try EditorComponentRegistry.decode(typeName: componentName, payload: resolvedPayload) {
                         if let ui = (component as? UIComponent) ?? (component as? CompanionPanel)?.ui {
                             let runtime = world.getResource(UIComponentRuntimeResource.self)?.runtime
@@ -266,36 +276,7 @@ enum EditorSceneFileLoader {
 
     @MainActor
     private static func completeRuntimeBundle(for entity: Entity, in world: World) {
-        guard let camera = world.get(Camera.self, from: entity.id) else {
-            return
-        }
-        if world.get(Visibility.self, from: entity.id) == nil {
-            world.insert(Visibility.visible, for: entity.id)
-        }
-        if world.get(VisibleEntities.self, from: entity.id) == nil {
-            world.insert(VisibleEntities(), for: entity.id)
-        }
-        if world.get(GlobalViewUniform.self, from: entity.id) == nil {
-            world.insert(GlobalViewUniform(), for: entity.id)
-        }
-        if world.get(AudioReceiver.self, from: entity.id) == nil {
-            world.insert(AudioReceiver(), for: entity.id)
-        }
-        if world.get(CameraRenderGraph.self, from: entity.id) == nil {
-            let renderGraph: CameraRenderGraph
-            switch camera.projection {
-            case .perspective:
-                renderGraph = CameraRenderGraph(subgraphLabel: .main3D, inputSlot: Core3DPlugin.InputNode.view)
-            case .orthographic,
-                .custom:
-                renderGraph = CameraRenderGraph(subgraphLabel: .main2D, inputSlot: Main2DRenderNode.InputNode.view)
-            }
-            world.insert(renderGraph, for: entity.id)
-        }
-        if case .perspective = camera.projection,
-            world.get(Environment3D.self, from: entity.id) == nil {
-            world.insert(Environment3D(), for: entity.id)
-        }
+        SceneRuntimeBootstrap.prepareCamera(on: entity, in: world)
     }
 
     @MainActor

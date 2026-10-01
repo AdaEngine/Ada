@@ -431,16 +431,14 @@ extension EditorComponentPayload {
     }
 }
 
-struct EditorTransformAnimationValues: KeyframeAnimatable, Sendable {
-    var transform: Transform
-
-    func apply(to entityId: Entity.ID, in world: World) {
-        world.insert(transform, for: entityId)
-    }
-}
+typealias EditorTransformAnimationValues = SceneTransformAnimationValues
 
 extension EditorAnimationClip {
     func makeRuntimeClip(initialTransform: Transform) -> AnyAnimatorClip {
+        AnyAnimatorClip(makeSerializableClip(initialTransform: initialTransform))
+    }
+
+    func makeSerializableClip(initialTransform: Transform) -> KeyframeClip<SceneTransformAnimationValues> {
         let initialValues = EditorTransformAnimationValues(transform: initialTransform)
         let runtimeTracks = tracks.compactMap { $0.makeRuntimeTrack() }
         let clip: KeyframeClip<EditorTransformAnimationValues> = KeyframeClip(
@@ -450,7 +448,7 @@ extension EditorAnimationClip {
             repeatMode: repeatMode.runtimeValue,
             tracks: runtimeTracks
         )
-        return AnyAnimatorClip(clip)
+        return clip
     }
 }
 

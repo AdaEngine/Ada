@@ -337,7 +337,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         )
     }
 
-    private static func prepareQuery(
+    static func prepareQuery(
         _ plan: AnnotatedQueryPlan,
         systemIdentifier: String,
         queryIndex: Int,
@@ -392,7 +392,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         )
     }
 
-    private static func resolveComponent(named name: String, world: World) -> ResolvedAnnotatedComponent? {
+    static func resolveComponent(named name: String, world: World) -> ResolvedAnnotatedComponent? {
         if let exact = RuntimeTypeRegistry.componentType(named: name) {
             return resolvedNativeComponent(exact)
         }
@@ -426,7 +426,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     }
 }
 
-private struct ResolvedAnnotatedComponent {
+struct ResolvedAnnotatedComponent: Sendable {
     let identifier: ComponentId
     let fields: [ReflectedComponentField]
 }
@@ -542,7 +542,7 @@ private enum AnnotatedResourceBridge {
     }
 }
 
-private struct PreparedAnnotatedQuery: Sendable {
+struct PreparedAnnotatedQuery: Sendable {
     let propertyName: String
     let query: DynamicQuery
     let componentAccesses: [AnnotatedComponentAccess]
