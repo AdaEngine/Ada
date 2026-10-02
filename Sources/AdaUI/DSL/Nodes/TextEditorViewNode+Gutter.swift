@@ -138,10 +138,16 @@ extension TextEditorViewNode {
         showsSpaceMarkers: Bool
     ) {
         let indentation = Array(line.text.prefix { $0 == " " || $0 == "\t" })
-        guard !indentation.isEmpty else { return }
+        guard !indentation.isEmpty else {
+            return
+        }
         let lineHeight = self.lineHeight(for: pointSize)
         let centerY = rowY + lineHeight * 0.5
         let color = self.environment.textEditorColors.gutter.opacity(0.75)
+        guard let caretLayout = self.cachedCaretLayout(for: line.text, font: font, pointSize: pointSize) else {
+            return
+        }
+        let textOriginX = self.textRect().minX
         var column = 0
         while column < indentation.count {
             let isTab = indentation[column] == "\t"
@@ -153,18 +159,8 @@ extension TextEditorViewNode {
                 step = remainingSpaces >= 4 ? 4 : remainingSpaces
             }
 
-            let startX = self.textRect().minX + self.caretXOffset(
-                forColumn: column,
-                in: line.text,
-                font: font,
-                pointSize: pointSize
-            )
-            let endX = self.textRect().minX + self.caretXOffset(
-                forColumn: column + step,
-                in: line.text,
-                font: font,
-                pointSize: pointSize
-            )
+            let startX = textOriginX + caretLayout.xOffset(forColumn: column)
+            let endX = textOriginX + caretLayout.xOffset(forColumn: column + step)
 
             if showsIndentationGuides, isTab || step == 4 {
                 context.drawLine(
@@ -197,18 +193,8 @@ extension TextEditorViewNode {
                 )
             } else if !isTab, showsSpaceMarkers {
                 for spaceColumn in column..<(column + step) {
-                    let spaceStartX = self.textRect().minX + self.caretXOffset(
-                        forColumn: spaceColumn,
-                        in: line.text,
-                        font: font,
-                        pointSize: pointSize
-                    )
-                    let spaceEndX = self.textRect().minX + self.caretXOffset(
-                        forColumn: spaceColumn + 1,
-                        in: line.text,
-                        font: font,
-                        pointSize: pointSize
-                    )
+                    let spaceStartX = textOriginX + caretLayout.xOffset(forColumn: spaceColumn)
+                    let spaceEndX = textOriginX + caretLayout.xOffset(forColumn: spaceColumn + 1)
                     context.drawRect(
                         Rect(x: (spaceStartX + spaceEndX) * 0.5, y: centerY, width: 1.8, height: 1.8),
                         color: color

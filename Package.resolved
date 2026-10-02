@@ -1,12 +1,13 @@
 {
-  "originHash" : "079038eed5c650bf4d2dea5e94359ae7c5e61183038d054557fbde335e8b10f0",
+  "originHash" : "df55b7f05ad0a87ffcd3db086b4941f54ecdafde6be6037ee0ab12dc816d469f",
   "pins" : [
     {
       "identity" : "gravity-lang",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/AdaEngine/gravity-lang.git",
       "state" : {
-        "revision" : "5ea76d1bea1cc0c9b1b6fbea5125a118908ab9e5"
+        "branch" : "master",
+        "revision" : "26f80cc250d478b16dbbd21a3a517a669d13f616"
       }
     },
     {
@@ -102,7 +103,7 @@
     {
       "identity" : "swift-service-context",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-service-context",
+      "location" : "https://github.com/apple/swift-service-context.git",
       "state" : {
         "revision" : "d0997351b0c7779017f88e7a93bc30a1878d7f29",
         "version" : "1.3.0"

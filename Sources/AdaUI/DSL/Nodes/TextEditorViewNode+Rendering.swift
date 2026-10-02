@@ -186,8 +186,10 @@ extension TextEditorViewNode {
 
         let lineHeight = self.lineHeight(for: Float(font.pointSize))
         let layout = self.cachedTextLayout(for: string, lineHeight: lineHeight)
+        self.drawTextLayout(layout, verticalOffset: Self.verticalTextOffset(for: layout, height: lineHeight), in: &context, at: point)
+    }
 
-        let verticalOffset = Self.verticalTextOffset(for: layout, height: lineHeight)
+    func drawTextLayout(_ layout: TextLayoutManager, verticalOffset: Float, in context: inout UIGraphicsContext, at point: Point) {
         context.translateBy(x: point.x, y: -(point.y) + verticalOffset)
         for line in layout.textLines {
             for run in line {
@@ -203,13 +205,23 @@ extension TextEditorViewNode {
         let key = TextLayoutCacheKey(text: text, lineHeight: lineHeight)
         self.textLayoutCacheAccess &+= 1
 
-        if var cached = self.textLayoutCache[key] {
+        if let cached = self.textLayoutCache[key] {
             cached.lastAccess = self.textLayoutCacheAccess
-            self.textLayoutCache[key] = cached
             self.textLayoutCacheHits += 1
             return cached.layout
         }
 
+        let layout = self.makeTextLayout(for: text, lineHeight: lineHeight)
+        self.textLayoutCacheMisses += 1
+        self.textLayoutCache[key] = CachedTextLayout(
+            layout: layout,
+            lastAccess: self.textLayoutCacheAccess
+        )
+        self.pruneTextLayoutCacheIfNeeded()
+        return layout
+    }
+
+    func makeTextLayout(for text: AttributedText, lineHeight: Float) -> TextLayoutManager {
         let layout = TextLayoutManager()
         var container = TextContainer(
             text: text,
@@ -221,13 +233,6 @@ extension TextEditorViewNode {
         container.numberOfLines = 1
         layout.setTextContainer(container)
         layout.fitToSize(Size(width: .infinity, height: lineHeight))
-
-        self.textLayoutCacheMisses += 1
-        self.textLayoutCache[key] = CachedTextLayout(
-            layout: layout,
-            lastAccess: self.textLayoutCacheAccess
-        )
-        self.pruneTextLayoutCacheIfNeeded()
         return layout
     }
 
@@ -266,21 +271,22 @@ extension TextEditorViewNode {
                 }
             }
 
-        guard !lineSpans.isEmpty else {
-            drawString(lineText, font: font, color: fallbackColor, in: &context, at: point)
+        guard !lineText.isEmpty else {
             return
         }
-
-        let attributedText = self.attributedLineText(
-            lineText,
-            lineSpans: lineSpans,
+        let hoveredRange = sourceInteraction?.hoveredRange.flatMap { range in
+            !lineSpans.isEmpty && lineIndex >= range.start.line && lineIndex <= range.end.line ? range : nil
+        }
+        let key = RenderedLineCacheKey(
+            text: lineText,
+            spans: lineSpans,
             font: font,
-            fallbackColor: fallbackColor,
-            hoveredRange: sourceInteraction?.hoveredRange,
-            lineIndex: lineIndex,
-            hoverColor: environment.accentColor
+            color: fallbackColor,
+            hoveredRange: hoveredRange,
+            hoverColor: hoveredRange != nil ? environment.accentColor : nil
         )
-        self.drawAttributedString(attributedText, font: font, in: &context, at: point)
+        let cached = self.cachedRenderedLine(key: key, lineIndex: lineIndex)
+        self.drawTextLayout(cached.layout, verticalOffset: cached.verticalOffset, in: &context, at: point)
     }
 
     func attributedLineText(
@@ -473,18 +479,15 @@ extension TextEditorViewNode {
     }
 
     func caretXOffset(forColumn column: Int, in lineText: String, font: Font?, pointSize: Float) -> Float {
-        let clamped = max(0, min(column, lineText.count))
-        guard let caretStops = self.layoutCaretStops(for: lineText, font: font, pointSize: pointSize), !caretStops.isEmpty else {
+        guard let layout = self.cachedCaretLayout(for: lineText, font: font, pointSize: pointSize) else {
+            let clamped = max(0, min(column, lineText.count))
             return Float(clamped) * self.characterAdvance(for: pointSize)
         }
-
-        // Unshaped layout emits one glyph per Character, including combined emoji.
-        let safeIndex = min(clamped, caretStops.count - 1)
-        return caretStops[safeIndex]
+        return layout.xOffset(forColumn: column)
     }
 
     func closestColumn(toX x: Float, in lineText: String, font: Font?, pointSize: Float) -> Int {
-        guard let caretStops = self.layoutCaretStops(for: lineText, font: font, pointSize: pointSize), !caretStops.isEmpty else {
+        guard let layout = self.cachedCaretLayout(for: lineText, font: font, pointSize: pointSize) else {
             let advance = self.characterAdvance(for: pointSize)
             guard advance > 0 else {
                 return 0
@@ -493,6 +496,8 @@ extension TextEditorViewNode {
             return max(0, min(Int((x / advance).rounded()), lineText.count))
         }
 
+        let caretStops = layout.stops
+
         if x <= 0 {
             return 0
         }
@@ -500,11 +505,11 @@ extension TextEditorViewNode {
         for index in 0..<(caretStops.count - 1) {
             let middle = (caretStops[index] + caretStops[index + 1]) * 0.5
             if x < middle {
-                return min(index, lineText.count)
+                return min(index, layout.characterCount)
             }
         }
 
-        return min(caretStops.count - 1, lineText.count)
+        return min(caretStops.count - 1, layout.characterCount)
     }
 
     func lineHeight(for pointSize: Float) -> Float {
@@ -542,33 +547,6 @@ extension TextEditorViewNode {
     }
 
     func layoutCaretStops(for lineText: String, font: Font?, pointSize: Float) -> [Float]? {
-        guard let font else {
-            return nil
-        }
-
-        guard !lineText.isEmpty else {
-            return [0]
-        }
-
-        var attributes = TextAttributeContainer()
-        attributes.font = font
-        attributes.foregroundColor = self.resolvedTextColor()
-        let layout = self.cachedTextLayout(
-            for: AttributedText(lineText, attributes: attributes),
-            lineHeight: self.lineHeight(for: pointSize)
-        )
-
-        var stops: [Float] = [0]
-        stops.reserveCapacity(lineText.unicodeScalars.count + 1)
-
-        for line in layout.textLines {
-            for run in line {
-                for glyph in run {
-                    stops.append(max(stops.last ?? 0, glyph.advanceX))
-                }
-            }
-        }
-
-        return stops.isEmpty ? [0] : stops
+        self.cachedCaretLayout(for: lineText, font: font, pointSize: pointSize)?.stops
     }
 }

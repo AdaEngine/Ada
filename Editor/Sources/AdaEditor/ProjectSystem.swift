@@ -162,7 +162,7 @@ public enum ProjectSystem {
             runtime: buildSystem.isAdaScript
                 ? .init(
                     moduleName: projectName,
-                    entry: .init(scene: SceneDocumentFormat.defaultScenePath, view: "game.main")
+                    entry: .init(scene: SceneDocumentFormat.defaultScenePath)
                 )
                 : .init(),
             editor: .init(startupScene: SceneDocumentFormat.defaultScenePath),

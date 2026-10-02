@@ -18,6 +18,10 @@ final class EditorWorkbenchViewModel {
     var openDocuments: [EditorWorkbenchDocument]
     var tileMapResourceRevision = 0
     var activeDocumentID: String
+    var secondaryDocumentIDs: Set<String> = []
+    var primarySelectedDocumentID: String?
+    var secondarySelectedDocumentID: String?
+    var focusedPane: EditorWorkbenchPane = .primary
     var codeColorPalette: EditorCodeColorPalette
     var codeFontSize: Double {
         didSet {
@@ -132,6 +136,9 @@ final class EditorWorkbenchViewModel {
             openDocuments[index] = document
         } else {
             openDocuments.append(document)
+            if isSplit, focusedPane == .secondary {
+                secondaryDocumentIDs.insert(document.id)
+            }
         }
 
         selectDocument(id: document.id)
@@ -178,6 +185,12 @@ final class EditorWorkbenchViewModel {
         }
 
         activeEditorTab = document.title
+        focusedPane = pane(for: document.id)
+        if pane(for: document.id) == .primary {
+            primarySelectedDocumentID = document.id
+        } else {
+            secondarySelectedDocumentID = document.id
+        }
         onActiveDocumentChanged?()
     }
 
@@ -222,6 +235,7 @@ final class EditorWorkbenchViewModel {
         }
 
         let wasActiveDocument = activeDocumentID == documentID
+        let closingPane = pane(for: documentID)
         if wasActiveDocument {
             onActiveDocumentWillChange?()
         }
@@ -231,6 +245,7 @@ final class EditorWorkbenchViewModel {
         tileMapModels.removeValue(forKey: documentID)
         sceneUndoHistory.removeValue(forKey: documentID)
         sceneRedoHistory.removeValue(forKey: documentID)
+        reconcilePanes()
 
         guard wasActiveDocument else {
             return
@@ -243,8 +258,8 @@ final class EditorWorkbenchViewModel {
             return
         }
 
-        let nextIndex = min(closingIndex, openDocuments.count - 1)
-        selectDocument(id: openDocuments[nextIndex].id, recordsNavigation: false)
+        let nextDocument = (isSplit ? selectedDocument(in: closingPane) : nil) ?? openDocuments[min(closingIndex, openDocuments.count - 1)]
+        selectDocument(id: nextDocument.id, recordsNavigation: false)
     }
 
     func discardDocuments(atOrBelow relativePath: String) {
@@ -265,6 +280,7 @@ final class EditorWorkbenchViewModel {
         sceneRedoHistory = sceneRedoHistory.filter { !discardedIDSet.contains($0.key) }
         navigationHistory.removeAll { discardedIDSet.contains($0) }
         navigationHistoryIndex = min(navigationHistoryIndex, navigationHistory.count - 1)
+        reconcilePanes()
 
         guard wasActiveDocumentDiscarded else {
             return
@@ -279,21 +295,23 @@ final class EditorWorkbenchViewModel {
     }
 
     func closeOtherDocuments(keeping documentID: String) {
-        closeDocuments(withIDs: openDocuments.lazy.filter { $0.id != documentID }.map(\.id))
+        closeDocuments(withIDs: documents(in: pane(for: documentID)).filter { $0.id != documentID }.map(\.id))
     }
 
     func closeDocumentsToLeft(of documentID: String) {
-        guard let index = openDocuments.firstIndex(where: { $0.id == documentID }) else {
+        let documents = documents(in: pane(for: documentID))
+        guard let index = documents.firstIndex(where: { $0.id == documentID }) else {
             return
         }
-        closeDocuments(withIDs: openDocuments[..<index].map(\.id))
+        closeDocuments(withIDs: documents[..<index].map(\.id))
     }
 
     func closeDocumentsToRight(of documentID: String) {
-        guard let index = openDocuments.firstIndex(where: { $0.id == documentID }) else {
+        let documents = documents(in: pane(for: documentID))
+        guard let index = documents.firstIndex(where: { $0.id == documentID }) else {
             return
         }
-        closeDocuments(withIDs: openDocuments[openDocuments.index(after: index)...].map(\.id))
+        closeDocuments(withIDs: documents[documents.index(after: index)...].map(\.id))
     }
 
     func closeCleanDocuments() {

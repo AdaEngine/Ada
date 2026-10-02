@@ -268,10 +268,11 @@ public struct UITessellator {
         offset: Vector2 = .zero,
         opacity: Float = 1
     ) -> [GlyphVertexData] {
-        let foregroundColor = glyph.attributes.foregroundColor
-            .opacity(glyph.attributes.foregroundColor.alpha * opacity)
-        let outlineColor = glyph.attributes.outlineColor
-            .opacity(glyph.attributes.outlineColor.alpha * opacity)
+        let foreground = glyph.attributes.foregroundColor
+        let foregroundColor = foreground.opacity(foreground.alpha * opacity)
+        let outline = glyph.attributes.outlineColor
+        let outlineColor = outline.opacity(outline.alpha * opacity)
+        let outlineWidth = glyph.attributes.outlineWidth
         let texCoord = glyph.textureCoordinates
 
         // Glyph position: [x: pl, y: pb, z: pr, w: pt]
@@ -288,7 +289,7 @@ public struct UITessellator {
                 position: transform * Vector4(x: x2, y: y1, z: 0, w: 1),
                 foregroundColor: foregroundColor,
                 outlineColor: outlineColor,
-                outlineWidth: glyph.attributes.outlineWidth,
+                outlineWidth: outlineWidth,
                 textureCoordinate: Vector2(texCoord.z, texCoord.y),
                 textureIndex: textureIndex
             ),
@@ -296,7 +297,7 @@ public struct UITessellator {
                 position: transform * Vector4(x: x2, y: y2, z: 0, w: 1),
                 foregroundColor: foregroundColor,
                 outlineColor: outlineColor,
-                outlineWidth: glyph.attributes.outlineWidth,
+                outlineWidth: outlineWidth,
                 textureCoordinate: Vector2(texCoord.z, texCoord.w),
                 textureIndex: textureIndex
             ),
@@ -304,7 +305,7 @@ public struct UITessellator {
                 position: transform * Vector4(x: x1, y: y2, z: 0, w: 1),
                 foregroundColor: foregroundColor,
                 outlineColor: outlineColor,
-                outlineWidth: glyph.attributes.outlineWidth,
+                outlineWidth: outlineWidth,
                 textureCoordinate: Vector2(texCoord.x, texCoord.w),
                 textureIndex: textureIndex
             ),
@@ -312,7 +313,7 @@ public struct UITessellator {
                 position: transform * Vector4(x: x1, y: y1, z: 0, w: 1),
                 foregroundColor: foregroundColor,
                 outlineColor: outlineColor,
-                outlineWidth: glyph.attributes.outlineWidth,
+                outlineWidth: outlineWidth,
                 textureCoordinate: Vector2(texCoord.x, texCoord.y),
                 textureIndex: textureIndex
             ),
@@ -337,10 +338,11 @@ public struct UITessellator {
         indices: inout [UInt32]
     ) {
         let vertexOffset = UInt32(vertices.count)
-        let foregroundColor = glyph.attributes.foregroundColor
-            .opacity(glyph.attributes.foregroundColor.alpha * opacity)
-        let outlineColor = glyph.attributes.outlineColor
-            .opacity(glyph.attributes.outlineColor.alpha * opacity)
+        let foreground = glyph.attributes.foregroundColor
+        let foregroundColor = foreground.opacity(foreground.alpha * opacity)
+        let outline = glyph.attributes.outlineColor
+        let outlineColor = outline.opacity(outline.alpha * opacity)
+        let outlineWidth = glyph.attributes.outlineWidth
         let textureCoordinates = glyph.textureCoordinates
         let position = glyph.position
         let x1 = position.x + offset.x
@@ -353,7 +355,7 @@ public struct UITessellator {
                 position: transform * Vector4(x: x2, y: y1, z: 0, w: 1),
                 foregroundColor: foregroundColor,
                 outlineColor: outlineColor,
-                outlineWidth: glyph.attributes.outlineWidth,
+                outlineWidth: outlineWidth,
                 textureCoordinate: Vector2(textureCoordinates.z, textureCoordinates.y),
                 textureIndex: textureIndex
             )
@@ -363,7 +365,7 @@ public struct UITessellator {
                 position: transform * Vector4(x: x2, y: y2, z: 0, w: 1),
                 foregroundColor: foregroundColor,
                 outlineColor: outlineColor,
-                outlineWidth: glyph.attributes.outlineWidth,
+                outlineWidth: outlineWidth,
                 textureCoordinate: Vector2(textureCoordinates.z, textureCoordinates.w),
                 textureIndex: textureIndex
             )
@@ -373,7 +375,7 @@ public struct UITessellator {
                 position: transform * Vector4(x: x1, y: y2, z: 0, w: 1),
                 foregroundColor: foregroundColor,
                 outlineColor: outlineColor,
-                outlineWidth: glyph.attributes.outlineWidth,
+                outlineWidth: outlineWidth,
                 textureCoordinate: Vector2(textureCoordinates.x, textureCoordinates.w),
                 textureIndex: textureIndex
             )
@@ -383,7 +385,7 @@ public struct UITessellator {
                 position: transform * Vector4(x: x1, y: y1, z: 0, w: 1),
                 foregroundColor: foregroundColor,
                 outlineColor: outlineColor,
-                outlineWidth: glyph.attributes.outlineWidth,
+                outlineWidth: outlineWidth,
                 textureCoordinate: Vector2(textureCoordinates.x, textureCoordinates.y),
                 textureIndex: textureIndex
             )
@@ -819,7 +821,77 @@ public struct UITessellator {
         return true
     }
 
-    private struct ClipBounds {
+    struct PreparedGlyphClip {
+        let interiorBounds: ClipBounds
+    }
+
+    /// A conservative inscribed rectangle proves containment without walking every mask edge per glyph.
+    func prepareGlyphClip(_ polygons: [[Vector2]]) -> PreparedGlyphClip? {
+        guard polygons.count == 1, let polygon = polygons.first, let bounds = clipBounds(of: polygon) else {
+            return nil
+        }
+        let area = signedArea(of: polygon)
+        guard area.isFinite, abs(area) > 0.0001 else {
+            return nil
+        }
+        let centerX = (bounds.minX + bounds.maxX) * 0.5
+        let centerY = (bounds.minY + bounds.maxY) * 0.5
+        let halfWidth = (bounds.maxX - bounds.minX) * 0.5
+        let halfHeight = (bounds.maxY - bounds.minY) * 0.5
+        let direction: Float = area > 0 ? 1 : -1
+        var scale: Float = 1
+        for index in polygon.indices {
+            let start = polygon[index]
+            let end = polygon[(index + 1) % polygon.count]
+            let normalX = (start.y - end.y) * direction
+            let normalY = (end.x - start.x) * direction
+            let distance = normalX * (centerX - start.x) + normalY * (centerY - start.y)
+            let extent = abs(normalX) * halfWidth + abs(normalY) * halfHeight
+            guard distance.isFinite, extent.isFinite, distance >= 0 else {
+                return nil
+            }
+            if extent > 0 { scale = min(scale, distance / extent) }
+        }
+        guard scale.isFinite, scale > 0 else {
+            return nil
+        }
+        // Leave a rounding margin and verify the result against the original half-plane predicate.
+        scale *= 0.9999
+        let interior = ClipBounds(
+            minX: centerX - halfWidth * scale,
+            minY: centerY - halfHeight * scale,
+            maxX: centerX + halfWidth * scale,
+            maxY: centerY + halfHeight * scale
+        )
+        guard bounds.contains(interior), containsBounds(interior, in: polygon, signedArea: area) else {
+            return nil
+        }
+        return PreparedGlyphClip(interiorBounds: interior)
+    }
+
+    func isGlyphFullyContained(_ glyph: Glyph, transform: Transform3D, offset: Vector2, clip: PreparedGlyphClip) -> Bool {
+        let position = glyph.position
+        let x1 = position.x + offset.x
+        let y1 = position.y + offset.y
+        let x2 = position.z + offset.x
+        let y2 = position.w + offset.y
+        let p1 = transform * Vector4(x1, y1, 0, 1)
+        let p2 = transform * Vector4(x1, y2, 0, 1)
+        let p3 = transform * Vector4(x2, y1, 0, 1)
+        let p4 = transform * Vector4(x2, y2, 0, 1)
+        guard p1.x.isFinite, p1.y.isFinite, p2.x.isFinite, p2.y.isFinite,
+              p3.x.isFinite, p3.y.isFinite, p4.x.isFinite, p4.y.isFinite else {
+            return false
+        }
+        return clip.interiorBounds.contains(ClipBounds(
+            minX: min(p1.x, p2.x, p3.x, p4.x),
+            minY: min(p1.y, p2.y, p3.y, p4.y),
+            maxX: max(p1.x, p2.x, p3.x, p4.x),
+            maxY: max(p1.y, p2.y, p3.y, p4.y)
+        ))
+    }
+
+    struct ClipBounds {
         let minX: Float
         let minY: Float
         let maxX: Float

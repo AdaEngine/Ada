@@ -97,7 +97,7 @@ struct EditorAdaScriptHighlightTests {
     }
 
     @Test("Editor preference reaches the text editor without disabling folding")
-    func indentationPreference() throws {
+    func indentationPreference() async throws {
         let suite = "AdaEditor.IndentationEditorTests.\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -114,8 +114,28 @@ struct EditorAdaScriptHighlightTests {
         let node = try #require(editorNode(in: container.viewTree.rootNode))
         #expect(node.showsIndentationMarkers)
         #expect(node.foldingStyle == .braces)
+        settings.showsSpaceMarkers = false
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1 / 60)
+            container.layoutIfNeeded()
+        }
+        #expect(!node.showsSpaceMarkers)
+        #expect(node.showsIndentationGuides)
+        #expect(node.showsTabMarkers)
+        settings.showsSpaceMarkers = true
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1 / 60)
+            container.layoutIfNeeded()
+        }
+        #expect(node.showsSpaceMarkers)
         settings.showsIndentationMarkers = false
-        container.layoutIfNeeded()
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1 / 60)
+            container.layoutIfNeeded()
+        }
         #expect(!node.showsIndentationMarkers)
         #expect(node.foldingStyle == .braces)
     }

@@ -26,7 +26,7 @@ let isWebExportEnabled: Bool = {
     return webExportValue.map(enabledValues.contains) == true
 }()
 
-// Local compiler development can override the pinned native-capable Gravity revision.
+// Local compiler development can override the Gravity default branch.
 let gravityDevelopmentPath = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"]
 let gravityAOTDependencies: [Target.Dependency] = [
     .product(name: "GravityAOT", package: "gravity-lang")
@@ -1333,7 +1333,7 @@ if let gravityDevelopmentPath {
 } else {
     package.dependencies.append(.package(
         url: "https://github.com/AdaEngine/gravity-lang.git",
-        revision: "5ea76d1bea1cc0c9b1b6fbea5125a118908ab9e5"
+        branch: "master"
     ))
 }
 

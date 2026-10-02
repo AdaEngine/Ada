@@ -44,7 +44,7 @@
 
         override func run(_ appWorlds: AppWorlds) throws {
             setupInput(for: appWorlds)
-            if let screen = screenManager.activeScreen() {
+            if let screen = renderingScreen() {
                 startDisplayLinkedLoop(for: appWorlds, screen: screen)
             } else {
                 startFallbackLoop(for: appWorlds)
@@ -156,7 +156,7 @@
             for appWorlds: AppWorlds,
             continuation: AsyncStream<Void>.Continuation
         ) {
-            guard let screen = screenManager.activeScreen(), screen !== linkedScreen else {
+            guard let screen = renderingScreen(), screen !== linkedScreen else {
                 return
             }
 
@@ -170,6 +170,10 @@
             displayLink?.invalidate()
             displayLink = replacement
             linkedScreen = screen
+        }
+
+        private func renderingScreen() -> NSScreen? {
+            (windowManager as? MacOSWindowManager)?.renderingScreen() ?? screenManager.activeScreen()
         }
 
         private func startFallbackLoop(for appWorlds: AppWorlds) {

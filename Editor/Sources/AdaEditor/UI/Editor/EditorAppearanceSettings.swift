@@ -132,7 +132,7 @@ struct EditorCodeDisplaySettings: View {
                 identifier: "TabMarkers"
             )
             settingToggle(
-                "Space markers",
+                "Show spaces as dots",
                 isOn: Binding(
                     get: { settings.showsSpaceMarkers },
                     set: { settings.showsSpaceMarkers = $0 }

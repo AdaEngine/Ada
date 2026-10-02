@@ -20,6 +20,10 @@ public struct ApplicationFramePacing: Resource, Codable, Sendable {
     /// do not expose display refresh information.
     public var synchronizesWithDisplayRefreshRate: Bool
 
+    /// Optional lower bound for display-linked updates, clamped to the active display's maximum.
+    /// When omitted, the system may adapt between 30 Hz and the resolved maximum.
+    public var minimumFramesPerSecond: Int?
+
     /// Minimum time between app-world updates for fixed-rate and fallback loops.
     public var minimumFrameDuration: LongTimeInterval {
         1 / LongTimeInterval(maximumFramesPerSecond)
@@ -30,12 +34,15 @@ public struct ApplicationFramePacing: Resource, Codable, Sendable {
     ///   - maximumFramesPerSecond: Maximum number of app-world updates per second.
     ///   - synchronizesWithDisplayRefreshRate: Whether display-linked platforms should
     ///     prefer the display's maximum refresh rate.
+    ///   - minimumFramesPerSecond: Optional minimum requested update rate. The display limit still applies.
     public init(
         maximumFramesPerSecond: Int,
-        synchronizesWithDisplayRefreshRate: Bool = false
+        synchronizesWithDisplayRefreshRate: Bool = false,
+        minimumFramesPerSecond: Int? = nil
     ) {
         self.maximumFramesPerSecond = max(1, maximumFramesPerSecond)
         self.synchronizesWithDisplayRefreshRate = synchronizesWithDisplayRefreshRate
+        self.minimumFramesPerSecond = minimumFramesPerSecond.map { max(1, $0) }
     }
 
     /// Creates frame pacing that follows the active display refresh rate where supported.
@@ -72,12 +79,13 @@ public struct ApplicationFramePacing: Resource, Codable, Sendable {
         let maximum = resolvedMaximumFramesPerSecond(
             forDisplayMaximumFramesPerSecond: displayMaximumFramesPerSecond
         )
-        return min(30, maximum)...maximum
+        return min(max(1, minimumFramesPerSecond ?? 30), maximum)...maximum
     }
 
     private enum CodingKeys: String, CodingKey {
         case maximumFramesPerSecond
         case synchronizesWithDisplayRefreshRate
+        case minimumFramesPerSecond
     }
 
     public init(from decoder: any Decoder) throws {
@@ -87,7 +95,8 @@ public struct ApplicationFramePacing: Resource, Codable, Sendable {
             synchronizesWithDisplayRefreshRate: try container.decodeIfPresent(
                 Bool.self,
                 forKey: .synchronizesWithDisplayRefreshRate
-            ) ?? false
+            ) ?? false,
+            minimumFramesPerSecond: try container.decodeIfPresent(Int.self, forKey: .minimumFramesPerSecond)
         )
     }
 
@@ -95,5 +104,6 @@ public struct ApplicationFramePacing: Resource, Codable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(maximumFramesPerSecond, forKey: .maximumFramesPerSecond)
         try container.encode(synchronizesWithDisplayRefreshRate, forKey: .synchronizesWithDisplayRefreshRate)
+        try container.encodeIfPresent(minimumFramesPerSecond, forKey: .minimumFramesPerSecond)
     }
 }

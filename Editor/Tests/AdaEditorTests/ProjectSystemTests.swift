@@ -211,7 +211,7 @@ struct ProjectSystemTests {
         #expect(project.build.system == .adaScript)
         #expect(project.paths.build == nil)
         #expect(project.runtime.moduleName == "PortableGame")
-        #expect(project.runtime.entryView == "game.main")
+        #expect(project.runtime.entry.view == nil)
         #expect(project.runtime.startupScene == SceneDocumentFormat.defaultScenePath)
         #expect(!FileManager.default.fileExists(atPath: projectURL.appendingPathComponent("Package.swift").path))
         #expect(try ProjectSystem.validateProjectLayout(at: projectURL) == project)
@@ -219,7 +219,7 @@ struct ProjectSystemTests {
         #expect(metadata.contains(#""system" : "adascript""#))
         #expect(metadata.contains(#""preset" : "game2d""#))
         #expect(metadata.contains(#""scene" : "Assets/Scenes/Main.ascn""#))
-        #expect(metadata.contains(#""view" : "game.main""#))
+        #expect(!metadata.contains(#""view""#))
         #expect(!metadata.contains(#""entryView""#))
         #expect(!metadata.contains(#""system" : "gravity""#))
     }

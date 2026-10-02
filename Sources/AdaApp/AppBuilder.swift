@@ -204,6 +204,10 @@ extension AppWorlds {
             try await world.update()
         }
 
+        // UI lifecycle callbacks can enqueue removals while a subworld is
+        // updating, after the main scheduler's final flush (or while paused).
+        // Apply them before clearing the removal tracker at the frame boundary.
+        main.flush()
         main.clearTrackers()
     }
 

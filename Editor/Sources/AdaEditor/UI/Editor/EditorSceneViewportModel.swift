@@ -290,7 +290,7 @@ final class EditorSceneViewportModel {
                 let rect = Rect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)
                 context.fill(CircleShape().path(in: rect), with: color(for: icon, theme: theme).opacity(icon.isExplicit ? 0.86 : 0.58))
             }
-            if displayMode == .threeD, !isPerspectiveTransitionActive {
+            if !isPerspectiveTransitionActive {
                 EditorSceneViewportCameraGizmo.draw(
                     in: &context,
                     world: world,
@@ -326,6 +326,18 @@ final class EditorSceneViewportModel {
         if let gizmo = transformGizmo() {
             gizmo.draw(in: &context, highlighted: activeGizmoHandle ?? hoveredGizmoHandle)
         }
+    }
+
+    func uiPreviews(size: Size) -> [EditorSceneUIPreview] {
+        guard displayMode == .twoD, !isPerspectiveTransitionActive, let world else {
+            return []
+        }
+        return EditorSceneUIPreview.make(
+            world: world,
+            editorIDsByEntityID: editorIDsByEntityID,
+            viewportModel: self,
+            size: size
+        )
     }
 
     private func color(for icon: EditorGizmoOverlayModel.Icon, theme: Theme) -> Color {

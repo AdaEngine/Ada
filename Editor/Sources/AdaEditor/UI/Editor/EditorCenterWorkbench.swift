@@ -38,58 +38,128 @@ struct EditorCenterWorkbench: View {
     @State private var previewResizeState = EditorPreviewResizeState()
     @State private var draggedTabID: String?
     @State private var dropTargetTabID: String?
-    @State private var isFilesBrowserActive = false
+    @State private var filesBrowserPanes: Set<EditorWorkbenchPane> = []
+    @State private var splitResizeState = EditorWorkbenchResizeState()
 
     var body: some View {
-        VStack(spacing: 0) {
-            editorTabs
-                .frame(height: AdaEngineStyleLayoutSpec.editorTabHeight)
-            activeDocumentView(metrics: metrics)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .layoutPriority(100)
-                .overlay(anchor: .bottomTrailing) {
-                    if showsSceneControls {
-                        aiFlightBox(metrics: metrics)
-                            .padding(metrics.size.height < 520 ? 8 : 18)
-                    }
+        workbenchContent
+            .background(
+                RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
+                    .fill(theme.editorColors.surfaceElevated)
+            )
+            .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+            .overlay {
+                adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
+            }
+            .onChange(of: viewModel.activeDocumentID) { _, id in
+                if !id.isEmpty {
+                    filesBrowserPanes.remove(viewModel.pane(for: id))
                 }
-        }
-        .background(
-            RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
-                .fill(theme.editorColors.surfaceElevated)
-        )
-        .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
-        .overlay {
-            adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
-        }
+            }
     }
 }
 
 extension EditorCenterWorkbench {
-    private var editorTabs: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 4) {
-                filesTab
-                ForEach(viewModel.openDocuments, id: \.id) { document in
-                    editorTab(document, active: document.id == viewModel.activeDocumentID)
+    @ViewBuilder
+    private var workbenchContent: some View {
+        if viewModel.isSplit {
+            GeometryReader { geometry in
+                EditorWorkbenchPanelsLayout(state: splitResizeState) {
+                    documentPane(.primary)
+                    splitResizeHandle(availableWidth: geometry.size.width)
+                    documentPane(.secondary)
                 }
+                .frame(width: geometry.size.width, height: geometry.size.height)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .fixedSize(horizontal: true, vertical: false)
+        } else {
+            documentPane(.primary)
+        }
+    }
+
+    private func documentPane(_ pane: EditorWorkbenchPane) -> some View {
+        VStack(spacing: 0) {
+            editorTabs(in: pane)
+                .frame(height: AdaEngineStyleLayoutSpec.editorTabHeight)
+                .overlay(anchor: .bottomLeading) {
+                    RectangleShape()
+                        .fill(viewModel.focusedPane == pane ? theme.editorColors.blue : theme.editorColors.border)
+                        .frame(height: viewModel.isSplit ? 2 : 0)
+                        .allowsHitTesting(false)
+                }
+            activeDocumentView(in: pane)
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                .layoutPriority(100)
+        }
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        .onPrimaryInteraction {
+            guard let document = viewModel.selectedDocument(in: pane) else {
+                viewModel.focusPane(pane)
+                return
+            }
+            guard document.id != viewModel.activeDocumentID else {
+                return
+            }
+            onSelectDocument?(document.id) ?? viewModel.selectDocument(id: document.id)
+        }
+        .accessibilityIdentifier("AdaEditor.Workbench.Pane.\(pane.rawValue)")
+    }
+
+    private func splitResizeHandle(availableWidth: Float) -> some View {
+        ZStack {
+            RectangleShape().fill(theme.editorColors.border).frame(width: 1)
+            EditorResizeHandle(
+                axis: .horizontal,
+                onResize: { splitResizeState.resize(translation: $0.width, availableWidth: availableWidth) },
+                onResizeEnded: { splitResizeState.endDrag() }
+            )
+        }
+        .frame(width: EditorWorkbenchPanelsLayout.handleWidth)
+        .frame(maxHeight: .infinity)
+        .accessibilityIdentifier("AdaEditor.Workbench.Split.Resize")
+    }
+
+    private func editorTabs(in pane: EditorWorkbenchPane) -> some View {
+        HStack(spacing: 0) {
+            ScrollView(.horizontal) {
+                HStack(spacing: 4) {
+                    filesTab(in: pane)
+                    ForEach(viewModel.documents(in: pane), id: \.id) { document in
+                        editorTab(document, active: !filesBrowserPanes.contains(pane) && document.id == viewModel.selectedDocument(in: pane)?.id)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .fixedSize(horizontal: true, vertical: false)
+            }
+            .frame(minWidth: 0, maxWidth: .infinity)
+            if viewModel.isSplit {
+                Button("Merge") { viewModel.mergePanes() }
+                    .buttonStyle(DefaultButtonStyle())
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.editorColors.muted)
+                    .padding(.horizontal, 8)
+                    .accessibilityIdentifier("AdaEditor.Workbench.Split.Merge.\(pane.rawValue)")
+            } else if let document = viewModel.selectedDocument(in: pane) {
+                Button("Split") { viewModel.splitDocument(id: document.id) }
+                    .buttonStyle(DefaultButtonStyle())
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.editorColors.blue)
+                    .padding(.horizontal, 8)
+                    .accessibilityIdentifier("AdaEditor.Workbench.Split")
+            }
         }
         .background(theme.editorColors.surfaceElevated)
     }
 
-    private var filesTab: some View {
-        Button(action: { isFilesBrowserActive = true }) {
+    private func filesTab(in pane: EditorWorkbenchPane) -> some View {
+        Button(action: { filesBrowserPanes.insert(pane) }) {
             HStack(spacing: 7) {
                 Text("\u{E2C7}")
                     .font(AdaEditorMaterialSymbolFont.font(size: 14))
                     .foregroundColor(theme.editorColors.blue)
                 Text("Files")
                     .font(.system(size: 12))
-                    .foregroundColor(isFilesBrowserActive ? theme.editorColors.text : theme.editorColors.muted)
+                    .foregroundColor(filesBrowserPanes.contains(pane) ? theme.editorColors.text : theme.editorColors.muted)
             }
             .padding(.horizontal, 10)
             .frame(height: 26)
@@ -97,16 +167,16 @@ extension EditorCenterWorkbench {
         .buttonStyle(DefaultButtonStyle())
         .background(
             RoundedRectangleShape(cornerRadius: 5)
-                .fill(isFilesBrowserActive ? theme.editorColors.surface : theme.editorColors.surfaceElevated)
+                .fill(filesBrowserPanes.contains(pane) ? theme.editorColors.surface : theme.editorColors.surfaceElevated)
         )
         .overlay {
             RoundedRectangleShape(cornerRadius: 5)
                 .stroke(
-                    isFilesBrowserActive ? theme.editorColors.blue.opacity(0.72) : theme.editorColors.border.opacity(0.52),
+                    filesBrowserPanes.contains(pane) ? theme.editorColors.blue.opacity(0.72) : theme.editorColors.border.opacity(0.52),
                     lineWidth: 1
                 )
         }
-        .accessibilityIdentifier("AdaEditor.Tab.Files")
+        .accessibilityIdentifier(pane == .primary ? "AdaEditor.Tab.Files" : "AdaEditor.Tab.Files.secondary")
     }
 
     private func editorTab(_ document: EditorWorkbenchDocument, active: Bool) -> some View {
@@ -116,7 +186,7 @@ extension EditorCenterWorkbench {
                     draggedTabID = nil
                     return
                 }
-                isFilesBrowserActive = false
+                filesBrowserPanes.remove(viewModel.pane(for: document.id))
                 onSelectDocument?(document.id) ?? viewModel.selectDocument(id: document.id)
             }) {
                 HStack(spacing: 7) {
@@ -194,20 +264,33 @@ extension EditorCenterWorkbench {
             viewModel.closeDocument(id: document.id)
         }
         .contextMenu {
+            Button(viewModel.pane(for: document.id) == .secondary ? "Move to Left Group" : "Split Right") {
+                filesBrowserPanes.remove(.secondary)
+                if viewModel.pane(for: document.id) == .secondary {
+                    viewModel.moveDocument(id: document.id, to: .primary)
+                } else {
+                    viewModel.splitDocument(id: document.id)
+                }
+            }
+            if viewModel.isSplit {
+                Button("Merge Editor Groups") { viewModel.mergePanes() }
+            }
+            Divider()
             Button("Close") {
                 viewModel.closeDocument(id: document.id)
             }
-            if viewModel.openDocuments.count > 1 {
+            if viewModel.documents(in: viewModel.pane(for: document.id)).count > 1 {
                 Button("Close Others") {
                     viewModel.closeOtherDocuments(keeping: document.id)
                 }
             }
-            if let index = viewModel.openDocuments.firstIndex(where: { $0.id == document.id }), index > 0 {
+            if let index = viewModel.documents(in: viewModel.pane(for: document.id)).firstIndex(where: { $0.id == document.id }), index > 0 {
                 Button("Close Left") {
                     viewModel.closeDocumentsToLeft(of: document.id)
                 }
             }
-            if let index = viewModel.openDocuments.firstIndex(where: { $0.id == document.id }), index < viewModel.openDocuments.count - 1 {
+            if let index = viewModel.documents(in: viewModel.pane(for: document.id)).firstIndex(where: { $0.id == document.id }),
+                index < viewModel.documents(in: viewModel.pane(for: document.id)).count - 1 {
                 Button("Close Right") {
                     viewModel.closeDocumentsToRight(of: document.id)
                 }
@@ -241,7 +324,7 @@ extension EditorCenterWorkbench {
     }
 
     private func tabDropTarget(for documentID: String, translationX: Float) -> String? {
-        let documents = viewModel.openDocuments
+        let documents = viewModel.documents(in: viewModel.pane(for: documentID))
         guard let sourceIndex = documents.firstIndex(where: { $0.id == documentID }) else {
             return nil
         }
@@ -323,14 +406,14 @@ extension EditorCenterWorkbench {
     }
 
     @ViewBuilder
-    private func activeDocumentView(metrics _: AdaEngineStyleLayoutMetrics) -> some View {
-        if isFilesBrowserActive {
+    private func activeDocumentView(in pane: EditorWorkbenchPane) -> some View {
+        if filesBrowserPanes.contains(pane) {
             EditorFilesBrowserTab(items: projectItems) { item in
-                isFilesBrowserActive = false
+                filesBrowserPanes.remove(pane)
                 onOpenProjectItem?(item)
             }
         } else {
-            switch viewModel.activeDocument {
+            switch viewModel.selectedDocument(in: pane) {
             case let .git(document):
                 EditorGitDiffView(document: document, workbench: viewModel)
             case let .scene(document):
@@ -431,7 +514,7 @@ extension EditorCenterWorkbench {
 
     @ViewBuilder
     private func textDocumentEditor(document: EditorTextDocument) -> some View {
-        switch viewModel.previewStatus {
+        switch document.id == viewModel.activeDocumentID ? viewModel.previewStatus : .hidden {
         case .hidden:
             codeFileView(document: document)
         default:

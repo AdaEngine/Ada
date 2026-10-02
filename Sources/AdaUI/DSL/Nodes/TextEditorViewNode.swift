@@ -28,9 +28,14 @@ final class TextEditorViewNode: ViewNode {
         var startOffset: Int
     }
 
-    struct CachedTextLayout {
-        var layout: TextLayoutManager
+    final class CachedTextLayout {
+        let layout: TextLayoutManager
         var lastAccess: UInt64
+
+        init(layout: TextLayoutManager, lastAccess: UInt64) {
+            self.layout = layout
+            self.lastAccess = lastAccess
+        }
     }
 
     struct TextLayoutCacheKey: Hashable {
@@ -104,6 +109,14 @@ final class TextEditorViewNode: ViewNode {
     var textLayoutCacheAccess: UInt64 = 0
     var textLayoutCacheHits = 0
     var textLayoutCacheMisses = 0
+    var caretLayoutCache: [CaretLayoutCacheKey: CachedCaretLayout] = [:]
+    var caretLayoutCacheAccess: UInt64 = 0
+    var caretLayoutCacheHits = 0
+    var caretLayoutCacheMisses = 0
+    var renderedLineCache: [Int: CachedRenderedLine] = [:]
+    var renderedLineCacheAccess: UInt64 = 0
+    var renderedLineCacheHits = 0
+    var renderedLineCacheMisses = 0
     var lineCache: [LineInfo]?
     var foldRangesCache: [Int: Range<Int>]?
     var displayedLinesCache: [Int]?

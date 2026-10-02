@@ -93,6 +93,7 @@ struct MobileEditorProjectsScreen: View {
 
 struct MobileEditorSettingsScreen: View {
     @Environment(\.theme) private var theme
+    @State private var sloppyLogo: Image?
     let agentStatus: String?
     let configureAgent: () -> Void
 
@@ -105,6 +106,28 @@ struct MobileEditorSettingsScreen: View {
                 }
                 .buttonStyle(DefaultButtonStyle())
                 .accessibilityIdentifier("AdaEditor.Mobile.ConfigureAgent")
+
+                HStack(spacing: 10) {
+                    if let sloppyLogo {
+                        sloppyLogo
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 28, height: 28)
+                    }
+                    Text("Power by Sloppy")
+                        .font(MobileEditorFont.font(size: 13))
+                        .foregroundColor(theme.editorColors.muted)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 10)
+                .accessibilityIdentifier("AdaEditor.Mobile.SloppyBranding")
+                .onAppear {
+                    guard sloppyLogo == nil,
+                          let url = Bundle.editor.url(forResource: "sloppy_logo", withExtension: "png", subdirectory: "Assets/Icons") else {
+                        return
+                    }
+                    sloppyLogo = try? Image(contentsOf: url)
+                }
             }
             .padding(.horizontal, 22)
             .padding(.top, 24)

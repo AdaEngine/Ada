@@ -341,7 +341,12 @@ public struct UIRenderTesselationSystem {
         var currentLineWidth: Float = 1.0
         var currentClipRect: Rect?
         var clipStack: [Rect?] = []
-        var currentClipPolygons: [[Vector2]]?
+        var currentClipPolygons: [[Vector2]]? {
+            didSet {
+                preparedGlyphClip = currentClipPolygons.flatMap { UITessellator().prepareGlyphClip($0) }
+            }
+        }
+        var preparedGlyphClip: UITessellator.PreparedGlyphClip?
         var clipPolygonStack: [[[Vector2]]?] = []
 
         init(
@@ -353,6 +358,7 @@ public struct UIRenderTesselationSystem {
             self.currentClipRect = currentClipRect
             self.clipStack = clipStack
             self.currentClipPolygons = currentClipPolygons
+            self.preparedGlyphClip = currentClipPolygons.flatMap { UITessellator().prepareGlyphClip($0) }
             self.clipPolygonStack = clipPolygonStack
             renderData.textures = [.whiteTexture]
             renderData.fontAtlases = []
@@ -827,7 +833,19 @@ public struct UIRenderTesselationSystem {
 
         let indexStart = state.renderData.glyphIndexBuffer.count
         let indexCount: Int
-        if let clipPolygons = state.currentClipPolygons {
+        if let preparedClip = state.preparedGlyphClip,
+            tessellator.isGlyphFullyContained(glyph, transform: transform, offset: offset, clip: preparedClip) {
+            tessellator.appendGlyph(
+                glyph,
+                transform: transform,
+                textureIndex: texIndex,
+                offset: offset,
+                opacity: opacity,
+                vertices: &state.renderData.glyphVertexBuffer.elements,
+                indices: &state.renderData.glyphIndexBuffer.elements
+            )
+            indexCount = 6
+        } else if let clipPolygons = state.currentClipPolygons {
             let result = tessellator.tessellateClippedGlyph(
                 glyph,
                 transform: transform,

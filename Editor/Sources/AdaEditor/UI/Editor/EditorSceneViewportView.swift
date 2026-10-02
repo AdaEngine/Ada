@@ -229,6 +229,7 @@ struct EditorSceneViewportView: View {
     private var viewportSceneOverlay: some View {
         ZStack(anchor: .topLeading) {
             viewportGridLayer
+            EditorSceneUIPreviewSurface(viewportModel: viewportModel)
             viewportGizmoLayer
             viewportCoordinateRulerLayer
             if displayMode == .threeD {

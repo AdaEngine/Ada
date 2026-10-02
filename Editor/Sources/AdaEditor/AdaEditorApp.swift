@@ -86,6 +86,11 @@ struct AdaEditorApp: App {
         .windowShadow(ProjectOpeningWindowConfiguration.hasShadow)
         .windowResizable(ProjectOpeningWindowConfiguration.isResizable)
         .minimumSize(width: ProjectOpeningLayout.windowWidth, height: ProjectOpeningLayout.windowHeight)
+        #if os(macOS)
+            .transformAppWorlds { worlds in
+                worlds.insertResource(ApplicationFramePacing(maximumFramesPerSecond: 120, minimumFramesPerSecond: 120))
+            }
+        #endif
         #if canImport(AdaMCPPlugin)
             .addPlugins(
                 MCPPlugin(

@@ -260,6 +260,36 @@
             return screenManager.makeScreen(from: screen)
         }
 
+        /// Follow our visible render window even when keyboard focus is in another app on another display.
+        func renderingScreen() -> NSScreen? {
+            let nativeWindows = windows.values.lazy.compactMap { $0.value.systemWindow as? NSWindow }
+            guard let window = Self.preferredRenderingWindow(in: nativeWindows) else {
+                return nil
+            }
+            return screenManager.screen(containing: window.frame) ?? window.screen
+        }
+
+        static func preferredRenderingWindow<Windows: Sequence>(in windows: Windows) -> NSWindow? where Windows.Element == NSWindow {
+            var mainWindow: NSWindow?
+            var largestWindow: NSWindow?
+            var largestArea: CGFloat = 0
+            for window in windows {
+                guard window.isVisible, !window.isMiniaturized else {
+                    continue
+                }
+                if window.isKeyWindow {
+                    return window
+                }
+                if window.isMainWindow { mainWindow = window }
+                let area = window.frame.width * window.frame.height
+                if largestWindow == nil || area > largestArea {
+                    largestWindow = window
+                    largestArea = area
+                }
+            }
+            return mainWindow ?? largestWindow
+        }
+
         private var currentShape: Input.CursorShape = .arrow
         private var mouseMode: Input.MouseMode = .visible
         private var cursors: [Input.CursorShape: (NSCursor, Texture2D, Vector2)] = [:]

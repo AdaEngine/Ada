@@ -49,5 +49,30 @@ struct WindowGroupFramePacingTests {
 
         #expect(framePacing.maximumFramesPerSecond == 30)
         #expect(framePacing.synchronizesWithDisplayRefreshRate == false)
+        #expect(framePacing.minimumFramesPerSecond == nil)
+    }
+
+    @Test
+    func requested120HzKeepsTheDisplayLimitAndSurvivesWindowGroupSetup() {
+        let appWorlds = AppWorlds(main: World())
+        let pacing = ApplicationFramePacing(maximumFramesPerSecond: 120, minimumFramesPerSecond: 120)
+        appWorlds.insertResource(pacing)
+        WindowGroupPlugin(content: EmptyView()).setup(in: appWorlds)
+        let installed = appWorlds.getResource(ApplicationFramePacing.self)
+        #expect(installed?.resolvedFrameRateRange(forDisplayMaximumFramesPerSecond: 120) == 120...120)
+        #expect(installed?.resolvedFrameRateRange(forDisplayMaximumFramesPerSecond: 60) == 60...60)
+        #expect(installed?.resolvedFrameRateRange(forDisplayMaximumFramesPerSecond: 240) == 120...120)
+    }
+
+    @Test
+    func minimumFrameRateRoundTripsAndClampsInvalidValues() throws {
+        let pacing = ApplicationFramePacing(maximumFramesPerSecond: 120, minimumFramesPerSecond: 120)
+        let decoded = try JSONDecoder().decode(ApplicationFramePacing.self, from: JSONEncoder().encode(pacing))
+        #expect(decoded.minimumFramesPerSecond == 120)
+        #expect(decoded.resolvedFrameRateRange(forDisplayMaximumFramesPerSecond: 120) == 120...120)
+        #expect(ApplicationFramePacing(maximumFramesPerSecond: 60, minimumFramesPerSecond: 0)
+            .resolvedFrameRateRange(forDisplayMaximumFramesPerSecond: 120) == 1...60)
+        #expect(ApplicationFramePacing(maximumFramesPerSecond: 60, minimumFramesPerSecond: 240)
+            .resolvedFrameRateRange(forDisplayMaximumFramesPerSecond: 120) == 60...60)
     }
 }

@@ -44,6 +44,20 @@ enum EditorSceneViewportCameraGizmo {
         theme: Theme,
         in context: inout UIGraphicsContext
     ) {
+        if viewportModel.displayMode == .twoD {
+            if let corners = orthographicFrame(camera: camera, transform: transform, viewport: size) {
+                drawFrame(corners, model: viewportModel, size: size, color: color, in: &context)
+            }
+            // Keep the camera recognizable even when zoomed far out.
+            if let point = viewportModel.project(transform.origin, size: size) {
+                context.stroke(
+                    RectangleShape().path(in: Rect(x: point.x - 7, y: point.y - 5, width: 14, height: 10)),
+                    with: color,
+                    style: StrokeStyle(lineWidth: 1.5)
+                )
+            }
+            return
+        }
         let origin = transform.origin
         let right = transform.x.xyz.normalized
         let up = transform.y.xyz.normalized
@@ -106,6 +120,29 @@ enum EditorSceneViewportCameraGizmo {
             lineWidth: 1,
             color: theme.editorColors.text.opacity(0.82)
         )
+    }
+
+    static func logicalSize(camera: Camera, fallback: Size) -> Size {
+        let size = camera.logicalViewport.rect.size
+        return size.width > 0 && size.height > 0 ? size : fallback
+    }
+
+    /// Authored camera coverage in world units, including a non-centered viewport origin.
+    static func orthographicFrame(camera: Camera, transform: Transform3D, viewport: Size) -> [Vector3]? {
+        guard case let .orthographic(projection) = camera.projection else {
+            return nil
+        }
+        let size = logicalSize(camera: camera, fallback: viewport)
+        let width = size.width / projection.scale
+        let height = size.height / projection.scale
+        let left = -width * projection.viewportOrigin.x
+        let bottom = -height * projection.viewportOrigin.y
+        return [
+            Vector3(left, bottom, 0),
+            Vector3(left + width, bottom, 0),
+            Vector3(left + width, bottom + height, 0),
+            Vector3(left, bottom + height, 0),
+        ].map { (transform * Vector4($0, 1)).xyz }
     }
 
     private static func frustumDimensions(for projection: Projection, viewport: Size) -> FrustumDimensions {

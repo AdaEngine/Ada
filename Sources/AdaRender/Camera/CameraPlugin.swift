@@ -10,7 +10,6 @@ import AdaAssets
 import AdaECS
 import AdaTransform
 import AdaUtils
-import Logging
 import Math
 
 public struct CameraPlugin: Plugin {
@@ -103,17 +102,23 @@ func ConfigurateRenderViewTarget(
     _ renderDevice: Res<RenderDeviceHandler>,
     _ cachedViewTargets: ResMut<ExtractedCameraRenderViewTargets>
 ) {
-    let logger = Logger(label: "org.adaengine.AdaRender.ConfigurateRenderViewTarget")
     query.forEach { _, camera, renderViewTarget, source in
+        // A drawable belongs to this frame only, including frames we cannot render.
+        renderViewTarget.outputTexture = nil
+        ageRetiredFrameTextures(renderViewTarget)
+        guard camera.isActive else {
+            return
+        }
+
         let outputViewport = camera.viewport.rect
         let outputSize = outputViewport.size.toSizeInt()
 
-        guard outputSize.width != 0 && outputSize.height != 0 else {
+        guard outputSize.width > 0 && outputSize.height > 0 else {
+            camera.isActive = false
             return
         }
 
         let scale = camera.computedData.targetScaleFactor
-        ageRetiredFrameTextures(renderViewTarget)
 
         if case let .texture(asset) = camera.renderTarget {
             let outputTexture = asset.asset
@@ -125,6 +130,24 @@ func ConfigurateRenderViewTarget(
             renderViewTarget.shadowMaskTexture = nil
             cachedViewTargets.targets[source.entityId] = nil
             return
+        }
+
+        if case let .window(ref) = camera.renderTarget {
+            // Windows can disappear between extraction and preparation, and a
+            // live window can temporarily have no drawable. Skip this extracted
+            // camera for the frame; the source camera stays active for recovery.
+            guard
+                let surface = resolveWindowSurface(for: ref, in: surfaces.wrappedValue, primaryWindow: primaryWindow.wrappedValue),
+                let swapchain = surface.swapchain,
+                let drawable = surface.currentDrawable
+            else {
+                camera.isActive = false
+                return
+            }
+            renderViewTarget.outputTexture = RenderTexture(
+                gpuTexture: drawable.texture,
+                format: swapchain.drawablePixelFormat
+            )
         }
 
         let viewportSize = resolveRenderSize(
@@ -175,29 +198,6 @@ func ConfigurateRenderViewTarget(
             renderViewTarget.sceneColor3DTexture = nil
             renderViewTarget.normalRoughness3DTexture = nil
             renderViewTarget.viewPositionMetallic3DTexture = nil
-        }
-
-        switch camera.renderTarget {
-        case .texture:
-            break
-        case let .window(ref):
-            renderViewTarget.outputTexture = nil
-            guard let surface = resolveWindowSurface(for: ref, in: surfaces.wrappedValue, primaryWindow: primaryWindow.wrappedValue) else {
-                logger.error("Failed to configurate render view target for window \(ref). No surface.")
-                return
-            }
-            guard let swapchain = surface.swapchain else {
-                logger.error("Failed to configurate render view target for window \(ref). No swapchain.")
-                return
-            }
-            guard let drawable = surface.currentDrawable else {
-                logger.error("Failed to configurate render view target for window \(ref). Drawable not exists.")
-                return
-            }
-            renderViewTarget.outputTexture = RenderTexture(
-                gpuTexture: drawable.texture,
-                format: swapchain.drawablePixelFormat
-            )
         }
 
         cachedViewTargets.targets[source.entityId] = renderViewTarget.wrappedValue.cacheableCopy

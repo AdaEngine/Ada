@@ -9,19 +9,46 @@ import Testing
 @MainActor
 @Suite("Agent glow preference", .serialized)
 struct EditorAppearanceSettingsTests {
-    @Test("The preference is available in General even without an open project")
+    @Test("Display preferences are reachable in General even without an open project")
     func settingsWithoutProject() throws {
         if unsafe RenderEngine.shared == nil {
             unsafe RenderEngine.configurations.preferredBackend = .headless
             RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "AppearanceSettingsUI")))
         }
-        let model = EditorSettingsWindowViewModel(editorViewModel: nil, selectedSection: .general)
+        let model = EditorSettingsWindowViewModel(editorViewModel: nil, selectedSection: .general, selectedPage: "APPEARANCE")
         let container = UIContainerView(rootView: EditorSettingsWindowView(viewModel: model).theme(.adaEditor))
         container.frame = Rect(x: 0, y: 0, width: 1000, height: 760)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.AgentActivityGlow"))
-        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.IndentationMarkers"))
+        let displayModel = EditorSettingsWindowViewModel(editorViewModel: nil, selectedSection: .general, selectedPage: EditorSettingsPage.editorDisplay)
+        #expect(displayModel.pages(in: .general).contains(EditorSettingsPage.editorDisplay))
+        let display = UIContainerView(rootView: EditorSettingsWindowView(viewModel: displayModel).theme(.adaEditor))
+        display.frame = container.frame
+        display.bounds.size = display.frame.size
+        display.layoutIfNeeded()
+        _ = try display.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.SpaceMarkers"))
+    }
+
+    @Test("Space dots can be toggled independently and survive reloading")
+    func spaceMarkersPersistence() throws {
+        let suite = "AdaEditor.SpaceMarkersTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = EditorAppearanceSettings(defaults: defaults)
+        let container = UIContainerView(rootView: EditorCodeDisplaySettings(settings: settings).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 500, height: 220)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        #expect(settings.showsSpaceMarkers)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Settings.SpaceMarkers"))
+        #expect(!settings.showsSpaceMarkers)
+        #expect(settings.showsIndentationGuides)
+        #expect(settings.showsTabMarkers)
+        #expect(!EditorAppearanceSettings(defaults: defaults).showsSpaceMarkers)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Settings.SpaceMarkers"))
+        #expect(settings.showsSpaceMarkers)
+        #expect(EditorAppearanceSettings(defaults: defaults).showsSpaceMarkers)
     }
 
     @Test("Indentation marks can be turned off and the choice survives reloading")

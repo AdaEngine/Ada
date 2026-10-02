@@ -7,6 +7,31 @@ import Testing
 @Suite("Settings tree", .serialized)
 @MainActor
 struct EditorSettingsTreeTests {
+    @Test("Space-dot controls are reachable from the settings sidebar", arguments: [false, true])
+    func opensEditorDisplay(hasProjectContext: Bool) async throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "EditorDisplayNavigation")))
+        }
+        let model = EditorSettingsWindowViewModel(
+            editorViewModel: hasProjectContext ? EditorViewModel(project: nil) : nil,
+            selectedSection: .general
+        )
+        let container = UIContainerView(rootView: EditorSettingsWindowView(viewModel: model).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 1_000, height: 720)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Settings.Page.\(EditorSettingsPage.editorDisplay)"))
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1 / 60)
+            container.layoutIfNeeded()
+        }
+        #expect(model.selectedPage == EditorSettingsPage.editorDisplay)
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.SpaceMarkers"))
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.IndentationGuides"))
+    }
+
     @Test("Nested selection filters the settings page and sections can collapse")
     func selectsAndCollapses() async throws {
         if unsafe RenderEngine.shared == nil {

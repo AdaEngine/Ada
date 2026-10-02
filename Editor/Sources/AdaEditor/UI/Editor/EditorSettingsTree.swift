@@ -3,13 +3,15 @@ import Foundation
 
 enum EditorSettingsPage {
     static let runtimeEntry = "RUNTIME ENTRY"
+    static let editorDisplay = "EDITOR DISPLAY"
 }
 
 extension EditorSettingsWindowViewModel {
     func pages(in section: EditorSettingsSection) -> [String] {
         switch section {
         case .general:
-            return editorViewModel == nil ? ["ADA CLOUD", "APPEARANCE"] : ["ADA CLOUD", "APPEARANCE", "EDITOR FONT", "SYNTAX APPEARANCE"]
+            let globalPages = ["ADA CLOUD", "APPEARANCE", EditorSettingsPage.editorDisplay]
+            return editorViewModel == nil ? globalPages : globalPages + ["EDITOR FONT", "SYNTAX APPEARANCE"]
         case .project:
             guard editorViewModel != nil else {
                 return []

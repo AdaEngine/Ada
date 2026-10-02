@@ -546,7 +546,7 @@ struct EditorSettingsWindowView: View {
             VStack(alignment: .leading, spacing: 0) {
                 settingsGroup("ADA CLOUD") { EditorCloudSettingsView() }
                 settingsGroup("APPEARANCE") { EditorAgentGlowSettings() }
-                settingsGroup("EDITOR DISPLAY") { EditorCodeDisplaySettings() }
+                settingsGroup(EditorSettingsPage.editorDisplay) { EditorCodeDisplaySettings() }
             }
         } else if let editorViewModel = viewModel.editorViewModel {
             switch viewModel.selectedSection {
@@ -572,7 +572,7 @@ struct EditorSettingsWindowView: View {
             settingsGroup("APPEARANCE") {
                 EditorAgentGlowSettings()
             }
-            settingsGroup("EDITOR DISPLAY") {
+            settingsGroup(EditorSettingsPage.editorDisplay) {
                 EditorCodeDisplaySettings()
             }
             settingsGroup("EDITOR FONT") {
