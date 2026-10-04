@@ -23,13 +23,15 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         public let meshIndex: Int?
         public let children: [Int]
         public let skinIndex: Int?
+        public let restPose: GLTFImportResult.NodeTRS?
 
-        public init(name: String?, transform: Transform3D, meshIndex: Int?, children: [Int], skinIndex: Int? = nil) {
+        public init(name: String?, transform: Transform3D, meshIndex: Int?, children: [Int], skinIndex: Int? = nil, restPose: GLTFImportResult.NodeTRS? = nil) {
             self.name = name
             self.transform = transform
             self.meshIndex = meshIndex
             self.children = children
             self.skinIndex = skinIndex
+            self.restPose = restPose
         }
     }
 
@@ -94,14 +96,14 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
                     }
                 return Mesh(models: [Mesh.Model(name: mesh.name, parts: parts)])
             }
-            self.nodes = result.meshes.indices.map { index in
+            nodes = result.meshes.indices.map { index in
                 Node(name: result.meshes[index].name, transform: .identity, meshIndex: index, children: [])
             }
-            self.scenes = [Array(result.meshes.indices)]
-            self.defaultScene = 0
-            self.skins = []
-            self.animationRig = nil
-            self.animationClips = []
+            scenes = [Array(result.meshes.indices)]
+            defaultScene = 0
+            skins = []
+            animationRig = nil
+            animationClips = []
             return
         }
 
@@ -111,57 +113,12 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         guard result.skins.allSatisfy({ $0.joints.count <= Skinning3DUniforms.maximumJoints }) else {
             throw AssetError.message("A skinned mesh supports at most \(Skinning3DUniforms.maximumJoints) joints.")
         }
-        self.skins = result.skins
-        self.animationRig = result.skins.isEmpty && result.animations.isEmpty ? nil : try Self.makeRig(nodes: result.nodes)
-        self.animationClips = try Self.makeClips(result.animations)
+        skins = result.skins
+        animationRig = result.skins.isEmpty && result.animations.isEmpty ? nil : try Self.makeRig(nodes: result.nodes)
+        animationClips = try Self.makeClips(result.animations)
         let device = unsafe RenderEngine.shared.renderDevice
 
-        // 1. Convert Materials
-        var materials: [Material] = []
-        for gltfMaterial in result.materials {
-            let material = PBRMaterial()
-            material.baseColorFactor = gltfMaterial.baseColorFactor
-            material.metallicFactor = gltfMaterial.metallicFactor
-            material.roughnessFactor = gltfMaterial.roughnessFactor
-
-            if let textureIndex = gltfMaterial.baseColorTextureIndex {
-                let gltfTexture = result.textures[textureIndex]
-                let gltfImage = result.images[gltfTexture.source]
-
-                if let data = gltfImage.data {
-                    if let image = try? Image.decode(from: data) {
-                        material.baseColorTexture = Texture2D(image: image)
-                    }
-                }
-            }
-
-            if let textureIndex = gltfMaterial.metallicRoughnessTextureIndex {
-                let gltfTexture = result.textures[textureIndex]
-                let gltfImage = result.images[gltfTexture.source]
-
-                if let data = gltfImage.data {
-                    if let image = try? Image.decode(from: data) {
-                        material.metallicRoughnessTexture = Texture2D(image: image)
-                    }
-                }
-            }
-
-            if let textureIndex = gltfMaterial.normalTextureIndex {
-                let gltfTexture = result.textures[textureIndex]
-                let gltfImage = result.images[gltfTexture.source]
-
-                if let data = gltfImage.data {
-                    if let image = try? Image.decode(from: data) {
-                        material.normalTexture = Texture2D(image: image)
-                    }
-                }
-            }
-
-            materials.append(material)
-        }
-        if materials.isEmpty {
-            materials.append(PBRMaterial())
-        }
+        let materials = try Self.makeMaterials(result)
 
         // 2. Convert Meshes
         var meshes: [Mesh] = []
@@ -181,6 +138,10 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
 
                 if let textureCoordinates = primitive.attributes[.texCoord(0)] {
                     descriptor.textureCoordinates = MeshBuffer(textureCoordinates.vector2Values())
+                }
+
+                if let coordinates = primitive.attributes[.texCoord(1)] {
+                    descriptor[MeshDescriptor.textureCoordinates1] = MeshBuffer(coordinates.vector2Values())
                 }
 
                 if let tangents = primitive.attributes[.tangent] {
@@ -207,7 +168,7 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
                     descriptor[MeshDescriptor.jointWeights] = MeshBuffer(skinning.weights)
                 }
 
-                let sourceIndices = primitive.indices ?? Array(0..<UInt32(descriptor.positions.count))
+                let sourceIndices = primitive.indices ?? Array(0 ..< UInt32(descriptor.positions.count))
                 let converted = primitive.convertTopology(indices: sourceIndices)
                 descriptor.indicies = converted.indices
                 descriptor.primitiveTopology = converted.topology
@@ -229,16 +190,16 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
             meshes.append(Mesh(models: [Mesh.Model(name: gltfMesh.name ?? "", parts: parts)]))
         }
 
-        self.nodes = result.nodes.map { Node(name: $0.name, transform: $0.transform, meshIndex: $0.meshIndex, children: $0.children, skinIndex: $0.skinIndex) }
+        nodes = result.nodes.map { Node(name: $0.name, transform: $0.transform, meshIndex: $0.meshIndex, children: $0.children, skinIndex: $0.skinIndex, restPose: $0.restPose) }
         self.meshes = meshes
         self.materials = materials
-        self.scenes = result.scenes
-        self.defaultScene = result.defaultScene
+        scenes = result.scenes
+        defaultScene = result.defaultScene
     }
 
     @discardableResult
     public func instantiate(in world: World) -> Entity {
-        let rootEntity = world.spawn(self.assetName)
+        let rootEntity = world.spawn(assetName)
         rootEntity.components[Transform.self] = Transform()
         if let animationRig {
             do {
@@ -249,11 +210,11 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
             }
         }
 
-        let sceneIndex = self.defaultScene ?? 0
-        if self.scenes.indices.contains(sceneIndex) {
-            let nodeIndices = self.scenes[sceneIndex]
+        let sceneIndex = defaultScene ?? 0
+        if scenes.indices.contains(sceneIndex) {
+            let nodeIndices = scenes[sceneIndex]
             for nodeIndex in nodeIndices {
-                self.instantiateNode(nodeIndex, parent: rootEntity, modelRoot: rootEntity, in: world)
+                instantiateNode(nodeIndex, parent: rootEntity, modelRoot: rootEntity, in: world)
             }
         }
 
@@ -261,9 +222,11 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
     }
 
     private func instantiateNode(_ nodeIndex: Int, parent: Entity, modelRoot: Entity, in world: World) {
-        let node = self.nodes[nodeIndex]
+        let node = nodes[nodeIndex]
         let entity = world.spawn(node.name ?? "Node \(nodeIndex)")
         if let pose = animationRig?.nodes[nodeIndex].restPose {
+            entity.components[Transform.self] = Transform(rotation: pose.rotation, scale: pose.scale, position: pose.translation)
+        } else if let pose = node.restPose {
             entity.components[Transform.self] = Transform(rotation: pose.rotation, scale: pose.scale, position: pose.translation)
         } else {
             entity.components[Transform.self] = Transform(matrix: node.transform)
@@ -273,10 +236,10 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         }
 
         if let meshIndex = node.meshIndex {
-            let mesh = self.meshes[meshIndex]
-            entity.components[Mesh3DComponent.self] = Mesh3DComponent(mesh: mesh, materials: self.materials)
+            let mesh = meshes[meshIndex]
+            entity.components[Mesh3DComponent.self] = Mesh3DComponent(mesh: mesh, materials: materials)
             if let skinIndex = node.skinIndex, skins.indices.contains(skinIndex),
-                let animation = modelRoot.components[ModelAnimation3DComponent.self] {
+               let animation = modelRoot.components[ModelAnimation3DComponent.self] {
                 var binding = SkinnedMesh3DComponent(modelRoot: modelRoot.id, meshNodeIndex: nodeIndex, skin: skins[skinIndex])
                 binding.updateMatrices(using: animation.player)
                 entity.components[SkinnedMesh3DComponent.self] = binding
@@ -286,7 +249,7 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         parent.addChild(entity)
 
         for childIndex in node.children {
-            self.instantiateNode(childIndex, parent: entity, modelRoot: modelRoot, in: world)
+            instantiateNode(childIndex, parent: entity, modelRoot: modelRoot, in: world)
         }
     }
 
@@ -295,7 +258,7 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
     }
 
     public static func extensions() -> [String] {
-        return ["gltf", "glb", "obj"]
+        ["gltf", "glb", "obj"]
     }
 }
 
@@ -329,7 +292,7 @@ extension GLTFImportResult.Primitive {
             }
             var triangleIndices: [UInt32] = []
             triangleIndices.reserveCapacity((indices.count - 2) * 3)
-            for index in 1..<(indices.count - 1) {
+            for index in 1 ..< (indices.count - 1) {
                 triangleIndices.append(indices[0])
                 triangleIndices.append(indices[index])
                 triangleIndices.append(indices[index + 1])

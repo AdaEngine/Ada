@@ -110,8 +110,13 @@ public struct FixedTimeSchedulerSystem {
             let step = self.fixedTimestep.step
             let world = context.world
             world.insertResource(FixedTime(deltaTime: step))
-            for scheduler in order {
-                await world.runScheduler(scheduler)
+            // Preserve simulation speed below the render refresh rate. Bound catch-up work after
+            // a stall so one expensive frame cannot trigger an unbounded physics backlog.
+            let tickCount = min(8, max(1, Int((result.fixedTime / step).rounded())))
+            for _ in 0..<tickCount {
+                for scheduler in order {
+                    await world.runScheduler(scheduler, deltaTime: step)
+                }
             }
         }
     }

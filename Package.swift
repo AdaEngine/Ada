@@ -1311,10 +1311,12 @@ targets.append(.executableTarget(
     name: "SkeletalGarden",
     dependencies: ["AdaEngine"],
     path: "Demos/SkeletalGarden",
-    exclude: ["script", "README.md", "dist"],
+    exclude: ["script", "README.md", "dist", "SourceAssets", "Tests"],
     resources: [.copy("Assets")],
     swiftSettings: swiftSettings
 ))
+
+targets.append(.testTarget(name: "SkeletalGardenTests", dependencies: ["SkeletalGarden", "AdaEngine"], path: "Demos/SkeletalGarden/Tests"))
 
 // MARK: - Package -
 

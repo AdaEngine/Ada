@@ -29,8 +29,8 @@ public enum DirectionalShadow3DMath {
         let snappedUp = (centerUp / worldUnitsPerTexel).rounded() * worldUnitsPerTexel
         let stabilizedCenter =
             center
-            + right * (snappedRight - centerRight)
-            + viewUp * (snappedUp - centerUp)
+                + right * (snappedRight - centerRight)
+                + viewUp * (snappedUp - centerUp)
         let eye = stabilizedCenter - rayDirection * distance
         let view = Transform3D(
             [right.x, viewUp.x, rayDirection.x, 0],
@@ -64,6 +64,9 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
     @Res<Opaque3DInstanceBuffers>
     private var instanceBuffers
 
+    @Res<PBR3DUniforms>
+    private var materialUniforms
+
     @Res<Skinning3DUniforms>
     private var skinningUniforms
 
@@ -87,6 +90,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
         _lighting.update(from: world)
         _instanceBuffers.update(from: world)
         _skinningUniforms.update(from: world)
+        _materialUniforms.update(from: world)
         _shadow.update(from: world)
         _scratch.update(from: world)
         _pipelines.update(from: world)
@@ -139,7 +143,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                             texture: colorTexture,
                             operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
                             clearColor: .white
-                        )
+                        ),
                     ],
                     depthStencilAttachment: DepthStencilAttachmentDescriptor(
                         texture: depthTexture,
@@ -154,15 +158,23 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
 
             for item in renderItems.items {
                 let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
-                guard item.castShadows, let batchRange = item.batchRange else {
+                guard item.castShadows, (item.material as? PBRMaterial)?.alphaMode != .blend, let batchRange = item.batchRange else {
                     continue
                 }
                 let pipeline = pipelines.pipeline(for: part.vertexDescriptor, device: renderDevice.renderDevice)
                 pass.setRenderPipelineState(pipeline)
                 pass.setVertexBuffer(part.vertexBuffer, offset: 0, slot: 0)
+                if let material = materialUniforms.buffer(for: item.material) {
+                    let base = (item.material as? PBRMaterial)?.baseColorTexture ?? Texture2D.whiteTexture
+                    pass.setResourceSet(RenderResourceSet(bindings: [
+                        .init(binding: 15, shaderStages: .fragment, resource: .uniformBuffer(material, offset: 0)),
+                        .init(binding: 4, shaderStages: .fragment, resource: .texture(base)),
+                        .init(binding: 7, shaderStages: .fragment, resource: .sampler(base.sampler)),
+                    ]), index: 0)
+                }
                 if let palette = item.skinningBuffer ?? skinningUniforms.identityBuffer {
                     pass.setResourceSet(RenderResourceSet(bindings: [
-                        .init(binding: Skinning3DUniforms.binding, shaderStages: .vertex, resource: .uniformBuffer(palette, offset: 0))
+                        .init(binding: Skinning3DUniforms.binding, shaderStages: .vertex, resource: .uniformBuffer(palette, offset: 0)),
                     ]), index: 0)
                 }
                 if let defaults = instanceBuffers.defaultVertexBuffer {

@@ -16,6 +16,7 @@ public final class Body3D: @unchecked Sendable {
     weak var entity: Entity?
 
     let bodyId: b3BodyId
+    private var collisionMeshes: [NativeTriangleMesh3D] = []
 
     internal init(world: consuming PhysicsWorld3D, bodyId: consuming b3BodyId, entity: consuming Entity) {
         self.world = world
@@ -33,12 +34,13 @@ public final class Body3D: @unchecked Sendable {
     func appendShape(
         _ shapeResource: Shape3DResource,
         shapeDef: b3ShapeDef
-    ) -> BoxShape3D {
-        let shapeId = BoxShape3D.makeShape(
+    ) -> BoxShape3D? {
+        guard let shapeId = BoxShape3D.makeShape(
             for: shapeResource,
             shapeDef: shapeDef,
-            bodyId: bodyId
-        )
+            bodyId: bodyId,
+            retainedMeshes: &collisionMeshes
+        ) else { return nil }
         return BoxShape3D(shape: shapeId)
     }
 
@@ -155,8 +157,9 @@ final class BoxShape3D {
     static func makeShape(
         for shape: Shape3DResource,
         shapeDef: b3ShapeDef,
-        bodyId: b3BodyId
-    ) -> b3ShapeId {
+        bodyId: b3BodyId,
+        retainedMeshes: inout [NativeTriangleMesh3D]
+    ) -> b3ShapeId? {
         switch shape.fixture {
         case let .box(shape):
             var hull = b3MakeBoxHull(
@@ -176,6 +179,18 @@ final class BoxShape3D {
                     b3CreateSphereShape(bodyId, shapeDefPtr, spherePtr)
                 }
             }
+        case let .triangleMesh(mesh):
+            guard b3Body_GetType(bodyId) == b3_staticBody, let native = unsafe NativeTriangleMesh3D(mesh) else {
+                return nil
+            }
+            let shape = unsafe withUnsafePointer(to: shapeDef) {
+                unsafe b3CreateMeshShape(bodyId, $0, native.pointer, b3Vec3(x: 1, y: 1, z: 1))
+            }
+            guard b3Shape_IsValid(shape) else {
+                return nil
+            }
+            unsafe retainedMeshes.append(native)
+            return shape
         }
     }
 }

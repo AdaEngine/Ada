@@ -248,6 +248,7 @@ final class EditorViewModel {
         self.playModeState = playModeState
         self.inspectorSidebar.textureAssets = Self.textureAssets(from: self.projectSidebar.items)
         self.inspectorSidebar.tileMapAssets = Self.tileMapAssets(from: self.projectSidebar.items)
+        self.inspectorSidebar.modelAssets = Self.modelAssets(from: self.projectSidebar.items)
         self.inspectorSidebar.sceneAssets = Self.sceneAssets(from: self.projectSidebar.items)
         self.inspectorSidebar.uiSourcePaths = Self.uiSourcePaths(from: self.projectSidebar.items)
         self.inspectorSidebar.uiSceneFiles = Self.uiSceneFiles(from: self.projectSidebar.items)

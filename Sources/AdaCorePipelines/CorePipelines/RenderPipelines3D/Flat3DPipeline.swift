@@ -41,13 +41,19 @@ public struct Flat3DDefaultVertexData: Sendable {
     public let tangent: Vector4
     public let jointIndices: Vector4
     public let jointWeights: Vector4
+    public let textureCoordinate1: Vector2
+    public let padding1: Vector2
+    public let vertexColor: Vector4
 
     public init(textureCoordinate: Vector2 = .zero, tangent: Vector4 = [1, 0, 0, 1]) {
         self.textureCoordinate = textureCoordinate
-        self.padding = .zero
+        padding = .zero
         self.tangent = tangent
-        self.jointIndices = [-1, 0, 0, 0]
-        self.jointWeights = [1, 0, 0, 0]
+        jointIndices = [-1, 0, 0, 0]
+        jointWeights = [1, 0, 0, 0]
+        textureCoordinate1 = .zero
+        padding1 = .zero
+        vertexColor = .one
     }
 }
 
@@ -60,13 +66,13 @@ public struct Opaque3DInstanceBuffers: Resource {
 
     public init() {
         let bufferCount = max(1, unsafe RenderEngine.configurations.maxFramesInFlight)
-        self.buffers = Array(repeating: nil, count: bufferCount)
-        self.instances = []
-        self.defaultVertexData = BufferData(
+        buffers = Array(repeating: nil, count: bufferCount)
+        instances = []
+        defaultVertexData = BufferData(
             label: "Opaque 3D Default Vertex Data",
             elements: [Flat3DDefaultVertexData()]
         )
-        self.currentIndex = bufferCount - 1
+        currentIndex = bufferCount - 1
     }
 
     public var currentBuffer: BufferData<Flat3DInstanceData>? {
@@ -102,7 +108,13 @@ public struct Opaque3DInstanceBuffers: Resource {
             return
         }
 
-        if defaultVertexData.buffer == nil {
+        // Fallback attributes advance per instance too, including multi-instance static batches.
+        if defaultVertexData.count < instances.count {
+            for _ in defaultVertexData.count ..< instances.count {
+                defaultVertexData.append(Flat3DDefaultVertexData())
+            }
+            defaultVertexData.write(to: renderDevice)
+        } else if defaultVertexData.buffer == nil {
             defaultVertexData.write(to: renderDevice)
         }
 
@@ -123,7 +135,7 @@ public struct Flat3DPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/flat3d.glsl", from: .module)
+        shader = ShaderModule.loadRequiredBundled(at: "Shaders/flat3d.glsl", from: .module)
     }
 
     public func configurate(with configuration: VertexDescriptor) -> RenderPipelineDescriptor {
@@ -147,7 +159,7 @@ public struct Flat3DPipeline: RenderPipelineConfigurator {
             stride: MemoryLayout<Flat3DInstanceData>.stride,
             stepFunction: .perInstance
         )
-        let defaults = ["defaultTextureCoordinate", "defaultTangent", "defaultJointIndices", "defaultJointWeights"]
+        let defaults = ["defaultTextureCoordinate", "defaultTangent", "defaultJointIndices", "defaultJointWeights", "defaultTextureCoordinate1", "defaultVertexColor"]
         if defaults.contains(where: { configuration.attributes.containsAttribute(by: $0) }) {
             configuration.layouts[4] = VertexDescriptor.Layout(
                 stride: MemoryLayout<Flat3DDefaultVertexData>.stride,

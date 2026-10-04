@@ -32,7 +32,7 @@ public struct NativeGLTFLoader: GLTFLoader {
             binaryBuffer = nil
         }
 
-        let supportedExtensions: Set<String> = ["KHR_mesh_quantization"]
+        let supportedExtensions: Set<String> = ["KHR_mesh_quantization", "KHR_materials_emissive_strength"]
         if let unsupportedExtension = gltf.extensionsRequired?.first(where: { !supportedExtensions.contains($0) }) {
             throw GLTFError.unsupportedRequiredExtension(unsupportedExtension)
         }
@@ -46,7 +46,7 @@ public struct NativeGLTFLoader: GLTFLoader {
         guard data.count >= 12 else {
             throw GLTFError.invalidGLB
         }
-        let magic = data.subdata(in: 0..<4)
+        let magic = data.subdata(in: 0 ..< 4)
         let version = readUInt32(data, at: 4)
         let declaredLength = Int(readUInt32(data, at: 8))
 
@@ -67,11 +67,11 @@ public struct NativeGLTFLoader: GLTFLoader {
             guard offset + 8 + chunkLength <= data.count else {
                 throw GLTFError.invalidGLB
             }
-            let chunkData = data.subdata(in: offset + 8..<offset + 8 + chunkLength)
+            let chunkData = data.subdata(in: offset + 8 ..< offset + 8 + chunkLength)
 
-            if chunkType == 0x4E4F_534A {  // JSON
+            if chunkType == 0x4E4F_534A { // JSON
                 gltf = try JSONDecoder().decode(GLTF.self, from: chunkData)
-            } else if chunkType == 0x004E_4942 {  // BIN
+            } else if chunkType == 0x004E_4942 { // BIN
                 binaryBuffer = chunkData
             }
 
@@ -102,7 +102,7 @@ public struct NativeGLTFLoader: GLTFLoader {
             }
 
             if uri.starts(with: "data:") {
-                buffers.append(try decodeDataURI(uri))
+                try buffers.append(decodeDataURI(uri))
             } else {
                 let bufferURL = baseURL.appendingPathComponent(uri.removingPercentEncoding ?? uri)
                 let data = try Data(contentsOf: bufferURL)
@@ -122,10 +122,10 @@ public struct NativeGLTFLoader: GLTFLoader {
             .map { image -> GLTFImportResult.Image in
                 if let uri = image.uri {
                     if uri.starts(with: "data:") {
-                        return GLTFImportResult.Image(uri: nil, data: try decodeDataURI(uri), mimeType: image.mimeType)
+                        return try GLTFImportResult.Image(uri: nil, data: decodeDataURI(uri), mimeType: image.mimeType)
                     }
                     let imageURL = baseURL.appendingPathComponent(uri.removingPercentEncoding ?? uri)
-                    return GLTFImportResult.Image(uri: imageURL, data: try Data(contentsOf: imageURL), mimeType: image.mimeType)
+                    return try GLTFImportResult.Image(uri: imageURL, data: Data(contentsOf: imageURL), mimeType: image.mimeType)
                 } else if let bufferViewIndex = image.bufferView {
                     let data = try getBufferViewData(bufferViewIndex, gltf: gltf, buffers: buffers)
                     return GLTFImportResult.Image(uri: nil, data: data, mimeType: image.mimeType)
@@ -133,27 +133,14 @@ public struct NativeGLTFLoader: GLTFLoader {
                 return GLTFImportResult.Image(uri: nil, data: nil, mimeType: image.mimeType)
             }
 
-        let textures = (gltf.textures ?? [])
-            .map { texture in
-                GLTFImportResult.Texture(source: texture.source ?? 0, sampler: texture.sampler)
-            }
-
-        let materials = (gltf.materials ?? [])
-            .map { material -> GLTFImportResult.Material in
-                let pbr = material.pbrMetallicRoughness
-                let baseColorFactor = pbr?.baseColorFactor ?? [1, 1, 1, 1]
-                let baseColor = Vector4(x: baseColorFactor[0], y: baseColorFactor[1], z: baseColorFactor[2], w: baseColorFactor[3])
-
-                return GLTFImportResult.Material(
-                    name: material.name,
-                    baseColorFactor: baseColor,
-                    baseColorTextureIndex: pbr?.baseColorTexture?.index,
-                    metallicFactor: pbr?.metallicFactor ?? 1.0,
-                    roughnessFactor: pbr?.roughnessFactor ?? 1.0,
-                    metallicRoughnessTextureIndex: pbr?.metallicRoughnessTexture?.index,
-                    normalTextureIndex: material.normalTexture?.index
-                )
-            }
+        let samplers = try importSamplers(gltf)
+        let textures = try (gltf.textures ?? []).enumerated().map { index, texture in
+            guard let source = texture.source, images.indices.contains(source),
+                  texture.sampler.map({ samplers.indices.contains($0) }) ?? true
+            else { throw GLTFError.invalidTexture(index) }
+            return GLTFImportResult.Texture(source: source, sampler: texture.sampler)
+        }
+        let materials = try importMaterials(gltf)
 
         let meshes = try (gltf.meshes ?? [])
             .map { mesh -> GLTFImportResult.Mesh in
@@ -185,12 +172,12 @@ public struct NativeGLTFLoader: GLTFLoader {
                         indices = nil
                     }
 
-                    return GLTFImportResult.Primitive(
+                    return try GLTFImportResult.Primitive(
                         attributes: attributes,
                         indices: indices,
                         materialIndex: primitive.material,
                         mode: GLTFImportResult.PrimitiveMode(rawValue: primitive.mode ?? 4) ?? .triangles,
-                        skinning: try importSkinning(primitive, attributes: attributes, gltf: gltf)
+                        skinning: importSkinning(primitive, attributes: attributes, gltf: gltf)
                     )
                 }
 
@@ -213,7 +200,8 @@ public struct NativeGLTFLoader: GLTFLoader {
             scenes: scenes,
             defaultScene: gltf.scene,
             skins: skins,
-            animations: animations
+            animations: animations,
+            samplers: samplers
         )
     }
 
@@ -258,7 +246,7 @@ public struct NativeGLTFLoader: GLTFLoader {
         guard offset >= 0, bufferView.byteLength >= 0, offset + bufferView.byteLength <= buffer.count else {
             throw GLTFError.bufferOutOfBounds
         }
-        return buffer.subdata(in: offset..<offset + bufferView.byteLength)
+        return buffer.subdata(in: offset ..< offset + bufferView.byteLength)
     }
 
     private func decodeDataURI(_ uri: String) throws -> Data {

@@ -75,7 +75,8 @@ public struct SkeletalAnimation3DSystem {
                     return
                 }
                 let pose = animation.player.poses[binding.nodeIndex]
-                transform.wrappedValue = Transform(rotation: pose.rotation, scale: pose.scale, position: pose.translation)
+                let value = Transform(rotation: pose.rotation, scale: pose.scale, position: pose.translation)
+                if transform.wrappedValue != value { transform.wrappedValue = value }
             }
             skins.forEach { binding in
                 guard binding.wrappedValue.modelRoot == root.id else {

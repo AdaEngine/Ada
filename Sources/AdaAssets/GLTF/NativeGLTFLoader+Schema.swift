@@ -1,6 +1,9 @@
 extension NativeGLTFLoader {
     /// Errors raised when a glTF document cannot be imported safely.
     public enum GLTFError: Error, Equatable, Sendable {
+        case invalidMaterial(Int)
+        case invalidSampler(Int)
+        case invalidTexture(Int)
         case invalidNode(Int)
         case invalidSkin(Int)
         case invalidSkinningAttributes
@@ -81,12 +84,12 @@ extension NativeGLTFLoader {
         }
 
         struct Material: Codable {
-            struct PBR: Codable {
-                struct TextureInfo: Codable {
-                    let index: Int
-                    let texCoord: Int?
-                }
+            struct TextureInfo: Codable {
+                let index: Int
+                let texCoord: Int?
+            }
 
+            struct PBR: Codable {
                 let baseColorFactor: [Float]?
                 let baseColorTexture: TextureInfo?
                 let metallicFactor: Float?
@@ -100,9 +103,34 @@ extension NativeGLTFLoader {
                 let scale: Float?
             }
 
+            struct OcclusionTextureInfo: Codable {
+                let index: Int
+                let texCoord: Int?
+                let strength: Float?
+            }
+
+            struct Extensions: Codable {
+                struct EmissiveStrength: Codable { let emissiveStrength: Float }
+                let KHR_materials_emissive_strength: EmissiveStrength?
+            }
+
             let name: String?
             let pbrMetallicRoughness: PBR?
             let normalTexture: NormalTextureInfo?
+            let occlusionTexture: OcclusionTextureInfo?
+            let emissiveTexture: TextureInfo?
+            let emissiveFactor: [Float]?
+            let alphaMode: String?
+            let alphaCutoff: Float?
+            let doubleSided: Bool?
+            let extensions: Extensions?
+        }
+
+        struct Sampler: Codable {
+            let minFilter: Int?
+            let magFilter: Int?
+            let wrapS: Int?
+            let wrapT: Int?
         }
 
         struct Texture: Codable {
@@ -147,6 +175,7 @@ extension NativeGLTFLoader {
                     let node: Int?
                     let path: String
                 }
+
                 let sampler: Int
                 let target: Target
             }
@@ -173,6 +202,7 @@ extension NativeGLTFLoader {
         let buffers: [Buffer]?
         let materials: [Material]?
         let textures: [Texture]?
+        let samplers: [Sampler]?
         let images: [Image]?
         let extensionsUsed: [String]?
         let extensionsRequired: [String]?

@@ -27,6 +27,8 @@ mat4 skinTransform() {
 layout (location = 0) in vec3 a_Position;
 layout (location = 1) in vec3 a_Normal;
 layout (location = 2) in vec2 a_TextureCoordinate;
+layout (location = 15) in vec2 a_TextureCoordinate1;
+layout (location = 3) in vec4 a_VertexColor;
 layout (location = 4) in vec4 a_Tangent;
 layout (location = 5) in vec4 a_Model0;
 layout (location = 6) in vec4 a_Model1;
@@ -44,6 +46,7 @@ struct VertexOut
     vec3 ViewNormal;
     vec4 ViewTangent;
     vec2 TextureCoordinate;
+    vec2 TextureCoordinate1;
     vec4 TextureFlags;
     vec4 ShadowFlags;
     vec4 ShadowPosition;
@@ -64,11 +67,12 @@ void flat3d_vertex()
     vec3 normal = normalize(normalMatrix * a_Normal);
     vec4 worldPosition = model * vec4(a_Position, 1.0);
     vec3 worldTangent = normalize(mat3(model) * a_Tangent.xyz);
-    Output.Color = a_Color;
+    Output.Color = a_Color * a_VertexColor;
     Output.ViewPosition = (u_ViewMatrix * worldPosition).xyz;
     Output.ViewNormal = normalize(mat3(u_ViewMatrix) * normal);
     Output.ViewTangent = vec4(normalize(mat3(u_ViewMatrix) * worldTangent), a_Tangent.w);
     Output.TextureCoordinate = a_TextureCoordinate;
+    Output.TextureCoordinate1 = a_TextureCoordinate1;
     Output.TextureFlags = a_TextureFlags;
     Output.ShadowFlags = a_ShadowFlags;
     Output.ShadowPosition = a_ShadowFlags.x > 0.5
@@ -106,6 +110,24 @@ layout (binding = 11) uniform sampler u_DirectionalShadowSampler;
 layout (binding = 12) uniform texture2D u_EmissiveTexture;
 layout (binding = 13) uniform sampler u_EmissiveSampler;
 
+layout (binding = 15) uniform PBR3DUniform {
+    vec4 u_EmissiveFactor;
+    vec4 u_SurfaceProperties;
+    vec4 u_SurfaceFlags;
+    vec4 u_UVSets;
+    vec4 u_Emission;
+};
+layout (binding = 16) uniform texture2D u_OcclusionTexture;
+layout (binding = 0) uniform sampler u_OcclusionSampler;
+layout (binding = 18) uniform texture2D u_Irradiance;
+layout (binding = 19) uniform texture2D u_PrefilteredEnvironment;
+layout (binding = 20) uniform texture2D u_BRDF;
+layout (binding = 3) uniform sampler u_IBLSampler;
+layout (binding = 22) uniform IBL3DUniform {
+    mat4 u_EnvironmentInverseView;
+    vec4 u_IBLParameters;
+};
+
 struct VertexOut
 {
     vec4 Color;
@@ -113,6 +135,7 @@ struct VertexOut
     vec3 ViewNormal;
     vec4 ViewTangent;
     vec2 TextureCoordinate;
+    vec2 TextureCoordinate1;
     vec4 TextureFlags;
     vec4 ShadowFlags;
     vec4 ShadowPosition;
@@ -153,6 +176,44 @@ vec3 fresnelSchlick(float cosine, vec3 reflectanceAtNormal) {
     return reflectanceAtNormal + (vec3(1.0) - reflectanceAtNormal) * pow(clamp(1.0 - cosine, 0.0, 1.0), 5.0);
 }
 
+vec2 materialUV(float setIndex) {
+    return setIndex > 0.5 ? Input.TextureCoordinate1 : Input.TextureCoordinate;
+}
+
+vec2 environmentUV(vec3 direction) {
+    float angle = u_IBLParameters.w;
+    direction.xz = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * direction.xz;
+    return vec2(atan(direction.z, direction.x) / (2.0 * PI) + 0.5, asin(clamp(direction.y, -1.0, 1.0)) / PI + 0.5);
+}
+
+vec3 samplePrefiltered(vec3 direction, float roughness) {
+    vec2 uv = environmentUV(direction);
+    float levels = max(u_IBLParameters.z, 2.0);
+    float layer = roughness * (levels - 1.0);
+    float lower = floor(layer);
+    float upper = min(lower + 1.0, levels - 1.0);
+    float texels = float(textureSize(sampler2D(u_PrefilteredEnvironment, u_IBLSampler), 0).y) / levels;
+    uv.y = clamp(uv.y, 0.5 / texels, 1.0 - 0.5 / texels);
+    vec3 left = texture(sampler2D(u_PrefilteredEnvironment, u_IBLSampler), vec2(uv.x, (lower + uv.y) / levels)).rgb;
+    vec3 right = texture(sampler2D(u_PrefilteredEnvironment, u_IBLSampler), vec2(uv.x, (upper + uv.y) / levels)).rgb;
+    return mix(left, right, layer - lower);
+}
+
+vec3 environmentLighting(vec3 normal, vec3 viewDirection, vec3 baseColor, float metallic, float roughness) {
+    vec3 worldNormal = normalize(mat3(u_EnvironmentInverseView) * normal);
+    vec3 worldView = normalize(mat3(u_EnvironmentInverseView) * viewDirection);
+    float ndotv = max(dot(normal, viewDirection), 0.0);
+    vec3 f0 = mix(vec3(0.04), baseColor, metallic);
+    vec3 fresnel = f0 + (max(vec3(1.0 - roughness), f0) - f0) * pow(1.0 - ndotv, 5.0);
+    vec3 diffuseWeight = (vec3(1.0) - fresnel) * (1.0 - metallic);
+    vec3 irradiance = texture(sampler2D(u_Irradiance, u_IBLSampler), environmentUV(worldNormal)).rgb;
+    vec3 reflected = samplePrefiltered(reflect(-worldView, worldNormal), roughness);
+    vec2 lutSize = vec2(textureSize(sampler2D(u_BRDF, u_IBLSampler), 0));
+    vec2 lutUV = clamp(vec2(ndotv, roughness), 0.5 / lutSize, vec2(1.0) - 0.5 / lutSize);
+    vec2 lut = texture(sampler2D(u_BRDF, u_IBLSampler), lutUV).rg;
+    return (diffuseWeight * irradiance * baseColor / PI + reflected * (f0 * lut.x + lut.y)) * u_IBLParameters.y;
+}
+
 mat3 cotangentFrame(vec3 normal, vec3 position, vec2 uv) {
     vec3 positionX = dFdx(position);
     vec3 positionY = dFdy(position);
@@ -172,14 +233,15 @@ vec3 materialNormal() {
         return normal;
     }
 
-    vec3 tangentNormal = texture(sampler2D(u_NormalTexture, u_NormalSampler), Input.TextureCoordinate).xyz * 2.0 - 1.0;
-    if (Input.TextureFlags.w > 0.5) {
+    vec3 tangentNormal = texture(sampler2D(u_NormalTexture, u_NormalSampler), materialUV(u_UVSets.z)).xyz * 2.0 - 1.0;
+    tangentNormal.xy *= u_SurfaceProperties.x;
+    if (Input.TextureFlags.w > 0.5 && u_UVSets.z < 0.5) {
         vec3 tangent = normalize(Input.ViewTangent.xyz - normal * dot(normal, Input.ViewTangent.xyz));
         vec3 bitangent = normalize(cross(normal, tangent)) * Input.ViewTangent.w;
         return normalize(mat3(tangent, bitangent, normal) * tangentNormal);
     }
 
-    return normalize(cotangentFrame(normal, Input.ViewPosition, Input.TextureCoordinate) * tangentNormal);
+    return normalize(cotangentFrame(normal, Input.ViewPosition, materialUV(u_UVSets.z)) * tangentNormal);
 }
 
 float directionalShadow(vec3 normal, vec3 lightDirection) {
@@ -212,24 +274,28 @@ float directionalShadow(vec3 normal, vec3 lightDirection) {
 [[main]]
 void flat3d_fragment()
 {
+    if (u_SurfaceFlags.x < 0.5 && !gl_FrontFacing) { discard; }
     vec4 baseColor = Input.Color;
     if (Input.TextureFlags.x > 0.5) {
-        vec4 sampledBaseColor = texture(sampler2D(u_BaseColorTexture, u_BaseColorSampler), Input.TextureCoordinate);
+        vec4 sampledBaseColor = texture(sampler2D(u_BaseColorTexture, u_BaseColorSampler), materialUV(u_UVSets.x));
         baseColor *= vec4(srgbToLinear(sampledBaseColor.rgb), sampledBaseColor.a);
     }
 
+    if (u_SurfaceProperties.w > 0.5 && u_SurfaceProperties.w < 1.5 && baseColor.a < u_SurfaceProperties.z) { discard; }
+    float opacity = u_SurfaceProperties.w > 1.5 ? baseColor.a : 1.0;
     float roughness = Input.Roughness;
     float metallic = Input.Metallic;
     if (Input.TextureFlags.y > 0.5) {
         vec4 metallicRoughness = texture(
             sampler2D(u_MetallicRoughnessTexture, u_MetallicRoughnessSampler),
-            Input.TextureCoordinate
+            materialUV(u_UVSets.y)
         );
         roughness = clamp(roughness * metallicRoughness.g, 0.04, 1.0);
         metallic = clamp(metallic * metallicRoughness.b, 0.0, 1.0);
     }
 
     vec3 normal = materialNormal();
+    if (!gl_FrontFacing && u_SurfaceFlags.x > 0.5) { normal = -normal; }
     vec3 viewDirection = normalize(-Input.ViewPosition);
     vec3 lightDirection = normalize(u_LightDirectionIntensity.xyz);
     gl_FragDepth = gl_FragCoord.z;
@@ -276,6 +342,9 @@ void flat3d_fragment()
     float shadowVisibility = directionalShadow(normal, lightDirection);
     vec3 directLighting = (diffuseWeight * baseColor.rgb / PI + specular) * radiance * normalLight * shadowVisibility;
     vec3 ambient = baseColor.rgb * (1.0 - metallic) * max(u_LightRadianceAmbient.w, 0.0);
+    if (u_IBLParameters.x > 0.5) { ambient = environmentLighting(normal, viewDirection, baseColor.rgb, metallic, roughness); }
+    float occlusion = u_SurfaceFlags.y > 0.5 ? texture(sampler2D(u_OcclusionTexture, u_OcclusionSampler), materialUV(u_UVSets.w)).r : 1.0;
+    ambient *= mix(1.0, occlusion, u_SurfaceProperties.y);
     float emissiveVisibility = 1.0;
     if (Input.EmissiveLightThreshold >= 0.0) {
         emissiveVisibility = 1.0 - smoothstep(
@@ -286,10 +355,10 @@ void flat3d_fragment()
     }
     vec3 emissive = srgbToLinear(texture(
         sampler2D(u_EmissiveTexture, u_EmissiveSampler),
-        Input.TextureCoordinate
-    ).rgb) * Input.EmissiveStrength * emissiveVisibility;
+        materialUV(u_Emission.x)
+    ).rgb) * u_EmissiveFactor.rgb * Input.EmissiveStrength * emissiveVisibility;
 
-    color = vec4(directLighting + ambient + emissive, 1.0);
+    color = vec4(directLighting + ambient + emissive, opacity);
     normalRoughness = vec4(normal, roughness);
     viewPositionMetallic = vec4(Input.ViewPosition, metallic);
 }
