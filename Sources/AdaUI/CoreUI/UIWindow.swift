@@ -31,11 +31,15 @@ open class UIWindow: UIView {
         set { self.systemWindow?.title = newValue }
     }
 
+    private weak var owningWindowManager: UIWindowManager?
+
     public var windowManager: UIWindowManager {
-        UIWindowManager.shared
+        owningWindowManager ?? UIWindowManager.shared
     }
 
     @_spi(Internal) public var systemWindow: SystemWindow?
+    /// Native view containing an embedded panel's overlays, in panel-local coordinates.
+    @_spi(Internal) public weak var nativeHostingView: AnyObject?
     @_spi(Internal) public var runtimeCameraEntity: Entity?
     internal let eventManager = EventManager()
     private var capturedMouseResponders: [MouseButton: WeakBox<UIView>] = [:]
@@ -89,6 +93,16 @@ open class UIWindow: UIView {
         super.init(frame: frame)
         self.backgroundColor = .clear
         self.windowManager.createWindow(for: self)
+    }
+
+    /// Creates a window owned by an embedded runtime, without changing the process-wide manager.
+    /// The runtime must retain `windowManager` for the window's lifetime.
+    public init(frame: Rect, configuration: Configuration, windowManager: UIWindowManager) {
+        self.configuration = configuration
+        self.owningWindowManager = windowManager
+        super.init(frame: frame)
+        self.backgroundColor = .clear
+        windowManager.createWindow(for: self)
     }
 
     open func showWindow(makeFocused flag: Bool) {

@@ -211,6 +211,20 @@ extension AppWorlds {
         main.clearTrackers()
     }
 
+    /// Re-extracts and updates one subworld without advancing the main simulation.
+    /// Used by embedded stereo hosts that render a second view of the same game tick.
+    package func updateSubworld(by name: AppWorldName) async throws {
+        try await withExclusiveWorldAccess {
+            guard let world = subWorlds[name.rawValue] else {
+                return
+            }
+            try await withExecutionContext {
+                unsafe await world.worldExctractor?.exctract(from: main, to: world.main)
+                try await world.update()
+            }
+        }
+    }
+
     /// Get the subworld builder by name.
     /// - Parameter name: The name of the subworld.
     /// - Returns: The subworld builder.

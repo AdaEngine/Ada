@@ -227,7 +227,8 @@ var adaEngineDependencies: [Target.Dependency] = [
     "AdaScripting",
     "AdaSprite",
     "AdaTilemap",
-    "AdaPhysics"
+    "AdaPhysics",
+    "AdaSpatial"
 ]
 
 #if os(Linux)
@@ -315,6 +316,8 @@ var targets: [Target] = [
     adaEngineEmbeddable,
     adaEngineMacros,
     .adaTarget(name: "Math"),
+    .adaTarget(name: "AdaSpatial", dependencies: ["AdaECS", "AdaTransform", "Math"]),
+    .testTarget(name: "AdaSpatialTests", dependencies: ["AdaSpatial", "AdaECS", "AdaTransform", "Math"], swiftSettings: swiftSettings),
     .adaTarget(
         name: "AdaApp",
         dependencies: [

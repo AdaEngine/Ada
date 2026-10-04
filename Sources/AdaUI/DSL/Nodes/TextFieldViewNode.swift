@@ -1204,7 +1204,9 @@ extension TextFieldViewNode {
 
         func hideEditMenu() {
             UIMenuController.shared.hideMenu()
+            #if !os(visionOS)
             UIMenuController.shared.setMenuVisible(false, animated: true)
+            #endif
         }
     }
 #endif

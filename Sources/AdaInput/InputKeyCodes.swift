@@ -197,7 +197,7 @@ public struct KeyModifier: OptionSet, Hashable, Sendable {
         }
     }
 
-#elseif os(iOS) || os(tvOS)
+#elseif os(iOS) || os(tvOS) || os(visionOS)
 
     import UIKit
 

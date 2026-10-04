@@ -6,7 +6,7 @@
 //
 
 /// Is an inifite line starting at `origin` point going in `direction`.
-@frozen public struct Ray: Hashable, Equatable, Codable {
+@frozen public struct Ray: Hashable, Equatable, Codable, Sendable {
     /// The origin point of the ray.
     public let origin: Vector3
 

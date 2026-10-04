@@ -43,17 +43,23 @@
         }
 
         override func getScreen(for _: AdaEngine.UIWindow) -> Screen? {
+            #if os(visionOS)
+            return nil
+            #else
             guard let nativeScreen = nativeView?.window?.screen else {
                 return nil
             }
 
             return Screen(systemScreen: nativeScreen, screenManager: screenManager)
+            #endif
         }
     }
 
     final class AppleEmbeddableScreenManager: ScreenManager {
         func getMainScreen() -> Screen? {
-            #if canImport(UIKit)
+            #if os(visionOS)
+                return nil
+            #elseif canImport(UIKit)
                 return makeScreen(from: UIScreen.main)
             #elseif canImport(AppKit)
                 guard let screen = NSScreen.main else {
@@ -64,7 +70,9 @@
         }
 
         func getScreens() -> [Screen] {
-            #if canImport(UIKit)
+            #if os(visionOS)
+                return []
+            #elseif canImport(UIKit)
                 return UIScreen.screens.map(makeScreen(from:))
             #elseif canImport(AppKit)
                 return NSScreen.screens.map(makeScreen(from:))
@@ -72,7 +80,9 @@
         }
 
         func getScreenScale(for screen: Screen) -> Float {
-            #if canImport(UIKit)
+            #if os(visionOS)
+                return 1
+            #elseif canImport(UIKit)
                 return Float((screen.systemScreen as? UIScreen)?.scale ?? 1)
             #elseif canImport(AppKit)
                 return Float((screen.systemScreen as? NSScreen)?.backingScaleFactor ?? 1)
@@ -80,7 +90,9 @@
         }
 
         func getSize(for screen: Screen) -> Size {
-            #if canImport(UIKit)
+            #if os(visionOS)
+                return .zero
+            #elseif canImport(UIKit)
                 return (screen.systemScreen as? UIScreen)?.bounds.size.toEngineSize ?? .zero
             #elseif canImport(AppKit)
                 return (screen.systemScreen as? NSScreen)?.frame.size.toEngineSize ?? .zero
@@ -88,7 +100,9 @@
         }
 
         func getBrightness(for screen: Screen) -> Float {
-            #if canImport(UIKit)
+            #if os(visionOS)
+                return 1
+            #elseif canImport(UIKit)
                 return Float((screen.systemScreen as? UIScreen)?.brightness ?? 1)
             #elseif canImport(AppKit)
                 return 1
