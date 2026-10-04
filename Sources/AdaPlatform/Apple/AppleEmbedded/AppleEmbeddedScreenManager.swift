@@ -10,6 +10,19 @@
     import Math
     import UIKit
 
+    #if os(visionOS)
+    // visionOS has spatial windows, not a publicly accessible physical UIScreen.
+    final class AppleEmbeddedScreenManager: ScreenManager {
+        func getMainScreen() -> Screen? { nil }
+        func getScreens() -> [Screen] { [] }
+        func getSize(for screen: Screen) -> Size { .zero }
+        func getScreenScale(for screen: Screen) -> Float { 1 }
+        func getBrightness(for screen: Screen) -> Float { 1 }
+        func makeScreen(from systemScreen: SystemScreen) -> Screen {
+            Screen(systemScreen: systemScreen, screenManager: self)
+        }
+    }
+    #else
     final class AppleEmbeddedScreenManager: ScreenManager, @unchecked Sendable {
         func getMainScreen() -> Screen? {
             MainActor.assumeIsolated {
@@ -48,4 +61,5 @@
     }
 
     extension UIKit.UIScreen: SystemScreen {}
+    #endif
 #endif

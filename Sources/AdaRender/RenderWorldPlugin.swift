@@ -67,7 +67,8 @@ public struct RenderWorldPlugin: Plugin {
             .insertResource(
                 WindowSurfaces(
                     windows: [:],
-                    allowsWindowRendering: app.main.getResource(OffscreenRenderWorld.self) == nil
+                    allowsWindowRendering: app.main.getResource(OffscreenRenderWorld.self) == nil,
+                    allowedWindowIDs: app.main.getResource(RenderWindowScope.self)?.windowIDs
                 )
             )
             .addSystem(CreateWindowSurfacesSystem.self, on: .prepare)
@@ -173,14 +174,16 @@ public struct WindowSurface: Sendable {
 public final class WindowSurfaces: Resource, @unchecked Sendable {
     public var windows: SparseSet<WindowRef, WindowSurface>
     let allowsWindowRendering: Bool
+    let allowedWindowIDs: Set<WindowID>?
 
     public convenience init(windows: SparseSet<WindowRef, WindowSurface>) {
         self.init(windows: windows, allowsWindowRendering: true)
     }
 
-    init(windows: SparseSet<WindowRef, WindowSurface>, allowsWindowRendering: Bool) {
+    init(windows: SparseSet<WindowRef, WindowSurface>, allowsWindowRendering: Bool, allowedWindowIDs: Set<WindowID>? = nil) {
         self.windows = windows
         self.allowsWindowRendering = allowsWindowRendering
+        self.allowedWindowIDs = allowedWindowIDs
     }
 }
 
@@ -202,6 +205,9 @@ public func CreateWindowSurfaces(
     do {
         let renderWindows = try await renderInstance.renderEngine.getRenderWindows()
         for (windowId, _) in renderWindows.windows.values {
+            if let allowed = surfaces.wrappedValue.allowedWindowIDs, !allowed.contains(windowId) {
+                continue
+            }
             guard let swapchain = await device.createSwapchain(from: windowId) else {
                 Logger(label: "org.adaengine.render")
                     .debug("Swapchain not enable for \(windowId)")
@@ -223,6 +229,13 @@ public func CreateWindowSurfaces(
     } catch {
         Logger(label: "org.adaengine.AdaRender").error("\(error)")
     }
+}
+
+/// Limits a runtime's drawable acquisition to its own native windows.
+/// Insert before building render plugins; other embedded panels keep their own frame loop.
+public struct RenderWindowScope: Resource {
+    public let windowIDs: Set<WindowID>
+    public init(windowIDs: Set<WindowID>) { self.windowIDs = windowIDs }
 }
 
 /// Insert before building plugins to render only into textures, without presenting windows.

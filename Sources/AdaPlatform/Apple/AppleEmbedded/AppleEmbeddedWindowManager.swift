@@ -88,8 +88,14 @@
                 window.configuration.scenePresentation == .new
                 ? nil
                 : connectedScene
+            #if os(visionOS)
+            let sceneBounds = scene?.coordinateSpace.bounds ?? CGRect(
+                x: 0, y: 0, width: CGFloat(window.frame.size.width), height: CGFloat(window.frame.size.height)
+            )
+            #else
             let screen = scene?.screen ?? UIScreen.main
             let sceneBounds = scene?.coordinateSpace.bounds ?? screen.bounds
+            #endif
             let frame = sceneBounds.toEngineRect
 
             // Register view in engine
@@ -210,11 +216,15 @@
         }
 
         override func getScreen(for window: AdaUI.UIWindow) -> Screen? {
+            #if os(visionOS)
+            return nil
+            #else
             guard let screen = (window.systemWindow as? UIKit.UIWindow)?.screen else {
                 return nil
             }
 
             return Screen(systemScreen: screen, screenManager: screenManager)
+            #endif
         }
 
         override func resizeWindow(_ window: AdaUI.UIWindow, size: Math.Size) {

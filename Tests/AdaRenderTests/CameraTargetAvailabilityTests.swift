@@ -74,6 +74,24 @@ struct CameraTargetAvailabilityTests {
         #expect(fixture.cache.targets.isEmpty)
     }
 
+    @Test("Offscreen depth targets survive extraction without retaining the output drawable")
+    @MainActor
+    func offscreenTargetsAreRetained() async throws {
+        try Fixture.initializeRenderer()
+        let output = RenderTexture(size: SizeInt(width: 16, height: 16), scaleFactor: 1, format: .bgra8)
+        let fixture = try Fixture(camera: Camera(renderTarget: output))
+        let first = try await fixture.prepareFrame()
+        let depth = RenderTexture(size: output.size, scaleFactor: 1, format: .depth_32f_stencil8)
+        var target = try #require(first.components[RenderViewTarget.self])
+        target.depthTexture = depth
+        first.components[RenderViewTarget.self] = target
+        await fixture.render.runScheduler(.postUpdate)
+        let second = try await fixture.prepareFrame()
+        #expect(second.components[RenderViewTarget.self]?.depthTexture === depth)
+        #expect(second.components[RenderViewTarget.self]?.outputTexture === output)
+        #expect(fixture.cache.targets[fixture.source.id]?.outputTexture == nil)
+    }
+
     @Test("Texture cameras render without a window surface")
     @MainActor
     func textureCameraDoesNotRequireSurface() async throws {
@@ -107,13 +125,14 @@ private struct Fixture {
             CameraRenderGraph(subgraphLabel: "TestCameraGraph", inputSlot: "view")
         }
         main.insertResource(PrimaryWindowId(windowId: RID()))
-        render.setSchedulers([.extract, .prepare])
+        render.setSchedulers([.extract, .prepare, .postUpdate])
         render.insertResource(surfaces)
         render.insertResource(ExtractedCameraRenderViewTargets())
         cache = render.getRefResource(ExtractedCameraRenderViewTargets.self)
         render.insertResource(unsafe RenderDeviceHandler(renderDevice: RenderEngine.shared.renderDevice))
         render.addSystem(ExtractCameraSystem.self, on: .extract)
         render.addSystem(ConfigurateRenderViewTargetSystem.self, on: .prepare)
+        render.addSystem(CacheCameraRenderTargetsSystem.self, on: .postUpdate)
     }
 
     static func initializeRenderer() throws {

@@ -3,7 +3,7 @@
 //  AdaEngine
 //
 
-#if canImport(MetalKit) && canImport(UIKit)
+#if canImport(MetalKit) && canImport(UIKit) && !os(visionOS)
     import AdaEngine
     import MetalKit
     import UIKit

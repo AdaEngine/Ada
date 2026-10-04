@@ -63,6 +63,13 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner {
         viewTree.setViewOwner(self)
     }
 
+    /// Updates host-supplied content while reconciling the existing node tree and local state.
+    public func updateRootView(_ content: Content) {
+        viewTree.updateRootView(content)
+        setNeedsLayout()
+        setNeedsDisplay()
+    }
+
     /// Layout the subviews.
     ///
     /// - Note: This method is called when the container view is laid out.

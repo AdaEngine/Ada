@@ -12,7 +12,7 @@ import Math
 
 @MainActor
 final class ViewTree<Content: View> {
-    let rootView: Content
+    private(set) var rootView: Content
     private(set) var rootNode: ViewRootNode
 
     init(rootView: Content, environment: EnvironmentValues = EnvironmentValues()) {
@@ -26,6 +26,12 @@ final class ViewTree<Content: View> {
         let contentNode = Content._makeView(_ViewGraphNode(value: rootView), inputs: inputs)
         self.rootNode = ViewRootNode(contentNode: contentNode.node, content: rootView)
         self.rootNode.mergeEnvironment(environment)
+    }
+
+    func updateRootView(_ content: Content) {
+        rootView = content
+        rootNode.setContent(content)
+        rootNode.invalidateContent()
     }
 
     func setViewOwner(_ owner: ViewOwner) {

@@ -39,9 +39,13 @@
             self.appWorlds = appWorlds
             self.setupInput(for: appWorlds)
 
+            #if os(visionOS)
+            self.displayLink = CADisplayLink(target: self, selector: #selector(update))
+            #else
             self.displayLink =
                 UIScreen.main.displayLink(withTarget: self, selector: #selector(update))
                 ?? CADisplayLink(target: self, selector: #selector(update))
+            #endif
             self.configureDisplayLinkFrameRate()
             self.displayLink.add(to: .main, forMode: .common)
 
@@ -148,7 +152,9 @@
                 return
             }
 
-            #if os(watchOS)
+            #if os(visionOS)
+                let displayMaximumFramesPerSecond = 90
+            #elseif os(watchOS)
                 let displayMaximumFramesPerSecond = 60
             #else
                 let displayMaximumFramesPerSecond = UIScreen.main.maximumFramesPerSecond

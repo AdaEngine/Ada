@@ -32,6 +32,7 @@ public struct CameraPlugin: Plugin {
             .insertResource(ExtractedCameraRenderViewTargets())
             .addSystem(ExtractCameraSystem.self, on: .extract)
             .addSystem(ConfigurateRenderViewTargetSystem.self, on: .prepare)
+            .addSystem(CacheCameraRenderTargetsSystem.self, on: .postUpdate)
             .getRefResource(RenderGraph.self)
             .wrappedValue
             .addNode(CameraRenderNode())
@@ -128,7 +129,7 @@ func ConfigurateRenderViewTarget(
             renderViewTarget.sceneColorTexture = nil
             renderViewTarget.lightAccumTexture = nil
             renderViewTarget.shadowMaskTexture = nil
-            cachedViewTargets.targets[source.entityId] = nil
+            cachedViewTargets.targets[source.entityId] = renderViewTarget.wrappedValue.cacheableCopy
             return
         }
 
@@ -338,4 +339,15 @@ public func ExtractCamera(
     }
 
     cachedViewTargets.targets = cachedViewTargets.targets.filter { activeCameraIds.contains($0.key) }
+}
+
+// Preserve targets after the 3D preparation systems have allocated their geometry buffers.
+@System
+func CacheCameraRenderTargets(
+    _ query: Query<RenderViewTarget, ExtractedCameraSource>,
+    _ cached: ResMut<ExtractedCameraRenderViewTargets>
+) {
+    query.forEach { target, source in
+        cached.targets[source.entityId] = target.cacheableCopy
+    }
 }
