@@ -34,3 +34,21 @@ Build output, SDKs and development signing keys are task-local and ignored.
 
 Worktrees: AdaEngine branch `codex/android` and Swan branch `codex/android-webgpu`,
 under `/Users/vlad-prusakov/.codex/worktrees/android/`. Original checkouts were preserved.
+
+## Revalidation after merging main
+
+- Merged main `e9a0aa485` into `codex/android` (merge `aa4877db6`). Kept the
+  updated GardenRobot, landscape, physics, PBR/IBL and animation systems from main,
+  with Android resource bundles, automatic movement and touch camera control.
+- Rebuilt and installed the ARM64 APK; signature and 16 KiB ZIP alignment passed.
+  Emulator process 5814 loaded 2 skins / 43 joints and Idle/Run/Walk/Jump/Fall/Land.
+  The landscape reports 48x48m, 8192 terrain triangles, 65 trees, 42 rocks and
+  193 grass tufts. The actual frame is `evidence/merge-main-garden.png`.
+- Touch orbit, Home/resume and Back/warm reopening passed; the warm launch retained
+  PID 5814. `evidence/merge-main-garden-logcat.txt` has zero WebGPU errors.
+- Focused host tests: AdaRender 112, garden terrain 2, PBR/character controller 12
+  passed (126 total). The final portable mipmap conversion was rerun: 3 passed.
+  Android Python setup/packaging tests: 7 passed. Full Swift suite was not run.
+- Swift 6.4, its checksum-verified Android SDK, and NDK r28c were restored under
+  `.build-android/toolchains/` after the old `/tmp` paths were removed. The local
+  launcher environment now points there and uses `.build-android-webgpu-main`.

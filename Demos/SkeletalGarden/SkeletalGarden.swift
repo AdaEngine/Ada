@@ -1,4 +1,5 @@
 import AdaEngine
+import Foundation
 
 #if os(Android)
 @_cdecl("ada_android_start")
