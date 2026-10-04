@@ -90,7 +90,7 @@ struct EditorModel3DTests {
         #expect(authored.components[EditorBuiltInComponentType.model3DSource]?["source"] == .string("@res://Triangle.gltf"))
         #expect(reopened.entities.count == initial.entities.count + 1)
         let app = AppWorlds(main: World())
-        app.addPlugin(MainSchedulerPlugin()).addPlugin(TransformPlugin()).addPlugin(Model3DPlugin())
+        app.addPlugin(MainSchedulerPlugin()).addPlugin(TransformPlugin()).addPlugin(RenderWorldPlugin()).addPlugin(Model3DPlugin())
         try await app.build()
         let result = EditorSceneFileLoader.load(content: content, into: app.main, loadsScriptableObjects: play, sourceURL: sceneURL, resourceRootURL: assets)
         #expect(result.warnings.isEmpty, Comment(rawValue: result.warnings.joined(separator: "\n")))
@@ -106,6 +106,12 @@ struct EditorModel3DTests {
         let count = app.main.getEntities().count
         await app.main.runScheduler(.preUpdate)
         #expect(app.main.getEntities().count == count, "Already prepared models must not instantiate twice")
+        await app.main.runScheduler(.postUpdate)
+        let renderWorld = try #require(app.getSubworldBuilder(by: .renderWorld)?.main)
+        renderWorld.insertResource(MainWorld(world: app.main))
+        await renderWorld.runScheduler(.extract)
+        let items = try #require(renderWorld.getResource(RenderItems<Opaque3DRenderItem>.self))
+        #expect(items.items.contains { $0.entity == mesh.id }, "Imported meshes must reach the production render extraction path")
         #expect(workbench.performDocumentHistory(redo: false))
         #expect(workbench.activeSceneDocument?.sceneModel?.entities.count == initial.entities.count)
         #expect(workbench.performDocumentHistory(redo: true))
@@ -138,8 +144,8 @@ struct EditorModel3DTests {
         let preview = EditorModelAssetPreviewModel()
         preview.asset = try #require(AssetsManager.loadSync(ModelAsset3D.self, at: source.path).asset)
         #expect(preview.animationNames == ["Rest pose", "Bend"])
-        let firstPreview = try preview.previewDocument(for: assetDocument(source))
-        #expect(try preview.previewDocument(for: assetDocument(source)).content == firstPreview.content, "Preview identity must be stable across redraws")
+        #expect(preview.normalizedBounds.center == .zero)
+        #expect(max(preview.normalizedBounds.halfExtents.x, max(preview.normalizedBounds.halfExtents.y, preview.normalizedBounds.halfExtents.z)) == 1.5)
         let previewWorld = World()
         let previewOwner = previewWorld.spawn("Preview")
         let previewRoot = try Model3DSource(source: source.path).instantiate(try #require(preview.asset), in: previewWorld, under: previewOwner)
@@ -224,10 +230,51 @@ struct EditorModel3DTests {
         #expect(EditorPicking.intersectionDistance(ray: ray, transform: transform, bounds: bounds) == 4)
     }
 
+    @Test("Play camera keeps authored lens settings while fitting its actual viewport", arguments: [Size(width: 320, height: 800), Size(width: 800, height: 320)])
+    func playCameraAspect(size: Size) throws {
+        let world = World()
+        var display = Camera()
+        display.logicalViewport.rect = Rect(x: 0, y: 0, width: size.width, height: size.height)
+        let target = world.spawn("SceneView_Camera") { display; Transform() }
+        var authored = Camera()
+        authored.projection = .perspective(PerspectiveProjection(near: 0.2, far: 400, fieldOfView: .degrees(65), aspectRation: 16 / 9))
+        world.spawn("Game camera") { authored; Transform() }
+        #expect(EditorSceneViewportView.synchronizePlayCamera(in: world))
+        guard case let .perspective(projection)? = target.components[Camera.self]?.projection else {
+            Issue.record("Missing perspective Play camera")
+            return
+        }
+        #expect(abs(projection.aspectRation - size.width / size.height) < 0.00001)
+        #expect(projection.fieldOfView == .degrees(65) && projection.near == 0.2 && projection.far == 400)
+    }
+
     private func temporaryDirectory() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("editor-model3d-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         return root
+    }
+
+    @Test("Asset camera fits portrait and landscape viewports and resets orbit/zoom", arguments: [Size(width: 360, height: 800), Size(width: 1200, height: 500)])
+    func assetCameraFraming(size: Size) {
+        let camera = EditorModelPreviewCamera()
+        camera.attach(to: World(), bounds: AABB(center: .zero, halfExtents: Vector3(1.2, 1.5, 0.8)))
+        camera.setViewportSize(size)
+        let transform = camera.cameraTransform()
+        let projection = PerspectiveProjection(fieldOfView: EditorModelPreviewCamera.fieldOfView, aspectRation: size.width / size.height).makeClipView()
+        for x: Float in [-1.2, 1.2] {
+            for y: Float in [-1.5, 1.5] {
+                for z: Float in [-0.8, 0.8] {
+                    let clip = projection * transform.matrix.inverse * Vector4(x, y, z, 1)
+                    #expect(clip.w > 0)
+                    #expect(abs(clip.x / clip.w) < 1 && abs(clip.y / clip.w) < 1)
+                }
+            }
+        }
+        camera.orbit(by: Point(100, 30))
+        camera.zoom(by: 2)
+        #expect(camera.cameraTransform() != transform)
+        camera.reset()
+        #expect(camera.cameraTransform() == transform)
     }
 
     private func ribbon(in root: URL) throws -> URL {

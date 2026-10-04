@@ -219,6 +219,13 @@ private func appendShapeLines(
             to: extractedShapes,
             color: color
         )
+    case let .triangleMesh(mesh):
+        for index in stride(from: 0, to: mesh.indices.count, by: 3) {
+            let points = (0..<3).map { (transform * Vector4(mesh.vertices[Int(mesh.indices[index + $0])], 1)).xyz }
+            for edge in 0..<3 {
+                extractedShapes.lines.append(.init(start: points[edge], end: points[(edge + 1) % 3], color: color))
+            }
+        }
     }
 }
 
@@ -239,6 +246,11 @@ private func combinedLocalBounds(for shapes: [Shape3DResource]) -> AABB? {
             let extents = Vector3(sphere.radius)
             minimum = min(minimum, sphere.center - extents)
             maximum = max(maximum, sphere.center + extents)
+        case let .triangleMesh(mesh):
+            for point in mesh.vertices {
+                minimum = min(minimum, point)
+                maximum = max(maximum, point)
+            }
         }
     }
 

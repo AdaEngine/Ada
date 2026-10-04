@@ -35,6 +35,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 : > "$DEMO_ROOT/dist/runtime.log"
 case "$MODE" in
+    --capture-overview)
+        mkdir -p "$DEMO_ROOT/dist/captures/overview"
+        rm -f "$DEMO_ROOT/dist/captures/overview/frame-30.png" "$DEMO_ROOT/dist/captures/overview/frame-50.png"
+        /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --pose-proof --overview-proof --capture-directory "$DEMO_ROOT/dist/captures/overview"
+        ;;
     --capture-no-ibl)
         mkdir -p "$DEMO_ROOT/dist/captures/no-ibl"
         rm -f "$DEMO_ROOT/dist/captures/no-ibl/frame-30.png" "$DEMO_ROOT/dist/captures/no-ibl/frame-50.png"
@@ -49,7 +54,7 @@ case "$MODE" in
     --autoplay) /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --autoplay ;;
     --verify)
         /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --controller-proof
-        for attempt in {1..20}; do
+        for attempt in {1..30}; do
             if rg -q 'controller verification PASS' "$DEMO_ROOT/dist/runtime.log"; then
                 cat "$DEMO_ROOT/dist/runtime.log"
                 exit 0
@@ -69,5 +74,5 @@ case "$MODE" in
         /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log"
         /usr/bin/log stream --info --style compact --predicate 'process == "SkeletalGarden"'
         ;;
-    *) echo 'usage: build_and_run.sh [run|--autoplay|--capture|--verify|--debug|--logs]' >&2; exit 2 ;;
+    *) echo 'usage: build_and_run.sh [run|--autoplay|--capture|--capture-overview|--capture-no-ibl|--verify|--debug|--logs]' >&2; exit 2 ;;
 esac

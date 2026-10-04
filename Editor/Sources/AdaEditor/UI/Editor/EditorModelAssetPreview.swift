@@ -12,16 +12,14 @@ final class EditorModelAssetPreviewModel {
     var selectedAnimation = "Rest pose" { didSet { updatePlayback() } }
     var playsAnimation = true { didSet { updatePlayback() } }
     @ObservationIgnored private var loadTask: Task<Void, Never>?
-    @ObservationIgnored private var previewScene: EditorSceneModel?
-    @ObservationIgnored private var previewCache: EditorSceneDocument?
+    @ObservationIgnored private var normalizationCache: (ObjectIdentifier, Transform, AABB)?
     @ObservationIgnored private weak var world: World?
     @ObservationIgnored private var animationRoot: Entity.ID?
 
     func load(_ document: EditorAssetDocument) {
         loadTask?.cancel()
         asset = nil
-        previewScene = nil
-        previewCache = nil
+        normalizationCache = nil
         world = nil
         animationRoot = nil
         error = nil
@@ -71,46 +69,20 @@ final class EditorModelAssetPreviewModel {
     var animationNames: [String] { ["Rest pose"] + (asset?.animationClips.map(\.name) ?? []) }
     var animation: String { selectedAnimation == "Rest pose" ? "" : selectedAnimation }
 
-    func previewDocument(for document: EditorAssetDocument) throws -> EditorSceneDocument {
-        guard let asset else { throw AssetError.message("Model has not loaded.") }
-        if let previewCache {
-            return previewCache
-        }
-        if previewScene == nil {
-            var scene = EditorSceneModel.default(projectName: document.title)
-            _ = scene.addEntity(template: .importedModel3D, parentID: scene.rootEntityID)
-            _ = scene.addEntity(template: .directionalLight3D, parentID: scene.rootEntityID)
-            previewScene = scene
-        }
-        guard var scene = previewScene else { throw AssetError.message("Unable to prepare model preview.") }
+    var normalizationTransform: Transform { normalization().1 }
+    var normalizedBounds: AABB { normalization().2 }
+
+    private func normalization() -> (ObjectIdentifier?, Transform, AABB) {
+        guard let asset else { return (nil, Transform(), .empty) }
+        let id = ObjectIdentifier(asset)
+        if let cached = normalizationCache, cached.0 == id { return (id, cached.1, cached.2) }
         let bounds = Self.bounds(of: asset)
         let extent = max(bounds.halfExtents.x, max(bounds.halfExtents.y, bounds.halfExtents.z))
         let scale = extent > 0.0001 ? 1.5 / extent : 1
-        if let index = scene.entities.firstIndex(where: { $0.components[EditorBuiltInComponentType.model3DSource] != nil }) {
-            scene.entities[index].components[EditorBuiltInComponentType.model3DSource] = [
-                "source": .string(document.assetReference ?? document.absolutePath ?? ""),
-                "animation": .string(""), "autoplay": .bool(false), "repeats": .bool(true),
-            ]
-            scene.entities[index].components[EditorBuiltInComponentType.transform]?["scale"] = .array([.double(Double(scale)), .double(Double(scale)), .double(Double(scale))])
-            let position = -bounds.center * scale
-            scene.entities[index].components[EditorBuiltInComponentType.transform]?["position"] = .array(
-                [.double(Double(position.x)), .double(Double(position.y)), .double(Double(position.z))]
-            )
-        }
-        let content = try scene.encodedYAML()
-        let preview = EditorSceneDocument(
-            id: "model-preview:\(document.id)",
-            title: document.title,
-            relativePath: document.relativePath,
-            absolutePath: document.absolutePath,
-            content: content,
-            isReadOnly: true,
-            sceneModel: scene,
-            isDirty: false,
-            loadSummary: .init(entityCount: scene.entities.count, warnings: [])
-        )
-        previewCache = preview
-        return preview
+        let transform = Transform(scale: Vector3(scale), position: -bounds.center * scale)
+        let normalized = AABB(center: .zero, halfExtents: bounds.halfExtents * scale)
+        normalizationCache = (id, transform, normalized)
+        return (id, transform, normalized)
     }
 
     static func bounds(of asset: ModelAsset3D) -> AABB {
@@ -152,61 +124,68 @@ struct EditorModelAssetPreview: View {
     let workbench: EditorWorkbenchViewModel
     let resourceRootURL: URL?
     @State private var model = EditorModelAssetPreviewModel()
-    @State private var inspector = EditorInspectorSidebarViewModel()
+    @State private var camera = EditorModelPreviewCamera()
     @State private var showsScenePicker = false
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Text(document.title).font(.system(size: 14)).foregroundColor(theme.editorColors.text)
-                Spacer()
-                addToScene
-            }
-            if showsScenePicker {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Choose destination scene").font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
-                    ForEach(targetScenes, id: \.id) { scene in
-                        Button(action: { place(in: scene.id) }) {
-                            Text(scene.relativePath).font(.system(size: 12)).foregroundColor(theme.editorColors.blue)
+        GeometryReader { geometry in
+            VStack(alignment: .leading, spacing: 12) {
+                header
+                if showsScenePicker {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Choose destination scene").font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+                            ForEach(targetScenes, id: \.id) { scene in
+                                Button(action: { place(in: scene.id) }) {
+                                    Text(scene.relativePath).font(.system(size: 12)).foregroundColor(theme.editorColors.blue)
+                                }
+                                .buttonStyle(DefaultButtonStyle())
+                                .accessibilityIdentifier("AdaEditor.ModelPreview.Scene.\(scene.id)")
+                            }
                         }
-                        .buttonStyle(DefaultButtonStyle())
-                        .accessibilityIdentifier("AdaEditor.ModelPreview.Scene.\(scene.id)")
+                    }
+                    .frame(height: 100)
+                }
+                ZStack {
+                    RoundedRectangleShape(cornerRadius: 10).fill(Color.fromHex(0x24282F))
+                    if model.isLoading {
+                        Text("Loading model…").foregroundColor(theme.editorColors.muted)
+                    } else if let error = model.error {
+                        Text(error).foregroundColor(.red).padding(24)
+                    } else if model.asset != nil {
+                        EditorModelPreviewViewport(model: model, camera: camera)
                     }
                 }
-            }
-            if model.isLoading {
-                Text("Loading model…").foregroundColor(theme.editorColors.muted)
-            } else if let error = model.error {
-                Text(error).foregroundColor(.red)
-            } else if let preview = try? model.previewDocument(for: document) {
+                .frame(height: max(180, geometry.size.height - (showsScenePicker ? 210 : 110)))
                 animationControls
-                Text("\(model.asset?.meshes.count ?? 0) meshes · \(model.asset?.materials.count ?? 0) materials · \(model.asset?.skins.count ?? 0) skins")
-                    .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
-                EditorSceneViewportView(
-                    document: preview,
-                    resourceRootURL: document.assetReference == nil ? document.absolutePath.map { URL(fileURLWithPath: $0).deletingLastPathComponent() } : resourceRootURL,
-                    inspectorViewModel: inspector,
-                    playModeState: .editing,
-                    playRuntime: nil,
-                    onEntitySelected: nil,
-                    onPlay: nil,
-                    onStop: nil,
-                    onDocumentChanged: { _ in },
-                    initialDisplayMode: .threeD,
-                    isAssetPreview: true,
-                    onEditWorldReady: { model.bind(to: $0) }
-                )
-                .frame(minHeight: 180, maxHeight: .infinity)
             }
-            Text(placementHint)
-                .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
         }
-        .padding(12)
+        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityIdentifier("AdaEditor.ModelPreview")
         .onAppear { model.load(document) }
         .onDisappear { model.cancel() }
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(document.title).font(.system(size: 14, weight: .bold)).foregroundColor(theme.editorColors.text)
+                if let asset = model.asset {
+                    Text("\(asset.meshes.count) meshes · \(asset.materials.count) materials · \(asset.skins.count) skins")
+                        .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+                }
+            }
+            Spacer()
+            Button(action: { camera.reset() }) {
+                Text("Frame model").font(.system(size: 12)).foregroundColor(theme.editorColors.text).padding(8)
+            }
+            .buttonStyle(DefaultButtonStyle())
+            .accessibilityIdentifier("AdaEditor.ModelPreview.Frame")
+            addToScene
+        }
+        .frame(height: 44)
     }
 
     private var animationControls: some View {
@@ -222,6 +201,7 @@ struct EditorModelAssetPreview: View {
                 Text(model.playsAnimation ? "Pause" : "Play").font(.system(size: 11))
             }
             .buttonStyle(DefaultButtonStyle())
+            .disabled(model.animation.isEmpty)
             .accessibilityIdentifier("AdaEditor.ModelPreview.PlayAnimation")
             Spacer()
         }
@@ -234,16 +214,6 @@ struct EditorModelAssetPreview: View {
             }
             return scene
         }
-    }
-
-    private var placementHint: String {
-        if targetScenes.isEmpty {
-            return "Open a scene to add this model."
-        }
-        if document.assetReference == nil {
-            return "Import this model into Assets to add it to a scene."
-        }
-        return "Add to Scene keeps the model's original scale."
     }
 
     private var addToScene: some View {

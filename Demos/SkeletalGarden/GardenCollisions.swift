@@ -1,7 +1,7 @@
 import AdaEngine
 
 @MainActor
-func makeGardenCollisions(in world: World, device: RenderDevice) {
+func makeGardenCollisions(in world: World) {
     // Collision sizes are world-space proxies for the authored props, including their demo scale.
     let boxes: [(String, Vector3, Vector3)] = [
         ("Courtyard floor", [0, -0.1, 0], [12, 0.2, 12]),
@@ -29,22 +29,6 @@ func makeGardenCollisions(in world: World, device: RenderDevice) {
     for (name, position, radius) in spheres {
         world.spawn("\(name) collider") {
             PhysicsBody3DComponent(shapes: [.generateSphere(radius: radius)], mode: .static)
-            Transform(position: position)
-        }
-    }
-    let stone = PBRMaterial()
-    stone.baseColorFactor = [0.22, 0.28, 0.3, 1]
-    stone.roughnessFactor = 0.85
-    stone.metallicFactor = 0
-    // Visible raised borders replace the old invisible square clamp.
-    let borders: [(Vector3, Vector3)] = [
-        ([-5.9, 0.25, 0], [0.2, 0.5, 12]), ([5.9, 0.25, 0], [0.2, 0.5, 12]),
-        ([0, 0.25, -5.9], [11.6, 0.5, 0.2]), ([0, 0.25, 5.9], [11.6, 0.5, 0.2]),
-    ]
-    for (position, size) in borders {
-        world.spawn("Courtyard border") {
-            Mesh3DComponent(mesh: .generateCube(size: size, renderDevice: device), materials: [stone])
-            PhysicsBody3DComponent(shapes: [.generateBox(width: size.x, height: size.y, depth: size.z)], mode: .static)
             Transform(position: position)
         }
     }

@@ -1,6 +1,6 @@
 # Skeletal Garden
 
-A native AdaEngine demo for skeletal GLB import, clip playback, cross-fading, GPU skinning, independent model instances, and animated directional shadows. The scene uses the CC0 Quaternius RobotExpressive character and six original textured garden props. Provenance and processing recipes are in `SourceAssets/ASSETS.md`.
+A native AdaEngine demo for skeletal GLB import, clip playback, cross-fading, GPU skinning, independent model instances, and animated directional shadows. The scene uses the CC0 Quaternius RobotExpressive character and six original textured garden props and original low-poly trees, rocks and grass. Provenance and processing recipes are in `SourceAssets/ASSETS.md`.
 
 Run from the AdaEngine repository root:
 
@@ -8,10 +8,11 @@ Run from the AdaEngine repository root:
 Demos/SkeletalGarden/script/build_and_run.sh
 ```
 
-- WASD: camera-relative movement inside the courtyard.
+- WASD: camera-relative movement through the courtyard and surrounding hills.
 - Shift: run. Idle, Walk, and Run fade over 0.22 seconds, retain walk/run cycle phase and match playback speed to actual movement.
 - Space: jump on a press edge. R: reset to the starting position.
-- Drag with the left mouse button: orbit the camera.
+- Drag with the left mouse button: orbit the camera. Q/E: zoom in/out. A sphere sweep pulls the camera in around obstacles and eases it back out.
+- Jump, Fall and Land are separate non-looping poses, blended from the actual grounded/vertical state.
 - The second humanoid plays its own Walk clip at a different speed.
 - Wood/stone props demonstrate color, ORM and normal maps; plants demonstrate alpha mask and double-sided leaves; the lantern demonstrates constant emission.
 
@@ -19,27 +20,35 @@ The scene uses offline-baked diffuse irradiance, GGX-prefiltered HDR reflections
 
 The first controller does not auto-step stairs, ride moving platforms, push dynamic bodies or collide with other controller capsules. Use it on a root entity without a PhysicsBody3DComponent; capsule dimensions are world units independent of visual scale. The second robot has a static collision proxy.
 
+## Expanded landscape
+
+The garden is 48x48 meters (16 times the original courtyard area), with a flat 12x12 plaza, rolling hills up to about 3.4m, a shallow lowland pond, a winding gravel trail, five jumping terraces, an elevated lookout and a stone gateway. A deterministic layout places 65 trees, 42 rocks and 193 grass tufts. The renderer and static Box3D collider share the same height geometry and triangle split. Collision uses 8192 triangles; rendering omits the triangles under the textured plaza. Scenery placement interpolates that exact surface. Trees include trunk/canopy collision proxies.
+
+The controller snaps vertically onto descending walkable terrain without injecting lateral speed. Fixed simulation catches up at lower render rates (up to eight ticks after a stall); all fixed systems receive the same 1/60s delta.
+
 ## Validation modes
 
 ```sh
 Demos/SkeletalGarden/script/build_and_run.sh --verify
 Demos/SkeletalGarden/script/build_and_run.sh --capture
+Demos/SkeletalGarden/script/build_and_run.sh --capture-overview
 Demos/SkeletalGarden/script/build_and_run.sh --capture-no-ibl
 Demos/SkeletalGarden/script/build_and_run.sh --debug
 ```
 
-`--verify` drives the same controller/animation systems through a scripted crate collision, movement/braking and jump/landing sequence. It fails unless all runtime position, velocity, grounded and clip checks pass. `--capture` fixes the camera and character root, plays skeletal poses, and saves two PNGs under `dist/captures` directly from the Metal render target. The readback uses the render graph's command queue and waits asynchronously for completion. It does not capture the desktop.
+`--verify` drives the same controller/animation systems through a scripted crate collision, movement/braking and jump/landing and terrain traversal sequence; it also checks camera occlusion and all three air clips. It fails unless all runtime position, velocity, grounded and clip checks pass. `--capture-overview` captures the whole landscape under `dist/captures/overview`. `--capture` fixes the camera and character root, plays skeletal poses, and saves two PNGs under `dist/captures` directly from the Metal render target. The readback uses the render graph's command queue and waits asynchronously for completion. It does not capture the desktop.
 
 The script stages `dist/SkeletalGarden.app`, including SwiftPM resource bundles, and launches it with macOS Launch Services. Logs are under `dist`. It only restarts the SkeletalGarden process. The build defaults to a dedicated `/tmp/adaengine-skeletal-import-build` scratch path; set `ADAENGINE_SKELETAL_BUILD_PATH` to override it.
 
 The initial runtime supports four vertex influences and at most 128 joints per skin. TRS tracks support LINEAR, STEP, and CUBICSPLINE, including quaternion slerp and cubic tangent scaling. Per-instance palettes use frame-buffered GPU allocations and are shared by the PBR and directional-shadow passes. Static meshes keep the identity skinning path.
 
-Useful regression suites: `SkeletalAnimationTests`, `SkeletalModel3DTests`, `GLTFSkeletalImportTests`, and `Model3DRenderItemsExtractionTests`, `CharacterController3DTests`, and `Physics3DTests`.
+Useful regression suites: `SkeletalAnimationTests`, `SkeletalModel3DTests`, `GLTFSkeletalImportTests`, and `Model3DRenderItemsExtractionTests`, `CharacterController3DTests`, and `Physics3DTests`, `Physics3DGeometryTests`, `FixedPhysicsCatchUpTests`, and demo-owned `GardenTerrainTests`.
 
 `--capture-no-ibl` captures a control scene under `dist/captures/no-ibl`. The generator/profile tools are reproducible:
 
 ```sh
 python3 Tools/3DAssets/prepare_robot.py
+/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python Tools/3DAssets/generate_landscape_assets.py
 /Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python Tools/3DAssets/generate_garden_assets.py
 ```
 

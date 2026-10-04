@@ -27,10 +27,10 @@ struct PBR3DSceneTests {
     }
 
     @Test
-    func fullCharacterHasThreeClipsAndIndependentSkinInstances() throws {
+    func fullCharacterHasLocomotionAndAirClipsWithIndependentSkinInstances() throws {
         try setup()
         let model = try loadModel("GardenRobot")
-        #expect(Set(model.animationClips.map(\.name)) == ["Idle", "Walk", "Run"])
+        #expect(Set(model.animationClips.map(\.name)) == ["Idle", "Walk", "Run", "Jump", "Fall", "Land"])
         #expect(model.skins.allSatisfy { $0.joints.count == 43 })
         #expect(model.meshes.count > 5)
         let world = World()

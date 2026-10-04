@@ -60,3 +60,5 @@ python3 Tools/3DAssets/prepare_robot.py
 The GLB import path keeps base color/emission in sRGB, material data in linear space, supports UV0/UV1 and glTF wrap/filter choices, and creates color-correct mipmaps. Referenced images that cannot be decoded fail import rather than becoming silently missing textures.
 
 Useful suites: `GLTFMaterialImportTests`, `ImageMipmapsTests`, `PBR3DSceneTests`. `SkeletalGarden --capture-no-ibl` provides a visual control scene; use the build script's flag of the same name.
+
+Landscape props: run Blender with `--background --factory-startup --python Tools/3DAssets/generate_landscape_assets.py` to reproduce Tree/Rock/Grass. `prepare_robot.py` also derives rotation-only Jump/Fall/Land clips from the retained CC0 source. The terrain itself is deterministic demo code, shared with its static triangle collider.

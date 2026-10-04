@@ -57,18 +57,28 @@ extension PhysicsWorld3D {
         if jumped { controller.verticalVelocity = controller.jumpSpeed }
         let fallLimit = controller.maximumFallSpeed.isFinite ? max(0, controller.maximumFallSpeed) : 50
         let gravityY = gravity.y.isFinite ? gravity.y : -9.81
-        controller.verticalVelocity = max(-fallLimit, controller.verticalVelocity + gravityY * deltaTime)
+        if controller.isGrounded, !jumped {
+            controller.verticalVelocity = 0
+        } else { controller.verticalVelocity = max(-fallLimit, controller.verticalVelocity + gravityY * deltaTime) }
         let start = position
         let velocity = controller.horizontalVelocity + Vector3(0, controller.verticalVelocity, 0)
         let groundThreshold = controller.minimumGroundNormalY.isFinite ? min(max(controller.minimumGroundNormalY, 0.01), 1) : 0.707107
-        let result = moveCapsule(position: start, radius: controller.radius, height: controller.height, delta: velocity * deltaTime, groundThreshold: groundThreshold)
+        var result = moveCapsule(position: start, radius: controller.radius, height: controller.height, delta: velocity * deltaTime, groundThreshold: groundThreshold)
+        let snapDistance = controller.groundSnapDistance.isFinite ? min(max(controller.groundSnapDistance, 0), controller.radius) : 0
+        if controller.isGrounded, !jumped, controller.verticalVelocity <= 0, snapDistance > 0,
+            let height = groundHeight(position: result.position, radius: controller.radius, distance: snapDistance, minimumNormalY: groundThreshold) {
+            result.position.y = height
+            result.grounded = true
+        }
         position = result.position
         controller.velocity = (position - start) / deltaTime
         controller.isGrounded = result.grounded && controller.verticalVelocity <= 0 && !jumped
         if controller.isGrounded { controller.verticalVelocity = 0 }
         if controller.verticalVelocity > 0 && result.ceiling { controller.verticalVelocity = 0 }
-        // Discard blocked horizontal velocity so releasing input stops a pinned character immediately.
-        controller.horizontalVelocity = [controller.velocity.x, 0, controller.velocity.z]
+        // Collision corrections must not inject energy into the next commanded movement.
+        let horizontal = Vector3(controller.velocity.x, 0, controller.velocity.z)
+        let maximumSpeed = controller.horizontalVelocity.length
+        controller.horizontalVelocity = horizontal.length > maximumSpeed ? horizontal.normalized * maximumSpeed : horizontal
     }
 
     private func moveCapsule(position: Vector3, radius: Float, height: Float, delta: Vector3, groundThreshold: Float) -> (position: Vector3, grounded: Bool, ceiling: Bool) {

@@ -46,8 +46,25 @@ enum AdaApplicationEntry {
 }
 
 struct AdaEditorApp: App {
+    #if DEBUG && os(macOS)
+    private let launchProject: EditorProjectReference?
+    #endif
+
     init() {
         EditorComponentRegistry.registerBuiltIns()
+        #if DEBUG && os(macOS)
+        if let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--editor-project=") }) {
+            let path = String(argument.dropFirst("--editor-project=".count))
+            do {
+                launchProject = try EditorProjectStore().openProject(at: URL(fileURLWithPath: path, isDirectory: true))
+            } catch {
+                launchProject = nil
+                Logger(label: "AdaEditor.Launch").error("Unable to open project: \(error.localizedDescription)")
+            }
+        } else {
+            launchProject = nil
+        }
+        #endif
         _ = EditorProjectOpenURLRouter.shared
         EditorAchievementBootstrap.install()
         EditorCloudSettingsView.installSync()
@@ -77,7 +94,15 @@ struct AdaEditorApp: App {
 
     var body: some AppScene {
         WindowGroup {
+            #if DEBUG && os(macOS)
+            if let launchProject {
+                EditorView(project: launchProject)
+            } else {
+                ProjectOpeningView()
+            }
+            #else
             ProjectOpeningView()
+            #endif
         }
         .windowMode(.windowed)
         .windowTitle("Ada Editor")

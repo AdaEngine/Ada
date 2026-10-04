@@ -20,6 +20,7 @@ struct GardenPlugin: Plugin {
         app.addSystem(StartupGardenSystem.self, on: .startup)
         app.addSystem(GardenInputSystem.self, on: .update)
         app.addSystem(GardenPresentationSystem.self, on: .postUpdate)
+        app.addSystem(GardenCameraSystem.self, on: .postUpdate)
         #if os(macOS)
             installCapture(in: app)
         #endif
@@ -32,13 +33,24 @@ struct GardenPlayer: Component {
     var resetHeld = false
     var locomotion = "Idle"
     var facingYaw: Float = .pi
+    var wasAirborne = false
+    var landingTime: Float = 0
+    var sawJump = false
+    var sawFall = false
+    var sawLand = false
     var proofStage = 0
     var proofMaximumHeight: Float = 0
 }
 
 struct GardenCamera: Component {
     var yaw: Float = 0.45
-    var pitch: Float = 0.38
+    var pitch: Float = 0.36
+    var distance: Float = 6.6
+    var actualDistance: Float = 6.6
+    var focus = Vector3.zero
+    var initialized = false
+    var isOccluded = false
+    var verifiedCollision = false
     var lastMouse = Point.zero
     var dragging = false
 }
@@ -93,11 +105,12 @@ private func makeGarden(in world: World) throws {
         Mesh3DComponent(mesh: Mesh.generateSphere(radius: 0.35, renderDevice: device), materials: [chrome])
         Transform(position: [2.3, 0.35, -0.15])
     }
-    makeGardenCollisions(in: world, device: device)
+    makeGardenCollisions(in: world)
+    try makeGardenLandscape(in: world, device: device)
     let ibl = try AssetsManager.loadSync(ImageBasedLighting3D.self, at: "Assets/Studio.ibl", from: .module)
     let noIBL = ProcessInfo.processInfo.arguments.contains("--no-ibl")
     world.spawn("Sun") {
-        DirectionalLightComponent(radiance: [1, 0.88, 0.7], intensity: 2.5, shadowDistance: 18, shadowBias: 0.002, shadowSlopeBias: 0.006)
+        DirectionalLightComponent(radiance: [1, 0.88, 0.7], intensity: 2.5, shadowDistance: 60, shadowBias: 0.002, shadowSlopeBias: 0.006)
         Transform(rotation: Quat(axis: .right, angle: 0.9))
     }
     var camera = Camera()

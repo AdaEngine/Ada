@@ -14,6 +14,8 @@ and assess gaps before proposing new features.
   [project.yml](project.yml) owns XcodeGen app configuration.
 - Use an isolated scratch/module cache when necessary; never delete the shared
   `.build`. Preserve unrelated engine, demo, and editor changes.
+- Debug macOS builds accept `--editor-project=<absolute-path>` to open the
+  production workspace directly for native UI validation.
 - Public scripting terminology is **AdaScript**. `Gravity*` names are internal
   compiler, VM, and language-tooling implementation names.
 

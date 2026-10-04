@@ -19,3 +19,9 @@ Crate, Bench, Plant, Pedestal, Lantern and Courtyard, including their PBR textur
 Studio radiance, irradiance, GGX roughness atlas and BRDF LUT are original deterministic CPU integrations produced by `Tools/3DAssets/bake_ibl.py`. Binary maps contain little-endian RGBA16F linear radiance. Irradiance stores the cosine integral (the shader divides by pi). Specular levels are stacked vertically; BRDF LUT stores the split-sum scale and bias in R/G. The source environment uses analytic area-like light lobes and a hemisphere background, with no external HDRI.
 
 The bake self-test checks constant-radiance energy, GGX preservation and BRDF LUT bounds. GLB validation reports are produced by `Tools/3DAssets/validate_glb.cjs`; informational notices about unused source accessors remain in the lossless character derivative.
+
+## Landscape expansion
+
+`Tree.glb`, `Rock.glb` and `Grass.glb` are original deterministic procedural models authored by `Tools/3DAssets/generate_landscape_assets.py` with Blender, without external images or paid generation services. The 48x48 meter terrain, colors, prop layout, terraces and lookout are defined in the demo's GardenTerrain/GardenLandscape sources. Rendering and static triangle collision use the same height geometry.
+
+The robot runtime profile now includes rotation-only derivatives of the original CC0 `Jump` clip: Jump uses frames 2–8, Fall holds frame 8, and Land uses frames 10–16 (the source is sampled at 24 FPS). Joint translations remain at rest in these clips; AdaPhysics owns world displacement. Original vertex positions, inverse-bind matrices and node transforms remain unchanged. The source model and CC0 provenance above remain applicable.

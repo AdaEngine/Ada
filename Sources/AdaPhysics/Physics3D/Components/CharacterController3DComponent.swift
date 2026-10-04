@@ -21,6 +21,8 @@ public struct CharacterController3DComponent: Sendable {
     public var maximumFallSpeed: Float = 50
     /// Minimum upward surface normal for grounded contacts; defaults to a 45 degree slope.
     public var minimumGroundNormalY: Float = 0.707107
+    /// Follows descending terrain while grounded; disabled automatically during a jump.
+    public var groundSnapDistance: Float = 0.16
 
     public internal(set) var isGrounded = false
     /// Actual displacement per second after collision resolution.

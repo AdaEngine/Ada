@@ -3,7 +3,7 @@ Blender is the authoring/inspection tool; this lossless GLB profile conversion o
 selects skeletal clips, disables unsupported morph data, and sets PBR factors.
 """
 from pathlib import Path
-import json, struct, hashlib
+import json, struct, hashlib, copy
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'Demos/SkeletalGarden/SourceAssets/RobotExpressive.glb'
 OUTPUT = ROOT / 'Demos/SkeletalGarden/Assets/GardenRobot.glb'
@@ -13,6 +13,7 @@ assert kind == 0x4E4F534A
 source = json.loads(raw[20:20+length])
 bin_chunk = raw[20+length:]
 binary = bytearray(bin_chunk[8:])
+jump_source = copy.deepcopy(next(a for a in source["animations"] if a["name"] == "Jump"))
 clips = []
 for clip in source['animations']:
     if clip['name'] not in ('Idle','Walking','Running'): continue
@@ -44,6 +45,41 @@ for index in weights:
         assert total > 0
         struct.pack_into('<4f',binary,offset,*(x/total for x in values))
     accessor.pop('min',None); accessor.pop('max',None)
+# Derive rotation-only in-place air/landing clips. Physics owns all root displacement.
+def read_float_accessor(index):
+    accessor = source['accessors'][index]
+    view = source['bufferViews'][accessor['bufferView']]
+    width = {'SCALAR':1, 'VEC3':3, 'VEC4':4}[accessor['type']]
+    start = view.get('byteOffset',0) + accessor.get('byteOffset',0)
+    stride = view.get('byteStride',width*4)
+    return [struct.unpack_from('<'+'f'*width,binary,start+i*stride) for i in range(accessor['count'])]
+
+def append_accessor(values, kind):
+    binary.extend(b'\0' * (-len(binary)%4))
+    offset = len(binary)
+    for value in values: binary.extend(struct.pack('<'+'f'*len(value),*value))
+    view_index = len(source['bufferViews'])
+    source['bufferViews'].append({'buffer':0,'byteOffset':offset,'byteLength':len(binary)-offset})
+    accessor = {'bufferView':view_index,'componentType':5126,'count':len(values),'type':kind}
+    if kind == 'SCALAR': accessor.update(min=[min(v[0] for v in values)],max=[max(v[0] for v in values)])
+    index = len(source['accessors']); source['accessors'].append(accessor)
+    return index
+
+for name, first, last in [('Jump',2,8),('Fall',8,8),('Land',10,16)]:
+    channels=[];samplers=[]
+    for channel in jump_source['channels']:
+        if channel['target']['path'] != 'rotation': continue
+        sampler=jump_source['samplers'][channel['sampler']]
+        times=read_float_accessor(sampler['input']);values=read_float_accessor(sampler['output'])
+        selected=values[first:last+1]
+        if first==last:
+            selected=selected*2;local_times=[(0.0,),(0.2,)]
+        else: local_times=[(t[0]-times[first][0],) for t in times[first:last+1]]
+        input_index=append_accessor(local_times,'SCALAR');output_index=append_accessor(selected,'VEC4')
+        channels.append({'sampler':len(samplers),'target':copy.deepcopy(channel['target'])})
+        samplers.append({'input':input_index,'output':output_index,'interpolation':'LINEAR'})
+    clips.append({'name':name,'channels':channels,'samplers':samplers})
+source['buffers'][0]['byteLength']=len(binary)
 bin_chunk = struct.pack('<II',len(binary),0x004E4942) + binary
 for material in source['materials']:
     pbr = material['pbrMetallicRoughness']

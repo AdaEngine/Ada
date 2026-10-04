@@ -78,6 +78,11 @@ struct EditorSceneViewportView: View {
                 ZStack(anchor: .bottomLeading) {
                     SceneView(
                         make: { app in
+                            if isAssetPreview {
+                                viewportModel.threeDPosition = Vector3(0, 0, -5)
+                                viewportModel.threeDPitch = 0
+                                viewportModel.perspectiveBlend = 1
+                            }
                             configureSceneViewApp(&app)
                             let result = EditorSceneFileLoader.load(
                                 content: document.content,
@@ -413,6 +418,13 @@ struct EditorSceneViewportView: View {
         }
 
         displayCamera.projection = authoredCamera.projection
+        if case var .perspective(projection) = displayCamera.projection {
+            let size = displayCamera.logicalViewport.rect.size
+            if size.width > 0, size.height > 0 {
+                projection.updateView(width: size.width, height: size.height)
+                displayCamera.projection = .perspective(projection)
+            }
+        }
         displayCamera.isActive = true
         displayCamera.backgroundColor = authoredCamera.backgroundColor
         displayCamera.clearFlags = authoredCamera.clearFlags
