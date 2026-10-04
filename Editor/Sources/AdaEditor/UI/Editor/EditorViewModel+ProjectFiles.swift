@@ -129,11 +129,13 @@ extension EditorViewModel {
         do {
             try fileManager.createDirectory(at: assetsURL, withIntermediateDirectories: true)
             for sourceURL in sourceURLs {
-                let destinationURL = uniqueAssetDestinationURL(for: sourceURL, in: assetsURL)
-                if fileManager.fileExists(atPath: destinationURL.path) {
-                    try fileManager.removeItem(at: destinationURL)
+                let destinationURL: URL
+                if EditorModelResource.extensions.contains(sourceURL.pathExtension.lowercased()) {
+                    destinationURL = try EditorModelAssetImporter.copy(sourceURL, to: assetsURL, fileManager: fileManager)
+                } else {
+                    destinationURL = uniqueAssetDestinationURL(for: sourceURL, in: assetsURL)
+                    try fileManager.copyItem(at: sourceURL, to: destinationURL)
                 }
-                try fileManager.copyItem(at: sourceURL, to: destinationURL)
                 appendOutput("Imported asset \(sourceURL.lastPathComponent) -> \(relativeProjectPath(for: destinationURL.path))")
             }
             try ensureAssetResourcesInManifest(projectURL: projectURL)

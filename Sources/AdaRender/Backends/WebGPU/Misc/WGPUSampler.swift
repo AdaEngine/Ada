@@ -18,6 +18,16 @@
         }
     }
 
+    extension SamplerAddressMode {
+        var toWebGPU: WebGPU.GPUAddressMode {
+            switch self {
+            case .clampToEdge: return .clampToEdge
+            case .repeat: return .repeat
+            case .mirroredRepeat: return .mirrorRepeat
+            }
+        }
+    }
+
     extension SamplerMinMagFilter {
         var toWebGPU: WebGPU.GPUFilterMode {
             switch self {

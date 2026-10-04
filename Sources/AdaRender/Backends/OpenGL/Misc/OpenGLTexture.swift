@@ -101,17 +101,19 @@
                     dataType = GLenum(GL_UNSIGNED_BYTE)
                 }
 
-                glTexImage2D(
-                    glType,
-                    GLint(descriptor.mipmapLevel),
-                    internalFormat,
-                    GLsizei(descriptor.width),
-                    GLsizei(descriptor.height),
-                    0,
-                    GLenum(format),
-                    dataType,
-                    pointer?.baseAddress
-                )
+                for level in 0..<max(1, descriptor.mipmapLevel) {
+                    glTexImage2D(
+                        glType,
+                        GLint(level),
+                        internalFormat,
+                        GLsizei(max(1, descriptor.width >> level)),
+                        GLsizei(max(1, descriptor.height >> level)),
+                        0,
+                        GLenum(format),
+                        dataType,
+                        level == 0 ? pointer?.baseAddress : nil
+                    )
+                }
             case .texture2DMultisample,
                 .texture2DMultisampleArray:
                 glTexImage2DMultisample(

@@ -1,24 +1,17 @@
 import AdaEngine
 
-struct GardenPlayer: Component {
+struct ImmersiveGardenPlayer: Component {
     var elapsed: Float = 0
 }
 
-struct GardenCamera: Component {
-    var yaw: Float = 0.45
-    var pitch: Float = 0.25
-    var lastMouse = Point.zero
-    var dragging = false
-}
-
 @MainActor
-func makeGarden(in world: World, assetBundle: Bundle, includeCamera: Bool = true) throws {
+func makeImmersiveGarden(in world: World, assetBundle: Bundle) throws {
     let device = unsafe RenderEngine.shared.renderDevice
     guard let model = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/TestHumanoid.glb", from: assetBundle).asset else {
         throw AssetError.message("TestHumanoid could not be loaded")
     }
     let player = model.instantiate(in: world)
-    player.components[GardenPlayer.self] = GardenPlayer()
+    player.components[ImmersiveGardenPlayer.self] = ImmersiveGardenPlayer()
     player.components[Transform.self] = Transform(position: [-0.7, 0, 0])
     if var animation = player.components[ModelAnimation3DComponent.self] {
         try animation.player.play("Idle", transitionDuration: 0)
@@ -70,12 +63,6 @@ func makeGarden(in world: World, assetBundle: Bundle, includeCamera: Bool = true
     world.spawn("Sun") {
         DirectionalLightComponent(radiance: [1, 0.88, 0.7], intensity: 4, shadowDistance: 18)
         Transform(rotation: Quat.euler([0.9, -0.4, 0]))
-    }
-    if includeCamera {
-        var camera = Camera()
-        camera.backgroundColor = Color(red: 0.12, green: 0.2, blue: 0.3)
-        let cameraEntity = world.spawn("Camera", bundle: Camera3D(camera: camera))
-        cameraEntity.components[GardenCamera.self] = GardenCamera()
     }
     print("[SkeletalGarden] loaded \(model.skins.count) skin, \(model.skins.first?.joints.count ?? 0) joints; clips=\(model.animationClips.map(\.name))")
 }

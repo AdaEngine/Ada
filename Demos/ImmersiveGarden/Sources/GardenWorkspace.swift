@@ -46,7 +46,7 @@ final class GardenWorkspace {
             }
             do {
                 try await host.run { world in
-                    try makeGarden(in: world, assetBundle: .main, includeCamera: false)
+                    try makeImmersiveGarden(in: world, assetBundle: .main)
                     let device = unsafe RenderEngine.shared.renderDevice
                     arrangeGardenForImmersion(world, device: device)
                     let material = PBRMaterial()
@@ -140,7 +140,7 @@ final class GardenWorkspace {
         var pillarIndex = 0
         for entity in world.getEntities() where entity.parent == nil {
             guard var transform = entity.components[Transform.self] else { continue }
-            if entity.components[GardenPlayer.self] != nil {
+            if entity.components[ImmersiveGardenPlayer.self] != nil {
                 transform.position = [-1.1, 0, 4.5]
             } else if let animation = entity.components[ModelAnimation3DComponent.self] {
                 transform.position = animation.player.clips.contains(where: { $0.name == "Bend" }) ? [-2, 0.2, 4] : [1.1, 0, 4.5]

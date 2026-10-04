@@ -23,25 +23,15 @@ extension EditorViewModel {
             }
             do {
                 let settings = try ProjectSystem.loadProject(at: projectURL)
-                let engine = URL(fileURLWithPath: #filePath).resolvingSymlinksInPath().deletingLastPathComponent().deletingLastPathComponent()
-                    .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-                let override = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"].map { URL(fileURLWithPath: $0) }
-                let candidates = override.map { [$0] } ?? [
-                    engine.deletingLastPathComponent().appendingPathComponent("gravity-lang-aot", isDirectory: true),
-                    engine.appendingPathComponent(".build/checkouts/gravity-lang", isDirectory: true),
-                    engine.appendingPathComponent("Editor/.build/checkouts/gravity-lang", isDirectory: true),
-                ]
-                guard let gravityRoot = candidates.first(where: { FileManager.default.fileExists(atPath: $0.appendingPathComponent("tools/aot_build.py").path) }) else {
-                    throw EditorPreviewBuildFailure(message: "Set ADAENGINE_GRAVITY_PACKAGE_PATH to a Gravity checkout with tools/aot_build.py.")
-                }
+                let sdk = try EditorBuildSDK.locate()
                 let toolchain = await SwiftToolchainLocator.locate()
                 let webSwift =
                     ProcessInfo.processInfo.environment["ADA_WEB_SWIFT_EXECUTABLE"]
                     ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Developer/Toolchains/swift-6.3.2-RELEASE.xctoolchain/usr/bin/swift").path
                 let options = EditorAdaScriptNativeExportOptions(
                     destination: web ? .web : .macOS,
-                    gravityRoot: gravityRoot,
-                    engineRoot: engine,
+                    gravityRoot: sdk.compilerRoot,
+                    engineRoot: sdk.engineRoot,
                     swiftExecutable: web ? webSwift : toolchain.swiftExecutablePath,
                     swiftSDK: ProcessInfo.processInfo.environment["ADA_WEB_SWIFT_SDK"] ?? "swift-6.3.2-RELEASE_wasm"
                 )

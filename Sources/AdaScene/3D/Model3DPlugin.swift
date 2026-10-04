@@ -18,6 +18,9 @@ public struct Model3DPlugin: Plugin {
     public init() {}
 
     public func setup(in app: AppWorlds) {
+        Model3DSource.registerComponent()
+        Model3DSourceState.registerComponent()
+        app.addSystem(Model3DSourceSystem.self, on: .preUpdate)
         Mesh3DComponent.registerComponent()
         DirectionalLightComponent.registerComponent()
         PointLightComponent.registerComponent()
@@ -31,9 +34,7 @@ public struct Model3DPlugin: Plugin {
         app.addSystem(BillboardSystem.self, on: .update)
 
         guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else {
-
             return
-
         }
 
         renderWorld
@@ -41,6 +42,8 @@ public struct Model3DPlugin: Plugin {
             .insertResource(RenderItems<Opaque3DRenderItem>())
             .insertResource(Opaque3DInstanceBuffers())
             .insertResource(Skinning3DUniforms())
+            .insertResource(PBR3DUniforms())
+            .insertResource(RenderPipelines(configurator: PBR3DPipeline()))
             .insertResource(RenderPipelines(configurator: Flat3DPipeline()))
             .insertResource(Model3DDrawPass())
             .addSystem(ExtractDirectionalLight3DSystem.self, on: .extract)
@@ -77,6 +80,7 @@ func ExtractModel3D(
     _ query: Extract<Query<Entity, Mesh3DComponent, GlobalTransform>>,
     _ skins: Extract<Query<Entity, SkinnedMesh3DComponent>>,
     _ skinningUniforms: ResMut<Skinning3DUniforms>,
+    _ materialUniforms: ResMut<PBR3DUniforms>,
     _ renderItems: ResMut<RenderItems<Opaque3DRenderItem>>,
     _ instanceBuffers: ResMut<Opaque3DInstanceBuffers>,
     _ renderDevice: Res<RenderDeviceHandler>,
@@ -86,12 +90,11 @@ func ExtractModel3D(
     items.removeAll(keepingCapacity: true)
     var instances = instanceBuffers.wrappedValue
     instances.beginFrame()
-    var palettes = skinningUniforms.wrappedValue
-    palettes.beginFrame(device: renderDevice.renderDevice)
+    skinningUniforms.wrappedValue.beginFrame(device: renderDevice.renderDevice)
     skins.wrappedValue.forEach { entity, skin in
-        _ = palettes.write(skin.matrices, for: entity.id, device: renderDevice.renderDevice)
+        _ = skinningUniforms.wrappedValue.write(skin.matrices, for: entity.id, device: renderDevice.renderDevice)
     }
-    skinningUniforms.wrappedValue = palettes
+    materialUniforms.wrappedValue.beginFrame()
     var currentBatchKey: Opaque3DBatchKey?
     var currentBatchIndex: Int?
 
@@ -100,11 +103,14 @@ func ExtractModel3D(
         for (modelIndex, model) in mesh.models.enumerated() {
             for (partIndex, part) in model.parts.enumerated() {
                 let material = mesh3d.materials[part.materialIndex]
+                materialUniforms.wrappedValue.write(material: material, descriptor: part.vertexDescriptor, device: renderDevice.renderDevice)
                 let pbrMaterial = material as? PBRMaterial
                 let atmosphereMaterial = material as? AtmosphereMaterial
-                let hasTextureCoordinates = part.vertexDescriptor.attributes.containsAttribute(
-                    by: MeshDescriptor.textureCoordinates.id.name
-                )
+                func hasUV(_ slot: Int) -> Bool {
+                    let set = pbrMaterial?.textureCoordinates.indices.contains(slot) == true ? pbrMaterial?.textureCoordinates[slot] ?? 0 : 0
+                    let name = set == 1 ? MeshDescriptor.textureCoordinates1.id.name : MeshDescriptor.textureCoordinates.id.name
+                    return part.vertexDescriptor.attributes.containsAttribute(by: name)
+                }
                 let hasTangents = part.vertexDescriptor.attributes.containsAttribute(
                     by: MeshDescriptor.tangents.id.name
                 )
@@ -115,13 +121,13 @@ func ExtractModel3D(
                         material: Vector4(
                             pbrMaterial?.roughnessFactor ?? 1,
                             pbrMaterial?.metallicFactor ?? 0,
-                            pbrMaterial?.emissiveTexture == nil ? 0 : pbrMaterial?.emissiveStrength ?? 0,
+                            pbrMaterial?.emissiveStrength ?? 0,
                             pbrMaterial?.emissiveLightThreshold ?? -1
                         ),
                         textureFlags: Vector4(
-                            hasTextureCoordinates && pbrMaterial?.baseColorTexture != nil ? 1 : 0,
-                            hasTextureCoordinates && pbrMaterial?.metallicRoughnessTexture != nil ? 1 : 0,
-                            hasTextureCoordinates && pbrMaterial?.normalTexture != nil ? 1 : 0,
+                            hasUV(0) && pbrMaterial?.baseColorTexture != nil ? 1 : 0,
+                            hasUV(1) && pbrMaterial?.metallicRoughnessTexture != nil ? 1 : 0,
+                            hasUV(2) && pbrMaterial?.normalTexture != nil ? 1 : 0,
                             hasTangents ? 1 : 0
                         ),
                         shadowFlags: Vector4(
@@ -137,12 +143,12 @@ func ExtractModel3D(
                     material: material,
                     castShadows: mesh3d.castShadows,
                     receiveShadows: mesh3d.receiveShadows,
-                    skinningBuffer: palettes.buffer(for: entity.id)
+                    skinningBuffer: skinningUniforms.wrappedValue.buffer(for: entity.id)
                 )
 
-                if key == currentBatchKey, let currentBatchIndex {
+                if pbrMaterial?.alphaMode != .blend, key == currentBatchKey, let currentBatchIndex {
                     let lowerBound = items[currentBatchIndex].batchRange?.lowerBound ?? instanceIndex
-                    items[currentBatchIndex].batchRange = lowerBound..<(instanceIndex + 1)
+                    items[currentBatchIndex].batchRange = lowerBound ..< (instanceIndex + 1)
                     continue
                 }
 
@@ -160,8 +166,8 @@ func ExtractModel3D(
                         worldTransform: transform.matrix,
                         castShadows: mesh3d.castShadows,
                         receiveShadows: mesh3d.receiveShadows,
-                        batchRange: instanceIndex..<(instanceIndex + 1),
-                        skinningBuffer: palettes.buffer(for: entity.id)
+                        batchRange: instanceIndex ..< (instanceIndex + 1),
+                        skinningBuffer: skinningUniforms.wrappedValue.buffer(for: entity.id)
                     )
                 )
             }
@@ -195,8 +201,11 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
             return
         }
 
-        let pipelines = world.getRefResource(RenderPipelines<Flat3DPipeline>.self)
-        let pipeline = pipelines.wrappedValue.pipeline(for: part.vertexDescriptor, device: renderDevice)
+        let pipelines = world.getRefResource(RenderPipelines<PBR3DPipeline>.self)
+        let pipeline = pipelines.wrappedValue.pipeline(
+            for: PBR3DConfiguration(vertex: part.vertexDescriptor, blended: (item.material as? PBRMaterial)?.alphaMode == .blend),
+            device: renderDevice
+        )
         guard
             let batchRange = item.batchRange,
             let instanceBuffers = world.getResource(Opaque3DInstanceBuffers.self),
@@ -207,20 +216,24 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
         }
 
         guard let palette = item.skinningBuffer ?? world.getResource(Skinning3DUniforms.self)?.identityBuffer else {
-
             return
-
+        }
+        guard let materialBuffer = world.getResource(PBR3DUniforms.self)?.buffer(for: item.material) else {
+            return
         }
         let pbrMaterial = item.material as? PBRMaterial
         let baseColorTexture = pbrMaterial?.baseColorTexture ?? Texture2D.whiteTexture
         let metallicRoughnessTexture = pbrMaterial?.metallicRoughnessTexture ?? Texture2D.whiteTexture
         let normalTexture = pbrMaterial?.normalTexture ?? Self.flatNormalTexture
-        let emissiveTexture = pbrMaterial?.emissiveTexture ?? Self.blackTexture
+        let emissiveTexture = pbrMaterial?.emissiveTexture ?? Texture2D.whiteTexture
 
         renderEncoder.setRenderPipelineState(pipeline)
         renderEncoder.setResourceSet(
             RenderResourceSet(
                 bindings: [
+                    .init(binding: PBR3DUniforms.binding, shaderStages: .fragment, resource: .uniformBuffer(materialBuffer, offset: 0)),
+                    .init(binding: 16, shaderStages: .fragment, resource: .texture(pbrMaterial?.occlusionTexture ?? Texture2D.whiteTexture)),
+                    .init(binding: 0, shaderStages: .fragment, resource: .sampler((pbrMaterial?.occlusionTexture ?? Texture2D.whiteTexture).sampler)),
                     .init(binding: Skinning3DUniforms.binding, shaderStages: .vertex, resource: .uniformBuffer(palette, offset: 0)),
                     .init(binding: 4, shaderStages: .fragment, resource: .texture(baseColorTexture)),
                     .init(binding: 5, shaderStages: .fragment, resource: .texture(metallicRoughnessTexture)),
@@ -259,8 +272,8 @@ private struct Opaque3DBatchKey: Equatable {
     let skinningBuffer: ObjectIdentifier?
 
     init(part: Mesh.Part, material: Material, castShadows: Bool, receiveShadows: Bool, skinningBuffer: (any UniformBuffer)?) {
-        self.vertexBuffer = ObjectIdentifier(part.vertexBuffer)
-        self.indexBuffer = ObjectIdentifier(part.indexBuffer)
+        vertexBuffer = ObjectIdentifier(part.vertexBuffer)
+        indexBuffer = ObjectIdentifier(part.indexBuffer)
         self.material = ObjectIdentifier(material)
         self.castShadows = castShadows
         self.receiveShadows = receiveShadows

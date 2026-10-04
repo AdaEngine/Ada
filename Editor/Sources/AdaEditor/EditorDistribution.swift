@@ -10,6 +10,14 @@ public enum EditorDistribution: String, Sendable {
         #if os(iOS) || os(tvOS) || os(visionOS)
             return .appStore
         #else
+            #if os(macOS)
+            if let executable = Bundle.main.executableURL, let app = EditorBuildSDK.appBundle(containing: executable) {
+                return resolve(
+                    channel: Bundle(url: app)?.object(forInfoDictionaryKey: "AdaEditorDistribution") as? String,
+                    isAppBundle: true
+                )
+            }
+            #endif
             return resolve(
                 channel: Bundle.main.object(forInfoDictionaryKey: "AdaEditorDistribution") as? String,
                 isAppBundle: Bundle.main.bundleURL.pathExtension == "app"

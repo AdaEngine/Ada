@@ -20,6 +20,7 @@ enum EditorSceneEntityTemplate: String, CaseIterable, Hashable, Sendable {
     case light2D
     case camera3D
     case model3D
+    case importedModel3D
     case directionalLight3D
     case pointLight3D
     case spotLight3D
@@ -41,6 +42,7 @@ enum EditorSceneEntityTemplate: String, CaseIterable, Hashable, Sendable {
             .twoD
         case .camera3D,
             .model3D,
+            .importedModel3D,
             .directionalLight3D,
             .pointLight3D,
             .spotLight3D:
@@ -64,6 +66,7 @@ enum EditorSceneEntityTemplate: String, CaseIterable, Hashable, Sendable {
         case .light2D: "Light 2D"
         case .camera3D: "Camera 3D"
         case .model3D: "Model Entity 3D"
+        case .importedModel3D: "Imported Model 3D"
         case .directionalLight3D: "Directional Light 3D"
         case .pointLight3D: "Point Light 3D"
         case .spotLight3D: "Spot Light 3D"
@@ -85,6 +88,7 @@ enum EditorSceneEntityTemplate: String, CaseIterable, Hashable, Sendable {
         case .light2D: "2D light and visibility"
         case .camera3D: "Perspective camera and visibility"
         case .model3D: "PBR mesh, material, and visibility"
+        case .importedModel3D: "GLB/glTF hierarchy, materials and animation"
         case .directionalLight3D: "Sun-like light with shadows"
         case .pointLight3D: "Omnidirectional 3D light"
         case .spotLight3D: "Focused 3D light"

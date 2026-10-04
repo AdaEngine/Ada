@@ -87,6 +87,7 @@ final class EditorInspectorSidebarViewModel {
     var scriptableObjectCatalog: [EditorScriptableObjectDescriptor] = []
     var textureAssets: [TextureAsset] = []
     var tileMapAssets: [TextureAsset] = []
+    var modelAssets: [TextureAsset] = []
     var sceneAssets: [SceneAsset] = []
     var uiSourcePaths: [String] = []
     var uiSceneFiles: [String: String] = [:]
@@ -278,6 +279,14 @@ final class EditorInspectorSidebarViewModel {
         return tileMapAssets.filter {
             $0.name.lowercased().contains(normalizedQuery) || $0.reference.lowercased().contains(normalizedQuery)
         }
+    }
+
+    func modelAssets(matching query: String) -> [TextureAsset] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedQuery.isEmpty else {
+            return modelAssets
+        }
+        return modelAssets.filter { $0.name.lowercased().contains(normalizedQuery) || $0.reference.lowercased().contains(normalizedQuery) }
     }
 
     func textureAsset(droppedFileURL url: URL) -> TextureAsset? {

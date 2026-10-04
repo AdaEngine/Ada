@@ -362,6 +362,8 @@ extension EditorCenterWorkbench {
                 return "\u{E8F1}"
             case .image:
                 return "\u{E3F4}"
+            case .model3D:
+                return EditorProjectTreeIcon.mesh
             case .audio:
                 return "\u{EB82}"
             case .generic:
@@ -399,6 +401,8 @@ extension EditorCenterWorkbench {
                 return theme.editorColors.blue
             case .image:
                 return theme.editorColors.blue
+            case .model3D:
+                return theme.editorColors.purple
             case .audio:
                 return theme.editorColors.purple
             case .generic:
@@ -438,6 +442,9 @@ extension EditorCenterWorkbench {
     @ViewBuilder
     private func assetPreview(document: EditorAssetDocument) -> some View {
         switch document.kind {
+        case .model3D:
+            EditorModelAssetPreview(document: document, workbench: viewModel, resourceRootURL: sceneResourceRootURL)
+                .id(document.id)
         case .tileSource:
             EditorTileSourceAssetEditor(document: document, model: viewModel.tileSourceModel(for: document))
                 .id(document.id)

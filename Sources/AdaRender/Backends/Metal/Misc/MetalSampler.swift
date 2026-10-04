@@ -19,6 +19,16 @@
             mtlDescriptor.lodMinClamp = descriptor.lodMinClamp
             mtlDescriptor.lodMaxClamp = descriptor.lodMaxClamp
             mtlDescriptor.supportArgumentBuffers = true
+            func address(_ mode: SamplerAddressMode) -> MTLSamplerAddressMode {
+                switch mode {
+                case .clampToEdge: return .clampToEdge
+                case .repeat: return .repeat
+                case .mirroredRepeat: return .mirrorRepeat
+                }
+            }
+            mtlDescriptor.sAddressMode = address(descriptor.addressModeU)
+            mtlDescriptor.tAddressMode = address(descriptor.addressModeV)
+            mtlDescriptor.rAddressMode = address(descriptor.addressModeW)
 
             switch descriptor.mipFilter {
             case .nearest:

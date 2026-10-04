@@ -12,7 +12,6 @@ targets:
     platform: visionOS
     sources:
       - Sources
-      - path: ../SkeletalGarden/GardenScene.swift
       - path: ../SkeletalGarden/Assets
         type: folder
         buildPhase: resources

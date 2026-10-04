@@ -163,6 +163,8 @@ targets:
         # CodeSign must run after staging replaces the executable and resources.
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/MacOS/adastudio
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/BuildSDK/sdk.json
         script: |
           set -euo pipefail
 
@@ -193,6 +195,19 @@ targets:
           mkdir -p "${destination_resources:h}"
           /usr/bin/ditto "${source_resources}" "${destination_resources}"
           /usr/bin/ditto "${source_ui_resources}" "${destination_ui_resources}"
+          cli_binary="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/MacOS/adastudio"
+          /usr/bin/ditto "${source_binary}" "${cli_binary}"
+          /bin/chmod +x "${cli_binary}"
+          /usr/bin/python3 "${SRCROOT}/scripts/stage-build-sdk.py" \
+            --engine-root "${SRCROOT}/.." \
+            --output "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/BuildSDK"
+          if [[ "${CODE_SIGNING_ALLOWED:-YES}" != "NO" ]]; then
+            identity="${EXPANDED_CODE_SIGN_IDENTITY:--}"
+            /usr/bin/codesign --force --options runtime --sign "${identity}" \
+              --entitlements "${SRCROOT}/Platforms/AdaEditor-Standalone.entitlements" "${cli_binary}"
+            /usr/bin/codesign --force --options runtime --sign "${identity}" \
+              "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/BuildSDK/AdaScript/gravity"
+          fi
   AdaEditor-iPadOS:
     attributes:
       SystemCapabilities:

@@ -17,8 +17,9 @@ open ImmersiveGarden.xcodeproj
 
 Select the ImmersiveGarden scheme and an Apple Vision Pro. Set your signing team
 in Xcode before installing on a device. Enter the garden from the tools window.
-The committed desktop SkeletalGarden scene construction and assets are shared;
-changes from another dirty checkout are not required.
+The immersive demo owns its scene construction and shares the committed assets
+from SkeletalGarden. The desktop demo keeps its newer landscape, controller and
+camera systems from main; changes from another dirty checkout are not required.
 
 ## Simulator
 

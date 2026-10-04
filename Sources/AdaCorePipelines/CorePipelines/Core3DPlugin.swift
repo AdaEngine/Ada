@@ -30,6 +30,7 @@ public struct Core3DPlugin: Plugin {
         GLTFLoaderResolver.shared.setLoader(NativeGLTFLoader())
         OBJLoaderResolver.shared.setLoader(NativeOBJLoader())
         Environment3D.registerComponent()
+        AssetsManager.registerAssetType(ImageBasedLighting3D.self)
 
         guard let app = app.getSubworldBuilder(by: .renderWorld) else {
             return
@@ -41,7 +42,7 @@ public struct Core3DPlugin: Plugin {
 
         var graph = RenderGraph(label: .main3D)
         let entryNode = graph.addEntryNode(inputs: [
-            RenderSlot(name: InputNode.view, kind: .entity)
+            RenderSlot(name: InputNode.view, kind: .entity),
         ])
 
         graph.addNode(EmptyNode(), by: .Main3D.beginPass)
@@ -75,6 +76,7 @@ public struct Core3DPlugin: Plugin {
             .insertResource(ExtractedEnvironment3D())
             .insertResource(ExtractedLighting3D())
             .insertResource(Lighting3DGPUScratch())
+            .insertResource(IBL3DScratch())
             .insertResource(Skinning3DUniforms())
             .insertResource(DirectionalShadow3D())
             .insertResource(DirectionalShadow3DScratch())
@@ -89,18 +91,18 @@ public struct Core3DPlugin: Plugin {
     }
 }
 
-extension RenderGraph.Label {
+public extension RenderGraph.Label {
     /// Render graph name.
-    public static let main3D: RenderGraph.Label = "Scene 3D Render Graph"
+    static let main3D: RenderGraph.Label = "Scene 3D Render Graph"
 }
 
-extension RenderNodeLabel {
-    public enum Main3D {
+public extension RenderNodeLabel {
+    enum Main3D {
         public static let beginPass: RenderNodeLabel = "Main3D.BeginPass"
         public static let endPass: RenderNodeLabel = "Main3D.EndPass"
     }
 }
 
-extension RenderNodeLabel {
-    public static let screenSpaceReflection: RenderNodeLabel = "Main3D.ScreenSpaceReflection"
+public extension RenderNodeLabel {
+    static let screenSpaceReflection: RenderNodeLabel = "Main3D.ScreenSpaceReflection"
 }

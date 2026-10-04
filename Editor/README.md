@@ -37,6 +37,13 @@ open AdaEditor.xcodeproj
 
 The generated project uses the local `AdaEditor` SwiftPM package. To build and run the editor, select the `AdaEditor (Editor)` scheme that Xcode creates for the package's executable product.
 
+## Command Line
+
+The standalone macOS bundle also includes the `adastudio` command-line entry for
+project inspection, validation and AdaScript app builds. See [CLI](Documentation/CLI.md)
+for commands, SDK prerequisites and the JSON contract. iOS uses its existing
+embedded validation and Play services.
+
 ## TestFlight
 
 Fastlane can build a signed iPadOS IPA (`bundle exec fastlane ios build`) or build

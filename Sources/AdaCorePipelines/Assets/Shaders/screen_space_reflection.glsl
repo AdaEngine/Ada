@@ -22,6 +22,8 @@ layout (binding = 1) uniform texture2D u_NormalRoughness;
 layout (binding = 2) uniform texture2D u_ViewPositionMetallic;
 layout (binding = 3) uniform sampler u_LinearSampler;
 layout (binding = 5) uniform texture2D u_EnvironmentTexture;
+layout (binding = 6) uniform texture2D u_Radiance;
+layout (binding = 7) uniform sampler u_RadianceSampler;
 
 layout (binding = 4) uniform Environment3DUniform {
     mat4 u_Projection;
@@ -35,6 +37,7 @@ layout (binding = 4) uniform Environment3DUniform {
     vec4 u_ReflectionQuality;
     vec4 u_EnvironmentFlags;
     vec4 u_Starfield;
+    vec4 u_IBL;
 };
 
 const float PI = 3.14159265359;
@@ -100,6 +103,12 @@ vec3 sampleSky(vec3 viewDirection) {
         return srgbToLinear(u_ClearColor.rgb);
     }
     vec3 worldDirection = normalize((u_InverseView * vec4(viewDirection, 0.0)).xyz);
+    if (u_IBL.x > 0.5 && u_IBL.w > 0.5) {
+        float angle = u_IBL.z;
+        worldDirection.xz = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * worldDirection.xz;
+        vec2 uv = vec2(atan(worldDirection.z, worldDirection.x) / (2.0 * PI) + 0.5, asin(clamp(worldDirection.y, -1.0, 1.0)) / PI + 0.5);
+        return texture(sampler2D(u_Radiance, u_RadianceSampler), uv).rgb * u_IBL.y;
+    }
     if (u_EnvironmentFlags.y > 0.5) {
         vec2 uv = vec2(
             atan(worldDirection.z, worldDirection.x) / (2.0 * PI) + 0.5,
@@ -173,6 +182,8 @@ void ssr_fragment() {
     }
 
     vec3 baseColor = texture(sampler2D(u_SceneColor, u_LinearSampler), v_UV).rgb;
+    // The PBR pass already integrated diffuse and specular IBL, including AO and material F0.
+    if (u_IBL.x > 0.5) { o_Color = vec4(presentColor(baseColor), 1.0); return; }
     vec3 normal = normalize(normalRoughness.xyz);
     float roughness = clamp(normalRoughness.w, 0.04, 1.0);
     float metallic = clamp(positionMetallic.w, 0.0, 1.0);

@@ -241,7 +241,8 @@ extension EditorSceneEntityTemplate {
             "\u{E3AF}"
         case .sprite: "\u{E3B6}"
         case .mesh2D,
-            .model3D:
+            .model3D,
+            .importedModel3D:
             "\u{E3A5}"
         case .tileMap: "\u{E8F1}"
         case .light2D,

@@ -5,6 +5,7 @@
 //  Created by Codex on 07/06/26.
 //
 
+import AdaAssets
 import AdaECS
 @_spi(Internal) import AdaRender
 import AdaUtils
@@ -21,7 +22,8 @@ public struct Main3DRenderNode: RenderNode {
         Entity,
         Camera,
         RenderViewTarget,
-        GlobalViewUniform
+        GlobalViewUniform,
+        ExtractedCameraSource
     >
     private var query
 
@@ -30,6 +32,9 @@ public struct Main3DRenderNode: RenderNode {
 
     @Res<ExtractedLighting3D>
     private var lighting
+
+    @Res<ExtractedEnvironment3D> private var environments
+    @ResMut<IBL3DScratch> private var ibl
 
     @ResMut<Lighting3DGPUScratch>
     private var lightingScratch
@@ -40,7 +45,7 @@ public struct Main3DRenderNode: RenderNode {
     public init() {}
 
     public let inputResources: [RenderSlot] = [
-        RenderSlot(name: InputNode.view, kind: .entity)
+        RenderSlot(name: InputNode.view, kind: .entity),
     ]
 
     public func update(from world: World) {
@@ -48,6 +53,8 @@ public struct Main3DRenderNode: RenderNode {
         _renderItems.update(from: world)
         _lighting.update(from: world)
         _lightingScratch.update(from: world)
+        _environments.update(from: world)
+        _ibl.update(from: world)
         _renderDevice.update(from: world)
     }
 
@@ -61,7 +68,7 @@ public struct Main3DRenderNode: RenderNode {
             return []
         }
 
-        try query.forEach { entity, camera, target, uniform in
+        try query.forEach { entity, camera, target, uniform, source in
             if entity != view {
                 return
             }
@@ -78,11 +85,11 @@ public struct Main3DRenderNode: RenderNode {
             let clearColor = camera.clearFlags.contains(.solid) ? camera.backgroundColor : .surfaceClearColor
             let directionalLight =
                 lighting.directionalLight
-                ?? ExtractedDirectionalLight3D(
-                    directionToLight: Vector3(0.35, 0.7, 0.45).normalized,
-                    radiance: .one,
-                    intensity: 3.2
-                )
+                    ?? ExtractedDirectionalLight3D(
+                        directionToLight: Vector3(0.35, 0.7, 0.45).normalized,
+                        radiance: .one,
+                        intensity: 3.2
+                    )
             let viewDirectionToLight = (uniform.viewMatrix * Vector4(directionalLight.directionToLight, 0)).xyz.normalized
             let shadowsEnabled = shadow.isEnabled && directionalLight.castsShadows && shadow.colorTexture != nil
             lightingScratch.directionalLight.elements = [
@@ -96,7 +103,7 @@ public struct Main3DRenderNode: RenderNode {
                         max(0, directionalLight.shadowSlopeBias),
                         1 / Float(DirectionalShadow3D.resolution)
                     )
-                )
+                ),
             ]
             lightingScratch.directionalLight.write(to: renderDevice.renderDevice)
 
@@ -148,10 +155,50 @@ public struct Main3DRenderNode: RenderNode {
                 ),
                 index: 0
             )
+            let settings = environments.environments[source.entityId]?.imageBasedLighting
+            let environment = settings?.asset.asset
+            ibl.uniform.elements = [
+                IBL3DUniform(
+                inverseView: uniform.viewMatrix.inverse,
+                parameters: Vector4(environment == nil ? 0 : 1, max(0, settings?.intensity ?? 1), Float(environment?.specularLevels ?? 2), settings?.rotation ?? 0)
+                )
+            ]
+            ibl.uniform.write(to: renderDevice.renderDevice)
+            let diffuse = environment?.irradiance ?? Texture2D.whiteTexture
+            let specular = environment?.specular ?? Texture2D.whiteTexture
+            let lut = environment?.brdf ?? Texture2D.whiteTexture
+            renderPass.setResourceSet(RenderResourceSet(bindings: [
+                .init(binding: 18, shaderStages: .fragment, resource: .texture(diffuse)),
+                .init(binding: 19, shaderStages: .fragment, resource: .texture(specular)),
+                .init(binding: 20, shaderStages: .fragment, resource: .texture(lut)),
+                .init(binding: 3, shaderStages: .fragment, resource: .sampler(diffuse.sampler)),
+            ]), index: 0)
+            renderPass.setFragmentBuffer(ibl.uniform, offset: 0, slot: 22)
             renderPass.setViewport(camera.viewport.rect)
 
             if !renderItems.items.isEmpty {
-                try renderItems.render(with: renderPass, world: context.world, view: view)
+                if renderItems.items.contains(where: { ($0.material as? PBRMaterial)?.alphaMode == .blend }) {
+                    let sorted = renderItems.items.enumerated().sorted { left, right in
+                        let lhs = left.element
+                        let rhs = right.element
+                        let leftBlend = (lhs.material as? PBRMaterial)?.alphaMode == .blend
+                        let rightBlend = (rhs.material as? PBRMaterial)?.alphaMode == .blend
+                        if leftBlend != rightBlend {
+                            return !leftBlend
+                        }
+                        if !leftBlend {
+                            return left.offset < right.offset
+                        }
+                        let leftDepth = (uniform.viewMatrix * lhs.worldTransform.w).z
+                        let rightDepth = (uniform.viewMatrix * rhs.worldTransform.w).z
+                        return leftDepth == rightDepth ? left.offset < right.offset : leftDepth > rightDepth
+                    }.map(\.element)
+                    var ordered = renderItems
+                    ordered.items = sorted
+                    try ordered.render(with: renderPass, world: context.world, view: view)
+                } else {
+                    try renderItems.render(with: renderPass, world: context.world, view: view)
+                }
             }
 
             renderPass.endRenderPass()

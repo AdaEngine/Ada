@@ -1050,8 +1050,9 @@ extension EditorSceneViewportModel {
                     return nil
                 }
 
-                let bounds = entity.components[BoundingComponent.self]
-                guard let distance = EditorPicking.intersectionDistance(ray: ray, transform: transform, bounds: bounds) else {
+                let worldMatrix = entity.components[GlobalTransform.self]?.matrix ?? transform.matrix
+                let bounds = entity.components[BoundingComponent.self] ?? entity.components[Mesh3DComponent.self].map { BoundingComponent(bounds: .aabb($0.mesh.bounds)) }
+                guard let distance = EditorPicking.intersectionDistance(ray: ray, matrix: worldMatrix, bounds: bounds) else {
                     return nil
                 }
                 return (editorID, distance)

@@ -46,7 +46,7 @@ struct SkeletalModel3DTests {
         let renderWorld = try #require(app.getSubworldBuilder(by: .renderWorld)?.main)
         renderWorld.insertResource(MainWorld(world: app.main))
         var buffers: [ObjectIdentifier] = []
-        for _ in 0..<4 {
+        for _ in 0 ..< 4 {
             await renderWorld.runScheduler(.extract)
             let items = try #require(renderWorld.getResource(RenderItems<Opaque3DRenderItem>.self)).items
             #expect(items.count == 2)
@@ -62,10 +62,50 @@ struct SkeletalModel3DTests {
     }
 
     @Test
+    func skinnedShadowPipelineDoesNotAllocateAnUnusedFallbackVertexSlot() async throws {
+        _ = try await makeApp()
+        let model = try loadModel("TestHumanoid")
+        let part = try #require(model.meshes.first?.models.first?.parts.first)
+        var pipeline = DirectionalShadow3DPipeline().configurate(with: part.vertexDescriptor)
+        #expect(pipeline.vertexDescriptor.layouts.enumerated().allSatisfy { index, layout in
+            layout.stride == 0 || pipeline.vertexDescriptor.attributes.contains { $0.format != .invalid && $0.bufferIndex == index }
+        })
+        #expect(pipeline.vertexDescriptor.layouts[3].stride == MemoryLayout<Flat3DInstanceData>.stride)
+        var staticMesh = MeshDescriptor(name: "Static")
+        staticMesh.positions = MeshBuffer([Vector3.zero])
+        var fallback = DirectionalShadow3DPipeline().configurate(with: staticMesh.getMeshVertexBufferDescriptor())
+        #expect(fallback.vertexDescriptor.layouts[4].stride == MemoryLayout<Flat3DDefaultVertexData>.stride)
+    }
+
+    @Test
+    func staticBatchesHaveEnoughFallbackVerticesForEveryInstance() async throws {
+        let app = try await makeApp()
+        let device = unsafe RenderEngine.shared.renderDevice
+        let mesh = Mesh.generateCube(renderDevice: device)
+        let material = PBRMaterial()
+        for _ in 0 ..< 4 {
+            app.main.spawn {
+                Mesh3DComponent(mesh: mesh, materials: [material])
+                Transform()
+            }
+        }
+        await app.main.runScheduler(.preUpdate)
+        let renderWorld = try #require(app.getSubworldBuilder(by: .renderWorld)?.main)
+        renderWorld.insertResource(MainWorld(world: app.main))
+        await renderWorld.runScheduler(.extract)
+        let items = try #require(renderWorld.getResource(RenderItems<Opaque3DRenderItem>.self)).items
+        #expect(items.count == 1)
+        #expect(items[0].batchRange?.count == 4)
+        let defaults = try #require(renderWorld.getResource(Opaque3DInstanceBuffers.self)?.defaultVertexBuffer)
+        #expect(defaults.count >= 4)
+        #expect(defaults.elements.allSatisfy { $0.jointIndices.x == -1 })
+    }
+
+    @Test
     func paletteCancelsTheMeshNodeTransformAndPreservesBindPose() throws {
         let rig = try SkeletalRig(nodes: [
             .init(parentIndex: nil, restPose: SkeletalJointPose(translation: [5, 0, 0]), restMatrix: Transform3D(translation: [5, 0, 0])),
-            .init(parentIndex: nil, restPose: SkeletalJointPose(translation: [0, 1, 0]), restMatrix: Transform3D(translation: [0, 1, 0]))
+            .init(parentIndex: nil, restPose: SkeletalJointPose(translation: [0, 1, 0]), restMatrix: Transform3D(translation: [0, 1, 0])),
         ])
         let player = try SkeletalAnimationPlayer(rig: rig, clips: [])
         let skin = GLTFImportResult.Skin(name: nil, joints: [1], skeletonRootIndex: nil, inverseBindMatrices: [.identity])
@@ -106,8 +146,8 @@ struct SkeletalModel3DTests {
     }
 
     private func nearIdentity(_ matrix: Transform3D) -> Bool {
-        (0..<4).allSatisfy { column in
-            (0..<4).allSatisfy { row in abs(matrix[column, row] - Transform3D.identity[column, row]) < 0.0001 }
+        (0 ..< 4).allSatisfy { column in
+            (0 ..< 4).allSatisfy { row in abs(matrix[column, row] - Transform3D.identity[column, row]) < 0.0001 }
         }
     }
 }

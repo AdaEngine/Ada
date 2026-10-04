@@ -127,34 +127,6 @@ public struct GLTFImportResult: Sendable {
         case triangleFan = 6
     }
 
-    public struct Material: Sendable {
-        public let name: String?
-        public let baseColorFactor: Vector4
-        public let baseColorTextureIndex: Int?
-        public let metallicFactor: Float
-        public let roughnessFactor: Float
-        public let metallicRoughnessTextureIndex: Int?
-        public let normalTextureIndex: Int?
-
-        public init(
-            name: String?,
-            baseColorFactor: Vector4,
-            baseColorTextureIndex: Int?,
-            metallicFactor: Float,
-            roughnessFactor: Float,
-            metallicRoughnessTextureIndex: Int?,
-            normalTextureIndex: Int?
-        ) {
-            self.name = name
-            self.baseColorFactor = baseColorFactor
-            self.baseColorTextureIndex = baseColorTextureIndex
-            self.metallicFactor = metallicFactor
-            self.roughnessFactor = roughnessFactor
-            self.metallicRoughnessTextureIndex = metallicRoughnessTextureIndex
-            self.normalTextureIndex = normalTextureIndex
-        }
-    }
-
     public struct Texture: Sendable {
         public let source: Int
         public let sampler: Int?
@@ -181,6 +153,7 @@ public struct GLTFImportResult: Sendable {
     public let meshes: [Mesh]
     public let materials: [Material]
     public let textures: [Texture]
+    public let samplers: [Sampler]
     public let images: [Image]
     public let scenes: [[Int]]
     public let defaultScene: Int?
@@ -196,7 +169,8 @@ public struct GLTFImportResult: Sendable {
         scenes: [[Int]],
         defaultScene: Int?,
         skins: [Skin] = [],
-        animations: [Animation] = []
+        animations: [Animation] = [],
+        samplers: [Sampler] = []
     ) {
         self.nodes = nodes
         self.meshes = meshes
@@ -207,6 +181,7 @@ public struct GLTFImportResult: Sendable {
         self.defaultScene = defaultScene
         self.skins = skins
         self.animations = animations
+        self.samplers = samplers
     }
 }
 
@@ -221,7 +196,7 @@ public final class GLTFLoaderResolver: @unchecked Sendable {
     }
 
     public func getLoader() -> any GLTFLoader {
-        guard let loader = self.loader else {
+        guard let loader else {
             fatalError("GLTFLoader is not set. Please set a loader using GLTFLoaderResolver.shared.setLoader(_:)")
         }
         return loader
