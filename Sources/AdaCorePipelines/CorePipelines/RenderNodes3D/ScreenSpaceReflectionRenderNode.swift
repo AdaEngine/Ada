@@ -94,6 +94,12 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                     max(skybox.starfield.intensity, 0),
                     max(skybox.starfield.size, 0.1),
                     skybox.starfield.seed
+                ),
+                ibl: Vector4(
+                    environment.imageBasedLighting?.asset.asset == nil ? 0 : 1,
+                    max(0, environment.imageBasedLighting?.intensity ?? 1),
+                    environment.imageBasedLighting?.rotation ?? 0,
+                    environment.imageBasedLighting?.asset.asset?.radiance == nil ? 0 : 1
                 )
             )
             scratch.uniform.elements = [uniform]
@@ -110,7 +116,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                             texture: mainTexture,
                             operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
                             clearColor: camera.backgroundColor
-                        )
+                        ),
                     ],
                     depthStencilAttachment: nil
                 )
@@ -123,6 +129,8 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                         .init(binding: 1, shaderStages: .fragment, resource: .texture(normalRoughness)),
                         .init(binding: 2, shaderStages: .fragment, resource: .texture(viewPositionMetallic)),
                         .init(binding: 3, shaderStages: .fragment, resource: .sampler(pipeline.sampler)),
+                        .init(binding: 6, shaderStages: .fragment, resource: .texture(environment.imageBasedLighting?.asset.asset?.radiance ?? Texture2D.whiteTexture)),
+                        .init(binding: 7, shaderStages: .fragment, resource: .sampler((environment.imageBasedLighting?.asset.asset?.radiance ?? Texture2D.whiteTexture).sampler)),
                         .init(binding: 5, shaderStages: .fragment, resource: .texture(environmentTexture)),
                     ]
                 ),
@@ -133,7 +141,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
             pass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
             pass.endRenderPass()
             if notifiesCompletion, let outputTexture = target.outputTexture,
-                mainTexture === outputTexture {
+               mainTexture === outputTexture {
                 commandBuffer.addCompletedHandler { [outputTexture] in
                     outputTexture.notifyRenderCompleted()
                 }

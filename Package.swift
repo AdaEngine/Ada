@@ -1311,7 +1311,7 @@ targets.append(.executableTarget(
     name: "SkeletalGarden",
     dependencies: ["AdaEngine"],
     path: "Demos/SkeletalGarden",
-    exclude: ["script", "README.md", "dist"],
+    exclude: ["script", "README.md", "dist", "SourceAssets"],
     resources: [.copy("Assets")],
     swiftSettings: swiftSettings
 ))

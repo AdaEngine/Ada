@@ -31,12 +31,18 @@ public struct SkeletalAnimationPlayer: Sendable {
 
     /// Starts a named clip, optionally fading from the current pose.
     public mutating func play(_ name: String, transitionDuration: Double = 0.15) throws(SkeletalAnimationError) {
+        try play(name, transitionDuration: transitionDuration, startTime: 0)
+    }
+
+    /// Starts at a clip-local time without cancelling the fade. Useful for matching walk/run phases.
+    /// Non-finite start times are treated as zero; looping and clamping follow `repeats`.
+    public mutating func play(_ name: String, transitionDuration: Double = 0.15, startTime: Double) throws(SkeletalAnimationError) {
         guard let index = clips.firstIndex(where: { $0.name == name }) else { throw .unknownClip(name) }
         self.transitionSource = poses
         self.transitionDuration = transitionDuration.isFinite ? max(0, transitionDuration) : 0
         self.transitionTime = 0
         self.clipIndex = index
-        self.time = 0
+        self.time = startTime.isFinite ? startTime : 0
         self.isPlaying = true
         evaluate()
     }
@@ -65,7 +71,7 @@ public struct SkeletalAnimationPlayer: Sendable {
             let duration = clips[clipIndex].duration
             if speed >= 0 && time >= duration || speed < 0 && time <= 0 {
                 time = min(max(time, 0), duration)
-                isPlaying = false
+                isPlaying = transitionTime < transitionDuration
             }
         }
         evaluate()

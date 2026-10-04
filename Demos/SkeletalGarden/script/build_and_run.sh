@@ -35,19 +35,34 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 : > "$DEMO_ROOT/dist/runtime.log"
 case "$MODE" in
+    --capture-no-ibl)
+        mkdir -p "$DEMO_ROOT/dist/captures/no-ibl"
+        rm -f "$DEMO_ROOT/dist/captures/no-ibl/frame-30.png" "$DEMO_ROOT/dist/captures/no-ibl/frame-50.png"
+        /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --pose-proof --no-ibl --capture-directory "$DEMO_ROOT/dist/captures/no-ibl"
+        ;;
     --capture)
         mkdir -p "$DEMO_ROOT/dist/captures"
+        rm -f "$DEMO_ROOT/dist/captures/frame-30.png" "$DEMO_ROOT/dist/captures/frame-50.png"
         /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --pose-proof --capture-directory "$DEMO_ROOT/dist/captures"
         ;;
     run) /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" ;;
     --autoplay) /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --autoplay ;;
     --verify)
-        /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --autoplay
-        sleep 8
-        if ! /usr/bin/pgrep -x SkeletalGarden >/dev/null; then
-            tail -60 "$DEMO_ROOT/dist/runtime.log"
-            exit 1
-        fi
+        /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --controller-proof
+        for attempt in {1..20}; do
+            if rg -q 'controller verification PASS' "$DEMO_ROOT/dist/runtime.log"; then
+                cat "$DEMO_ROOT/dist/runtime.log"
+                exit 0
+            fi
+            if ! /usr/bin/pgrep -x SkeletalGarden >/dev/null || rg -q 'controller .* FAIL|startup failed' "$DEMO_ROOT/dist/runtime.log"; then
+                tail -60 "$DEMO_ROOT/dist/runtime.log"
+                exit 1
+            fi
+            sleep 1
+        done
+        tail -60 "$DEMO_ROOT/dist/runtime.log"
+        echo 'Controller verification timed out' >&2
+        exit 1
         ;;
     --debug) /usr/bin/lldb -- "$APP/Contents/MacOS/SkeletalGarden" ;;
     --logs)

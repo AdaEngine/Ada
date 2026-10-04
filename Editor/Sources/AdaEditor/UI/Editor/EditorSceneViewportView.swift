@@ -12,6 +12,9 @@ struct EditorSceneViewportView: View {
     let onPlay: (() -> Void)?
     let onStop: (() -> Void)?
     let onDocumentChanged: (EditorSceneDocument) -> Void
+    var initialDisplayMode: EditorSceneViewportDisplayMode = .twoD
+    var isAssetPreview = false
+    var onEditWorldReady: ((World) -> Void)?
 
     @State private var performanceSession = EditorGamePerformanceSession()
     @State var displayPreview = EditorDisplayPreviewModel()
@@ -41,9 +44,14 @@ struct EditorSceneViewportView: View {
         }
         .accessibilityIdentifier("AdaEditor.SceneViewport.\(document.title)")
         .onAppear {
+            selectViewportMode(hasImportedModels ? .threeD : initialDisplayMode)
+            if isAssetPreview { selectTool(.select) }
             if let resourceRootURL {
                 displayPreview.load(projectRoot: Self.uiProjectRoot(from: resourceRootURL))
             }
+        }
+        .onChange(of: hasImportedModels) { _, hasModels in
+            if hasModels { selectViewportMode(.threeD) }
         }
         .onDisappear {
             viewportModel.disconnect()
@@ -57,6 +65,10 @@ struct EditorSceneViewportView: View {
         }
 
         return false
+    }
+
+    private var hasImportedModels: Bool {
+        document.sceneModel?.entities.contains { $0.components[EditorBuiltInComponentType.model3DSource] != nil } == true
     }
 
     private var editViewport: some View {
@@ -78,6 +90,7 @@ struct EditorSceneViewportView: View {
                                 runtimeWarnings = result.warnings
                             }
                             viewportModel.attachSceneWorld(app.main, loadResult: result)
+                            onEditWorldReady?(app.main)
                         },
                         updateContent: { world, deltaTime in
                             var didChangeViewport = false
@@ -252,7 +265,7 @@ struct EditorSceneViewportView: View {
                 .foregroundColor(theme.editorColors.muted)
             #endif
             Spacer()
-            Text(isPlayingThisDocument ? "PLAY MODE" : "SCENE")
+            Text(isPlayingThisDocument ? "PLAY MODE" : isAssetPreview ? "MODEL PREVIEW" : "SCENE")
                 .font(.system(size: 10))
                 .foregroundColor(isPlayingThisDocument ? theme.editorColors.purple : theme.editorColors.muted)
         }
@@ -286,7 +299,9 @@ struct EditorSceneViewportView: View {
             onPlay: { onPlay?() },
             onSelectDisplayMode: selectViewportMode,
             onSelectTool: selectTool,
-            onStop: { onStop?() }
+            onStop: { onStop?() },
+            showsEditingTools: !isAssetPreview,
+            showsPlayback: !isAssetPreview
         )
     }
 

@@ -87,6 +87,9 @@ enum EditorSceneFileLoader {
         typeName: String, payload: EditorComponentPayload, sourceURL: URL?, resourceRootURL: URL?
     ) throws -> EditorComponentPayload {
         var resolvedPayload = payload
+        if typeName == EditorBuiltInComponentType.model3DSource, let reference = payload["source"]?.stringValue, !reference.isEmpty {
+            resolvedPayload["source"] = .string(try EditorModelResource.resolve(reference, sourceURL: sourceURL, resourceRootURL: resourceRootURL).path)
+        }
         if typeName == EditorBuiltInComponentType.tileMap,
             let reference = payload["map"]?.stringValue,
             !reference.isEmpty {
@@ -200,6 +203,24 @@ enum EditorSceneFileLoader {
                 }
             }
             completeRuntimeBundle(for: entity, in: world)
+            #if !WASM
+            if let reference = entity.components[Model3DSource.self], !reference.source.isEmpty {
+                do {
+                    let model = try AssetsManager.loadSync(ModelAsset3D.self, at: reference.source)
+                    guard let asset = model.asset else { throw AssetError.message("Model has not loaded.") }
+                    let root = try reference.instantiate(asset, in: world, under: entity)
+                    func registerNodes(_ node: Entity) {
+                        entityCount += 1
+                        editorIDsByRuntimeEntityID[node.id] = runtimeEditorID
+                        for child in node.children { registerNodes(child) }
+                    }
+                    registerNodes(root)
+                } catch {
+                    entity.components[Model3DSourceState.self] = .init(reference: reference, error: error.localizedDescription)
+                    warnings.append("Failed to load model on \(sceneEntity.name): \(error.localizedDescription)")
+                }
+            }
+            #endif
         }
 
         for sceneEntity in sceneModel.entities {

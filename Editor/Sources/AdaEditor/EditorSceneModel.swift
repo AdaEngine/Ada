@@ -272,6 +272,8 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
                 [EditorBuiltInComponentType.light2D]
             case .model3D:
                 [EditorBuiltInComponentType.mesh3D]
+            case .importedModel3D:
+                [EditorBuiltInComponentType.model3DSource]
             case .directionalLight3D:
                 [EditorBuiltInComponentType.directionalLight3D]
             case .pointLight3D:

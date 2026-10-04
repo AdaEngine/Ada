@@ -95,18 +95,38 @@ public struct ScreenSpaceReflection: Codable, Sendable {
     }
 }
 
+/// An offline-baked environment shared by cameras; intensity is linear radiance scaling.
+public struct ImageBasedLightingSettings: Codable, Sendable {
+    public var asset: AssetHandle<ImageBasedLighting3D>
+    public var intensity: Float
+    public var rotation: Float
+
+    public init(asset: AssetHandle<ImageBasedLighting3D>, intensity: Float = 1, rotation: Float = 0) {
+        self.asset = asset
+        self.intensity = intensity
+        self.rotation = rotation
+    }
+}
+
 /// Environment settings consumed by the main 3D render graph.
 @Component
 public struct Environment3D: Codable, Sendable {
     public var skybox: Skybox3D
     public var screenSpaceReflection: ScreenSpaceReflection
+    public var imageBasedLighting: ImageBasedLightingSettings?
+
+    public init(skybox: Skybox3D = Skybox3D(), screenSpaceReflection: ScreenSpaceReflection = ScreenSpaceReflection()) {
+        self.init(skybox: skybox, screenSpaceReflection: screenSpaceReflection, imageBasedLighting: nil)
+    }
 
     public init(
         skybox: Skybox3D = Skybox3D(),
-        screenSpaceReflection: ScreenSpaceReflection = ScreenSpaceReflection()
+        screenSpaceReflection: ScreenSpaceReflection = ScreenSpaceReflection(),
+        imageBasedLighting: ImageBasedLightingSettings?
     ) {
         self.skybox = skybox
         self.screenSpaceReflection = screenSpaceReflection
+        self.imageBasedLighting = imageBasedLighting
     }
 }
 

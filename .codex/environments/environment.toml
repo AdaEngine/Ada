@@ -9,3 +9,8 @@ script = ""
 name = "Run"
 icon = "run"
 command = "./script/build_and_run.sh"
+
+[[actions]]
+name = "Run SkeletalGarden"
+icon = "run"
+command = "./Demos/SkeletalGarden/script/build_and_run.sh"

@@ -19,6 +19,16 @@ public class PBRMaterial: Material, @unchecked Sendable {
     public var normalTexture: Texture2D?
     public var emissiveTexture: Texture2D?
     public var emissiveStrength: Float = 0
+    public var emissiveFactor: Vector3 = .one
+    public var occlusionTexture: Texture2D?
+    public var occlusionStrength: Float = 1
+    public var normalScale: Float = 1
+    public enum AlphaMode: UInt8, Sendable { case opaque, mask, blend }
+    public var alphaMode: AlphaMode = .opaque
+    public var alphaCutoff: Float = 0.5
+    public var doubleSided = false
+    /// UV sets for base color, metallic/roughness, normal, occlusion, and emission.
+    public var textureCoordinates: [Int] = [0, 0, 0, 0, 0]
     /// A negative value emits everywhere. Non-negative values fade emission
     /// out as direct illumination rises above this threshold.
     public var emissiveLightThreshold: Float = -1
@@ -36,16 +46,16 @@ public class PBRMaterial: Material, @unchecked Sendable {
 
     override public func collectDefines(for _: VertexDescriptor, keys _: Set<String>) -> [ShaderDefine] {
         var defines: [ShaderDefine] = []
-        if self.baseColorTexture != nil {
+        if baseColorTexture != nil {
             defines.append(ShaderDefine(name: "HAS_BASE_COLOR_TEXTURE", value: "1"))
         }
-        if self.metallicRoughnessTexture != nil {
+        if metallicRoughnessTexture != nil {
             defines.append(ShaderDefine(name: "HAS_METALLIC_ROUGHNESS_TEXTURE", value: "1"))
         }
-        if self.normalTexture != nil {
+        if normalTexture != nil {
             defines.append(ShaderDefine(name: "HAS_NORMAL_TEXTURE", value: "1"))
         }
-        if self.emissiveTexture != nil {
+        if emissiveTexture != nil {
             defines.append(ShaderDefine(name: "HAS_EMISSIVE_TEXTURE", value: "1"))
         }
         return defines

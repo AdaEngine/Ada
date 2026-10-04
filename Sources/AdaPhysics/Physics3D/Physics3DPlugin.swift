@@ -39,6 +39,7 @@ public struct Physics3DPlugin: Plugin {
 
         PhysicsBody3DComponent.registerComponent()
         PhysicsBody3DInitialized.registerComponent()
+        CharacterController3DComponent.registerComponent()
 
         if app.getResource(PhysicsDebugOptions.self) == nil {
             app.insertResource(PhysicsDebugOptions())
@@ -57,6 +58,7 @@ public struct Physics3DPlugin: Plugin {
             .addSystem(Physics3DSyncSystem.self, on: .physicsSync)
             .addSystem(Physics3DUpdateSystem.self, on: .physicsStep)
             .addSystem(Physics3DWritebackSystem.self, on: .physicsWriteback)
+            .addSystem(CharacterController3DSystem.self, on: .physicsWriteback)
 
         guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else {
             return

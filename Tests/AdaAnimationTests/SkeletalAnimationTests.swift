@@ -86,6 +86,38 @@ struct SkeletalAnimationTests {
     }
 
     @Test
+    func phaseMatchedPlaybackPreservesAndCompletesTheFade() throws {
+        var player = try player()
+        try player.play("Move", transitionDuration: 0)
+        player.seek(to: 0.25)
+        let source = player.poses[0].translation.x
+        try player.play("Move", transitionDuration: 0.2, startTime: 0.75)
+        #expect(player.time == 0.75)
+        #expect(player.poses[0].translation.x == source)
+        player.advance(by: 0.1)
+        #expect(abs(player.poses[0].translation.x - 1.1) < 0.00001)
+        player.advance(by: 0.1)
+        #expect(abs(player.poses[0].translation.x - 1.9) < 0.00001)
+        try player.play("Move", transitionDuration: 0, startTime: .nan)
+        #expect(player.time == 0)
+        #expect(player.poses[0].translation == .zero)
+    }
+
+    @Test
+    func shortOneShotClipFinishesItsTransitionBeforeStopping() throws {
+        let constant = try SkeletalAnimationTrack(nodeIndex: 0, path: .translation, interpolation: .linear, times: [0], values: [[2, 0, 0, 0]])
+        var player = try SkeletalAnimationPlayer(rig: rig(), clips: [.init(name: "Pose", tracks: [constant])])
+        player.repeats = false
+        try player.play("Pose", transitionDuration: 0.2)
+        player.advance(by: 0.1)
+        #expect(player.isPlaying)
+        #expect(player.poses[0].translation.x == 1)
+        player.advance(by: 0.1)
+        #expect(!player.isPlaying)
+        #expect(player.poses[0].translation.x == 2)
+    }
+
+    @Test
     func transitionsBlendFromTheCurrentPose() throws {
         let rig = try rig()
         let first = SkeletalAnimationClip(name: "First", tracks: [try track(path: .translation, interpolation: .linear, values: [.zero, [2, 0, 0, 0]])])
