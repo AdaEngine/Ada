@@ -50,8 +50,13 @@ extension EditorViewModel {
                     appendOutput("Skipped \(sourceURL.lastPathComponent): a folder cannot be copied into itself.")
                     continue
                 }
-                let target = uniqueAssetDestinationURL(for: sourceURL, in: destination)
-                try fileManager.copyItem(at: source, to: target)
+                let target: URL
+                if values.isDirectory != true, EditorModelResource.extensions.contains(source.pathExtension.lowercased()) {
+                    target = try EditorModelAssetImporter.copy(source, to: destination, fileManager: fileManager)
+                } else {
+                    target = uniqueAssetDestinationURL(for: sourceURL, in: destination)
+                    try fileManager.copyItem(at: source, to: target)
+                }
                 importedCount += 1
                 appendOutput("Imported file \(sourceURL.lastPathComponent) -> \(relativeProjectPath(for: target.path))")
             } catch {

@@ -37,6 +37,36 @@
       },
       {
         "kind": "heading",
+        "text": "Import and place a 3D model",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use **File > Import Assets** or drop a `.glb`/`.gltf` into the project navigator.\nModels open in a 3D preview with camera navigation, mesh/material/skin counts,\nand a named animation picker with Play/Pause. Preview framing fits the model;\nplacing it in a scene preserves its original scale.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Open the destination `.ascn` scene, then open the model and choose\n**Add to Scene…**. Select the destination from the open scenes. The new entity\nstores a portable resource reference, so Save, reopening, duplicate and undo/redo\nretain the model without copying imported nodes into the authored scene file.\nThe selected preview clip and playback setting become the entity's initial\nanimation settings.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Alternatively, add **Imported Model 3D** from the entity palette or add a\n**Model 3D** component to an existing entity. In the Inspector, choose a project\nmodel, enter a clip name shown in its preview, and set **Play animation** and\n**Loop animation**. Imported nodes/materials are instantiated in both the scene\nviewport and Play. Each placed model has its own animation player.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "glTF imports with external buffers or textures are copied into a new model folder\nwith those dependencies. Keep dependencies beneath the source model's directory;\nremote URLs and references escaping that directory are rejected. Missing files\nfail the bundle import. Repeated imports create another bundle without replacing\nthe original. Imported materials are preserved; visual material editing and\nskeleton/clip authoring are not part of this workflow yet.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
         "text": "Build and run",
         "level": 2,
         "links": []

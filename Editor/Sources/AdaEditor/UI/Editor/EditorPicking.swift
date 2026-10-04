@@ -16,15 +16,20 @@ enum EditorPicking {
     }
 
     static func intersectionDistance(ray: Ray, transform: Transform, bounds: BoundingComponent?) -> Float? {
-        let aabb = localAABB(from: bounds)
-        let fallback = Vector3(0.35)
-        let halfExtents = Vector3(
-            max(abs(aabb.halfExtents.x * transform.scale.x), fallback.x),
-            max(abs(aabb.halfExtents.y * transform.scale.y), fallback.y),
-            max(abs(aabb.halfExtents.z * transform.scale.z), fallback.z)
-        )
-        let worldAABB = AABB(center: transform.position + aabb.center, halfExtents: halfExtents)
-        return rayAABBIntersectionDistance(ray: ray, aabb: worldAABB)
+        intersectionDistance(ray: ray, matrix: transform.matrix, bounds: bounds)
+    }
+
+    static func intersectionDistance(ray: Ray, matrix: Transform3D, bounds: BoundingComponent?) -> Float? {
+        guard abs(matrix.determinant) > 0.000001 else {
+            return nil
+        }
+        let inverse = matrix.inverse
+        let origin = inverse * Vector4(ray.origin.x, ray.origin.y, ray.origin.z, 1)
+        let direction = inverse * Vector4(ray.direction.x, ray.direction.y, ray.direction.z, 0)
+        // Do not normalize: the local ray parameter must still represent world distance.
+        let localRay = Ray(origin: origin.xyz, direction: direction.xyz)
+        let aabb = bounds == nil ? AABB(center: .zero, halfExtents: Vector3(0.35)) : localAABB(from: bounds)
+        return rayAABBIntersectionDistance(ray: localRay, aabb: aabb)
     }
 
     static func perspectiveRay(

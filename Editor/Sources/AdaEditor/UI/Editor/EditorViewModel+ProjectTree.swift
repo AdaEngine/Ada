@@ -222,7 +222,7 @@ extension EditorViewModel {
             return .audio
         }
 
-        if url.pathExtension.lowercased() == "tileset" {
+        if url.pathExtension.lowercased() == "tileset" || EditorModelResource.extensions.contains(url.pathExtension.lowercased()) {
             return .genericAsset
         }
 
@@ -257,6 +257,9 @@ extension EditorViewModel {
         for kind: EditorProjectFileKind,
         fileExtension: String
     ) -> EditorAssetPreviewKind {
+        if EditorModelResource.extensions.contains(fileExtension.lowercased()) {
+            return .model3D
+        }
         if fileExtension == "tileset" {
             return .tileSource
         }
@@ -332,6 +335,16 @@ extension EditorViewModel {
         }
     }
 
+    static func modelAssets(from items: [EditorProjectSidebarViewModel.Item]) -> [EditorInspectorSidebarViewModel.TextureAsset] {
+        items.compactMap { item in
+            guard !item.isFolder, EditorModelResource.extensions.contains(URL(fileURLWithPath: item.title).pathExtension.lowercased()),
+                let assetsRoot = item.assetRoot,
+                let reference = assetReference(for: item.relativePath, assetsRoot: assetsRoot),
+                let absolutePath = absoluteFilePath(from: item.id) else { return nil }
+            return .init(name: item.title, reference: reference, absolutePath: absolutePath)
+        }
+    }
+
     static func uiSourcePaths(from items: [EditorProjectSidebarViewModel.Item]) -> [String] {
         items.compactMap { item in
             let ext = URL(fileURLWithPath: item.title).pathExtension.lowercased()
@@ -361,6 +374,7 @@ extension EditorViewModel {
     func syncInspectorTextureAssets() {
         inspectorSidebar.textureAssets = Self.textureAssets(from: projectSidebar.items)
         inspectorSidebar.tileMapAssets = Self.tileMapAssets(from: projectSidebar.items)
+        inspectorSidebar.modelAssets = Self.modelAssets(from: projectSidebar.items)
         inspectorSidebar.sceneAssets = Self.sceneAssets(from: projectSidebar.items)
         inspectorSidebar.uiSourcePaths = Self.uiSourcePaths(from: projectSidebar.items)
         inspectorSidebar.uiSceneFiles = Self.uiSceneFiles(from: projectSidebar.items)

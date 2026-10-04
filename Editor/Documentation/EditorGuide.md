@@ -10,6 +10,33 @@ The Project Navigator shows project files. Select a source file to edit it, or a
 
 Use **File > Save** to save the active document, or **File > Save All** to save all documents. The Code menu includes tab actions and editor font size controls.
 
+## Import and place a 3D model
+
+Use **File > Import Assets** or drop a `.glb`/`.gltf` into the project navigator.
+Models open in a 3D preview with camera navigation, mesh/material/skin counts,
+and a named animation picker with Play/Pause. Preview framing fits the model;
+placing it in a scene preserves its original scale.
+
+Open the destination `.ascn` scene, then open the model and choose
+**Add to Scene…**. Select the destination from the open scenes. The new entity
+stores a portable resource reference, so Save, reopening, duplicate and undo/redo
+retain the model without copying imported nodes into the authored scene file.
+The selected preview clip and playback setting become the entity's initial
+animation settings.
+
+Alternatively, add **Imported Model 3D** from the entity palette or add a
+**Model 3D** component to an existing entity. In the Inspector, choose a project
+model, enter a clip name shown in its preview, and set **Play animation** and
+**Loop animation**. Imported nodes/materials are instantiated in both the scene
+viewport and Play. Each placed model has its own animation player.
+
+glTF imports with external buffers or textures are copied into a new model folder
+with those dependencies. Keep dependencies beneath the source model's directory;
+remote URLs and references escaping that directory are rejected. Missing files
+fail the bundle import. Repeated imports create another bundle without replacing
+the original. Imported materials are preserved; visual material editing and
+skeleton/clip authoring are not part of this workflow yet.
+
 ## Build and run
 
 Choose **Build > Build Project** to build the project. **Build > Run** runs the active scene inside the editor when a scene is selected; otherwise it runs the selected target. **Build > Stop** stops the current operation. Build Output and Problems show progress and diagnostics.

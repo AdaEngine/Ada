@@ -230,6 +230,7 @@ enum EditorAssetPreviewKind: String, Equatable, Sendable {
     case tileSource
     case tileMap
     case atlas
+    case model3D
     case image
     case audio
     case generic

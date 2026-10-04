@@ -33,6 +33,20 @@
         var allowsMousePassthrough: Bool = false
         weak var windowManager: UIWindowManager?
 
+        @_spi(Internal)
+        public func setEmbeddedTransparency(_ enabled: Bool) {
+            allowsTransparency = enabled
+            #if canImport(UIKit)
+            isOpaque = !enabled
+            #endif
+        }
+
+        /// Routes embedded-view input through its own manager instead of a global application.
+        @_spi(Internal)
+        public func bindWindowManager(_ manager: UIWindowManager) {
+            windowManager = manager
+        }
+
         #if MACOS
             var pinchScale: Float = 1
             var currentTrackingArea: NSTrackingArea?
@@ -103,7 +117,10 @@
 
         @discardableResult
         func updateDrawableMetrics() -> CGSize {
-            #if canImport(UIKit)
+            #if os(visionOS)
+                let scale = contentScaleFactor
+                self.layer.contentsScale = scale
+            #elseif canImport(UIKit)
                 let scale = self.window?.screen.scale ?? UIScreen.main.scale
                 self.contentScaleFactor = scale
                 self.layer.contentsScale = scale

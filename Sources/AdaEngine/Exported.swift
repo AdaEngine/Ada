@@ -21,6 +21,7 @@
 @_exported import AdaRender
 @_exported import AdaScene
 @_exported import AdaScripting
+@_exported import AdaSpatial
 @_exported import AdaSprite
 @_exported import AdaText
 @_exported import AdaTilemap

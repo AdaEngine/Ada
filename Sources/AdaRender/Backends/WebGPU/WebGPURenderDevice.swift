@@ -120,6 +120,9 @@
                 context.device.createSampler(
                     descriptor: WebGPU.GPUSamplerDescriptor(
                         label: nil,
+                        addressModeU: descriptor.addressModeU.toWebGPU,
+                        addressModeV: descriptor.addressModeV.toWebGPU,
+                        addressModeW: descriptor.addressModeW.toWebGPU,
                         magFilter: descriptor.magFilter.toWebGPU,
                         minFilter: descriptor.minFilter.toWebGPU,
                         mipmapFilter: descriptor.mipFilter.toWebGPU,

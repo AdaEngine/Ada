@@ -101,7 +101,7 @@
                         depthOrArrayLayers: 1
                     ),
                     format: descriptor.pixelFormat.toWebGPU,
-                    mipLevelCount: 1,
+                    mipLevelCount: UInt32(max(1, descriptor.mipmapLevel)),
                     sampleCount: 1,
                     dimension: descriptor.textureType.toWebGPUTextureDimension
                 )
@@ -116,7 +116,7 @@
                         depthOrArrayLayers: 1
                     ),
                     format: descriptor.pixelFormat.toWebGPU,
-                    mipLevelCount: 1,
+                    mipLevelCount: UInt32(max(1, descriptor.mipmapLevel)),
                     sampleCount: 1,
                     viewFormats: [
                         descriptor.pixelFormat.toWebGPU

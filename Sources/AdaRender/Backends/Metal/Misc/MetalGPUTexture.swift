@@ -61,6 +61,7 @@
             }
 
             textureDesc.usage = mtlUsage
+            textureDesc.mipmapLevelCount = max(1, descriptor.mipmapLevel)
             textureDesc.width = descriptor.width
             textureDesc.height = descriptor.height
             textureDesc.pixelFormat = descriptor.pixelFormat.toMetal

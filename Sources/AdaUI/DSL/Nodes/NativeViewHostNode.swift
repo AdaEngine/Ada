@@ -351,6 +351,9 @@ import Math
 
         #if canImport(UIKit) && (os(iOS) || os(tvOS) || os(visionOS))
             private func findUIKitParentView() -> UIKit.UIView? {
+                if let embedded = owner?.window?.nativeHostingView as? UIKit.UIView {
+                    return embedded
+                }
                 guard let window = owner?.window?.systemWindow as? UIKit.UIWindow else {
                     return nil
                 }
@@ -782,11 +785,20 @@ import Math
         }
 
         private func platformBackingScaleFactor() -> Float {
+            #if canImport(UIKit)
+                if let embedded = owner?.window?.nativeHostingView as? UIKit.UIView {
+                    return Float(embedded.contentScaleFactor)
+                }
+            #endif
             #if canImport(AppKit) && os(macOS)
                 if let nsWindow = owner?.window?.systemWindow as? NSWindow {
                     return Float(nsWindow.backingScaleFactor)
                 }
-            #elseif canImport(UIKit) && (os(iOS) || os(tvOS) || os(visionOS))
+            #elseif os(visionOS)
+                if let uiWindow = owner?.window?.systemWindow as? UIKit.UIWindow {
+                    return Float(uiWindow.contentScaleFactor)
+                }
+            #elseif canImport(UIKit) && (os(iOS) || os(tvOS))
                 if let uiWindow = owner?.window?.systemWindow as? UIKit.UIWindow {
                     return Float(uiWindow.screen.scale)
                 }

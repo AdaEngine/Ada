@@ -1,0 +1,29 @@
+name: ImmersiveGarden
+options:
+  bundleIdPrefix: org.adaengine
+  deploymentTarget:
+    visionOS: "26.0"
+packages:
+  AdaEngine:
+    path: ../..
+targets:
+  ImmersiveGarden:
+    type: application
+    platform: visionOS
+    sources:
+      - Sources
+      - path: ../SkeletalGarden/Assets
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: AdaEngine
+        product: AdaEngineEmbeddable
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.adaengine.ImmersiveGarden
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Info.plist
+        CODE_SIGN_STYLE: Automatic
+    scheme:
+      gatherCoverageData: false

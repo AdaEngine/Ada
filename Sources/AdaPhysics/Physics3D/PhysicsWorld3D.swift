@@ -12,7 +12,7 @@ import Math
 
 /// Box3D-backed 3D physics world.
 public final class PhysicsWorld3D: Codable, @unchecked Sendable {
-    private let worldId: b3WorldId
+    let worldId: b3WorldId
 
     private var configuredSubStepCount: Int32
 

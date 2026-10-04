@@ -225,7 +225,8 @@ var adaEngineDependencies: [Target.Dependency] = [
     "AdaScripting",
     "AdaSprite",
     "AdaTilemap",
-    "AdaPhysics"
+    "AdaPhysics",
+    "AdaSpatial"
 ]
 
 #if os(Linux)
@@ -329,6 +330,8 @@ var targets: [Target] = [
     adaEngineEmbeddable,
     adaEngineMacros,
     .adaTarget(name: "Math"),
+    .adaTarget(name: "AdaSpatial", dependencies: ["AdaECS", "AdaTransform", "Math"]),
+    .testTarget(name: "AdaSpatialTests", dependencies: ["AdaSpatial", "AdaECS", "AdaTransform", "Math"], swiftSettings: swiftSettings),
     .adaTarget(
         name: "AdaApp",
         dependencies: [
@@ -1339,7 +1342,7 @@ if isAndroidBuildEnabled {
         name: "SkeletalGarden",
         dependencies: ["AdaEngine"],
         path: "Demos/SkeletalGarden",
-        exclude: ["script"],
+        exclude: ["script", "README.md", "dist", "SourceAssets", "Tests"],
         resources: [.copy("Assets")],
         swiftSettings: swiftSettings
     ))
@@ -1348,11 +1351,13 @@ if isAndroidBuildEnabled {
         name: "SkeletalGarden",
         dependencies: ["AdaEngine"],
         path: "Demos/SkeletalGarden",
-        exclude: ["script"],
+        exclude: ["script", "README.md", "dist", "SourceAssets", "Tests"],
         resources: [.copy("Assets")],
         swiftSettings: swiftSettings
     ))
 }
+
+targets.append(.testTarget(name: "SkeletalGardenTests", dependencies: ["SkeletalGarden", "AdaEngine"], path: "Demos/SkeletalGarden/Tests"))
 
 // MARK: - Package -
 

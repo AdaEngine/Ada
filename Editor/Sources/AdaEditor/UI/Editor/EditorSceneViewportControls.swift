@@ -9,6 +9,8 @@ struct EditorSceneViewportControls: View {
     let onSelectDisplayMode: (EditorSceneViewportDisplayMode) -> Void
     let onSelectTool: (EditorSceneViewportTool) -> Void
     let onStop: () -> Void
+    var showsEditingTools = true
+    var showsPlayback = true
 
     @Environment(\.theme) private var theme
 
@@ -46,22 +48,26 @@ struct EditorSceneViewportControls: View {
                     action: onStop
                 )
             } else {
-                ForEach(EditorSceneViewportTool.allCases, id: \.rawValue) { tool in
-                    pillButton(tool.rawValue, symbol: tool.symbol, active: activeTool == tool) {
-                        onSelectTool(tool)
+                if showsEditingTools {
+                    ForEach(EditorSceneViewportTool.allCases, id: \.rawValue) { tool in
+                        pillButton(tool.rawValue, symbol: tool.symbol, active: activeTool == tool) {
+                            onSelectTool(tool)
+                        }
                     }
+                    divider
                 }
-                divider
                 modeButton(.twoD)
                 modeButton(.threeD)
-                divider
-                pillButton(
-                    "Play",
-                    symbol: "\u{E037}",
-                    active: false,
-                    color: Color(red: 110 / 255, green: 205 / 255, blue: 126 / 255),
-                    action: onPlay
-                )
+                if showsPlayback {
+                    divider
+                    pillButton(
+                        "Play",
+                        symbol: "\u{E037}",
+                        active: false,
+                        color: Color(red: 110 / 255, green: 205 / 255, blue: 126 / 255),
+                        action: onPlay
+                    )
+                }
             }
         }
         .padding(5)

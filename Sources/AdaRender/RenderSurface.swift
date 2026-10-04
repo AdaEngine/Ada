@@ -36,6 +36,8 @@ public protocol RenderSurface {
         public var scaleFactor: Float {
             #if canImport(AppKit)
                 return unsafe Float(appKitBackingScaleFactor(for: self.window))
+            #elseif os(visionOS)
+                return Float(contentScaleFactor)
             #elseif canImport(UIKit)
                 return Float(self.window?.screen.scale ?? UIScreen.main.scale)
             #else

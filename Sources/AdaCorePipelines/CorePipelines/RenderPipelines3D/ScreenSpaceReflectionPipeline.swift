@@ -23,10 +23,10 @@ public struct ScreenSpaceReflectionPipeline: Resource {
             depthPixelFormat: .none
         )
         descriptor.colorAttachments = [
-            RenderPipelineColorAttachmentDescriptor(format: .bgra8, isBlendingEnabled: false)
+            RenderPipelineColorAttachmentDescriptor(format: .bgra8, isBlendingEnabled: false),
         ]
-        self.renderPipeline = device.createRenderPipeline(from: descriptor)
-        self.sampler = device.createSampler(
+        renderPipeline = device.createRenderPipeline(from: descriptor)
+        sampler = device.createSampler(
             from: SamplerDescriptor(
                 minFilter: .linear,
                 magFilter: .linear,
@@ -48,6 +48,7 @@ struct Environment3DUniform: Sendable {
     var reflectionQuality: Vector4
     var environmentFlags: Vector4
     var starfield: Vector4
+    var ibl: Vector4
 }
 
 public struct ScreenSpaceReflectionScratch: Resource, Sendable {

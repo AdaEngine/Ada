@@ -7,7 +7,7 @@
 
 import Foundation
 
-#if os(iOS) || os(tvOS)
+#if os(iOS) || os(tvOS) || os(visionOS)
     import QuartzCore
 #endif
 #if os(macOS)
@@ -29,7 +29,7 @@ public typealias LongTimeInterval = Double
 public struct Time {
     /// Return current time in system.
     public static var absolute: LongTimeInterval {
-        #if os(iOS) || os(tvOS) || os(OSX) || os(watchOS)
+        #if os(iOS) || os(tvOS) || os(visionOS) || os(OSX) || os(watchOS)
             return LongTimeInterval(CACurrentMediaTime())
         #elseif os(Windows)
             // Windows doesn't have clock_gettime, use Foundation's ProcessInfo

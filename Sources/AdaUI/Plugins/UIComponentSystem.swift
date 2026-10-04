@@ -127,7 +127,7 @@ extension UIComponentSystem {
 
 extension EnvironmentValues {
     /// The world where view attached.
-    @_spi(Internal) @Entry public internal(set) var world: World?
+    @_spi(Internal) @Entry public package(set) var world: World?
 
     /// The game scene where view attached.
     @Entry internal var entity: Entity?
@@ -135,5 +135,5 @@ extension EnvironmentValues {
     @Entry internal var input: Ref<Input>?
 
     /// The windowManager where view attached.
-    @_spi(Internal) @Entry public internal(set) var windowManager: UIWindowManager?
+    @_spi(Internal) @Entry public package(set) var windowManager: UIWindowManager?
 }
