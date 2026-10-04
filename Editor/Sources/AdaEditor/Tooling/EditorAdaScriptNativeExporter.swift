@@ -155,6 +155,7 @@ actor EditorAdaScriptNativeExporter {
             arguments += ["--allow-writing-to-package-directory", "--allow-network-connections", "all", "export-web", "--product", "AdaNativeGame", "--output", stage.appendingPathComponent("web").path]
             if let wasmScratch = options.scratchDirectory { arguments += ["--scratch-path", wasmScratch.path] }
             arguments += ["--swift-sdk", options.swiftSDK]
+            arguments += [options.configuration == .debug ? "--debug" : "--release"]
             try await run(options.swiftExecutable, arguments, at: stage, environment: webEnv, log: log)
         }
         try Data("{\"version\":1,\"destination\":\"\(options.destination.rawValue)\"}".utf8).write(to: stage.appendingPathComponent("ada-native-export.json"))
@@ -311,7 +312,10 @@ actor EditorAdaScriptNativeExporter {
     }
 
     private static func player(project: AdaProject, sources: [AdaScriptSource], plugins: EditorAdaScriptResolvedRuntimePlugins) -> String {
-        let scene = project.runtime.entry.scene ?? ""
+        let entryScene = project.runtime.entry.scene ?? ""
+        let assetsPrefix = (project.paths.assets ?? "Assets") + "/"
+        // Project metadata uses project-relative paths; the standalone player starts at GameAssets.
+        let scene = entryScene.hasPrefix(assetsPrefix) ? String(entryScene.dropFirst(assetsPrefix.count)) : entryScene
         let title = project.runtime.window.title ?? project.project.displayName ?? project.project.name ?? "AdaScript Game"
         let metadata = sources.map { "AdaScriptSource(path: \(quote($0.path)), source: \(quote($0.source)))" }.joined(separator: ",\n")
         let pluginCode = plugins.pluginIDs.compactMap { id -> String? in
@@ -341,7 +345,7 @@ actor EditorAdaScriptNativeExporter {
             #endif
             @main struct AdaNativeGame: App {
                 var body: some AppScene {
-                WindowGroup { GameView() }
+                WindowGroup(content: { GameView() }, assetBundle: Bundle.module)
                     .windowTitle(\(quote(title)))
                     .windowMode(.windowed)
                     .minimumSize(width: \(project.runtime.window.size.width), height: \(project.runtime.window.size.height))

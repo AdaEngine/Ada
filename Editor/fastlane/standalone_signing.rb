@@ -7,6 +7,8 @@ module EditorStandaloneSigning
     framework = File.join(app, "Contents/Frameworks/Sparkle.framework")
     version = File.realpath(File.join(framework, "Versions/Current"))
     paths = [
+      File.join(app, "Contents/Resources/BuildSDK/AdaScript/gravity"),
+      File.join(app, "Contents/MacOS/adastudio"),
       File.join(version, "XPCServices/Downloader.xpc"),
       File.join(version, "XPCServices/Installer.xpc"),
       File.join(version, "Autoupdate"),

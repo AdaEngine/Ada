@@ -21,6 +21,10 @@ import Logging
 enum AdaApplicationEntry {
     @MainActor static func main() async throws {
         #if os(macOS)
+            if EditorCLI.isInvocation(CommandLine.arguments) {
+                let code = await EditorCLI.run(arguments: CommandLine.arguments)
+                Foundation.exit(code)
+            }
             if CommandLine.arguments.contains(EditorAgentMCPConnection.bridgeArgument) {
                 try await EditorAgentMCPStdioBridge(endpoint: URL(string: EditorMCPServerAddress.url)).run()
                 return
