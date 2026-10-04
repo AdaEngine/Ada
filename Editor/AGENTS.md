@@ -164,6 +164,9 @@ Swift/macOS debugging through `lldb-dap`: breakpoints, pause/continue/step,
 threads/frames, variables, watches and LLDB commands, with project persistence.
 Game Performance panel: update rate, CPU update/p95, process memory, entity count,
 ECS-system/render-node CPU durations, bounded history and Chrome Trace export.
+Overview/Timeline views share the panel, with an expanded central-workspace mode.
+Delayed, duration-limited CPU captures expose selectable event lanes, graph/node
+details, filters, zoom and time navigation; overlapping calls use separate rows.
 Profiler MCP tools address individual embedded game sessions and captures.
 
 Guides: [Debugging.md](Documentation/Debugging.md),
@@ -224,8 +227,7 @@ Guides: [Notifications.md](Documentation/Notifications.md),
   editing, skeleton editing and skeletal-clip authoring remain incomplete.
   The shared-workbench model preview has not established iPhone UI parity.
 - Performance measurements cover CPU/update cadence, not GPU time or display
-  FPS. AdaPlayer/external Swift profiling and an interactive event timeline are
-  outside the current panel.
+  FPS. AdaPlayer/external Swift profiling is outside the current panel.
 - Agent simulation is logic verification; rendering, audio, network and touch
   interaction require visible Play. Build success is not gameplay verification.
 

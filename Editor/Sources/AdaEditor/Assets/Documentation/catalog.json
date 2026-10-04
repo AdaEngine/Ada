@@ -2086,6 +2086,80 @@
     ]
   },
   {
+    "id": "VisionOSImmersive",
+    "title": "visionOS Immersive Rendering",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/VisionOSImmersive.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Use `AdaEngineEmbeddable` from a SwiftUI visionOS application to display an AdaEngine\nworld in a full immersive space. `Demos/ImmersiveGarden` contains a runnable host.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Create an `ImmersiveSpace` containing a `CompositorLayer` configured with\n`ImmersiveLayerConfiguration`. In the layer's callback, start a main-actor task,\ncreate `AdaImmersiveRenderer`, and await its `run(setup:)`. Instantiate scene models\nin `setup`, after renderer plugins and asset loading are ready. Keep and cancel the\ntask when the immersive space closes. `performWorldAccess` queues inspector edits\nbetween frames; do not mutate the world from arbitrary SwiftUI callbacks.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The host converts ARKit world poses to Ada's +Z-forward coordinates and uses the\ncompositor's asymmetric per-eye projections. Native projections accept right-handed\nview-space input, so the host explicitly mirrors input Z before adapting their depth;\nthe compositor's NDC convention alone does not convert camera handedness. Ada's offscreen pipelines use forward\nZ; the final Metal pass converts depth back to reverse Z for system composition.\nThe host uses the engine's Metal command queue to preserve GPU resource ordering.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`SpatialGrabbable` marks root entities with local bounds. `SpatialInput` provides\nactive grip poses and optional selection rays. `SpatialInteractionSystem` updates\ntransforms and publishes `SpatialSelection` for inspectors. The platform-independent\ninteraction path can be tested without ARKit or a headset.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The initial host requires visionOS 26, disables foveation, and serializes its eye\npasses. It is intended for functional device validation before multiview and frame\nlatency optimization. It does not yet render capture-target drawables.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Reuse AdaUI panels in spatial windows",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "SwiftUI owns window scenes and immersive presentation. Existing AdaUI panels keep\ntheir view models, `@State`, bindings, input handling and rendering inside `AdaUIHost`\nfrom `AdaEngineEmbeddable` (UIKit platforms, including visionOS).",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Inside a visionOS editor target, an existing panel can be composed as follows:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "SwiftUI.WindowGroup(id: \"inspector\") {\n    AdaUIHost(assetBundle: .module) {\n        EditorInspectorSidebar(viewModel: sharedInspectorViewModel)\n    }\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Add the `AdaEngineEmbeddable` product to that target's dependencies. Share the same\neditor view model with the scene and other panels; do not mirror editor state into\na second SwiftUI implementation. The host reconciles updated root content while\nretaining AdaUI local state and node identity. It owns a separate input/window\nmanager, acquires only its own drawable, and stops when SwiftUI dismantles the view.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`ImmersiveGarden` demonstrates this split with an AdaUI tools panel and the original\n`GardenWorkspace`. This validates the bridge; it does not yet port the full Ada Studio\napplication or all native panel controls to visionOS.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
     "id": "AdaScriptAnnotations",
     "title": "AdaScript Annotation Reference",
     "section": "AdaScript",

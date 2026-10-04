@@ -23,7 +23,7 @@ final class EditorWorkspaceResizeState {
             size: size,
             showsLeftPanel: viewModel.showLeftPanel,
             showsRightPanel: viewModel.showRightPanel,
-            showsBottomPanel: viewModel.showBottomPanel,
+            showsBottomPanel: viewModel.showBottomPanel && !viewModel.performance.isExpanded,
             requestedLeftPanelWidth: leftWidth,
             requestedRightPanelWidth: rightWidth,
             requestedBottomPanelHeight: bottomHeight,

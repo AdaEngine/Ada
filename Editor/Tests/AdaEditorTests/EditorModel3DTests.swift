@@ -264,7 +264,9 @@ struct EditorModel3DTests {
         for x: Float in [-1.2, 1.2] {
             for y: Float in [-1.5, 1.5] {
                 for z: Float in [-0.8, 0.8] {
-                    let clip = projection * transform.matrix.inverse * Vector4(x, y, z, 1)
+                    let clipMatrix = projection * transform.matrix.inverse
+                    let corner = Vector4(x, y, z, 1)
+                    let clip = clipMatrix * corner
                     #expect(clip.w > 0)
                     #expect(abs(clip.x / clip.w) < 1 && abs(clip.y / clip.w) < 1)
                 }

@@ -59,7 +59,7 @@ enum AdaEngineStyleContent {
     static let defaultSceneModel = EditorSceneModel.default(projectName: "Main")
     static let defaultSceneContent =
         (try? defaultSceneModel.encodedYAML())
-        ?? SceneDocumentFormat.defaultSceneYAML(projectName: "Main")
+            ?? SceneDocumentFormat.defaultSceneYAML(projectName: "Main")
     static let defaultEditorDocuments: [EditorWorkbenchDocument] = [
         .text(
             EditorTextDocument(
@@ -233,19 +233,19 @@ struct EditorView: View {
             .fullScreenCover(isPresented: viewModel.inspectorSidebar.componentPickerPresentationBinding) {
                 EditorAddComponentDialog(viewModel: viewModel.inspectorSidebar)
             }
-            #if os(iOS)
-                .fullScreenCover(item: viewModel.settingsPresentationBinding) { section in
-                    EditorSettingsWindowView(
-                        viewModel: EditorSettingsWindowViewModel(
-                            editorViewModel: viewModel,
-                            selectedSection: section,
-                            selectedPage: viewModel.requestedSettingsPage
-                        ),
-                        showsCloseButton: true
-                    )
-                    .theme(.adaEditor)
-                }
-            #endif
+        #if os(iOS)
+            .fullScreenCover(item: viewModel.settingsPresentationBinding) { section in
+                EditorSettingsWindowView(
+                    viewModel: EditorSettingsWindowViewModel(
+                        editorViewModel: viewModel,
+                        selectedSection: section,
+                        selectedPage: viewModel.requestedSettingsPage
+                    ),
+                    showsCloseButton: true
+                )
+                .theme(.adaEditor)
+            }
+        #endif
             .alert(
                 "Delete item?",
                 isPresented: viewModel.isDeleteProjectItemAlertPresentedBinding,
@@ -262,18 +262,18 @@ struct EditorView: View {
             )
             .menuBar(EditorMenuBar.makeMenus())
             .keyboardShortcuts(editorKeyboardShortcuts)
-            #if os(macOS)
-                .onChange(of: viewModel.settingsPresentationToken) { _, _ in
-                    guard let section = viewModel.requestedSettingsSection else {
-                        return
-                    }
-                    EditorSettingsWindowController.open(
-                        editorViewModel: viewModel,
-                        selectedSection: section,
-                        selectedPage: viewModel.requestedSettingsPage
-                    )
+        #if os(macOS)
+            .onChange(of: viewModel.settingsPresentationToken) { _, _ in
+                guard let section = viewModel.requestedSettingsSection else {
+                    return
                 }
-            #endif
+                EditorSettingsWindowController.open(
+                    editorViewModel: viewModel,
+                    selectedSection: section,
+                    selectedPage: viewModel.requestedSettingsPage
+                )
+            }
+        #endif
             .task {
                 RuntimeLogStore.shared.setEnabled(true)
                 while !Task.isCancelled {
@@ -374,76 +374,82 @@ private struct EditorWorkspaceRegion: View {
                         EditorLeftSidebarContent(viewModel: viewModel)
                     },
                     mainPanel: {
-                        EditorCenterWorkbench(
-                            viewModel: viewModel.workbench,
-                            inspectorViewModel: viewModel.inspectorSidebar,
-                            playModeState: viewModel.playModeState,
-                            scenePlayRuntime: viewModel.scenePlayRuntime,
-                            sceneResourceRootURL: viewModel.projectAssetsURL,
-                            onPlayScene: viewModel.runActiveSceneInEditor,
-                            onStopScene: viewModel.stopPlayMode,
-                            onSceneEntitySelected: viewModel.presentSceneInspector,
-                            onSourceHover: { document, position in
-                                viewModel.handleSourceHover(document: document, position: position)
-                            },
-                            onGoToDefinition: { document, position in
-                                viewModel.goToDefinition(document: document, position: position)
-                            },
-                            onCompletionPosition: { document, position, text in
-                                viewModel.handleCompletionPosition(document: document, position: position, text: text)
-                            },
-                            onCompletionRequest: { document, position, text in
-                                viewModel.handleCompletionRequest(document: document, position: position, text: text)
-                            },
-                            onApplyCompletion: { item, document in
-                                viewModel.applyCompletion(item, to: document)
-                            },
-                            onMoveCompletionSelection: { document, delta in
-                                viewModel.moveCompletionSelection(in: document, by: delta)
-                            },
-                            onAcceptCompletion: { document in
-                                viewModel.applySelectedCompletion(in: document)
-                            },
-                            onAcceptSnippetPlaceholder: { document, selection in
-                                viewModel.acceptSnippetPlaceholder(in: document, selection: selection)
-                            },
-                            onTextSelection: { document, range, text in
-                                viewModel.handleTextSelection(document: document, range: range, text: text)
-                            },
-                            onChatSelection: { document, range, text in
-                                viewModel.chatAboutTextSelection(document: document, range: range, text: text)
-                            },
-                            sourceContextMenuItems: { document, position in
-                                viewModel.sourceContextMenuItems(document: document, position: position)
-                            },
-                            onSelectDocument: { documentID in
-                                viewModel.selectWorkbenchDocument(id: documentID)
-                            },
-                            onRevealDocument: { document in
-                                viewModel.revealDocument(document)
-                            },
-                            onCopyDocumentPath: { document, relative in
-                                viewModel.copyDocumentPath(document, relative: relative)
-                            },
-                            onSelectPreview: { declaration in
-                                viewModel.selectPreview(declaration)
-                            },
-                            onRebuildPreview: {
-                                viewModel.rebuildSelectedPreview()
-                            },
-                            onHidePreview: {
-                                viewModel.hidePreview()
-                            },
-                            onShowPreviewBuildOutput: {
-                                viewModel.showBuildOutput()
-                            },
-                            debugger: viewModel.debugger,
-                            projectItems: viewModel.projectSidebar.items,
-                            onOpenProjectItem: { item in
-                                viewModel.openProjectItem(item)
+                        ZStack {
+                            EditorCenterWorkbench(
+                                viewModel: viewModel.workbench,
+                                inspectorViewModel: viewModel.inspectorSidebar,
+                                playModeState: viewModel.playModeState,
+                                scenePlayRuntime: viewModel.scenePlayRuntime,
+                                sceneResourceRootURL: viewModel.projectAssetsURL,
+                                onPlayScene: viewModel.runActiveSceneInEditor,
+                                onStopScene: viewModel.stopPlayMode,
+                                onSceneEntitySelected: viewModel.presentSceneInspector,
+                                onSourceHover: { document, position in
+                                    viewModel.handleSourceHover(document: document, position: position)
+                                },
+                                onGoToDefinition: { document, position in
+                                    viewModel.goToDefinition(document: document, position: position)
+                                },
+                                onCompletionPosition: { document, position, text in
+                                    viewModel.handleCompletionPosition(document: document, position: position, text: text)
+                                },
+                                onCompletionRequest: { document, position, text in
+                                    viewModel.handleCompletionRequest(document: document, position: position, text: text)
+                                },
+                                onApplyCompletion: { item, document in
+                                    viewModel.applyCompletion(item, to: document)
+                                },
+                                onMoveCompletionSelection: { document, delta in
+                                    viewModel.moveCompletionSelection(in: document, by: delta)
+                                },
+                                onAcceptCompletion: { document in
+                                    viewModel.applySelectedCompletion(in: document)
+                                },
+                                onAcceptSnippetPlaceholder: { document, selection in
+                                    viewModel.acceptSnippetPlaceholder(in: document, selection: selection)
+                                },
+                                onTextSelection: { document, range, text in
+                                    viewModel.handleTextSelection(document: document, range: range, text: text)
+                                },
+                                onChatSelection: { document, range, text in
+                                    viewModel.chatAboutTextSelection(document: document, range: range, text: text)
+                                },
+                                sourceContextMenuItems: { document, position in
+                                    viewModel.sourceContextMenuItems(document: document, position: position)
+                                },
+                                onSelectDocument: { documentID in
+                                    viewModel.selectWorkbenchDocument(id: documentID)
+                                },
+                                onRevealDocument: { document in
+                                    viewModel.revealDocument(document)
+                                },
+                                onCopyDocumentPath: { document, relative in
+                                    viewModel.copyDocumentPath(document, relative: relative)
+                                },
+                                onSelectPreview: { declaration in
+                                    viewModel.selectPreview(declaration)
+                                },
+                                onRebuildPreview: {
+                                    viewModel.rebuildSelectedPreview()
+                                },
+                                onHidePreview: {
+                                    viewModel.hidePreview()
+                                },
+                                onShowPreviewBuildOutput: {
+                                    viewModel.showBuildOutput()
+                                },
+                                debugger: viewModel.debugger,
+                                projectItems: viewModel.projectSidebar.items,
+                                onOpenProjectItem: { item in
+                                    viewModel.openProjectItem(item)
+                                }
+                            )
+                            .frame(maxHeight: .infinity)
+                            .allowsHitTesting(!viewModel.performance.isExpanded)
+                            if viewModel.performance.isExpanded {
+                                EditorPerformancePanel(model: viewModel.performance, isWorkspace: true)
                             }
-                        )
-                        .frame(maxHeight: .infinity)
+                        }
                     },
                     rightPanel: {
                         EditorRightSidebarContent(viewModel: viewModel)
