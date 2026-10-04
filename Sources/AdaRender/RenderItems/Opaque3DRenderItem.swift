@@ -21,6 +21,7 @@ public struct Opaque3DRenderItem: RenderItem {
     public let worldTransform: Transform3D
     public let castShadows: Bool
     public let receiveShadows: Bool
+    public let skinningBuffer: (any UniformBuffer)?
 
     public init(
         entity: Entity.ID,
@@ -33,7 +34,8 @@ public struct Opaque3DRenderItem: RenderItem {
         worldTransform: Transform3D,
         castShadows: Bool = true,
         receiveShadows: Bool = true,
-        batchRange: Range<Int32>? = nil
+        batchRange: Range<Int32>? = nil,
+        skinningBuffer: (any UniformBuffer)? = nil
     ) {
         self.entity = entity
         self.drawPass = drawPass
@@ -46,5 +48,6 @@ public struct Opaque3DRenderItem: RenderItem {
         self.castShadows = castShadows
         self.receiveShadows = receiveShadows
         self.batchRange = batchRange
+        self.skinningBuffer = skinningBuffer
     }
 }

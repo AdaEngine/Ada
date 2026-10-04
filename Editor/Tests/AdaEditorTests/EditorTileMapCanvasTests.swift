@@ -149,9 +149,37 @@ struct EditorTileMapCanvasTests {
         }
     }
 
+    @Test("Every tilemap toolbar button draws its icon from the bundled font")
+    func toolbarGlyphs() throws {
+        let fixture = try fixture(layers: [.init(name: "Ground", zIndex: 0, isEnabled: true, cells: [])])
+        defer { try? FileManager.default.removeItem(at: fixture.url.deletingLastPathComponent()) }
+        let container = UIContainerView(rootView: EditorTileMapAssetEditor(document: fixture.document, model: fixture.model))
+        container.frame = Rect(x: 0, y: 0, width: 1200, height: 700)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        for id in ["Paint", "Erase", "Pan", "ZoomOut", "ZoomIn", "Fit", "Grid", "Reload"] {
+            let node = try #require(container.viewTree.rootNode.findNodyByAccessibilityIdentifier("AdaEditor.TileMapEditor.\(id)"))
+            let context = UIGraphicsContext()
+            node.draw(with: context)
+            var glyphCount = 0
+            for command in context.getDrawCommands() {
+                switch command {
+                case let .drawGlyph(glyph, _, _):
+                    #expect(glyph.size.width > 0 && glyph.size.height > 0, "Missing icon for \(id)")
+                    glyphCount += 1
+                case let .drawText(layout, _, _):
+                    glyphCount += layout.textLines.reduce(0) { count, line in count + line.reduce(0) { $0 + $1.count } }
+                default:
+                    break
+                }
+            }
+            #expect(glyphCount == 1, "Missing icon for \(id)")
+        }
+    }
+
     private enum CanvasTestError: Error { case missingLayer }
 
-    private func fixture(layers: [EditorTileMapResource.PaletteLayer]) throws -> (model: EditorTileMapEditorModel, url: URL) {
+    private func fixture(layers: [EditorTileMapResource.PaletteLayer]) throws -> (model: EditorTileMapEditorModel, url: URL, document: EditorAssetDocument) {
         if unsafe RenderEngine.shared == nil {
             unsafe RenderEngine.configurations.preferredBackend = .headless
             RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "TileMapCanvasTests")))
@@ -163,10 +191,17 @@ struct EditorTileMapCanvasTests {
         map.paletteLayers = layers
         try map.write(to: url)
         let document = EditorAssetDocument(
-            id: "canvas", title: "Canvas.tilemap", relativePath: "Canvas.tilemap", absolutePath: url.path,
-            assetReference: "@res://Canvas.tilemap", kind: .tileMap, fileExtension: "tilemap",
-            byteCount: nil, modifiedAt: nil, errorMessage: nil
+            id: "canvas",
+            title: "Canvas.tilemap",
+            relativePath: "Canvas.tilemap",
+            absolutePath: url.path,
+            assetReference: "@res://Canvas.tilemap",
+            kind: .tileMap,
+            fileExtension: "tilemap",
+            byteCount: nil,
+            modifiedAt: nil,
+            errorMessage: nil
         )
-        return (EditorTileMapEditorModel(document: document), url)
+        return (EditorTileMapEditorModel(document: document), url, document)
     }
 }

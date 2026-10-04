@@ -81,8 +81,18 @@ struct EditorWorkbenchSplitTests {
         container.frame = Rect(x: 0, y: 0, width: 1000, height: 500)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
+        #if os(macOS) || os(Windows) || os(Linux)
+            #expect(throws: (any Error).self) {
+                try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Tab.Files"))
+            }
+        #endif
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Workbench.Split"))
         await settle(container)
+        #if os(macOS) || os(Windows) || os(Linux)
+            #expect(throws: (any Error).self) {
+                try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Tab.Files.secondary"))
+            }
+        #endif
         let left = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Workbench.Pane.primary")).absoluteFrame
         let right = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Workbench.Pane.secondary")).absoluteFrame
         #expect(left.width > 0 && right.width > 0)

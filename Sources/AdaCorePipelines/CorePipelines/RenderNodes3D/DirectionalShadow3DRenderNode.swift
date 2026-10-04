@@ -64,6 +64,9 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
     @Res<Opaque3DInstanceBuffers>
     private var instanceBuffers
 
+    @Res<Skinning3DUniforms>
+    private var skinningUniforms
+
     @ResMut<DirectionalShadow3D>
     private var shadow
 
@@ -83,6 +86,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
         _renderItems.update(from: world)
         _lighting.update(from: world)
         _instanceBuffers.update(from: world)
+        _skinningUniforms.update(from: world)
         _shadow.update(from: world)
         _scratch.update(from: world)
         _pipelines.update(from: world)
@@ -156,6 +160,14 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                 let pipeline = pipelines.pipeline(for: part.vertexDescriptor, device: renderDevice.renderDevice)
                 pass.setRenderPipelineState(pipeline)
                 pass.setVertexBuffer(part.vertexBuffer, offset: 0, slot: 0)
+                if let palette = item.skinningBuffer ?? skinningUniforms.identityBuffer {
+                    pass.setResourceSet(RenderResourceSet(bindings: [
+                        .init(binding: Skinning3DUniforms.binding, shaderStages: .vertex, resource: .uniformBuffer(palette, offset: 0))
+                    ]), index: 0)
+                }
+                if let defaults = instanceBuffers.defaultVertexBuffer {
+                    pass.setVertexBuffer(defaults, offset: 0, slot: 4)
+                }
                 pass.setVertexBuffer(
                     instances,
                     offset: Int(batchRange.lowerBound) * MemoryLayout<Flat3DInstanceData>.stride,

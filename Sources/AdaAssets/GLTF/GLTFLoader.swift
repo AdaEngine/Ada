@@ -20,12 +20,18 @@ public struct GLTFImportResult: Sendable {
         public let transform: Transform3D
         public let children: [Int]
         public let meshIndex: Int?
+        /// Index into the imported skins array.
+        public let skinIndex: Int?
+        /// Authored local TRS; nil for nodes authored with a matrix.
+        public let restPose: NodeTRS?
 
-        public init(name: String?, transform: Transform3D, children: [Int], meshIndex: Int?) {
+        public init(name: String?, transform: Transform3D, children: [Int], meshIndex: Int?, skinIndex: Int? = nil, restPose: NodeTRS? = nil) {
             self.name = name
             self.transform = transform
             self.children = children
             self.meshIndex = meshIndex
+            self.skinIndex = skinIndex
+            self.restPose = restPose
         }
     }
 
@@ -44,12 +50,14 @@ public struct GLTFImportResult: Sendable {
         public let indices: [UInt32]?
         public let materialIndex: Int?
         public let mode: PrimitiveMode
+        public let skinning: Skinning?
 
-        public init(attributes: [Attribute: Accessor], indices: [UInt32]?, materialIndex: Int?, mode: PrimitiveMode) {
+        public init(attributes: [Attribute: Accessor], indices: [UInt32]?, materialIndex: Int?, mode: PrimitiveMode, skinning: Skinning? = nil) {
             self.attributes = attributes
             self.indices = indices
             self.materialIndex = materialIndex
             self.mode = mode
+            self.skinning = skinning
         }
     }
 
@@ -176,8 +184,20 @@ public struct GLTFImportResult: Sendable {
     public let images: [Image]
     public let scenes: [[Int]]
     public let defaultScene: Int?
+    public let skins: [Skin]
+    public let animations: [Animation]
 
-    public init(nodes: [Node], meshes: [Mesh], materials: [Material], textures: [Texture], images: [Image], scenes: [[Int]], defaultScene: Int?) {
+    public init(
+        nodes: [Node],
+        meshes: [Mesh],
+        materials: [Material],
+        textures: [Texture],
+        images: [Image],
+        scenes: [[Int]],
+        defaultScene: Int?,
+        skins: [Skin] = [],
+        animations: [Animation] = []
+    ) {
         self.nodes = nodes
         self.meshes = meshes
         self.materials = materials
@@ -185,6 +205,8 @@ public struct GLTFImportResult: Sendable {
         self.images = images
         self.scenes = scenes
         self.defaultScene = defaultScene
+        self.skins = skins
+        self.animations = animations
     }
 }
 

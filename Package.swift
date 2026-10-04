@@ -1210,6 +1210,7 @@ targets += [
             "AdaAssets",
             "Math"
         ],
+        resources: [.copy("Fixtures")],
     ),
     .testTarget(
         name: "AdaAudioTests",
@@ -1303,6 +1304,17 @@ targets += [
 #if os(macOS)
 //targets.append(contentsOf: swiftLintTargets)
 #endif
+
+// Native skeletal animation development demo.
+products.append(.executable(name: "SkeletalGarden", targets: ["SkeletalGarden"]))
+targets.append(.executableTarget(
+    name: "SkeletalGarden",
+    dependencies: ["AdaEngine"],
+    path: "Demos/SkeletalGarden",
+    exclude: ["script", "README.md", "dist"],
+    resources: [.copy("Assets")],
+    swiftSettings: swiftSettings
+))
 
 // MARK: - Package -
 

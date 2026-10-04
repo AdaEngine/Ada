@@ -5,7 +5,9 @@
 //  Created by v.prusakov on 04/21/26.
 //
 
+import AdaAnimation
 import AdaAssets
+import AdaCorePipelines
 import AdaECS
 @_spi(Internal) import AdaRender
 import AdaTransform
@@ -20,12 +22,14 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         public let transform: Transform3D
         public let meshIndex: Int?
         public let children: [Int]
+        public let skinIndex: Int?
 
-        public init(name: String?, transform: Transform3D, meshIndex: Int?, children: [Int]) {
+        public init(name: String?, transform: Transform3D, meshIndex: Int?, children: [Int], skinIndex: Int? = nil) {
             self.name = name
             self.transform = transform
             self.meshIndex = meshIndex
             self.children = children
+            self.skinIndex = skinIndex
         }
     }
 
@@ -34,15 +38,30 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
     public let materials: [Material]
     public let scenes: [[Int]]
     public let defaultScene: Int?
+    public let skins: [GLTFImportResult.Skin]
+    public let animationRig: SkeletalRig?
+    public let animationClips: [SkeletalAnimationClip]
 
     public var assetMetaInfo: AssetMetaInfo?
 
-    public init(nodes: [Node], meshes: [Mesh], materials: [Material], scenes: [[Int]], defaultScene: Int?) {
+    public init(
+        nodes: [Node],
+        meshes: [Mesh],
+        materials: [Material],
+        scenes: [[Int]],
+        defaultScene: Int?,
+        skins: [GLTFImportResult.Skin] = [],
+        animationRig: SkeletalRig? = nil,
+        animationClips: [SkeletalAnimationClip] = []
+    ) {
         self.nodes = nodes
         self.meshes = meshes
         self.materials = materials
         self.scenes = scenes
         self.defaultScene = defaultScene
+        self.skins = skins
+        self.animationRig = animationRig
+        self.animationClips = animationClips
     }
 
     public init(from assetDecoder: any AssetDecoder) async throws {
@@ -80,12 +99,21 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
             }
             self.scenes = [Array(result.meshes.indices)]
             self.defaultScene = 0
+            self.skins = []
+            self.animationRig = nil
+            self.animationClips = []
             return
         }
 
         let loader = GLTFLoaderResolver.shared.getLoader()
         let result = try await loader.load(url: assetDecoder.assetMeta.filePath)
 
+        guard result.skins.allSatisfy({ $0.joints.count <= Skinning3DUniforms.maximumJoints }) else {
+            throw AssetError.message("A skinned mesh supports at most \(Skinning3DUniforms.maximumJoints) joints.")
+        }
+        self.skins = result.skins
+        self.animationRig = result.skins.isEmpty && result.animations.isEmpty ? nil : try Self.makeRig(nodes: result.nodes)
+        self.animationClips = try Self.makeClips(result.animations)
         let device = unsafe RenderEngine.shared.renderDevice
 
         // 1. Convert Materials
@@ -172,6 +200,13 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
                     }
                 }
 
+                if let skinning = primitive.skinning {
+                    descriptor[MeshDescriptor.jointIndices] = MeshBuffer(skinning.jointIndices.map { joints in
+                        Vector4(Float(joints.x), Float(joints.y), Float(joints.z), Float(joints.w))
+                    })
+                    descriptor[MeshDescriptor.jointWeights] = MeshBuffer(skinning.weights)
+                }
+
                 let sourceIndices = primitive.indices ?? Array(0..<UInt32(descriptor.positions.count))
                 let converted = primitive.convertTopology(indices: sourceIndices)
                 descriptor.indicies = converted.indices
@@ -194,7 +229,7 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
             meshes.append(Mesh(models: [Mesh.Model(name: gltfMesh.name ?? "", parts: parts)]))
         }
 
-        self.nodes = result.nodes.map { Node(name: $0.name, transform: $0.transform, meshIndex: $0.meshIndex, children: $0.children) }
+        self.nodes = result.nodes.map { Node(name: $0.name, transform: $0.transform, meshIndex: $0.meshIndex, children: $0.children, skinIndex: $0.skinIndex) }
         self.meshes = meshes
         self.materials = materials
         self.scenes = result.scenes
@@ -204,32 +239,54 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
     @discardableResult
     public func instantiate(in world: World) -> Entity {
         let rootEntity = world.spawn(self.assetName)
+        rootEntity.components[Transform.self] = Transform()
+        if let animationRig {
+            do {
+                let player = try SkeletalAnimationPlayer(rig: animationRig, clips: animationClips)
+                rootEntity.components[ModelAnimation3DComponent.self] = ModelAnimation3DComponent(player: player)
+            } catch {
+                assertionFailure("Invalid model animation rig: \(error)")
+            }
+        }
 
         let sceneIndex = self.defaultScene ?? 0
         if self.scenes.indices.contains(sceneIndex) {
             let nodeIndices = self.scenes[sceneIndex]
             for nodeIndex in nodeIndices {
-                self.instantiateNode(nodeIndex, parent: rootEntity, in: world)
+                self.instantiateNode(nodeIndex, parent: rootEntity, modelRoot: rootEntity, in: world)
             }
         }
 
         return rootEntity
     }
 
-    private func instantiateNode(_ nodeIndex: Int, parent: Entity, in world: World) {
+    private func instantiateNode(_ nodeIndex: Int, parent: Entity, modelRoot: Entity, in world: World) {
         let node = self.nodes[nodeIndex]
         let entity = world.spawn(node.name ?? "Node \(nodeIndex)")
-        entity.components[Transform.self] = Transform(matrix: node.transform)
+        if let pose = animationRig?.nodes[nodeIndex].restPose {
+            entity.components[Transform.self] = Transform(rotation: pose.rotation, scale: pose.scale, position: pose.translation)
+        } else {
+            entity.components[Transform.self] = Transform(matrix: node.transform)
+        }
+        if animationRig != nil {
+            entity.components[ModelNode3DComponent.self] = ModelNode3DComponent(modelRoot: modelRoot.id, nodeIndex: nodeIndex)
+        }
 
         if let meshIndex = node.meshIndex {
             let mesh = self.meshes[meshIndex]
             entity.components[Mesh3DComponent.self] = Mesh3DComponent(mesh: mesh, materials: self.materials)
+            if let skinIndex = node.skinIndex, skins.indices.contains(skinIndex),
+                let animation = modelRoot.components[ModelAnimation3DComponent.self] {
+                var binding = SkinnedMesh3DComponent(modelRoot: modelRoot.id, meshNodeIndex: nodeIndex, skin: skins[skinIndex])
+                binding.updateMatrices(using: animation.player)
+                entity.components[SkinnedMesh3DComponent.self] = binding
+            }
         }
 
         parent.addChild(entity)
 
         for childIndex in node.children {
-            self.instantiateNode(childIndex, parent: entity, in: world)
+            self.instantiateNode(childIndex, parent: entity, modelRoot: modelRoot, in: world)
         }
     }
 

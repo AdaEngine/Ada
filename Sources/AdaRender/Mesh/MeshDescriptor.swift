@@ -126,6 +126,9 @@ extension MeshDescriptor {
         /// A texture coordinates attribute identifier.
         public static let textureCoordinates: MeshDescriptor.Identifier = MeshDescriptor.Identifier(name: "textureCoordinates", isCustom: false)
 
+        public static let jointIndices = MeshDescriptor.Identifier(name: "jointIndices", isCustom: false)
+        public static let jointWeights = MeshDescriptor.Identifier(name: "jointWeights", isCustom: false)
+
         /// A colors attribute identifier.
         public static let colors: MeshDescriptor.Identifier = MeshDescriptor.Identifier(name: "colors", isCustom: false)
     }
@@ -154,6 +157,10 @@ extension MeshDescriptor {
 
     /// A semantic of a mesh array for colors.
     public static let colors: MeshDescriptor.Semantic<Color> = MeshDescriptor.Semantic<Color>(id: .colors)
+
+    /// Four palette indices per vertex, represented exactly as floats for vertex input portability.
+    public static let jointIndices = MeshDescriptor.Semantic<Vector4>(id: .jointIndices)
+    public static let jointWeights = MeshDescriptor.Semantic<Vector4>(id: .jointWeights)
 
     /// Create a custom semantic of a mesh array.
     public static func custom<Value>(_ name: String, type _: Value.Type) -> MeshDescriptor.Semantic<Value> {
@@ -338,6 +345,10 @@ extension MeshDescriptor.Identifier {
             return 3
         case .tangents:
             return 4
+        case .jointIndices:
+            return 13
+        case .jointWeights:
+            return 14
         default:
             return nil
         }

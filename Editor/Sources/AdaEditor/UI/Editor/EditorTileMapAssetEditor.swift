@@ -139,8 +139,8 @@ struct EditorTileMapAssetEditor: View {
     private func toolbarSymbol(_ id: String) -> String {
         switch id {
         case "Paint": "\u{E3AE}"
-        case "Erase": "\u{E1B8}"
-        case "Pan": "\u{E9E9}"
+        case "Erase": "\u{E6D0}"
+        case "Pan": "\u{E925}"
         case "ZoomOut": "\u{E900}"
         case "ZoomIn": "\u{E8FF}"
         case "Fit": "\u{E5D0}"

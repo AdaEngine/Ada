@@ -75,6 +75,7 @@ public struct Core3DPlugin: Plugin {
             .insertResource(ExtractedEnvironment3D())
             .insertResource(ExtractedLighting3D())
             .insertResource(Lighting3DGPUScratch())
+            .insertResource(Skinning3DUniforms())
             .insertResource(DirectionalShadow3D())
             .insertResource(DirectionalShadow3DScratch())
             .insertResource(RenderPipelines(configurator: DirectionalShadow3DPipeline()))

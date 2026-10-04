@@ -39,11 +39,15 @@ public struct Flat3DDefaultVertexData: Sendable {
     public let textureCoordinate: Vector2
     public let padding: Vector2
     public let tangent: Vector4
+    public let jointIndices: Vector4
+    public let jointWeights: Vector4
 
     public init(textureCoordinate: Vector2 = .zero, tangent: Vector4 = [1, 0, 0, 1]) {
         self.textureCoordinate = textureCoordinate
         self.padding = .zero
         self.tangent = tangent
+        self.jointIndices = [-1, 0, 0, 0]
+        self.jointWeights = [1, 0, 0, 0]
     }
 }
 
@@ -130,6 +134,7 @@ public struct Flat3DPipeline: RenderPipelineConfigurator {
         if !configuration.attributes.containsAttribute(by: MeshDescriptor.tangents.id.name) {
             configuration.attributes[4] = .attribute(.vector4, name: "defaultTangent", bufferIndex: 4, offset: 16)
         }
+        configureSkinningAttributes(&configuration)
         configuration.attributes[5] = .attribute(.vector4, name: "instanceModel0", bufferIndex: 3, offset: 0)
         configuration.attributes[6] = .attribute(.vector4, name: "instanceModel1", bufferIndex: 3, offset: 16)
         configuration.attributes[7] = .attribute(.vector4, name: "instanceModel2", bufferIndex: 3, offset: 32)
@@ -142,10 +147,13 @@ public struct Flat3DPipeline: RenderPipelineConfigurator {
             stride: MemoryLayout<Flat3DInstanceData>.stride,
             stepFunction: .perInstance
         )
-        configuration.layouts[4] = VertexDescriptor.Layout(
-            stride: MemoryLayout<Flat3DDefaultVertexData>.stride,
-            stepFunction: .perInstance
-        )
+        let defaults = ["defaultTextureCoordinate", "defaultTangent", "defaultJointIndices", "defaultJointWeights"]
+        if defaults.contains(where: { configuration.attributes.containsAttribute(by: $0) }) {
+            configuration.layouts[4] = VertexDescriptor.Layout(
+                stride: MemoryLayout<Flat3DDefaultVertexData>.stride,
+                stepFunction: .perInstance
+            )
+        }
 
         var descriptor = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex))
         descriptor.fragment = shader.asset.getShader(for: .fragment)

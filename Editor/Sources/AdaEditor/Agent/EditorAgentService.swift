@@ -128,6 +128,7 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             var client: Client
             var eventSink: EditorACPEventSink
             var agentSettings: AdaProjectAgent
+            var mcpEnabled: Bool
             var upstreamSessionID: SessionId
             var supportsLoadSession: Bool
             var agentName: String?
@@ -136,10 +137,12 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             var assistantEventID: String
             var thinkingEventID: String
             var hasSentPrompt: Bool
+            var isPromptRunning: Bool
             var configuration: EditorAgentSessionConfiguration
         }
 
         private var sessions: [String: ManagedSession] = [:]
+        private var sessionPreparations: [String: Task<ManagedSession, any Error>] = [:]
         private let permissionBroker = EditorAgentPermissionBroker()
 
         func connect(
@@ -167,8 +170,15 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             var managed = try await prepareSession(
                 request: request,
                 onEvent: onEvent,
-                onProjectFileChanged: onProjectFileChanged
+                onProjectFileChanged: onProjectFileChanged,
+                forPrompt: true
             )
+            defer {
+                if var current = sessions[request.session.id] {
+                    current.isPromptRunning = false
+                    sessions[request.session.id] = current
+                }
+            }
             managed.assistantText = ""
             managed.assistantEventID = UUID().uuidString
             managed.thinkingEventID = UUID().uuidString
@@ -257,6 +267,7 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
 
         func shutdown() async {
             await permissionBroker.cancelAll()
+            for preparation in sessionPreparations.values { preparation.cancel() }
             for session in sessions.values {
                 session.notificationTask.cancel()
                 await session.client.terminate()
@@ -267,15 +278,30 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
         private func prepareSession(
             request: EditorAgentRunRequest,
             onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void,
-            onProjectFileChanged: @escaping @Sendable (String) async -> Void
+            onProjectFileChanged: @escaping @Sendable (String) async -> Void,
+            forPrompt: Bool = false
         ) async throws -> ManagedSession {
             let agentConfig = request.project.ai.agent
             guard agentConfig.enabled else {
                 throw EditorAgentServiceError.disabled
             }
-            if let existing = sessions[request.session.id] {
-                if existing.agentSettings == agentConfig {
-                    await existing.eventSink.update(onEvent: onEvent, onFileChanged: onProjectFileChanged)
+            if let preparation = sessionPreparations[request.session.id] {
+                _ = try await preparation.value
+                if sessionPreparations[request.session.id] == preparation {
+                    sessionPreparations.removeValue(forKey: request.session.id)
+                }
+                return try await prepareSession(request: request, onEvent: onEvent, onProjectFileChanged: onProjectFileChanged, forPrompt: forPrompt)
+            }
+            if var existing = sessions[request.session.id] {
+                if existing.agentSettings == agentConfig, existing.mcpEnabled == request.project.ai.mcp.enabled {
+                    if forPrompt {
+                        existing.isPromptRunning = true
+                        sessions[request.session.id] = existing
+                    }
+                    // An automatic connect must not replace the active prompt's transcript sink.
+                    if forPrompt || !existing.isPromptRunning {
+                        await existing.eventSink.update(onEvent: onEvent, onFileChanged: onProjectFileChanged)
+                    }
                     return existing
                 }
                 existing.notificationTask.cancel()
@@ -285,6 +311,32 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             guard let command = agentConfig.target.command?.trimmingCharacters(in: .whitespacesAndNewlines), !command.isEmpty else {
                 throw EditorAgentServiceError.missingCommand
             }
+
+            let preparation = Task {
+                try await createSession(request: request, command: command, onEvent: onEvent, onProjectFileChanged: onProjectFileChanged)
+            }
+            sessionPreparations[request.session.id] = preparation
+            do {
+                _ = try await preparation.value
+                if sessionPreparations[request.session.id] == preparation {
+                    sessionPreparations.removeValue(forKey: request.session.id)
+                }
+            } catch {
+                if sessionPreparations[request.session.id] == preparation {
+                    sessionPreparations.removeValue(forKey: request.session.id)
+                }
+                throw error
+            }
+            return try await prepareSession(request: request, onEvent: onEvent, onProjectFileChanged: onProjectFileChanged, forPrompt: forPrompt)
+        }
+
+        private func createSession(
+            request: EditorAgentRunRequest,
+            command: String,
+            onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void,
+            onProjectFileChanged: @escaping @Sendable (String) async -> Void
+        ) async throws -> ManagedSession {
+            let agentConfig = request.project.ai.agent
 
             let client = Client()
             let eventSink = EditorACPEventSink(onEvent: onEvent, onFileChanged: onProjectFileChanged)
@@ -320,8 +372,24 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             let models: ModelsInfo?
             let configOptions: [SessionConfigOption]?
             let supportsLoadSession = initialized.agentCapabilities.loadSession == true
+            let servers = EditorAgentMCPConnection.servers(
+                enabled: request.project.ai.mcp.enabled,
+                supportsHTTP: initialized.agentCapabilities.mcpCapabilities?.http == true
+            )
+            let localSessionID = request.session.id
+            // Consume load-session replay while the session is still being prepared,
+            // rather than leaving it buffered until the first new prompt starts.
+            let notificationTask = Task { [weak self] in
+                for await notification in await client.notifications {
+                    await self?.handleNotification(
+                        localSessionID: localSessionID,
+                        notification: notification,
+                        onEvent: { await eventSink.emit($0) }
+                    )
+                }
+            }
             if let upstream = request.session.upstreamSessionID, supportsLoadSession, request.session.agentTargetIdentity == agentConfig.target.sessionIdentity {
-                let response = try await client.loadSession(sessionId: SessionId(upstream), cwd: workingDirectory.path)
+                let response = try await client.loadSession(sessionId: SessionId(upstream), cwd: workingDirectory.path, mcpServers: servers)
                 upstreamSessionID = response.sessionId
                 modes = response.modes
                 models = response.models
@@ -329,7 +397,7 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             } else {
                 let response = try await client.newSession(
                     workingDirectory: workingDirectory.path,
-                    mcpServers: mcpServers(for: request.project),
+                    mcpServers: servers,
                     timeout: 30
                 )
                 upstreamSessionID = response.sessionId
@@ -338,24 +406,12 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
                 configOptions = response.configOptions
             }
 
-            let localSessionID = request.session.id
-            let notificationTask = Task { [weak self] in
-                for await notification in await client.notifications {
-                    await self?
-                        .handleNotification(
-                            localSessionID: localSessionID,
-                            upstreamSessionID: upstreamSessionID,
-                            notification: notification,
-                            onEvent: { await eventSink.emit($0) }
-                        )
-                }
-            }
-
             let agentName = initialized.agentInfo?.title ?? initialized.agentInfo?.name
             let managed = ManagedSession(
                 client: client,
                 eventSink: eventSink,
                 agentSettings: agentConfig,
+                mcpEnabled: request.project.ai.mcp.enabled,
                 upstreamSessionID: upstreamSessionID,
                 supportsLoadSession: supportsLoadSession,
                 agentName: agentName,
@@ -364,6 +420,7 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
                 assistantEventID: UUID().uuidString,
                 thinkingEventID: UUID().uuidString,
                 hasSentPrompt: false,
+                isPromptRunning: false,
                 configuration: Self.configuration(
                     agentName: agentName,
                     modes: modes,
@@ -374,15 +431,6 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             sessions[localSessionID] = managed
             await onEvent(EditorAgentEvent(kind: .runStatus, configuration: managed.configuration))
             return managed
-        }
-
-        private func mcpServers(for project: AdaProject) -> [MCPServerConfig] {
-            guard project.ai.mcp.enabled else {
-                return []
-            }
-            return [
-                .http(HTTPServerConfig(name: "AdaEditor", url: EditorMCPServerAddress.url))
-            ]
         }
 
         private static func configuration(
@@ -482,15 +530,14 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
 
         private func handleNotification(
             localSessionID: String,
-            upstreamSessionID: SessionId,
             notification: JSONRPCNotification,
             onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void
         ) async {
             guard
                 notification.method == "session/update",
                 let payload = decode(notification: notification, as: SessionUpdateNotification.self),
-                payload.sessionId == upstreamSessionID,
-                var managed = sessions[localSessionID]
+                var managed = sessions[localSessionID],
+                payload.sessionId == managed.upstreamSessionID
             else {
                 return
             }

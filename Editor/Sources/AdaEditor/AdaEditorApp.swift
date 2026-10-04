@@ -20,6 +20,12 @@ import Logging
 @main
 enum AdaApplicationEntry {
     @MainActor static func main() async throws {
+        #if os(macOS)
+            if CommandLine.arguments.contains(EditorAgentMCPConnection.bridgeArgument) {
+                try await EditorAgentMCPStdioBridge(endpoint: URL(string: EditorMCPServerAddress.url)).run()
+                return
+            }
+        #endif
         #if DEBUG && os(iOS) && targetEnvironment(simulator)
             if CommandLine.arguments.contains("--mobile-agent-tools-smoke") {
                 await MobileEditorAgentSmoke.run()

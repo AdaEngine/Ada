@@ -122,7 +122,9 @@ extension EditorCenterWorkbench {
         HStack(spacing: 0) {
             ScrollView(.horizontal) {
                 HStack(spacing: 4) {
-                    filesTab(in: pane)
+                    #if !os(macOS) && !os(Windows) && !os(Linux)
+                        filesTab(in: pane)
+                    #endif
                     ForEach(viewModel.documents(in: pane), id: \.id) { document in
                         editorTab(document, active: !filesBrowserPanes.contains(pane) && document.id == viewModel.selectedDocument(in: pane)?.id)
                     }

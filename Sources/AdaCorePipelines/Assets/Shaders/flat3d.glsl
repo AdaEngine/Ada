@@ -10,6 +10,20 @@ layout (binding = 1) uniform DirectionalLight3DUniform {
     vec4 u_ShadowParameters;
 };
 
+layout (location = 13) in vec4 a_JointIndices;
+layout (location = 14) in vec4 a_JointWeights;
+layout (binding = 14) uniform Skinning3DUniform {
+    mat4 u_JointMatrices[128];
+};
+
+mat4 skinTransform() {
+    if (a_JointIndices.x < 0.0) { return mat4(1.0); }
+    return u_JointMatrices[int(a_JointIndices.x)] * a_JointWeights.x
+        + u_JointMatrices[int(a_JointIndices.y)] * a_JointWeights.y
+        + u_JointMatrices[int(a_JointIndices.z)] * a_JointWeights.z
+        + u_JointMatrices[int(a_JointIndices.w)] * a_JointWeights.w;
+}
+
 layout (location = 0) in vec3 a_Position;
 layout (location = 1) in vec3 a_Normal;
 layout (location = 2) in vec2 a_TextureCoordinate;
@@ -44,8 +58,9 @@ layout (location = 0) out VertexOut Output;
 [[main]]
 void flat3d_vertex()
 {
-    mat4 model = mat4(a_Model0, a_Model1, a_Model2, a_Model3);
-    mat3 normalMatrix = transpose(inverse(mat3(model)));
+    mat4 model = mat4(a_Model0, a_Model1, a_Model2, a_Model3) * skinTransform();
+    mat3 basis = mat3(model);
+    mat3 normalMatrix = abs(determinant(basis)) > 0.000001 ? transpose(inverse(basis)) : mat3(1.0);
     vec3 normal = normalize(normalMatrix * a_Normal);
     vec4 worldPosition = model * vec4(a_Position, 1.0);
     vec3 worldTangent = normalize(mat3(model) * a_Tangent.xyz);

@@ -12,6 +12,10 @@ public struct DirectionalShadow3DPipeline: RenderPipelineConfigurator {
 
     public func configurate(with configuration: VertexDescriptor) -> RenderPipelineDescriptor {
         var configuration = configuration
+        configureSkinningAttributes(&configuration)
+        if configuration.attributes.containsAttribute(by: "defaultJointIndices") || configuration.attributes.containsAttribute(by: "defaultJointWeights") {
+            configuration.layouts[4] = VertexDescriptor.Layout(stride: MemoryLayout<Flat3DDefaultVertexData>.stride, stepFunction: .perInstance)
+        }
         configuration.attributes[5] = .attribute(.vector4, name: "instanceModel0", bufferIndex: 3, offset: 0)
         configuration.attributes[6] = .attribute(.vector4, name: "instanceModel1", bufferIndex: 3, offset: 16)
         configuration.attributes[7] = .attribute(.vector4, name: "instanceModel2", bufferIndex: 3, offset: 32)
