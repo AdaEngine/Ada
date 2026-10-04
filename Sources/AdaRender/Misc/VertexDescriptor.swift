@@ -168,6 +168,11 @@ public enum VertexFormat: UInt, Codable, Sendable {
 /// A pipeline state is the state of the graphics rendering pipeline, including shaders, blending,
 /// multisampling, and visibility testing. For every pipeline state, there can be only one VertexDescriptor object.
 public struct VertexDescriptor: Codable, Hashable, Sendable {
+    // WebGPU vertex buffer layouts are dense; engine buffer indices may be sparse.
+    var activeBufferIndices: [Int] {
+        Set(attributes.filter { $0.format != .invalid }.map(\.bufferIndex)).sorted()
+    }
+
     /// An array of state data that describes how vertex attribute data is stored in memory and is mapped to arguments for a vertex shader.
     public var attributes: VertexDescriptorAttributesArray
 

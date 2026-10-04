@@ -1,4 +1,4 @@
-#if canImport(WebGPU) && !WASM
+#if canImport(WebGPU) && !WASM && !os(Android)
     import Foundation
     import Subprocess
     import WebGPU
@@ -15,7 +15,7 @@
             stage: ShaderStage,
             defines _: [ShaderDefine]
         ) async throws -> DeviceCompiledShader {
-            guard let toolExecutable = Bundle.module.tintExecutable else {
+            guard let toolExecutable = Bundle.adaModule.tintExecutable else {
                 throw ShaderCompilerError.tintNotFound
             }
 

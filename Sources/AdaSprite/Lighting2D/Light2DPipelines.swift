@@ -50,7 +50,7 @@ public struct Light2DRenderPipelines: Resource {
     public let sampler: Sampler
 
     public init(device: RenderDevice) {
-        let compositeShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_composite.glsl", from: .module)
+        let compositeShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_composite.glsl", from: .adaModule)
         var compositeDesc = RenderPipelineDescriptor(
             vertex: compositeShader.asset.requiredShader(for: .vertex),
             fragment: compositeShader.asset.getShader(for: .fragment),
@@ -63,7 +63,7 @@ public struct Light2DRenderPipelines: Resource {
         ]
         self.compositePipeline = device.createRenderPipeline(from: compositeDesc)
 
-        let pointShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_point.glsl", from: .module)
+        let pointShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_point.glsl", from: .adaModule)
         var pointDesc = RenderPipelineDescriptor(
             vertex: pointShader.asset.requiredShader(for: .vertex),
             fragment: pointShader.asset.getShader(for: .fragment),
@@ -83,7 +83,7 @@ public struct Light2DRenderPipelines: Resource {
         ]
         self.pointLightPipeline = device.createRenderPipeline(from: pointDesc)
 
-        let dirShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_directional.glsl", from: .module)
+        let dirShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_directional.glsl", from: .adaModule)
         var dirDesc = RenderPipelineDescriptor(
             vertex: dirShader.asset.requiredShader(for: .vertex),
             fragment: dirShader.asset.getShader(for: .fragment),

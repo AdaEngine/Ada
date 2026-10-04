@@ -20,6 +20,7 @@
 
         func getNextDrawable(_: RenderDevice) -> (any Drawable)? {
             renderWindow.surfaceLock.withLock { _ in
+                guard renderWindow.isActive else { return nil }
                 if renderWindow.pendingDrawableSkips > 0 {
                     renderWindow.pendingDrawableSkips -= 1
                     return nil
@@ -40,7 +41,7 @@
                         return nil
                     }
                     return WGPUSwapchainDrawable(
-                        surface: renderWindow.surface,
+                        renderWindow: renderWindow,
                         surfaceTexture: WebGPU.GPUSurfaceTexture(wgpuStruct: surfaceTexture)
                     )
                 #endif
@@ -60,12 +61,12 @@
                 )
             }
         #else
-            let surface: WebGPU.GPUSurface
+            let renderWindow: WGPUContext.WGPURenderWindow
             let surfaceTexture: WebGPU.GPUSurfaceTexture
             var isPresented: Bool = false
 
-            init(surface: WebGPU.GPUSurface, surfaceTexture: WebGPU.GPUSurfaceTexture) {
-                self.surface = surface
+            init(renderWindow: WGPUContext.WGPURenderWindow, surfaceTexture: WebGPU.GPUSurfaceTexture) {
+                self.renderWindow = renderWindow
                 self.surfaceTexture = surfaceTexture
                 self.texture = WGPUGPUTexture(
                     texture: surfaceTexture.texture,
@@ -79,8 +80,9 @@
             #if WASM
                 self.isPresented = true
             #else
-                let value = webGPUDeviceLock.withLock { _ in
-                    surface.present()
+                let value = renderWindow.surfaceLock.withLock { _ in
+                    guard renderWindow.isActive else { return WebGPU.GPUStatus.success }
+                    return webGPUDeviceLock.withLock { _ in renderWindow.surface.present() }
                 }
                 self.isPresented = true
                 if value != .success {

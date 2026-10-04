@@ -354,7 +354,13 @@ enum ShaderCache {
 
     enum Constants {
         static let cacheDirectoryName = "AdaEngine"
+        #if os(Android)
+        // Native WebGPU consumes SPIR-V directly; keep its device shader cache
+        // separate from the previous GLES prototype and other shader profiles.
+        static let shadersDirectoryName = "Shaders-Android-WebGPU-v1"
+        #else
         static let shadersDirectoryName = "Shaders"
+        #endif
         static let shaderCacheFileName = "ShaderCache-v2.json"
         static let shaderCacheFileExtension = "yaml"
         static let separator = "/"

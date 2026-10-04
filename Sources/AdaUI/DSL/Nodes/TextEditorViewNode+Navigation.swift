@@ -210,7 +210,7 @@ extension TextEditorViewNode {
         let displayed = self.displayedLines()
         let scrollY = self.nearestScrollView()?.contentOffset.y ?? 0
         let firstLine = max(0, Int(max(0, scrollY - self.textContentRect().minY) / max(1, lineHeight)))
-        let visibleCount = max(1, Int(ceil(viewportHeight / max(1, lineHeight))) + 2)
+        let visibleCount = max(1, Int((viewportHeight / max(1, lineHeight)).rounded(.up)) + 2)
         let lowerBound = min(displayed.count, firstLine)
         return lowerBound..<min(displayed.count, lowerBound + visibleCount)
     }

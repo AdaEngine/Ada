@@ -216,6 +216,12 @@ public struct OperationDescriptor: Sendable {
 /// including rasterization (such as multisampling), visibility, blending, tessellation, and graphics function state.
 ///
 /// To specify the vertex or fragment function in the rendering pipeline descriptor, set the vertex or fragment property.
+/// Vertex order that identifies a triangle's front face.
+public enum TriangleWinding: Sendable {
+    case clockwise
+    case counterClockwise
+}
+
 public struct RenderPipelineDescriptor: Sendable {
     /// The vertex shader the pipeline run to process vertices.
     public var vertex: Shader
@@ -228,6 +234,9 @@ public struct RenderPipelineDescriptor: Sendable {
 
     /// A Boolean value that indicates whether backface culling is enabled.
     public var backfaceCulling: Bool = true
+
+    /// Overrides the backend's default triangle winding when specified.
+    public var frontFaceWinding: TriangleWinding?
 
     /// The primitive type.
     public var primitive: IndexPrimitive = .triangle

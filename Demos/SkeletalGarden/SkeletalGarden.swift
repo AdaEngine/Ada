@@ -1,15 +1,36 @@
 import AdaEngine
+import Foundation
 
+#if os(Android)
+@_cdecl("ada_android_start")
+public func startAndroidGarden() {
+    AndroidRuntime.start { SkeletalGarden() }
+}
+#else
 @main
+private enum GardenMain {
+    static func main() async throws {
+        try await SkeletalGarden.main()
+    }
+}
+#endif
 struct SkeletalGarden: App {
     var body: some AppScene {
-        DefaultAppWindow(assetBundle: .module)
+        DefaultAppWindow(assetBundle: gardenBundle)
             .addPlugins(GardenPlugin())
             .window(with: UIWindow.Configuration(
                 title: "AdaEngine · Skeletal Garden · WASD / Shift / drag to orbit",
                 frame: Rect(x: 120, y: 100, width: 1100, height: 760)
             ))
     }
+}
+
+private var gardenBundle: Foundation.Bundle {
+    #if os(Android)
+    AndroidResourceBundle.bundle(named: "AdaEngine_SkeletalGarden")
+    #else
+    .module
+    #endif
 }
 
 struct GardenPlugin: Plugin {
@@ -38,13 +59,13 @@ struct GardenCamera: Component {
 @System
 @MainActor
 func StartupGarden(_ context: WorldUpdateContext) {
-    do { try makeGarden(in: context.world) } catch { print("[SkeletalGarden] startup failed: \(error)") }
+    do { try makeGarden(in: context.world) } catch { gardenLog("[SkeletalGarden] startup failed: \(error)") }
 }
 
 @MainActor
 private func makeGarden(in world: World) throws {
     let device = unsafe RenderEngine.shared.renderDevice
-    guard let model = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/TestHumanoid.glb", from: .module).asset else {
+    guard let model = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/TestHumanoid.glb", from: gardenBundle).asset else {
         throw AssetError.message("TestHumanoid could not be loaded")
     }
     let player = model.instantiate(in: world)
@@ -61,7 +82,7 @@ private func makeGarden(in world: World) throws {
         animation.player.speed = 0.65
         reference.components[ModelAnimation3DComponent.self] = animation
     }
-    guard let ribbonModel = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/TwoBoneRibbon.glb", from: .module).asset else {
+    guard let ribbonModel = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/TwoBoneRibbon.glb", from: gardenBundle).asset else {
         throw AssetError.message("TwoBoneRibbon could not be loaded")
     }
     let ribbon = ribbonModel.instantiate(in: world)
@@ -105,7 +126,7 @@ private func makeGarden(in world: World) throws {
     camera.backgroundColor = Color(red: 0.12, green: 0.2, blue: 0.3)
     let cameraEntity = world.spawn("Camera", bundle: Camera3D(camera: camera))
     cameraEntity.components[GardenCamera.self] = GardenCamera()
-    print("[SkeletalGarden] loaded \(model.skins.count) skin, \(model.skins.first?.joints.count ?? 0) joints; clips=\(model.animationClips.map(\.name))")
+    gardenLog("[SkeletalGarden] loaded \(model.skins.count) skin, \(model.skins.first?.joints.count ?? 0) joints; clips=\(model.animationClips.map(\.name))")
 }
 
 @PlainSystem
@@ -115,7 +136,11 @@ struct UpdateGardenSystem {
     @Query<Ref<GardenCamera>, Ref<Transform>> private var cameras
     @Res<Input> private var input
     @Res<DeltaTime> private var time
+    #if os(Android)
+    private let autoplay = true
+    #else
     private let autoplay = ProcessInfo.processInfo.arguments.contains("--autoplay")
+    #endif
     private let poseProof = ProcessInfo.processInfo.arguments.contains("--pose-proof")
 
     init(world _: World) {}
@@ -135,7 +160,12 @@ struct UpdateGardenSystem {
             let moving = direction.length > 0.01
             let clip = moving ? (running ? "Run" : "Walk") : "Idle"
             if animation.player.clipIndex.map({ animation.player.clips[$0].name }) != clip {
-                do { try animation.player.play(clip) } catch { print("[SkeletalGarden] \(error)") }
+                do {
+                    try animation.player.play(clip)
+                    #if os(Android)
+                    gardenLog("[SkeletalGarden] animation=\(clip)")
+                    #endif
+                } catch { gardenLog("[SkeletalGarden] \(error)") }
             }
             if moving && !poseProof {
                 direction = direction.normalized
@@ -147,8 +177,14 @@ struct UpdateGardenSystem {
             focus = transform.position + [0, 1, 0]
         }
         cameras.forEach { (orbit: Ref<GardenCamera>, transform: Ref<Transform>) in
-            let mouse = input.getMousePosition()
-            let dragging = input.isMouseButtonPressed(.left)
+            #if os(Android)
+                let contact = input.getTouches().first { $0.phase == .began || $0.phase == .moved }
+                let mouse = contact?.location ?? orbit.lastMouse
+                let dragging = contact != nil
+            #else
+                let mouse = input.getMousePosition()
+                let dragging = input.isMouseButtonPressed(.left)
+            #endif
             if dragging && orbit.dragging {
                 orbit.yaw -= (mouse.x - orbit.lastMouse.x) * 0.008
                 orbit.pitch = min(max(orbit.pitch + (mouse.y - orbit.lastMouse.y) * 0.006, 0.1), 0.8)
@@ -164,4 +200,12 @@ struct UpdateGardenSystem {
             transform.wrappedValue = Transform(matrix: matrix)
         }
     }
+}
+
+private func gardenLog(_ message: String) {
+    #if os(Android)
+    AndroidRuntime.log(message)
+    #else
+    print(message)
+    #endif
 }

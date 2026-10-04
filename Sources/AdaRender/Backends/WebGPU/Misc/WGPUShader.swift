@@ -49,7 +49,16 @@
                     let code = data.withUnsafeBytes { buffer in
                         Array(buffer.bindMemory(to: UInt32.self))
                     }
-                    shaderData = WebGPU.GPUShaderSourceSPIRV(code: code)
+                    #if os(Android)
+                        // Native GLSL permits texture sampling in divergent control flow.
+                        // Preserve that SPIR-V behavior when Dawn translates through WGSL.
+                        shaderData = WebGPU.GPUShaderSourceSPIRV(
+                            code: code,
+                            nextInChain: WebGPU.DawnShaderModuleSPIRVOptionsDescriptor(allowNonUniformDerivatives: true)
+                        )
+                    #else
+                        shaderData = WebGPU.GPUShaderSourceSPIRV(code: code)
+                    #endif
                     entryPoint = "main"
                 }
 

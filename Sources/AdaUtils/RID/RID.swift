@@ -9,7 +9,9 @@ import Foundation
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
     import Darwin
-#elseif os(Android) || os(Linux)
+#elseif os(Android)
+    import Android
+#elseif os(Linux)
     import Glibc
 #endif
 

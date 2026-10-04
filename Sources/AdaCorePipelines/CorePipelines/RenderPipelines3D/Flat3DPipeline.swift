@@ -123,7 +123,7 @@ public struct Flat3DPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/flat3d.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/flat3d.glsl", from: .adaModule)
     }
 
     public func configurate(with configuration: VertexDescriptor) -> RenderPipelineDescriptor {
@@ -159,6 +159,9 @@ public struct Flat3DPipeline: RenderPipelineConfigurator {
         descriptor.fragment = shader.asset.getShader(for: .fragment)
         descriptor.debugName = "Flat 3D Pipeline"
         descriptor.vertexDescriptor = configuration
+        #if os(Android)
+            descriptor.frontFaceWinding = .clockwise
+        #endif
         descriptor.depthStencilDescriptor = DepthStencilDescriptor(
             isDepthTestEnabled: true,
             isDepthWriteEnabled: true,

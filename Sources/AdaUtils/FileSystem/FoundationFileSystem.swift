@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if os(Android)
+import CAndroid
+#endif
 
 final class FoundationFileSystem: FileSystem, @unchecked Sendable {
     let fileManager: FileManager = .default
@@ -14,6 +17,8 @@ final class FoundationFileSystem: FileSystem, @unchecked Sendable {
     override var applicationFolderURL: URL {
         #if MACOS
             return Bundle.main.bundleURL.deletingLastPathComponent()
+        #elseif os(Android)
+            return androidFilesURL.appendingPathComponent("resources")
         #elseif IOS || TVOS
             return try! self.fileManager.url(for: .applicationDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         #else
@@ -23,6 +28,18 @@ final class FoundationFileSystem: FileSystem, @unchecked Sendable {
     // swiftlint:enable force_try
 
     override func url(for searchPath: SearchDirectoryPath, create: Bool = false) throws -> URL {
+        #if os(Android)
+            let directory: String
+            switch searchPath {
+            case .applicationSupportDirectory: directory = "ApplicationSupport"
+            case .downloadsDirectory: directory = "Downloads"
+            case .documentDirectory: directory = "Documents"
+            case .cachesDirectory: directory = "Caches"
+            }
+            let url = androidFilesURL.appendingPathComponent(directory, isDirectory: true)
+            if create { try fileManager.createDirectory(at: url, withIntermediateDirectories: true) }
+            return url
+        #else
         let searchPathDir: FileManager.SearchPathDirectory
 
         switch searchPath {
@@ -37,7 +54,17 @@ final class FoundationFileSystem: FileSystem, @unchecked Sendable {
         }
 
         return try self.fileManager.url(for: searchPathDir, in: .userDomainMask, appropriateFor: nil, create: create)
+        #endif
     }
+
+    #if os(Android)
+    private var androidFilesURL: URL {
+        guard let path = unsafe ada_android_files_path() else {
+            preconditionFailure("Android filesystem requires the NativeActivity host")
+        }
+        return unsafe URL(fileURLWithPath: String(cString: path))
+    }
+    #endif
 
     override func itemExists(at url: URL) -> Bool {
         return fileManager.fileExists(atPath: url.path)

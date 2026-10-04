@@ -19,6 +19,8 @@ let isHeadlessCIEnabled: Bool = {
         || disableSwanValue.map(enabledValues.contains) == true
 }()
 
+let isAndroidBuildEnabled = ProcessInfo.processInfo.environment["ADAENGINE_ANDROID"] == "1"
+
 let isWebExportEnabled: Bool = {
     let webExportValue = ProcessInfo.processInfo.environment["ADAENGINE_WEB_EXPORT"]?.lowercased()
     let enabledValues: Set<String> = ["1", "true", "yes", "on"]
@@ -37,9 +39,9 @@ import Darwin.C
 
 /// Only xcode can import AppleProductTypes and we can use it as checker
 #if canImport(AppleProductTypes)
-let isWGPUEnabled = isWebExportEnabled // We can't build wgpu from xcode, except web export builds.
+let isWGPUEnabled = isWebExportEnabled || isAndroidBuildEnabled // We can't build wgpu from xcode, except web export builds.
 #else
-let isWGPUEnabled = isWebExportEnabled
+let isWGPUEnabled = isWebExportEnabled || isAndroidBuildEnabled
 #endif
 
 #else
@@ -60,12 +62,6 @@ extension String {
 }
 
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS, .watchOS, .visionOS]
-
-#if canImport(Darwin)
-let miniaudioSources = isWebExportEnabled ? ["miniaudio.c"] : ["miniaudio.c", "miniaudio_apple.m"]
-#else
-let miniaudioSources = ["miniaudio.c"]
-#endif
 
 var products: [Product] = [
     .executable(name: "AdaWebPlayer", targets: ["AdaWebPlayer"]),
@@ -157,6 +153,8 @@ var products: [Product] = [
     ])
 ]
 
+products.append(.library(name: "AndroidDemo", type: .dynamic, targets: ["AndroidDemo"]))
+
 // MARK: - Targets
 
 // MARK: Editor Target
@@ -164,7 +162,7 @@ var products: [Product] = [
 var commonPlugins: [Target.PluginUsage] = []
 
 #if os(macOS) || os(Linux)
-if !isWebExportEnabled {
+if !isWebExportEnabled && !isAndroidBuildEnabled {
     commonPlugins.append(
         .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
     )
@@ -231,10 +229,11 @@ var adaEngineDependencies: [Target.Dependency] = [
 ]
 
 #if os(Linux)
-adaEngineDependencies += ["X11"]
+adaEngineDependencies += [.target(name: "X11", condition: .when(platforms: [.linux]))]
 #endif
 
 var adaRenderDependencies: [Target.Dependency] = [
+    .target(name: "CAndroid", condition: .when(platforms: [.android])),
     "AdaApp",
     "AdaECS",
     "AdaAssets",
@@ -311,6 +310,21 @@ let adaEngineMacros: Target = .macro(
 // MARK: Other Targets
 
 var targets: [Target] = [
+    .target(
+        name: "CAndroid",
+        linkerSettings: [
+            .linkedLibrary("android", .when(platforms: [.android])),
+            .linkedLibrary("log", .when(platforms: [.android])),
+        ]
+    ),
+    .target(
+        name: "AndroidDemo",
+        dependencies: ["AdaEngine", "CAndroid"],
+        path: "Demos/AndroidDemo",
+        exclude: ["README.md"],
+        resources: [.copy("Assets")],
+        swiftSettings: swiftSettings
+    ),
     adaEngineTarget,
     adaEngineEmbeddable,
     adaEngineMacros,
@@ -334,6 +348,7 @@ var targets: [Target] = [
             "AdaUtils",
             "AdaECS",
             "AdaApp",
+            .target(name: "CAndroid", condition: .when(platforms: [.android])),
             "AdaUI",
             .product(
                 name: "JavaScriptKit",
@@ -406,6 +421,7 @@ var targets: [Target] = [
     .adaTarget(
         name: "AdaUtils",
         dependencies: [
+            .target(name: "CAndroid", condition: .when(platforms: [.android])),
             .product(name: "Collections", package: "swift-collections"),
             .product(name: "BitCollections", package: "swift-collections"),
             "AdaEngineMacros",
@@ -1021,9 +1037,18 @@ targets += [
             .linkedLibrary("setjmp", .when(platforms: [.wasi]))
         ]
     ),
+    // Select Objective-C implementation by destination, not the manifest host.
+    .target(
+        name: "miniaudioApple",
+        path: "Sources/miniaudioApple",
+        sources: ["AppleImplementation.m"],
+        publicHeadersPath: "include",
+        cSettings: [.unsafeFlags(["-w"])]
+    ),
     .target(
         name: "miniaudio",
-        sources: miniaudioSources,
+        dependencies: [.target(name: "miniaudioApple", condition: .when(platforms: applePlatforms))],
+        sources: ["miniaudio.c"],
         publicHeadersPath: "include",
         cSettings: [
             .define("MA_NO_DEVICE_IO", .when(platforms: [.wasi])),
@@ -1306,15 +1331,28 @@ targets += [
 #endif
 
 // Native skeletal animation development demo.
-products.append(.executable(name: "SkeletalGarden", targets: ["SkeletalGarden"]))
-targets.append(.executableTarget(
-    name: "SkeletalGarden",
-    dependencies: ["AdaEngine"],
-    path: "Demos/SkeletalGarden",
-    exclude: ["script", "README.md", "dist"],
-    resources: [.copy("Assets")],
-    swiftSettings: swiftSettings
-))
+products.append(isAndroidBuildEnabled
+    ? .library(name: "SkeletalGarden", type: .dynamic, targets: ["SkeletalGarden"])
+    : .executable(name: "SkeletalGarden", targets: ["SkeletalGarden"]))
+if isAndroidBuildEnabled {
+    targets.append(.target(
+        name: "SkeletalGarden",
+        dependencies: ["AdaEngine"],
+        path: "Demos/SkeletalGarden",
+        exclude: ["script"],
+        resources: [.copy("Assets")],
+        swiftSettings: swiftSettings
+    ))
+} else {
+    targets.append(.executableTarget(
+        name: "SkeletalGarden",
+        dependencies: ["AdaEngine"],
+        path: "Demos/SkeletalGarden",
+        exclude: ["script"],
+        resources: [.copy("Assets")],
+        swiftSettings: swiftSettings
+    ))
+}
 
 // MARK: - Package -
 
@@ -1375,7 +1413,7 @@ package.dependencies += [
     .package(url: "https://github.com/swiftlang/swift-syntax", from: "602.0.0"),
 ]
 
-if !isWebExportEnabled {
+if !isWebExportEnabled && !isAndroidBuildEnabled {
     package.dependencies.append(
         .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.62.1")
     )
@@ -1383,7 +1421,8 @@ if !isWebExportEnabled {
 
 if !isHeadlessCIEnabled {
     package.dependencies.append(
-        .package(url: "https://github.com/adobe/swan", .upToNextMinor(from: "0.0.8"))
+        ProcessInfo.processInfo.environment["ADAENGINE_SWAN_PACKAGE_PATH"].map { .package(name: "swan", path: $0) }
+            ?? .package(url: "https://github.com/adobe/swan", .upToNextMinor(from: "0.0.8"))
     )
 }
 

@@ -38,16 +38,17 @@
                 fatalError("Cannot replace a region on a WebGPU texture without a device")
             }
 
+            #if WASM
+            let origin = WebGPU.GPUOrigin3D(x: region.origin.x, y: region.origin.y, z: 0)
+            #else
+            let origin = WebGPU.GPUOrigin3D(x: UInt32(region.origin.x), y: UInt32(region.origin.y), z: 0)
+            #endif
             webGPUDeviceLock.withLock { _ in
                 device.queue.writeTexture(
                     destination: WebGPU.GPUTexelCopyTextureInfo(
                         texture: texture,
                         mipLevel: UInt32(mipmapLevel),
-                        origin: WebGPU.GPUOrigin3D(
-                            x: region.origin.x,
-                            y: region.origin.y,
-                            z: 0
-                        ),
+                        origin: origin,
                         aspect: WebGPU.GPUTextureAspect.all
                     ),
                     data: UnsafeRawBufferPointer(

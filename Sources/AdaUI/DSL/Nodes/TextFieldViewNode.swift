@@ -107,7 +107,7 @@ final class TextFieldViewNode: ViewNode {
 
         if self.wrapsTextToWidth {
             let contentWidth = max(1, result.width - Constants.horizontalInset * 2)
-            let wrappedLines = max(1, Int(ceil(measuredWidth / contentWidth)))
+            let wrappedLines = max(1, Int((measuredWidth / contentWidth).rounded(.up)))
             let wrappedHeight = Float(wrappedLines) * measuredHeight + Constants.verticalInset * 2
             result.height = max(result.height, max(Constants.minimumHeight, wrappedHeight))
         }

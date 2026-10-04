@@ -10,7 +10,7 @@ import Foundation
 extension Bundle {
     public static var engineBundle: Bundle {
         #if SWIFT_PACKAGE
-            return Self.module
+            return Self.adaModule
         #else
             return Bundle(for: BundleToken.self)
         #endif

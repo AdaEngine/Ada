@@ -92,6 +92,14 @@ public protocol RenderSurface {
 
 #endif
 
+#if os(Android)
+    /// Android native window retained for the lifetime of its WebGPU surface.
+    @MainActor
+    public protocol AndroidNativeWindowRenderSurface: RenderSurface {
+        var nativeWindow: UnsafeMutableRawPointer { get }
+    }
+#endif
+
 #if os(Windows)
     import WinSDK
 

@@ -77,7 +77,7 @@ public final class ShaderCompiler {
     public private(set) var includeSearchPaths: [ShaderSource.IncludeSearchPath] = [
         .module(
             name: "AdaEngine",
-            modulePath: Bundle.module.resourceURL?.appendingPathComponent("Shaders/Public") ?? Bundle.module.bundleURL
+            modulePath: Bundle.adaModule.resourceURL?.appendingPathComponent("Shaders/Public") ?? Bundle.adaModule.bundleURL
         )
     ]
 
@@ -330,7 +330,7 @@ public final class ShaderCompiler {
 extension ShaderCompiler {
     func makeDeviceShaderCompiler() -> ShaderDeviceCompilerEngine {
         switch unsafe RenderEngine.shared.type.deviceLang {
-        #if canImport(WebGPU) && !WASM
+        #if canImport(WebGPU) && !WASM && !os(Android)
             case .wgsl:
                 return WGSLShaderCompiler()
         #endif
