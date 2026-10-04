@@ -42,7 +42,7 @@ final class EditorModelPreviewCamera {
         // Fit a sphere to keep tall and wide models inside the frame while orbiting.
         let radius = max(0.1, halfExtents.length)
         let verticalHalfAngle = Self.fieldOfView.radians * 0.5
-        let horizontalHalfAngle = Math.atan(Math.tan(verticalHalfAngle) * aspect)
+        let horizontalHalfAngle = Float(Foundation.atan(Foundation.tan(Double(verticalHalfAngle)) * Double(aspect)))
         return radius / Math.sin(min(verticalHalfAngle, horizontalHalfAngle)) * 1.12 * zoom
     }
 

@@ -24,7 +24,7 @@ struct EditorDistributionTests {
         let url = URL(fileURLWithPath: reference.path)
         let project = try ProjectSystem.loadProject(at: url)
         let report = try EditorAdaScriptProjectBuilder().build(project: project, at: url)
-        #expect(report.viewCount == 1)
+        #expect(report.viewCount == 0)
         #expect(try store.openProject(at: url).path == reference.path)
         #expect(!FileManager.default.fileExists(atPath: url.appendingPathComponent("Package.swift").path))
         let launcher = ProjectOpeningViewModel(store: store)

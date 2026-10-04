@@ -366,9 +366,18 @@ extension EditorProcessRunning {
                 }
             }
 
+            // Unstructured tasks deliberately keep draining/reaping after caller cancellation.
+            // AsyncStream stops iteration when its task is cancelled, but Process remains alive.
+            // These tasks are always joined before the process handle leaves this actor.
+            let terminationTask = Task {
+                for await _ in terminationEvents { }
+            }
+
             do {
                 try process.run()
             } catch {
+                terminationTask.cancel()
+                await terminationTask.value
                 return EditorProcessResult(
                     command: command,
                     exitCode: 127,
@@ -377,17 +386,19 @@ extension EditorProcessRunning {
                 )
             }
 
-            async let standardOutput = Self.collectOutput(from: output, stream: .standardOutput, output: outputHandler)
-            async let standardError = Self.collectOutput(from: error, stream: .standardError, output: outputHandler)
-            for await _ in terminationEvents {
-                break
+            let outputTask = Task {
+                await Self.collectOutput(from: output, stream: .standardOutput, output: outputHandler)
             }
+            let errorTask = Task {
+                await Self.collectOutput(from: error, stream: .standardError, output: outputHandler)
+            }
+            await terminationTask.value
 
             return await EditorProcessResult(
                 command: command,
                 exitCode: process.terminationStatus,
-                standardOutput: standardOutput,
-                standardError: standardError
+                standardOutput: outputTask.value,
+                standardError: errorTask.value
             )
         }
 

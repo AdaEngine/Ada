@@ -143,6 +143,13 @@ project deployment are implemented separately from embedded Play.
 Web run/export paths and AdaScript AOT export to macOS/Web exist, with different
 toolchain requirements and component support; check the selected path explicitly.
 
+Standalone macOS Studio includes `Contents/MacOS/adastudio` and a bundled source
+build SDK. The CLI dispatches before app/UI startup and reuses project inspection,
+AdaScript validation and native build/export services, with JSON diagnostics and
+stable exit codes. CLI/SDK staging is excluded from iOS and App Store wrappers.
+Host Swift/Xcode tools and Python 3 remain required; validation scope and current
+export limitations are documented in [CLI.md](Documentation/CLI.md).
+
 Entry points: [EditorViewModel+Commands.swift](Sources/AdaEditor/UI/Editor/EditorViewModel+Commands.swift),
 [EditorViewModel+AdaScriptHotReload.swift](Sources/AdaEditor/UI/Editor/EditorViewModel+AdaScriptHotReload.swift),
 [EditorAdaScriptNativeExporter.swift](Sources/AdaEditor/Tooling/EditorAdaScriptNativeExporter.swift),
