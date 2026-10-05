@@ -5,6 +5,7 @@ import MCP
 
 struct EditorPerformancePanel: View {
     let model: EditorPerformanceModel
+    var isWorkspace = false
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -22,29 +23,46 @@ struct EditorPerformancePanel: View {
                         }
                     }
                     if model.target != nil {
-                        if geometry.size.width >= 700 {
-                            HStack(spacing: 12) {
+                        if model.displayMode == .timeline {
+                            if let capture = model.capture?.objectValue {
+                                captureSummary(capture)
+                            }
+                            if let timeline = model.timeline {
+                                EditorPerformanceTimelineView(timeline: timeline)
+                                    .id(model.selectedCaptureID ?? "")
+                            } else {
+                                Text(
+                                    model.activeCapture == nil
+                                        ? "Record a capture or select a completed recording to inspect CPU calls."
+                                        : "Recording CPU calls… Timeline appears when the capture completes."
+                                )
+                                    .foregroundColor(theme.editorColors.muted)
+                            }
+                        } else {
+                            if geometry.size.width >= 700 {
+                                HStack(spacing: 12) {
+                                    rateChart
+                                    timeChart
+                                    memoryChart
+                                    entityChart
+                                }
+                            } else {
                                 rateChart
                                 timeChart
                                 memoryChart
                                 entityChart
                             }
-                        } else {
-                            rateChart
-                            timeChart
-                            memoryChart
-                            entityChart
-                        }
-                        if !model.physicsSnapshots.isEmpty {
-                            physicsProfiles
-                        }
-                        if let capture = model.capture?.objectValue {
-                            captureSummary(capture)
-                            hotspots("ECS systems · capture", values: captureRows(capture, key: "systemHotspots"))
-                            hotspots("Render nodes · CPU · capture", values: captureRows(capture, key: "renderNodeHotspots"))
-                        } else {
-                            hotspots("ECS systems · latest sample", values: liveRows(model.systems))
-                            hotspots("Render nodes · CPU · latest sample", values: liveRows(model.renderNodes))
+                            if !model.physicsSnapshots.isEmpty {
+                                physicsProfiles
+                            }
+                            if let capture = model.capture?.objectValue {
+                                captureSummary(capture)
+                                hotspots("ECS systems · capture", values: captureRows(capture, key: "systemHotspots"))
+                                hotspots("Render nodes · CPU · capture", values: captureRows(capture, key: "renderNodeHotspots"))
+                            } else {
+                                hotspots("ECS systems · latest sample", values: liveRows(model.systems))
+                                hotspots("Render nodes · CPU · latest sample", values: liveRows(model.renderNodes))
+                            }
                         }
                     } else {
                         Text("Run a scene or an AdaScript project inside AdaEditor to begin.")
@@ -56,9 +74,10 @@ struct EditorPerformancePanel: View {
                 .frame(width: max(0, geometry.size.width - 4), alignment: .topLeading)
             }
         }
+        .background(theme.editorColors.surfaceElevated)
         .accessibilityIdentifier("AdaEditor.Performance")
-        .onAppear { model.appear() }
-        .onDisappear { model.disappear() }
+        .onAppear { model.appear(presentation: isWorkspace ? .workspace : .panel) }
+        .onDisappear { model.disappear(presentation: isWorkspace ? .workspace : .panel) }
     }
 
     private var toolbar: some View {
@@ -76,32 +95,69 @@ struct EditorPerformancePanel: View {
                 Spacer()
                 Text(model.status).foregroundColor(theme.editorColors.muted)
             }
-            HStack(spacing: 8) {
-                if model.activeCapture != nil {
-                    action("Stop recording") { model.stopRecording() }
-                    Text("Recording…").foregroundColor(theme.editorColors.purple)
-                } else if model.target?.isRunning == true {
-                    action("Record 5 s") { model.record() }
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(EditorPerformanceModel.DisplayMode.allCases, id: \.rawValue) { mode in
+                        action(mode.rawValue) { model.displayMode = mode }
+                            .background(model.displayMode == mode ? theme.editorColors.blue.opacity(0.18) : .clear)
+                    }
+                    action(model.isExpanded ? "Return to editor" : "Expand") { model.isExpanded.toggle() }
                 }
-                Text(model.selectedCaptureID == nil ? "Live ▾" : "Capture ▾")
-                    .padding(.horizontal, 8)
-                    .frame(height: 26)
-                    .background(theme.editorColors.surface)
-                    .contextMenu(opensOnPrimaryAction: true) {
-                        ContextMenuOption("Live", isSelected: model.selectedCaptureID == nil) { model.selectCapture(nil) }
-                        ForEach(Array(model.captures.indices), id: \.self) { index in
-                            let value = model.captures[index].objectValue
-                            let id = value?["id"]?.stringValue ?? ""
-                            ContextMenuOption("\(index + 1). \(value?["startedAt"]?.stringValue ?? id)", isSelected: model.selectedCaptureID == id) {
-                                model.selectCapture(id)
+            }
+            .frame(height: 28)
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    if let status = model.scheduledStatus {
+                        action("Cancel scheduled") { model.cancelScheduledRecording() }
+                        Text(status).foregroundColor(theme.editorColors.purple)
+                    } else if model.activeCapture != nil {
+                        if model.activeCapture?.objectValue?["targetId"]?.stringValue == model.target?.id {
+                            action("Stop recording") { model.stopRecording() }
+                        }
+                        Text("Recording…").foregroundColor(theme.editorColors.purple)
+                    } else if model.target?.isRunning == true {
+                        action("Record \(model.recordingDurationSeconds) s") { model.record() }
+                    }
+                    Text("Delay \(Int(model.recordingDelaySeconds)) s ▾")
+                        .accessibilityIdentifier("AdaEditor.Performance.Delay")
+                        .contextMenu(opensOnPrimaryAction: true) {
+                            ForEach([0, 1, 3, 5, 10, 30, 60], id: \.self) { seconds in
+                                ContextMenuOption("\(seconds) s", isSelected: model.recordingDelaySeconds == Double(seconds)) {
+                                    model.recordingDelaySeconds = Double(seconds)
+                                }
                             }
                         }
+                    Text("Duration \(model.recordingDurationSeconds) s ▾")
+                        .accessibilityIdentifier("AdaEditor.Performance.Duration")
+                        .contextMenu(opensOnPrimaryAction: true) {
+                            ForEach([1, 5, 10, 30, 60, 120], id: \.self) { seconds in
+                                ContextMenuOption("\(seconds) s", isSelected: model.recordingDurationSeconds == seconds) {
+                                    model.recordingDurationSeconds = seconds
+                                }
+                            }
+                        }
+                    Text(model.selectedCaptureID == nil ? "Live ▾" : "Capture ▾")
+                        .padding(.horizontal, 8)
+                        .frame(height: 26)
+                        .background(theme.editorColors.surface)
+                        .contextMenu(opensOnPrimaryAction: true) {
+                            ContextMenuOption("Live", isSelected: model.selectedCaptureID == nil) { model.selectCapture(nil) }
+                            ForEach(Array(model.captures.indices), id: \.self) { index in
+                                let value = model.captures[index].objectValue
+                                let id = value?["id"]?.stringValue ?? ""
+                                if value?["targetId"]?.stringValue == model.target?.id {
+                                    ContextMenuOption("\(index + 1). \(value?["startedAt"]?.stringValue ?? id)", isSelected: model.selectedCaptureID == id) {
+                                        model.selectCapture(id)
+                                    }
+                                }
+                            }
+                        }
+                    if model.capture?.objectValue?["trace"] != nil {
+                        action("Export JSON") { model.exportCapture() }
                     }
-                if model.capture?.objectValue?["trace"] != nil {
-                    action("Export JSON") { model.exportCapture() }
                 }
-                Spacer()
             }
+            .frame(height: 28)
         }
     }
 
