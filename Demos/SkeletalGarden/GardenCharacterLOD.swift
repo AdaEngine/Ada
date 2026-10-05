@@ -19,7 +19,8 @@ func installGardenCharacterLOD(root: Entity, model: ModelAsset3D, alternatives: 
     if var animation = root.components[ModelAnimation3DComponent.self] {
         var settings = AnimationLOD3DSettings()
         settings.center = [0, 1.5, 0]
-        animation.evaluationLOD = settings
+        // The controlled character stays responsive and smooth even when zoomed out.
+        animation.evaluationLOD = root.components[GardenPlayer.self] == nil ? settings : nil
         root.components[ModelAnimation3DComponent.self] = animation
     }
 }

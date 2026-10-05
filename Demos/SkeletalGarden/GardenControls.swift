@@ -41,14 +41,14 @@ struct GardenInputSystem {
                     direction = [0, 0, 1]
                 } else if state.elapsed >= 10, state.elapsed < 10.75 {
                     direction = [1, 0, 0]
-                } else if state.elapsed >= 10.75, state.elapsed < 17.5 {
+                } else if state.elapsed >= 10.75, state.elapsed < 15.25 {
                     let targetX: Float = transform.position.z < 7.5 ? 0 : GardenTerrain.trailX(z: transform.position.z)
                     direction = [min(max((targetX - transform.position.x) * 3, -1.5), 1.5), 0, 1]
                 } else { direction = .zero }
                 jumping = state.elapsed >= 7 && state.elapsed < 7.2
             }
             if poseProof || renderProof { direction = .zero; jumping = false }
-            controller.desiredVelocity = direction.length > 0.01 ? direction.normalized * (running ? 2.2 : 1.1) : .zero
+            controller.desiredVelocity = direction.length > 0.01 ? direction.normalized * (running ? GardenLocomotion.runSpeed : GardenLocomotion.walkSpeed) : .zero
             if jumping, !state.jumpHeld { controller.jumpRequested = true }
             state.jumpHeld = jumping
             let resetting = input.isKeyPressed(.r)
@@ -80,7 +80,7 @@ struct GardenPresentationSystem {
             let speed = horizontal.length
             // Hysteresis prevents clip thrashing at low speeds and near the walk/run boundary.
             let idleThreshold: Float = state.locomotion == "Idle" ? 0.16 : 0.07
-            let runThreshold: Float = state.locomotion == "Run" ? 1.4 : 1.65
+            let runThreshold: Float = state.locomotion == "Run" ? GardenLocomotion.runExitSpeed : GardenLocomotion.runEnterSpeed
             var clip = speed < idleThreshold ? "Idle" : (speed > runThreshold ? "Run" : "Walk")
             let dt = time.deltaTime.isFinite ? min(max(time.deltaTime, 0), 0.1) : 0
             if !controller.isGrounded, state.elapsed > 0.15 {
@@ -113,7 +113,7 @@ struct GardenPresentationSystem {
                 } catch { gardenLog("[SkeletalGarden] \(error)") }
             }
             if airClip { animation.player.speed = 1 } else if clip != "Idle" {
-                let referenceSpeed: Double = clip == "Run" ? 2.2 : 1.1
+                let referenceSpeed: Double = clip == "Run" ? GardenLocomotion.runClipReferenceSpeed : GardenLocomotion.walkClipReferenceSpeed
                 animation.player.speed = poseProof ? 1 : min(max(Double(speed) / referenceSpeed, 0.25), 1.5)
             } else { animation.player.speed = 1 }
             if renderProof {

@@ -81,8 +81,7 @@ public struct SkeletalAnimation3DSystem {
         var observers: [AnimationLOD3DObserver] = []
         cameras.forEach { camera, graph in
             if camera.isActive, graph.subgraphLabel == .main3D {
-                let data = camera.computedData
-                observers.append(.init(view: data.viewMatrix, projection: data.projectionMatrix, frustum: .init(viewProjection: data.projectionMatrix * data.viewMatrix)))
+                observers.append(.init(camera: camera))
             }
         }
         // These references are local to this update; no structural world mutations occur here.

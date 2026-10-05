@@ -2,6 +2,10 @@ import AdaEngine
 
 @MainActor
 func makeGardenLandscape(in world: World, device: RenderDevice) async throws {
+    if ProcessInfo.processInfo.arguments.contains("--tree-lod-proof") {
+        try await makeGardenTreeLODProof(in: world, device: device)
+        return
+    }
     let terrain = GardenTerrain()
     let grass = PBRMaterial()
     grass.baseColorFactor = .one
@@ -78,6 +82,27 @@ func makeGardenLandscape(in world: World, device: RenderDevice) async throws {
     }
     try await makeGardenLandmarks(in: world, terrain: terrain, device: device)
     gardenLog("[SkeletalGarden] landscape 48x48m, \(terrain.indices.count / 3) terrain triangles; \(trees) trees, \(rocks) rocks, \(grasses) grass tufts")
+}
+
+/// Fixed comparison of all tree levels through the normal mesh/LOD draw path.
+@MainActor
+private func makeGardenTreeLODProof(in world: World, device: RenderDevice) async throws {
+    let base = try await landscapeModel("Tree")
+    let levels = [base, try await landscapeModel("TreeLOD1"), try await landscapeModel("TreeLOD2")]
+    for (level, model) in levels.enumerated() {
+        let root = base.instantiate(in: world)
+        root.components[Transform.self] = Transform(position: [Float(level - 1) * 4, 0, 8])
+        if level > 0 {
+            attachGardenLODs(to: root, alternatives: [model], thresholds: [10])
+        }
+    }
+    let ground = PBRMaterial()
+    ground.baseColorFactor = [0.35, 0.5, 0.22, 1]
+    world.spawn("Tree LOD comparison ground") {
+        Mesh3DComponent(mesh: Mesh.generateCube(renderDevice: device), materials: [ground])
+        Transform(scale: [14, 0.1, 7], position: [0, -0.05, 8])
+    }
+    gardenLog("[SkeletalGarden] tree LOD comparison: LOD0 / LOD1 / LOD2 left to right")
 }
 
 @MainActor

@@ -1,5 +1,6 @@
 import AdaAnimation
 import AdaCorePipelines
+@_spi(Internal) import AdaRender
 import Math
 
 /// Visual animation sampling by projected size. Gameplay/root transforms keep their own cadence.
@@ -26,6 +27,17 @@ struct AnimationLOD3DObserver {
     var view: Transform3D
     var projection: Transform3D
     var frustum: MeshVisibilityFrustum3D
+
+    init(view: Transform3D, projection: Transform3D, frustum: MeshVisibilityFrustum3D) {
+        self.view = view
+        self.projection = projection
+        self.frustum = frustum
+    }
+
+    init(camera: Camera) {
+        let projection = camera.computedData.projectionMatrix
+        self.init(view: camera.viewMatrix, projection: projection, frustum: .init(viewProjection: projection * camera.viewMatrix))
+    }
 }
 
 struct AnimationLOD3DState: Sendable {

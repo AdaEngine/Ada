@@ -11,6 +11,7 @@ struct GardenCameraSystem {
     @Local private var proofFrame = 0
     private let temporalMotion = ProcessInfo.processInfo.arguments.contains("--temporal-motion")
     private let overview = ProcessInfo.processInfo.arguments.contains("--overview-proof")
+    private let treeLODProof = ProcessInfo.processInfo.arguments.contains("--tree-lod-proof")
     private let controllerProof = ProcessInfo.processInfo.arguments.contains("--controller-proof")
 
     init(world _: World) {}
@@ -51,7 +52,10 @@ struct GardenCameraSystem {
             orbit.focus += (focus - orbit.focus) * Float(1 - exp(-Double(dt) * 12))
             var eye: Vector3
             var target = orbit.focus
-            if overview {
+            if treeLODProof {
+                eye = [0, 3, -7]
+                target = [0, 2.3, 8]
+            } else if overview {
                 eye = [25, 30, -31]
                 target = [0, -2, 1]
             } else {

@@ -223,3 +223,9 @@ and `--capture-crowd`. Their files are under `dist/captures/<mode>`.
 
 Implementation contracts, measurements and proof boundaries:
 [PerformanceValidation.md](PerformanceValidation.md).
+
+
+The controlled robot always evaluates animation each frame, including camera
+zoom/orbit and travel away from the plaza. Background actors retain animation
+LOD. Movement is 1.65 m/s walking and 3.3 m/s with Shift; walk/run clip playback
+still follows the original authored stride speeds (1.1/2.2 m/s).

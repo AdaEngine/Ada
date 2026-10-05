@@ -39,6 +39,10 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 : > "$DEMO_ROOT/dist/runtime.log"
 case "$MODE" in
+    --capture-tree-lods)
+        mkdir -p "$DEMO_ROOT/dist/captures/tree-lods"
+        /usr/bin/open -n "$APP" ${LAUNCH_ENV[@]+"${LAUNCH_ENV[@]}"} --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --metal --render-proof --daylight --tree-lod-proof --capture-directory "$DEMO_ROOT/dist/captures/tree-lods"
+        ;;
     --capture-crowd-lod|--capture-crowd|--capture-crowd-reference|--capture-gpu-visibility|--capture-cpu-visibility|--capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized|--capture-temporal|--capture-temporal-motion|--capture-spatial|--capture-spatial-motion|--capture-temporal-multi|--capture-local-lights|--capture-local-no-lights|--capture-local-unshadowed|--capture-local-point|--capture-local-spot|--capture-local-budget|--capture-local-many|--capture-local-moving|--capture-local-multi)
         NAME="${MODE#--capture-}"
         mkdir -p "$DEMO_ROOT/dist/captures/$NAME"
@@ -100,13 +104,13 @@ case "$MODE" in
         EXTRA=()
         if [[ "$MODE" == --verify-temporal ]]; then EXTRA+=(--temporal); fi
         if [[ "$MODE" == --verify-local-lights ]]; then EXTRA+=(--local-lights --temporal); fi
-        /usr/bin/open -n "$APP" ${LAUNCH_ENV[@]+"${LAUNCH_ENV[@]}"} --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --controller-proof "${EXTRA[@]}"
+        /usr/bin/open -n "$APP" ${LAUNCH_ENV[@]+"${LAUNCH_ENV[@]}"} --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --controller-proof ${EXTRA[@]+"${EXTRA[@]}"}
         for attempt in {1..30}; do
             if rg -q 'controller verification PASS' "$DEMO_ROOT/dist/runtime.log"; then
                 cat "$DEMO_ROOT/dist/runtime.log"
                 exit 0
             fi
-            if ! /usr/bin/pgrep -x SkeletalGarden >/dev/null || rg -q 'controller .* FAIL|startup failed' "$DEMO_ROOT/dist/runtime.log"; then
+            if { (( attempt > 3 )) && ! /usr/bin/pgrep -x SkeletalGarden >/dev/null; } || rg -q 'controller .* FAIL|startup failed' "$DEMO_ROOT/dist/runtime.log"; then
                 tail -60 "$DEMO_ROOT/dist/runtime.log"
                 exit 1
             fi
@@ -121,5 +125,5 @@ case "$MODE" in
         /usr/bin/open -n "$APP" ${LAUNCH_ENV[@]+"${LAUNCH_ENV[@]}"} --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log"
         /usr/bin/log stream --info --style compact --predicate 'process == "SkeletalGarden"'
         ;;
-    *) echo 'usage: build_and_run.sh [run|--daylight|--webgpu|--temporal|--local-lights|--autoplay|--capture|--capture-overview|--capture-no-ibl|--capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized|--capture-temporal|--capture-temporal-motion|--capture-spatial|--capture-spatial-motion|--verify|--capture-temporal-multi|--verify-temporal|--verify-local-lights|--capture-local-{lights,no-lights,unshadowed,point,spot,budget,many,moving,multi}|--debug|--logs]' >&2; exit 2 ;;
+    *) echo 'usage: build_and_run.sh [run|--daylight|--webgpu|--temporal|--local-lights|--autoplay|--capture|--capture-overview|--capture-tree-lods|--capture-no-ibl|--capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized|--capture-temporal|--capture-temporal-motion|--capture-spatial|--capture-spatial-motion|--verify|--capture-temporal-multi|--verify-temporal|--verify-local-lights|--capture-local-{lights,no-lights,unshadowed,point,spot,budget,many,moving,multi}|--debug|--logs]' >&2; exit 2 ;;
 esac

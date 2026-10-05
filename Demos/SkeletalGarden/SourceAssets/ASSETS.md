@@ -28,7 +28,9 @@ The robot runtime profile now includes rotation-only derivatives of the original
 
 ## Static LOD assets
 
-The landscape generator joins the original tree geometry at the common root pivot before export, then uses deterministic Blender decimation (0.55/0.27 ratios). TreeLOD1/2 and RockLOD1/2 retain the base material ordering and identity node transform. Actual triangle counts are Tree 96/51/23 and Rock 80/44/20. The Khronos validator reported zero errors and zero warnings on all six files. Terrain LOD is demo-native geometry with unchanged boundary samples and three interior resolutions; runtime physics retains full resolution.
+The landscape generator joins the original tree geometry at the common root pivot before export, then uses deterministic Blender decimation (0.65/0.4 for each disconnected tree canopy, 0.55/0.27 for rocks). Tree reduction applies only to the canopy: the closed 36-triangle trunk is preserved at every level. Whole-tree decimation previously collapsed the trunk to one triangle, producing floating crowns when the camera crossed a LOD threshold. TreeLOD1/2 and RockLOD1/2 retain the base material ordering and identity node transform. Actual triangle counts are Tree 96/72/60 and Rock 80/44/20. Terrain LOD is demo-native geometry with unchanged boundary samples and three interior resolutions; runtime physics retains full resolution.
+
+`GardenLandscapeLODTests` imports each real GLB and probes the indexed trunk surface from 16 directions at three heights and checks that every canopy surface stays closed. The final Tree LODs pass the Khronos validator with zero errors and warnings. `script/build_and_run.sh --capture-tree-lods` renders LOD0/1/2 left to right through the normal mesh/LOD path for visual comparison.
 
 ## Robot mesh LODs
 

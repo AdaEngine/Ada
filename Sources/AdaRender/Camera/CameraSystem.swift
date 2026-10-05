@@ -30,6 +30,7 @@ public struct CameraSystem: Sendable {
         self.query.forEach { entity, camera, globalTransform in
             let viewMatrix = globalTransform.matrix.inverse
             camera.viewMatrix = viewMatrix
+            camera.computedData.viewMatrix = viewMatrix
             self.updateViewportSizeIfNeeded(for: camera)
             self.updateProjectionMatrix(for: camera)
             self.updateFrustum(for: camera)

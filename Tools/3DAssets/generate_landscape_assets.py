@@ -2,6 +2,7 @@
 from pathlib import Path
 import math, random, json, struct
 import bpy
+import bmesh
 OUT = Path(__file__).resolve().parents[2] / 'Demos/SkeletalGarden/Assets'
 rng = random.Random(314159)
 
@@ -31,7 +32,12 @@ def read_glb(path):
     raw=path.read_bytes();length=struct.unpack_from('<I',raw,12)[0]
     return json.loads(raw[20:20+length]),raw[20+length:]
 
-def export_lods(name):
+def keep_faces(obj, predicate):
+    mesh=bmesh.new();mesh.from_mesh(obj.data)
+    bmesh.ops.delete(mesh,geom=[face for face in mesh.faces if not predicate(face)],context='FACES')
+    mesh.to_mesh(obj.data);mesh.free();obj.data.update()
+
+def export_lods(name, protected_material=None):
     objects=[o for o in bpy.context.scene.objects if o.type=='MESH']
     bpy.ops.object.select_all(action='DESELECT')
     for obj in objects:obj.select_set(True)
@@ -42,10 +48,35 @@ def export_lods(name):
     export(name)
     base,_=read_glb(OUT/(name+'.glb'))
     materials=base.get('materials',[]);names={m.get('name'):i for i,m in enumerate(materials)}
-    for index,ratio in [(1,0.55),(2,0.27)]:
+    ratios=[(1,0.65),(2,0.4)] if protected_material is not None else [(1,0.55),(2,0.27)]
+    for index,ratio in ratios:
         obj.data=original.copy()
-        mod=obj.modifiers.new('Static LOD Reduction','DECIMATE');mod.ratio=ratio;mod.use_collapse_triangulate=True
-        bpy.ops.object.modifier_apply(modifier=mod.name)
+        protected=None
+        reductions=[obj]
+        if protected_material is not None:
+            # Whole-tree decimation collapses the narrow trunk before the canopy.
+            # Preserve its closed silhouette and simplify only the foliage.
+            slot=next(i for i,mat in enumerate(obj.data.materials) if mat==protected_material)
+            protected=obj.copy();protected.data=obj.data.copy()
+            bpy.context.collection.objects.link(protected)
+            keep_faces(protected,lambda face:face.material_index==slot)
+            keep_faces(obj,lambda face:face.material_index!=slot)
+            # Each disconnected canopy must retain volume, rather than spending
+            # the whole budget on one part and collapsing the other crowns.
+            bpy.ops.object.select_all(action='DESELECT');obj.select_set(True)
+            bpy.context.view_layer.objects.active=obj
+            bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.separate(type='LOOSE');bpy.ops.object.mode_set(mode='OBJECT')
+            reductions=list(bpy.context.selected_objects)
+        for piece in reductions:
+            bpy.context.view_layer.objects.active=piece
+            mod=piece.modifiers.new('Static LOD Reduction','DECIMATE');mod.ratio=ratio;mod.use_collapse_triangulate=True
+            bpy.ops.object.modifier_apply(modifier=mod.name)
+        if protected is not None:
+            bpy.ops.object.select_all(action='DESELECT')
+            for piece in reductions:piece.select_set(True)
+            protected.select_set(True);bpy.context.view_layer.objects.active=obj
+            bpy.ops.object.join()
         export(name+'LOD'+str(index))
         path=OUT/(name+'LOD'+str(index)+'.glb');doc,binary=read_glb(path)
         for mesh in doc['meshes']:
@@ -65,7 +96,7 @@ for i,(position,scale) in enumerate([((0,0,3.3),(1.45,1.2,1.45)),((0.6,0.2,3.0),
     bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)
     for mat in foliage:obj.data.materials.append(mat)
     for face in obj.data.polygons:face.material_index=rng.randrange(3)
-export_lods('Tree')
+export_lods('Tree',protected_material=bark)
 clear();bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=1,location=(0,0,0.55))
 obj=bpy.context.object;obj.name='Rock';obj.scale=(0.95,0.8,0.7)
 bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)

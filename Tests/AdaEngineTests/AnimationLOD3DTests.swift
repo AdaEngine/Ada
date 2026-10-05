@@ -1,11 +1,36 @@
 import AdaAnimation
 import AdaEngine
+@_spi(Internal) import AdaRender
 import Testing
 
 @testable import AdaScene
 
 @Suite
 struct AnimationLOD3DTests {
+    @Test
+    func movingTheCameraAndModelTogetherDoesNotBecomeOffscreenAtTheWorldOrigin() throws {
+        let pose = SkeletalJointPose()
+        let rig = try SkeletalRig(nodes: [.init(parentIndex: nil, restPose: pose, restMatrix: pose.matrix)])
+        let track = try SkeletalAnimationTrack(nodeIndex: 0, path: .translation, interpolation: .linear, times: [0, 1], values: [.zero, [1, 0, 0, 0]])
+        var player = try SkeletalAnimationPlayer(rig: rig, clips: [.init(name: "Move", tracks: [track])])
+        try player.play("Move", transitionDuration: 0)
+        var state = AnimationLOD3DState()
+        let settings = AnimationLOD3DSettings(radius: 0.1)
+        var camera = Camera()
+        // The legacy cached field may be stale; observers must use the authoritative camera view.
+        camera.computedData.viewMatrix = .identity
+        camera.computedData.projectionMatrix = .identity
+        for origin: Float in [0, 30, -30] {
+            camera.viewMatrix = Transform3D(translation: [-origin, 0, 0])
+            let observer = AnimationLOD3DObserver(camera: camera)
+            for _ in 0..<10 {
+                state.advance(player: &player, delta: 1 / 60, settings: settings, transform: Transform3D(translation: [origin, 0, 0.5]), observers: [observer])
+                #expect(state.interval == 0)
+                #expect(abs(Double(player.poses[0].translation.x) - player.time) < 0.0001)
+            }
+        }
+    }
+
     @Test
     func clocksAdvanceWithoutSamplingAndVisiblePosesInterpolate() throws {
         let pose = SkeletalJointPose()
