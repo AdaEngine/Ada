@@ -67,8 +67,8 @@ under `/Users/vlad-prusakov/.codex/worktrees/android/`. Original checkouts were 
   cold boot of the task-owned AdaStudioAndroidProof AVD on emulator-5554.
   The installed AOT process 4197 logged Native game ready with no WebGPU errors.
   Stop returned Studio to Ready and removed that app process, retaining the AVD.
-- Final focused editor suites: 16 tests passed; the opt-in real APK integration
-  test separately passed. Python APK setup/selection: 8 passed. Bundled build SDK
+- Final focused editor suites: 15 tests passed and the opt-in real APK
+  integration test was skipped; that integration test separately passed. Python APK setup/selection: 8 passed. Bundled build SDK
   staging/relocation: 2 passed. 18 offline guides passed consistency checks.
 - A user AVD booted successfully but lacked installation storage; its app data
   was preserved and the AVD was stopped again. Installation/run verification used
@@ -77,3 +77,11 @@ under `/Users/vlad-prusakov/.codex/worktrees/android/`. Original checkouts were 
   the installed Studio MCP Run/Stop checks. Android scene:
   `evidence/studio-export-script-android.png`; runtime log:
   `evidence/studio-ui-avd-logcat.txt`.
+
+## PR preparation after synchronizing current main
+
+- Merged remote main `82809fa2e` into the Android branch. Studio rebuilt, and
+  22 focused Android export/CLI/toolbar/native-export/performance tests passed;
+  the real APK integration test was skipped in this host-only rerun.
+- Android packaging (8), BuildSDK staging/relocation (2), Dawn configuration (5),
+  offline guide consistency (18), shell syntax and diff checks passed again.
