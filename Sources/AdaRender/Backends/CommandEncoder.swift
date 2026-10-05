@@ -465,6 +465,11 @@ public protocol RenderCommandEncoder: CommonCommandEncoder {
     ///   - indexCount: The number of indices to draw.
     ///   - indexBufferOffset: The byte offset in the index buffer to start reading from.
     ///   - instanceCount: The number of instances to draw.
+    /// Encodes a GPU-generated indexed draw. Returns false when this encoder lacks support.
+    /// Unsupported backends should use the caller's CPU draw counts instead.
+    @discardableResult
+    func drawIndexedIndirect(arguments: any Buffer, offset: Int) -> Bool
+
     func drawIndexed(indexCount: Int, indexBufferOffset: Int, instanceCount: Int)
 
     /// Issues a non-indexed draw call.
@@ -506,4 +511,8 @@ extension RenderCommandEncoder {
             unsafe self.setVertexBytes(baseAddress, length: MemoryLayout<T>.stride, slot: slot)
         }
     }
+}
+
+extension RenderCommandEncoder {
+    public func drawIndexedIndirect(arguments _: any Buffer, offset _: Int) -> Bool { false }
 }

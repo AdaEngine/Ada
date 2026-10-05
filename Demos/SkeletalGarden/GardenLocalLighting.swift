@@ -1,5 +1,11 @@
 import AdaEngine
 
+enum GardenLightingMode {
+    static func usesLocalLights(arguments: [String]) -> Bool {
+        arguments.contains("--local-lights") || !arguments.contains("--daylight")
+    }
+}
+
 struct GardenLocalLight: Component {
     var origin: Vector3
     var moves: Bool = false
@@ -8,7 +14,7 @@ struct GardenLocalLight: Component {
 @MainActor
 func addGardenLocalLighting(in world: World) {
     let args = ProcessInfo.processInfo.arguments
-    guard args.contains("--local-lights") else {
+    guard GardenLightingMode.usesLocalLights(arguments: args) else {
         return
     }
     let disabled = args.contains("--no-local-lights")

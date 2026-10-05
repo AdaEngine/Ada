@@ -144,6 +144,18 @@ struct MeshVisibilityLOD3DTests {
         let box = try #require(computed)
         #expect(box.min.y == 10 && box.max.y == 12)
         #expect(box.min.x <= 10 && box.max.x >= 22)
+        cache.beginFrame()
+        let mergedBounds = cache.bounds(meshes: [mesh, mesh], matrices: matrices)
+        let merged = try #require(mergedBounds)
+        #expect(merged.min == box.min && merged.max == box.max)
+        cache.finishFrame()
+        cache.beginFrame()
+        let movedBounds = cache.bounds(meshes: [mesh, mesh], matrices: [.identity, .identity])
+        let moved = try #require(movedBounds)
+        #expect(moved.min.y == 0 && moved.max.y == 2)
+        let invalid = Mesh.generateSphere(segments: 8, rings: 4, renderDevice: unsafe RenderEngine.shared.renderDevice)
+        let invalidBounds = cache.bounds(meshes: [mesh, invalid], matrices: matrices)
+        #expect(invalidBounds == nil)
     }
 
     private func source(_ entity: Entity.ID, mesh: Mesh, material: Material, at position: Vector3) -> Mesh3DRenderSource {

@@ -12,6 +12,7 @@ struct GardenRenderQualitySystem {
     @Local private var lodHeld = false
     @Local private var aaHeld = false
     @Local private var temporalHeld = false
+    @Local private var occlusionHeld = false
 
     init(world _: World) {}
 
@@ -23,6 +24,7 @@ struct GardenRenderQualitySystem {
         let lod = input.isKeyPressed(.num6)
         let aa = input.isKeyPressed(.num3)
         let temporal = input.isKeyPressed(.num7)
+        let occlusion = input.isKeyPressed(.num0)
         if temporal, !temporalHeld {
             temporalCameras.forEach { camera in
                 camera.temporalUpscaling = camera.temporalUpscaling == nil ? .init(renderScale: 0.75) : nil
@@ -31,6 +33,7 @@ struct GardenRenderQualitySystem {
         }
         temporalHeld = temporal
         cameras.forEach { environment in
+            if occlusion, !occlusionHeld { environment.meshVisibility.gpuOcclusion.toggle() }
             if shadows, !shadowsHeld {
                 environment.shadows.isEnabled.toggle()
                 gardenLog("[SkeletalGarden] shadows=\(environment.shadows.isEnabled)")
@@ -50,6 +53,7 @@ struct GardenRenderQualitySystem {
                 gardenLog("[SkeletalGarden] AA=\(environment.antiAliasing.rawValue)")
             }
         }
+        occlusionHeld = occlusion
         cullingHeld = culling
         lodHeld = lod
         shadowsHeld = shadows

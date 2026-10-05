@@ -32,6 +32,7 @@ public struct Main3DRenderNode: RenderNode {
 
     @Res<ExtractedMesh3DSources> private var candidates
     @ResMut<VisibleMesh3DLists> private var lists
+    @ResMut<GPUVisibility3DState> private var gpuVisibility
     @ResMut<Active3DInstanceBuffers> private var activeInstances
     @ResMut<PBR3DUniforms> private var materials
     @Res<Render3DVisibilityStatistics> private var statistics
@@ -55,7 +56,7 @@ public struct Main3DRenderNode: RenderNode {
     public init() {}
 
     public let inputResources: [RenderSlot] = [
-        RenderSlot(name: InputNode.view, kind: .entity),
+        RenderSlot(name: InputNode.view, kind: .entity)
     ]
 
     public func update(from world: World) {
@@ -65,6 +66,7 @@ public struct Main3DRenderNode: RenderNode {
         _lighting.update(from: world)
         _candidates.update(from: world)
         _lists.update(from: world)
+        _gpuVisibility.update(from: world)
         _activeInstances.update(from: world)
         _materials.update(from: world)
         _statistics.update(from: world)
@@ -78,6 +80,7 @@ public struct Main3DRenderNode: RenderNode {
         lightingScratch.cache.retainViews(activeViews)
         ibl.cache.retainViews(activeViews)
         lists.retainViews(activeViews)
+        gpuVisibility.retainViews(activeViews)
     }
 
     public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
@@ -91,6 +94,7 @@ public struct Main3DRenderNode: RenderNode {
         }
 
         var submitted: CommandBuffer?
+        var visibilityCommand: CommandBuffer?
         try query.forEach { entity, camera, target, uniform, source in
             if entity != view {
                 return
@@ -115,21 +119,38 @@ public struct Main3DRenderNode: RenderNode {
                 cullingProjection: uniform.viewProjectionMatrix,
                 settings: environments.environments[source.entityId]?.meshVisibility ?? MeshVisibilitySettings3D(),
                 device: renderDevice.renderDevice,
-                    materials: &_materials.wrappedValue
+                materials: &_materials.wrappedValue
             )
-            let visibleItems = lists.items(view: source.entityId, pass: -1)
+            var visibleItems = lists.items(view: source.entityId, pass: -1)
             _activeInstances.wrappedValue = lists.buffers(view: source.entityId, pass: -1)
             statistics.record(lists.count(view: source.entityId, pass: -1), view: source.entityId, pass: -1)
 
             let drawUniform = temporalViewUniform(uniform, target: target)
+            if environments.environments[source.entityId]?.meshVisibility.gpuOcclusion == true {
+                visibilityCommand = gpuVisibility.encode(
+                    view: source.entityId,
+                    size: sceneColor.size,
+                    projection: drawUniform.viewProjectionMatrix,
+                    items: &visibleItems,
+                    candidates: lists.gpuCandidates(view: source.entityId, pass: -1),
+                    buffers: &_activeInstances.wrappedValue,
+                    device: renderDevice.renderDevice,
+                    queue: renderContext.commandQueue,
+                    materials: _materials.wrappedValue,
+                    identityPalette: context.world.getResource(Skinning3DUniforms.self)?.identityBuffer,
+                    metrics: metrics
+                )
+            } else {
+                gpuVisibility.clearOutput(for: source.entityId)
+            }
             let clearColor = camera.clearFlags.contains(.solid) ? camera.backgroundColor : .surfaceClearColor
             let directionalLight =
                 lighting.directionalLight
-                    ?? ExtractedDirectionalLight3D(
-                        directionToLight: Vector3(0.35, 0.7, 0.45).normalized,
-                        radiance: .one,
-                        intensity: lighting.hasAuthoredLights ? 0 : 3.2
-                    )
+                ?? ExtractedDirectionalLight3D(
+                    directionToLight: Vector3(0.35, 0.7, 0.45).normalized,
+                    radiance: .one,
+                    intensity: lighting.hasAuthoredLights ? 0 : 3.2
+                )
             let viewDirectionToLight = (uniform.viewMatrix * Vector4(directionalLight.directionToLight, 0)).xyz.normalized
             let shadowsEnabled = shadow.isEnabled && directionalLight.castsShadows && shadow.colorTexture != nil
             let lightConstants = lightingScratch.cache.write(
@@ -202,9 +223,12 @@ public struct Main3DRenderNode: RenderNode {
             renderPass.setFragmentBuffer(lightConstants, offset: 0, slot: 1)
             renderPass.setFragmentBuffer(localConstants, offset: 0, slot: 25)
             renderPass.setFragmentBuffer(localMatrices, offset: 0, slot: 28)
-            renderPass.setResourceSet(RenderResourceSet(bindings: [
-                .init(binding: 26, shaderStages: .fragment, resource: .texture(localTexture)),
-            ]), index: 0)
+            renderPass.setResourceSet(
+                RenderResourceSet(bindings: [
+                    .init(binding: 26, shaderStages: .fragment, resource: .texture(localTexture))
+                ]),
+                index: 0
+            )
             let shadowTexture = shadow.colorTexture ?? Texture2D.whiteTexture
             renderPass.setResourceSet(
                 RenderResourceSet(
@@ -228,12 +252,15 @@ public struct Main3DRenderNode: RenderNode {
             let diffuse = environment?.irradiance ?? Texture2D.whiteTexture
             let specular = environment?.specular ?? Texture2D.whiteTexture
             let lut = environment?.brdf ?? Texture2D.whiteTexture
-            renderPass.setResourceSet(RenderResourceSet(bindings: [
-                .init(binding: 18, shaderStages: .fragment, resource: .texture(diffuse)),
-                .init(binding: 19, shaderStages: .fragment, resource: .texture(specular)),
-                .init(binding: 20, shaderStages: .fragment, resource: .texture(lut)),
-                .init(binding: 3, shaderStages: .fragment, resource: .sampler(diffuse.sampler)),
-            ]), index: 0)
+            renderPass.setResourceSet(
+                RenderResourceSet(bindings: [
+                    .init(binding: 18, shaderStages: .fragment, resource: .texture(diffuse)),
+                    .init(binding: 19, shaderStages: .fragment, resource: .texture(specular)),
+                    .init(binding: 20, shaderStages: .fragment, resource: .texture(lut)),
+                    .init(binding: 3, shaderStages: .fragment, resource: .sampler(diffuse.sampler)),
+                ]),
+                index: 0
+            )
             renderPass.setFragmentBuffer(iblConstants, offset: 0, slot: 22)
             renderPass.setViewport(camera.viewport.rect)
 
@@ -269,6 +296,9 @@ public struct Main3DRenderNode: RenderNode {
             submitted = commandBuffer
         }
 
+        if let visibilityCommand {
+            if let metrics { await metrics.commit(visibilityCommand) } else { visibilityCommand.commit() }
+        }
         if let submitted {
             if let metrics { await metrics.commit(submitted) } else { submitted.commit() }
         }

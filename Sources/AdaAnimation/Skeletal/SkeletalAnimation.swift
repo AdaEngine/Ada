@@ -2,7 +2,7 @@ import Foundation
 import Math
 
 /// A local joint transform. Quaternion rotations remain separate from scale.
-public struct SkeletalJointPose: Sendable {
+public struct SkeletalJointPose: Sendable, Equatable {
     public var translation: Vector3
     public var rotation: Quat
     public var scale: Vector3

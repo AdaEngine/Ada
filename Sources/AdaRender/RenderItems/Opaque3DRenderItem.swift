@@ -13,6 +13,7 @@ public struct Opaque3DRenderItem: RenderItem {
     public let drawPass: any DrawPass
     public let sortKey: Float
     public var batchRange: Range<Int32>?
+    public var indirectArgumentOffset: Int?
 
     public let modelIndex: Int
     public let partIndex: Int

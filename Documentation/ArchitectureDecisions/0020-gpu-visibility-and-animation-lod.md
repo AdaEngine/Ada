@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-05
-- Implementation: Planned
+- Implementation: Implemented on Metal with CPU fallback; WebGPU GPU compaction remains a backend extension
 
 ## Context
 
@@ -27,11 +27,11 @@ gameplay simulation independent from visual LOD.
 
 ## Implementation checklist
 
-- [ ] Hi-Z generation, conservative bounds tests and disocclusion recovery.
-- [ ] Backend-neutral indirect draw/compaction capability and Metal implementation.
-- [ ] Skinned mesh LOD asset/runtime contracts.
-- [ ] Animation evaluation cadence, interpolation and significance policies.
-- [ ] Large-scene CPU/GPU profiling with correctness comparison to CPU reference.
+- [x] Hi-Z generation, conservative bounds tests and disocclusion recovery.
+- [x] Backend-neutral indirect draw/compaction capability and Metal implementation.
+- [x] Skinned mesh LOD asset/runtime contracts.
+- [x] Animation evaluation cadence, interpolation and significance policies.
+- [x] Large-scene CPU/GPU profiling with correctness comparison to CPU reference.
 
 ## Validation requirements
 
@@ -39,6 +39,17 @@ Compare visibility with CPU reference in moving-camera, moving-object and
 occluder-removal scenes. Verify offscreen shadow casters and independent cameras.
 Measure draw/triangle counts separately from actual GPU and CPU time. Validate
 character transitions, animated bounds and gameplay independence.
+
+## Recorded implementation
+
+The first GPU path uses current-frame opaque/alpha-mask depth and max-depth
+Hi-Z, followed by per-draw instance compaction and indexed indirect arguments.
+This avoids stale-depth disocclusion errors and keeps shadow lists independent.
+Metal executes this path; other backends retain CPU visibility. Character mesh
+LODs preserve the ordered palette and material contracts. Projected-size
+animation cadence interpolates visible poses while playback/gameplay clocks
+remain independent. See [PerformanceValidation.md](../../Demos/SkeletalGarden/PerformanceValidation.md)
+for concrete tests, measurements, opt-in controls and platform limits.
 
 ## Consequences
 

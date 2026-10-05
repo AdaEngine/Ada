@@ -6,6 +6,9 @@
 //
 
 #if WEBGPU_ENABLED && canImport(WebGPU)
+    #if WASM
+        import JavaScriptKit
+    #endif
     import Math
     import Synchronization
     @unsafe @preconcurrency import WebGPU
@@ -15,8 +18,8 @@
         private var currentIndexBuffer: WebGPU.GPUBuffer?
         private var currentIndexType: WebGPU.GPUIndexFormat = .uint32
         private var currentPipeline: WGPURenderPipeline?
-        private var genericBuffers: [Int: (buffer: WebGPU.GPUBuffer, offset: UInt64, size: UInt64)] = [:]
-        private var vertexBuffers: [Int: (buffer: WebGPU.GPUBuffer, offset: UInt64, size: UInt64)] = [:]
+        private var genericBuffers: [Int: (buffer: WGPUBuffer, offset: UInt64, size: UInt64)] = [:]
+        private var vertexBuffers: [Int: (buffer: WGPUBuffer, offset: UInt64, size: UInt64)] = [:]
 
         private var device: WebGPU.GPUDevice
 
@@ -25,7 +28,7 @@
         private var triangleFillMode: TriangleFillMode = .fill
 
         struct BindGroupResources {
-            var uniformBuffers: [Int: (buffer: WebGPU.GPUBuffer, offset: Int, size: UInt64)] = [:]
+            var uniformBuffers: [Int: (buffer: WGPUBuffer, offset: Int, size: UInt64)] = [:]
             var textures: [Int: WGPUGPUTexture] = [:]
             var samplers: [Int: WGPUSampler] = [:]
         }
@@ -60,6 +63,9 @@
             // Save old pipeline before updating
             let oldPipeline = currentPipeline
             let pipelineChanged = oldPipeline !== wgpuPipeline
+            guard pipelineChanged else {
+                return
+            }
 
             renderEncoder.setPipeline(pipeline: wgpuPipeline.renderPipeline)
             self.currentPipeline = wgpuPipeline
@@ -75,7 +81,7 @@
             // filters them when building each pipeline's bind group.
             for (engineSlot, gpuSlot) in wgpuPipeline.vertexBufferSlots {
                 if let binding = vertexBuffers[engineSlot] {
-                    renderEncoder.setVertexBuffer(slot: gpuSlot, buffer: binding.buffer, offset: binding.offset, size: binding.size)
+                    renderEncoder.setVertexBuffer(slot: gpuSlot, buffer: binding.buffer.buffer, offset: binding.offset, size: binding.size)
                 }
             }
 
@@ -95,7 +101,7 @@
             }
             updateBindGroupResources(setIndex: 0) { resources in
                 resources.uniformBuffers[slot] = (
-                    buffer: wgpuBuffer.buffer,
+                    buffer: wgpuBuffer,
                     offset: offset,
                     size: UInt64(wgpuBuffer.length)
                 )
@@ -115,7 +121,7 @@
             }
             updateBindGroupResources(setIndex: 0) { resources in
                 resources.uniformBuffers[slot] = (
-                    buffer: wgpuBuffer.buffer,
+                    buffer: wgpuBuffer,
                     offset: offset,
                     size: UInt64(wgpuBuffer.length)
                 )
@@ -127,7 +133,7 @@
                 fatalError("BufferData is not a WGPUBuffer")
             }
 
-            let binding = (buffer: wgpuBuffer.buffer, offset: UInt64(offset), size: UInt64(wgpuBuffer.length - offset))
+            let binding = (buffer: wgpuBuffer, offset: UInt64(offset), size: UInt64(wgpuBuffer.length - offset))
             genericBuffers[slot] = binding
             if let pipeline = currentPipeline, pipeline.vertexBufferSlots[slot] == nil,
                 expectedResourceKinds(for: pipeline, setIndex: 0)[slot] == .uniformBuffer {
@@ -140,8 +146,10 @@
 
         private func bindVertexBuffer(_ buffer: WGPUBuffer, offset: Int, engineSlot: Int) {
             let size = UInt64(buffer.length - offset)
-            vertexBuffers[engineSlot] = (buffer.buffer, UInt64(offset), size)
-            guard let gpuSlot = currentPipeline?.vertexBufferSlots[engineSlot] else { return }
+            vertexBuffers[engineSlot] = (buffer, UInt64(offset), size)
+            guard let gpuSlot = currentPipeline?.vertexBufferSlots[engineSlot] else {
+                return
+            }
             renderEncoder.setVertexBuffer(slot: gpuSlot, buffer: buffer.buffer, offset: UInt64(offset), size: size)
         }
 
@@ -152,7 +160,7 @@
 
             updateBindGroupResources(setIndex: 0) { resources in
                 resources.uniformBuffers[slot] = (
-                    buffer: wgpuBuffer.buffer,
+                    buffer: wgpuBuffer,
                     offset: offset,
                     size: UInt64(wgpuBuffer.length)
                 )
@@ -195,7 +203,7 @@
             }
             updateBindGroupResources(setIndex: 0) { resources in
                 resources.uniformBuffers[slot] = (
-                    buffer: buffer,
+                    buffer: WGPUBuffer(buffer: buffer, device: device),
                     offset: 0,
                     size: UInt64(length)
                 )
@@ -229,16 +237,16 @@
                             fatalError("UniformBuffer is not a WGPUUniformBuffer")
                         }
                         resources.uniformBuffers[binding.binding] = (
-                            buffer: wgpuBuffer.buffer,
+                            buffer: wgpuBuffer,
                             offset: offset,
                             size: UInt64(wgpuBuffer.length)
                         )
-                    case let .texture(texture):
+                    case .texture(let texture):
                         guard let wgpuTexture = texture.gpuTexture as? WGPUGPUTexture else {
                             fatalError("Texture's gpuTexture is not a WGPUGPUTexture")
                         }
                         resources.textures[binding.binding] = wgpuTexture
-                    case let .sampler(sampler):
+                    case .sampler(let sampler):
                         guard let wgpuSampler = sampler as? WGPUSampler else {
                             fatalError("Sampler is not a WGPUSampler")
                         }
@@ -249,14 +257,29 @@
         }
 
         private func updateBindGroupResources(setIndex: Int, update: (inout BindGroupResources) -> Void) {
-            var resources = bindGroupResources[setIndex] ?? BindGroupResources()
-            update(&resources)
-            bindGroupResources[setIndex] = resources
+            update(&bindGroupResources[setIndex, default: BindGroupResources()])
             bindGroupDirty = true
         }
 
         func setViewport(_ viewport: Rect) {
-            #if !WASM
+            #if WASM
+                // Swan's browser wrapper has no setViewport API yet. Atlas tiles
+                // still require the same viewport transform as native WebGPU.
+                let object = renderEncoder.jsObject
+                guard let setViewport = object["setViewport"].function else {
+                    assertionFailure("WebGPU render pass is missing setViewport")
+                    return
+                }
+                _ = setViewport.callAsFunction(
+                    this: object,
+                    Double(viewport.origin.x),
+                    Double(viewport.origin.y),
+                    Double(viewport.size.width),
+                    Double(viewport.size.height),
+                    0,
+                    1
+                )
+            #else
                 renderEncoder.setViewport(
                     x: Float(viewport.origin.x),
                     y: Float(viewport.origin.y),
@@ -333,12 +356,6 @@
     }
 
     extension WGPURenderCommandEncoder {
-        private enum BindingResourceKind {
-            case uniformBuffer
-            case texture
-            case sampler
-        }
-
         private func commitBindGroup() {
             guard let pipeline = currentPipeline else {
                 // Pipeline not set yet, will commit when it's set
@@ -352,118 +369,142 @@
                     continue
                 }
 
-                #if WASM
-                    var entries: [WebGPU.GPUBindGroupEntryEx] = []
-                #else
-                    var entries: [WebGPU.GPUBindGroupEntry] = []
-                #endif
                 let expectedResources = expectedResourceKinds(for: pipeline, setIndex: setIndex)
-
-                for (bindingSlot, texture) in resources.textures
-                where shouldBind(
-                    bindingSlot,
-                    as: .texture,
-                    expectedResources: expectedResources
-                ) {
-                    #if WASM
-                        entries.append(
-                            WebGPU.GPUBindGroupEntryEx(
-                                binding: bindingSlot,
-                                textureView: texture.textureView
-                            )
-                        )
-                    #else
-                        entries.append(
-                            WebGPU.GPUBindGroupEntry(
-                                binding: UInt32(bindingSlot),
-                                textureView: texture.textureView
-                            )
-                        )
-                    #endif
-                }
-
-                for (bindingSlot, sampler) in resources.samplers
-                where shouldBind(
-                    bindingSlot,
-                    as: .sampler,
-                    expectedResources: expectedResources
-                ) {
-                    #if WASM
-                        entries.append(
-                            WebGPU.GPUBindGroupEntryEx(
-                                binding: bindingSlot,
-                                sampler: sampler.wgpuSampler
-                            )
-                        )
-                    #else
-                        entries.append(
-                            WebGPU.GPUBindGroupEntry(
-                                binding: UInt32(bindingSlot),
-                                sampler: sampler.wgpuSampler
-                            )
-                        )
-                    #endif
-                }
-
-                for (bindingSlot, uniform) in resources.uniformBuffers
-                where shouldBind(
-                    bindingSlot,
-                    as: .uniformBuffer,
-                    expectedResources: expectedResources
-                ) {
-                    #if WASM
-                        entries.append(
-                            WebGPU.GPUBindGroupEntryEx(
-                                binding: bindingSlot,
-                                buffer: uniform.buffer,
-                                offset: UInt64(uniform.offset),
-                                size: uniform.size
-                            )
-                        )
-                    #else
-                        entries.append(
-                            WebGPU.GPUBindGroupEntry(
-                                binding: UInt32(bindingSlot),
-                                buffer: uniform.buffer,
-                                offset: UInt64(uniform.offset),
-                                size: uniform.size
-                            )
-                        )
-                    #endif
-                }
-
-                guard !entries.isEmpty else {
-                    continue
-                }
-
-
-                // Get bind group layout - this will fail if the pipeline is invalid
-                // The layout will be null/invalid if the pipeline creation failed
-                #if WASM
-                    let layout = pipeline.renderPipeline.getBindGroupLayout(index: UInt32(setIndex))
-                #else
-                    guard let layout = pipeline.renderPipeline.getBindGroupLayout(groupIndex: UInt32(setIndex)) else {
-                        continue
+                var keys: [WGPUBindingKey] = []
+                var owners: [AnyObject] = []
+                keys.reserveCapacity(expectedResources.count)
+                owners.reserveCapacity(expectedResources.count)
+                for slot in expectedResources.keys.sorted() {
+                    switch expectedResources[slot] {
+                    case .uniformBuffer:
+                        if let uniform = resources.uniformBuffers[slot] {
+                            keys.append(.init(slot: slot, owner: ObjectIdentifier(uniform.buffer), offset: uniform.offset, size: uniform.size))
+                            owners.append(uniform.buffer)
+                        }
+                    case .texture:
+                        if let texture = resources.textures[slot] {
+                            keys.append(.init(slot: slot, owner: ObjectIdentifier(texture)))
+                            owners.append(texture)
+                        }
+                    case .sampler:
+                        if let sampler = resources.samplers[slot] {
+                            keys.append(.init(slot: slot, owner: ObjectIdentifier(sampler)))
+                            owners.append(sampler)
+                        }
+                    case nil: break
                     }
-                #endif
-                let bindGroup = webGPUDeviceLock.withLock { _ in
+                }
+                let key = WGPUBindGroupKey(set: setIndex, bindings: keys)
+                let bindGroup = pipeline.cachedBindGroup(key: key, owners: owners) {
                     #if WASM
-                        device.createBindGroup(
-                            label: pipeline.descriptor.debugName + " Bind Group \(setIndex)",
-                            layout: layout,
-                            entries: entries
-                        )
+                        var entries: [WebGPU.GPUBindGroupEntryEx] = []
                     #else
-                        device.createBindGroup(
-                            descriptor: WebGPU.GPUBindGroupDescriptor(
+                        var entries: [WebGPU.GPUBindGroupEntry] = []
+                    #endif
+                    for (bindingSlot, texture) in resources.textures
+                    where shouldBind(
+                        bindingSlot,
+                        as: .texture,
+                        expectedResources: expectedResources
+                    ) {
+                        #if WASM
+                            entries.append(
+                                WebGPU.GPUBindGroupEntryEx(
+                                    binding: bindingSlot,
+                                    textureView: texture.textureView
+                                )
+                            )
+                        #else
+                            entries.append(
+                                WebGPU.GPUBindGroupEntry(
+                                    binding: UInt32(bindingSlot),
+                                    textureView: texture.textureView
+                                )
+                            )
+                        #endif
+                    }
+
+                    for (bindingSlot, sampler) in resources.samplers
+                    where shouldBind(
+                        bindingSlot,
+                        as: .sampler,
+                        expectedResources: expectedResources
+                    ) {
+                        #if WASM
+                            entries.append(
+                                WebGPU.GPUBindGroupEntryEx(
+                                    binding: bindingSlot,
+                                    sampler: sampler.wgpuSampler
+                                )
+                            )
+                        #else
+                            entries.append(
+                                WebGPU.GPUBindGroupEntry(
+                                    binding: UInt32(bindingSlot),
+                                    sampler: sampler.wgpuSampler
+                                )
+                            )
+                        #endif
+                    }
+
+                    for (bindingSlot, uniform) in resources.uniformBuffers
+                    where shouldBind(
+                        bindingSlot,
+                        as: .uniformBuffer,
+                        expectedResources: expectedResources
+                    ) {
+                        #if WASM
+                            entries.append(
+                                WebGPU.GPUBindGroupEntryEx(
+                                    binding: bindingSlot,
+                                    buffer: uniform.buffer.buffer,
+                                    offset: UInt64(uniform.offset),
+                                    size: uniform.size
+                                )
+                            )
+                        #else
+                            entries.append(
+                                WebGPU.GPUBindGroupEntry(
+                                    binding: UInt32(bindingSlot),
+                                    buffer: uniform.buffer.buffer,
+                                    offset: UInt64(uniform.offset),
+                                    size: uniform.size
+                                )
+                            )
+                        #endif
+                    }
+
+                    guard !entries.isEmpty else {
+                        return nil
+                    }
+
+                    // Get bind group layout - this will fail if the pipeline is invalid
+                    // The layout will be null/invalid if the pipeline creation failed
+                    #if WASM
+                        let layout = pipeline.renderPipeline.getBindGroupLayout(index: UInt32(setIndex))
+                    #else
+                        guard let layout = pipeline.renderPipeline.getBindGroupLayout(groupIndex: UInt32(setIndex)) else {
+                            return nil
+                        }
+                    #endif
+                    return webGPUDeviceLock.withLock { _ in
+                        #if WASM
+                            device.createBindGroup(
                                 label: pipeline.descriptor.debugName + " Bind Group \(setIndex)",
                                 layout: layout,
                                 entries: entries
                             )
-                        )
-                    #endif
+                        #else
+                            device.createBindGroup(
+                                descriptor: WebGPU.GPUBindGroupDescriptor(
+                                    label: pipeline.descriptor.debugName + " Bind Group \(setIndex)",
+                                    layout: layout,
+                                    entries: entries
+                                )
+                            )
+                        #endif
+                    }
                 }
-
                 renderEncoder.setBindGroup(
                     groupIndex: UInt32(setIndex),
                     group: bindGroup,
@@ -475,38 +516,14 @@
         private func expectedResourceKinds(
             for pipeline: WGPURenderPipeline,
             setIndex: Int
-        ) -> [Int: BindingResourceKind] {
-            var expected: [Int: BindingResourceKind] = [:]
-
-            func collect(from reflection: ShaderReflectionData) {
-                guard reflection.descriptorSets.indices.contains(setIndex) else {
-                    return
-                }
-
-                let descriptorSet = reflection.descriptorSets[setIndex]
-                for binding in descriptorSet.uniformsBuffers.keys {
-                    expected[binding] = .uniformBuffer
-                }
-                for binding in descriptorSet.sampledImages.keys {
-                    expected[binding] = .texture
-                }
-                for binding in descriptorSet.samplers.keys {
-                    expected[binding] = .sampler
-                }
-            }
-
-            collect(from: pipeline.descriptor.vertex.reflectionData)
-            if let fragment = pipeline.descriptor.fragment {
-                collect(from: fragment.reflectionData)
-            }
-
-            return expected
+        ) -> [Int: WGPUBindingKind] {
+            pipeline.bindingKinds.indices.contains(setIndex) ? pipeline.bindingKinds[setIndex] : [:]
         }
 
         private func shouldBind(
             _ binding: Int,
-            as kind: BindingResourceKind,
-            expectedResources: [Int: BindingResourceKind]
+            as kind: WGPUBindingKind,
+            expectedResources: [Int: WGPUBindingKind]
         ) -> Bool {
             guard let expectedKind = expectedResources[binding] else {
                 return expectedResources.isEmpty

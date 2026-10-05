@@ -229,12 +229,18 @@ public struct AssetsManager: Resource {
         }
 
         let processedPath = self.processPath(path)
-        guard
-            let uri = bundle.url(forResource: processedPath.url.relativeString, withExtension: nil),
-            !shouldCheckAssetFileExistence || FileSystem.current.itemExists(at: uri)
-        else {
-            throw AssetError.notExistAtPath(processedPath.url.relativeString)
-        }
+        #if WASM
+            // Corelibs Bundle.url(forResource:withExtension:nil) truncates the final
+            // filename character in this SDK. The exported bundle already supplies
+            // a virtual resource directory, so build the full URL without a lookup.
+            let resourcePath = processedPath.url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            let resolvedURL = bundle.resourceURL?.appendingPathComponent(resourcePath)
+        #else
+            let resolvedURL = bundle.url(forResource: processedPath.url.relativeString, withExtension: nil)
+        #endif
+        guard let uri = resolvedURL,
+              !shouldCheckAssetFileExistence || FileSystem.current.itemExists(at: uri)
+        else { throw AssetError.notExistAtPath(processedPath.url.relativeString) }
 
         let resource: A = try await self.load(
             from: Path(url: uri, query: processedPath.query),

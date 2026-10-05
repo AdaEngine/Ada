@@ -61,6 +61,15 @@ isolation. Compare illuminated surfaces against a no-light control and verify
 shadowed/unshadowed cases, moving casters, atlas exhaustion and light removal.
 Record actual GPU cost and limits; component registration is not rendering proof.
 
+## Recorded backend validation
+
+SkeletalGarden now enables local lights in ordinary launches; `--daylight`
+restores the original sunlight scene. macOS Metal and native WebGPU captures,
+plus a Swift 6.3.2 WASM debug export running in the Codex in-app browser, exercise
+colored point/spot illumination and atlas shadows. Browser controls verify light
+and shadow toggles. See [WebGPUValidation.md](../../Demos/SkeletalGarden/WebGPUValidation.md)
+for the build commands, proof boundaries and backend compatibility fixes.
+
 ## Consequences
 
 This is an accepted implementation direction, not evidence of shipped behavior.

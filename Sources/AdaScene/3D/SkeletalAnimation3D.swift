@@ -1,12 +1,19 @@
 import AdaAnimation
 import AdaAssets
+import AdaCorePipelines
 import AdaECS
+@_spi(Internal) import AdaRender
 import AdaTransform
+import Foundation
 import Math
 
 /// Instance-local pose and named clip playback on the model root entity.
 public struct ModelAnimation3DComponent: Component {
     public var player: SkeletalAnimationPlayer
+    public var evaluationLOD: AnimationLOD3DSettings?
+    var lodState = AnimationLOD3DState()
+    var appliedGeneration: UInt64?
+    var appliedPlayer: UUID?
 
     public init(player: SkeletalAnimationPlayer) { self.player = player }
 }
@@ -28,6 +35,8 @@ public struct SkinnedMesh3DComponent: Component {
     public let meshNodeIndex: Int
     public let skin: GLTFImportResult.Skin
     public private(set) var matrices: [Transform3D]
+    public private(set) var poseGeneration: UInt64 = 0
+    public let paletteID = UUID()
 
     public init(modelRoot: Entity.ID, meshNodeIndex: Int, skin: GLTFImportResult.Skin) {
         self.modelRoot = modelRoot
@@ -51,6 +60,7 @@ public struct SkinnedMesh3DComponent: Component {
         for index in skin.joints.indices {
             matrices[index] = inverseMesh * player.globalTransforms[skin.joints[index]] * skin.inverseBindMatrices[index]
         }
+        poseGeneration &+= 1
     }
 }
 
@@ -61,29 +71,51 @@ public struct SkeletalAnimation3DSystem {
     @Query<ModelNode3DComponent, Ref<Transform>> private var nodes
     @Query<Ref<SkinnedMesh3DComponent>> private var skins
     @Res<DeltaTime> private var time
+    @Query<Camera, CameraRenderGraph> private var cameras
+    @Query<GlobalTransform> private var transformAccess
 
     public init(world _: World) {}
 
     public func update(context _: UpdateContext) {
+        _ = transformAccess.wrappedValue
+        var observers: [AnimationLOD3DObserver] = []
+        cameras.forEach { camera, graph in
+            if camera.isActive, graph.subgraphLabel == .main3D {
+                let data = camera.computedData
+                observers.append(.init(view: data.viewMatrix, projection: data.projectionMatrix, frustum: .init(viewProjection: data.projectionMatrix * data.viewMatrix)))
+            }
+        }
+        // These references are local to this update; no structural world mutations occur here.
+        var nodesByRoot: [Entity.ID: [(Int, Ref<Transform>)]] = [:]
+        nodes.forEach { binding, transform in nodesByRoot[binding.modelRoot, default: []].append((binding.nodeIndex, transform)) }
+        var skinsByRoot: [Entity.ID: [Ref<SkinnedMesh3DComponent>]] = [:]
+        skins.forEach { skin in skinsByRoot[skin.wrappedValue.modelRoot, default: []].append(skin) }
         models.forEach { root, animation in
-            animation.player.advance(by: Double(time.deltaTime))
-            nodes.forEach { binding, transform in
-                guard binding.modelRoot == root.id,
-                    animation.player.poses.indices.contains(binding.nodeIndex),
-                    animation.player.rig.nodes[binding.nodeIndex].restPose != nil
-                else {
-                    return
-                }
-                let pose = animation.player.poses[binding.nodeIndex]
-                let value = Transform(rotation: pose.rotation, scale: pose.scale, position: pose.translation)
-                if transform.wrappedValue != value { transform.wrappedValue = value }
+            var value = animation.wrappedValue
+            if value.appliedPlayer != value.player.instanceID { value.lodState = AnimationLOD3DState() }
+            if let settings = value.evaluationLOD {
+                value.lodState.advance(
+                    player: &value.player,
+                    delta: Double(time.deltaTime),
+                    settings: settings,
+                    transform: root.components[GlobalTransform.self]?.matrix ?? .identity,
+                    observers: observers
+                )
+            } else {
+                value.player.advance(by: Double(time.deltaTime))
             }
-            skins.forEach { binding in
-                guard binding.wrappedValue.modelRoot == root.id else {
-                    return
+            if value.appliedPlayer != value.player.instanceID || value.appliedGeneration != value.player.poseGeneration {
+                for (index, transform) in nodesByRoot[root.id] ?? [] {
+                    guard value.player.poses.indices.contains(index), value.player.rig.nodes[index].restPose != nil else { continue }
+                    let pose = value.player.poses[index]
+                    let next = Transform(rotation: pose.rotation, scale: pose.scale, position: pose.translation)
+                    if transform.wrappedValue != next { transform.wrappedValue = next }
                 }
-                binding.wrappedValue.updateMatrices(using: animation.player)
+                for skin in skinsByRoot[root.id] ?? [] { skin.wrappedValue.updateMatrices(using: value.player) }
+                value.appliedGeneration = value.player.poseGeneration
+                value.appliedPlayer = value.player.instanceID
             }
+            animation.wrappedValue = value
         }
     }
 }

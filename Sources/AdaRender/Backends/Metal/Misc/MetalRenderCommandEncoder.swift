@@ -124,7 +124,7 @@
                     if binding.shaderStages.contains(.fragment) {
                         renderEncoder.setFragmentBuffer(metalBuffer.buffer, offset: offset, index: binding.binding)
                     }
-                case let .texture(texture):
+                case .texture(let texture):
                     guard let metalTexture = texture.gpuTexture as? MetalGPUTexture else {
                         fatalError("Texture is not a MetalGPUTexture")
                     }
@@ -134,7 +134,7 @@
                     if binding.shaderStages.contains(.fragment) {
                         renderEncoder.setFragmentTexture(metalTexture.texture, index: binding.binding)
                     }
-                case let .sampler(sampler):
+                case .sampler(let sampler):
                     guard let metalSampler = sampler as? MetalSampler else {
                         fatalError("Sampler is not a MetalSampler")
                     }
@@ -146,6 +146,21 @@
                     }
                 }
             }
+        }
+
+        func drawIndexedIndirect(arguments: any Buffer, offset: Int) -> Bool {
+            guard let arguments = arguments as? MetalBuffer, let index = currentIndexBuffer else {
+                return false
+            }
+            renderEncoder.drawIndexedPrimitives(
+                type: currentPrimitiveType,
+                indexType: currentIndexType,
+                indexBuffer: index,
+                indexBufferOffset: 0,
+                indirectBuffer: arguments.buffer,
+                indirectBufferOffset: offset
+            )
+            return true
         }
 
         func setViewport(_ viewport: Rect) {

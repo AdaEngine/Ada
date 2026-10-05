@@ -1,6 +1,6 @@
 # Skeletal Garden
 
-A native AdaEngine demo for skeletal GLB import, clip playback, cross-fading, GPU skinning, independent model instances, and animated directional shadows. The scene uses the CC0 Quaternius RobotExpressive character and six original textured garden props and original low-poly trees, rocks and grass. Provenance and processing recipes are in `SourceAssets/ASSETS.md`.
+An AdaEngine demo for skeletal GLB import, clip playback, cross-fading, GPU skinning, independent model instances, and animated directional shadows. The scene uses the CC0 Quaternius RobotExpressive character and six original textured garden props and original low-poly trees, rocks and grass. Provenance and processing recipes are in `SourceAssets/ASSETS.md`.
 
 Run from the AdaEngine repository root:
 
@@ -36,7 +36,7 @@ Demos/SkeletalGarden/script/build_and_run.sh --capture-no-ibl
 Demos/SkeletalGarden/script/build_and_run.sh --debug
 ```
 
-`--verify` drives the same controller/animation systems through a scripted crate collision, movement/braking and jump/landing and terrain traversal sequence; it also checks camera occlusion and all three air clips. It fails unless all runtime position, velocity, grounded and clip checks pass. `--capture-overview` captures the whole landscape under `dist/captures/overview`. `--capture` fixes the camera and character root, plays skeletal poses, and saves two PNGs under `dist/captures` directly from the Metal render target. The readback uses the render graph's command queue and waits asynchronously for completion. It does not capture the desktop.
+`--verify` drives the same controller/animation systems through a scripted crate collision, movement/braking and jump/landing and terrain traversal sequence; it also checks camera occlusion and all three air clips. It fails unless all runtime position, velocity, grounded and clip checks pass. `--capture-overview` captures the whole landscape under `dist/captures/overview`. `--capture` fixes the camera and character root, plays skeletal poses, and saves two PNGs under `dist/captures` directly from the render target. The readback uses the render graph's command queue and waits asynchronously for completion. It does not capture the desktop.
 
 The script stages `dist/SkeletalGarden.app`, including SwiftPM resource bundles, and launches it with macOS Launch Services. Logs are under `dist`. It only restarts the SkeletalGarden process. The build defaults to a dedicated `/tmp/adaengine-skeletal-import-build` scratch path; set `ADAENGINE_SKELETAL_BUILD_PATH` to override it.
 
@@ -153,8 +153,9 @@ reused 512-pixel-tile atlas with a single pass per camera. Alpha-mask and GPU
 skinning are shared with the sunlight shadow path. Transparent BLEND materials
 remain unshadowed casters. Atlas sampling clamps PCF taps to the current tile.
 
-The demo's extra lights are opt-in. Key 8 toggles local lights and key 9 toggles
-their shadows. Inspector controls expose range, cone, shadow bias/priority and
+The demo enables colored point/spot lights by default, including ordinary and
+WebAssembly launches. Use `--daylight` for the original sunlight scene. Key 8
+toggles local lights and key 9 toggles their shadows. Inspector controls expose range, cone, shadow bias/priority and
 the per-camera local shadow budget.
 
 ```sh
@@ -176,3 +177,49 @@ GPU pass timings are separate. The moving control animates a point light, the
 character pose and the camera using deterministic frame increments. The
 multi-camera control also tests render-to-texture and a resized temporal input.
 Native proof and limits: [LocalLightingValidation.md](LocalLightingValidation.md).
+
+
+## WebGPU and WebAssembly
+
+The native WebGPU backend can be selected with `--webgpu`; it logs the actual
+backend and fails startup if the requested backend is unavailable. Native WGSL
+compilation uses bundled Tint or an executable specified by `TINT_EXECUTABLE`.
+
+```sh
+ADAENGINE_WEB_EXPORT=1 Demos/SkeletalGarden/script/build_and_run.sh --webgpu
+# Browser reactor build + packaged resources and WGSL:
+ADAENGINE_WEB_EXPORT=1 swift package --disable-sandbox \
+  --scratch-path /tmp/ada-garden-web-tools \
+  --allow-writing-to-package-directory --allow-network-connections all \
+  export-web --product SkeletalGarden --output Demos/SkeletalGarden/dist/web \
+  --scratch-path /tmp/ada-garden-wasm \
+  --swift-sdk swift-6.3.2-RELEASE_wasm --debug
+python3 -m http.server 8765 --bind 127.0.0.1 --directory Demos/SkeletalGarden/dist/web
+```
+
+Use a host toolchain matching the selected WASM SDK. Browser startup loads GLB
+resources asynchronously; it reports unique uncaptured WebGPU validation errors
+in the console. MetalFX uses the spatial fallback on WebGPU. Native WebGPU and
+browser execution results are recorded in [WebGPUValidation.md](WebGPUValidation.md).
+
+
+## Performance and GPU visibility
+
+The native script defaults to Release; set `ADAENGINE_SKELETAL_CONFIGURATION=debug`
+for Debug. Browser export also defaults to Release (`--debug` is a correctness
+control, not a performance build). Add `?stats=1` to the browser URL for measured
+FPS and frame interval. Native window titles include FPS.
+
+Press 0 or pass `--gpu-visibility` to opt into Metal's current-frame Hi-Z,
+instance compaction and GPU indexed indirect counts. Unsupported devices retain
+CPU visibility. This adds a depth prepass, so open scenes may be faster with CPU
+visibility. Shadows use their independent caster lists.
+
+Characters use index-only skin-compatible mesh LODs and optional animation
+sampling/interpolation by projected size; `--no-character-lod` is the control.
+`--crowd` adds 64 independent actors. Capture controls:
+`--capture-cpu-visibility`, `--capture-gpu-visibility`, `--capture-crowd-reference`
+and `--capture-crowd`. Their files are under `dist/captures/<mode>`.
+
+Implementation contracts, measurements and proof boundaries:
+[PerformanceValidation.md](PerformanceValidation.md).

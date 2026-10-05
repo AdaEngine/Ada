@@ -14,6 +14,10 @@ private enum GardenMain {
 #endif
 struct SkeletalGarden: App {
     init() {
+        if ProcessInfo.processInfo.arguments.contains("--metal") { unsafe RenderEngine.configurations.preferredBackend = .metal }
+        if ProcessInfo.processInfo.arguments.contains("--webgpu") {
+            unsafe RenderEngine.configurations.preferredBackend = .webgpu
+        }
         if ProcessInfo.processInfo.arguments.contains("--spatial-proof") {
             unsafe RenderEngine.configurations.upscaling = .spatial(renderScale: 0.75)
         }
@@ -92,14 +96,19 @@ struct GardenCamera: Component {
 
 @System
 @MainActor
-func StartupGarden(_ context: WorldUpdateContext) {
-    do { try makeGarden(in: context.world) } catch { gardenLog("[SkeletalGarden] startup failed: \(error)") }
+func StartupGarden(_ context: WorldUpdateContext) async {
+    do { try await makeGarden(in: context.world) } catch { gardenLog("[SkeletalGarden] startup failed: \(error)") }
 }
 
 @MainActor
-private func makeGarden(in world: World) throws {
+private func makeGarden(in world: World) async throws {
+    let backend = unsafe RenderEngine.shared.type
+    if ProcessInfo.processInfo.arguments.contains("--webgpu"), backend != .webgpu {
+        throw AssetError.message("WebGPU backend was requested but is not linked in this build")
+    }
+    gardenLog("[SkeletalGarden] backend=\(backend)")
     let device = unsafe RenderEngine.shared.renderDevice
-    guard let model = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/GardenRobot.glb", from: gardenBundle).asset else {
+    guard let model = (try await AssetsManager.load(ModelAsset3D.self, at: "Assets/GardenRobot.glb", from: gardenBundle)).asset else {
         throw AssetError.message("GardenRobot could not be loaded")
     }
     let player = model.instantiate(in: world)
@@ -131,7 +140,7 @@ private func makeGarden(in world: World) throws {
         ("Pedestal", [3.1, 0, 0.5], 1), ("Lantern", [3.1, 1, 0.5], 1),
     ]
     for (name, position, scale) in props {
-        guard let prop = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/\(name).glb", from: gardenBundle).asset else {
+        guard let prop = (try await AssetsManager.load(ModelAsset3D.self, at: "Assets/\(name).glb", from: gardenBundle)).asset else {
             throw AssetError.message("Missing garden prop \(name)")
         }
         let root = prop.instantiate(in: world)
@@ -144,14 +153,28 @@ private func makeGarden(in world: World) throws {
         Mesh3DComponent(mesh: Mesh.generateSphere(radius: 0.35, renderDevice: device), materials: [chrome])
         Transform(position: [2.3, 0.35, -0.15])
     }
+    let lod1 = try await AssetsManager.load(ModelAsset3D.self, at: "Assets/GardenRobotLOD1.glb", from: gardenBundle)
+    let lod2 = try await AssetsManager.load(ModelAsset3D.self, at: "Assets/GardenRobotLOD2.glb", from: gardenBundle)
+    let characterLODs = [lod1.asset, lod2.asset].compactMap { $0 }
+    if !ProcessInfo.processInfo.arguments.contains("--no-character-lod") {
+        installGardenCharacterLOD(root: player, model: model, alternatives: characterLODs, world: world)
+        installGardenCharacterLOD(root: reference, model: model, alternatives: characterLODs, world: world)
+    }
+    if ProcessInfo.processInfo.arguments.contains("--crowd") { try makeGardenCrowd(model: model, alternatives: characterLODs, world: world) }
     makeGardenCollisions(in: world)
-    try makeGardenLandscape(in: world, device: device)
-    let ibl = try AssetsManager.loadSync(ImageBasedLighting3D.self, at: "Assets/Studio.ibl", from: gardenBundle)
+    try await makeGardenLandscape(in: world, device: device)
+    let ibl = try await AssetsManager.load(ImageBasedLighting3D.self, at: "Assets/Studio.ibl", from: gardenBundle)
     let arguments = ProcessInfo.processInfo.arguments
     let noIBL = arguments.contains("--no-ibl")
     let baseline = arguments.contains("--render-baseline")
     world.spawn("Sun") {
-        DirectionalLightComponent(radiance: [1, 0.88, 0.7], intensity: arguments.contains("--local-lights") ? 0.18 : 2.5, shadowDistance: 60, shadowBias: 0.002, shadowSlopeBias: 0.006)
+        DirectionalLightComponent(
+            radiance: [1, 0.88, 0.7],
+            intensity: GardenLightingMode.usesLocalLights(arguments: arguments) ? 0.18 : 2.5,
+            shadowDistance: 60,
+            shadowBias: 0.002,
+            shadowSlopeBias: 0.006
+        )
         Transform(rotation: Quat(axis: .right, angle: 0.9))
     }
     addGardenLocalLighting(in: world)
@@ -167,7 +190,8 @@ private func makeGarden(in world: World) throws {
         meshVisibility: MeshVisibilitySettings3D(
             frustumCulling: !arguments.contains("--no-culling"),
             lod: !arguments.contains("--no-lod"),
-            distanceCulling: !arguments.contains("--no-distance-culling")
+            distanceCulling: !arguments.contains("--no-distance-culling"),
+            gpuOcclusion: arguments.contains("--gpu-visibility")
         )
     )))
     if var environment = cameraEntity.components[Environment3D.self] {

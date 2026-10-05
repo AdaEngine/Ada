@@ -27,6 +27,8 @@
                     tempFileURL.path(),
                     "--format",
                     "wgsl",
+                    "--allow-non-uniform-derivatives",
+                    "true",
                 ],
                 output: .string(limit: .max),
                 error: .string(limit: 1024)
@@ -86,6 +88,9 @@
 
     extension Bundle {
         var tintExecutable: URL? {
+            if let path = ProcessInfo.processInfo.environment["TINT_EXECUTABLE"], FileManager.default.isExecutableFile(atPath: path) {
+                return URL(fileURLWithPath: path)
+            }
             #if os(Windows)
                 return url(forResource: "tint", withExtension: "exe")
             #else

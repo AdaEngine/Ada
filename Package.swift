@@ -1342,7 +1342,7 @@ if isAndroidBuildEnabled {
         name: "SkeletalGarden",
         dependencies: ["AdaEngine"],
         path: "Demos/SkeletalGarden",
-        exclude: ["script", "README.md", "RenderQualityValidation.md", "VisibilityValidation.md", "MetalFXValidation.md", "LocalLightingValidation.md", "dist", "SourceAssets", "Tests"],
+        exclude: ["script", "README.md", "RenderQualityValidation.md", "VisibilityValidation.md", "MetalFXValidation.md", "LocalLightingValidation.md", "WebGPUValidation.md", "PerformanceValidation.md", "dist", "SourceAssets", "Tests"],
         resources: [.copy("Assets")],
         swiftSettings: swiftSettings
     ))
@@ -1351,9 +1351,10 @@ if isAndroidBuildEnabled {
         name: "SkeletalGarden",
         dependencies: ["AdaEngine"],
         path: "Demos/SkeletalGarden",
-        exclude: ["script", "README.md", "RenderQualityValidation.md", "VisibilityValidation.md", "MetalFXValidation.md", "LocalLightingValidation.md", "dist", "SourceAssets", "Tests"],
+        exclude: ["script", "README.md", "RenderQualityValidation.md", "VisibilityValidation.md", "MetalFXValidation.md", "LocalLightingValidation.md", "WebGPUValidation.md", "PerformanceValidation.md", "dist", "SourceAssets", "Tests"],
         resources: [.copy("Assets")],
-        swiftSettings: swiftSettings
+        swiftSettings: swiftSettings,
+        linkerSettings: wasmExecutableLinkerSettings
     ))
 }
 

@@ -37,6 +37,8 @@ public struct UpscalePipeline: Resource {
 
         var descriptor = RenderPipelineDescriptor(vertex: spriteShader.asset.requiredShader(for: .vertex))
         descriptor.debugName = "Upscale Pipeline"
+        // Fullscreen triangles have no physical facing; presentation must survive backend winding conventions.
+        descriptor.backfaceCulling = false
 
         descriptor.fragment = spriteShader.asset.getShader(for: .fragment)
         #if os(Android)

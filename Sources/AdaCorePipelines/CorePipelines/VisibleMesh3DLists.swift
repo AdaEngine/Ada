@@ -7,20 +7,28 @@ import Math
 public struct Active3DInstanceBuffers: Resource {
     public var instances: BufferData<Flat3DInstanceData>?
     public var defaults: BufferData<Flat3DDefaultVertexData>?
+    public var indirectArguments: (any Buffer)?
     public init() {}
 }
 
 /// Compact, frame-buffered draw lists per camera and per shadow cascade.
 public struct VisibleMesh3DLists: Resource {
-    private struct Key: Hashable { var view: Entity.ID; var pass: Int }
+    private struct Key: Hashable {
+        var view: Entity.ID
+        var pass: Int
+    }
     private struct Entry {
         var buffers = Opaque3DInstanceBuffers()
         var items: [Opaque3DRenderItem] = []
+        var candidates: [GPUVisibilityCandidate] = []
         var count = Visibility3DCount()
         var records: [Record] = []
     }
 
-    private struct SelectionKey: Hashable { var view: Entity.ID; var entity: Entity.ID }
+    private struct SelectionKey: Hashable {
+        var view: Entity.ID
+        var entity: Entity.ID
+    }
     private struct BatchKey: Hashable {
         var vertex: ObjectIdentifier
         var index: ObjectIdentifier
@@ -68,14 +76,16 @@ public struct VisibleMesh3DLists: Resource {
         entry.items.removeAll(keepingCapacity: true)
         entry.buffers.beginFrame()
         entry.records.removeAll(keepingCapacity: true)
+        entry.candidates.removeAll(keepingCapacity: true)
         entry.count = Visibility3DCount()
         let cameraPosition = viewMatrix.inverse.origin
+        let frustum = MeshVisibilityFrustum3D(viewProjection: cullingProjection)
         var ranks: [BatchKey: Int] = [:]
         for (sourceIndex, source) in sources.enumerated() {
             if pass >= 0 && !source.castShadows { continue }
             entry.count.candidates += 1
             if settings.frustumCulling, !source.forceVisible, let bounds = source.bounds,
-               !MeshVisibility3DMath.intersects(bounds, viewProjection: cullingProjection) {
+                !frustum.intersects(bounds) {
                 entry.count.frustumRejected += 1
                 continue
             }
@@ -83,13 +93,16 @@ public struct VisibleMesh3DLists: Resource {
             let distance = (center - cameraPosition).length
             var fade: Float = 1
             if settings.distanceCulling, let maximum = source.maximumDistance, maximum.isFinite, maximum > 0 {
-                if distance >= maximum { entry.count.distanceRejected += 1; continue }
-                let fadeDistance = finiteRenderValue(source.fadeDistance, fallback: 4, range: 0 ... maximum)
+                if distance >= maximum {
+                    entry.count.distanceRejected += 1
+                    continue
+                }
+                let fadeDistance = finiteRenderValue(source.fadeDistance, fallback: 4, range: 0...maximum)
                 if fadeDistance > 0 { fade = min(max((maximum - distance) / fadeDistance, 0), 1) }
             }
             let selectionKey = SelectionKey(view: view, entity: source.entity)
             var lod = 0
-            if settings.lod, source.skinningBuffer == nil, let bounds = source.bounds {
+            if settings.lod, let bounds = source.bounds {
                 lod = MeshVisibility3DMath.selectLOD(
                     size: MeshVisibility3DMath.projectedDiameter(bounds, view: viewMatrix, projection: projection),
                     thresholds: source.thresholds,
@@ -119,18 +132,20 @@ public struct VisibleMesh3DLists: Resource {
                     )
                     let rank = ranks[batchKey] ?? ranks.count
                     ranks[batchKey] = rank
-                    entry.records.append(Record(
-                        source: sourceIndex,
-                        mesh: mesh,
-                        model: modelIndex,
-                        part: partIndex,
-                        material: material,
-                        fade: fade,
-                        key: batchKey,
-                        rank: rank,
-                        sequence: entry.records.count,
-                        blended: (material as? PBRMaterial)?.alphaMode == .blend
-                    ))
+                    entry.records.append(
+                        Record(
+                            source: sourceIndex,
+                            mesh: mesh,
+                            model: modelIndex,
+                            part: partIndex,
+                            material: material,
+                            fade: fade,
+                            key: batchKey,
+                            rank: rank,
+                            sequence: entry.records.count,
+                            blended: (material as? PBRMaterial)?.alphaMode == .blend
+                        )
+                    )
                     entry.count.triangles += part.indexCount / 3
                 }
             }
@@ -153,22 +168,35 @@ public struct VisibleMesh3DLists: Resource {
             let instanceIndex = entry.buffers.append(makeInstance(source, material: record.material, descriptor: part.vertexDescriptor, fade: record.fade))
             if !record.blended, previousKey == record.key, let last = entry.items.indices.last {
                 let lower = entry.items[last].batchRange?.lowerBound ?? instanceIndex
-                entry.items[last].batchRange = lower ..< (instanceIndex + 1)
+                entry.items[last].batchRange = lower..<(instanceIndex + 1)
             } else {
-                entry.items.append(Opaque3DRenderItem(
-                    entity: source.entity,
-                    drawPass: source.drawPass,
-                    sortKey: 0,
-                    modelIndex: record.model,
-                    partIndex: record.part,
-                    mesh: record.mesh,
-                    material: record.material,
-                    worldTransform: source.transform,
-                    castShadows: source.castShadows,
-                    receiveShadows: source.receiveShadows,
-                    batchRange: instanceIndex ..< (instanceIndex + 1),
-                    skinningBuffer: source.skinningBuffer
-                ))
+                entry.items.append(
+                    Opaque3DRenderItem(
+                        entity: source.entity,
+                        drawPass: source.drawPass,
+                        sortKey: 0,
+                        modelIndex: record.model,
+                        partIndex: record.part,
+                        mesh: record.mesh,
+                        material: record.material,
+                        worldTransform: source.transform,
+                        castShadows: source.castShadows,
+                        receiveShadows: source.receiveShadows,
+                        batchRange: instanceIndex..<(instanceIndex + 1),
+                        skinningBuffer: source.skinningBuffer
+                    )
+                )
+            }
+            if pass < 0 && settings.gpuOcclusion, let item = entry.items.last, let range = item.batchRange {
+                entry.candidates.append(
+                    GPUVisibilityCandidate(
+                        bounds: source.bounds,
+                        draw: UInt32(entry.items.count - 1),
+                        source: UInt32(instanceIndex),
+                        destination: UInt32(range.lowerBound),
+                        forceVisible: source.forceVisible || record.blended
+                    )
+                )
             }
             previousKey = record.blended ? nil : record.key
         }
@@ -176,6 +204,8 @@ public struct VisibleMesh3DLists: Resource {
         entry.count.drawCalls = entry.items.count
         entries[key] = entry
     }
+
+    public func gpuCandidates(view: Entity.ID, pass: Int) -> [GPUVisibilityCandidate] { entries[Key(view: view, pass: pass)]?.candidates ?? [] }
 
     public func items(view: Entity.ID, pass: Int) -> [Opaque3DRenderItem] { entries[Key(view: view, pass: pass)]?.items ?? [] }
     public func count(view: Entity.ID, pass: Int) -> Visibility3DCount { entries[Key(view: view, pass: pass)]?.count ?? Visibility3DCount() }

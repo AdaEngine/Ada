@@ -95,6 +95,10 @@
             return metalBuffer
         }
 
+        func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? {
+            try? MetalVisibilityProcessor(device: device)
+        }
+
         func createBuffer(label: String?, length: Int, options: ResourceOptions) -> Buffer {
             let buffer = self.device.makeBuffer(length: length, options: options.metal)
                 .unwrap(message: "Metal failed to allocate a buffer of \(length) bytes.")

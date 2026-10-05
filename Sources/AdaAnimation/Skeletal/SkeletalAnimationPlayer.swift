@@ -3,10 +3,14 @@ import Math
 
 /// Instance-owned playback and pose buffers. The rig and clips can be shared by value.
 public struct SkeletalAnimationPlayer: Sendable {
+    /// Identifies this playback instance even when its pose generation restarts.
+    public let instanceID = UUID()
     public let rig: SkeletalRig
     public let clips: [SkeletalAnimationClip]
     public private(set) var clipIndex: Int?
     public private(set) var time: Double = 0
+    /// Changes whenever evaluated or interpolated pose matrices change.
+    public private(set) var poseGeneration: UInt64 = 0
     public var speed: Double = 1
     public var isPlaying = false
     public var repeats = true
@@ -18,9 +22,11 @@ public struct SkeletalAnimationPlayer: Sendable {
     private var transitionTime: Double = 0
 
     public init(rig: SkeletalRig, clips: [SkeletalAnimationClip]) throws(SkeletalAnimationError) {
-        guard clips.allSatisfy({ clip in
-            clip.tracks.allSatisfy { rig.nodes.indices.contains($0.nodeIndex) && rig.nodes[$0.nodeIndex].restPose != nil }
-        }) else { throw .invalidTrack }
+        guard
+            clips.allSatisfy({ clip in
+                clip.tracks.allSatisfy { rig.nodes.indices.contains($0.nodeIndex) && rig.nodes[$0.nodeIndex].restPose != nil }
+            })
+        else { throw .invalidTrack }
         self.rig = rig
         self.clips = clips
         self.poses = rig.nodes.map { $0.restPose ?? SkeletalJointPose() }
@@ -57,7 +63,10 @@ public struct SkeletalAnimationPlayer: Sendable {
         evaluate()
     }
 
-    public mutating func advance(by deltaTime: Double) {
+    public mutating func advance(by deltaTime: Double) { advance(by: deltaTime, evaluatePose: true) }
+
+    /// Advances playback and transitions independently from the visual pose sampling rate.
+    public mutating func advance(by deltaTime: Double, evaluatePose: Bool) {
         guard isPlaying, deltaTime.isFinite, deltaTime >= 0, speed.isFinite else {
             return
         }
@@ -74,7 +83,24 @@ public struct SkeletalAnimationPlayer: Sendable {
                 isPlaying = transitionTime < transitionDuration
             }
         }
-        evaluate()
+        if evaluatePose { evaluate() }
+    }
+
+    /// Evaluates the current playback clock without advancing gameplay time.
+    public mutating func sampleCurrentPose() { evaluate() }
+
+    /// Interpolates visual poses; playback/transition clocks remain unchanged.
+    public mutating func presentPose(from source: [SkeletalJointPose], to target: [SkeletalJointPose], amount: Float) {
+        guard source.count == poses.count, target.count == poses.count else {
+            return
+        }
+        let t = amount.isFinite ? min(max(amount, 0), 1) : 1
+        for index in poses.indices {
+            poses[index].translation = source[index].translation + (target[index].translation - source[index].translation) * t
+            poses[index].scale = source[index].scale + (target[index].scale - source[index].scale) * t
+            poses[index].rotation = slerpQuat(source[index].rotation, target[index].rotation, t: t)
+        }
+        rebuildTransforms()
     }
 
     private mutating func evaluate() {
@@ -104,6 +130,11 @@ public struct SkeletalAnimationPlayer: Sendable {
             transitionSource.removeAll(keepingCapacity: true)
             transitionDuration = 0
         }
+        rebuildTransforms()
+    }
+
+    private mutating func rebuildTransforms() {
+        poseGeneration &+= 1
         for index in rig.evaluationOrder {
             let node = rig.nodes[index]
             localTransforms[index] = node.restPose == nil ? node.restMatrix : poses[index].matrix

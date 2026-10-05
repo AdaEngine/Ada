@@ -31,35 +31,12 @@
       let files = target.sources.filter { $0.hasSuffix(".swift") }.map {
         sourceRoot.appendingPathComponent($0)
       }
-      let detector = EntryDetector(viewMode: .sourceAccurate)
-      for file in files {
-        detector.walk(Parser.parse(source: try String(contentsOf: file, encoding: .utf8)))
-      }
-      if !detector.hasAndroidEntry {
-        guard detector.apps.count == 1, let app = detector.apps.first else {
-          throw EditorPreviewBuildFailure(
-            message:
-              "Android export requires one @main AdaEngine App or an ada_android_start entry point."
-          )
-        }
-        for file in files {
-          let source = try String(contentsOf: file, encoding: .utf8)
-          let tree = Parser.parse(source: source)
-          let rewrite = AndroidSourceRewriter(
-            bundle: model.name + "_" + targetName, removeMain: true)
-          var rewritten = rewrite.rewrite(tree).description
-          if source.contains("@main"), EntryDetector.containsApp(tree, name: app) {
-            rewritten += """
-
-              @_cdecl("ada_android_start")
-              public func adaStudioAndroidStart() {
-                  AndroidRuntime.start { \(app)() }
-              }
-
-              """
-          }
-          try rewritten.write(to: file, atomically: true, encoding: .utf8)
-        }
+      let sources = try files.map { try String(contentsOf: $0, encoding: .utf8) }
+      let bootstrapped = try EditorAndroidAppBootstrap.prepare(sources)
+      for (file, source) in zip(files, bootstrapped) {
+        let rewrite = AndroidSourceRewriter(bundle: model.name + "_" + targetName)
+        let rewritten = rewrite.rewrite(Parser.parse(source: source)).description
+        try rewritten.write(to: file, atomically: true, encoding: .utf8)
       }
       let manifestURL = stage.appendingPathComponent("Package.swift")
       let manifest = try String(contentsOf: manifestURL, encoding: .utf8)
@@ -80,52 +57,10 @@
     }
   }
 
-  private final class EntryDetector: SyntaxVisitor {
-    var apps: [String] = []
-    var hasAndroidEntry = false
-    override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
-      collect(node.name.text, attributes: node.attributes, inheritance: node.inheritanceClause)
-      return .visitChildren
-    }
-    override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
-      collect(node.name.text, attributes: node.attributes, inheritance: node.inheritanceClause)
-      return .visitChildren
-    }
-    override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
-      hasAndroidEntry =
-        hasAndroidEntry
-        || node.attributes.contains { attribute in
-          attribute.as(AttributeSyntax.self)?.attributeName.trimmedDescription == "_cdecl"
-            && attribute.description.contains("\"ada_android_start\"")
-        }
-      return .visitChildren
-    }
-    private func collect(
-      _ name: String, attributes: AttributeListSyntax, inheritance: InheritanceClauseSyntax?
-    ) {
-      if attributes.contains(where: {
-        $0.as(AttributeSyntax.self)?.attributeName.trimmedDescription == "main"
-      }),
-        inheritance?.inheritedTypes.contains(where: {
-          ["App", "AdaEngine.App"].contains($0.type.trimmedDescription)
-        }) == true
-      {
-        apps.append(name)
-      }
-    }
-    static func containsApp(_ tree: SourceFileSyntax, name: String) -> Bool {
-      let detector = EntryDetector(viewMode: .sourceAccurate)
-      detector.walk(tree)
-      return detector.apps.contains(name)
-    }
-  }
-
   private final class AndroidSourceRewriter: SyntaxRewriter {
     let bundle: String
-    let removeMain: Bool
-    init(bundle: String, removeMain: Bool) {
+    init(bundle: String) {
       self.bundle = bundle
-      self.removeMain = removeMain
       super.init(viewMode: .sourceAccurate)
     }
     override func visit(_ node: StructDeclSyntax) -> DeclSyntax {
@@ -137,11 +72,6 @@
       var result = super.visit(node)
       result.leadingTrivia = node.leadingTrivia
       return result
-    }
-    override func visit(_ node: AttributeListSyntax) -> AttributeListSyntax {
-      guard removeMain else { return super.visit(node) }
-      return AttributeListSyntax(
-        node.filter { $0.as(AttributeSyntax.self)?.attributeName.trimmedDescription != "main" })
     }
     override func visit(_ node: MemberAccessExprSyntax) -> ExprSyntax {
       guard node.declName.baseName.text == "module",

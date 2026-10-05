@@ -8,11 +8,26 @@ public struct MeshVisibilitySettings3D: Codable, Sendable {
     public var frustumCulling: Bool
     public var lod: Bool
     public var distanceCulling: Bool
+    /// Opt-in current-frame GPU Hi-Z/indirect rendering; unsupported devices keep CPU visibility.
+    public var gpuOcclusion: Bool = false
 
     public init(frustumCulling: Bool = true, lod: Bool = true, distanceCulling: Bool = true) {
+        self.init(frustumCulling: frustumCulling, lod: lod, distanceCulling: distanceCulling, gpuOcclusion: false)
+    }
+
+    public init(frustumCulling: Bool = true, lod: Bool = true, distanceCulling: Bool = true, gpuOcclusion: Bool) {
         self.frustumCulling = frustumCulling
         self.lod = lod
         self.distanceCulling = distanceCulling
+        self.gpuOcclusion = gpuOcclusion
+    }
+    private enum CodingKeys: String, CodingKey { case frustumCulling, lod, distanceCulling, gpuOcclusion }
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        frustumCulling = try values.decodeIfPresent(Bool.self, forKey: .frustumCulling) ?? true
+        lod = try values.decodeIfPresent(Bool.self, forKey: .lod) ?? true
+        distanceCulling = try values.decodeIfPresent(Bool.self, forKey: .distanceCulling) ?? true
+        gpuOcclusion = try values.decodeIfPresent(Bool.self, forKey: .gpuOcclusion) ?? false
     }
 }
 
@@ -55,10 +70,20 @@ public struct Mesh3DRenderSource: Sendable {
     ) {
         self.previousTransform = previousTransform ?? transform
         self.drawPass = drawPass
-        self.entity = entity; self.mesh = mesh; self.materials = materials; self.transform = transform; self.bounds = bounds
-        self.alternatives = alternatives; self.thresholds = thresholds; self.hysteresis = hysteresis
-        self.maximumDistance = maximumDistance; self.fadeDistance = fadeDistance; self.forceVisible = forceVisible
-        self.castShadows = castShadows; self.receiveShadows = receiveShadows; self.skinningBuffer = skinningBuffer
+        self.entity = entity
+        self.mesh = mesh
+        self.materials = materials
+        self.transform = transform
+        self.bounds = bounds
+        self.alternatives = alternatives
+        self.thresholds = thresholds
+        self.hysteresis = hysteresis
+        self.maximumDistance = maximumDistance
+        self.fadeDistance = fadeDistance
+        self.forceVisible = forceVisible
+        self.castShadows = castShadows
+        self.receiveShadows = receiveShadows
+        self.skinningBuffer = skinningBuffer
     }
 }
 
@@ -93,19 +118,7 @@ public final class Render3DVisibilityStatistics: Resource, Sendable {
 /// Metal/D3D clip convention: -W<=X,Y<=W, 0<=Z<=W. Conservative world-AABB rejection.
 public enum MeshVisibility3DMath {
     public static func intersects(_ bounds: AABB, viewProjection: Transform3D) -> Bool {
-        let row0 = viewProjection.row(at: 0), row1 = viewProjection.row(at: 1)
-        let row2 = viewProjection.row(at: 2), row3 = viewProjection.row(at: 3)
-        // Keeping uncertain bounds is safer than dropping geometry.
-        if !bounds.center.x.isFinite || !bounds.center.y.isFinite || !bounds.center.z.isFinite {
-            return true
-        }
-        for plane in [row3 + row0, row3 - row0, row3 + row1, row3 - row1, row2, row3 - row2] {
-            let radius = abs(plane.x) * bounds.halfExtents.x + abs(plane.y) * bounds.halfExtents.y + abs(plane.z) * bounds.halfExtents.z
-            if plane.xyz.dot(bounds.center) + plane.w + radius < -0.0001 {
-                return false
-            }
-        }
-        return true
+        MeshVisibilityFrustum3D(viewProjection: viewProjection).intersects(bounds)
     }
 
     public static func transformed(_ bounds: AABB, by matrix: Transform3D) -> AABB {
@@ -132,17 +145,43 @@ public enum MeshVisibility3DMath {
 
     public static func selectLOD(size: Float, thresholds: [Float], levels: Int, previous: Int?, hysteresis: Float) -> Int {
         guard levels > 1, thresholds.count >= levels - 1,
-              thresholds.prefix(levels - 1).allSatisfy({ $0.isFinite && $0 > 0 })
+            thresholds.prefix(levels - 1).allSatisfy({ $0.isFinite && $0 > 0 })
         else {
             return 0
         }
-        for index in 1 ..< (levels - 1) where thresholds[index] >= thresholds[index - 1] {
+        for index in 1..<(levels - 1) where thresholds[index] >= thresholds[index - 1] {
             return 0
         }
         var level = min(max(previous ?? 0, 0), levels - 1)
-        let margin = finiteRenderValue(hysteresis, fallback: 0.15, range: 0 ... 0.4)
+        let margin = finiteRenderValue(hysteresis, fallback: 0.15, range: 0...0.4)
         while level < levels - 1 && size < thresholds[level] * (1 - (previous == nil ? 0 : margin)) { level += 1 }
         while level > 0 && size > thresholds[level - 1] * (1 + (previous == nil ? 0 : margin)) { level -= 1 }
         return level
+    }
+}
+
+/// Prepares the six planes once per view/pass instead of allocating them for every mesh.
+public struct MeshVisibilityFrustum3D: Sendable {
+    private let planes: [Vector4]
+
+    public init(viewProjection: Transform3D) {
+        let row0 = viewProjection.row(at: 0)
+        let row1 = viewProjection.row(at: 1)
+        let row2 = viewProjection.row(at: 2)
+        let row3 = viewProjection.row(at: 3)
+        planes = [row3 + row0, row3 - row0, row3 + row1, row3 - row1, row2, row3 - row2]
+    }
+
+    public func intersects(_ bounds: AABB) -> Bool {
+        if !bounds.center.x.isFinite || !bounds.center.y.isFinite || !bounds.center.z.isFinite {
+            return true
+        }
+        for plane in planes {
+            let radius = abs(plane.x) * bounds.halfExtents.x + abs(plane.y) * bounds.halfExtents.y + abs(plane.z) * bounds.halfExtents.z
+            if plane.xyz.dot(bounds.center) + plane.w + radius < -0.0001 {
+                return false
+            }
+        }
+        return true
     }
 }

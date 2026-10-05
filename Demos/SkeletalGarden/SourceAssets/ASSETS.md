@@ -29,3 +29,18 @@ The robot runtime profile now includes rotation-only derivatives of the original
 ## Static LOD assets
 
 The landscape generator joins the original tree geometry at the common root pivot before export, then uses deterministic Blender decimation (0.55/0.27 ratios). TreeLOD1/2 and RockLOD1/2 retain the base material ordering and identity node transform. Actual triangle counts are Tree 96/51/23 and Rock 80/44/20. The Khronos validator reported zero errors and zero warnings on all six files. Terrain LOD is demo-native geometry with unchanged boundary samples and three interior resolutions; runtime physics retains full resolution.
+
+## Robot mesh LODs
+
+`GardenRobotLOD1.glb` and `GardenRobotLOD2.glb` are index-only CC0 derivatives
+of the prepared `GardenRobot.glb`. Meshoptimizer 1.2.0 simplifies each triangle
+primitive while preserving all original vertex attributes, skin joint order,
+inverse binds, node transforms, animations and material indices. No Blender
+re-export or mesh compression is used for this legacy FBX rig. Normals, weights
+and weighted joint indices influence simplification; the resulting meshes keep
+the original vertices and use fewer indices. LOD0/1/2 have 3237/2711/1491 triangles.
+
+Reproduce with `Tools/3DAssets/generate_robot_lods.mjs`; its header lists the
+pinned temporary npm install command. `robot-lods.json` records source SHA-256,
+error limits and counts. Runtime interpolation and GPU skinning still use the
+same instance-local palette. Character-controller collision remains unchanged.

@@ -7,10 +7,16 @@
 
 #if WEBGPU_ENABLED && canImport(WebGPU)
     import AdaUtils
+    import Foundation
     import Synchronization
     @unsafe @preconcurrency import WebGPU
 
     final class WGPURenderPipeline: RenderPipeline, @unchecked Sendable {
+        let bindingKinds: [[Int: WGPUBindingKind]]
+        // Cache ownership is protected by this lock. NSLock avoids transferring
+        // the non-Sendable vendor handles across a Mutex sending boundary.
+        private let bindingLock = NSLock()
+        private var bindingCache = BoundedResourceCache<WGPUBindGroupKey, WebGPU.GPUBindGroup>(capacity: 512)
         let vertexBufferSlots: [Int: UInt32]
         let descriptor: RenderPipelineDescriptor
         let renderPipeline: WebGPU.GPURenderPipeline
@@ -26,6 +32,16 @@
             let fragmentState = Self.makeFragmentState(from: descriptor)
             let depthStencilState = Self.makeDepthStencilState(from: descriptor)
 
+            var reflection = ShaderReflectionData()
+            reflection.merge(descriptor.vertex.reflectionData)
+            if let fragment = descriptor.fragment { reflection.merge(fragment.reflectionData) }
+            self.bindingKinds = reflection.descriptorSets.map { set in
+                var kinds: [Int: WGPUBindingKind] = [:]
+                for binding in set.uniformsBuffers.keys { kinds[binding] = .uniformBuffer }
+                for binding in set.sampledImages.keys { kinds[binding] = .texture }
+                for binding in set.samplers.keys { kinds[binding] = .sampler }
+                return kinds
+            }
             self.descriptor = descriptor
             let topology = descriptor.primitive.toWebGPU
             let stripIndexFormat: WebGPU.GPUIndexFormat = (topology == .triangleStrip || topology == .lineStrip) ? .uint32 : .undefined
@@ -34,7 +50,7 @@
                 entryPoint: vertex.entryPoint,
                 buffers: vertexBuffers
             )
-            let frontFace: WebGPU.GPUFrontFace = descriptor.frontFaceWinding == .clockwise ? .CW : .CCW
+            let frontFace: WebGPU.GPUFrontFace = descriptor.frontFaceWinding == .counterClockwise ? .CCW : .CW
             #if WASM
                 let primitiveState = WebGPU.GPUPrimitiveState(
                     topology: topology,
@@ -64,7 +80,7 @@
                             depthStencil: depthStencilState,
                             multisample: WebGPU.GPUMultisampleState(
                                 count: 1,
-                                mask: ~0,
+                                mask: 1,  // One active sample; avoid a negative Int crossing the JS unsigned-long boundary.
                                 alphaToCoverageEnabled: false
                             ),
                             fragment: fragmentState
@@ -80,7 +96,7 @@
                             depthStencil: depthStencilState,
                             multisample: WebGPU.GPUMultisampleState(
                                 count: 1,
-                                mask: ~0,
+                                mask: 1,  // One active sample; avoid a negative Int crossing the JS unsigned-long boundary.
                                 alphaToCoverageEnabled: false
                             ),
                             fragment: fragmentState,
@@ -88,6 +104,12 @@
                         )
                     )
                 #endif
+            }
+        }
+
+        func cachedBindGroup(key: WGPUBindGroupKey, owners: [AnyObject], create: () -> WebGPU.GPUBindGroup?) -> WebGPU.GPUBindGroup? {
+            bindingLock.withLock {
+                bindingCache.value(for: key, owners: owners, create: create)
             }
         }
 
@@ -143,9 +165,9 @@
             descriptor.fragment.map { shader in
                 let wgpuShader = (shader.compiledShader as? WGPUShader).unwrap(message: "Fragment shader is not a WGPUShader")
                 #if WASM
-                let constants: [String: Double] = [:]
+                    let constants: [String: Double] = [:]
                 #else
-                let constants: [WebGPU.GPUConstantEntry] = []
+                    let constants: [WebGPU.GPUConstantEntry] = []
                 #endif
                 return WebGPU.GPUFragmentState(
                     module: wgpuShader.shader,
@@ -180,11 +202,11 @@
             descriptor.depthStencilDescriptor.map { depthDesc in
                 let stencilOp = depthDesc.stencilOperationDescriptor
                 #if WASM
-                let depthWrite = depthDesc.isDepthWriteEnabled
-                let stencilMask = -1
+                    let depthWrite = depthDesc.isDepthWriteEnabled
+                    let stencilMask = 0xff  // All bits of an 8-bit stencil attachment, within BridgeJS signed Int range.
                 #else
-                let depthWrite: WebGPU.GPUOptionalBool = depthDesc.isDepthWriteEnabled ? .true : .false
-                let stencilMask = UInt32.max
+                    let depthWrite: WebGPU.GPUOptionalBool = depthDesc.isDepthWriteEnabled ? .true : .false
+                    let stencilMask = UInt32.max
                 #endif
                 return WebGPU.GPUDepthStencilState(
                     format: descriptor.depthPixelFormat.toWebGPU,

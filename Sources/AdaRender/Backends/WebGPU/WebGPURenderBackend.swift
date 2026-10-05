@@ -189,7 +189,10 @@
                         unsafe text.withCString { unsafe ada_android_log($0) }
                     }
                     #else
-                    descriptor.uncapturedErrorCallbackInfo.callback = nil
+                    descriptor.uncapturedErrorCallbackInfo.callback = { _, type, message, _, _ in
+                        let text = "WebGPU error \(type.rawValue): \(message.toString)\n"
+                        FileHandle.standardError.write(Data(text.utf8))
+                    }
                     #endif
                     descriptor.uncapturedErrorCallbackInfo.userdata1 = nil
                     descriptor.uncapturedErrorCallbackInfo.userdata2 = nil

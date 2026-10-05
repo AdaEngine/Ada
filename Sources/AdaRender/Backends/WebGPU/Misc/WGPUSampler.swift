@@ -22,7 +22,12 @@
         var toWebGPU: WebGPU.GPUAddressMode {
             switch self {
             case .clampToEdge: return .clampToEdge
-            case .repeat: return .repeat
+            case .repeat:
+                #if WASM
+                    return .repeatMode
+                #else
+                    return .repeat
+                #endif
             case .mirroredRepeat: return .mirrorRepeat
             }
         }

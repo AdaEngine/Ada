@@ -60,6 +60,9 @@ public protocol RenderDevice: AnyObject, Sendable {
     /// Creates an independent temporal history for fixed input/output sizes, or nil when unavailable.
     func createTemporalUpscaler(inputSize: SizeInt, outputSize: SizeInt) -> (any TemporalUpscaler)?
 
+    /// Creates a per-camera GPU occlusion processor, or nil for the CPU visibility fallback.
+    func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)?
+
     // MARK: - Buffers
 
     /// Create a new GPU buffer with specific length and options.
@@ -117,6 +120,7 @@ public protocol Drawable: AnyObject, Sendable {
 }
 
 extension RenderDevice {
+    public func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? { nil }
     public var supportsSpatialUpscaling: Bool { false }
     public var supportsTemporalUpscaling: Bool { false }
     public func createTemporalUpscaler(inputSize _: SizeInt, outputSize _: SizeInt) -> (any TemporalUpscaler)? { nil }

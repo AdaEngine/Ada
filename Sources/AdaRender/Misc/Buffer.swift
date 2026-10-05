@@ -5,6 +5,8 @@
 //  Created by v.prusakov on 11/4/21.
 //
 
+import Foundation
+
 /// This protocol describe buffer created for GPU usage.
 public protocol Buffer: AnyObject, Sendable {
     /// A string that identifies the resource.
@@ -23,6 +25,10 @@ public protocol Buffer: AnyObject, Sendable {
     ///
     /// - Returns: A pointer to the shared copy of the buffer data, or NULL for buffers allocated with a private resource storage mode
     func contents() -> UnsafeMutableRawPointer
+
+    /// Copies CPU-readable buffer storage after prior GPU writes have completed.
+    /// Backend implementations may stage and asynchronously map GPU-only memory.
+    func readData() async throws -> Data
 
     /// Unmap the buffer's storage.
     func unmap()
@@ -50,6 +56,10 @@ public struct BufferMapMode: OptionSet, Sendable {
 }
 
 extension Buffer {
+    public func readData() async throws -> Data {
+        unsafe Data(bytes: contents(), count: length)
+    }
+
     // func map(mode: BufferMapMode = [.write, .read], offset: Int = 0, size: Int = Int.max, block: @escaping @Sendable (Result<UnsafeMutableRawPointer, Error>) -> Void) {
     //     unsafe self.map(mode: mode, offset: offset, size: size, block: block)
     // }

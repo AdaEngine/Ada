@@ -1,5 +1,6 @@
 import AdaEngine
 @_spi(Internal) @testable import AdaRender
+import Foundation
 import Testing
 
 @MainActor
@@ -55,6 +56,40 @@ struct PBR3DSceneTests {
         #expect(ibl.radiance != nil)
         #expect(ibl.irradiance.sampler.descriptor.addressModeU == .repeat)
         #expect(ibl.brdf.sampler.descriptor.addressModeU == .clampToEdge)
+    }
+
+    @Test(arguments: [
+        (UInt16(0x0000), true), (0x8000, true), // Both signs of zero.
+        (0x0001, true), (0x03FF, true), (0x0400, true), (0x3C00, true), (0x7BFF, true),
+        (0x8001, false), (0x83FF, false), (0x8400, false), (0xBC00, false), (0xFBFF, false),
+        (0x7C00, false), (0xFC00, false), // Infinities.
+        (0x7C01, false), (0x7E00, false), (0xFC01, false), (0xFE00, false), // NaNs.
+    ])
+    func hdrIBLValidatesBinary16Radiance(bits: UInt16, isValid: Bool) throws {
+        try setup()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let data = Data([UInt8(truncatingIfNeeded: bits), UInt8(bits >> 8), 0, 0, 0, 0, 0, 0])
+        try data.write(to: directory.appendingPathComponent("map.rgba16f"))
+        try (data + data).write(to: directory.appendingPathComponent("specular.rgba16f"))
+        let manifest = """
+        {"version":1,"specularLevels":2,
+         "radiance":{"file":"map.rgba16f","width":1,"height":1},
+         "irradiance":{"file":"map.rgba16f","width":1,"height":1},
+         "specular":{"file":"specular.rgba16f","width":1,"height":2},
+         "brdf":{"file":"map.rgba16f","width":1,"height":1}}
+        """
+        let url = directory.appendingPathComponent("Test.ibl")
+        try Data(manifest.utf8).write(to: url)
+        if isValid {
+            let ibl = try #require(AssetsManager.loadSync(ImageBasedLighting3D.self, at: url.path).asset)
+            #expect(ibl.radiance != nil)
+        } else {
+            #expect(throws: AssetError.self) {
+                try AssetsManager.loadSync(ImageBasedLighting3D.self, at: url.path)
+            }
+        }
     }
 
     @Test

@@ -3,7 +3,7 @@ import AdaRender
 import Math
 
 /// Per-draw material parameters; vertex instance data retains color and metal/rough factors.
-public struct PBR3DUniform: Sendable {
+public struct PBR3DUniform: Sendable, Equatable {
     public let emissiveFactor: Vector4
     public let properties: Vector4
     public let flags: Vector4
@@ -28,7 +28,7 @@ public struct PBR3DUniform: Sendable {
 /// Reuses triple-buffered material uniforms and prunes entries after material removal.
 public struct PBR3DUniforms: Resource {
     public static let binding = 15
-    private struct Entry { var buffers: [(any UniformBuffer)?]; var frame: Int }
+    private struct Entry { var buffers: [(any UniformBuffer)?]; var uploaded: [PBR3DUniform?]; var frame: Int }
     private var entries: [ObjectIdentifier: Entry] = [:]
     private var currentIndex = 0
     private var frame = 0
@@ -44,10 +44,13 @@ public struct PBR3DUniforms: Resource {
 
     public mutating func write(material: Material, descriptor: VertexDescriptor, device: RenderDevice) {
         let key = ObjectIdentifier(material)
-        var entry = entries[key] ?? Entry(buffers: Array(repeating: nil, count: count), frame: frame)
+        var entry = entries[key] ?? Entry(buffers: Array(repeating: nil, count: count), uploaded: Array(repeating: nil, count: count), frame: frame)
         if entry.buffers[currentIndex] == nil { entry.buffers[currentIndex] = device.createUniformBuffer(PBR3DUniform.self, binding: Self.binding) }
         let uniform = PBR3DUniform(material: material as? PBRMaterial, descriptor: descriptor)
-        entry.buffers[currentIndex]?.setData(uniform)
+        if entry.uploaded[currentIndex] != uniform {
+            entry.buffers[currentIndex]?.setData(uniform)
+            entry.uploaded[currentIndex] = uniform
+        }
         entry.frame = frame
         entries[key] = entry
     }

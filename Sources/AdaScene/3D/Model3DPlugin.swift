@@ -96,9 +96,14 @@ func ExtractModel3D(
     instances.beginFrame()
     skinningUniforms.wrappedValue.beginFrame(device: renderDevice.renderDevice)
     skins.wrappedValue.forEach { entity, skin in
-        _ = skinningUniforms.wrappedValue.write(skin.matrices, for: entity.id, device: renderDevice.renderDevice)
+        _ = skinningUniforms.wrappedValue.write(skin.matrices, for: entity.id, device: renderDevice.renderDevice, revision: .init(id: skin.paletteID, generation: skin.poseGeneration))
         if let mesh = entity.components[Mesh3DComponent.self]?.mesh {
-            posedBounds[entity.id] = animatedBounds.wrappedValue.bounds(mesh: mesh, matrices: skin.matrices)
+            let lod = lodByEntity[entity.id]
+            let meshes = lod?.skeletonCompatible == true ? [mesh] + (lod?.alternatives ?? []) : [mesh]
+            let bounds = meshes.count > 1
+                ? animatedBounds.wrappedValue.bounds(meshes: meshes, matrices: skin.matrices)
+                : animatedBounds.wrappedValue.bounds(mesh: mesh, matrices: skin.matrices)
+            posedBounds[entity.id] = bounds
         }
     }
     materialUniforms.wrappedValue.beginFrame()
@@ -132,7 +137,7 @@ func ExtractModel3D(
             materials: mesh3d.materials,
             transform: transform.matrix,
             bounds: localBounds.map { MeshVisibility3DMath.transformed($0, by: transform.matrix) },
-            alternatives: palette == nil ? lod?.alternatives ?? [] : [],
+            alternatives: palette == nil || lod?.skeletonCompatible == true && localBounds != nil ? lod?.alternatives ?? [] : [],
             thresholds: lod?.screenThresholds ?? [],
             hysteresis: lod?.hysteresis ?? 0.15,
             maximumDistance: lod?.maximumDistance,
@@ -315,6 +320,8 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
         )
         renderEncoder.setVertexBuffer(defaultVertexData, offset: 0, slot: 4)
         renderEncoder.setIndexBuffer(part.indexBuffer, offset: 0)
+        if !isMotion, let offset = item.indirectArgumentOffset, let arguments = active?.indirectArguments,
+           renderEncoder.drawIndexedIndirect(arguments: arguments, offset: offset) { return }
         renderEncoder.drawIndexed(
             indexCount: part.indexCount,
             indexBufferOffset: 0,

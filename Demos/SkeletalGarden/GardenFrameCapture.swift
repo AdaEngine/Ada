@@ -129,11 +129,22 @@ import AdaEngine
                 try JSONEncoder().encode(summary).write(to: state.directory.appendingPathComponent("motion-\(state.frame).json"))
                 gardenLog("[SkeletalGarden] motion frame=\(state.frame) moving=\(movingPixels) nonfinite=\(nonfinitePixels) maxPixels=\(maximumPixels)")
             }
+            if let output = context.world.getResource(GPUVisibility3DState.self)?.output(for: current.components[ExtractedCameraSource.self]?.entityId ?? current.id) {
+                let arguments = try await output.arguments.readData()
+                var activeDraws = 0, instances = 0
+                for offset in stride(from: 0, to: output.drawCount * 20, by: 20) {
+                    let count = arguments.withUnsafeBytes { unsafe $0.loadUnaligned(fromByteOffset: offset + 4, as: UInt32.self) }
+                    if count > 0 { activeDraws += 1; instances += Int(count) }
+                }
+                let result = ["activeDraws": activeDraws, "visibleInstances": instances]
+                try JSONEncoder().encode(result).write(to: state.directory.appendingPathComponent("gpu-visibility-\(state.frame).json"))
+                gardenLog("[SkeletalGarden] GPU visibility \(result)")
+            }
+            let readback = try await buffer.readData()
             var bytes = Data()
             bytes.reserveCapacity(rowBytes * height)
-            let pointer = unsafe buffer.contents()
             for row in 0 ..< height {
-                bytes.append(unsafe Data(bytes: pointer.advanced(by: row * alignedRowBytes), count: rowBytes))
+                bytes.append(readback[(row * alignedRowBytes)..<(row * alignedRowBytes + rowBytes)])
             }
             let image = Image(width: width, height: height, data: bytes, format: .bgra8)
             try FileManager.default.createDirectory(at: state.directory, withIntermediateDirectories: true)

@@ -139,7 +139,8 @@ public final class ShaderCompiler {
         let version = self.getShaderVersion(for: stage)
         let hasChanges = ShaderCache.hasChanges(for: self.shaderSource, stage: stage, version: version)
         if !hasChanges {
-            if let deviceCompiledShader = ShaderCache.getCachedDeviceCompiledShader(for: self.shaderSource, stage: stage) {
+            if let deviceCompiledShader = ShaderCache.getCachedDeviceCompiledShader(for: self.shaderSource, stage: stage),
+               deviceCompiledShader.language == (unsafe RenderEngine.shared.type.deviceLang) {
                 return try Shader.make(from: deviceCompiledShader, entryPoint: deviceCompiledShader.entryPoints.first?.name ?? "", stage: stage)
             }
         }
@@ -175,7 +176,7 @@ public final class ShaderCompiler {
 
         let binary = try self.compileSpirvBin(for: stage, ignoreCache: hasChanges)
 
-        #if canImport(WebGPU)
+        #if canImport(WebGPU) && os(Android)
             if unsafe RenderEngine.shared.type.deviceLang == .wgsl {
                 let shader = try Shader(spirv: binary, compiler: self)
                 let spirvCompiler = try SpirvCompiler(spriv: binary.data, stage: stage, deviceLang: .glsl)

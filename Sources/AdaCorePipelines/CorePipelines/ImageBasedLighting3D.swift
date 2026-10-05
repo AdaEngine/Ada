@@ -49,8 +49,11 @@ public struct ImageBasedLighting3D: Asset, Sendable {
             guard data.count == map.width * map.height * 8 else { throw AssetError.message("Invalid IBL map byte count") }
             for offset in stride(from: 0, to: data.count, by: 2) {
                 let bits = UInt16(data[offset]) | UInt16(data[offset + 1]) << 8
-                let value = Float16(bitPattern: bits)
-                guard value.isFinite, value >= 0 else { throw AssetError.message("IBL contains invalid radiance") }
+                // Validate IEEE 754 binary16 directly; Float16 is unavailable on Intel macOS.
+                // An all-ones exponent is nonfinite. Accept either sign of zero.
+                guard bits & 0x7C00 != 0x7C00, bits & 0x8000 == 0 || bits & 0x7FFF == 0 else {
+                    throw AssetError.message("IBL contains invalid radiance")
+                }
             }
             let texture = Texture2D(descriptor: TextureDescriptor(
                 width: map.width,

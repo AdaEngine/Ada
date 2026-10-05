@@ -1500,6 +1500,35 @@ private func mainJS(product: String) -> String {
       const requiredFeatures = optionalFeatures.filter((feature) => adapter.features.has(feature));
       updateLoader(64, "Creating WebGPU device…");
       const device = await adapter.requestDevice({ requiredFeatures });
+      if (new URLSearchParams(location.search).has("stats")) {
+        const panel = document.createElement("output");
+        panel.id = "ada-performance";
+        panel.style.cssText = "position:fixed;right:12px;top:12px;padding:8px;background:#111c;color:#fff;font:14px monospace;z-index:10000;pointer-events:none";
+        document.body.append(panel);
+        let frames = 0, start = performance.now();
+        const samples = [];
+        const original = GPUCanvasContext.prototype.getCurrentTexture;
+        GPUCanvasContext.prototype.getCurrentTexture = function() { frames++; return original.call(this); };
+        setInterval(() => {
+          const now = performance.now(), seconds = (now - start) / 1000;
+          if (frames > 0) {
+            const fps = frames / seconds;
+            samples.push(fps);
+            panel.textContent = fps.toFixed(1) + " FPS · " + (1000 / fps).toFixed(1) + " ms/frame";
+            panel.dataset.samples = JSON.stringify(samples.slice(-12));
+          }
+          frames = 0; start = now;
+        }, 2000);
+      }
+
+      const reportedGPUErrors = new Set();
+      device.addEventListener("uncapturederror", (event) => {
+        const message = event.error.message;
+        if (!reportedGPUErrors.has(message)) {
+          reportedGPUErrors.add(message);
+          console.error("[AdaWebGPU] " + message);
+        }
+      });
       globalThis.__adaWebGPUAdapter = adapter;
       globalThis.__adaWebGPUDevice = device;
 

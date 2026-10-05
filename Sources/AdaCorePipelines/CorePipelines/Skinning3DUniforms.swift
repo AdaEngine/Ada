@@ -1,6 +1,17 @@
 import AdaECS
 import AdaRender
+import Foundation
 import Math
+
+/// Stable identity plus a component-owned update counter, including component replacement.
+public struct SkinningPoseRevision: Sendable, Equatable {
+    public let id: UUID
+    public let generation: UInt64
+    public init(id: UUID, generation: UInt64) {
+        self.id = id
+        self.generation = generation
+    }
+}
 
 /// Reused, frame-buffered joint palettes shared by the main and shadow passes.
 public struct Skinning3DUniforms: Resource {
@@ -11,6 +22,9 @@ public struct Skinning3DUniforms: Resource {
         var frame: Int
         var previousBuffers: [(any UniformBuffer)?]
         var matrices: [Transform3D]
+        var revision: SkinningPoseRevision?
+        var uploaded: [SkinningPoseRevision?]
+        var previousUploaded: [SkinningPoseRevision?]
     }
     private var entries: [Entity.ID: Entry] = [:]
     private var frame = 0
@@ -50,27 +64,46 @@ public struct Skinning3DUniforms: Resource {
     }
 
     public mutating func write(_ matrices: [Transform3D], for entity: Entity.ID, device: RenderDevice) -> (any UniformBuffer)? {
+        write(matrices, for: entity, device: device, revision: nil)
+    }
+
+    /// Reuses unchanged GPU palette uploads while keeping current/previous frame histories separate.
+    public mutating func write(_ matrices: [Transform3D], for entity: Entity.ID, device: RenderDevice, revision: SkinningPoseRevision?) -> (any UniformBuffer)? {
         guard !matrices.isEmpty, matrices.count <= Self.maximumJoints else {
             return nil
         }
-        var entry = entries[entity] ?? Entry(
-            buffers: Array(repeating: nil, count: bufferCount),
-            frame: frame,
-            previousBuffers: Array(repeating: nil, count: bufferCount),
-            matrices: matrices
-        )
+        var entry =
+            entries[entity]
+            ?? Entry(
+                buffers: Array(repeating: nil, count: bufferCount),
+                frame: frame,
+                previousBuffers: Array(repeating: nil, count: bufferCount),
+                matrices: matrices,
+                revision: revision,
+                uploaded: Array(repeating: nil, count: bufferCount),
+                previousUploaded: Array(repeating: nil, count: bufferCount)
+            )
         if entry.previousBuffers[currentIndex] == nil {
             entry.previousBuffers[currentIndex] = device.createUniformBuffer(Transform3D.self, count: Self.maximumJoints, binding: 24)
         }
-        let previous = entry.matrices.count == matrices.count ? entry.matrices : matrices
-        for index in upload.indices { upload[index] = index < previous.count ? previous[index] : .identity }
-        entry.previousBuffers[currentIndex]?.setElements(&upload)
+        let compatible = entry.matrices.count == matrices.count && entry.revision?.id == revision?.id
+        let previous = compatible ? entry.matrices : matrices
+        let previousRevision = compatible ? entry.revision : revision
+        if revision == nil || entry.previousUploaded[currentIndex] != previousRevision {
+            for index in upload.indices { upload[index] = index < previous.count ? previous[index] : .identity }
+            entry.previousBuffers[currentIndex]?.setElements(&upload)
+            entry.previousUploaded[currentIndex] = previousRevision
+        }
         entry.matrices = matrices
+        entry.revision = revision
         if entry.buffers[currentIndex] == nil {
             entry.buffers[currentIndex] = device.createUniformBuffer(Transform3D.self, count: Self.maximumJoints, binding: Self.binding)
         }
-        for index in upload.indices { upload[index] = index < matrices.count ? matrices[index] : .identity }
-        entry.buffers[currentIndex]?.setElements(&upload)
+        if revision == nil || entry.uploaded[currentIndex] != revision {
+            for index in upload.indices { upload[index] = index < matrices.count ? matrices[index] : .identity }
+            entry.buffers[currentIndex]?.setElements(&upload)
+            entry.uploaded[currentIndex] = revision
+        }
         entry.frame = frame
         entries[entity] = entry
         return entry.buffers[currentIndex]

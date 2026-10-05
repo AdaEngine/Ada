@@ -147,6 +147,8 @@ Android export/run also supports Swift AdaEngine App projects, ADB device discov
 AVD boot, per-project debug signing and toolbar Run/Stop. Physical devices require
 authorized USB debugging; host-side export remains standalone macOS only. See
 [Android.md](Documentation/Android.md) for setup and verification scope.
+Android startup is generated from a top-level, nongeneric `@main App` in the
+export copy; private types and explicit target source lists are supported.
 
 Standalone macOS Studio includes `Contents/MacOS/adastudio` and a bundled source
 build SDK. The CLI dispatches before app/UI startup and reuses project inspection,

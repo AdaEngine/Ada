@@ -1,7 +1,7 @@
 import AdaEngine
 
 @MainActor
-func makeGardenLandscape(in world: World, device: RenderDevice) throws {
+func makeGardenLandscape(in world: World, device: RenderDevice) async throws {
     let terrain = GardenTerrain()
     let grass = PBRMaterial()
     grass.baseColorFactor = .one
@@ -23,11 +23,11 @@ func makeGardenLandscape(in world: World, device: RenderDevice) throws {
             }
         }
     }
-    let tree = try landscapeModel("Tree")
-    let rock = try landscapeModel("Rock")
-    let tuft = try landscapeModel("Grass")
-    let treeLODs = try [landscapeModel("TreeLOD1"), landscapeModel("TreeLOD2")]
-    let rockLODs = try [landscapeModel("RockLOD1"), landscapeModel("RockLOD2")]
+    let tree = try await landscapeModel("Tree")
+    let rock = try await landscapeModel("Rock")
+    let tuft = try await landscapeModel("Grass")
+    let treeLODs = [try await landscapeModel("TreeLOD1"), try await landscapeModel("TreeLOD2")]
+    let rockLODs = [try await landscapeModel("RockLOD1"), try await landscapeModel("RockLOD2")]
     var random = GardenRandom()
     var trees = 0, rocks = 0, grasses = 0
     for row in -4...4 {
@@ -76,20 +76,20 @@ func makeGardenLandscape(in world: World, device: RenderDevice) throws {
         )
         grasses += 1
     }
-    try makeGardenLandmarks(in: world, terrain: terrain, device: device)
+    try await makeGardenLandmarks(in: world, terrain: terrain, device: device)
     gardenLog("[SkeletalGarden] landscape 48x48m, \(terrain.indices.count / 3) terrain triangles; \(trees) trees, \(rocks) rocks, \(grasses) grass tufts")
 }
 
 @MainActor
-private func landscapeModel(_ name: String) throws -> ModelAsset3D {
-    guard let model = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/\(name).glb", from: gardenBundle).asset else {
+private func landscapeModel(_ name: String) async throws -> ModelAsset3D {
+    guard let model = (try await AssetsManager.load(ModelAsset3D.self, at: "Assets/\(name).glb", from: gardenBundle)).asset else {
         throw AssetError.message("Missing landscape asset \(name)")
     }
     return model
 }
 
 @MainActor
-private func makeGardenLandmarks(in world: World, terrain: GardenTerrain, device: RenderDevice) throws {
+private func makeGardenLandmarks(in world: World, terrain: GardenTerrain, device: RenderDevice) async throws {
     let stone = PBRMaterial()
     stone.baseColorFactor = [0.39, 0.38, 0.31, 1]
     stone.roughnessFactor = 0.85
@@ -119,8 +119,8 @@ private func makeGardenLandmarks(in world: World, terrain: GardenTerrain, device
         gardenBlock(in: world, name: "Garden gateway", position: [x, 1.9, 6], size: [0.42, 3.8, 0.42], material: stone, device: device)
     }
     gardenBlock(in: world, name: "Gateway lintel", position: [0, 3.9, 6], size: [3.8, 0.4, 0.7], material: stone, device: device)
-    let bench = try landscapeModel("Bench")
-    let plant = try landscapeModel("Plant")
+    let bench = try await landscapeModel("Bench")
+    let plant = try await landscapeModel("Plant")
     for (x, z): (Float, Float) in [(-13, 10), (10, -12), (-8, -6.5)] {
         let y = terrain.surfaceHeight(x: x, z: z)
         let root = bench.instantiate(in: world)

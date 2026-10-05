@@ -65,7 +65,7 @@ public enum ShaderResource {
     public struct Sampler: Codable, Sendable {
         public let name: String
         public let binding: Int
-        public let shaderStage: ShaderStageFlags
+        public internal(set) var shaderStage: ShaderStageFlags
     }
 
     /// Describe reflected texture information.
@@ -75,7 +75,7 @@ public enum ShaderResource {
         public let textureType: Texture.TextureType
         public let descriptorSet: Int
         public let arraySize: Int
-        public let shaderStage: ShaderStageFlags
+        public internal(set) var shaderStage: ShaderStageFlags
         public let resourceAccess: ResourceAccess
     }
 
@@ -83,7 +83,7 @@ public enum ShaderResource {
     public struct ShaderBuffer: Codable, Sendable {
         public let name: String
         public let size: Int
-        public let shaderStage: ShaderStageFlags
+        public internal(set) var shaderStage: ShaderStageFlags
         public let binding: Int
         public let resourceAccess: ResourceAccess
 
@@ -231,8 +231,6 @@ public struct ShaderReflectionData: Codable, Sendable {
 }
 
 extension ShaderReflectionData {
-    // FIXME: We should merge descriptor sets
-
     /// Merge one ``ShaderReflectionData`` into another.
     public mutating func merge(_ data: ShaderReflectionData) {
         self.shaderBuffers.merge(data.shaderBuffers) { existing, new in
@@ -273,10 +271,26 @@ extension ShaderReflectionData {
             for (index, descriptorSet) in data.descriptorSets.enumerated() {
                 var mergedSet = self.descriptorSets[index]
 
-                mergedSet.uniformsBuffers.merge(descriptorSet.uniformsBuffers) { _, new in return new }
-                mergedSet.constantBuffers.merge(descriptorSet.constantBuffers) { _, new in return new }
-                mergedSet.sampledImages.merge(descriptorSet.sampledImages) { _, new in return new }
-                mergedSet.samplers.merge(descriptorSet.samplers) { _, new in return new }
+                mergedSet.uniformsBuffers.merge(descriptorSet.uniformsBuffers) { existing, new in
+                    var merged = new
+                    merged.shaderStage.formUnion(existing.shaderStage)
+                    return merged
+                }
+                mergedSet.constantBuffers.merge(descriptorSet.constantBuffers) { existing, new in
+                    var merged = new
+                    merged.shaderStage.formUnion(existing.shaderStage)
+                    return merged
+                }
+                mergedSet.sampledImages.merge(descriptorSet.sampledImages) { existing, new in
+                    var merged = new
+                    merged.shaderStage.formUnion(existing.shaderStage)
+                    return merged
+                }
+                mergedSet.samplers.merge(descriptorSet.samplers) { existing, new in
+                    var merged = new
+                    merged.shaderStage.formUnion(existing.shaderStage)
+                    return merged
+                }
 
                 self.descriptorSets[index] = mergedSet
             }

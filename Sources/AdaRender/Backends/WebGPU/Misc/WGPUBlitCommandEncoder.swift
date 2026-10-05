@@ -58,13 +58,13 @@
                     source: WebGPU.GPUTexelCopyTextureInfo(
                         texture: src.texture,
                         mipLevel: UInt32(sourceMipLevel),
-                        origin: WebGPU.GPUOrigin3D(x: UInt32(sourceOrigin.x), y: UInt32(sourceOrigin.y), z: UInt32(sourceOrigin.z)),
+                        origin: WebGPU.GPUOrigin3D(x: .init(sourceOrigin.x), y: .init(sourceOrigin.y), z: .init(sourceOrigin.z)),
                         aspect: WebGPU.GPUTextureAspect.all
                     ),
                     destination: WebGPU.GPUTexelCopyTextureInfo(
                         texture: dst.texture,
                         mipLevel: UInt32(destinationMipLevel),
-                        origin: WebGPU.GPUOrigin3D(x: UInt32(destinationOrigin.x), y: UInt32(destinationOrigin.y), z: UInt32(destinationOrigin.z)),
+                        origin: WebGPU.GPUOrigin3D(x: .init(destinationOrigin.x), y: .init(destinationOrigin.y), z: .init(destinationOrigin.z)),
                         aspect: WebGPU.GPUTextureAspect.all
                     ),
                     copySize: WebGPU.GPUExtent3D(
@@ -128,7 +128,7 @@
                 destination: WebGPU.GPUTexelCopyTextureInfo(
                     texture: dst.texture,
                     mipLevel: UInt32(destinationMipLevel),
-                    origin: WebGPU.GPUOrigin3D(x: UInt32(destinationOrigin.x), y: UInt32(destinationOrigin.y), z: UInt32(destinationOrigin.z)),
+                    origin: WebGPU.GPUOrigin3D(x: .init(destinationOrigin.x), y: .init(destinationOrigin.y), z: .init(destinationOrigin.z)),
                     aspect: WebGPU.GPUTextureAspect.all
                 ),
                 copySize: WebGPU.GPUExtent3D(
@@ -161,7 +161,7 @@
                 source: WebGPU.GPUTexelCopyTextureInfo(
                     texture: src.texture,
                     mipLevel: UInt32(sourceMipLevel),
-                    origin: WebGPU.GPUOrigin3D(x: UInt32(sourceOrigin.x), y: UInt32(sourceOrigin.y), z: UInt32(sourceOrigin.z)),
+                    origin: WebGPU.GPUOrigin3D(x: .init(sourceOrigin.x), y: .init(sourceOrigin.y), z: .init(sourceOrigin.z)),
                     aspect: WebGPU.GPUTextureAspect.all
                 ),
                 destination: WebGPU.GPUTexelCopyBufferInfo(

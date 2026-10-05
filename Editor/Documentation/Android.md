@@ -47,6 +47,27 @@ Studio prepares the Android shared-library entry point and resource lookup in an
 unpublished project copy; it preserves the original Swift sources and manifest.
 Unsupported manifest shapes produce an actionable export error.
 
+Keep startup code platform-independent:
+
+```swift
+import AdaEngine
+
+@main
+struct Garden: App {
+    var body: some AppScene {
+        DefaultAppWindow(assetBundle: .module)
+    }
+}
+```
+
+Studio removes `@main` in the export copy and generates `ada_android_start`,
+which starts that app through `AndroidRuntime`. No Android startup function or
+separate desktop `main` wrapper is needed in the project. Top-level, nongeneric
+`struct`, `class` and `enum` App types are supported, including private types.
+The bridge stays in the app's file, so explicit target `sources` lists work.
+An existing `ada_android_start` is preserved; Studio still adapts resource lookup.
+The GUI and CLI use the same generation path.
+
 Exports publish atomically only after packaging succeeds. A failed export leaves
 the previous APK intact. Per-project development signing keys live under
 `.ada/android-signing/`; preserve them to update an already-installed debug app.
