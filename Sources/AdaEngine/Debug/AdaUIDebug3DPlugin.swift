@@ -706,7 +706,7 @@ final class AdaUIDebug3DModel {
         let safeHeight = max(1, viewportSize.height)
         let distance = max(safeWidth, safeHeight) * max(1.0, 1.28 / max(0.2, zoom))
         let fieldOfView = Float(54.0 * .pi / 180.0)
-        let focalLength = safeHeight / (2 * tan(fieldOfView * 0.5))
+        let focalLength = safeHeight / (2 * Math.tanf(fieldOfView * 0.5))
         return max(0.1, distance / max(1, focalLength))
     }
 

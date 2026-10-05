@@ -26,8 +26,14 @@ struct GardenCameraSystem {
         }
         let dt = time.deltaTime.isFinite ? min(max(time.deltaTime, 0), 0.1) : 0
         cameras.forEach { orbit, transform in
+            #if os(Android)
+            let contact = input.getTouches().first { $0.phase == .began || $0.phase == .moved }
+            let mouse = contact?.location ?? orbit.lastMouse
+            let dragging = contact != nil
+            #else
             let mouse = input.getMousePosition()
             let dragging = input.isMouseButtonPressed(.left)
+            #endif
             if dragging, orbit.dragging {
                 orbit.yaw -= (mouse.x - orbit.lastMouse.x) * 0.008
                 orbit.pitch = min(max(orbit.pitch + (mouse.y - orbit.lastMouse.y) * 0.006, 0.08), 1.1)

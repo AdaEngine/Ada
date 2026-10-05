@@ -227,7 +227,7 @@ extension FontResource {
         let resolvedScale = emFontScale ?? Constants.defaultEmFontScale
         let fontName = "OpenSans-\(weight.fileNameComponent)"
         guard
-            let fontPath = Bundle.module.url(
+            let fontPath = Bundle.adaModule.url(
                 forResource: fontName,
                 withExtension: "ttf",
                 subdirectory: "Assets/Fonts/opensans"
@@ -447,7 +447,7 @@ extension FontResource {
             return cached
         }
 
-        guard let resourceURL = Bundle.module.resourceURL else {
+        guard let resourceURL = Bundle.adaModule.resourceURL else {
             fatalError("[Font]: Failed to resolve system font bundle")
         }
 

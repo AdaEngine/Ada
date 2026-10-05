@@ -56,7 +56,7 @@ private struct ShadowBackground: View {
             let blur = radius.isFinite ? min(max(radius, 0), 64) : 8
             let offsetX = x.isFinite ? min(max(x, -128), 128) : 0
             let offsetY = y.isFinite ? min(max(y, -128), 128) : 0
-            let inset = ceil(blur * 3 + max(abs(offsetX), abs(offsetY)) + 2)
+            let inset = (blur * 3 + max(abs(offsetX), abs(offsetY)) + 2).rounded(.up)
             material.parameters = UIShadowParameters(
                 color: color,
                 geometry: Vector4(size.width, size.height, inset, shape.cornerRadius(for: size)),
@@ -91,7 +91,7 @@ struct UIShadowMaterial: UIShaderMaterial {
     static func fragmentShader() throws -> AssetHandle<ShaderSource> {
         let relativePath = "Shaders/ui_shadow.glsl"
         #if WASM
-            guard let resourceURL = Bundle.module.resourceURL else {
+            guard let resourceURL = Bundle.adaModule.resourceURL else {
                 throw UIShadowResourceError.missingShader
             }
             return AssetHandle(try ShaderSource(from: resourceURL.appendingPathComponent(relativePath)))
@@ -103,7 +103,7 @@ struct UIShadowMaterial: UIShaderMaterial {
                     return AssetHandle(try ShaderSource(from: shaderURL))
                 }
             }
-            guard let resourceURL = Bundle.module.resourceURL else {
+            guard let resourceURL = Bundle.adaModule.resourceURL else {
                 throw UIShadowResourceError.missingShader
             }
             return AssetHandle(try ShaderSource(from: resourceURL.appendingPathComponent(relativePath)))

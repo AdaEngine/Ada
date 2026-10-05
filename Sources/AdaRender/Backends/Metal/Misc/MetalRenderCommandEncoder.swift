@@ -44,6 +44,7 @@
             }
             renderEncoder.setRenderPipelineState(metalPipeline.renderPipeline)
             renderEncoder.setDepthStencilState(metalPipeline.depthStencilState ?? defaultDepthStencilState)
+            renderEncoder.setFrontFacing(metalPipeline.descriptor.frontFaceWinding == .counterClockwise ? .counterClockwise : .clockwise)
             currentPrimitiveType = metalPipeline.descriptor.primitive.toMetal
         }
 

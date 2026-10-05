@@ -15,6 +15,8 @@
         private var currentIndexBuffer: WebGPU.GPUBuffer?
         private var currentIndexType: WebGPU.GPUIndexFormat = .uint32
         private var currentPipeline: WGPURenderPipeline?
+        private var genericBuffers: [Int: (buffer: WebGPU.GPUBuffer, offset: UInt64, size: UInt64)] = [:]
+        private var vertexBuffers: [Int: (buffer: WebGPU.GPUBuffer, offset: UInt64, size: UInt64)] = [:]
 
         private var device: WebGPU.GPUDevice
 
@@ -62,24 +64,18 @@
             renderEncoder.setPipeline(pipeline: wgpuPipeline.renderPipeline)
             self.currentPipeline = wgpuPipeline
 
-            // When switching between pipelines (not first pipeline in render pass),
-            // clear textures and samplers but keep uniform buffers.
-            // Different pipelines have different bind group layouts - some may not use
-            // textures/samplers at all (e.g. Line Pipeline only uses uniform buffer).
-            // Uniform buffers (like view uniform) are shared across pipelines.
-            //
-            // We only clear if there WAS a previous pipeline - if oldPipeline was nil,
-            // resources might have been set FOR this new pipeline before setRenderPipelineState.
-            if pipelineChanged && oldPipeline != nil {
-                for setIndex in Array(bindGroupResources.keys) {
-                    bindGroupResources[setIndex]?.textures.removeAll()
-                    bindGroupResources[setIndex]?.samplers.removeAll()
-                    guard let uniformBindings = bindGroupResources[setIndex]?.uniformBuffers.keys else {
-                        continue
-                    }
-                    for binding in Array(uniformBindings) where binding != GlobalBufferIndex.viewUniform {
-                        bindGroupResources[setIndex]?.uniformBuffers.removeValue(forKey: binding)
-                    }
+            let expected = expectedResourceKinds(for: wgpuPipeline, setIndex: 0)
+            for (slot, binding) in genericBuffers where wgpuPipeline.vertexBufferSlots[slot] == nil && expected[slot] == .uniformBuffer {
+                updateBindGroupResources(setIndex: 0) { resources in
+                    resources.uniformBuffers[slot] = (binding.buffer, Int(binding.offset), binding.size)
+                }
+            }
+
+            // Engine bindings persist across pipeline changes, as on Metal. Reflection
+            // filters them when building each pipeline's bind group.
+            for (engineSlot, gpuSlot) in wgpuPipeline.vertexBufferSlots {
+                if let binding = vertexBuffers[engineSlot] {
+                    renderEncoder.setVertexBuffer(slot: gpuSlot, buffer: binding.buffer, offset: binding.offset, size: binding.size)
                 }
             }
 
@@ -110,12 +106,7 @@
             guard let wgpuBuffer = buffer as? WGPUVertexBuffer else {
                 fatalError("VertexBuffer is not a WGPUVertexBuffer")
             }
-            renderEncoder.setVertexBuffer(
-                slot: UInt32(slot),
-                buffer: wgpuBuffer.buffer,
-                offset: UInt64(offset),
-                size: UInt64(buffer.length)
-            )
+            bindVertexBuffer(wgpuBuffer, offset: offset, engineSlot: slot)
         }
 
         func setFragmentBuffer(_ buffer: UniformBuffer, offset: Int, slot: Int) {
@@ -136,12 +127,22 @@
                 fatalError("BufferData is not a WGPUBuffer")
             }
 
-            renderEncoder.setVertexBuffer(
-                slot: UInt32(slot),
-                buffer: wgpuBuffer.buffer,
-                offset: UInt64(offset),
-                size: UInt64(wgpuBuffer.length)
-            )
+            let binding = (buffer: wgpuBuffer.buffer, offset: UInt64(offset), size: UInt64(wgpuBuffer.length - offset))
+            genericBuffers[slot] = binding
+            if let pipeline = currentPipeline, pipeline.vertexBufferSlots[slot] == nil,
+                expectedResourceKinds(for: pipeline, setIndex: 0)[slot] == .uniformBuffer {
+                updateBindGroupResources(setIndex: 0) { resources in
+                    resources.uniformBuffers[slot] = (binding.buffer, offset, binding.size)
+                }
+            }
+            bindVertexBuffer(wgpuBuffer, offset: offset, engineSlot: slot)
+        }
+
+        private func bindVertexBuffer(_ buffer: WGPUBuffer, offset: Int, engineSlot: Int) {
+            let size = UInt64(buffer.length - offset)
+            vertexBuffers[engineSlot] = (buffer.buffer, UInt64(offset), size)
+            guard let gpuSlot = currentPipeline?.vertexBufferSlots[engineSlot] else { return }
+            renderEncoder.setVertexBuffer(slot: gpuSlot, buffer: buffer.buffer, offset: UInt64(offset), size: size)
         }
 
         func setFragmentBuffer<T>(_ bufferData: BufferData<T>, offset: Int, slot: Int) {
@@ -434,6 +435,7 @@
                 guard !entries.isEmpty else {
                     continue
                 }
+
 
                 // Get bind group layout - this will fail if the pipeline is invalid
                 // The layout will be null/invalid if the pipeline creation failed

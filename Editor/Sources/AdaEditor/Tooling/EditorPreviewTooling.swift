@@ -34,7 +34,8 @@ struct EditorPreviewBuildRequest: Equatable, Sendable {
     var uiExportProvider: String?
 }
 
-struct EditorPreviewBuildFailure: Error, Equatable, Sendable, CustomStringConvertible {
+struct EditorPreviewBuildFailure: Error, LocalizedError, Equatable, Sendable, CustomStringConvertible {
+    var errorDescription: String? { message }
     var message: String
 
     var description: String {

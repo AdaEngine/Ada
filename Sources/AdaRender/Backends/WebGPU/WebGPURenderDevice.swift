@@ -111,6 +111,11 @@
         }
 
         public func createSampler(from descriptor: SamplerDescriptor) -> any Sampler {
+            #if WASM
+            let lodMin = Double(descriptor.lodMinClamp), lodMax = Double(descriptor.lodMaxClamp)
+            #else
+            let lodMin = descriptor.lodMinClamp, lodMax = descriptor.lodMaxClamp
+            #endif
             let wgpuSampler = webGPUDeviceLock.withLock { _ in
                 context.device.createSampler(
                     descriptor: WebGPU.GPUSamplerDescriptor(
@@ -121,8 +126,8 @@
                         magFilter: descriptor.magFilter.toWebGPU,
                         minFilter: descriptor.minFilter.toWebGPU,
                         mipmapFilter: descriptor.mipFilter.toWebGPU,
-                        lodMinClamp: Double(descriptor.lodMinClamp),
-                        lodMaxClamp: Double(descriptor.lodMaxClamp)
+                        lodMinClamp: lodMin,
+                        lodMaxClamp: lodMax
                     )
                 )
             }

@@ -469,6 +469,15 @@ enum EditorRunDestination: String, CaseIterable, Equatable, Sendable {
     case macOS = "macOS"
     case iPadOS = "iPadOS"
     case web = "Web"
+    case android = "Android"
+
+    static var availableCases: [Self] {
+        #if os(macOS)
+        EditorDistribution.current.supportsSwiftProjects ? allCases : allCases.filter { $0 != .android }
+        #else
+        allCases.filter { $0 != .android }
+        #endif
+    }
 }
 
 struct SwiftPackageModel: Equatable, Sendable {

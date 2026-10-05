@@ -46,3 +46,6 @@ Derived/
 # Sloppy
 .sloppy/
 .sloppy-worktrees/
+
+# Isolated Android builds and debug signing keys
+.build-android*/

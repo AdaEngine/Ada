@@ -15,7 +15,7 @@ struct NavigationBackButtonIcon: View {
                 }
             }
         #endif
-        guard let resourceURL = Bundle.module.resourceURL else {
+        guard let resourceURL = Bundle.adaModule.resourceURL else {
             return nil
         }
         return try? Image(contentsOf: resourceURL.appendingPathComponent(relativePath))

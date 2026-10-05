@@ -63,11 +63,11 @@ public final class FSWatch: @unchecked Sendable {
         let watcherDelegate = _WatcherDelegate(block: block)
         self.watcherHandler = watcherDelegate
 
-        #if WASM || os(OpenBSD) || os(FreeBSD)
+        #if WASM || os(Android) || os(OpenBSD) || os(FreeBSD)
             self._watcher = NoOpWatcher(paths: paths, latency: latency, delegate: watcherDelegate)
         #elseif os(Windows)
             self._watcher = RDCWatcher(paths: paths, latency: latency, delegate: watcherDelegate)
-        #elseif canImport(Glibc) || canImport(Musl) || canImport(Android)
+        #elseif canImport(Glibc) || canImport(Musl)
             var ipaths: [AbsolutePath: Inotify.WatchOptions] = [:]
 
             // FIXME: We need to recurse here.
@@ -120,13 +120,13 @@ private protocol _FileWatcher {
     func stop()
 }
 
-#if WASM || os(OpenBSD) || os(FreeBSD) || (!os(macOS) && canImport(Darwin))
+#if WASM || os(Android) || os(OpenBSD) || os(FreeBSD) || (!os(macOS) && canImport(Darwin))
     extension FSWatch._WatcherDelegate: NoOpWatcherDelegate {}
     extension NoOpWatcher: _FileWatcher {}
 #elseif os(Windows)
     extension FSWatch._WatcherDelegate: RDCWatcherDelegate {}
     extension RDCWatcher: _FileWatcher {}
-#elseif canImport(Glibc) || canImport(Musl) || canImport(Android)
+#elseif canImport(Glibc) || canImport(Musl)
     extension FSWatch._WatcherDelegate: InotifyDelegate {}
     extension Inotify: _FileWatcher {}
 #elseif os(macOS)
@@ -138,7 +138,7 @@ private protocol _FileWatcher {
 
 // MARK: - inotify
 
-#if WASM || os(FreeBSD) || os(OpenBSD) || (!os(macOS) && canImport(Darwin))
+#if WASM || os(Android) || os(FreeBSD) || os(OpenBSD) || (!os(macOS) && canImport(Darwin))
 
     public protocol NoOpWatcherDelegate: AnyObject {
         func pathsDidReceiveEvent(_ paths: [AbsolutePath])
@@ -337,7 +337,7 @@ private protocol _FileWatcher {
         }
     }
 
-#elseif canImport(Glibc) || canImport(Musl) || canImport(Android)
+#elseif canImport(Glibc) || canImport(Musl)
 
     /// The delegate for receiving inotify events.
     public protocol InotifyDelegate: AnyObject {

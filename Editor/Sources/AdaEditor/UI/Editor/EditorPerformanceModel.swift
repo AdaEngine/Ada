@@ -86,6 +86,16 @@ private final class EditorPhysicsPerformanceRegistry {
 @Observable
 @MainActor
 final class EditorPerformanceModel {
+    enum DisplayMode: String, CaseIterable { case overview = "Overview", timeline = "Timeline" }
+    enum Presentation: Hashable { case panel, workspace }
+    var displayMode: DisplayMode = .overview
+    var isExpanded = false
+    var recordingDelaySeconds: Double = 0
+    var recordingDurationSeconds = 5
+    private(set) var scheduledTargetID: String?
+    private(set) var scheduledStart: Date?
+    private(set) var timeline: EditorPerformanceTimeline?
+    @ObservationIgnored private var recordingTask: Task<Void, Never>?
     var targets: [AdaMCPPerformanceTarget] = []
     var target: AdaMCPPerformanceTarget?
     var selectedTargetID: String?
@@ -100,6 +110,7 @@ final class EditorPerformanceModel {
     @ObservationIgnored private var lease: AdaMCPTraceLease?
     @ObservationIgnored private var leasedTargetID: String?
     @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var presentations: Set<Presentation> = []
 
     var samples: [AdaMCPPerformanceSample] { target?.samples ?? [] }
     var latest: AdaMCPPerformanceSample? { samples.last }
@@ -118,7 +129,8 @@ final class EditorPerformanceModel {
     var systems: [AdaMCPPerformanceHotspot] { latest?.systems ?? [] }
     var renderNodes: [AdaMCPPerformanceHotspot] { latest?.renderNodes ?? [] }
 
-    func appear() {
+    func appear(presentation: Presentation = .panel) {
+        presentations.insert(presentation)
         guard !isVisible else {
             return
         }
@@ -131,7 +143,9 @@ final class EditorPerformanceModel {
             }
         }
     }
-    func disappear() {
+    func disappear(presentation: Presentation = .panel) {
+        presentations.remove(presentation)
+        guard presentations.isEmpty else { return }
         isVisible = false
         task?.cancel()
         task = nil
@@ -139,9 +153,11 @@ final class EditorPerformanceModel {
         leasedTargetID = nil
     }
     func selectTarget(_ id: String) {
+        cancelScheduledRecording()
         selectedTargetID = id
         selectedCaptureID = nil
         capture = nil
+        timeline = nil
         refresh()
     }
     func refresh() {
@@ -155,6 +171,7 @@ final class EditorPerformanceModel {
         if target?.id != id {
             selectedCaptureID = nil
             capture = nil
+            timeline = nil
         }
         target = id.flatMap { profiler.performance.target($0) }
         physicsSnapshots = EditorPhysicsPerformanceRegistry.shared.snapshots(targetID: id)
@@ -174,26 +191,74 @@ final class EditorPerformanceModel {
                 let last = updated.last?.objectValue,
                 last["targetId"]?.stringValue == target?.id {
                 selectedCaptureID = last["id"]?.stringValue
+                capture = nil
+                timeline = nil
             }
             captures = updated
             if let selectedCaptureID, !captures.contains(where: { $0.objectValue?["id"]?.stringValue == selectedCaptureID }) {
                 self.selectedCaptureID = nil
                 capture = nil
+                timeline = nil
             }
-            if let selectedCaptureID {
+            if let selectedCaptureID, capture == nil {
                 capture = try profiler.capturePayload(id: selectedCaptureID)
+                timeline = EditorPerformanceTimeline(trace: capture?.objectValue?["trace"])
+            }
+            if let scheduledTargetID, profiler.performance.target(scheduledTargetID)?.isRunning != true {
+                cancelScheduledRecording()
+                errorMessage = "Scheduled game stopped before recording began."
             }
         } catch { errorMessage = error.localizedDescription }
     }
+    var scheduledStatus: String? {
+        guard let scheduledStart else { return nil }
+        return "Starts in \(max(0, Int(ceil(scheduledStart.timeIntervalSinceNow)))) s"
+    }
+
     func record() {
-        guard let profiler, let target else {
+        guard let profiler, let target, target.isRunning, scheduledTargetID == nil else { return }
+        guard recordingDelaySeconds.isFinite, (0...300).contains(recordingDelaySeconds),
+              (1...120).contains(recordingDurationSeconds) else {
+            errorMessage = "Choose a delay of 0–300 s and a duration of 1–120 s."
+            return
+        }
+        let durationMs = recordingDurationSeconds * 1000
+        errorMessage = nil
+        if recordingDelaySeconds == 0 {
+            startRecording(profiler: profiler, targetID: target.id, durationMs: durationMs)
+            return
+        }
+        let delay = recordingDelaySeconds
+        scheduledTargetID = target.id
+        scheduledStart = Date().addingTimeInterval(delay)
+        recordingTask = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            guard !Task.isCancelled, let self else { return }
+            self.scheduledTargetID = nil
+            self.scheduledStart = nil
+            self.recordingTask = nil
+            self.startRecording(profiler: profiler, targetID: target.id, durationMs: durationMs)
+        }
+    }
+
+    func cancelScheduledRecording() {
+        recordingTask?.cancel()
+        recordingTask = nil
+        scheduledTargetID = nil
+        scheduledStart = nil
+    }
+
+    private func startRecording(profiler: AdaMCPProfiler, targetID: String, durationMs: Int) {
+        guard profiler.performance.target(targetID)?.isRunning == true else {
+            errorMessage = "Scheduled game stopped before recording began."
             return
         }
         do {
-            errorMessage = nil
-            _ = try profiler.startCapture(arguments: ["targetId": .string(target.id), "durationMs": .int(5000)])
+            _ = try profiler.startCapture(arguments: ["targetId": .string(targetID), "durationMs": .int(durationMs)])
             selectedCaptureID = nil
             capture = nil
+            timeline = nil
+            displayMode = .timeline
             refresh()
         } catch { errorMessage = error.localizedDescription }
     }
@@ -211,6 +276,7 @@ final class EditorPerformanceModel {
     func selectCapture(_ id: String?) {
         selectedCaptureID = id
         capture = nil
+        timeline = nil
         refresh()
     }
     func exportCapture() {

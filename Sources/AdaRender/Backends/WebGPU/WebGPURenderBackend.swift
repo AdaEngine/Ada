@@ -1,4 +1,7 @@
 #if WEBGPU_ENABLED && canImport(WebGPU)
+    #if os(Android)
+        import CAndroid
+    #endif
     import AdaUtils
     import Foundation
     import Logging
@@ -86,7 +89,7 @@
         }
 
         #if !WASM
-            private static func requestAdapter(instance: WebGPU.GPUInstance, logger _: Logger) throws -> WebGPU.GPUAdapter {
+            private static func requestAdapter(instance: WebGPU.GPUInstance, logger: Logger) throws -> WebGPU.GPUAdapter {
                 var requestStatus: WebGPU.GPURequestAdapterStatus?
                 var requestedAdapter: WebGPU.GPUAdapter?
                 var requestMessage: String?
@@ -107,6 +110,7 @@
                     throw WebGPUBackendError.requestAdapterFailed(requestMessage ?? "unknown error")
                 }
 
+                logAdapterInfo(adapter, logger: logger)
                 return adapter
             }
 
@@ -121,6 +125,8 @@
                         powerPreference: .highPerformance,
                         backendType: .metal
                     )
+                #elseif os(Android)
+                    WebGPU.GPURequestAdapterOptions(powerPreference: .highPerformance, backendType: .vulkan)
                 #elseif os(Linux)
                     WebGPU.GPURequestAdapterOptions(powerPreference: .highPerformance)
                 #else
@@ -135,9 +141,11 @@
                     return
                 }
 
-                logger.info(
-                    "Selected WebGPU adapter: backend=\(info.backendType.rawValue) vendor=\(info.vendor) device=\(info.device) description=\(info.description)"
-                )
+                let message = "Selected WebGPU adapter: backend=\(info.backendType.rawValue) vendor=\(info.vendor) device=\(info.device) description=\(info.description)"
+                logger.info("\(message)")
+                #if os(Android)
+                    unsafe message.withCString { unsafe ada_android_log($0) }
+                #endif
             }
 
             private static func requestDevice(
@@ -169,7 +177,20 @@
                 }
                 _ = descriptor.withWGPUStruct { descriptor in
                     var descriptor = descriptor
+                    // Release the generated one-shot closure before replacing it; the
+                    // raw stateless callback below has no retained Swift userdata.
+                    if let userdata = descriptor.uncapturedErrorCallbackInfo.userdata1 {
+                        Unmanaged<AnyObject>.fromOpaque(userdata).release()
+                    }
+                    #if os(Android)
+                    // Stateless C callback: Dawn can invoke it repeatedly without Swift userdata.
+                    descriptor.uncapturedErrorCallbackInfo.callback = { _, type, message, _, _ in
+                        let text = "WebGPU error \(type.rawValue): \(message.toString)"
+                        unsafe text.withCString { unsafe ada_android_log($0) }
+                    }
+                    #else
                     descriptor.uncapturedErrorCallbackInfo.callback = nil
+                    #endif
                     descriptor.uncapturedErrorCallbackInfo.userdata1 = nil
                     descriptor.uncapturedErrorCallbackInfo.userdata2 = nil
 

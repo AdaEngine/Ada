@@ -7,7 +7,7 @@ import Foundation
 import GravityAOT
 
 struct EditorAdaScriptNativeExportOptions: Sendable {
-    enum Destination: String, Sendable { case macOS, web }
+    enum Destination: String, Sendable { case macOS, web, android }
     enum Configuration: String, Sendable { case debug, release }
     let destination: Destination
     let gravityRoot: URL
@@ -18,6 +18,10 @@ struct EditorAdaScriptNativeExportOptions: Sendable {
     var configuration: Configuration = .release
     var scratchDirectory: URL?
     var hostScratchDirectory: URL?
+    var androidConfiguration: EditorAndroidConfiguration?
+    var androidABI = "arm64-v8a"
+    var androidApplicationID = "org.adaengine.nativegame"
+    var androidSigningKey: URL?
 }
 
 /// Each export is prepared in an unpublished directory. The old export remains
@@ -99,7 +103,7 @@ actor EditorAdaScriptNativeExporter {
         try JSONEncoder().encode(project).write(to: stage.appendingPathComponent("project.json"))
         let plugins = try EditorAdaScriptRuntimePluginResolver.resolve(project.runtime.plugins)
         try Self.manifest(options: options).write(to: stage.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.player(project: project, sources: sources, plugins: plugins).write(to: player.appendingPathComponent("Game.swift"), atomically: true, encoding: .utf8)
+        try Self.player(project: project, sources: sources, plugins: plugins, destination: options.destination).write(to: player.appendingPathComponent("Game.swift"), atomically: true, encoding: .utf8)
         let scriptDirectory = stage.appendingPathComponent("script")
         try FileManager.default.createDirectory(at: scriptDirectory, withIntermediateDirectories: true)
         let script = scriptDirectory.appendingPathComponent("build_and_run.sh")
@@ -121,6 +125,14 @@ actor EditorAdaScriptNativeExporter {
         let env = ["ADAENGINE_GRAVITY_PACKAGE_PATH": options.gravityRoot.path, "ADAENGINE_DISABLE_SWAN": "1"]
         if !options.buildsPlayer {
             // Package-only mode is used for reusable library exports and compiler QA.
+        } else if options.destination == .android {
+            guard let configuration = options.androidConfiguration else {
+                throw EditorPreviewBuildFailure(message: "Android toolchain configuration is missing.")
+            }
+            _ = try await EditorAndroidProjectExporter.buildAPK(at: stage, product: "AdaNativeGame", applicationID: options.androidApplicationID,
+                label: project.project.displayName ?? project.project.name ?? "AdaScript Game", engineRoot: options.engineRoot,
+                configuration: configuration, abi: options.androidABI, scratch: options.scratchDirectory ?? stage.appendingPathComponent("build-android"),
+                buildConfiguration: options.configuration.rawValue, signingKey: options.androidSigningKey, runner: runner, log: log)
         } else if options.destination == .macOS {
             let scratch = options.scratchDirectory ?? stage.appendingPathComponent("build-native")
             try await run(
@@ -297,21 +309,31 @@ actor EditorAdaScriptNativeExporter {
     }
 
     private static func manifest(options: EditorAdaScriptNativeExportOptions) -> String {
-        """
+        let product = options.destination == .android
+            ? ".library(name: \"AdaNativeGame\", type: .dynamic, targets: [\"AdaNativeGame\"])"
+            : ".executable(name: \"AdaNativeGame\", targets: [\"AdaNativeGame\"])"
+        let targetKind = options.destination == .android ? "target" : "executableTarget"
+        return """
         // swift-tools-version: 6.2
         import PackageDescription
-        let package = Package(name: "AdaNativeGame", platforms: [.macOS(.v15)], products: [.executable(name: "AdaNativeGame", targets: ["AdaNativeGame"])], dependencies: [
+        let package = Package(name: "AdaNativeGame", platforms: [.macOS(.v15)], products: [\(product)], dependencies: [
             .package(name: "AdaEngine", path: \(quote(options.engineRoot.path))),
             .package(name: "gravity-lang", path: \(quote(options.gravityRoot.path))),
             .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", exact: "0.53.0")
         ], targets: [
             .target(name: "GameplayNative", dependencies: [.product(name: "CGravity", package: "gravity-lang")], exclude: ["libada_game.a", "ada_game.h", "ada_game.sources.json"], publicHeadersPath: "include"),
-            .executableTarget(name: "AdaNativeGame", dependencies: ["GameplayNative", .product(name: "AdaEngine", package: "AdaEngine"), .product(name: "AdaMultiplayer", package: "AdaEngine"), .product(name: "GravityAOT", package: "gravity-lang"), .product(name: "JavaScriptKit", package: "JavaScriptKit", condition: .when(platforms: [.wasi]))], resources: [.copy("GameAssets")], linkerSettings: [.unsafeFlags(["-Xclang-linker", "-mexec-model=reactor", "-Xlinker", "--export-if-defined=main", "-Xlinker", "--export-if-defined=__main_argc_argv"], .when(platforms: [.wasi])), .unsafeFlags(["-Xlinker", "--strip-debug"], .when(platforms: [.wasi], configuration: .release))])
+            .\(targetKind)(name: "AdaNativeGame", dependencies: ["GameplayNative", .product(name: "AdaEngine", package: "AdaEngine"), .product(name: "AdaMultiplayer", package: "AdaEngine"), .product(name: "GravityAOT", package: "gravity-lang"), .product(name: "JavaScriptKit", package: "JavaScriptKit", condition: .when(platforms: [.wasi]))], resources: [.copy("GameAssets")], linkerSettings: [.unsafeFlags(["-Xclang-linker", "-mexec-model=reactor", "-Xlinker", "--export-if-defined=main", "-Xlinker", "--export-if-defined=__main_argc_argv"], .when(platforms: [.wasi])), .unsafeFlags(["-Xlinker", "--strip-debug"], .when(platforms: [.wasi], configuration: .release))])
         ])
         """
     }
 
-    private static func player(project: AdaProject, sources: [AdaScriptSource], plugins: EditorAdaScriptResolvedRuntimePlugins) -> String {
+    private static func player(project: AdaProject, sources: [AdaScriptSource], plugins: EditorAdaScriptResolvedRuntimePlugins, destination: EditorAdaScriptNativeExportOptions.Destination) -> String {
+        let entryPoint = destination == .android ? """
+        #if os(Android)
+        @_cdecl("ada_android_start")
+        public func adaNativeGameStart() { AndroidRuntime.start { AdaNativeGame() } }
+        #endif
+        """ : ""
         let entryScene = project.runtime.entry.scene ?? ""
         let assetsPrefix = (project.paths.assets ?? "Assets") + "/"
         // Project metadata uses project-relative paths; the standalone player starts at GameAssets.
@@ -338,14 +360,23 @@ actor EditorAdaScriptNativeExporter {
         return """
             import AdaEngine
             import AdaMultiplayer
+            import Foundation
             import GravityAOT
             import GameplayNative
             #if os(WASI)
             import JavaScriptKit
             #endif
-            @main struct AdaNativeGame: App {
+            \(entryPoint)
+            private var gameBundle: Bundle {
+                #if os(Android)
+                AndroidResourceBundle.bundle(named: "AdaNativeGame_AdaNativeGame")
+                #else
+                .module
+                #endif
+            }
+            \(destination == .android ? "" : "@main ")struct AdaNativeGame: App {
                 var body: some AppScene {
-                WindowGroup(content: { GameView() }, assetBundle: Bundle.module)
+                WindowGroup(content: { GameView() }, assetBundle: gameBundle)
                     .windowTitle(\(quote(title)))
                     .windowMode(.windowed)
                     .minimumSize(width: \(project.runtime.window.size.width), height: \(project.runtime.window.size.height))
@@ -357,7 +388,7 @@ actor EditorAdaScriptNativeExporter {
                     do {
                         let base = Bundle.main.bundleURL
                         let candidates = ["AdaNativeGame_AdaNativeGame.bundle", "AdaNativeGame_AdaNativeGame.resources"].map { base.appendingPathComponent($0 + "/GameAssets") }
-                        guard let assetURL = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }) ?? Bundle.module.resourceURL?.appendingPathComponent("GameAssets") else {
+                        guard let assetURL = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }) ?? gameBundle.resourceURL?.appendingPathComponent("GameAssets") else {
                             throw AdaScriptError.invalidManifest("Native game assets are missing")
                         }
                         let assets = assetURL.resolvingSymlinksInPath().standardizedFileURL
@@ -386,7 +417,13 @@ actor EditorAdaScriptNativeExporter {
                 }
             }
             private enum NativeGameLog {
-            static func write(_ message: String) { FileHandle.standardOutput.write(Data((message + "\\n").utf8)) }
+            static func write(_ message: String) {
+                #if os(Android)
+                AndroidRuntime.log(message)
+                #else
+                FileHandle.standardOutput.write(Data((message + "\\n").utf8))
+                #endif
+            }
         }
         private struct NativeGameNetwork: Plugin {
                 @MainActor func setup(in app: borrowing AppWorlds) {
@@ -439,6 +476,15 @@ actor EditorAdaScriptNativeExporter {
 
     private static func buildRunScript(options: EditorAdaScriptNativeExportOptions) -> String {
         func shellQuote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'" }
+        if options.destination == .android {
+            return """
+            #!/usr/bin/env bash
+            set -euo pipefail
+            ANDROID_EXPORT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+            exec /usr/bin/python3 \(shellQuote(options.engineRoot.appendingPathComponent("Tools/Android/android.py").path)) run \
+              --package "$ANDROID_EXPORT_ROOT" --product AdaNativeGame --application-id \(shellQuote(options.androidApplicationID)) "$@"
+            """
+        }
         return """
         #!/usr/bin/env bash
         set -euo pipefail

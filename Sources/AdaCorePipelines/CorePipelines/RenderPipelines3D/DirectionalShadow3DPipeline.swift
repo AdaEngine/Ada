@@ -7,7 +7,7 @@ public struct DirectionalShadow3DPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        shader = ShaderModule.loadRequiredBundled(at: "Shaders/directional_shadow_3d.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/directional_shadow_3d.glsl", from: .adaModule)
     }
 
     public func configurate(with configuration: VertexDescriptor) -> RenderPipelineDescriptor {
@@ -36,6 +36,9 @@ public struct DirectionalShadow3DPipeline: RenderPipelineConfigurator {
         descriptor.backfaceCulling = false
         descriptor.debugName = "Directional Shadow 3D Pipeline"
         descriptor.vertexDescriptor = configuration
+        #if os(Android)
+            descriptor.frontFaceWinding = .clockwise
+        #endif
         descriptor.depthStencilDescriptor = DepthStencilDescriptor(
             isDepthTestEnabled: true,
             isDepthWriteEnabled: true,

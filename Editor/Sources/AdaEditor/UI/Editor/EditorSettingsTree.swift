@@ -10,7 +10,10 @@ extension EditorSettingsWindowViewModel {
     func pages(in section: EditorSettingsSection) -> [String] {
         switch section {
         case .general:
-            let globalPages = ["ADA CLOUD", "APPEARANCE", EditorSettingsPage.editorDisplay]
+            var globalPages = ["ADA CLOUD", "APPEARANCE", EditorSettingsPage.editorDisplay]
+            #if os(macOS)
+            if EditorDistribution.current.supportsSwiftProjects { globalPages.append("ANDROID") }
+            #endif
             return editorViewModel == nil ? globalPages : globalPages + ["EDITOR FONT", "SYNTAX APPEARANCE"]
         case .project:
             guard editorViewModel != nil else {

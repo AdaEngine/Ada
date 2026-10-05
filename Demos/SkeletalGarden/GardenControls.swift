@@ -7,7 +7,11 @@ struct GardenInputSystem {
     @Query<GardenCamera> private var cameras
     @Res<Input> private var input
     @Res<DeltaTime> private var time
+    #if os(Android)
+    private let autoplay = true
+    #else
     private let autoplay = ProcessInfo.processInfo.arguments.contains("--autoplay")
+    #endif
     private let renderProof = ProcessInfo.processInfo.arguments.contains("--render-proof")
     private let poseProof = ProcessInfo.processInfo.arguments.contains("--pose-proof")
     private let controllerProof = ProcessInfo.processInfo.arguments.contains("--controller-proof")

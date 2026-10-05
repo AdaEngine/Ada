@@ -63,6 +63,10 @@ public struct AppPlatformPlugin: Plugin {
                     #endif
                 } catch {
                     Logger(label: "org.adaengine.AppPlatform").error("\(error)")
+                    #if os(Android)
+                        AndroidRuntime.log("Android frame loop failed: \(error)")
+                        application.terminate()
+                    #endif
                 }
             }
         } catch {
