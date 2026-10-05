@@ -447,6 +447,7 @@ extension EditorRunDestination {
             .player:
             .iPadOS
         case .web: .web
+        case .android: .android
         }
     }
 }

@@ -193,7 +193,13 @@ struct EditorView: View {
                     selectedDestination: viewModel.selectedRunDestination,
                     toolbarHeight: metrics.topToolbarHeight,
                     onDismiss: { isRunDestinationMenuPresented = false },
-                    onSelect: viewModel.selectRunDestination
+                    onSelect: viewModel.selectRunDestination,
+                    androidTargets: viewModel.androidTargets,
+                    selectedAndroidTargetID: viewModel.selectedAndroidTargetID,
+                    androidStatus: viewModel.androidStatus,
+                    onSelectAndroid: viewModel.selectAndroidTarget,
+                    onRefreshAndroid: viewModel.refreshAndroidTargets,
+                    onAndroidSettings: { viewModel.presentSettings(.general, page: "ANDROID") }
                 )
             }
         }

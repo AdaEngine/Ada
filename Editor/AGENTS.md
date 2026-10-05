@@ -140,8 +140,13 @@ Scene Play and embedded AdaScript project runtime; AdaScript hot reload compiles
 dirty source buffers and keeps previous running code when reload fails.
 Swift view previews have a dedicated build/host path. AdaPlayer pairing and
 project deployment are implemented separately from embedded Play.
-Web run/export paths and AdaScript AOT export to macOS/Web exist, with different
+Web run/export paths and AdaScript AOT export to macOS/Web/Android exist, with different
 toolchain requirements and component support; check the selected path explicitly.
+
+Android export/run also supports Swift AdaEngine App projects, ADB device discovery,
+AVD boot, per-project debug signing and toolbar Run/Stop. Physical devices require
+authorized USB debugging; host-side export remains standalone macOS only. See
+[Android.md](Documentation/Android.md) for setup and verification scope.
 
 Standalone macOS Studio includes `Contents/MacOS/adastudio` and a bundled source
 build SDK. The CLI dispatches before app/UI startup and reuses project inspection,

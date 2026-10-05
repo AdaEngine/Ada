@@ -51,6 +51,16 @@ final class EditorViewModel {
     var problems: [EditorDiagnostic]
     var symbolReferences: [EditorSourceReference]
     var selectedRunProduct: String?
+    var androidConfiguration = EditorAndroidConfiguration.load(engineRoot: EditorAndroidConfiguration.studioEngineRoot)
+    var androidTargets: [EditorAndroidTarget] = []
+    var androidStatus = "Refresh to find Android devices and emulators."
+    var selectedAndroidTargetID: String?
+    var androidRunningSession: EditorAndroidRunSession?
+    @ObservationIgnored var androidDiscoveryTask: Task<Void, Never>?
+    #if os(macOS)
+    @ObservationIgnored var androidRunner: EditorProcessRunner?
+    @ObservationIgnored var androidTools: EditorAndroidTools?
+    #endif
     var selectedRunDestination: EditorRunDestination
     var dependencyLocation = ""
     var dependencyRequirement = #"from: "1.0.0""#

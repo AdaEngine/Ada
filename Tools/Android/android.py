@@ -160,6 +160,20 @@ def stage_resources(binaries, assets):
         raise AndroidError("No SwiftPM resource bundles were built")
     (destination/"manifest.txt").write_text("\n".join(files)+"\n")
 
+def select_swift_sdks(args,bundle):
+    # Target-triple IDs select the right architecture/API metadata. Restrict
+    # discovery to the selected SDK release when several versions are installed.
+    selected_sdks=Path(args.scratch).expanduser().resolve()/"swift-sdks"/args.swift_sdk
+    selected_sdks.mkdir(parents=True,exist_ok=True)
+    link=selected_sdks/f"{args.swift_sdk}.artifactbundle"
+    if link.is_symlink() and link.resolve()!=bundle.parent.resolve():
+        link.unlink()
+    if not link.exists():
+        link.symlink_to(bundle.parent,target_is_directory=True)
+    if link.resolve()!=bundle.parent.resolve():
+        raise AndroidError(f"Unexpected SDK selection path: {link}")
+    return selected_sdks
+
 def build(args):
     validate_options(args)
     env=build_env()
@@ -180,17 +194,7 @@ def build(args):
         raise AndroidError(f"Host Swift and Android SDK must match exactly: host={version.strip()}, sdk={args.swift_sdk}")
     output=Path(args.output).expanduser().resolve()
     output.mkdir(parents=True,exist_ok=True)
-    # Target-triple IDs select the right architecture/API metadata. Restrict
-    # discovery to the selected SDK release when several versions are installed.
-    selected_sdks=output/"swift-sdks"/args.swift_sdk
-    selected_sdks.mkdir(parents=True,exist_ok=True)
-    link=selected_sdks/f"{args.swift_sdk}.artifactbundle"
-    if link.is_symlink() and link.resolve()!=bundle.parent.resolve():
-        link.unlink()
-    if not link.exists():
-        link.symlink_to(bundle.parent,target_is_directory=True)
-    if link.resolve()!=bundle.parent.resolve():
-        raise AndroidError(f"Unexpected SDK selection path: {link}")
+    selected_sdks=select_swift_sdks(args,bundle)
     staging=output/"staging"
     if staging.exists():
         shutil.rmtree(staging)
@@ -224,7 +228,8 @@ def build(args):
             apk.write(path,path.relative_to(staging).as_posix())
     aligned=output/"aligned.apk"
     run([tool(tools/"zipalign"),"-P","16","-f","4",unsigned,aligned],env=env)
-    key=output/"debug.keystore"
+    key=Path(args.debug_keystore).expanduser().resolve() if args.debug_keystore else output/"debug.keystore"
+    key.parent.mkdir(parents=True,exist_ok=True)
     if not key.exists():
         keytool=Path(env["JAVA_HOME"])/"bin/keytool" if env.get("JAVA_HOME") else Path(shutil.which("keytool") or "keytool")
         run([keytool,"-genkeypair","-keystore",key,"-storepass","android","-alias","androiddebugkey","-keypass","android","-dname","CN=AdaEngine Android Debug","-keyalg","RSA","-keysize","2048","-validity","10000"],env=env)
@@ -277,6 +282,7 @@ def parser():
     parser.add_argument("--configuration",choices=["debug","release"],default="debug")
     parser.add_argument("--scratch",default=os.environ.get("SWIFT_ANDROID_SCRATCH",str(ROOT/".build-android")))
     parser.add_argument("--output",default=str(ROOT/".build-android/apk"))
+    parser.add_argument("--debug-keystore",help="Stable development signing key for rebuild/install updates")
     parser.add_argument("--jobs",type=int,default=6)
     parser.add_argument("--serial")
     parser.add_argument("--apk",help="Install an existing APK without rebuilding")

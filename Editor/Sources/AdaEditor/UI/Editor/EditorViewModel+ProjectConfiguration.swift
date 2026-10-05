@@ -291,6 +291,7 @@ extension EditorViewModel {
 
     func selectRunDestination(_ destination: EditorRunDestination) {
         selectedRunDestination = destination
+        if destination == .android { refreshAndroidTargets() }
         // A paired device is session state, not a change to project platform settings.
         guard destination != .player else {
             return
@@ -434,6 +435,7 @@ extension EditorViewModel {
         case .macOS: .macOS
         case .iPadOS: .iPadOS
         case .web: .web
+        case .android: .android
         }
     }
 

@@ -11,6 +11,7 @@ extension EditorViewModel {
 
         RuntimeLogStore.shared.setEnabled(true)
         didStartEditorSession = true
+        if selectedRunDestination == .android { refreshAndroidTargets() }
         bootstrapWorkspaceIfNeeded()
         refreshSourceControl()
     }
@@ -273,6 +274,8 @@ extension EditorViewModel {
             return
         }
         switch selectedRunDestination {
+        case .android:
+            exportAndroidProject(launch: true)
         case .player:
             runOnAdaPlayer()
         case .macOS:
@@ -495,7 +498,7 @@ extension EditorViewModel {
     }
 
     var isProjectRunning: Bool {
-        if playerSession.isRunning || playerSession.isBusy {
+        if androidRunningSession != nil || playerSession.isRunning || playerSession.isBusy {
             return true
         }
         if debugger.isActive {
@@ -603,6 +606,7 @@ extension EditorViewModel {
     }
 
     func cancelWorkspaceCommand() {
+        if androidRunningSession != nil { stopAndroidRun(); return }
         #if os(macOS)
         if adaScriptWebServer != nil {
             stopAdaScriptWebServer()
@@ -632,6 +636,9 @@ extension EditorViewModel {
             appendOutput("Stopped AdaScript project.")
             return
         }
+        #if os(macOS)
+        let cancellingAndroidRunner = androidRunner
+        #endif
         workspaceTask?.cancel()
         workspaceTask = nil
         workspaceStatus = .cancelled
@@ -639,6 +646,7 @@ extension EditorViewModel {
             await workspaceService.cancel()
             #if os(macOS)
             await adaScriptWebExportRunner?.cancelAll()
+            await cancellingAndroidRunner?.cancelAll()
             #endif
         }
     }
@@ -721,7 +729,9 @@ extension EditorViewModel {
         case .build:
             buildAll()
         case .run:
-            if workbench.activeSceneDocument != nil {
+            if selectedRunDestination == .android {
+                runSelectedTarget()
+            } else if workbench.activeSceneDocument != nil {
                 runActiveSceneInEditor()
             } else {
                 runSelectedTarget()
@@ -730,6 +740,8 @@ extension EditorViewModel {
             exportAdaScriptNativeGame(web: false)
         case .exportNativeWeb:
             exportAdaScriptNativeGame(web: true)
+        case .exportNativeAndroid:
+            exportAndroidProject()
         case .runTests:
             runTests()
         case .stop:

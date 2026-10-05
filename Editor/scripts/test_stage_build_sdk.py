@@ -39,6 +39,21 @@ class StageSDKTests(unittest.TestCase):
             sdk.stage(engine, compiler, destination)
             self.assertFalse((destination / "BuildSDK").exists())
 
+    def test_android_sdk_keeps_dawn_static_library_after_relocation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary); engine=root/"engine"; compiler=root/"compiler"; swan=root/"swan"
+            for base, names in [(engine,["Package.swift","Tools/Android/android.py"]),(compiler,["Package.swift","tools/aot_build.py"]),
+                                (swan,["Package.swift","Sources/WebGPU/WebGPU.swift","Dawn/dist/android.artifactbundle/info.json","Dawn/dist/android.artifactbundle/arm64/libwebgpu_dawn.a"])]:
+                for name in names:
+                    path=base/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text("fixture")
+            host=compiler/"gravity";host.write_text("#!/bin/sh\nexit 0\n");host.chmod(0o755)
+            destination=root/"Studio.app/Contents/Resources/BuildSDK"
+            sdk.stage(engine,compiler,destination,swan)
+            moved=root/"Relocated/BuildSDK";moved.parent.mkdir();destination.rename(moved)
+            self.assertTrue(json.loads((moved/"sdk.json").read_text())["android"])
+            self.assertEqual((moved/"Swan/Dawn/dist/android.artifactbundle/arm64/libwebgpu_dawn.a").read_text(),"fixture")
+            self.assertTrue((moved/"AdaEngine/Tools/Android/android.py").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

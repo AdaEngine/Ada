@@ -75,10 +75,18 @@ Exit codes: `0` success, `2` invalid command/options, `3` invalid project,
 
 Unknown, repeated and missing options are rejected. Relative `--project`, SDK,
 output and scratch paths resolve from the calling shell's working directory.
-The default output is `<project>/Exports/macOS` (or `Web`); default caches are
+The default output is `<project>/Exports/macOS` (or `Web` / `Android`); default caches are
 under `<project>/.ada/cli-build`. Project, output and scratch locks prevent
 concurrent CLI writers. Locks release on process exit. The native exporter
 stages output and retains the previous valid export when a build fails.
 
 To add a terminal command, create a user-managed symlink to the bundled
 `adastudio` executable. Studio does not change PATH or install files automatically.
+
+## Android
+
+Standalone Studio can export AdaScript AOT and Swift AdaEngine App projects to
+Android APKs. `export --target android --device <adb serial>` also installs and
+runs; `--emulator <AVD name>` boots an available AVD first. `--product` selects a
+Swift executable product. See [Android export and run](Android.md) for tool setup,
+signing, supported manifest shapes and the validation boundary.

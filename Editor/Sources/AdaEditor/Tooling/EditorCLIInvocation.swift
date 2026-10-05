@@ -31,7 +31,7 @@ struct EditorCLIInvocation: Sendable {
         let common: Set<String> = ["format"]
         let project: Set<String> = ["project"]
         let toolchain: Set<String> = ["sdk", "swift"]
-        let build: Set<String> = ["target", "configuration", "output", "scratch-path", "swift-sdk"]
+        let build: Set<String> = ["target", "configuration", "output", "scratch-path", "swift-sdk", "product", "abi", "device", "emulator", "android-sdk", "ndk", "swift-sdks", "swan", "dawn"]
         let allowed: Set<String>
         switch command {
         case .help, .version: allowed = common
@@ -60,12 +60,18 @@ struct EditorCLIInvocation: Sendable {
         if let configuration = parsed["configuration"], !["debug", "release"].contains(configuration) {
             throw EditorCLIError.argument("--configuration must be debug or release.")
         }
-        if let target = parsed["target"], !["macos", "web"].contains(target) {
-            throw EditorCLIError.argument("--target must be macos or web. iOS export is not available yet.")
+        if let target = parsed["target"], !["macos", "web", "android"].contains(target) {
+            throw EditorCLIError.argument("--target must be macos, web or android. iOS export is not available yet.")
         }
         if command == .build, parsed["target"] == "web" {
             throw EditorCLIError.argument("Use 'export --target web' for Web output.")
         }
+        let androidOptions: Set<String> = ["product", "abi", "device", "emulator", "android-sdk", "ndk", "swift-sdks", "swan", "dawn"]
+        if parsed["target"] != "android", !androidOptions.isDisjoint(with: parsed.keys) {
+            throw EditorCLIError.argument("Android options require --target android.")
+        }
+        if parsed["device"] != nil, parsed["emulator"] != nil { throw EditorCLIError.argument("Choose --device or --emulator, not both.") }
+        if let abi = parsed["abi"], !["arm64-v8a", "x86_64", "all"].contains(abi) { throw EditorCLIError.argument("Unsupported Android ABI.") }
         self.format = format
         options = parsed
         projectURL = URL(fileURLWithPath: parsed["project"] ?? directory.path, relativeTo: directory).standardizedFileURL
@@ -81,12 +87,16 @@ struct EditorCLIInvocation: Sendable {
       project inspect            Read project metadata without writing it
       validate                   Check metadata, AdaScript and the entry scene
       build                      Build an AdaScript macOS .app
-      export                     Export an AdaScript macOS .app or Web bundle
+      export                     Export a macOS .app, Web bundle or Android APK
 
     Common:    --format text|json
     Project:   --project <directory> (default: current directory)
-    Build:     --target macos|web --configuration debug|release --output <directory>
+    Build:     --target macos|web|android --configuration debug|release --output <directory>
                --scratch-path <directory> --swift-sdk <SDK identifier> (Web)
+    Android:   --product <Swift product> --abi arm64-v8a|x86_64|all
+               --device <adb serial> or --emulator <AVD name> to also install/run
+               --android-sdk <path> --ndk <path> --swift-sdks <path>
+               --swan <package path> --dawn <artifact path relative to Swan>
     Toolchain: --sdk <BuildSDK directory> --swift <Swift executable>
 
     Installed: "/Applications/Ada Studio.app/Contents/MacOS/adastudio" <command>

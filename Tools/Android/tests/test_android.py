@@ -75,3 +75,13 @@ class AndroidWebGPUSetupTests(unittest.TestCase):
             x86=android.parser().parse_args(["build","--abi","x86_64"])
             with self.assertRaisesRegex(android.AndroidError,"x86_64-unknown-linux-android29"):
                 android.validate_webgpu(x86,env)
+
+class AndroidSDKSelectionTests(unittest.TestCase):
+    def test_export_staging_does_not_change_sdk_import_paths(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary); bundle=root/"sdk.artifactbundle/swift-android"; bundle.mkdir(parents=True)
+            first=android.parser().parse_args(["build","--scratch",str(root/"cache"),"--output",str(root/"stage-one")])
+            second=android.parser().parse_args(["build","--scratch",str(root/"cache"),"--output",str(root/"stage-two")])
+            self.assertEqual(android.select_swift_sdks(first,bundle),android.select_swift_sdks(second,bundle))
+            self.assertEqual((android.select_swift_sdks(first,bundle)/(first.swift_sdk+".artifactbundle")).resolve(),bundle.parent.resolve())
+            self.assertFalse((root/"stage-one/swift-sdks").exists())
