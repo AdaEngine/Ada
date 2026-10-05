@@ -131,7 +131,9 @@ extension RenderEngine {
             #if WEBGPU_ENABLED && canImport(WebGPU)
                 renderBackend = try WebGPURenderBackend.createBackend()
             #else
-                #if WASM
+                #if os(Android)
+                    throw RenderEngineSetupError.androidWebGPUBackendUnavailable
+                #elseif WASM
                     throw RenderEngineSetupError.browserWebGPUBackendUnavailable
                 #else
                     fallthrough
@@ -151,7 +153,9 @@ extension RenderEngine {
     }
 
     private static func defaultBackendType() -> RenderBackendType {
-        #if WASM
+        #if os(Android)
+            return .webgpu
+        #elseif WASM
             #if WEBGPU_ENABLED && canImport(WebGPU)
                 return .webgpu
             #else
@@ -168,10 +172,13 @@ extension RenderEngine {
 }
 
 private enum RenderEngineSetupError: LocalizedError {
+    case androidWebGPUBackendUnavailable
     case browserWebGPUBackendUnavailable
 
     var errorDescription: String? {
         switch self {
+        case .androidWebGPUBackendUnavailable:
+            "Android WebGPU requires Swan and an Android Dawn/Vulkan artifact bundle."
         case .browserWebGPUBackendUnavailable:
             "Browser WebGPU backend is not linked. Add a WASM/browser WebGPU implementation before using RenderWorldPlugin in web exports."
         }

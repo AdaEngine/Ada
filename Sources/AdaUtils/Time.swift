@@ -13,7 +13,9 @@ import Foundation
 #if os(macOS)
     import Quartz
 #endif
-#if os(Android) || os(Linux)
+#if os(Android)
+    import Android
+#elseif os(Linux)
     import Glibc
 #endif
 
@@ -32,6 +34,8 @@ public struct Time {
         #elseif os(Windows)
             // Windows doesn't have clock_gettime, use Foundation's ProcessInfo
             return LongTimeInterval(ProcessInfo.processInfo.systemUptime)
+        #elseif os(Android)
+            return ProcessInfo.processInfo.systemUptime
         #elseif os(WASI)
             return LongTimeInterval(Date().timeIntervalSince1970)
         #else

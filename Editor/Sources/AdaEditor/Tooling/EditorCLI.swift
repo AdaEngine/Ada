@@ -94,7 +94,7 @@ enum EditorCLI {
                 }
                 report.details = [
                     "engine": sdk.engineRoot.path, "compiler": sdk.compilerRoot.path, "swift": swift,
-                    "distribution": EditorDistribution.current.rawValue, "nativeTargets": "macos,web", "validation": "available"
+                    "distribution": EditorDistribution.current.rawValue, "nativeTargets": "macos,web,android", "validation": "available"
                 ]
             case .inspect, .validate, .build, .export:
                 let root = invocation.projectURL
@@ -116,6 +116,41 @@ enum EditorCLI {
                     report.details["validationScope"] = "metadata,layout"
                 }
                 if invocation.command == .validate {
+                    return report
+                }
+                if invocation.options["target"] == "android" {
+                    let sdk = try EditorBuildSDK.locate(override: invocation.options["sdk"])
+                    var configuration = EditorAndroidConfiguration.load(engineRoot: sdk.engineRoot)
+                    for (option, key) in [("swift", "SWIFT_ANDROID_SWIFT"), ("swift-sdk", "SWIFT_ANDROID_SDK"), ("android-sdk", "ANDROID_HOME"),
+                                          ("ndk", "ANDROID_NDK_HOME"), ("swift-sdks", "SWIFT_ANDROID_SDKS_PATH"), ("swan", "ADAENGINE_SWAN_PACKAGE_PATH"), ("dawn", "SWAN_LOCAL_DAWN")] {
+                        if let value = invocation.options[option] { configuration.environment[key] = value }
+                    }
+                    try configuration.validateBuildTools(engineRoot: sdk.engineRoot)
+                    let tools = EditorAndroidTools(runner: runner)
+                    var serial = invocation.options["device"]
+                    if let avd = invocation.options["emulator"] {
+                        serial = try await tools.resolve(EditorAndroidTarget(id: "avd:" + avd, name: avd, kind: .emulator, serial: nil, avd: avd, state: "stopped"),
+                                                         configuration: configuration, at: root, log: log)
+                    }
+                    let abi: String
+                    if let serial { abi = try await tools.abi(serial: serial, configuration: configuration, at: root) }
+                    else { abi = invocation.options["abi"] ?? "arm64-v8a" }
+                    let output = URL(fileURLWithPath: invocation.options["output"] ?? root.appendingPathComponent("Exports/Android").path).standardizedFileURL
+                    try validateOutput(output, project: root)
+                    let lock = try EditorCLIBuildLock(at: root.appendingPathComponent(".ada/cli-build.lock"))
+                    defer { lock.release() }
+                    let scratch = invocation.options["scratch-path"].map { URL(fileURLWithPath: $0) }
+                    let result = try await EditorAndroidProjectExporter(runner: runner).export(project: project, at: root, to: output, sdk: sdk,
+                        configuration: configuration, abi: abi, product: invocation.options["product"], buildConfiguration: invocation.options["configuration"] ?? "debug", scratchDirectory: scratch, log: log)
+                    let apk = try EditorAndroidProjectExporter.apk(in: result)
+                    if let serial {
+                        try await tools.launch(apk: apk, applicationID: EditorAndroidConfiguration.applicationID(for: project.project.name ?? root.lastPathComponent),
+                                               serial: serial, configuration: configuration, at: root, requiresAOTReady: project.build.system.isAdaScript, log: log)
+                        report.details["device"] = serial
+                    }
+                    report.artifacts = [apk.path]
+                    report.details["exportDirectory"] = result.path
+                    report.details["target"] = "android"
                     return report
                 }
                 guard project.build.system.isAdaScript else {

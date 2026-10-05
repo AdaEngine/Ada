@@ -65,3 +65,10 @@ python3 scripts/update-offline-documentation.py --check
 ```
 
 The snapshot lives in `Sources/AdaEditor/Assets/Documentation/catalog.json` and ships through the existing SwiftPM `Assets` resource copy, including the macOS and iPadOS app wrappers. The generator preserves code examples, removes DocC presentation metadata, and validates internal article links.
+
+### Android
+
+Standalone macOS Studio supports **Build → Export to Android…** and Android
+Run Destinations with connected devices and AVDs. Swift and AdaScript projects
+use the native Swift/WebGPU Android host. Configure **Settings → Android** and
+see [Android export and run](Documentation/Android.md).

@@ -36,14 +36,14 @@ extension CanvasMaterial {
     public static func vertexShader() throws -> AssetHandle<ShaderSource> {
         return try loadBundledCanvasShaderSource(
             at: "Shaders/mesh2d/mesh2d.glsl#vert",
-            from: Bundle.module
+            from: Bundle.adaModule
         )
     }
 
     public static func fragmentShader() throws -> AssetHandle<ShaderSource> {
         return try loadBundledCanvasShaderSource(
             at: "Shaders/mesh2d/mesh2d.glsl#frag",
-            from: Bundle.module
+            from: Bundle.adaModule
         )
     }
 
@@ -106,7 +106,7 @@ public struct ColorCanvasMaterial: CanvasMaterial {
     public static func fragmentShader() throws -> AssetHandle<ShaderSource> {
         return try loadBundledCanvasShaderSource(
             at: "Shaders/Materials/color_canvas_material.glsl",
-            from: Bundle.module
+            from: Bundle.adaModule
         )
     }
 }
@@ -125,7 +125,7 @@ struct CircleCanvasMaterial: CanvasMaterial {
     public static func fragmentShader() throws -> AssetHandle<ShaderSource> {
         return try loadBundledCanvasShaderSource(
             at: "Shaders/Materials/circle_canvas_material.glsl",
-            from: Bundle.module
+            from: Bundle.adaModule
         )
     }
 }

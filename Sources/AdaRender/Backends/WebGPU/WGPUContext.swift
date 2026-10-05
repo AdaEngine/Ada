@@ -75,7 +75,8 @@
                     surface: wgpuSurface,
                     pixelFormat: surface.prefferedPixelFormat,
                     size: size,
-                    scaleFactor: surface.scaleFactor
+                    scaleFactor: surface.scaleFactor,
+                    surfaceOwner: surface
                 )
             )
         }
@@ -121,6 +122,7 @@
                     throw ContextError.windowNotFound
                 }
                 window.surfaceLock.withLock { _ in
+                    guard window.size != newSize || (scaleFactor ?? window.scaleFactor) != window.scaleFactor else { return }
                     webGPUDeviceLock.withLock { _ in
                         configureSurface(
                             surface: window.surface,
@@ -143,8 +145,14 @@
 
         public func destroyWindow(_ windowId: WindowID) throws {
             try self.windows.withLock {
-                guard $0[windowId] != nil else {
+                guard let window = $0[windowId] else {
                     throw ContextError.windowNotFound
+                }
+                window.surfaceLock.withLock { _ in
+                    window.isActive = false
+                    #if !WASM
+                    webGPUDeviceLock.withLock { _ in window.surface.unconfigure() }
+                    #endif
                 }
                 $0.removeValue(forKey: windowId)
             }
@@ -222,6 +230,9 @@
             let surface: WGPUSurfaceHandle
             public let pixelFormat: PixelFormat
             let surfaceLock = Mutex(())
+            // Retains the platform surface/ANativeWindow lease across render jobs.
+            let surfaceOwner: any RenderSurface
+            var isActive = true
             var pendingDrawableSkips: Int = 0
             public var size: Math.SizeInt
             public var scaleFactor: Float
@@ -231,13 +242,15 @@
                 surface: WGPUSurfaceHandle,
                 pixelFormat: PixelFormat,
                 size: Math.SizeInt,
-                scaleFactor: Float
+                scaleFactor: Float,
+                surfaceOwner: any RenderSurface
             ) {
                 self.windowId = windowId
                 self.surface = surface
                 self.pixelFormat = pixelFormat
                 self.size = size
                 self.scaleFactor = scaleFactor
+                self.surfaceOwner = surfaceOwner
             }
         }
 
@@ -276,6 +289,11 @@
                     surfaceDescriptor.nextInChain = unsafe WebGPU.GPUSurfaceSourceMetalLayer(
                         layer: Unmanaged.passUnretained(layer).toOpaque()
                     )
+                #elseif os(Android)
+                    guard let androidSurface = self as? AndroidNativeWindowRenderSurface else {
+                        preconditionFailure("Android WebGPU needs an Android native window surface")
+                    }
+                    surfaceDescriptor.nextInChain = unsafe WebGPU.GPUSurfaceSourceAndroidNativeWindow(window: androidSurface.nativeWindow)
                 #elseif os(Linux)
                     surfaceDescriptor.nextInChain = unsafe WebGPU.GPUSurfaceSourceXlibWindow(
                         display: UnsafeMutableRawPointer(glfwGetX11Display()),

@@ -5,6 +5,10 @@
 //  Created by v.prusakov on 11/12/21.
 //
 
+#if os(Android)
+    import Android
+#endif
+
 #if canImport(Glibc)
     import Glibc
 #endif
@@ -30,6 +34,8 @@
 public func tanf(_ float: Float) -> Float {
     #if os(Linux)
         return Glibc.tanf(float)
+    #elseif os(Android)
+        return Android.tanf(float)
     #elseif os(Windows)
         return WinSDK.tanf(float)
     #elseif os(WASI)
@@ -44,6 +50,8 @@ public func tanf(_ float: Float) -> Float {
 public func atan2(_ lhs: Double, _ rhs: Double) -> Double {
     #if os(Linux)
         return Glibc.atan2(lhs, rhs)
+    #elseif os(Android)
+        return Android.atan2(lhs, rhs)
     #elseif os(Windows)
         return WinSDK.atan2(lhs, rhs)
     #elseif os(WASI)
@@ -58,6 +66,8 @@ public func atan2(_ lhs: Double, _ rhs: Double) -> Double {
 public func atan2(_ lhs: Float, _ rhs: Float) -> Float {
     #if os(Linux)
         return Glibc.atan2(lhs, rhs)
+    #elseif os(Android)
+        return Android.atan2(lhs, rhs)
     #elseif os(Windows)
         return WinSDK.atan2f(lhs, rhs)
     #elseif os(WASI)
@@ -72,6 +82,8 @@ public func atan2(_ lhs: Float, _ rhs: Float) -> Float {
 public func sqrt(_ value: Float) -> Float {
     #if os(Linux)
         return Glibc.sqrtf(value)
+    #elseif os(Android)
+        return Android.sqrtf(value)
     #elseif os(Windows)
         return WinSDK.sqrtf(value)
     #elseif os(WASI)
@@ -86,6 +98,8 @@ public func sqrt(_ value: Float) -> Float {
 public func sqrt(_ value: Double) -> Double {
     #if os(Linux)
         return Glibc.sqrt(value)
+    #elseif os(Android)
+        return Android.sqrt(value)
     #elseif os(Windows)
         return WinSDK.sqrt(value)
     #elseif os(WASI)
@@ -118,6 +132,8 @@ public func cross(_ lhs: Vector3, _ rhs: Vector3) -> Vector3 {
 public func round<T: FloatingPoint>(_ value: T) -> T {
     #if os(Linux)
         return Glibc.round(value)
+    #elseif os(Android)
+        return Android.round(value)
     #elseif os(Windows)
         if let value = value as? Float {
             return WinSDK.roundf(value) as! T
@@ -142,6 +158,8 @@ public func round<T: FloatingPoint>(_ value: T) -> T {
 public func sin(_ value: Double) -> Double {
     #if os(Linux)
         return Glibc.sin(value)
+    #elseif os(Android)
+        return Android.sin(value)
     #elseif os(Windows)
         return WinSDK.sin(value)
     #elseif os(WASI)
@@ -156,6 +174,8 @@ public func sin(_ value: Double) -> Double {
 public func sin(_ value: Float) -> Float {
     #if os(Linux)
         return Glibc.sinf(value)
+    #elseif os(Android)
+        return Android.sinf(value)
     #elseif os(Windows)
         return WinSDK.sinf(value)
     #elseif os(WASI)
@@ -170,6 +190,8 @@ public func sin(_ value: Float) -> Float {
 public func cos(_ value: Double) -> Double {
     #if os(Linux)
         return Glibc.cos(value)
+    #elseif os(Android)
+        return Android.cos(value)
     #elseif os(Windows)
         return WinSDK.cos(value)
     #elseif os(WASI)
@@ -184,6 +206,8 @@ public func cos(_ value: Double) -> Double {
 public func cos(_ value: Float) -> Float {
     #if os(Linux)
         return Glibc.cosf(value)
+    #elseif os(Android)
+        return Android.cosf(value)
     #elseif os(Windows)
         return WinSDK.cosf(value)
     #elseif os(WASI)
@@ -198,6 +222,8 @@ public func cos(_ value: Float) -> Float {
 public func acos(_ value: Float) -> Float {
     #if os(Linux)
         return Glibc.acos(value)
+    #elseif os(Android)
+        return Android.acos(value)
     #elseif os(Windows)
         return WinSDK.acosf(value)
     #elseif os(WASI)
@@ -212,6 +238,8 @@ public func acos(_ value: Float) -> Float {
 public func acos(_ value: Double) -> Double {
     #if os(Linux)
         return Glibc.acos(value)
+    #elseif os(Android)
+        return Android.acos(value)
     #elseif os(Windows)
         return WinSDK.acos(value)
     #elseif os(WASI)

@@ -31,7 +31,7 @@ struct EditorTopToolbarRegion: View {
     }
 
     private var debugAction: (() -> Void)? {
-        guard viewModel.selectedRunDestination != .player else {
+        guard viewModel.selectedRunDestination != .player, viewModel.selectedRunDestination != .android else {
             return nil
         }
         return { viewModel.debugSelectedTarget() }
@@ -44,6 +44,12 @@ struct EditorRunDestinationOverlay: View {
     let toolbarHeight: Float
     let onDismiss: () -> Void
     let onSelect: (EditorRunDestination) -> Void
+    var androidTargets: [EditorAndroidTarget] = []
+    var selectedAndroidTargetID: String?
+    var androidStatus = ""
+    var onSelectAndroid: ((EditorAndroidTarget) -> Void)?
+    var onRefreshAndroid: (() -> Void)?
+    var onAndroidSettings: (() -> Void)?
 
     var body: some View {
         if isPresented {
@@ -57,7 +63,13 @@ struct EditorRunDestinationOverlay: View {
                     onSelect: { destination in
                         onDismiss()
                         onSelect(destination)
-                    }
+                    },
+                    androidTargets: androidTargets,
+                    selectedAndroidTargetID: selectedAndroidTargetID,
+                    androidStatus: androidStatus,
+                    onSelectAndroid: { target in onDismiss(); onSelectAndroid?(target) },
+                    onRefreshAndroid: onRefreshAndroid,
+                    onAndroidSettings: { onDismiss(); onAndroidSettings?() }
                 )
                 .offset(
                     x: -EditorRunDestinationMenuLayout.trailingOffset,

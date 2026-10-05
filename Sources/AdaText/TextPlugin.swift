@@ -39,7 +39,7 @@ public struct TextPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = (try? ShaderModule.loadBundled(at: "Assets/text.glsl", from: .module))
+        self.shader = (try? ShaderModule.loadBundled(at: "Assets/text.glsl", from: .adaModule))
             .unwrap(message: "Bundled text shader is missing.")
     }
 

@@ -107,6 +107,29 @@ struct EditorTopToolbarTests {
         }
     #endif
 
+    #if os(macOS)
+    @Test("Android device and AVD rows have distinct frames and select their own destinations")
+    @MainActor
+    func androidRowsDoNotOverlap() throws {
+        prepareRendererIfNeeded()
+        let avd = EditorAndroidTarget(id: "avd:Pixel", name: "Pixel", kind: .emulator, serial: nil, avd: "Pixel", state: "stopped")
+        let phone = EditorAndroidTarget(id: "device:USB1", name: "Phone", kind: .device, serial: "USB1", avd: nil, state: "device")
+        var selected: String?
+        let container = UIContainerView(rootView: EditorRunDestinationMenu(selectedDestination: .android, onSelect: { _ in },
+            androidTargets: [avd, phone], onSelectAndroid: { selected = $0.id }))
+        container.frame = Rect(x: 0, y: 0, width: 308, height: 500)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        let first = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Android.Target.avd:Pixel"))
+        let second = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Android.Target.device:USB1"))
+        #expect(first.absoluteFrame.maxY <= second.absoluteFrame.minY)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Android.Target.avd:Pixel"))
+        #expect(selected == avd.id)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Android.Target.device:USB1"))
+        #expect(selected == phone.id)
+    }
+    #endif
+
     @MainActor
     private func prepareRendererIfNeeded() {
         guard unsafe RenderEngine.shared == nil else {

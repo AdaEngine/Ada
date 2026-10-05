@@ -33,15 +33,19 @@ public struct UpscalePipeline: Resource {
     public let sampler: Sampler
 
     public init(device: RenderDevice) {
-        let spriteShader = ShaderModule.loadRequiredBundled(at: "Shaders/FullScreenShader.glsl", from: .module)
+        let spriteShader = ShaderModule.loadRequiredBundled(at: "Shaders/FullScreenShader.glsl", from: .adaModule)
 
         var descriptor = RenderPipelineDescriptor(vertex: spriteShader.asset.requiredShader(for: .vertex))
         descriptor.debugName = "Upscale Pipeline"
 
         descriptor.fragment = spriteShader.asset.getShader(for: .fragment)
-        descriptor.colorAttachments = [
-            RenderPipelineColorAttachmentDescriptor(format: .bgra8)
-        ]
+        #if os(Android)
+            // Android native swapchains expose RGBA; intermediate targets remain BGRA.
+            let outputFormat: PixelFormat = .rgba8
+        #else
+            let outputFormat: PixelFormat = .bgra8
+        #endif
+        descriptor.colorAttachments = [RenderPipelineColorAttachmentDescriptor(format: outputFormat)]
 
         self.renderPipeline = device.createRenderPipeline(from: descriptor)
         self.sampler = device.createSampler(from: SamplerDescriptor())

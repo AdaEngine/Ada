@@ -1,15 +1,34 @@
 import AdaEngine
+import Foundation
 
+#if os(Android)
+@_cdecl("ada_android_start")
+public func startAndroidGarden() {
+    AndroidRuntime.start { SkeletalGarden() }
+}
+#else
 @main
+private enum GardenMain {
+    static func main() async throws { try await SkeletalGarden.main() }
+}
+#endif
 struct SkeletalGarden: App {
     var body: some AppScene {
-        DefaultAppWindow(assetBundle: .module)
+        DefaultAppWindow(assetBundle: gardenBundle)
             .addPlugins(GardenPlugin())
             .window(with: UIWindow.Configuration(
                 title: "AdaEngine · Skeletal Garden · WASD / Shift / Space / drag to orbit",
                 frame: Rect(x: 120, y: 100, width: 1100, height: 760)
             ))
     }
+}
+
+var gardenBundle: Foundation.Bundle {
+    #if os(Android)
+    AndroidResourceBundle.bundle(named: "AdaEngine_SkeletalGarden")
+    #else
+    .module
+    #endif
 }
 
 struct GardenPlugin: Plugin {
@@ -64,7 +83,7 @@ func StartupGarden(_ context: WorldUpdateContext) {
 @MainActor
 private func makeGarden(in world: World) throws {
     let device = unsafe RenderEngine.shared.renderDevice
-    guard let model = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/GardenRobot.glb", from: .module).asset else {
+    guard let model = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/GardenRobot.glb", from: gardenBundle).asset else {
         throw AssetError.message("GardenRobot could not be loaded")
     }
     let player = model.instantiate(in: world)
@@ -92,7 +111,7 @@ private func makeGarden(in world: World) throws {
         ("Pedestal", [3.1, 0, 0.5], 1), ("Lantern", [3.1, 1, 0.5], 1),
     ]
     for (name, position, scale) in props {
-        guard let prop = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/\(name).glb", from: .module).asset else {
+        guard let prop = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/\(name).glb", from: gardenBundle).asset else {
             throw AssetError.message("Missing garden prop \(name)")
         }
         let root = prop.instantiate(in: world)
@@ -107,7 +126,7 @@ private func makeGarden(in world: World) throws {
     }
     makeGardenCollisions(in: world)
     try makeGardenLandscape(in: world, device: device)
-    let ibl = try AssetsManager.loadSync(ImageBasedLighting3D.self, at: "Assets/Studio.ibl", from: .module)
+    let ibl = try AssetsManager.loadSync(ImageBasedLighting3D.self, at: "Assets/Studio.ibl", from: gardenBundle)
     let noIBL = ProcessInfo.processInfo.arguments.contains("--no-ibl")
     world.spawn("Sun") {
         DirectionalLightComponent(radiance: [1, 0.88, 0.7], intensity: 2.5, shadowDistance: 60, shadowBias: 0.002, shadowSlopeBias: 0.006)
@@ -124,5 +143,9 @@ private func makeGarden(in world: World) throws {
 }
 
 func gardenLog(_ message: String) {
+    #if os(Android)
+    AndroidRuntime.log(message)
+    #else
     FileHandle.standardOutput.write(Data((message + "\n").utf8))
+    #endif
 }

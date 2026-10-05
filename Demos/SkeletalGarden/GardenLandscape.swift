@@ -67,7 +67,7 @@ func makeGardenLandscape(in world: World, device: RenderDevice) throws {
 
 @MainActor
 private func landscapeModel(_ name: String) throws -> ModelAsset3D {
-    guard let model = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/\(name).glb", from: .module).asset else {
+    guard let model = try AssetsManager.loadSync(ModelAsset3D.self, at: "Assets/\(name).glb", from: gardenBundle).asset else {
         throw AssetError.message("Missing landscape asset \(name)")
     }
     return model

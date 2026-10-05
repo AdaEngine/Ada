@@ -16,7 +16,9 @@ extension Notification.Name {
 }
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
     import Darwin
-#elseif os(Linux) || os(Android)
+#elseif os(Android)
+    import Android
+#elseif os(Linux)
     import Glibc
 #elseif os(Windows)
     import WinSDK

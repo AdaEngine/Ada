@@ -70,7 +70,7 @@ public struct GlassPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/glass.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/glass.glsl", from: .adaModule)
     }
 
     public func configurate(

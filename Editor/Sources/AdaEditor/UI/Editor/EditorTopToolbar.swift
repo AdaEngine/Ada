@@ -132,12 +132,20 @@ struct EditorTopToolbar: View {
 struct EditorRunDestinationMenu: View {
     let selectedDestination: EditorRunDestination
     let onSelect: (EditorRunDestination) -> Void
+    var androidTargets: [EditorAndroidTarget] = []
+    var selectedAndroidTargetID: String?
+    var androidStatus = ""
+    var onSelectAndroid: ((EditorAndroidTarget) -> Void)?
+    var onRefreshAndroid: (() -> Void)?
+    var onAndroidSettings: (() -> Void)?
+
+    private var menuWidth: Float { selectedDestination == .android ? 300 : EditorRunDestinationMenuLayout.width }
 
     @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(EditorRunDestination.allCases, id: \.self) { destination in
+            ForEach(EditorRunDestination.availableCases, id: \.self) { destination in
                 Button(
                     action: { onSelect(destination) },
                     label: {
@@ -152,15 +160,42 @@ struct EditorRunDestinationMenu: View {
                         }
                         .foregroundColor(selectedDestination == destination ? theme.editorColors.blue : theme.editorColors.text)
                         .padding(.horizontal, 10)
-                        .frame(width: EditorRunDestinationMenuLayout.width, height: EditorRunDestinationMenuLayout.rowHeight)
+                        .frame(width: menuWidth, height: EditorRunDestinationMenuLayout.rowHeight)
                     }
                 )
                 .buttonStyle(DefaultButtonStyle())
                 .accessibilityIdentifier("AdaEditor.RunDestination.\(destination.rawValue)")
             }
+            if selectedDestination == .android {
+                Text(androidStatus).font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+                    .lineLimit(3).padding(.horizontal, 10).frame(width: menuWidth)
+                ScrollView(.vertical, showsIndicators: true) {
+                VStack(alignment: .leading, spacing: 0) {
+                ForEach(androidTargets) { target in
+                    Button(action: { onSelectAndroid?(target) }) {
+                        HStack(spacing: 8) {
+                            Text((target.kind == .emulator ? "Emulator · " : "Device · ") + target.title)
+                                .font(.system(size: 11)).lineLimit(2)
+                            Spacer()
+                            if selectedAndroidTargetID == target.id { Text("✓").font(.system(size: 12)) }
+                        }
+                        .foregroundColor(theme.editorColors.text).padding(.horizontal, 10)
+                        .frame(width: menuWidth, height: 42)
+                    }
+                    .buttonStyle(DefaultButtonStyle()).disabled(!target.isAvailable)
+                    .accessibilityIdentifier("AdaEditor.Android.Target." + target.id)
+                }
+                }
+                }.frame(width: menuWidth, height: min(Float(androidTargets.count) * 42, 210))
+                HStack(spacing: 16) {
+                    Button("Refresh") { onRefreshAndroid?() }.foregroundColor(theme.editorColors.blue)
+                    Button("Android Settings…") { onAndroidSettings?() }.foregroundColor(theme.editorColors.blue)
+                }
+                .font(.system(size: 11)).padding(10)
+            }
         }
         .padding(4)
-        .frame(width: EditorRunDestinationMenuLayout.width + 8)
+        .frame(width: menuWidth + 8)
         .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surfaceElevated))
         .overlay {
             RoundedRectangleShape(cornerRadius: 8)

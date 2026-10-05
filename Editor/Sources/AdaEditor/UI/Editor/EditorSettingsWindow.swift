@@ -544,7 +544,10 @@ struct EditorSettingsWindowView: View {
             agentSettings(viewModel.agent)
         } else if viewModel.selectedSection == .general, viewModel.editorViewModel == nil {
             VStack(alignment: .leading, spacing: 0) {
-                settingsGroup("ADA CLOUD") { EditorCloudSettingsView() }
+                #if os(macOS)
+            settingsGroup("ANDROID") { EditorAndroidSettingsView(editor: viewModel.editorViewModel) }
+            #endif
+            settingsGroup("ADA CLOUD") { EditorCloudSettingsView() }
                 settingsGroup("APPEARANCE") { EditorAgentGlowSettings() }
                 settingsGroup(EditorSettingsPage.editorDisplay) { EditorCodeDisplaySettings() }
             }

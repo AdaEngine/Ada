@@ -14,11 +14,11 @@ import Math
 
 public enum CorePipelineShaders {
     public static func loadBundled(at path: String) throws -> AssetHandle<ShaderModule> {
-        try ShaderModule.loadBundled(at: path, from: .module)
+        try ShaderModule.loadBundled(at: path, from: .adaModule)
     }
 
     public static func loadRequiredBundled(at path: String) -> AssetHandle<ShaderModule> {
-        ShaderModule.loadRequiredBundled(at: path, from: .module)
+        ShaderModule.loadRequiredBundled(at: path, from: .adaModule)
     }
 }
 
@@ -29,7 +29,7 @@ public struct QuadPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/quad.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/quad.glsl", from: .adaModule)
     }
 
     public func configurate(
@@ -64,7 +64,7 @@ public struct LinearGradientPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/gradient.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/gradient.glsl", from: .adaModule)
     }
 
     public func configurate(
@@ -99,7 +99,7 @@ public struct CirclePipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/circle.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/circle.glsl", from: .adaModule)
     }
 
     public func configurate(
@@ -136,7 +136,7 @@ public struct LinePipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/line.glsl", from: .module)
+        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/line.glsl", from: .adaModule)
     }
 
     public func configurate(
