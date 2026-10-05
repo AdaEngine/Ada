@@ -8,6 +8,7 @@ struct IBL3DUniform: Sendable {
 }
 
 public struct IBL3DScratch: Resource, Sendable {
+    var cache = FrameUniformCache3D<IBL3DUniform>()
     var uniform = BufferData<IBL3DUniform>(label: "Image Based Lighting", elements: [])
     public init() {}
 }

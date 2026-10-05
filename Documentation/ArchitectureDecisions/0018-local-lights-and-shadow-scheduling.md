@@ -2,7 +2,28 @@
 
 - Status: Accepted
 - Date: 2026-10-05
-- Implementation: Planned
+- Implementation: Partial (local foundation; not released)
+
+## Implementation status
+
+Last verified: 2026-10-05 in the current checkout. This implementation is local
+and uncommitted. Four directional and 32 per-camera local lights use bounded
+forward PBR lighting. Range attenuation and spot half-angles are explicit, with
+legacy point/spot payload decoding and Inspector fields.
+
+Each camera owns a reusable atlas: 512-pixel tiles, six columns, up to four light
+slots/rows. Point lights render six faces and spot lights one in a single atlas
+pass. Priority and estimated influence select winners; retained winners keep
+slots. Over-budget sources retain unshadowed lighting. Alpha-mask, GPU skinning
+and independent caster culling reuse the existing shadow path. Local uniforms,
+shadow matrices and IBL inverse-view constants use independent per-camera rings.
+
+Native Metal controls cover no-local-light, point-only, spot-only, unshadowed,
+budget, many-light, moving and multi-camera scenes. Results and limits are in
+[LocalLightingValidation.md](../../Demos/SkeletalGarden/LocalLightingValidation.md).
+Apple mobile/WebGPU execution and visual Inspector interaction remain unverified.
+Clustered light assignment, contact-quality refinement and adaptive atlas tile
+sizes remain future work. Transparent BLEND materials do not cast shadows.
 
 ## Context
 
@@ -27,11 +48,11 @@ required feature. Avoid a pass or allocation per light every frame.
 
 ## Implementation checklist
 
-- [ ] Multiple directional/point/spot extraction, GPU uniforms and PBR evaluation.
-- [ ] Finite range, attenuation and spot-cone API with scene coding and Editor controls.
-- [ ] Point/spot shadow resources, allocation budget and scheduling.
-- [ ] Animated/alpha-masked shadows and independent caster visibility.
-- [ ] Native lighting/shadow captures and performance measurements for many lights.
+- [x] Multiple directional/point/spot extraction, GPU uniforms and PBR evaluation.
+- [x] Finite range, attenuation and spot-cone API with scene coding and Editor controls.
+- [x] Point/spot shadow resources, allocation budget and scheduling.
+- [x] Animated/alpha-masked shadows and independent caster visibility.
+- [x] Native lighting/shadow captures and performance measurements for many lights.
 
 ## Validation requirements
 

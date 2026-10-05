@@ -159,6 +159,24 @@ struct VertexOut
 
 layout (location = 0) in VertexOut Input;
 
+struct LocalLight3D {
+    vec4 positionRange;
+    vec4 radianceIntensity;
+    vec4 directionOuter;
+    vec4 innerShadow;
+};
+layout (binding = 25) uniform LocalLighting3DUniform {
+    vec4 u_LightCounts;
+    vec4 u_AdditionalDirections[3];
+    vec4 u_AdditionalRadiance[3];
+    LocalLight3D u_LocalLights[32];
+};
+layout (binding = 28) uniform LocalShadow3DUniform {
+    mat4 u_LocalShadowMatrices[24];
+    vec4 u_LocalAtlas;
+};
+layout (binding = 26) uniform texture2D u_LocalShadowTexture;
+
 const float PI = 3.14159265359;
 
 vec3 srgbToLinear(vec3 value) {
@@ -300,6 +318,77 @@ float directionalShadow(vec3 normal, vec3 lightDirection) {
     return visibility;
 }
 
+vec3 evaluateDirect(vec3 normal, vec3 viewDirection, vec3 lightDirection, vec3 baseColor, float metallic, float roughness, vec3 radiance) {
+    float nl = max(dot(normal, lightDirection), 0.0), nv = max(dot(normal, viewDirection), 0.0);
+    if (nl <= 0.0 || nv <= 0.0) { return vec3(0.0); }
+    vec3 halfway = normalize(viewDirection + lightDirection);
+    vec3 f0 = mix(vec3(0.04), baseColor, metallic);
+    vec3 fresnel = fresnelSchlick(max(dot(halfway, viewDirection), 0.0), f0);
+    float distribution = distributionGGX(normal, halfway, roughness);
+    float geometry = geometrySmith(normal, viewDirection, lightDirection, roughness);
+    vec3 specular = distribution * geometry * fresnel / max(4.0 * nv * nl, 0.0001);
+    return ((vec3(1.0) - fresnel) * (1.0 - metallic) * baseColor / PI + specular) * max(radiance, vec3(0.0)) * nl;
+}
+
+int localPointFace(vec3 ray) {
+    vec3 a = abs(ray);
+    if (a.x >= a.y && a.x >= a.z) { return ray.x >= 0.0 ? 0 : 1; }
+    if (a.y >= a.z) { return ray.y >= 0.0 ? 2 : 3; }
+    return ray.z >= 0.0 ? 4 : 5;
+}
+
+float localShadowVisibility(LocalLight3D light, vec3 lightDirection, vec3 normal) {
+    int slot = int(light.innerShadow.w);
+    if (slot < 0 || slot >= 4 || Input.ShadowFlags.x < 0.5) { return 1.0; }
+    // View-space direction to the surface converted back to world-space for cube-face choice.
+    vec3 worldRay = mat3(u_EnvironmentInverseView) * (Input.ViewPosition - light.positionRange.xyz);
+    int face = light.directionOuter.w < 0.0 ? localPointFace(worldRay) : 0;
+    vec4 clip = u_LocalShadowMatrices[slot * 6 + face] * vec4(Input.WorldPosition, 1.0);
+    if (clip.w <= 0.0) { return 1.0; }
+    vec3 ndc = clip.xyz / clip.w;
+    if (ndc.z < 0.0 || ndc.z > 1.0 || any(greaterThan(abs(ndc.xy), vec2(1.0)))) { return 1.0; }
+    vec2 tileOrigin = vec2(float(face), float(slot)) * u_LocalAtlas.z;
+    vec2 texel = u_LocalAtlas.xy;
+    vec2 uv = (tileOrigin + (ndc.xy * vec2(0.5, -0.5) + 0.5) * u_LocalAtlas.z) * texel;
+    vec2 lo = (tileOrigin + 0.5) * texel, hi = (tileOrigin + u_LocalAtlas.z - 0.5) * texel;
+    float bias = light.innerShadow.y + light.innerShadow.z * (1.0 - max(dot(normal, lightDirection), 0.0));
+    float visibility = 0.0;
+    for (int y = -1; y <= 1; ++y) { for (int x = -1; x <= 1; ++x) {
+        float stored = texture(sampler2D(u_LocalShadowTexture, u_DirectionalShadowSampler), clamp(uv + vec2(float(x), float(y)) * texel, lo, hi)).r;
+        visibility += ndc.z - bias <= stored ? 1.0 : 0.0;
+    } }
+    return visibility / 9.0;
+}
+
+vec3 additionalLighting(vec3 normal, vec3 viewDirection, vec3 baseColor, float metallic, float roughness) {
+    vec3 result = vec3(0.0);
+    for (int i = 0; i < 3; ++i) {
+        if (i >= int(u_LightCounts.x)) { break; }
+        result += evaluateDirect(normal, viewDirection, normalize(u_AdditionalDirections[i].xyz), baseColor, metallic, roughness,
+            u_AdditionalRadiance[i].rgb * max(u_AdditionalDirections[i].w, 0.0));
+    }
+    for (int i = 0; i < 32; ++i) {
+        if (i >= int(u_LightCounts.y)) { break; }
+        LocalLight3D light = u_LocalLights[i];
+        vec3 delta = light.positionRange.xyz - Input.ViewPosition;
+        float distance = length(delta), range = light.positionRange.w;
+        if (distance >= range || range <= 0.0) { continue; }
+        vec3 direction = delta / max(distance, 0.00001);
+        float ratio = distance / range;
+        float cutoff = max(0.0, 1.0 - ratio * ratio * ratio * ratio);
+        float attenuation = cutoff * cutoff / max(distance * distance, 0.01);
+        if (light.directionOuter.w >= 0.0) {
+            float cone = dot(normalize(light.directionOuter.xyz), -direction);
+            attenuation *= smoothstep(light.directionOuter.w, light.innerShadow.x, cone);
+        }
+        if (attenuation <= 0.0) { continue; }
+        vec3 contribution = evaluateDirect(normal, viewDirection, direction, baseColor, metallic, roughness,
+            light.radianceIntensity.rgb * max(light.radianceIntensity.w, 0.0) * attenuation);
+        result += contribution * localShadowVisibility(light, direction, normal);
+    }
+    return result;
+}
+
 float visibilityDither(vec2 pixel) {
     int x = int(mod(floor(pixel.x), 4.0)), y = int(mod(floor(pixel.y), 4.0));
     const float values[16] = float[](0.0,8.0,2.0,10.0,12.0,4.0,14.0,6.0,3.0,11.0,1.0,9.0,15.0,7.0,13.0,5.0);
@@ -378,6 +467,7 @@ void flat3d_fragment()
     vec3 radiance = max(u_LightRadianceAmbient.rgb, vec3(0.0)) * max(u_LightDirectionIntensity.w, 0.0);
     float shadowVisibility = directionalShadow(normal, lightDirection);
     vec3 directLighting = (diffuseWeight * baseColor.rgb / PI + specular) * radiance * normalLight * shadowVisibility;
+    directLighting += additionalLighting(normal, viewDirection, baseColor.rgb, metallic, roughness);
     vec3 ambient = baseColor.rgb * (1.0 - metallic) * max(u_LightRadianceAmbient.w, 0.0);
     if (u_IBLParameters.x > 0.5) { ambient = environmentLighting(normal, viewDirection, baseColor.rgb, metallic, roughness); }
     float occlusion = u_SurfaceFlags.y > 0.5 ? texture(sampler2D(u_OcclusionTexture, u_OcclusionSampler), materialUV(u_UVSets.w)).r : 1.0;

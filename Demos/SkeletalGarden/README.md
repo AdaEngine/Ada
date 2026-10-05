@@ -129,3 +129,50 @@ scene overlays. It is a quality option; faster rendering is not assumed.
 Apple mobile and WebGPU execution require separate validation.
 
 Recorded native proof: [MetalFXValidation.md](MetalFXValidation.md).
+
+## Local lighting and shadows
+
+Point/spot lights use world-meter ranges independent of entity scale. Intensity
+is a linear radiance multiplier at one meter with inverse-square falloff and a
+smooth range cutoff. Spot lights aim along local +Z; cone angles are half-angles
+in degrees. The inner cone is fully lit; the outer cone smoothly reaches zero.
+
+```swift
+PointLightComponent(radiance: [1, 0.35, 0.08], intensity: 45, range: 9)
+SpotLightComponent(intensity: 160, range: 12, innerConeAngle: 16, outerConeAngle: 28)
+```
+
+The forward shader supports four directional lights (one primary cascaded-shadow
+sun) and 32 visible local lights per camera. Local lights are selected by
+estimated influence with stable entity-ID ties. A camera's
+`Environment3D.localShadows` controls an enabled flag and 0–4 shadowed lights.
+Higher `shadowPriority` wins among selected visible lights, then influence;
+retained winners keep their atlas slots. Over-budget lights remain illuminated
+without shadows. Point shadows use six projections and spot shadows one, in a
+reused 512-pixel-tile atlas with a single pass per camera. Alpha-mask and GPU
+skinning are shared with the sunlight shadow path. Transparent BLEND materials
+remain unshadowed casters. Atlas sampling clamps PCF taps to the current tile.
+
+The demo's extra lights are opt-in. Key 8 toggles local lights and key 9 toggles
+their shadows. Inspector controls expose range, cone, shadow bias/priority and
+the per-camera local shadow budget.
+
+```sh
+Demos/SkeletalGarden/script/build_and_run.sh --local-lights
+Demos/SkeletalGarden/script/build_and_run.sh --capture-local-lights
+Demos/SkeletalGarden/script/build_and_run.sh --capture-local-no-lights
+Demos/SkeletalGarden/script/build_and_run.sh --capture-local-unshadowed
+Demos/SkeletalGarden/script/build_and_run.sh --capture-local-point
+Demos/SkeletalGarden/script/build_and_run.sh --capture-local-spot
+Demos/SkeletalGarden/script/build_and_run.sh --capture-local-budget
+Demos/SkeletalGarden/script/build_and_run.sh --capture-local-many
+Demos/SkeletalGarden/script/build_and_run.sh --capture-local-moving
+Demos/SkeletalGarden/script/build_and_run.sh --capture-local-multi
+Demos/SkeletalGarden/script/build_and_run.sh --verify-local-lights
+```
+
+`lights.json` records each camera's selected lights, shadow faces and atlas size;
+GPU pass timings are separate. The moving control animates a point light, the
+character pose and the camera using deterministic frame increments. The
+multi-camera control also tests render-to-texture and a resized temporal input.
+Native proof and limits: [LocalLightingValidation.md](LocalLightingValidation.md).

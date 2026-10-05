@@ -56,32 +56,6 @@ public struct Model3DPlugin: Plugin {
 }
 
 @System
-func ExtractDirectionalLight3D(
-    _ query: Extract<Query<Entity,
-    DirectionalLightComponent,
-    GlobalTransform>>,
-    _ extracted: ResMut<ExtractedLighting3D>
-) {
-    extracted.directionalLight = nil
-    query.wrappedValue.forEach { _, light, transform in
-        guard extracted.directionalLight == nil, light.intensity > 0 else {
-            return
-        }
-
-        let rayDirection = transform.matrix.z.xyz.normalized
-        extracted.directionalLight = ExtractedDirectionalLight3D(
-            directionToLight: -rayDirection,
-            radiance: light.radiance,
-            intensity: light.intensity,
-            castsShadows: light.castShadows,
-            shadowDistance: light.shadowDistance,
-            shadowBias: light.shadowBias,
-            shadowSlopeBias: light.shadowSlopeBias
-        )
-    }
-}
-
-@System
 func ExtractModel3D(
     _ query: Extract<Query<Entity,
     Mesh3DComponent,

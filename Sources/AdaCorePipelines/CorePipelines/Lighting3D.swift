@@ -12,6 +12,7 @@ public struct ExtractedDirectionalLight3D: Sendable {
     public var shadowDistance: Float
     public var shadowBias: Float
     public var shadowSlopeBias: Float
+    public var entity: Entity.ID?
 
     public init(
         directionToLight: Vector3,
@@ -35,6 +36,11 @@ public struct ExtractedDirectionalLight3D: Sendable {
 /// Lighting data copied into the render world every frame.
 public struct ExtractedLighting3D: Resource, Sendable {
     public var directionalLight: ExtractedDirectionalLight3D?
+    /// All authored active directional lights, with the primary sunlight at index zero.
+    public var directionalLights: [ExtractedDirectionalLight3D] = []
+    public var localLights: [ExtractedLocalLight3D] = []
+    /// Preserve the legacy default sun only when a scene contains no authored lights at all.
+    public var hasAuthoredLights = false
 
     public init(directionalLight: ExtractedDirectionalLight3D? = nil) {
         self.directionalLight = directionalLight

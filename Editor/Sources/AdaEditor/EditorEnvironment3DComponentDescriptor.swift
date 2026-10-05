@@ -8,6 +8,8 @@ extension EditorComponentRegistry {
         description: "Configures the sky, star field, and screen-space reflections for a 3D camera.",
         requiredComponentTypeNames: [EditorBuiltInComponentType.camera],
         fields: [
+            environmentField("localShadows.isEnabled", "Local Shadows Enabled", .bool),
+            environmentField("localShadows.maximumLights", "Local Shadow Light Budget (0–4)", .int, minimumValue: 0),
             environmentField("skybox.texture", "Skybox Texture", .assetReference),
             environmentField("skybox.isEnabled", "Skybox Enabled", .bool),
             environmentField("skybox.intensity", "Skybox Intensity", .float, minimumValue: 0),
@@ -46,6 +48,7 @@ extension EditorComponentRegistry {
     private static func makeDefaultEnvironment3DPayload() -> EditorComponentPayload {
         let environment = Environment3D()
         return [
+            "localShadows": .object(["isEnabled": .bool(environment.localShadows.isEnabled), "maximumLights": .int(environment.localShadows.maximumLights)]),
             "skybox": .object([
                 "texture": .null,
                 "zenithColor": colorValue(environment.skybox.zenithColor),
@@ -107,7 +110,12 @@ extension EditorComponentRegistry {
             intensity: Float(root.value(at: ["screenSpaceReflection", "intensity"][...])?.doubleValue ?? Double(defaults.screenSpaceReflection.intensity)),
             edgeFade: Float(root.value(at: ["screenSpaceReflection", "edgeFade"][...])?.doubleValue ?? Double(defaults.screenSpaceReflection.edgeFade))
         )
-        return Environment3D(skybox: skybox, screenSpaceReflection: reflection)
+        var result = Environment3D(skybox: skybox, screenSpaceReflection: reflection)
+        result.localShadows = LocalShadowSettings3D(
+            isEnabled: root.value(at: ["localShadows", "isEnabled"][...])?.boolValue ?? defaults.localShadows.isEnabled,
+            maximumLights: Int(root.value(at: ["localShadows", "maximumLights"][...])?.doubleValue ?? Double(defaults.localShadows.maximumLights))
+        )
+        return result
     }
 
     private static func colorValue(_ color: Color) -> EditorSceneValue {

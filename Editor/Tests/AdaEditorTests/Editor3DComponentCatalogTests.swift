@@ -149,6 +149,37 @@ struct Editor3DComponentCatalogTests {
         #expect(light.radiance == Vector3(0.2, 0.4, 0.6) && light.intensity == 2 && !light.castShadows)
     }
 
+    @Test("Local light controls preserve range, cone and shadow settings in a saved scene")
+    func localLightFieldsSurviveSceneCoding() throws {
+        EditorComponentRegistry.registerBuiltIns()
+        let descriptor = try #require(EditorComponentRegistry.descriptor(named: EditorBuiltInComponentType.spotLight3D))
+        var payload = descriptor.makeDefaultPayload()
+        for (key, value) in [("range", "16"), ("innerConeAngle", "12"), ("outerConeAngle", "28"), ("shadowPriority", "8"), ("shadowBias", "0.003")] {
+            let field = try #require(descriptor.fields.first { $0.key == key })
+            field.write(value, to: &payload)
+        }
+        var scene = EditorSceneModel.default(projectName: "Local Lights")
+        let root = try #require(scene.rootEntityID)
+        let index = try #require(scene.entities.firstIndex { $0.id == root })
+        scene.entities[index].components[EditorBuiltInComponentType.spotLight3D] = payload
+        let restored = try JSONDecoder().decode(EditorSceneModel.self, from: JSONEncoder().encode(scene))
+        let world = World()
+        let loaded = EditorSceneFileLoader.load(model: restored, into: world, loadsScriptableObjects: false)
+        #expect(loaded.warnings.isEmpty)
+        let id = try #require(loaded.entitiesByEditorID[root])
+        let light = try #require(world.getEntityByID(id)?.components[SpotLightComponent.self])
+        #expect(light.range == 16 && light.innerConeAngle == 12 && light.outerConeAngle == 28)
+        #expect(light.shadowPriority == 8 && light.shadowBias == 0.003)
+        let legacy = try #require(EditorComponentRegistry.decode(typeName: EditorBuiltInComponentType.pointLight3D, payload: [:]) as? PointLightComponent)
+        #expect(legacy.range == 10)
+        let environmentDescriptor = try #require(EditorComponentRegistry.descriptor(named: EditorBuiltInComponentType.environment3D))
+        var environmentPayload = environmentDescriptor.makeDefaultPayload()
+        let budget = try #require(environmentDescriptor.fields.first { $0.key == "localShadows.maximumLights" })
+        budget.write("1", to: &environmentPayload)
+        let environment = try #require(EditorComponentRegistry.decode(typeName: EditorBuiltInComponentType.environment3D, payload: environmentPayload) as? Environment3D)
+        #expect(environment.localShadows.maximumLights == 1)
+    }
+
     private func prepareRenderer() {
         if unsafe RenderEngine.shared == nil {
             unsafe RenderEngine.configurations.preferredBackend = .headless

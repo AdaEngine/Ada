@@ -53,7 +53,7 @@ describes the intended design even when its implementation is still planned.
 | ADR | Status | Implementation | Decision |
 | --- | --- | --- | --- |
 | [ADR-0017](0017-temporal-antialiasing-and-metalfx.md) | Accepted | Partial (local foundation; not released) | Temporal antialiasing and MetalFX |
-| [ADR-0018](0018-local-lights-and-shadow-scheduling.md) | Accepted | Planned | Local lights and shadow scheduling |
+| [ADR-0018](0018-local-lights-and-shadow-scheduling.md) | Accepted | Partial (local foundation; not released) | Local lights and shadow scheduling |
 | [ADR-0019](0019-environment-lighting-and-postprocessing.md) | Accepted | Planned | Environment lighting and postprocessing |
 | [ADR-0020](0020-gpu-visibility-and-animation-lod.md) | Accepted | Planned | GPU visibility and animation LOD |
 | [ADR-0021](0021-hybrid-ray-tracing.md) | Accepted | Planned | Hybrid ray tracing |

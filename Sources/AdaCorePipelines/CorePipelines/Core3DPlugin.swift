@@ -47,6 +47,7 @@ public struct Core3DPlugin: Plugin {
 
         graph.addNode(EmptyNode(), by: .Main3D.beginPass)
         graph.addNode(DirectionalShadow3DRenderNode())
+        graph.addNode(LocalShadow3DRenderNode())
         graph.addNode(Main3DRenderNode())
         graph.addNode(ScreenSpaceAO3DRenderNode())
         graph.addNode(AntiAliasing3DRenderNode(notifiesCompletion: !includes2D))
@@ -63,6 +64,8 @@ public struct Core3DPlugin: Plugin {
         )
 
         graph.addNodeEdge(from: RenderNodeLabel.Main3D.beginPass, to: DirectionalShadow3DRenderNode.name)
+        graph.addNodeEdge(from: DirectionalShadow3DRenderNode.name, to: LocalShadow3DRenderNode.name)
+        graph.addNodeEdge(from: LocalShadow3DRenderNode.name, to: Main3DRenderNode.name)
         graph.addNodeEdge(from: DirectionalShadow3DRenderNode.name, to: Main3DRenderNode.name)
         graph.addNodeEdge(from: Main3DRenderNode.name, to: ScreenSpaceReflectionRenderNode.name)
         graph.addNodeEdge(from: Main3DRenderNode.name, to: ScreenSpaceAO3DRenderNode.name)
@@ -87,6 +90,11 @@ public struct Core3DPlugin: Plugin {
             .insertResource(RenderPipelines(configurator: Motion3DPipeline()))
             .insertResource(ExtractedEnvironment3D())
             .insertResource(ExtractedLighting3D())
+            .insertResource(LocalShadow3DViews())
+            .insertResource(Render3DLightStatistics())
+            .insertResource(LocalShadow3DScratch())
+            .insertResource(LocalLighting3DGPUScratch())
+            .insertResource(RenderPipelines(configurator: LocalShadow3DPipeline()))
             .insertResource(ExtractedMesh3DSources())
             .insertResource(VisibleMesh3DLists())
             .insertResource(Active3DInstanceBuffers())

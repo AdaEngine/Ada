@@ -35,13 +35,22 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 : > "$DEMO_ROOT/dist/runtime.log"
 case "$MODE" in
-    --capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized|--capture-temporal|--capture-temporal-motion|--capture-spatial|--capture-spatial-motion|--capture-temporal-multi)
+    --capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized|--capture-temporal|--capture-temporal-motion|--capture-spatial|--capture-spatial-motion|--capture-temporal-multi|--capture-local-lights|--capture-local-no-lights|--capture-local-unshadowed|--capture-local-point|--capture-local-spot|--capture-local-budget|--capture-local-many|--capture-local-moving|--capture-local-multi)
         NAME="${MODE#--capture-}"
         mkdir -p "$DEMO_ROOT/dist/captures/$NAME"
         rm -f "$DEMO_ROOT/dist/captures/$NAME/frame-30.png" "$DEMO_ROOT/dist/captures/$NAME/frame-50.png" "$DEMO_ROOT/dist/captures/$NAME/gpu-timings.json"
         EXTRA=(--measure-gpu)
         case "$NAME" in
             temporal) EXTRA+=(--temporal) ;;
+            local-lights) EXTRA+=(--local-lights) ;;
+            local-no-lights) EXTRA+=(--local-lights --no-local-lights) ;;
+            local-unshadowed) EXTRA+=(--local-lights --no-local-shadows) ;;
+            local-point) EXTRA+=(--local-lights --point-only) ;;
+            local-spot) EXTRA+=(--local-lights --spot-only) ;;
+            local-budget) EXTRA+=(--local-lights --local-shadow-budget) ;;
+            local-many) EXTRA+=(--local-lights --many-local-lights) ;;
+            local-multi) EXTRA+=(--local-lights --temporal-multi) ;;
+            local-moving) EXTRA+=(--local-lights --local-motion --temporal-motion) ;;
             temporal-multi) EXTRA+=(--temporal --temporal-multi) ;;
             temporal-motion) EXTRA+=(--temporal --temporal-motion) ;;
             spatial) EXTRA+=(--spatial-proof --no-aa) ;;
@@ -72,12 +81,14 @@ case "$MODE" in
         rm -f "$DEMO_ROOT/dist/captures/frame-30.png" "$DEMO_ROOT/dist/captures/frame-50.png"
         /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --pose-proof --capture-directory "$DEMO_ROOT/dist/captures"
         ;;
+    --local-lights) /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --local-lights ;;
     --temporal) /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --temporal ;;
     run) /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" ;;
     --autoplay) /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --autoplay ;;
-    --verify|--verify-temporal)
+    --verify|--verify-temporal|--verify-local-lights)
         EXTRA=()
         if [[ "$MODE" == --verify-temporal ]]; then EXTRA+=(--temporal); fi
+        if [[ "$MODE" == --verify-local-lights ]]; then EXTRA+=(--local-lights --temporal); fi
         /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --controller-proof "${EXTRA[@]}"
         for attempt in {1..30}; do
             if rg -q 'controller verification PASS' "$DEMO_ROOT/dist/runtime.log"; then
@@ -99,5 +110,5 @@ case "$MODE" in
         /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log"
         /usr/bin/log stream --info --style compact --predicate 'process == "SkeletalGarden"'
         ;;
-    *) echo 'usage: build_and_run.sh [run|--temporal|--autoplay|--capture|--capture-overview|--capture-no-ibl|--capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized|--capture-temporal|--capture-temporal-motion|--capture-spatial|--capture-spatial-motion|--verify|--capture-temporal-multi|--verify-temporal|--debug|--logs]' >&2; exit 2 ;;
+    *) echo 'usage: build_and_run.sh [run|--temporal|--local-lights|--autoplay|--capture|--capture-overview|--capture-no-ibl|--capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized|--capture-temporal|--capture-temporal-motion|--capture-spatial|--capture-spatial-motion|--verify|--capture-temporal-multi|--verify-temporal|--verify-local-lights|--capture-local-{lights,no-lights,unshadowed,point,spot,budget,many,moving,multi}|--debug|--logs]' >&2; exit 2 ;;
 esac

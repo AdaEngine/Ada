@@ -16,6 +16,7 @@ import AdaEngine
         @Res<Render3DPerformanceMetrics?> private var metrics
         @Res<Render3DVisibilityStatistics?> private var visibility
         @Res<Render3DTemporalStatistics?> private var temporal
+        @Res<Render3DLightStatistics?> private var lights
 
         func update(from world: World) {
             views.update(from: world)
@@ -23,6 +24,7 @@ import AdaEngine
             _metrics.update(from: world)
             _visibility.update(from: world)
             _temporal.update(from: world)
+            _lights.update(from: world)
         }
 
         func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
@@ -43,6 +45,11 @@ import AdaEngine
                 }
                 if let temporal {
                     try JSONEncoder().encode(temporal.snapshots).write(to: state.directory.appendingPathComponent("temporal.json"))
+                }
+                if let lights {
+                    let data = try JSONEncoder().encode(lights.snapshots)
+                    try data.write(to: state.directory.appendingPathComponent("lights.json"))
+                    gardenLog("[SkeletalGarden] lights \(String(data: data, encoding: .utf8) ?? "unavailable")")
                 }
                 state.reportedTimings = true
             }

@@ -42,6 +42,8 @@ public struct Main3DRenderNode: RenderNode {
     @Res<ExtractedEnvironment3D> private var environments
     @ResMut<IBL3DScratch> private var ibl
 
+    @ResMut<LocalLighting3DGPUScratch> private var localUniforms
+
     @ResMut<Lighting3DGPUScratch>
     private var lightingScratch
 
@@ -67,12 +69,14 @@ public struct Main3DRenderNode: RenderNode {
         _materials.update(from: world)
         _statistics.update(from: world)
         _lightingScratch.update(from: world)
+        _localUniforms.update(from: world)
         _environments.update(from: world)
         _ibl.update(from: world)
         _renderDevice.update(from: world)
         var activeViews: [Entity.ID] = []
         query.forEach { _, _, _, _, source in activeViews.append(source.entityId) }
         lightingScratch.cache.retainViews(activeViews)
+        ibl.cache.retainViews(activeViews)
         lists.retainViews(activeViews)
     }
 
@@ -124,7 +128,7 @@ public struct Main3DRenderNode: RenderNode {
                     ?? ExtractedDirectionalLight3D(
                         directionToLight: Vector3(0.35, 0.7, 0.45).normalized,
                         radiance: .one,
-                        intensity: 3.2
+                        intensity: lighting.hasAuthoredLights ? 0 : 3.2
                     )
             let viewDirectionToLight = (uniform.viewMatrix * Vector4(directionalLight.directionToLight, 0)).xyz.normalized
             let shadowsEnabled = shadow.isEnabled && directionalLight.castsShadows && shadow.colorTexture != nil
@@ -147,6 +151,15 @@ public struct Main3DRenderNode: RenderNode {
                 view: source.entityId,
                 device: renderDevice.renderDevice
             )
+
+            let localShadows = context.world.getResource(LocalShadow3DViews.self)?.entries[source.entityId]
+            let localConstants = localUniforms.write(view: source.entityId, count: 135, device: renderDevice.renderDevice) {
+                packLocalLighting(_lighting.wrappedValue, view: uniform.viewMatrix, shadows: localShadows, into: &$0)
+            }
+            let localMatrices = localUniforms.write(view: source.entityId, pass: 1, count: 97, device: renderDevice.renderDevice) {
+                packLocalShadowMatrices(localShadows, into: &$0)
+            }
+            let localTexture = localShadows?.color ?? Texture2D.whiteTexture
 
             let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
             commandBuffer.label = "Main 3d Render Pass"
@@ -187,25 +200,31 @@ public struct Main3DRenderNode: RenderNode {
             renderPass.setVertexBuffer(drawUniform, slot: GlobalBufferIndex.viewUniform)
             renderPass.setVertexBuffer(lightConstants, offset: 0, slot: 1)
             renderPass.setFragmentBuffer(lightConstants, offset: 0, slot: 1)
+            renderPass.setFragmentBuffer(localConstants, offset: 0, slot: 25)
+            renderPass.setFragmentBuffer(localMatrices, offset: 0, slot: 28)
+            renderPass.setResourceSet(RenderResourceSet(bindings: [
+                .init(binding: 26, shaderStages: .fragment, resource: .texture(localTexture)),
+            ]), index: 0)
             let shadowTexture = shadow.colorTexture ?? Texture2D.whiteTexture
             renderPass.setResourceSet(
                 RenderResourceSet(
                     bindings: [
                         .init(binding: 10, shaderStages: .fragment, resource: .texture(shadowTexture)),
-                        .init(binding: 11, shaderStages: .fragment, resource: .sampler(shadowTexture.sampler)),
+                        .init(binding: 11, shaderStages: .fragment, resource: .sampler(localShadows?.color?.sampler ?? shadowTexture.sampler)),
                     ]
                 ),
                 index: 0
             )
             let settings = environments.environments[source.entityId]?.imageBasedLighting
             let environment = settings?.asset.asset
-            ibl.uniform.elements = [
+            let iblConstants = ibl.cache.write(
                 IBL3DUniform(
                     inverseView: uniform.viewMatrix.inverse,
                     parameters: Vector4(environment == nil ? 0 : 1, max(0, settings?.intensity ?? 1), Float(environment?.specularLevels ?? 2), settings?.rotation ?? 0)
                 ),
-            ]
-            ibl.uniform.write(to: renderDevice.renderDevice)
+                view: source.entityId,
+                device: renderDevice.renderDevice
+            )
             let diffuse = environment?.irradiance ?? Texture2D.whiteTexture
             let specular = environment?.specular ?? Texture2D.whiteTexture
             let lut = environment?.brdf ?? Texture2D.whiteTexture
@@ -215,7 +234,7 @@ public struct Main3DRenderNode: RenderNode {
                 .init(binding: 20, shaderStages: .fragment, resource: .texture(lut)),
                 .init(binding: 3, shaderStages: .fragment, resource: .sampler(diffuse.sampler)),
             ]), index: 0)
-            renderPass.setFragmentBuffer(ibl.uniform, offset: 0, slot: 22)
+            renderPass.setFragmentBuffer(iblConstants, offset: 0, slot: 22)
             renderPass.setViewport(camera.viewport.rect)
 
             if !visibleItems.isEmpty {

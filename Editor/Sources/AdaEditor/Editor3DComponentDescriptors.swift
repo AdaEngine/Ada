@@ -76,52 +76,55 @@ extension EditorComponentRegistry {
     static let pointLight3DDescriptor = localLight3DDescriptor(
         typeName: EditorBuiltInComponentType.pointLight3D,
         displayName: "Point Light 3D",
-        description: "Lights 3D meshes in every direction from the entity position.",
-        makeComponent: { radiance, intensity, castShadows in
-            PointLightComponent(radiance: radiance, intensity: intensity, castShadows: castShadows)
-        }
+        description: "Lights meshes in all directions. Range is in meters; intensity is a linear multiplier at one meter.",
+        isSpot: false,
+        decode: { payload in try EditorComponentPayloadDecoder.decode(PointLightComponent.self, payload: payload) as! PointLightComponent }
     )
 
     static let spotLight3DDescriptor = localLight3DDescriptor(
         typeName: EditorBuiltInComponentType.spotLight3D,
         displayName: "Spot Light 3D",
-        description: "Lights 3D meshes from a focused entity-mounted source.",
-        makeComponent: { radiance, intensity, castShadows in
-            SpotLightComponent(radiance: radiance, intensity: intensity, castShadows: castShadows)
-        }
+        description: "Lights a cone along local +Z. Cone fields are half-angles in degrees; rotate the entity to aim.",
+        isSpot: true,
+        decode: { payload in try EditorComponentPayloadDecoder.decode(SpotLightComponent.self, payload: payload) as! SpotLightComponent }
     )
 
     private static func localLight3DDescriptor(
         typeName: String,
         displayName: String,
         description: String,
-        makeComponent: @escaping @Sendable (Vector3, Float, Bool) -> any Component
+        isSpot: Bool,
+        decode: @escaping @Sendable ([String: EditorSceneValue]) throws -> any Component
     ) -> EditorComponentDescriptor {
-        EditorComponentDescriptor(
+        var fields: [EditorComponentField] = [
+            .init(key: "radiance", label: "Radiance (RGB)", kind: .vector3),
+            .init(key: "intensity", label: "Intensity at 1 m", kind: .float),
+            .init(key: "range", label: "Range (m)", kind: .float),
+            .init(key: "castShadows", label: "Cast Shadows", kind: .bool),
+            .init(key: "shadowBias", label: "Shadow Bias", kind: .float),
+            .init(key: "shadowSlopeBias", label: "Shadow Slope Bias", kind: .float),
+            .init(key: "shadowPriority", label: "Shadow Priority", kind: .int),
+        ]
+        if isSpot {
+            fields.append(.init(key: "innerConeAngle", label: "Inner Half Angle (degrees)", kind: .float))
+            fields.append(.init(key: "outerConeAngle", label: "Outer Half Angle (degrees)", kind: .float))
+        }
+        return EditorComponentDescriptor(
             typeName: typeName,
             displayName: displayName,
             category: "3D",
             description: description,
             requiredComponentTypeNames: [EditorBuiltInComponentType.transform],
-            fields: [
-                EditorComponentField(key: "radiance", label: "Radiance (RGB)", kind: .vector3),
-                EditorComponentField(key: "intensity", label: "Intensity", kind: .float),
-                EditorComponentField(key: "castShadows", label: "Cast Shadows", kind: .bool),
-            ],
+            fields: fields,
             makeDefaultPayload: {
-                [
-                    "radiance": .array([.double(1), .double(1), .double(1)]),
-                    "intensity": .double(1),
-                    "castShadows": .bool(true),
+                var payload: [String: EditorSceneValue] = [
+                    "radiance": .array([.double(1), .double(1), .double(1)]), "intensity": .double(1), "range": .double(10),
+                    "castShadows": .bool(true), "shadowBias": .double(0.002), "shadowSlopeBias": .double(0.004), "shadowPriority": .int(0),
                 ]
+                if isSpot { payload["innerConeAngle"] = .double(20); payload["outerConeAngle"] = .double(35) }
+                return payload
             },
-            decode: { payload in
-                makeComponent(
-                    vector3(from: payload["radiance"]),
-                    Float(payload["intensity"]?.doubleValue ?? 1),
-                    payload["castShadows"]?.boolValue ?? true
-                )
-            }
+            decode: decode
         )
     }
 

@@ -26,6 +26,7 @@ struct GardenPlugin: Plugin {
         app.addSystem(StartupGardenSystem.self, on: .startup)
         app.addSystem(GardenInputSystem.self, on: .update)
         app.addSystem(GardenRenderQualitySystem.self, on: .update)
+        app.addSystem(GardenLocalLightingSystem.self, on: .postUpdate)
         app.addSystem(GardenTemporalValidationSystem.self, on: .update)
         app.addSystem(GardenVisibilityStatsSystem.self, on: .update)
         if let stats = app.getSubworldBuilder(by: .renderWorld)?.getResource(Render3DVisibilityStatistics.self) {
@@ -131,9 +132,10 @@ private func makeGarden(in world: World) throws {
     let noIBL = arguments.contains("--no-ibl")
     let baseline = arguments.contains("--render-baseline")
     world.spawn("Sun") {
-        DirectionalLightComponent(radiance: [1, 0.88, 0.7], intensity: 2.5, shadowDistance: 60, shadowBias: 0.002, shadowSlopeBias: 0.006)
+        DirectionalLightComponent(radiance: [1, 0.88, 0.7], intensity: arguments.contains("--local-lights") ? 0.18 : 2.5, shadowDistance: 60, shadowBias: 0.002, shadowSlopeBias: 0.006)
         Transform(rotation: Quat(axis: .right, angle: 0.9))
     }
+    addGardenLocalLighting(in: world)
     var camera = Camera()
     if arguments.contains("--temporal") { camera.temporalUpscaling = .init(renderScale: 0.75) }
     camera.backgroundColor = Color(red: 0.12, green: 0.2, blue: 0.3)
@@ -149,6 +151,11 @@ private func makeGarden(in world: World) throws {
             distanceCulling: !arguments.contains("--no-distance-culling")
         )
     )))
+    if var environment = cameraEntity.components[Environment3D.self] {
+        environment.localShadows.isEnabled = !arguments.contains("--no-local-shadows")
+        if arguments.contains("--local-shadow-budget") { environment.localShadows.maximumLights = 1 }
+        cameraEntity.components[Environment3D.self] = environment
+    }
     cameraEntity.components[GardenCamera.self] = GardenCamera()
     if arguments.contains("--temporal-multi") {
         let texture = RenderTexture(size: [480, 320], scaleFactor: 1, format: .bgra8)

@@ -119,6 +119,7 @@ public struct Environment3D: Codable, Sendable {
     public var ambientOcclusion: ScreenSpaceAO3D
     public var antiAliasing: AntiAliasing3D
     public var meshVisibility: MeshVisibilitySettings3D
+    public var localShadows: LocalShadowSettings3D = LocalShadowSettings3D()
 
     public init(
         skybox: Skybox3D = Skybox3D(),
@@ -157,7 +158,7 @@ public struct Environment3D: Codable, Sendable {
         self.meshVisibility = meshVisibility
     }
 
-    private enum CodingKeys: CodingKey { case skybox, screenSpaceReflection, imageBasedLighting, shadows, ambientOcclusion, antiAliasing, meshVisibility }
+    private enum CodingKeys: CodingKey { case skybox, screenSpaceReflection, imageBasedLighting, shadows, ambientOcclusion, antiAliasing, meshVisibility, localShadows }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -168,6 +169,7 @@ public struct Environment3D: Codable, Sendable {
         ambientOcclusion = try container.decodeIfPresent(ScreenSpaceAO3D.self, forKey: .ambientOcclusion) ?? ScreenSpaceAO3D()
         antiAliasing = try container.decodeIfPresent(AntiAliasing3D.self, forKey: .antiAliasing) ?? .none
         meshVisibility = try container.decodeIfPresent(MeshVisibilitySettings3D.self, forKey: .meshVisibility) ?? MeshVisibilitySettings3D()
+        localShadows = try container.decodeIfPresent(LocalShadowSettings3D.self, forKey: .localShadows) ?? LocalShadowSettings3D()
     }
 }
 
