@@ -115,18 +115,59 @@ public struct Environment3D: Codable, Sendable {
     public var screenSpaceReflection: ScreenSpaceReflection
     public var imageBasedLighting: ImageBasedLightingSettings?
 
-    public init(skybox: Skybox3D = Skybox3D(), screenSpaceReflection: ScreenSpaceReflection = ScreenSpaceReflection()) {
-        self.init(skybox: skybox, screenSpaceReflection: screenSpaceReflection, imageBasedLighting: nil)
+    public var shadows: ShadowSettings3D
+    public var ambientOcclusion: ScreenSpaceAO3D
+    public var antiAliasing: AntiAliasing3D
+    public var meshVisibility: MeshVisibilitySettings3D
+
+    public init(
+        skybox: Skybox3D = Skybox3D(),
+        screenSpaceReflection: ScreenSpaceReflection = ScreenSpaceReflection(),
+        imageBasedLighting: ImageBasedLightingSettings? = nil,
+        shadows: ShadowSettings3D = ShadowSettings3D(),
+        ambientOcclusion: ScreenSpaceAO3D = ScreenSpaceAO3D(),
+        antiAliasing: AntiAliasing3D = .none
+    ) {
+        self.init(
+            skybox: skybox,
+            screenSpaceReflection: screenSpaceReflection,
+            imageBasedLighting: imageBasedLighting,
+            shadows: shadows,
+            ambientOcclusion: ambientOcclusion,
+            antiAliasing: antiAliasing,
+            meshVisibility: MeshVisibilitySettings3D()
+        )
     }
 
     public init(
         skybox: Skybox3D = Skybox3D(),
         screenSpaceReflection: ScreenSpaceReflection = ScreenSpaceReflection(),
-        imageBasedLighting: ImageBasedLightingSettings?
+        imageBasedLighting: ImageBasedLightingSettings? = nil,
+        shadows: ShadowSettings3D = ShadowSettings3D(),
+        ambientOcclusion: ScreenSpaceAO3D = ScreenSpaceAO3D(),
+        antiAliasing: AntiAliasing3D = .none,
+        meshVisibility: MeshVisibilitySettings3D
     ) {
         self.skybox = skybox
         self.screenSpaceReflection = screenSpaceReflection
         self.imageBasedLighting = imageBasedLighting
+        self.shadows = shadows
+        self.ambientOcclusion = ambientOcclusion
+        self.antiAliasing = antiAliasing
+        self.meshVisibility = meshVisibility
+    }
+
+    private enum CodingKeys: CodingKey { case skybox, screenSpaceReflection, imageBasedLighting, shadows, ambientOcclusion, antiAliasing, meshVisibility }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        skybox = try container.decodeIfPresent(Skybox3D.self, forKey: .skybox) ?? Skybox3D()
+        screenSpaceReflection = try container.decodeIfPresent(ScreenSpaceReflection.self, forKey: .screenSpaceReflection) ?? ScreenSpaceReflection()
+        imageBasedLighting = try container.decodeIfPresent(ImageBasedLightingSettings.self, forKey: .imageBasedLighting)
+        shadows = try container.decodeIfPresent(ShadowSettings3D.self, forKey: .shadows) ?? ShadowSettings3D()
+        ambientOcclusion = try container.decodeIfPresent(ScreenSpaceAO3D.self, forKey: .ambientOcclusion) ?? ScreenSpaceAO3D()
+        antiAliasing = try container.decodeIfPresent(AntiAliasing3D.self, forKey: .antiAliasing) ?? .none
+        meshVisibility = try container.decodeIfPresent(MeshVisibilitySettings3D.self, forKey: .meshVisibility) ?? MeshVisibilitySettings3D()
     }
 }
 

@@ -22,6 +22,7 @@ public struct Model3DPlugin: Plugin {
         Model3DSourceState.registerComponent()
         app.addSystem(Model3DSourceSystem.self, on: .preUpdate)
         Mesh3DComponent.registerComponent()
+        MeshLOD3DComponent.registerComponent()
         DirectionalLightComponent.registerComponent()
         PointLightComponent.registerComponent()
         SpotLightComponent.registerComponent()
@@ -39,6 +40,9 @@ public struct Model3DPlugin: Plugin {
 
         renderWorld
             .insertResource(ExtractedLighting3D())
+            .insertResource(ExtractedMesh3DSources())
+            .insertResource(AnimatedBounds3D())
+            .insertResource(Active3DInstanceBuffers())
             .insertResource(RenderItems<Opaque3DRenderItem>())
             .insertResource(Opaque3DInstanceBuffers())
             .insertResource(Skinning3DUniforms())
@@ -53,7 +57,9 @@ public struct Model3DPlugin: Plugin {
 
 @System
 func ExtractDirectionalLight3D(
-    _ query: Extract<Query<Entity, DirectionalLightComponent, GlobalTransform>>,
+    _ query: Extract<Query<Entity,
+    DirectionalLightComponent,
+    GlobalTransform>>,
     _ extracted: ResMut<ExtractedLighting3D>
 ) {
     extracted.directionalLight = nil
@@ -77,8 +83,21 @@ func ExtractDirectionalLight3D(
 
 @System
 func ExtractModel3D(
-    _ query: Extract<Query<Entity, Mesh3DComponent, GlobalTransform>>,
-    _ skins: Extract<Query<Entity, SkinnedMesh3DComponent>>,
+    _ query: Extract<Query<Entity,
+    Mesh3DComponent,
+    GlobalTransform>>,
+    _ lods: Extract<Query<Entity,
+    MeshLOD3DComponent>>,
+    _ visibilityAccess: Extract<Query<Entity,
+    Visibility>>,
+    _ noCullingAccess: Extract<Query<Entity,
+    NoFrustumCulling>>,
+    _ hierarchyAccess: Extract<Query<Entity,
+    RelationshipComponent>>,
+    _ skins: Extract<Query<Entity,
+    SkinnedMesh3DComponent>>,
+    _ sources: ResMut<ExtractedMesh3DSources>,
+    _ animatedBounds: ResMut<AnimatedBounds3D>,
     _ skinningUniforms: ResMut<Skinning3DUniforms>,
     _ materialUniforms: ResMut<PBR3DUniforms>,
     _ renderItems: ResMut<RenderItems<Opaque3DRenderItem>>,
@@ -86,6 +105,15 @@ func ExtractModel3D(
     _ renderDevice: Res<RenderDeviceHandler>,
     _ drawPass: Res<Model3DDrawPass>
 ) {
+    animatedBounds.wrappedValue.beginFrame()
+    sources.meshes.removeAll(keepingCapacity: true)
+    // These typed queries declare all optional/hierarchical component reads without requiring them on a mesh.
+    _ = visibilityAccess.wrappedValue
+    _ = noCullingAccess.wrappedValue
+    _ = hierarchyAccess.wrappedValue
+    var lodByEntity: [Entity.ID: MeshLOD3DComponent] = [:]
+    lods.wrappedValue.forEach { entity, lod in lodByEntity[entity.id] = lod }
+    var posedBounds: [Entity.ID: AABB] = [:]
     var items = renderItems.items
     items.removeAll(keepingCapacity: true)
     var instances = instanceBuffers.wrappedValue
@@ -93,13 +121,51 @@ func ExtractModel3D(
     skinningUniforms.wrappedValue.beginFrame(device: renderDevice.renderDevice)
     skins.wrappedValue.forEach { entity, skin in
         _ = skinningUniforms.wrappedValue.write(skin.matrices, for: entity.id, device: renderDevice.renderDevice)
+        if let mesh = entity.components[Mesh3DComponent.self]?.mesh {
+            posedBounds[entity.id] = animatedBounds.wrappedValue.bounds(mesh: mesh, matrices: skin.matrices)
+        }
     }
     materialUniforms.wrappedValue.beginFrame()
     var currentBatchKey: Opaque3DBatchKey?
     var currentBatchIndex: Int?
 
     query.wrappedValue.forEach { entity, mesh3d, transform in
+        let lod = lodByEntity[entity.id]
+        let visibility = entity.components[Visibility.self]
+        let noCulling = entity.components[NoFrustumCulling.self]
+        if visibility == .hidden {
+            return
+        }
+        var ancestor = entity.parent
+        while let parent = ancestor {
+            if parent.components[Visibility.self] == .hidden {
+                return
+            }
+            ancestor = parent.parent
+        }
         let mesh = mesh3d.mesh
+        let palette = skinningUniforms.wrappedValue.buffer(for: entity.id)
+        var localBounds: AABB? = palette == nil ? mesh.bounds : posedBounds[entity.id]
+        if palette == nil, let lod {
+            for level in lod.alternatives { localBounds = localBounds.map { AABB(min: min($0.min, level.bounds.min), max: max($0.max, level.bounds.max)) } ?? level.bounds }
+        }
+        sources.meshes.append(Mesh3DRenderSource(
+            entity: entity.id,
+            drawPass: drawPass.wrappedValue,
+            mesh: mesh,
+            materials: mesh3d.materials,
+            transform: transform.matrix,
+            bounds: localBounds.map { MeshVisibility3DMath.transformed($0, by: transform.matrix) },
+            alternatives: palette == nil ? lod?.alternatives ?? [] : [],
+            thresholds: lod?.screenThresholds ?? [],
+            hysteresis: lod?.hysteresis ?? 0.15,
+            maximumDistance: lod?.maximumDistance,
+            fadeDistance: lod?.fadeDistance ?? 4,
+            forceVisible: noCulling != nil,
+            castShadows: mesh3d.castShadows,
+            receiveShadows: mesh3d.receiveShadows,
+            skinningBuffer: palette
+        ))
         for (modelIndex, model) in mesh.models.enumerated() {
             for (partIndex, part) in model.parts.enumerated() {
                 let material = mesh3d.materials[part.materialIndex]
@@ -174,6 +240,7 @@ func ExtractModel3D(
         }
     }
 
+    animatedBounds.wrappedValue.finishFrame()
     instances.write(to: renderDevice.renderDevice)
     instanceBuffers.wrappedValue = instances
     renderItems.items = items
@@ -206,11 +273,12 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
             for: PBR3DConfiguration(vertex: part.vertexDescriptor, blended: (item.material as? PBRMaterial)?.alphaMode == .blend),
             device: renderDevice
         )
+        let active = world.getResource(Active3DInstanceBuffers.self)
+        let instanceBuffers = world.getResource(Opaque3DInstanceBuffers.self)
         guard
             let batchRange = item.batchRange,
-            let instanceBuffers = world.getResource(Opaque3DInstanceBuffers.self),
-            let instances = instanceBuffers.currentBuffer,
-            let defaultVertexData = instanceBuffers.defaultVertexBuffer
+            let instances = active?.instances ?? instanceBuffers?.currentBuffer,
+            let defaultVertexData = active?.defaults ?? instanceBuffers?.defaultVertexBuffer
         else {
             return
         }

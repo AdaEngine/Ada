@@ -53,3 +53,36 @@ python3 Tools/3DAssets/prepare_robot.py
 ```
 
 The glTF material path imports AO/ORM, normal scale, emission factors and KHR_materials_emissive_strength, OPAQUE/MASK/BLEND, alpha cutoff, double-sided flags, UV0/UV1, wrap/filter settings and color-correct mipmaps. Alpha mask is applied in both PBR and animated-shadow passes. Transparent instances render after opaque geometry with depth writes disabled. IBL maps are loaded once from `.ibl` manifests; integrations are offline, not per-frame shader loops.
+
+## Render quality
+
+The demo enables three stabilized directional-shadow cascades (1024px per tile, a 3072x1024 atlas), half-resolution SSAO with depth/normal-aware bilateral filtering and upsampling, and spatial FXAA after tone mapping. Other scenes keep the source-compatible defaults: one shadow map, SSAO disabled, AA disabled. Settings are per camera in Environment3D.
+
+1 toggles sunlight shadows, 2 toggles SSAO, 3 toggles FXAA, 4 switches one/three shadow cascades. These switches do not change scene geometry or animation. SSAO attenuates the opaque indirect-light buffer; direct lighting and emission remain separate. Transparent foreground attenuates that buffer and preserves the opaque normals/positions underneath. FXAA runs before UI/2D content and has no temporal history.
+
+```sh
+Demos/SkeletalGarden/script/build_and_run.sh --capture-quality
+Demos/SkeletalGarden/script/build_and_run.sh --capture-baseline
+Demos/SkeletalGarden/script/build_and_run.sh --capture-no-ao
+Demos/SkeletalGarden/script/build_and_run.sh --capture-no-aa
+Demos/SkeletalGarden/script/build_and_run.sh --capture-single-shadows
+Demos/SkeletalGarden/script/build_and_run.sh --capture-no-shadows
+```
+
+These modes freeze both robots and the camera, capture frames 30/50 and write GPU timings after frame 160. Baseline retains the original single shadow map and disables SSAO/FXAA. Files are under dist/captures/<mode>. Profiling serializes GPU passes only in these measurement modes, records Metal hardware timestamps and discards 20 warmup samples per pass. Min/mean/max are pass durations, not a universal FPS estimate; normal play keeps asynchronous GPU submission. Backends without timestamps report unavailable.
+
+Focused regression suites: CascadedShadow3DTests and RenderQuality3DIntegrationTests.
+
+Native capture/measurement results and limitations are recorded in [RenderQualityValidation.md](RenderQualityValidation.md).
+
+## Visibility and static LOD
+
+The 3D renderer builds compact CPU-selected draw lists per camera and per sunlight cascade. Six clip planes use the engine's 0...W depth convention. Hidden meshes/hierarchies are excluded; NoFrustumCulling keeps an explicitly marked mesh. Shadow visibility is independent from the camera list, including offscreen casters. Skin bounds use cached joint-influence envelopes transformed by the actual pose; static rest bounds do not discard a moving character.
+
+Trees have 96/51/23 triangles and rocks 80/44/20 at LOD0/1/2. Static alternatives preserve the base local coordinates and material indices. LOD uses projected viewport-height coverage with 15 percent hysteresis, per camera. Grass fades with an ordered screen-space dither over the final 5m of its 30m range (including its shadow). The terrain has 60 visible 6m chunks, three resolutions and fixed-resolution stitched boundaries; collision stays at the original full resolution.
+
+5 toggles frustum culling, 6 toggles static LOD. The native window title displays visible/candidate meshes, submitted triangles, draw calls and LOD distribution. Capture modes --capture-visibility, --capture-no-culling, --capture-no-lod and --capture-unoptimized write visibility.json alongside PNG/GPU timing captures. Unoptimized disables frustum culling, LOD and distance culling while retaining the same scene and lighting.
+
+This is the CPU frustum/LOD foundation. GPU Hi-Z occlusion and indirect draw generation are a future layer.
+
+Measured visibility/LOD results and validation limits: [VisibilityValidation.md](VisibilityValidation.md).

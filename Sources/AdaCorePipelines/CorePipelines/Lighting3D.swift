@@ -51,23 +51,36 @@ public struct DirectionalLight3DUniform: Sendable {
     public var shadowViewProjection: Transform3D
     /// X enables shadows, Y is constant bias, Z is slope bias, W is the shadow-map texel size.
     public var shadowParameters: Vector4
+    public var shadowViewProjection1: Transform3D
+    public var shadowViewProjection2: Transform3D
+    public var cascadeSplits: Vector4
+    public var shadowAtlas: Vector4
 
     public init(
         directionIntensity: Vector4,
         radianceAmbient: Vector4,
         shadowViewProjection: Transform3D = .identity,
-        shadowParameters: Vector4 = .zero
+        shadowParameters: Vector4 = .zero,
+        shadowViewProjection1: Transform3D = .identity,
+        shadowViewProjection2: Transform3D = .identity,
+        cascadeSplits: Vector4 = [1000, 1000, 1000, 1],
+        shadowAtlas: Vector4 = [1 / 1024, 1 / 1024, 0.1, 0]
     ) {
         self.directionIntensity = directionIntensity
         self.radianceAmbient = radianceAmbient
         self.shadowViewProjection = shadowViewProjection
         self.shadowParameters = shadowParameters
+        self.shadowViewProjection1 = shadowViewProjection1
+        self.shadowViewProjection2 = shadowViewProjection2
+        self.cascadeSplits = cascadeSplits
+        self.shadowAtlas = shadowAtlas
     }
 }
 
 /// Reusable GPU buffers for the 3D lighting pass.
 public struct Lighting3DGPUScratch: Resource, Sendable {
     public var directionalLight: BufferData<DirectionalLight3DUniform>
+    var cache = FrameUniformCache3D<DirectionalLight3DUniform>()
 
     public init() {
         self.directionalLight = BufferData(label: "Directional Light 3D", elements: [])
@@ -82,6 +95,10 @@ public struct DirectionalShadow3D: Resource, Sendable {
     public var depthTexture: RenderTexture?
     public var viewProjection: Transform3D
     public var isEnabled: Bool
+    public var viewProjection1: Transform3D = .identity
+    public var viewProjection2: Transform3D = .identity
+    public var cascadeSplits: Vector4 = [1000, 1000, 1000, 1]
+    public var blendFraction: Float = 0.1
 
     public init() {
         self.colorTexture = nil
@@ -94,15 +111,18 @@ public struct DirectionalShadow3D: Resource, Sendable {
 /// Uniform data used while rendering the directional shadow map.
 public struct DirectionalShadowViewUniform: Sendable {
     public var viewProjection: Transform3D
+    public var tileBounds: Vector4
 
-    public init(viewProjection: Transform3D) {
+    public init(viewProjection: Transform3D, tileBounds: Vector4 = [0, 0, 1024, 1024]) {
         self.viewProjection = viewProjection
+        self.tileBounds = tileBounds
     }
 }
 
 /// Reusable GPU storage for the directional shadow pass.
 public struct DirectionalShadow3DScratch: Resource, Sendable {
     public var view: BufferData<DirectionalShadowViewUniform>
+    var cache = FrameUniformCache3D<DirectionalShadowViewUniform>()
 
     public init() {
         self.view = BufferData(label: "Directional Shadow View", elements: [])

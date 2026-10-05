@@ -19,10 +19,18 @@ struct GardenPlugin: Plugin {
         GardenCamera.registerComponent()
         app.addSystem(StartupGardenSystem.self, on: .startup)
         app.addSystem(GardenInputSystem.self, on: .update)
+        app.addSystem(GardenRenderQualitySystem.self, on: .update)
+        app.addSystem(GardenVisibilityStatsSystem.self, on: .update)
+        if let stats = app.getSubworldBuilder(by: .renderWorld)?.getResource(Render3DVisibilityStatistics.self) {
+            app.insertResource(stats)
+        }
         app.addSystem(GardenPresentationSystem.self, on: .postUpdate)
         app.addSystem(GardenCameraSystem.self, on: .postUpdate)
         #if os(macOS)
             installCapture(in: app)
+            if ProcessInfo.processInfo.arguments.contains("--measure-gpu"), let render = app.getSubworldBuilder(by: .renderWorld) {
+                render.insertResource(Render3DPerformanceMetrics(synchronizesPasses: true))
+            }
         #endif
     }
 }
@@ -84,6 +92,10 @@ private func makeGarden(in world: World) throws {
     if var animation = reference.components[ModelAnimation3DComponent.self] {
         try animation.player.play("Walk", transitionDuration: 0)
         animation.player.speed = 0.65
+        if ProcessInfo.processInfo.arguments.contains("--render-proof") {
+            animation.player.seek(to: 0.15)
+            animation.player.isPlaying = false
+        }
         reference.components[ModelAnimation3DComponent.self] = animation
     }
     let props: [(String, Vector3, Float)] = [
@@ -108,7 +120,9 @@ private func makeGarden(in world: World) throws {
     makeGardenCollisions(in: world)
     try makeGardenLandscape(in: world, device: device)
     let ibl = try AssetsManager.loadSync(ImageBasedLighting3D.self, at: "Assets/Studio.ibl", from: .module)
-    let noIBL = ProcessInfo.processInfo.arguments.contains("--no-ibl")
+    let arguments = ProcessInfo.processInfo.arguments
+    let noIBL = arguments.contains("--no-ibl")
+    let baseline = arguments.contains("--render-baseline")
     world.spawn("Sun") {
         DirectionalLightComponent(radiance: [1, 0.88, 0.7], intensity: 2.5, shadowDistance: 60, shadowBias: 0.002, shadowSlopeBias: 0.006)
         Transform(rotation: Quat(axis: .right, angle: 0.9))
@@ -117,7 +131,15 @@ private func makeGarden(in world: World) throws {
     camera.backgroundColor = Color(red: 0.12, green: 0.2, blue: 0.3)
     let cameraEntity = world.spawn("Camera", bundle: Camera3D(camera: camera, environment: Environment3D(
         screenSpaceReflection: ScreenSpaceReflection(isEnabled: false),
-        imageBasedLighting: noIBL ? nil : ImageBasedLightingSettings(asset: ibl, intensity: 0.5)
+        imageBasedLighting: noIBL ? nil : ImageBasedLightingSettings(asset: ibl, intensity: 0.5),
+        shadows: ShadowSettings3D(isEnabled: !arguments.contains("--no-shadows"), cascadeCount: baseline || arguments.contains("--single-shadows") ? 1 : 3),
+        ambientOcclusion: ScreenSpaceAO3D(isEnabled: !baseline && !arguments.contains("--no-ao")),
+        antiAliasing: baseline || arguments.contains("--no-aa") ? .none : .fxaa,
+        meshVisibility: MeshVisibilitySettings3D(
+            frustumCulling: !arguments.contains("--no-culling"),
+            lod: !arguments.contains("--no-lod"),
+            distanceCulling: !arguments.contains("--no-distance-culling")
+        )
     )))
     cameraEntity.components[GardenCamera.self] = GardenCamera()
     gardenLog("[SkeletalGarden] loaded \(model.skins.count) skin, \(model.skins.first?.joints.count ?? 0) joints; clips=\(model.animationClips.map(\.name))")

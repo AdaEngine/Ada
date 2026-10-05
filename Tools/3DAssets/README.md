@@ -62,3 +62,5 @@ The GLB import path keeps base color/emission in sRGB, material data in linear s
 Useful suites: `GLTFMaterialImportTests`, `ImageMipmapsTests`, `PBR3DSceneTests`. `SkeletalGarden --capture-no-ibl` provides a visual control scene; use the build script's flag of the same name.
 
 Landscape props: run Blender with `--background --factory-startup --python Tools/3DAssets/generate_landscape_assets.py` to reproduce Tree/Rock/Grass. `prepare_robot.py` also derives rotation-only Jump/Fall/Land clips from the retained CC0 source. The terrain itself is deterministic demo code, shared with its static triangle collider.
+
+The landscape generator also exports TreeLOD1/2 and RockLOD1/2 with preserved pivot/material slots. Do not overwrite character skeletons with static mesh decimation. All generated LODs should pass validate_glb.cjs and preserve the base level's local coordinate frame.

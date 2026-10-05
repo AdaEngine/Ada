@@ -8,6 +8,10 @@ layout (binding = 1) uniform DirectionalLight3DUniform {
     vec4 u_LightRadianceAmbient;
     mat4 u_ShadowViewProjection;
     vec4 u_ShadowParameters;
+    mat4 u_ShadowViewProjection1;
+    mat4 u_ShadowViewProjection2;
+    vec4 u_CascadeSplits;
+    vec4 u_ShadowAtlas;
 };
 
 layout (location = 13) in vec4 a_JointIndices;
@@ -43,6 +47,7 @@ struct VertexOut
 {
     vec4 Color;
     vec3 ViewPosition;
+    vec3 WorldPosition;
     vec3 ViewNormal;
     vec4 ViewTangent;
     vec2 TextureCoordinate;
@@ -68,6 +73,7 @@ void flat3d_vertex()
     vec4 worldPosition = model * vec4(a_Position, 1.0);
     vec3 worldTangent = normalize(mat3(model) * a_Tangent.xyz);
     Output.Color = a_Color * a_VertexColor;
+    Output.WorldPosition = worldPosition.xyz;
     Output.ViewPosition = (u_ViewMatrix * worldPosition).xyz;
     Output.ViewNormal = normalize(mat3(u_ViewMatrix) * normal);
     Output.ViewTangent = vec4(normalize(mat3(u_ViewMatrix) * worldTangent), a_Tangent.w);
@@ -91,12 +97,17 @@ void flat3d_vertex()
 layout (location = 0) out vec4 color;
 layout (location = 1) out vec4 normalRoughness;
 layout (location = 2) out vec4 viewPositionMetallic;
+layout (location = 3) out vec4 indirectLighting;
 
 layout (binding = 1) uniform DirectionalLight3DUniform {
     vec4 u_LightDirectionIntensity;
     vec4 u_LightRadianceAmbient;
     mat4 u_ShadowViewProjection;
     vec4 u_ShadowParameters;
+    mat4 u_ShadowViewProjection1;
+    mat4 u_ShadowViewProjection2;
+    vec4 u_CascadeSplits;
+    vec4 u_ShadowAtlas;
 };
 
 layout (binding = 4) uniform texture2D u_BaseColorTexture;
@@ -132,6 +143,7 @@ struct VertexOut
 {
     vec4 Color;
     vec3 ViewPosition;
+    vec3 WorldPosition;
     vec3 ViewNormal;
     vec4 ViewTangent;
     vec2 TextureCoordinate;
@@ -244,36 +256,60 @@ vec3 materialNormal() {
     return normalize(cotangentFrame(normal, Input.ViewPosition, materialUV(u_UVSets.z)) * tangentNormal);
 }
 
-float directionalShadow(vec3 normal, vec3 lightDirection) {
-    if (Input.ShadowFlags.x < 0.5 || u_ShadowParameters.x < 0.5 || Input.ShadowPosition.w <= 0.0) {
-        return 1.0;
-    }
-
-    vec3 projected = Input.ShadowPosition.xyz / Input.ShadowPosition.w;
-    vec2 uv = projected.xy * vec2(0.5, -0.5) + 0.5;
-    if (projected.z < 0.0 || projected.z > 1.0 || any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) {
-        return 1.0;
-    }
-
-    float normalLight = max(dot(normal, lightDirection), 0.0);
-    float bias = u_ShadowParameters.y + u_ShadowParameters.z * (1.0 - normalLight);
+float cascadeVisibility(int cascade, vec3 normal, vec3 lightDirection) {
+    vec4 position;
+    if (cascade == 0) { position = u_ShadowViewProjection * vec4(Input.WorldPosition, 1.0); }
+    else if (cascade == 1) { position = u_ShadowViewProjection1 * vec4(Input.WorldPosition, 1.0); }
+    else { position = u_ShadowViewProjection2 * vec4(Input.WorldPosition, 1.0); }
+    vec3 projected = position.xyz / position.w;
+    vec2 localUV = projected.xy * vec2(0.5, -0.5) + 0.5;
+    if (projected.z < 0.0 || projected.z > 1.0 || any(lessThan(localUV, vec2(0.0))) || any(greaterThan(localUV, vec2(1.0)))) { return 1.0; }
+    float count = max(u_CascadeSplits.w, 1.0);
+    vec2 uv = vec2((localUV.x + float(cascade)) / count, localUV.y);
+    vec2 minimum = vec2(float(cascade) / count, 0.0) + u_ShadowAtlas.xy * 0.5;
+    vec2 maximum = vec2(float(cascade + 1) / count, 1.0) - u_ShadowAtlas.xy * 0.5;
+    float bias = u_ShadowParameters.y + u_ShadowParameters.z * (1.0 - max(dot(normal, lightDirection), 0.0));
     float visibility = 0.0;
     for (int y = -1; y <= 1; ++y) {
         for (int x = -1; x <= 1; ++x) {
-            vec2 offset = vec2(float(x), float(y)) * u_ShadowParameters.w;
-            float storedDepth = texture(
-                sampler2D(u_DirectionalShadowTexture, u_DirectionalShadowSampler),
-                uv + offset
-            ).r;
+            vec2 sampleUV = clamp(uv + vec2(float(x), float(y)) * u_ShadowAtlas.xy, minimum, maximum);
+            float storedDepth = texture(sampler2D(u_DirectionalShadowTexture, u_DirectionalShadowSampler), sampleUV).r;
             visibility += projected.z - bias <= storedDepth ? 1.0 : 0.0;
         }
     }
     return visibility / 9.0;
 }
 
+float directionalShadow(vec3 normal, vec3 lightDirection) {
+    if (Input.ShadowFlags.x < 0.5 || u_ShadowParameters.x < 0.5) { return 1.0; }
+    float depth = Input.ViewPosition.z;
+    if (depth > u_CascadeSplits.z) { return 1.0; }
+    int count = int(u_CascadeSplits.w);
+    int cascade = depth <= u_CascadeSplits.x ? 0 : (depth <= u_CascadeSplits.y ? 1 : 2);
+    cascade = min(cascade, count - 1);
+    float visibility = cascadeVisibility(cascade, normal, lightDirection);
+    if (cascade < count - 1) {
+        float edge = cascade == 0 ? u_CascadeSplits.x : u_CascadeSplits.y;
+        float start = cascade == 0 ? 0.0 : u_CascadeSplits.x;
+        float width = (edge - start) * u_ShadowAtlas.z;
+        if (width > 0.0 && depth > edge - width) {
+            float next = cascadeVisibility(cascade + 1, normal, lightDirection);
+            visibility = mix(visibility, next, smoothstep(edge - width, edge, depth));
+        }
+    }
+    return visibility;
+}
+
+float visibilityDither(vec2 pixel) {
+    int x = int(mod(floor(pixel.x), 4.0)), y = int(mod(floor(pixel.y), 4.0));
+    const float values[16] = float[](0.0,8.0,2.0,10.0,12.0,4.0,14.0,6.0,3.0,11.0,1.0,9.0,15.0,7.0,13.0,5.0);
+    return (values[y * 4 + x] + 0.5) / 16.0;
+}
+
 [[main]]
 void flat3d_fragment()
 {
+    if (Input.ShadowFlags.w > 0.0 && visibilityDither(gl_FragCoord.xy) < Input.ShadowFlags.w) { discard; }
     if (u_SurfaceFlags.x < 0.5 && !gl_FrontFacing) { discard; }
     vec4 baseColor = Input.Color;
     if (Input.TextureFlags.x > 0.5) {
@@ -323,6 +359,7 @@ void flat3d_fragment()
         vec3 atmosphereColor = baseColor.rgb * mix(0.72, 1.2, dayFacing);
 
         color = vec4(atmosphereColor, alpha);
+        indirectLighting = vec4(0.0, 0.0, 0.0, alpha);
         normalRoughness = vec4(normal, 1.0);
         viewPositionMetallic = vec4(Input.ViewPosition, 0.0);
         return;
@@ -359,6 +396,8 @@ void flat3d_fragment()
     ).rgb) * u_EmissiveFactor.rgb * Input.EmissiveStrength * emissiveVisibility;
 
     color = vec4(directLighting + ambient + emissive, opacity);
+    // Transparent surfaces attenuate the opaque indirect buffer but do not contribute to it.
+    indirectLighting = vec4(u_SurfaceProperties.w > 1.5 ? vec3(0.0) : ambient, opacity);
     normalRoughness = vec4(normal, roughness);
     viewPositionMetallic = vec4(Input.ViewPosition, metallic);
 }

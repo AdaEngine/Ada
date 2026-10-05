@@ -35,6 +35,23 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 : > "$DEMO_ROOT/dist/runtime.log"
 case "$MODE" in
+    --capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized)
+        NAME="${MODE#--capture-}"
+        mkdir -p "$DEMO_ROOT/dist/captures/$NAME"
+        rm -f "$DEMO_ROOT/dist/captures/$NAME/frame-30.png" "$DEMO_ROOT/dist/captures/$NAME/frame-50.png" "$DEMO_ROOT/dist/captures/$NAME/gpu-timings.json"
+        EXTRA=(--measure-gpu)
+        case "$NAME" in
+            baseline) EXTRA+=(--render-baseline) ;;
+            no-ao) EXTRA+=(--no-ao) ;;
+            no-aa) EXTRA+=(--no-aa) ;;
+            single-shadows) EXTRA+=(--single-shadows) ;;
+            no-shadows) EXTRA+=(--no-shadows) ;;
+            no-culling) EXTRA+=(--no-culling) ;;
+            no-lod) EXTRA+=(--no-lod) ;;
+            unoptimized) EXTRA+=(--no-culling --no-lod --no-distance-culling) ;;
+        esac
+        /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --render-proof "${EXTRA[@]}" --capture-directory "$DEMO_ROOT/dist/captures/$NAME"
+        ;;
     --capture-overview)
         mkdir -p "$DEMO_ROOT/dist/captures/overview"
         rm -f "$DEMO_ROOT/dist/captures/overview/frame-30.png" "$DEMO_ROOT/dist/captures/overview/frame-50.png"
@@ -74,5 +91,5 @@ case "$MODE" in
         /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log"
         /usr/bin/log stream --info --style compact --predicate 'process == "SkeletalGarden"'
         ;;
-    *) echo 'usage: build_and_run.sh [run|--autoplay|--capture|--capture-overview|--capture-no-ibl|--verify|--debug|--logs]' >&2; exit 2 ;;
+    *) echo 'usage: build_and_run.sh [run|--autoplay|--capture|--capture-overview|--capture-no-ibl|--capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized|--verify|--debug|--logs]' >&2; exit 2 ;;
 esac

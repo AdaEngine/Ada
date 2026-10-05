@@ -8,6 +8,7 @@ struct GardenInputSystem {
     @Res<Input> private var input
     @Res<DeltaTime> private var time
     private let autoplay = ProcessInfo.processInfo.arguments.contains("--autoplay")
+    private let renderProof = ProcessInfo.processInfo.arguments.contains("--render-proof")
     private let poseProof = ProcessInfo.processInfo.arguments.contains("--pose-proof")
     private let controllerProof = ProcessInfo.processInfo.arguments.contains("--controller-proof")
 
@@ -42,7 +43,7 @@ struct GardenInputSystem {
                 } else { direction = .zero }
                 jumping = state.elapsed >= 7 && state.elapsed < 7.2
             }
-            if poseProof { direction = .zero; jumping = false }
+            if poseProof || renderProof { direction = .zero; jumping = false }
             controller.desiredVelocity = direction.length > 0.01 ? direction.normalized * (running ? 2.2 : 1.1) : .zero
             if jumping, !state.jumpHeld { controller.jumpRequested = true }
             state.jumpHeld = jumping
@@ -60,6 +61,7 @@ struct GardenInputSystem {
 struct GardenPresentationSystem {
     @Query<Ref<GardenPlayer>, CharacterController3DComponent, Ref<Transform>, Ref<ModelAnimation3DComponent>> private var players
     @Res<DeltaTime> private var time
+    private let renderProof = ProcessInfo.processInfo.arguments.contains("--render-proof")
     private let poseProof = ProcessInfo.processInfo.arguments.contains("--pose-proof")
     private let controllerProof = ProcessInfo.processInfo.arguments.contains("--controller-proof")
 
@@ -86,7 +88,7 @@ struct GardenPresentationSystem {
                 clip = "Land"
                 state.landingTime = max(0, state.landingTime - dt)
             }
-            if poseProof { clip = "Walk" }
+            if poseProof || renderProof { clip = "Walk" }
             state.sawJump = state.sawJump || clip == "Jump"
             state.sawFall = state.sawFall || clip == "Fall"
             state.sawLand = state.sawLand || clip == "Land"
@@ -107,7 +109,11 @@ struct GardenPresentationSystem {
                 let referenceSpeed: Double = clip == "Run" ? 2.2 : 1.1
                 animation.player.speed = poseProof ? 1 : min(max(Double(speed) / referenceSpeed, 0.25), 1.5)
             } else { animation.player.speed = 1 }
-            if speed > 0.07, !poseProof {
+            if renderProof {
+                animation.player.seek(to: 0.35)
+                animation.player.isPlaying = false
+            }
+            if speed > 0.07, !poseProof, !renderProof {
                 var turn = (Math.atan2(horizontal.x, horizontal.z) - state.facingYaw).truncatingRemainder(dividingBy: .pi * 2)
                 if turn > .pi { turn -= .pi * 2 }
                 if turn < -.pi { turn += .pi * 2 }

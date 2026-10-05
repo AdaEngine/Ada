@@ -11,7 +11,10 @@
     import Metal
 
     final class MetalCommandEncoder: CommandBuffer {
-        var label: String?
+        var label: String? {
+            get { commandBuffer.label }
+            set { commandBuffer.label = newValue }
+        }
         let commandBuffer: MTLCommandBuffer
         private let device: MTLDevice
         #if canImport(MetalFX) && (os(macOS) || os(iOS))
@@ -42,6 +45,13 @@
         func addCompletedHandler(_ handler: @escaping @Sendable () -> Void) {
             self.commandBuffer.addCompletedHandler { _ in
                 handler()
+            }
+        }
+
+        func addCompletedTimingHandler(_ handler: @escaping @Sendable (Double?) -> Void) {
+            commandBuffer.addCompletedHandler { completed in
+                let duration = completed.gpuEndTime - completed.gpuStartTime
+                handler(completed.status == .completed && completed.gpuStartTime > 0 && duration > 0 ? duration : nil)
             }
         }
 

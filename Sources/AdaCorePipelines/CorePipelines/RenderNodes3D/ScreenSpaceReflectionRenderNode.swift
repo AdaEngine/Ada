@@ -30,16 +30,22 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
 
     private let notifiesCompletion: Bool
 
+    @Res<Render3DPerformanceMetrics?> private var metrics
+
     public init(notifiesCompletion: Bool = true) {
         self.notifiesCompletion = notifiesCompletion
     }
 
     public func update(from world: World) {
+        _metrics.update(from: world)
         query.update(from: world)
         _environments.update(from: world)
         _pipeline.update(from: world)
         _scratch.update(from: world)
         _renderDevice.update(from: world)
+        var activeViews: [Entity.ID] = []
+        query.forEach { _, _, _, _, source in activeViews.append(source.entityId) }
+        scratch.cache.retainViews(activeViews)
     }
 
     public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
@@ -47,6 +53,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
             return []
         }
 
+        var submitted: CommandBuffer?
         query.forEach { entity, camera, target, viewUniform, source in
             guard
                 entity == view,
@@ -60,6 +67,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
             }
 
             let environment = environments.environments[source.entityId] ?? Environment3D()
+            let compositeTarget = environment.antiAliasing == .none ? mainTexture : (target.antiAliasing3DInputTexture ?? mainTexture)
             let skybox = environment.skybox
             let reflection = environment.screenSpaceReflection
             let skyIntensity = max(0, skybox.intensity)
@@ -100,10 +108,10 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                     max(0, environment.imageBasedLighting?.intensity ?? 1),
                     environment.imageBasedLighting?.rotation ?? 0,
                     environment.imageBasedLighting?.asset.asset?.radiance == nil ? 0 : 1
-                )
+                ),
+                quality: Vector4(environment.ambientOcclusion.isEnabled ? 1 : 0, finiteRenderValue(environment.ambientOcclusion.radius, fallback: 0.65, range: 0.05...3), 0, 0)
             )
-            scratch.uniform.elements = [uniform]
-            scratch.uniform.write(to: renderDevice.renderDevice)
+            let constants = scratch.cache.write(uniform, view: source.entityId, device: renderDevice.renderDevice)
 
             let environmentTexture = skybox.texture?.asset ?? Texture2D.whiteTexture
             let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
@@ -113,7 +121,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                     label: "Screen Space Reflection Composite",
                     colorAttachments: [
                         .init(
-                            texture: mainTexture,
+                            texture: compositeTarget,
                             operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
                             clearColor: camera.backgroundColor
                         ),
@@ -125,6 +133,9 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
             pass.setResourceSet(
                 RenderResourceSet(
                     bindings: [
+                        .init(binding: 8, shaderStages: .fragment, resource: .texture(target.indirectLighting3DTexture ?? Texture2D.whiteTexture)),
+                        .init(binding: 9, shaderStages: .fragment, resource: .texture(target.ambientOcclusion3DTexture ?? Texture2D.whiteTexture)),
+                        .init(binding: 11, shaderStages: .fragment, resource: .sampler(pipeline.nearest)),
                         .init(binding: 0, shaderStages: .fragment, resource: .texture(sceneColor)),
                         .init(binding: 1, shaderStages: .fragment, resource: .texture(normalRoughness)),
                         .init(binding: 2, shaderStages: .fragment, resource: .texture(viewPositionMetallic)),
@@ -136,19 +147,25 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                 ),
                 index: 0
             )
-            pass.setFragmentBuffer(scratch.uniform, offset: 0, slot: 4)
+            pass.setFragmentBuffer(constants, offset: 0, slot: 4)
             pass.setRenderPipelineState(pipeline.renderPipeline)
             pass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
             pass.endRenderPass()
-            if notifiesCompletion, let outputTexture = target.outputTexture,
+            if notifiesCompletion, environment.antiAliasing == .none, let outputTexture = target.outputTexture,
                mainTexture === outputTexture {
                 commandBuffer.addCompletedHandler { [outputTexture] in
                     outputTexture.notifyRenderCompleted()
                 }
             }
-            commandBuffer.commit()
+            if let metrics {
+                commandBuffer.addCompletedTimingHandler { metrics.record(pass: "composite", seconds: $0) }
+            }
+            submitted = commandBuffer
         }
 
+        if let submitted {
+            if let metrics { await metrics.commit(submitted) } else { submitted.commit() }
+        }
         return []
     }
 }

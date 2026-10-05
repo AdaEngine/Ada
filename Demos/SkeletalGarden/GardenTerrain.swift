@@ -13,15 +13,15 @@ struct GardenTerrain: Sendable {
     init() {
         var vertices: [Vector3] = []
         var indices: [UInt32] = []
-        for row in 0...Self.cells {
-            for column in 0...Self.cells {
+        for row in 0 ... Self.cells {
+            for column in 0 ... Self.cells {
                 let x = -Self.extent + Float(column) * Self.spacing
                 let z = -Self.extent + Float(row) * Self.spacing
                 vertices.append([x, Self.height(x: x, z: z), z])
             }
         }
-        for row in 0..<Self.cells {
-            for column in 0..<Self.cells {
+        for row in 0 ..< Self.cells {
+            for column in 0 ..< Self.cells {
                 let first = UInt32(row * (Self.cells + 1) + column)
                 let next = first + UInt32(Self.cells + 1)
                 indices.append(contentsOf: [first, next, next + 1, first, next + 1, first + 1])
@@ -54,7 +54,7 @@ struct GardenTerrain: Sendable {
             normals[a] += normal; normals[b] += normal; normals[c] += normal
             let center = (vertices[a] + vertices[b] + vertices[c]) / 3
             // The original textured plaza covers the central 12x12 meters.
-            if abs(center.x) >= 6 || abs(center.z) >= 6 { visible.append(contentsOf: indices[index..<index + 3]) }
+            if abs(center.x) >= 6 || abs(center.z) >= 6 { visible.append(contentsOf: indices[index ..< index + 3]) }
         }
         descriptor.normals = MeshBuffer(normals.map(\.normalized))
         let colors: [Color] = vertices.map { point in
@@ -68,6 +68,60 @@ struct GardenTerrain: Sendable {
         }
         descriptor.colors = MeshBuffer(colors)
         descriptor.indicies = visible
+        return descriptor
+    }
+
+    /// 6m chunks, with identical full-resolution edge vertices at every LOD.
+    /// Coarse boundary cells use a fan so neighboring levels share the same boundary segments.
+    func chunkDescriptor(column: Int, row: Int, step: Int) -> MeshDescriptor {
+        let n = 8
+        let columnStart = column * n, rowStart = row * n
+        var descriptor = MeshDescriptor(name: "Terrain chunk \(column),\(row) LOD \(step)")
+        var points: [Vector3] = [], normals: [Vector3] = [], colors: [Color] = []
+        var elements: [UInt32] = []
+        let step = min(max(step, 1), 4)
+        func vertex(_ x: Int, _ z: Int) -> UInt32 {
+            let index = (rowStart + z) * (Self.cells + 1) + columnStart + x
+            let p = vertices[index]
+            let left = vertices[(rowStart + z) * (Self.cells + 1) + max(columnStart + x - 1, 0)]
+            let right = vertices[(rowStart + z) * (Self.cells + 1) + min(columnStart + x + 1, Self.cells)]
+            let back = vertices[max(rowStart + z - 1, 0) * (Self.cells + 1) + columnStart + x]
+            let front = vertices[min(rowStart + z + 1, Self.cells) * (Self.cells + 1) + columnStart + x]
+            let dx = (right.y - left.y) / max(right.x - left.x, Self.spacing)
+            let dz = (front.y - back.y) / max(front.z - back.z, Self.spacing)
+            let variation = 0.035 * Math.sin(p.x * 1.3 + p.z * 0.8)
+            let base = Vector3(0.24 + variation, 0.36 + variation, 0.16 + variation * 0.4)
+            let path = max(0, 1 - abs(p.x - Self.trailX(z: p.z)) / 1.4)
+            let rgb = base + (Vector3(0.48, 0.41, 0.27) - base) * path
+            let result = UInt32(points.count)
+            points.append(p); normals.append(Vector3(-dx, 1, -dz).normalized)
+            colors.append(Color(red: rgb.x, green: rgb.y, blue: rgb.z))
+            return result
+        }
+        for z in stride(from: 0, to: n, by: step) {
+            for x in stride(from: 0, to: n, by: step) {
+                if step == 1 {
+                    let a = vertex(x, z), b = vertex(x, z + 1), c = vertex(x + 1, z + 1), d = vertex(x + 1, z)
+                    elements.append(contentsOf: [a, b, c, a, c, d])
+                    continue
+                }
+                var boundary: [UInt32] = []
+                boundary.append(vertex(x, z))
+                if x == 0 { for offset in 1 ..< step { boundary.append(vertex(x, z + offset)) } }
+                boundary.append(vertex(x, z + step))
+                if z + step == n { for offset in 1 ..< step { boundary.append(vertex(x + offset, z + step)) } }
+                boundary.append(vertex(x + step, z + step))
+                if x + step == n { for offset in 1 ..< step { boundary.append(vertex(x + step, z + step - offset)) } }
+                boundary.append(vertex(x + step, z))
+                if z == 0 { for offset in 1 ..< step { boundary.append(vertex(x + step - offset, z)) } }
+                let center = vertex(x + step / 2, z + step / 2)
+                for edge in boundary.indices { elements.append(contentsOf: [center, boundary[edge], boundary[(edge + 1) % boundary.count]]) }
+            }
+        }
+        descriptor.positions = MeshBuffer(points)
+        descriptor.normals = MeshBuffer(normals)
+        descriptor.colors = MeshBuffer(colors)
+        descriptor.indicies = elements
         return descriptor
     }
 
@@ -93,7 +147,7 @@ struct GardenTerrain: Sendable {
 }
 
 struct GardenRandom {
-    private var state: UInt64 = 0xADAE_3D_2026
+    private var state: UInt64 = 0xAD_AE3D_2026
 
     mutating func next(_ lower: Float, _ upper: Float) -> Float {
         state = state &* 6_364_136_223_846_793_005 &+ 1

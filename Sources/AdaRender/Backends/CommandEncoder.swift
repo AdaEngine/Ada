@@ -126,11 +126,18 @@ public protocol CommandBuffer: AnyObject {
     /// and cannot be modified further.
     func commit()
 
+    /// Reports GPU execution seconds after completion, or nil when timestamps are unavailable.
+    func addCompletedTimingHandler(_ handler: @escaping @Sendable (Double?) -> Void)
+
     /// Registers a callback that runs after the command buffer has finished.
     func addCompletedHandler(_ handler: @escaping @Sendable () -> Void)
 }
 
 extension CommandBuffer {
+    public func addCompletedTimingHandler(_ handler: @escaping @Sendable (Double?) -> Void) {
+        addCompletedHandler { handler(nil) }
+    }
+
     public func encodeSpatialUpscale(source _: Texture, destination _: Texture) -> Bool {
         false
     }

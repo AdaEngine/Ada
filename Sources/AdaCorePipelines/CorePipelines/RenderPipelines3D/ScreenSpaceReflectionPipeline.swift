@@ -12,6 +12,7 @@ import Math
 public struct ScreenSpaceReflectionPipeline: Resource {
     public let renderPipeline: RenderPipeline
     public let sampler: Sampler
+    let nearest: Sampler
 
     public init(device: RenderDevice) {
         let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/screen_space_reflection.glsl")
@@ -26,6 +27,7 @@ public struct ScreenSpaceReflectionPipeline: Resource {
             RenderPipelineColorAttachmentDescriptor(format: .bgra8, isBlendingEnabled: false),
         ]
         renderPipeline = device.createRenderPipeline(from: descriptor)
+        nearest = device.createSampler(from: .init(minFilter: .nearest, magFilter: .nearest, mipFilter: .notMipmapped))
         sampler = device.createSampler(
             from: SamplerDescriptor(
                 minFilter: .linear,
@@ -49,9 +51,11 @@ struct Environment3DUniform: Sendable {
     var environmentFlags: Vector4
     var starfield: Vector4
     var ibl: Vector4
+    var quality: Vector4
 }
 
 public struct ScreenSpaceReflectionScratch: Resource, Sendable {
+    var cache = FrameUniformCache3D<Environment3DUniform>()
     var uniform = BufferData<Environment3DUniform>(label: "Environment 3D Uniform", elements: [])
 
     public init() {}

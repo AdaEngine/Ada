@@ -5,20 +5,37 @@ import AdaEngine
         var frame = 0
         var captured = 0
         let directory: URL
+        var reportedTimings = false
     }
 
     /// Optional demo-only readback on the same command queue as the 3D graph.
     struct GardenFrameCapture: RenderNode {
         @Query<Entity, RenderViewTarget> private var views
         @ResMut<GardenCaptureState> private var state
+        @Res<Render3DPerformanceMetrics?> private var metrics
+        @Res<Render3DVisibilityStatistics?> private var visibility
 
         func update(from world: World) {
             views.update(from: world)
             _state.update(from: world)
+            _metrics.update(from: world)
+            _visibility.update(from: world)
         }
 
         func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
             state.frame += 1
+            if state.frame >= 160, !state.reportedTimings, let metrics {
+                let samples = metrics.samples
+                let data = try JSONEncoder().encode(samples)
+                try data.write(to: state.directory.appendingPathComponent("gpu-timings.json"))
+                gardenLog("[SkeletalGarden] GPU timings \(String(data: data, encoding: .utf8) ?? "unavailable")")
+                if let visibility {
+                    let counters = try JSONEncoder().encode(visibility.snapshots)
+                    try counters.write(to: state.directory.appendingPathComponent("visibility.json"))
+                    gardenLog("[SkeletalGarden] visibility \(String(data: counters, encoding: .utf8) ?? "unavailable")")
+                }
+                state.reportedTimings = true
+            }
             guard state.frame == 30 || state.frame == 50, let view = context.viewEntity else {
                 return []
             }
@@ -82,7 +99,7 @@ import AdaEngine
                 return
             }
             graph.addNode(GardenFrameCapture())
-            graph.addNodeEdge(from: ScreenSpaceReflectionRenderNode.name, to: GardenFrameCapture.name)
+            graph.addNodeEdge(from: AntiAliasing3DRenderNode.name, to: GardenFrameCapture.name)
             graph.addNodeEdge(from: GardenFrameCapture.name, to: RenderNodeLabel.Main3D.endPass)
             root.wrappedValue.addSubgraph(graph, name: .main3D)
         }

@@ -24,6 +24,9 @@ layout (binding = 3) uniform sampler u_LinearSampler;
 layout (binding = 5) uniform texture2D u_EnvironmentTexture;
 layout (binding = 6) uniform texture2D u_Radiance;
 layout (binding = 7) uniform sampler u_RadianceSampler;
+layout (binding = 8) uniform texture2D u_Indirect;
+layout (binding = 9) uniform texture2D u_AO;
+layout (binding = 11) uniform sampler u_GBufferSampler;
 
 layout (binding = 4) uniform Environment3DUniform {
     mat4 u_Projection;
@@ -38,6 +41,7 @@ layout (binding = 4) uniform Environment3DUniform {
     vec4 u_EnvironmentFlags;
     vec4 u_Starfield;
     vec4 u_IBL;
+    vec4 u_Quality;
 };
 
 const float PI = 3.14159265359;
@@ -156,7 +160,7 @@ bool traceReflection(vec3 origin, vec3 direction, out vec2 hitUV) {
             break;
         }
 
-        vec3 scenePosition = texture(sampler2D(u_ViewPositionMetallic, u_LinearSampler), uv).xyz;
+        vec3 scenePosition = texture(sampler2D(u_ViewPositionMetallic, u_GBufferSampler), uv).xyz;
         if (length(scenePosition) > 0.0001) {
             float rayDepth = -ray.z;
             float sceneDepth = -scenePosition.z;
@@ -169,10 +173,32 @@ bool traceReflection(vec3 origin, vec3 direction, out vec2 hitUV) {
     return false;
 }
 
+float ambientOcclusion(vec3 position, vec3 normal) {
+    if (u_Quality.x < 0.5) { return 1.0; }
+    vec2 size = vec2(textureSize(sampler2D(u_AO, u_LinearSampler), 0));
+    vec2 base = floor(v_UV * size - 0.5);
+    vec2 fraction = fract(v_UV * size - 0.5);
+    float sum = 0.0, weights = 0.0;
+    for (int y = 0; y < 2; ++y) {
+        for (int x = 0; x < 2; ++x) {
+            vec2 uv = clamp((base + vec2(float(x), float(y)) + 0.5) / size, 0.5 / size, vec2(1.0) - 0.5 / size);
+            vec3 other = texture(sampler2D(u_ViewPositionMetallic, u_GBufferSampler), uv).xyz;
+            vec3 otherNormal = texture(sampler2D(u_NormalRoughness, u_GBufferSampler), uv).xyz;
+            if (other.z <= 0.0 || length(otherNormal) < 0.1) { continue; }
+            float bilinear = (x == 0 ? 1.0 - fraction.x : fraction.x) * (y == 0 ? 1.0 - fraction.y : fraction.y);
+            float weight = bilinear * exp(-abs(position.z - other.z) / max(0.02, u_Quality.y * 0.1));
+            weight *= pow(max(dot(normal, normalize(otherNormal)), 0.0), 8.0);
+            sum += texture(sampler2D(u_AO, u_GBufferSampler), uv).r * weight;
+            weights += weight;
+        }
+    }
+    return weights > 0.0001 ? sum / weights : 1.0;
+}
+
 [[main]]
 void ssr_fragment() {
-    vec4 normalRoughness = texture(sampler2D(u_NormalRoughness, u_LinearSampler), v_UV);
-    vec4 positionMetallic = texture(sampler2D(u_ViewPositionMetallic, u_LinearSampler), v_UV);
+    vec4 normalRoughness = texture(sampler2D(u_NormalRoughness, u_GBufferSampler), v_UV);
+    vec4 positionMetallic = texture(sampler2D(u_ViewPositionMetallic, u_GBufferSampler), v_UV);
     if (length(normalRoughness.xyz) < 0.1 || length(positionMetallic.xyz) < 0.0001) {
         vec2 ndc = vec2(v_UV.x * 2.0 - 1.0, 1.0 - v_UV.y * 2.0);
         vec4 viewFar = u_InverseProjection * vec4(ndc, 1.0, 1.0);
@@ -182,6 +208,9 @@ void ssr_fragment() {
     }
 
     vec3 baseColor = texture(sampler2D(u_SceneColor, u_LinearSampler), v_UV).rgb;
+    float ao = ambientOcclusion(positionMetallic.xyz, normalize(normalRoughness.xyz));
+    vec3 indirect = texture(sampler2D(u_Indirect, u_LinearSampler), v_UV).rgb;
+    baseColor = max(baseColor - indirect * (1.0 - ao), vec3(0.0));
     // The PBR pass already integrated diffuse and specular IBL, including AO and material F0.
     if (u_IBL.x > 0.5) { o_Color = vec4(presentColor(baseColor), 1.0); return; }
     vec3 normal = normalize(normalRoughness.xyz);
@@ -206,5 +235,5 @@ void ssr_fragment() {
     reflectivity *= (1.0 - roughness * 0.7) * u_ReflectionQuality.y;
     vec3 ambient = sampleSky(normal) * (0.035 + 0.035 * (1.0 - roughness));
     vec3 reflectionResult = mix(environment, reflectedColor, visibility);
-    o_Color = vec4(presentColor(baseColor + ambient + reflectionResult * reflectivity), 1.0);
+    o_Color = vec4(presentColor(baseColor + (ambient + reflectionResult * reflectivity) * ao), 1.0);
 }

@@ -25,3 +25,7 @@ The bake self-test checks constant-radiance energy, GGX preservation and BRDF LU
 `Tree.glb`, `Rock.glb` and `Grass.glb` are original deterministic procedural models authored by `Tools/3DAssets/generate_landscape_assets.py` with Blender, without external images or paid generation services. The 48x48 meter terrain, colors, prop layout, terraces and lookout are defined in the demo's GardenTerrain/GardenLandscape sources. Rendering and static triangle collision use the same height geometry.
 
 The robot runtime profile now includes rotation-only derivatives of the original CC0 `Jump` clip: Jump uses frames 2–8, Fall holds frame 8, and Land uses frames 10–16 (the source is sampled at 24 FPS). Joint translations remain at rest in these clips; AdaPhysics owns world displacement. Original vertex positions, inverse-bind matrices and node transforms remain unchanged. The source model and CC0 provenance above remain applicable.
+
+## Static LOD assets
+
+The landscape generator joins the original tree geometry at the common root pivot before export, then uses deterministic Blender decimation (0.55/0.27 ratios). TreeLOD1/2 and RockLOD1/2 retain the base material ordering and identity node transform. Actual triangle counts are Tree 96/51/23 and Rock 80/44/20. The Khronos validator reported zero errors and zero warnings on all six files. Terrain LOD is demo-native geometry with unchanged boundary samples and three interior resolutions; runtime physics retains full resolution.

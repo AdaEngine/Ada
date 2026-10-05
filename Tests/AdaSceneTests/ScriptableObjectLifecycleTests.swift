@@ -48,11 +48,9 @@ struct ScriptableObjectLifecycleTests {
         #expect(script.calls.contains("update"))
         #expect(script.readyEntityID == entity.id)
 
-        let fixedUpdateDeadline = ContinuousClock.now.advanced(by: .seconds(2))
-        while !script.calls.contains("fixedUpdate"), ContinuousClock.now < fixedUpdateDeadline {
-            try await Task.sleep(for: .milliseconds(20))
-            await world.runScheduler(.update)
-        }
+        // Advance the real scheduler with a deterministic step; unrelated shader compilation can
+        // suspend this main-actor test beyond a wall-clock deadline in a parallel suite.
+        await world.runScheduler(.update, deltaTime: 1.0 / 60.0)
         #expect(script.calls.filter { $0 == "ready" }.count == 1)
         #expect(script.calls.contains("fixedUpdate"))
 

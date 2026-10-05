@@ -180,6 +180,7 @@ public struct Flat3DPipeline: RenderPipelineConfigurator {
             RenderPipelineColorAttachmentDescriptor(format: .rgba_16f, isBlendingEnabled: true),
             RenderPipelineColorAttachmentDescriptor(format: .rgba_16f),
             RenderPipelineColorAttachmentDescriptor(format: .rgba_16f),
+            RenderPipelineColorAttachmentDescriptor(format: .rgba_16f),
         ]
         return descriptor
     }

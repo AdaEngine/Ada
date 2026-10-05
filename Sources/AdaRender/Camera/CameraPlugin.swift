@@ -61,6 +61,12 @@ public struct RenderViewTarget: @unchecked Sendable {
     /// View-space position in RGB and metallic factor in A.
     public var viewPositionMetallic3DTexture: RenderTexture?
 
+    /// Opaque indirect-light contribution, attenuated by transparent foreground coverage.
+    public var indirectLighting3DTexture: RenderTexture?
+    public var ambientOcclusion3DRawTexture: RenderTexture?
+    public var ambientOcclusion3DTexture: RenderTexture?
+    public var antiAliasing3DInputTexture: RenderTexture?
+
     /// When true, ``Main2DRenderNode`` writes albedo to ``sceneColorTexture``; lighting composite writes ``mainTexture``.
     public var lighting2DUsesDeferredTargets: Bool = false
     /// When true, the main 3D pass writes the environment geometry buffers.
@@ -176,6 +182,10 @@ func ConfigurateRenderViewTarget(
                 renderViewTarget.sceneColor3DTexture,
                 renderViewTarget.normalRoughness3DTexture,
                 renderViewTarget.viewPositionMetallic3DTexture,
+                renderViewTarget.indirectLighting3DTexture,
+                renderViewTarget.ambientOcclusion3DRawTexture,
+                renderViewTarget.ambientOcclusion3DTexture,
+                renderViewTarget.antiAliasing3DInputTexture,
             ]
             .compactMap { $0 }
             renderViewTarget.retiredFrameTextures.append(contentsOf: retireFrameTextures(retiredTextures))
@@ -199,6 +209,10 @@ func ConfigurateRenderViewTarget(
             renderViewTarget.sceneColor3DTexture = nil
             renderViewTarget.normalRoughness3DTexture = nil
             renderViewTarget.viewPositionMetallic3DTexture = nil
+            renderViewTarget.indirectLighting3DTexture = nil
+            renderViewTarget.ambientOcclusion3DRawTexture = nil
+            renderViewTarget.ambientOcclusion3DTexture = nil
+            renderViewTarget.antiAliasing3DInputTexture = nil
         }
 
         cachedViewTargets.targets[source.entityId] = renderViewTarget.wrappedValue.cacheableCopy

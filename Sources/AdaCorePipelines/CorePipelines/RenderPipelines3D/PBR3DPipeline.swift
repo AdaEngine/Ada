@@ -20,6 +20,20 @@ public struct PBR3DPipeline: RenderPipelineConfigurator {
         var descriptor = base.configurate(with: configuration.vertex)
         descriptor.backfaceCulling = false
         descriptor.depthStencilDescriptor?.isDepthWriteEnabled = !configuration.blended
+        if configuration.blended {
+            for index in 1...2 {
+                descriptor.colorAttachments[index] = RenderPipelineColorAttachmentDescriptor(
+                    format: .rgba_16f,
+                    isBlendingEnabled: true,
+                    sourceRGBBlendFactor: .zero,
+                    sourceAlphaBlendFactor: .zero,
+                    destinationAlphaBlendFactor: .one,
+                    destinationRGBBlendFactor: .one
+                )
+            }
+            descriptor.colorAttachments[3].isBlendingEnabled = true
+            descriptor.colorAttachments[3].sourceRGBBlendFactor = .zero
+        }
         return descriptor
     }
 }

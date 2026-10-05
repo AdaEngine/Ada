@@ -25,6 +25,7 @@ public struct DirectionalShadow3DPipeline: RenderPipelineConfigurator {
         configuration.attributes[7] = .attribute(.vector4, name: "instanceModel2", bufferIndex: 3, offset: 32)
         configuration.attributes[9] = .attribute(.vector4, name: "instanceColor", bufferIndex: 3, offset: 64)
         configuration.attributes[8] = .attribute(.vector4, name: "instanceModel3", bufferIndex: 3, offset: 48)
+        configuration.attributes[12] = .attribute(.vector4, name: "instanceShadowFlags", bufferIndex: 3, offset: 112)
         configuration.layouts[3] = VertexDescriptor.Layout(
             stride: MemoryLayout<Flat3DInstanceData>.stride,
             stepFunction: .perInstance

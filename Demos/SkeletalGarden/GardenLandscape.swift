@@ -9,13 +9,25 @@ func makeGardenLandscape(in world: World, device: RenderDevice) throws {
     grass.roughnessFactor = 0.95
     let collision = try Shape3DResource.generateTriangleMesh(vertices: terrain.vertices, indices: terrain.indices)
     world.spawn("Rolling landscape") {
-        Mesh3DComponent(mesh: .generate(from: [terrain.descriptor()], renderDevice: device), materials: [grass])
         PhysicsBody3DComponent(shapes: [collision], mode: .static)
         Transform()
+    }
+    for row in 0..<8 {
+        for column in 0..<8 {
+            if (3...4).contains(column), (3...4).contains(row) { continue }
+            let levels = [1, 2, 4].map { Mesh.generate(from: [terrain.chunkDescriptor(column: column, row: row, step: $0)], renderDevice: device) }
+            world.spawn("Terrain \(column),\(row)") {
+                Mesh3DComponent(mesh: levels[0], materials: [grass])
+                MeshLOD3DComponent(alternatives: Array(levels.dropFirst()), screenThresholds: [0.65, 0.3])
+                Transform()
+            }
+        }
     }
     let tree = try landscapeModel("Tree")
     let rock = try landscapeModel("Rock")
     let tuft = try landscapeModel("Grass")
+    let treeLODs = try [landscapeModel("TreeLOD1"), landscapeModel("TreeLOD2")]
+    let rockLODs = try [landscapeModel("RockLOD1"), landscapeModel("RockLOD2")]
     var random = GardenRandom()
     var trees = 0, rocks = 0, grasses = 0
     for row in -4...4 {
@@ -26,6 +38,7 @@ func makeGardenLandscape(in world: World, device: RenderDevice) throws {
             let size = random.next(0.65, 1.25)
             let height = terrain.surfaceHeight(x: x, z: z)
             let root = tree.instantiate(in: world)
+            attachGardenLODs(to: root, alternatives: treeLODs, thresholds: [0.4, 0.2])
             root.components[Transform.self] = Transform(rotation: Quat(axis: .up, angle: random.next(0, .pi * 2)), scale: Vector3(size), position: [x, height, z])
             world.spawn("Tree trunk collider") {
                 PhysicsBody3DComponent(shapes: [
@@ -43,6 +56,7 @@ func makeGardenLandscape(in world: World, device: RenderDevice) throws {
         let scale = random.next(0.45, 1.35)
         let height = terrain.surfaceHeight(x: x, z: z)
         let root = rock.instantiate(in: world)
+        attachGardenLODs(to: root, alternatives: rockLODs, thresholds: [0.16, 0.06])
         root.components[Transform.self] = Transform(rotation: Quat(axis: .up, angle: random.next(0, .pi * 2)), scale: Vector3(scale), position: [x, height, z])
         world.spawn("Rock collider") {
             PhysicsBody3DComponent(shapes: [.generateSphere(radius: 0.72 * scale)], mode: .static)
@@ -54,6 +68,7 @@ func makeGardenLandscape(in world: World, device: RenderDevice) throws {
         let x = random.next(-23, 23), z = random.next(-23, 23)
         guard max(abs(x), abs(z)) > 6.2, abs(x - GardenTerrain.trailX(z: z)) > 1.3 else { continue }
         let root = tuft.instantiate(in: world)
+        attachGardenLODs(to: root, alternatives: [], thresholds: [], maximumDistance: 30)
         root.components[Transform.self] = Transform(
             rotation: Quat(axis: .up, angle: random.next(0, .pi * 2)),
             scale: Vector3(random.next(0.8, 1.5)),
@@ -134,5 +149,17 @@ private func gardenBlock(in world: World, name: String, position: Vector3, size:
     }
     if let material {
         root.components[Mesh3DComponent.self] = Mesh3DComponent(mesh: .generateCube(size: size, renderDevice: device), materials: [material])
+    }
+}
+
+@MainActor
+private func attachGardenLODs(to root: Entity, alternatives: [ModelAsset3D], thresholds: [Float], maximumDistance: Float? = nil) {
+    let meshes = alternatives.compactMap { $0.meshes.first }
+    var pending = root.children
+    while let node = pending.popLast() {
+        if node.components[Mesh3DComponent.self] != nil {
+            node.components[MeshLOD3DComponent.self] = MeshLOD3DComponent(alternatives: meshes, screenThresholds: thresholds, maximumDistance: maximumDistance, fadeDistance: 5)
+        }
+        pending.append(contentsOf: node.children)
     }
 }
