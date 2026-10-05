@@ -3,6 +3,7 @@ import AdaEngine
 @PlainSystem
 struct GardenRenderQualitySystem {
     @Query<Ref<Environment3D>> private var cameras
+    @Query<Ref<Camera>> private var temporalCameras
     @Res<Input> private var input
     @Local private var shadowsHeld = false
     @Local private var cascadesHeld = false
@@ -10,6 +11,7 @@ struct GardenRenderQualitySystem {
     @Local private var cullingHeld = false
     @Local private var lodHeld = false
     @Local private var aaHeld = false
+    @Local private var temporalHeld = false
 
     init(world _: World) {}
 
@@ -20,6 +22,14 @@ struct GardenRenderQualitySystem {
         let culling = input.isKeyPressed(.num5)
         let lod = input.isKeyPressed(.num6)
         let aa = input.isKeyPressed(.num3)
+        let temporal = input.isKeyPressed(.num7)
+        if temporal, !temporalHeld {
+            temporalCameras.forEach { camera in
+                camera.temporalUpscaling = camera.temporalUpscaling == nil ? .init(renderScale: 0.75) : nil
+                gardenLog("[SkeletalGarden] MetalFX Temporal=\(camera.temporalUpscaling != nil)")
+            }
+        }
+        temporalHeld = temporal
         cameras.forEach { environment in
             if shadows, !shadowsHeld {
                 environment.shadows.isEnabled.toggle()

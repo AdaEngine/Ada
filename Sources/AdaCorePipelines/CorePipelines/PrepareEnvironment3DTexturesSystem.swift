@@ -32,11 +32,12 @@ public struct PrepareEnvironment3DTexturesSystem {
 
             let size = mainTexture.size
             let scale = mainTexture.scaleFactor
-            if target.depthTexture?.size != size {
+            let depthFormat: PixelFormat = camera.temporalUpscaling != nil && target.depthTexture?.pixelFormat == .depth_32f ? .depth_32f : .depth_32f_stencil8
+            if target.depthTexture?.size != size || target.depthTexture?.pixelFormat != depthFormat {
                 target.depthTexture = RenderTexture(
                     size: size,
                     scaleFactor: scale,
-                    format: .depth_32f_stencil8,
+                    format: depthFormat,
                     debugLabel: "3D Camera Depth Texture"
                 )
             }

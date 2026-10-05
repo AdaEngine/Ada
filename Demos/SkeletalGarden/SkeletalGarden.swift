@@ -2,6 +2,12 @@ import AdaEngine
 
 @main
 struct SkeletalGarden: App {
+    init() {
+        if ProcessInfo.processInfo.arguments.contains("--spatial-proof") {
+            unsafe RenderEngine.configurations.upscaling = .spatial(renderScale: 0.75)
+        }
+    }
+
     var body: some AppScene {
         DefaultAppWindow(assetBundle: .module)
             .addPlugins(GardenPlugin())
@@ -20,6 +26,7 @@ struct GardenPlugin: Plugin {
         app.addSystem(StartupGardenSystem.self, on: .startup)
         app.addSystem(GardenInputSystem.self, on: .update)
         app.addSystem(GardenRenderQualitySystem.self, on: .update)
+        app.addSystem(GardenTemporalValidationSystem.self, on: .update)
         app.addSystem(GardenVisibilityStatsSystem.self, on: .update)
         if let stats = app.getSubworldBuilder(by: .renderWorld)?.getResource(Render3DVisibilityStatistics.self) {
             app.insertResource(stats)
@@ -128,6 +135,7 @@ private func makeGarden(in world: World) throws {
         Transform(rotation: Quat(axis: .right, angle: 0.9))
     }
     var camera = Camera()
+    if arguments.contains("--temporal") { camera.temporalUpscaling = .init(renderScale: 0.75) }
     camera.backgroundColor = Color(red: 0.12, green: 0.2, blue: 0.3)
     let cameraEntity = world.spawn("Camera", bundle: Camera3D(camera: camera, environment: Environment3D(
         screenSpaceReflection: ScreenSpaceReflection(isEnabled: false),
@@ -142,6 +150,13 @@ private func makeGarden(in world: World) throws {
         )
     )))
     cameraEntity.components[GardenCamera.self] = GardenCamera()
+    if arguments.contains("--temporal-multi") {
+        let texture = RenderTexture(size: [480, 320], scaleFactor: 1, format: .bgra8)
+        var second = Camera(renderTarget: texture)
+        second.temporalUpscaling = .init(renderScale: 0.5)
+        let other = world.spawn("Temporal Texture Camera", bundle: Camera3D(camera: second))
+        other.components[GardenCamera.self] = GardenCamera(yaw: -0.5, distance: 8)
+    }
     gardenLog("[SkeletalGarden] loaded \(model.skins.count) skin, \(model.skins.first?.joints.count ?? 0) joints; clips=\(model.animationClips.map(\.name))")
 }
 

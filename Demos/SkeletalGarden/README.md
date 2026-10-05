@@ -86,3 +86,46 @@ Trees have 96/51/23 triangles and rocks 80/44/20 at LOD0/1/2. Static alternative
 This is the CPU frustum/LOD foundation. GPU Hi-Z occlusion and indirect draw generation are a future layer.
 
 Measured visibility/LOD results and validation limits: [VisibilityValidation.md](VisibilityValidation.md).
+
+## MetalFX Temporal
+
+Temporal reconstruction is opt-in per 3D camera. Press 7 to toggle it in the demo:
+
+```swift
+camera.temporalUpscaling = TemporalUpscalingSettings(renderScale: 0.75)
+// After a scripted cut or teleport:
+camera.temporalUpscaling?.resetGeneration += 1
+```
+
+On supported Metal devices the scene stays linear HDR through MetalFX, then
+uses the existing ACES/sRGB output transform before UI. Camera, rigid mesh and
+skinned mesh velocities are unjittered current-to-previous UV displacement.
+An eight-sample Halton sequence jitters input geometry; transparent foreground
+uses a reactive mask while preserving opaque velocity/depth underneath. FXAA is
+bypassed while temporal reconstruction is active. Unsupported devices keep the
+ordinary spatial/native pipeline; failed encodes use a complete spatial fallback
+and reset history on the next frame.
+
+```sh
+Demos/SkeletalGarden/script/build_and_run.sh --temporal
+Demos/SkeletalGarden/script/build_and_run.sh --capture-temporal
+Demos/SkeletalGarden/script/build_and_run.sh --capture-temporal-motion
+Demos/SkeletalGarden/script/build_and_run.sh --capture-spatial
+Demos/SkeletalGarden/script/build_and_run.sh --capture-spatial-motion
+Demos/SkeletalGarden/script/build_and_run.sh --capture-temporal-multi
+Demos/SkeletalGarden/script/build_and_run.sh --verify-temporal
+```
+
+Motion modes use the same deterministic camera orbit and character pose sequence
+for temporal/spatial controls. Captures read the final output after upscaling,
+at the same output resolution. `motion-30.json`/`motion-50.json` summarize actual
+GPU velocity readback; `temporal.json` records encoded/fallback frames and resets.
+Multi-camera mode also renders to a 480x320 texture, explicitly resets that
+history, changes input scale and disables/re-enables the texture camera.
+
+The first implementation uses a separate mesh-motion pass. Its measured cost
+includes motion, MetalFX, output tone mapping and the depth resolve used by 2D
+scene overlays. It is a quality option; faster rendering is not assumed.
+Apple mobile and WebGPU execution require separate validation.
+
+Recorded native proof: [MetalFXValidation.md](MetalFXValidation.md).

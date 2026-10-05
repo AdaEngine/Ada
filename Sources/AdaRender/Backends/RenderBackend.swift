@@ -54,6 +54,12 @@ public protocol RenderDevice: AnyObject, Sendable {
     /// Returns whether this device can encode a backend-native spatial upscale.
     var supportsSpatialUpscaling: Bool { get }
 
+    /// Whether the device supports temporal reconstruction of color, depth and motion.
+    var supportsTemporalUpscaling: Bool { get }
+
+    /// Creates an independent temporal history for fixed input/output sizes, or nil when unavailable.
+    func createTemporalUpscaler(inputSize: SizeInt, outputSize: SizeInt) -> (any TemporalUpscaler)?
+
     // MARK: - Buffers
 
     /// Create a new GPU buffer with specific length and options.
@@ -112,6 +118,8 @@ public protocol Drawable: AnyObject, Sendable {
 
 extension RenderDevice {
     public var supportsSpatialUpscaling: Bool { false }
+    public var supportsTemporalUpscaling: Bool { false }
+    public func createTemporalUpscaler(inputSize _: SizeInt, outputSize _: SizeInt) -> (any TemporalUpscaler)? { nil }
 
     /// Create a new GPU buffer with specific length and options.
     @inline(__always)

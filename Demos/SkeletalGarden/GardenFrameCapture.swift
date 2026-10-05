@@ -1,4 +1,5 @@
 import AdaEngine
+@_spi(Internal) import AdaRender
 
 #if os(macOS)
     struct GardenCaptureState: Resource {
@@ -14,15 +15,21 @@ import AdaEngine
         @ResMut<GardenCaptureState> private var state
         @Res<Render3DPerformanceMetrics?> private var metrics
         @Res<Render3DVisibilityStatistics?> private var visibility
+        @Res<Render3DTemporalStatistics?> private var temporal
 
         func update(from world: World) {
             views.update(from: world)
             _state.update(from: world)
             _metrics.update(from: world)
             _visibility.update(from: world)
+            _temporal.update(from: world)
         }
 
         func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
+            // Read back the window camera; additional texture cameras keep independent histories.
+            guard let current = context.viewEntity,
+                  let camera = current.components[Camera.self], case .window = camera.renderTarget
+            else { return [] }
             state.frame += 1
             if state.frame >= 160, !state.reportedTimings, let metrics {
                 let samples = metrics.samples
@@ -34,17 +41,29 @@ import AdaEngine
                     try counters.write(to: state.directory.appendingPathComponent("visibility.json"))
                     gardenLog("[SkeletalGarden] visibility \(String(data: counters, encoding: .utf8) ?? "unavailable")")
                 }
+                if let temporal {
+                    try JSONEncoder().encode(temporal.snapshots).write(to: state.directory.appendingPathComponent("temporal.json"))
+                }
                 state.reportedTimings = true
             }
             guard state.frame == 30 || state.frame == 50, let view = context.viewEntity else {
                 return []
             }
             var target: RenderTexture?
+            var motion: RenderTexture?
             views.forEach { entity, value in
-                if entity == view { target = value.mainTexture }
+                if entity == view {
+                    target = value.outputTexture ?? value.mainTexture
+                    motion = value.temporalMotionTexture
+                }
             }
             guard let target, target.pixelFormat == .bgra8 else {
                 return []
+            }
+            if let temporal, !temporal.snapshots.isEmpty {
+                let data = try JSONEncoder().encode(temporal.snapshots)
+                try data.write(to: state.directory.appendingPathComponent("temporal.json"))
+                gardenLog("[SkeletalGarden] temporal \(String(data: data, encoding: .utf8) ?? "unavailable")")
             }
             let width = target.size.width
             let height = target.size.height
@@ -52,6 +71,8 @@ import AdaEngine
             let alignedRowBytes = (rowBytes + 255) / 256 * 256
             let buffer = renderContext.device.createBuffer(label: "Garden Frame Capture", length: alignedRowBytes * height, options: .storageShared)
             let command = renderContext.commandQueue.makeCommandBuffer()
+            let motionRowBytes = motion.map { ($0.size.width * 8 + 255) / 256 * 256 } ?? 0
+            let motionBuffer = motion.map { renderContext.device.createBuffer(label: "Motion Readback", length: motionRowBytes * $0.size.height, options: .storageShared) }
             let blit = command.beginBlitPass(BlitPassDescriptor())
             blit.copyTextureToBuffer(
                 source: target,
@@ -64,10 +85,42 @@ import AdaEngine
                 destinationBytesPerRow: alignedRowBytes,
                 destinationBytesPerImage: alignedRowBytes * height
             )
+            if let motion, let motionBuffer {
+                blit.copyTextureToBuffer(
+                    source: motion,
+                    sourceOrigin: .init(x: 0, y: 0, z: 0),
+                    sourceMipLevel: 0,
+                    sourceSlice: 0,
+                    sourceSize: .init(width: motion.size.width, height: motion.size.height, depth: 1),
+                    destination: motionBuffer,
+                    destinationOffset: 0,
+                    destinationBytesPerRow: motionRowBytes,
+                    destinationBytesPerImage: motionRowBytes * motion.size.height
+                )
+            }
             blit.endBlitPass()
             await withCheckedContinuation { continuation in
                 command.addCompletedHandler { continuation.resume() }
                 command.commit()
+            }
+            if let motion, let motionBuffer {
+                let pointer = unsafe motionBuffer.contents()
+                var movingPixels = 0, nonfinitePixels = 0
+                var maximumPixels: Float = 0
+                for y in 0..<motion.size.height {
+                    for x in 0..<motion.size.width {
+                        let pixel = unsafe pointer.advanced(by: y * motionRowBytes + x * 8)
+                        let mx = Float(Float16(bitPattern: unsafe pixel.load(as: UInt16.self))) * Float(motion.size.width)
+                        let my = Float(Float16(bitPattern: unsafe pixel.advanced(by: 2).load(as: UInt16.self))) * Float(motion.size.height)
+                        if !mx.isFinite || !my.isFinite { nonfinitePixels += 1; continue }
+                        let magnitude = max(abs(mx), abs(my))
+                        if magnitude > 0.001 { movingPixels += 1 }
+                        maximumPixels = max(maximumPixels, magnitude)
+                    }
+                }
+                let summary: [String: Double] = ["movingPixels": Double(movingPixels), "nonfinitePixels": Double(nonfinitePixels), "maximumInputPixels": Double(maximumPixels)]
+                try JSONEncoder().encode(summary).write(to: state.directory.appendingPathComponent("motion-\(state.frame).json"))
+                gardenLog("[SkeletalGarden] motion frame=\(state.frame) moving=\(movingPixels) nonfinite=\(nonfinitePixels) maxPixels=\(maximumPixels)")
             }
             var bytes = Data()
             bytes.reserveCapacity(rowBytes * height)
@@ -99,8 +152,7 @@ import AdaEngine
                 return
             }
             graph.addNode(GardenFrameCapture())
-            graph.addNodeEdge(from: AntiAliasing3DRenderNode.name, to: GardenFrameCapture.name)
-            graph.addNodeEdge(from: GardenFrameCapture.name, to: RenderNodeLabel.Main3D.endPass)
+            graph.addNodeEdge(from: UpscaleNode.name, to: GardenFrameCapture.name)
             root.wrappedValue.addSubgraph(graph, name: .main3D)
         }
     }

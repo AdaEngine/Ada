@@ -51,6 +51,7 @@ public struct Core3DPlugin: Plugin {
         graph.addNode(ScreenSpaceAO3DRenderNode())
         graph.addNode(AntiAliasing3DRenderNode(notifiesCompletion: !includes2D))
         graph.addNode(ScreenSpaceReflectionRenderNode(notifiesCompletion: !includes2D))
+        graph.addNode(Temporal3DRenderNode())
         graph.addNode(EmptyNode(), by: .Main3D.endPass)
         graph.addNode(UpscaleNode())
 
@@ -67,17 +68,23 @@ public struct Core3DPlugin: Plugin {
         graph.addNodeEdge(from: Main3DRenderNode.name, to: ScreenSpaceAO3DRenderNode.name)
         graph.addNodeEdge(from: ScreenSpaceAO3DRenderNode.name, to: ScreenSpaceReflectionRenderNode.name)
         graph.addNodeEdge(from: ScreenSpaceReflectionRenderNode.name, to: AntiAliasing3DRenderNode.name)
+        graph.addNodeEdge(from: AntiAliasing3DRenderNode.name, to: Temporal3DRenderNode.name)
         if includes2D {
             app.insertResource(Scene2DPipelines())
             graph.addNode(Scene2DRenderNode())
-            graph.addNodeEdge(from: AntiAliasing3DRenderNode.name, to: Scene2DRenderNode.name)
+            graph.addNodeEdge(from: Temporal3DRenderNode.name, to: Scene2DRenderNode.name)
             graph.addNodeEdge(from: Scene2DRenderNode.name, to: RenderNodeLabel.Main3D.endPass)
         } else {
-            graph.addNodeEdge(from: AntiAliasing3DRenderNode.name, to: RenderNodeLabel.Main3D.endPass)
+            graph.addNodeEdge(from: Temporal3DRenderNode.name, to: RenderNodeLabel.Main3D.endPass)
         }
         graph.addNodeEdge(from: RenderNodeLabel.Main3D.endPass, to: UpscaleNode.name)
 
         app
+            .insertResource(Render3DTemporalStatistics())
+            .insertResource(Temporal3DViews())
+            .insertResource(Temporal3DPipelines(device: renderDevice))
+            .insertResource(ActiveMotion3DPass())
+            .insertResource(RenderPipelines(configurator: Motion3DPipeline()))
             .insertResource(ExtractedEnvironment3D())
             .insertResource(ExtractedLighting3D())
             .insertResource(ExtractedMesh3DSources())
@@ -96,6 +103,7 @@ public struct Core3DPlugin: Plugin {
             .insertResource(ScreenQuality3DScratch())
             .addSystem(ExtractEnvironment3DSystem.self, on: .extract)
             .addSystem(PrepareEnvironment3DTexturesSystem.self, on: .prepare)
+            .addSystem(PrepareTemporal3DSystem.self, on: .prepare)
             .getRefResource(RenderGraph.self)
             .wrappedValue
             .addSubgraph(graph, name: .main3D)

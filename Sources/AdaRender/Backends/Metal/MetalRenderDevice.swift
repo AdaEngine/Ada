@@ -26,6 +26,22 @@
             #endif
         }
 
+        var supportsTemporalUpscaling: Bool {
+            #if canImport(MetalFX) && (os(macOS) || os(iOS))
+                MTLFXTemporalScalerDescriptor.supportsDevice(device)
+            #else
+                false
+            #endif
+        }
+
+        func createTemporalUpscaler(inputSize: SizeInt, outputSize: SizeInt) -> (any TemporalUpscaler)? {
+            #if canImport(MetalFX) && (os(macOS) || os(iOS))
+                MetalTemporalUpscaler(device: device, inputSize: inputSize, outputSize: outputSize)
+            #else
+                nil
+            #endif
+        }
+
         let device: MTLDevice
         let commandQueue: MTLCommandQueue
         private weak var context: MetalRenderBackend.Context?

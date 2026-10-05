@@ -55,6 +55,10 @@ final class EditorProjectOpenURLRouter {
     }
 
     func receive(_ url: URL) {
+        #if os(macOS)
+        if EditorAssetStoreRouter.shared.receive(url) { return }
+        #endif
+        guard url.isFileURL else { return }
         guard let viewModel else {
             pendingProjectURLs.append(url)
             return

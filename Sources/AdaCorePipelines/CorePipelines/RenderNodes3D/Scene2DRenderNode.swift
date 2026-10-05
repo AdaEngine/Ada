@@ -1,5 +1,6 @@
 import AdaECS
 @_spi(Internal) import AdaRender
+import Math
 
 /// Draws transparent 2D content over the composited scene, testing against mesh depth.
 public struct Scene2DRenderNode: RenderNode {
@@ -29,7 +30,7 @@ public struct Scene2DRenderNode: RenderNode {
             let uniform = view.components[GlobalViewUniform.self],
             let target = view.components[RenderViewTarget.self],
             let color = target.mainTexture,
-            let depth = target.depthTexture
+            let depth = target.temporalUpscalingActive ? target.temporalOutputDepthTexture : target.depthTexture
         else {
             return []
         }
@@ -53,7 +54,7 @@ public struct Scene2DRenderNode: RenderNode {
             )
         )
         pass.setVertexBuffer(uniform, slot: GlobalBufferIndex.viewUniform)
-        pass.setViewport(camera.viewport.rect)
+        pass.setViewport(target.temporalUpscalingActive ? Rect(x: 0, y: 0, width: Float(color.size.width), height: Float(color.size.height)) : camera.viewport.rect)
 
         for var item in renderItems.items.items {
             item.renderPipeline = pipelines.pipeline(for: item.renderPipeline, device: device.renderDevice)

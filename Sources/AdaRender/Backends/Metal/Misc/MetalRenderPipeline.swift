@@ -65,7 +65,7 @@
 
             if let depthStencilDesc = descriptor.depthStencilDescriptor {
                 pipelineDescriptor.depthAttachmentPixelFormat = descriptor.depthPixelFormat.toMetal
-                pipelineDescriptor.stencilAttachmentPixelFormat = descriptor.depthPixelFormat.toMetal
+                pipelineDescriptor.stencilAttachmentPixelFormat = descriptor.depthPixelFormat == .depth_32f ? .invalid : descriptor.depthPixelFormat.toMetal
 
                 let depthStencilDescriptor = MTLDepthStencilDescriptor()
                 depthStencilDescriptor.depthCompareFunction = depthStencilDesc.depthCompareOperator.toMetal

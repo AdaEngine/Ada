@@ -12,6 +12,7 @@ import Math
 public struct ScreenSpaceReflectionPipeline: Resource {
     public let renderPipeline: RenderPipeline
     public let sampler: Sampler
+    public let hdrRenderPipeline: RenderPipeline
     let nearest: Sampler
 
     public init(device: RenderDevice) {
@@ -27,6 +28,9 @@ public struct ScreenSpaceReflectionPipeline: Resource {
             RenderPipelineColorAttachmentDescriptor(format: .bgra8, isBlendingEnabled: false),
         ]
         renderPipeline = device.createRenderPipeline(from: descriptor)
+        descriptor.colorAttachments = [.init(format: .rgba_16f)]
+        descriptor.debugName = "HDR Environment Composite"
+        hdrRenderPipeline = device.createRenderPipeline(from: descriptor)
         nearest = device.createSampler(from: .init(minFilter: .nearest, magFilter: .nearest, mipFilter: .notMipmapped))
         sampler = device.createSampler(
             from: SamplerDescriptor(

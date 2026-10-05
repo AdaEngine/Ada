@@ -106,6 +106,8 @@ func ExtractModel3D(
     _ drawPass: Res<Model3DDrawPass>
 ) {
     animatedBounds.wrappedValue.beginFrame()
+    var previousTransforms: [Entity.ID: Transform3D] = [:]
+    for source in sources.meshes { previousTransforms[source.entity] = source.transform }
     sources.meshes.removeAll(keepingCapacity: true)
     // These typed queries declare all optional/hierarchical component reads without requiring them on a mesh.
     _ = visibilityAccess.wrappedValue
@@ -164,7 +166,8 @@ func ExtractModel3D(
             forceVisible: noCulling != nil,
             castShadows: mesh3d.castShadows,
             receiveShadows: mesh3d.receiveShadows,
-            skinningBuffer: palette
+            skinningBuffer: palette,
+            previousTransform: previousTransforms[entity.id]
         ))
         for (modelIndex, model) in mesh.models.enumerated() {
             for (partIndex, part) in model.parts.enumerated() {
@@ -259,7 +262,7 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
     public func render(
         with renderEncoder: RenderCommandEncoder,
         world: World,
-        view _: Entity,
+        view: Entity,
         item: Opaque3DRenderItem
     ) throws {
         let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
@@ -268,11 +271,20 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
             return
         }
 
-        let pipelines = world.getRefResource(RenderPipelines<PBR3DPipeline>.self)
-        let pipeline = pipelines.wrappedValue.pipeline(
-            for: PBR3DConfiguration(vertex: part.vertexDescriptor, blended: (item.material as? PBRMaterial)?.alphaMode == .blend),
-            device: renderDevice
+        let configuration = PBR3DConfiguration(
+            vertex: part.vertexDescriptor,
+            blended: (item.material as? PBRMaterial)?.alphaMode == .blend,
+            temporalDepth: view.components[RenderViewTarget.self]?.temporalUpscalingActive == true
         )
+        let isMotion = world.getResource(ActiveMotion3DPass.self)?.isEnabled == true
+        let pipeline: any RenderPipeline
+        if isMotion {
+            let pipelines = world.getRefResource(RenderPipelines<Motion3DPipeline>.self)
+            pipeline = pipelines.wrappedValue.pipeline(for: configuration, device: renderDevice)
+        } else {
+            let pipelines = world.getRefResource(RenderPipelines<PBR3DPipeline>.self)
+            pipeline = pipelines.wrappedValue.pipeline(for: configuration, device: renderDevice)
+        }
         let active = world.getResource(Active3DInstanceBuffers.self)
         let instanceBuffers = world.getResource(Opaque3DInstanceBuffers.self)
         guard
@@ -295,6 +307,12 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
         let normalTexture = pbrMaterial?.normalTexture ?? Self.flatNormalTexture
         let emissiveTexture = pbrMaterial?.emissiveTexture ?? Texture2D.whiteTexture
 
+        if isMotion {
+            let previous = world.getResource(Skinning3DUniforms.self)?.previousBuffer(for: item.entity) ?? palette
+            renderEncoder.setResourceSet(RenderResourceSet(bindings: [
+                .init(binding: 24, shaderStages: .vertex, resource: .uniformBuffer(previous, offset: 0)),
+            ]), index: 0)
+        }
         renderEncoder.setRenderPipelineState(pipeline)
         renderEncoder.setResourceSet(
             RenderResourceSet(

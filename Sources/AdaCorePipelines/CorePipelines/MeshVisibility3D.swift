@@ -23,6 +23,7 @@ public struct Mesh3DRenderSource: Sendable {
     public var mesh: Mesh
     public var materials: [Material]
     public var transform: Transform3D
+    public var previousTransform: Transform3D
     public var bounds: AABB?
     public var alternatives: [Mesh]
     public var thresholds: [Float]
@@ -49,8 +50,10 @@ public struct Mesh3DRenderSource: Sendable {
         forceVisible: Bool = false,
         castShadows: Bool = true,
         receiveShadows: Bool = true,
-        skinningBuffer: (any UniformBuffer)? = nil
+        skinningBuffer: (any UniformBuffer)? = nil,
+        previousTransform: Transform3D? = nil
     ) {
+        self.previousTransform = previousTransform ?? transform
         self.drawPass = drawPass
         self.entity = entity; self.mesh = mesh; self.materials = materials; self.transform = transform; self.bounds = bounds
         self.alternatives = alternatives; self.thresholds = thresholds; self.hysteresis = hysteresis

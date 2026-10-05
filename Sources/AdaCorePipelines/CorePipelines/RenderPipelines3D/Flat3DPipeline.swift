@@ -18,19 +18,22 @@ public struct Flat3DInstanceData: Sendable {
     public let material: Vector4
     public let textureFlags: Vector4
     public let shadowFlags: Vector4
+    public let previousModelMatrix: Transform3D
 
     public init(
         modelMatrix: Transform3D,
         color: Vector4,
         material: Vector4,
         textureFlags: Vector4 = .zero,
-        shadowFlags: Vector4 = [1, 0, 0, 0]
+        shadowFlags: Vector4 = [1, 0, 0, 0],
+        previousModelMatrix: Transform3D? = nil
     ) {
         self.modelMatrix = modelMatrix
         self.color = color
         self.material = material
         self.textureFlags = textureFlags
         self.shadowFlags = shadowFlags
+        self.previousModelMatrix = previousModelMatrix ?? modelMatrix
     }
 }
 

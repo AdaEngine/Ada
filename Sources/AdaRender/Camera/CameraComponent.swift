@@ -114,6 +114,9 @@ public struct Camera: Sendable {
     /// The render order.
     public var renderOrder: Int = 0
 
+    /// Opt-in temporal reconstruction for 3D cameras. Increment resetGeneration after a camera cut.
+    public var temporalUpscaling: TemporalUpscalingSettings?
+
     public var viewMatrix: Transform3D = .identity
 
     // MARK: - Init

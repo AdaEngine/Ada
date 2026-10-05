@@ -61,6 +61,8 @@ struct GardenInputSystem {
 struct GardenPresentationSystem {
     @Query<Ref<GardenPlayer>, CharacterController3DComponent, Ref<Transform>, Ref<ModelAnimation3DComponent>> private var players
     @Res<DeltaTime> private var time
+    @Local private var proofFrame = 0
+    private let temporalMotion = ProcessInfo.processInfo.arguments.contains("--temporal-motion")
     private let renderProof = ProcessInfo.processInfo.arguments.contains("--render-proof")
     private let poseProof = ProcessInfo.processInfo.arguments.contains("--pose-proof")
     private let controllerProof = ProcessInfo.processInfo.arguments.contains("--controller-proof")
@@ -68,6 +70,7 @@ struct GardenPresentationSystem {
     init(world _: World) {}
 
     func update(context _: UpdateContext) {
+        proofFrame += 1
         players.forEach { state, controller, transform, animation in
             let horizontal = Vector3(controller.velocity.x, 0, controller.velocity.z)
             let speed = horizontal.length
@@ -110,7 +113,7 @@ struct GardenPresentationSystem {
                 animation.player.speed = poseProof ? 1 : min(max(Double(speed) / referenceSpeed, 0.25), 1.5)
             } else { animation.player.speed = 1 }
             if renderProof {
-                animation.player.seek(to: 0.35)
+                animation.player.seek(to: temporalMotion ? 0.35 + Double(proofFrame) / 60 : 0.35)
                 animation.player.isPlaying = false
             }
             if speed > 0.07, !poseProof, !renderProof {

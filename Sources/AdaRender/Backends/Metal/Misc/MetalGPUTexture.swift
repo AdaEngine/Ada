@@ -65,7 +65,7 @@
             textureDesc.width = descriptor.width
             textureDesc.height = descriptor.height
             textureDesc.pixelFormat = descriptor.pixelFormat.toMetal
-            if descriptor.pixelFormat.isDepthFormat {
+            if descriptor.pixelFormat.isDepthFormat || descriptor.usesPrivateStorage {
                 textureDesc.storageMode = .private
             }
 

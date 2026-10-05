@@ -30,6 +30,9 @@ public struct TextureDescriptor {
     /// The data from we can create a texture.
     public var image: Image?
 
+    /// Requests GPU-only storage when a backend-native effect requires private textures.
+    public var usesPrivateStorage: Bool = false
+
     /// The label marked texture for debug reason.
     public var debugLabel: String?
 

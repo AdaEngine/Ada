@@ -8,11 +8,11 @@ export CLANG_MODULE_CACHE_PATH="$BUILD_PATH/clang-cache"
 export SWIFTPM_MODULECACHE_OVERRIDE="$BUILD_PATH/swift-cache"
 APP="$DEMO_ROOT/dist/SkeletalGarden.app"
 mkdir -p "$DEMO_ROOT/dist"
-if ! swift build --package-path "$REPO_ROOT" --disable-sandbox --scratch-path "$BUILD_PATH" --product SkeletalGarden > "$DEMO_ROOT/dist/build.log" 2>&1; then
+if [[ "${ADAENGINE_SKIP_BUILD:-0}" != 1 ]] && ! swift build --package-path "$REPO_ROOT" --disable-sandbox --scratch-path "$BUILD_PATH" --product SkeletalGarden > "$DEMO_ROOT/dist/build.log" 2>&1; then
     tail -80 "$DEMO_ROOT/dist/build.log"
     exit 1
 fi
-BIN="$(swift build --package-path "$REPO_ROOT" --disable-sandbox --scratch-path "$BUILD_PATH" --show-bin-path)"
+BIN="${ADAENGINE_SKELETAL_BIN_PATH:-$(swift build --package-path "$REPO_ROOT" --disable-sandbox --scratch-path "$BUILD_PATH" --show-bin-path)}"
 /usr/bin/pkill -x SkeletalGarden >/dev/null 2>&1 || true
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -35,12 +35,17 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 : > "$DEMO_ROOT/dist/runtime.log"
 case "$MODE" in
-    --capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized)
+    --capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized|--capture-temporal|--capture-temporal-motion|--capture-spatial|--capture-spatial-motion|--capture-temporal-multi)
         NAME="${MODE#--capture-}"
         mkdir -p "$DEMO_ROOT/dist/captures/$NAME"
         rm -f "$DEMO_ROOT/dist/captures/$NAME/frame-30.png" "$DEMO_ROOT/dist/captures/$NAME/frame-50.png" "$DEMO_ROOT/dist/captures/$NAME/gpu-timings.json"
         EXTRA=(--measure-gpu)
         case "$NAME" in
+            temporal) EXTRA+=(--temporal) ;;
+            temporal-multi) EXTRA+=(--temporal --temporal-multi) ;;
+            temporal-motion) EXTRA+=(--temporal --temporal-motion) ;;
+            spatial) EXTRA+=(--spatial-proof --no-aa) ;;
+            spatial-motion) EXTRA+=(--spatial-proof --no-aa --temporal-motion) ;;
             baseline) EXTRA+=(--render-baseline) ;;
             no-ao) EXTRA+=(--no-ao) ;;
             no-aa) EXTRA+=(--no-aa) ;;
@@ -67,10 +72,13 @@ case "$MODE" in
         rm -f "$DEMO_ROOT/dist/captures/frame-30.png" "$DEMO_ROOT/dist/captures/frame-50.png"
         /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --pose-proof --capture-directory "$DEMO_ROOT/dist/captures"
         ;;
+    --temporal) /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --temporal ;;
     run) /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" ;;
     --autoplay) /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --autoplay ;;
-    --verify)
-        /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --controller-proof
+    --verify|--verify-temporal)
+        EXTRA=()
+        if [[ "$MODE" == --verify-temporal ]]; then EXTRA+=(--temporal); fi
+        /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log" --args --controller-proof "${EXTRA[@]}"
         for attempt in {1..30}; do
             if rg -q 'controller verification PASS' "$DEMO_ROOT/dist/runtime.log"; then
                 cat "$DEMO_ROOT/dist/runtime.log"
@@ -91,5 +99,5 @@ case "$MODE" in
         /usr/bin/open -n "$APP" --stdout "$DEMO_ROOT/dist/runtime.log" --stderr "$DEMO_ROOT/dist/runtime.log"
         /usr/bin/log stream --info --style compact --predicate 'process == "SkeletalGarden"'
         ;;
-    *) echo 'usage: build_and_run.sh [run|--autoplay|--capture|--capture-overview|--capture-no-ibl|--capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized|--verify|--debug|--logs]' >&2; exit 2 ;;
+    *) echo 'usage: build_and_run.sh [run|--temporal|--autoplay|--capture|--capture-overview|--capture-no-ibl|--capture-quality|--capture-baseline|--capture-no-ao|--capture-no-aa|--capture-single-shadows|--capture-no-shadows|--capture-visibility|--capture-no-culling|--capture-no-lod|--capture-unoptimized|--capture-temporal|--capture-temporal-motion|--capture-spatial|--capture-spatial-motion|--verify|--capture-temporal-multi|--verify-temporal|--debug|--logs]' >&2; exit 2 ;;
 esac

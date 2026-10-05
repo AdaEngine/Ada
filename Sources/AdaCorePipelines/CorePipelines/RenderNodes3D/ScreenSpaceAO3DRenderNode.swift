@@ -49,7 +49,7 @@ public struct ScreenSpaceAO3DRenderNode: RenderNode {
             for index in 0..<2 {
                 let output = index == 0 ? raw : filtered
                 let constants = scratch.ao.write(
-                    SSAO3DUniform(projection: uniform.projectionMatrix, parameters: parameters, pass: Vector4(Float(index), 0, 0, 0)),
+                    SSAO3DUniform(projection: temporalViewUniform(uniform, target: target).projectionMatrix, parameters: parameters, pass: Vector4(Float(index), 0, 0, 0)),
                     view: source.entityId,
                     pass: index,
                     device: device.renderDevice

@@ -37,18 +37,21 @@ public final class RenderTexture: Texture2D, @unchecked Sendable {
         scaleFactor: Float,
         format: PixelFormat,
         debugLabel: String? = nil,
-        samplerDescription: SamplerDescriptor = SamplerDescriptor()
+        samplerDescription: SamplerDescriptor = SamplerDescriptor(),
+        usage: Texture.Usage = [.renderTarget, .read],
+        usesPrivateStorage: Bool = false
     ) {
-        let descriptor = TextureDescriptor(
+        var descriptor = TextureDescriptor(
             width: size.width,
             height: size.height,
             pixelFormat: format,
-            textureUsage: [.renderTarget, .read],
+            textureUsage: usage,
             textureType: .texture2D,
             debugLabel: debugLabel,
             samplerDescription: samplerDescription
         )
 
+        descriptor.usesPrivateStorage = usesPrivateStorage
         self.pixelFormat = format
         self.scaleFactor = scaleFactor
 

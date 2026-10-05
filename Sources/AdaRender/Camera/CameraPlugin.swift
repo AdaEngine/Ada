@@ -67,6 +67,19 @@ public struct RenderViewTarget: @unchecked Sendable {
     public var ambientOcclusion3DTexture: RenderTexture?
     public var antiAliasing3DInputTexture: RenderTexture?
 
+    /// Temporal scene input and full-resolution resolve; UI is drawn only into mainTexture after resolve.
+    public var temporalInputTexture: RenderTexture?
+    public var temporalResolvedTexture: RenderTexture?
+    public var temporalPresentationTexture: RenderTexture?
+    public var temporalMotionTexture: RenderTexture?
+    public var temporalReactiveTexture: RenderTexture?
+    public var temporalOutputDepthTexture: RenderTexture?
+    public var temporalJitter: Vector2 = .zero
+    public var temporalPreviousViewProjection: Transform3D = .identity
+    public var temporalPreviousView: Transform3D = .identity
+    public var temporalReset = true
+    public var temporalUpscalingActive = false
+
     /// When true, ``Main2DRenderNode`` writes albedo to ``sceneColorTexture``; lighting composite writes ``mainTexture``.
     public var lighting2DUsesDeferredTargets: Bool = false
     /// When true, the main 3D pass writes the environment geometry buffers.
@@ -110,6 +123,12 @@ func ConfigurateRenderViewTarget(
     _ cachedViewTargets: ResMut<ExtractedCameraRenderViewTargets>
 ) {
     query.forEach { _, camera, renderViewTarget, source in
+        // Restore the low-resolution scene target cached before the previous temporal resolve.
+        if renderViewTarget.temporalUpscalingActive {
+            renderViewTarget.mainTexture = renderViewTarget.temporalInputTexture
+        }
+        renderViewTarget.temporalUpscalingActive = false
+        renderViewTarget.temporalJitter = .zero
         // A drawable belongs to this frame only, including frames we cannot render.
         renderViewTarget.outputTexture = nil
         ageRetiredFrameTextures(renderViewTarget)
@@ -127,10 +146,16 @@ func ConfigurateRenderViewTarget(
 
         let scale = camera.computedData.targetScaleFactor
 
-        if case let .texture(asset) = camera.renderTarget {
+        if case let .texture(asset) = camera.renderTarget, camera.temporalUpscaling == nil {
             let outputTexture = asset.asset
             renderViewTarget.outputTexture = outputTexture
             renderViewTarget.mainTexture = outputTexture
+            renderViewTarget.temporalInputTexture = nil
+            renderViewTarget.temporalResolvedTexture = nil
+            renderViewTarget.temporalPresentationTexture = nil
+            renderViewTarget.temporalMotionTexture = nil
+            renderViewTarget.temporalReactiveTexture = nil
+            renderViewTarget.temporalOutputDepthTexture = nil
             renderViewTarget.retiredFrameTextures.removeAll(keepingCapacity: false)
             renderViewTarget.sceneColorTexture = nil
             renderViewTarget.lightAccumTexture = nil
@@ -157,10 +182,12 @@ func ConfigurateRenderViewTarget(
             )
         }
 
+        if case let .texture(asset) = camera.renderTarget { renderViewTarget.outputTexture = asset.asset }
+
         let viewportSize = resolveRenderSize(
             outputSize: outputSize,
-            mode: unsafe RenderEngine.configurations.upscaling,
-            supportsSpatialUpscaling: renderDevice.renderDevice.supportsSpatialUpscaling
+            mode: camera.temporalUpscaling.map { .spatial(renderScale: $0.renderScale) } ?? (unsafe RenderEngine.configurations.upscaling),
+            supportsSpatialUpscaling: renderDevice.renderDevice.supportsSpatialUpscaling || (camera.temporalUpscaling != nil && renderDevice.renderDevice.supportsTemporalUpscaling)
         )
         let viewportScale = Float(viewportSize.width) / Float(outputSize.width)
         camera.viewport.rect = Rect(
@@ -172,7 +199,8 @@ func ConfigurateRenderViewTarget(
 
         if renderViewTarget.mainTexture == nil
             || renderViewTarget.mainTexture?.size != viewportSize
-            || renderViewTarget.mainTexture?.scaleFactor != scale {
+            || renderViewTarget.mainTexture?.scaleFactor != scale
+            || (camera.temporalUpscaling == nil && renderViewTarget.mainTexture?.pixelFormat != .bgra8) {
             let retiredTextures = [
                 renderViewTarget.mainTexture,
                 renderViewTarget.depthTexture,
@@ -186,6 +214,11 @@ func ConfigurateRenderViewTarget(
                 renderViewTarget.ambientOcclusion3DRawTexture,
                 renderViewTarget.ambientOcclusion3DTexture,
                 renderViewTarget.antiAliasing3DInputTexture,
+                renderViewTarget.temporalResolvedTexture,
+                renderViewTarget.temporalPresentationTexture,
+                renderViewTarget.temporalMotionTexture,
+                renderViewTarget.temporalReactiveTexture,
+                renderViewTarget.temporalOutputDepthTexture,
             ]
             .compactMap { $0 }
             renderViewTarget.retiredFrameTextures.append(contentsOf: retireFrameTextures(retiredTextures))
@@ -199,7 +232,9 @@ func ConfigurateRenderViewTarget(
                 size: viewportSize,
                 scaleFactor: scale,
                 format: .bgra8,
-                debugLabel: "Camera Main Texture"
+                debugLabel: "Camera Main Texture",
+                usage: camera.temporalUpscaling != nil ? [.renderTarget, .read, .write] : [.renderTarget, .read],
+                usesPrivateStorage: camera.temporalUpscaling != nil
             )
 
             renderViewTarget.depthTexture = nil
@@ -213,6 +248,12 @@ func ConfigurateRenderViewTarget(
             renderViewTarget.ambientOcclusion3DRawTexture = nil
             renderViewTarget.ambientOcclusion3DTexture = nil
             renderViewTarget.antiAliasing3DInputTexture = nil
+            renderViewTarget.temporalInputTexture = nil
+            renderViewTarget.temporalResolvedTexture = nil
+            renderViewTarget.temporalPresentationTexture = nil
+            renderViewTarget.temporalMotionTexture = nil
+            renderViewTarget.temporalReactiveTexture = nil
+            renderViewTarget.temporalOutputDepthTexture = nil
         }
 
         cachedViewTargets.targets[source.entityId] = renderViewTarget.wrappedValue.cacheableCopy

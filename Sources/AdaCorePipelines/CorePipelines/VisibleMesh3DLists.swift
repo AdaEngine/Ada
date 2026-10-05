@@ -205,7 +205,8 @@ public struct VisibleMesh3DLists: Resource {
                 hasUV(2) && pbr?.normalTexture != nil ? 1 : 0,
                 descriptor.attributes.containsAttribute(by: MeshDescriptor.tangents.id.name) ? 1 : 0,
             ],
-            shadowFlags: [source.receiveShadows ? 1 : 0, atmosphere?.fresnelPower ?? 0, atmosphere?.atmosphereIntensity ?? 0, 1 - fade]
+            shadowFlags: [source.receiveShadows ? 1 : 0, atmosphere?.fresnelPower ?? 0, atmosphere?.atmosphereIntensity ?? 0, 1 - fade],
+            previousModelMatrix: source.previousTransform
         )
     }
 }

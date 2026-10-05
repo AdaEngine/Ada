@@ -34,7 +34,7 @@ public struct AntiAliasing3DRenderNode: RenderNode {
         }
         var submitted: CommandBuffer?
         views.forEach { entity, camera, target, source in
-            guard entity == view, environments.environments[source.entityId]?.antiAliasing == .fxaa,
+            guard entity == view, !target.temporalUpscalingActive, environments.environments[source.entityId]?.antiAliasing == .fxaa,
                 let input = target.antiAliasing3DInputTexture, let output = target.mainTexture
             else { return }
             let constants = scratch.aa.write(Vector4(1 / Float(input.size.width), 1 / Float(input.size.height), 0, 0), view: source.entityId, device: device.renderDevice)

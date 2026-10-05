@@ -65,7 +65,7 @@ vec3 acesToneMap(vec3 value) {
 }
 
 vec3 presentColor(vec3 linearColor) {
-    return linearToSrgb(acesToneMap(linearColor));
+    return u_Quality.z > 0.5 ? linearColor : linearToSrgb(acesToneMap(linearColor));
 }
 
 vec3 proceduralSky(vec3 direction) {

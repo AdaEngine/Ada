@@ -8,6 +8,8 @@ struct GardenCameraSystem {
     @ResMut<Physics3DWorldHolder> private var physics
     @Res<Input> private var input
     @Res<DeltaTime> private var time
+    @Local private var proofFrame = 0
+    private let temporalMotion = ProcessInfo.processInfo.arguments.contains("--temporal-motion")
     private let overview = ProcessInfo.processInfo.arguments.contains("--overview-proof")
     private let controllerProof = ProcessInfo.processInfo.arguments.contains("--controller-proof")
 
@@ -15,6 +17,7 @@ struct GardenCameraSystem {
 
     @MainActor
     func update(context _: UpdateContext) {
+        proofFrame += 1
         var focus = Vector3(0, 1.15, 0)
         var elapsed: Float = 0
         players.forEach { player, transform in
@@ -33,6 +36,7 @@ struct GardenCameraSystem {
             orbit.dragging = dragging
             if input.isKeyPressed(.q) { orbit.distance = max(3.2, orbit.distance - dt * 5) }
             if input.isKeyPressed(.e) { orbit.distance = min(12, orbit.distance + dt * 5) }
+            if temporalMotion { orbit.yaw = 0.45 + Float(proofFrame) * 0.004 }
             if controllerProof, elapsed > 6 { orbit.yaw = .pi }
             if !orbit.initialized {
                 orbit.focus = focus
@@ -54,7 +58,8 @@ struct GardenCameraSystem {
                     orbit.actualDistance = allowed
                 } else { orbit.actualDistance += (allowed - orbit.actualDistance) * Float(1 - exp(-Double(dt) * 5)) }
                 eye = focus + travel.normalized * orbit.actualDistance
-                if controllerProof, elapsed > 6.8, !orbit.verifiedCollision {
+                if temporalMotion { orbit.yaw = 0.45 + Float(proofFrame) * 0.004 }
+            if controllerProof, elapsed > 6.8, !orbit.verifiedCollision {
                     let passed = orbit.isOccluded && orbit.actualDistance < orbit.distance - 1
                     gardenLog("[SkeletalGarden] controller camera-sweep \(passed ? "PASS" : "FAIL") distance=\(orbit.actualDistance)")
                     orbit.verifiedCollision = true

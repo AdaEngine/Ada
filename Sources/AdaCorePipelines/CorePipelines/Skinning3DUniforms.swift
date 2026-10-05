@@ -9,6 +9,8 @@ public struct Skinning3DUniforms: Resource {
     private struct Entry {
         var buffers: [(any UniformBuffer)?]
         var frame: Int
+        var previousBuffers: [(any UniformBuffer)?]
+        var matrices: [Transform3D]
     }
     private var entries: [Entity.ID: Entry] = [:]
     private var frame = 0
@@ -40,11 +42,30 @@ public struct Skinning3DUniforms: Resource {
         return entry.buffers[currentIndex]
     }
 
+    public func previousBuffer(for entity: Entity.ID) -> (any UniformBuffer)? {
+        guard let entry = entries[entity], entry.frame == frame else {
+            return nil
+        }
+        return entry.previousBuffers[currentIndex]
+    }
+
     public mutating func write(_ matrices: [Transform3D], for entity: Entity.ID, device: RenderDevice) -> (any UniformBuffer)? {
         guard !matrices.isEmpty, matrices.count <= Self.maximumJoints else {
             return nil
         }
-        var entry = entries[entity] ?? Entry(buffers: Array(repeating: nil, count: bufferCount), frame: frame)
+        var entry = entries[entity] ?? Entry(
+            buffers: Array(repeating: nil, count: bufferCount),
+            frame: frame,
+            previousBuffers: Array(repeating: nil, count: bufferCount),
+            matrices: matrices
+        )
+        if entry.previousBuffers[currentIndex] == nil {
+            entry.previousBuffers[currentIndex] = device.createUniformBuffer(Transform3D.self, count: Self.maximumJoints, binding: 24)
+        }
+        let previous = entry.matrices.count == matrices.count ? entry.matrices : matrices
+        for index in upload.indices { upload[index] = index < previous.count ? previous[index] : .identity }
+        entry.previousBuffers[currentIndex]?.setElements(&upload)
+        entry.matrices = matrices
         if entry.buffers[currentIndex] == nil {
             entry.buffers[currentIndex] = device.createUniformBuffer(Transform3D.self, count: Self.maximumJoints, binding: Self.binding)
         }

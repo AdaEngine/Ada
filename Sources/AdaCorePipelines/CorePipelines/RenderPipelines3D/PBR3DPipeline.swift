@@ -4,8 +4,10 @@ import AdaRender
 public struct PBR3DConfiguration: Hashable, Sendable {
     public let vertex: VertexDescriptor
     public let blended: Bool
+    public let temporalDepth: Bool
 
-    public init(vertex: VertexDescriptor, blended: Bool) {
+    public init(vertex: VertexDescriptor, blended: Bool, temporalDepth: Bool = false) {
+        self.temporalDepth = temporalDepth
         self.vertex = vertex
         self.blended = blended
     }
@@ -19,6 +21,7 @@ public struct PBR3DPipeline: RenderPipelineConfigurator {
     public func configurate(with configuration: PBR3DConfiguration) -> RenderPipelineDescriptor {
         var descriptor = base.configurate(with: configuration.vertex)
         descriptor.backfaceCulling = false
+        if configuration.temporalDepth { descriptor.depthPixelFormat = .depth_32f }
         descriptor.depthStencilDescriptor?.isDepthWriteEnabled = !configuration.blended
         if configuration.blended {
             for index in 1...2 {

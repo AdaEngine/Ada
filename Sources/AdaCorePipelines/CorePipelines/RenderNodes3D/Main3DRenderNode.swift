@@ -117,6 +117,7 @@ public struct Main3DRenderNode: RenderNode {
             _activeInstances.wrappedValue = lists.buffers(view: source.entityId, pass: -1)
             statistics.record(lists.count(view: source.entityId, pass: -1), view: source.entityId, pass: -1)
 
+            let drawUniform = temporalViewUniform(uniform, target: target)
             let clearColor = camera.clearFlags.contains(.solid) ? camera.backgroundColor : .surfaceClearColor
             let directionalLight =
                 lighting.directionalLight
@@ -154,7 +155,7 @@ public struct Main3DRenderNode: RenderNode {
                 DepthStencilAttachmentDescriptor(
                     texture: $0,
                     depthOperation: OperationDescriptor(loadAction: .clear, storeAction: .store),
-                    stencilOperation: OperationDescriptor(loadAction: .clear, storeAction: .store)
+                    stencilOperation: target.temporalUpscalingActive ? nil : OperationDescriptor(loadAction: .clear, storeAction: .store)
                 )
             }
 
@@ -183,7 +184,7 @@ public struct Main3DRenderNode: RenderNode {
                 )
             )
 
-            renderPass.setVertexBuffer(uniform, slot: GlobalBufferIndex.viewUniform)
+            renderPass.setVertexBuffer(drawUniform, slot: GlobalBufferIndex.viewUniform)
             renderPass.setVertexBuffer(lightConstants, offset: 0, slot: 1)
             renderPass.setFragmentBuffer(lightConstants, offset: 0, slot: 1)
             let shadowTexture = shadow.colorTexture ?? Texture2D.whiteTexture

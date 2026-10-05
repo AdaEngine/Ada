@@ -17,6 +17,8 @@ describes the intended design even when its implementation is still planned.
   the ADR's own implementation checklist still has open requirements.
 - **Partial (worktree foundation; not released)**: a tested implementation is
   available in an isolated worktree, with remaining ADR requirements open.
+- **Partial (local foundation; not released)**: validated implementation in the
+  current checkout, with remaining platform or feature requirements open.
 - **Implemented**: every normative requirement in the ADR is shipped and its
   validation is recorded.
 
@@ -45,3 +47,13 @@ describes the intended design even when its implementation is still planned.
 | [ADR-0012](0012-host-authoritative-replication-and-rpc.md) | Accepted | Partial (foundation shipped) | Host-authoritative marker replication, interpolation, and typed RPC |
 | [ADR-0013](0013-multiplayer-transports-and-cloud-relay.md) | Accepted | Partial (foundation shipped) | Apple LAN transport and region-gated AdaEngine Cloud WebSocket relay |
 | [ADR-0014](0014-declarative-multiplayer-schemas.md) | Accepted | Partial (Swift and portable AdaScript component/command paths shipped) | Generated Swift and AdaScript schemas for typed RPC and declarative ECS replication |
+
+## 3D rendering decisions
+
+| ADR | Status | Implementation | Decision |
+| --- | --- | --- | --- |
+| [ADR-0017](0017-temporal-antialiasing-and-metalfx.md) | Accepted | Partial (local foundation; not released) | Temporal antialiasing and MetalFX |
+| [ADR-0018](0018-local-lights-and-shadow-scheduling.md) | Accepted | Planned | Local lights and shadow scheduling |
+| [ADR-0019](0019-environment-lighting-and-postprocessing.md) | Accepted | Planned | Environment lighting and postprocessing |
+| [ADR-0020](0020-gpu-visibility-and-animation-lod.md) | Accepted | Planned | GPU visibility and animation LOD |
+| [ADR-0021](0021-hybrid-ray-tracing.md) | Accepted | Planned | Hybrid ray tracing |

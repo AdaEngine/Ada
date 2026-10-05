@@ -67,13 +67,15 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
             }
 
             let environment = environments.environments[source.entityId] ?? Environment3D()
-            let compositeTarget = environment.antiAliasing == .none ? mainTexture : (target.antiAliasing3DInputTexture ?? mainTexture)
+            let compositeTarget = target.temporalUpscalingActive ? (target.temporalInputTexture ?? mainTexture)
+                : (environment.antiAliasing == .none ? mainTexture : (target.antiAliasing3DInputTexture ?? mainTexture))
+            let jitteredUniform = temporalViewUniform(viewUniform, target: target)
             let skybox = environment.skybox
             let reflection = environment.screenSpaceReflection
             let skyIntensity = max(0, skybox.intensity)
             let uniform = Environment3DUniform(
-                projection: viewUniform.projectionMatrix,
-                inverseProjection: viewUniform.projectionMatrix.inverse,
+                projection: jitteredUniform.projectionMatrix,
+                inverseProjection: jitteredUniform.projectionMatrix.inverse,
                 inverseView: viewUniform.viewMatrix.inverse,
                 zenithColor: skybox.zenithColor.asVector,
                 horizonColor: skybox.horizonColor.asVector,
@@ -109,7 +111,12 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                     environment.imageBasedLighting?.rotation ?? 0,
                     environment.imageBasedLighting?.asset.asset?.radiance == nil ? 0 : 1
                 ),
-                quality: Vector4(environment.ambientOcclusion.isEnabled ? 1 : 0, finiteRenderValue(environment.ambientOcclusion.radius, fallback: 0.65, range: 0.05...3), 0, 0)
+                quality: Vector4(
+                    environment.ambientOcclusion.isEnabled ? 1 : 0,
+                    finiteRenderValue(environment.ambientOcclusion.radius, fallback: 0.65, range: 0.05...3),
+                    target.temporalUpscalingActive ? 1 : 0,
+                    0
+                )
             )
             let constants = scratch.cache.write(uniform, view: source.entityId, device: renderDevice.renderDevice)
 
@@ -148,7 +155,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                 index: 0
             )
             pass.setFragmentBuffer(constants, offset: 0, slot: 4)
-            pass.setRenderPipelineState(pipeline.renderPipeline)
+            pass.setRenderPipelineState(target.temporalUpscalingActive ? pipeline.hdrRenderPipeline : pipeline.renderPipeline)
             pass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
             pass.endRenderPass()
             if notifiesCompletion, environment.antiAliasing == .none, let outputTexture = target.outputTexture,
