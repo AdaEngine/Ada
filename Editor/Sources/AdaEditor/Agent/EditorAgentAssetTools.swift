@@ -86,7 +86,35 @@ enum EditorAgentAssetTools {
                 ["path", "texture", "channel"],
                 false
             ),
-            tool("editor.asset.validate", "Validate an image, .atlas, .tileset or .tilemap with native decoders and resource formats.", ["path": string], ["path"], true),
+            tool(
+                "editor.model.inspect",
+                "Inspect a GLB/glTF through the native importer: scene bounds, meshes, PBR materials and texture slots, nodes, skins and named animation clips. Does not render.",
+                ["path": string],
+                ["path"],
+                true
+            ),
+            tool(
+                "editor.model.validate",
+                "Validate GLB/glTF dependencies, geometry, images, hierarchy and the native import profile. Success is not GPU, animation playback or gameplay proof.",
+                ["path": string],
+                ["path"],
+                true
+            ),
+            tool(
+                "editor.model.import",
+                "Import a project-local GLB/glTF from Downloads or Assets into Assets, with local dependencies and a collision-free bundle name. Returns an asset reference.",
+                ["source": string, "destination": string],
+                ["source", "destination"],
+                false
+            ),
+            tool(
+                "editor.model.material.edit",
+                "Patch PBR factors using settingsJSON. Read editor.docs.read Agent3DWorkflow for supported fields. Preserves binary geometry; rebuild after edits.",
+                ["path": string, "material": .object(["type": "integer", "minimum": 0]), "settingsJSON": string],
+                ["path", "material", "settingsJSON"],
+                false
+            ),
+            tool("editor.asset.validate", "Validate a GLB/glTF, image, .atlas, .tileset or .tilemap with native decoders and resource formats.", ["path": string], ["path"], true),
         ]
     }
 }

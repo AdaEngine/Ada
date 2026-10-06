@@ -1031,26 +1031,26 @@ extension EditorSceneViewportModel {
             return nil
         }
 
-        let ray = EditorPicking.perspectiveRay(
+        let state = cameraState(for: viewportSize)
+        guard let ray = EditorPicking.ray(
             point: screenPoint,
             viewportSize: viewportSize,
-            cameraPosition: threeDPosition,
-            front: front3D,
-            right: right3D,
-            verticalFieldOfView: .degrees(62)
-        )
+            cameraTransform: state.transform.matrix,
+            projection: state.projection.makeClipView()
+        ) else {
+            return nil
+        }
 
         return world.getEntities()
             .compactMap { entity -> (editorID: String, distance: Float)? in
                 guard
                     entity.id != cameraEntityID,
                     let editorID = editorIDsByEntityID[entity.id],
-                    let transform = entity.components[Transform.self]
+                    let worldMatrix = EditorPicking.worldMatrix(for: entity)
                 else {
                     return nil
                 }
 
-                let worldMatrix = entity.components[GlobalTransform.self]?.matrix ?? transform.matrix
                 let bounds = entity.components[BoundingComponent.self] ?? entity.components[Mesh3DComponent.self].map { BoundingComponent(bounds: .aabb($0.mesh.bounds)) }
                 guard let distance = EditorPicking.intersectionDistance(ray: ray, matrix: worldMatrix, bounds: bounds) else {
                     return nil

@@ -19,7 +19,6 @@ enum EditorAgentToolEncoding {
 enum EditorMobileAgentTools {
     static func tools() -> [Tool] {
         let path: Value = .object(["type": "string", "description": "Project-relative file path."])
-        let query: Value = .object(["type": "string", "description": "Search words; omit to list available entries."])
         let position: [String: Value] = [
             "path": path,
             "line": .object(["type": "integer", "minimum": 0]),
@@ -31,17 +30,6 @@ enum EditorMobileAgentTools {
             tool("editor.gravity.completion", "Get AdaScript LSP completions at a zero-based UTF-16 position.", position, ["path", "line", "character"]),
             tool("editor.gravity.hover", "Read AdaScript LSP symbol documentation.", position, ["path", "line", "character"]),
             tool("editor.gravity.definition", "Resolve AdaScript symbols across project files.", position, ["path", "line", "character"]),
-            tool("editor.docs.search", "Search the offline bundled AdaEngine and AdaScript documentation. Returns article IDs and excerpts.", ["query": query]),
-            tool("editor.docs.read", "Read a bundled documentation article by ID.", ["id": .object(["type": "string"])], ["id"]),
-            tool("editor.api.describe", "Read the current AdaScript compiler API catalog, including signatures and host constructors.", ["query": query]),
-            tool("editor.components.describe", "Read registered scene component type names, required components, fields, and complete default YAML payloads.", ["query": query]),
-            tool("editor.examples.list", "List bundled complete AdaScript example projects and their files."),
-            tool(
-                "editor.examples.read",
-                "Read an example project's exact source, scene, and configuration. Use files.write to adapt its files; use editor.project.configure for runtime settings.",
-                ["id": .object(["type": "string"])],
-                ["id"]
-            ),
             tool(
                 "editor.project.configure",
                 "Update runtime.entry, runtime.plugins and inputActions using a validated JSON patch. Rejects other keys and invalid settings.",
@@ -85,7 +73,7 @@ enum EditorMobileAgentTools {
                 "Read bounded build/debug output by cursor, plus current errors from the visible Play runtime.",
                 ["after": .object(["type": "integer", "minimum": 0])]
             ),
-        ] + EditorAgentAssetTools.tools() + EditorAgentWebTools.tools()
+        ] + EditorAgentKnowledgeTools.tools() + EditorAgentAssetTools.tools() + EditorAgentWebTools.tools()
     }
 
     static func tool(

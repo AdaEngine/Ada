@@ -296,6 +296,9 @@ private final class Fixture {
     var selectionUpdates = 0
 
     init(transform: Transform = Transform(), parent: Transform? = nil) throws {
+        // These drag fixtures intentionally map one screen point to one world unit.
+        // Individual zoom tests override this instead of depending on Studio's default.
+        viewport.twoDZoom = 1
         var model = EditorSceneModel.default(projectName: "Gizmo")
         let root = try #require(model.rootEntityID)
         let selected = model.addEntity(name: "Selected", parentID: root)

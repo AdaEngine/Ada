@@ -13,7 +13,7 @@ extension ModelAsset3D {
         }
         return try SkeletalRig(nodes: nodes.enumerated().map { index, node in
             let pose = node.restPose.map { SkeletalJointPose(translation: $0.translation, rotation: $0.rotation, scale: $0.scale) }
-            return SkeletalRig.Node(parentIndex: parents[index], restPose: pose, restMatrix: node.transform)
+            return SkeletalRig.Node(parentIndex: parents[index], restPose: pose, restMatrix: node.transform, name: node.name)
         })
     }
 

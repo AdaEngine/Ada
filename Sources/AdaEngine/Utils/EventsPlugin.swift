@@ -16,6 +16,9 @@ public struct EventsPlugin: Plugin {
     public init() {}
 
     public func setup(in app: borrowing AppWorlds) {
+        guard !app.main.supportsEventDelivery else {
+            return
+        }
         app.insertResource(HandledEvents())
         app.addSystem(EventsUpdateSystem.self, on: .preUpdate)
     }

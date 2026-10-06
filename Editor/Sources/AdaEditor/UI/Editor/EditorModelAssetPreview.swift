@@ -11,12 +11,18 @@ final class EditorModelAssetPreviewModel {
     var isLoading = true
     var selectedAnimation = "Rest pose" { didSet { updatePlayback() } }
     var playsAnimation = true { didSet { updatePlayback() } }
+    var animationGraph: AnimationGraph? { didSet { updatePlayback() } }
+    var graphEventLog: [String] = []
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var normalizationCache: (ObjectIdentifier, Transform, AABB)?
     @ObservationIgnored private weak var world: World?
     @ObservationIgnored private var animationRoot: Entity.ID?
 
     func load(_ document: EditorAssetDocument) {
+        load(path: document.absolutePath)
+    }
+
+    func load(path: String?) {
         loadTask?.cancel()
         asset = nil
         normalizationCache = nil
@@ -26,7 +32,7 @@ final class EditorModelAssetPreviewModel {
         isLoading = true
         loadTask = Task { [weak self] in
             do {
-                guard let path = document.absolutePath else { throw AssetError.message("Model file is unavailable.") }
+                guard let path else { throw AssetError.message("Model file is unavailable.") }
                 let handle = try await AssetsManager.load(ModelAsset3D.self, at: path)
                 try Task.checkCancellation()
                 guard let asset = handle.asset else { throw AssetError.message("Model has not loaded.") }
@@ -52,7 +58,14 @@ final class EditorModelAssetPreviewModel {
         guard let world, let animationRoot, let root = world.getEntityByID(animationRoot),
             var component = root.components[ModelAnimation3DComponent.self] else { return }
         do {
-            if animation.isEmpty {
+            if let animationGraph {
+                if component.player.graph != animationGraph {
+                    let clock = component.player.graph == nil ? 0 : component.player.time
+                    try component.player.play(animationGraph, transitionDuration: 0)
+                    component.player.seek(to: clock)
+                }
+                component.player.isPlaying = playsAnimation
+            } else if animation.isEmpty {
                 component.player = try SkeletalAnimationPlayer(rig: component.player.rig, clips: component.player.clips)
             } else {
                 if component.player.clipIndex.map({ component.player.clips[$0].name }) != animation {
@@ -64,6 +77,27 @@ final class EditorModelAssetPreviewModel {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    func seekGraph(to time: Double) {
+        guard let world, let animationRoot, let root = world.getEntityByID(animationRoot),
+            var component = root.components[ModelAnimation3DComponent.self] else {
+            return
+        }
+        component.player.seek(to: time)
+        root.components[ModelAnimation3DComponent.self] = component
+    }
+
+    func pollGraphEvents(in world: World) {
+        guard animationGraph != nil, world.supportsEventDelivery else {
+            return
+        }
+        let events = Events<ModelAnimation3DEvent>(from: world)
+        events.update(from: world)
+        let messages = events.wrappedValue.filter { $0.modelRoot == animationRoot }.map {
+            "\($0.animation.clip): \($0.animation.marker.name) · \($0.animation.marker.payload)"
+        }
+        if !messages.isEmpty { graphEventLog = Array((graphEventLog + messages).suffix(8)) }
     }
 
     var animationNames: [String] { ["Rest pose"] + (asset?.animationClips.map(\.name) ?? []) }
@@ -126,6 +160,8 @@ struct EditorModelAssetPreview: View {
     @State private var model = EditorModelAssetPreviewModel()
     @State private var camera = EditorModelPreviewCamera()
     @State private var showsScenePicker = false
+    @State private var showsGraph = false
+    @State private var graphModel = EditorAnimationGraphModel()
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -154,7 +190,14 @@ struct EditorModelAssetPreview: View {
                     } else if let error = model.error {
                         Text(error).foregroundColor(.red).padding(24)
                     } else if model.asset != nil {
-                        EditorModelPreviewViewport(model: model, camera: camera)
+                        if showsGraph {
+                            HStack(spacing: 8) {
+                                EditorModelPreviewViewport(model: model, camera: camera).frame(width: max(180, geometry.size.width * 0.35))
+                                EditorAnimationGraphEditor(model: graphModel)
+                            }
+                        } else {
+                            EditorModelPreviewViewport(model: model, camera: camera)
+                        }
                     }
                 }
                 .frame(height: max(180, geometry.size.height - (showsScenePicker ? 210 : 110)))
@@ -166,6 +209,12 @@ struct EditorModelAssetPreview: View {
         .accessibilityIdentifier("AdaEditor.ModelPreview")
         .onAppear { model.load(document) }
         .onDisappear { model.cancel() }
+        .onChange(of: model.asset.map(ObjectIdentifier.init)) { _, _ in
+            if let asset = model.asset { graphModel.configure(asset: asset) }
+        }
+        .onChange(of: graphModel.graph) { _, _ in
+            if showsGraph, let graph = graphModel.validGraph { model.animationGraph = graph }
+        }
     }
 
     private var header: some View {
@@ -191,6 +240,13 @@ struct EditorModelAssetPreview: View {
     private var animationControls: some View {
         HStack(spacing: 8) {
             Text("Animation").font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+            Button(action: {
+                showsGraph.toggle()
+                model.animationGraph = showsGraph ? graphModel.validGraph : nil
+            }) { Text(showsGraph ? "Clips" : "Animation Graph").font(.system(size: 11)) }
+                .buttonStyle(DefaultButtonStyle())
+                .disabled(model.asset?.animationClips.isEmpty != false)
+                .accessibilityIdentifier("AdaEditor.ModelPreview.Graph")
             EditorEnumField(
                 cases: model.animationNames,
                 selection: Binding(get: { model.selectedAnimation }, set: { model.selectedAnimation = $0 }),
@@ -201,7 +257,7 @@ struct EditorModelAssetPreview: View {
                 Text(model.playsAnimation ? "Pause" : "Play").font(.system(size: 11))
             }
             .buttonStyle(DefaultButtonStyle())
-            .disabled(model.animation.isEmpty)
+            .disabled(model.animation.isEmpty && model.animationGraph == nil)
             .accessibilityIdentifier("AdaEditor.ModelPreview.PlayAnimation")
             Spacer()
         }
@@ -230,23 +286,25 @@ struct EditorModelAssetPreview: View {
                 .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.12)))
         }
         .buttonStyle(DefaultButtonStyle())
-        .disabled(model.asset == nil || targetScenes.isEmpty || document.assetReference == nil)
+        .disabled(model.asset == nil || targetScenes.isEmpty || document.assetReference == nil || showsGraph && graphModel.validGraph == nil)
         .accessibilityIdentifier("AdaEditor.ModelPreview.AddToScene")
     }
 
     private func place(in sceneID: String) {
-        workbench.addModelAsset(document, to: sceneID, animation: model.animation, autoplay: model.playsAnimation)
+        workbench.addModelAsset(document, to: sceneID, animation: model.animation, autoplay: model.playsAnimation, animationGraph: showsGraph ? graphModel.validGraph : nil)
         showsScenePicker = false
     }
 }
 
 extension EditorWorkbenchViewModel {
     @discardableResult
-    func addModelAsset(_ asset: EditorAssetDocument, to documentID: String, animation: String = "", autoplay: Bool = false) -> Bool {
+    func addModelAsset(_ asset: EditorAssetDocument, to documentID: String, animation: String = "", autoplay: Bool = false, animationGraph: AnimationGraph? = nil) -> Bool {
         guard let reference = asset.assetReference, asset.kind == .model3D,
             let document = sceneDocument(id: documentID), !document.isReadOnly, document.sceneModel != nil else {
                 return false
             }
+        let graphValue: EditorSceneValue?
+        do { graphValue = try animationGraph.map(EditorAnimationGraphPayload.encode) } catch { return false }
         selectDocument(id: documentID)
         updateSceneModelDocument(id: documentID, status: "Model added") { scene in
             let entity = scene.addEntity(template: .importedModel3D, parentID: scene.editor?.selectedEntity)
@@ -257,6 +315,7 @@ extension EditorWorkbenchViewModel {
             scene.entities[index].components[EditorBuiltInComponentType.model3DSource] = [
                 "source": .string(reference), "animation": .string(animation), "autoplay": .bool(autoplay), "repeats": .bool(true),
             ]
+            scene.entities[index].components[EditorBuiltInComponentType.model3DSource]?["animationGraph"] = graphValue
         }
         return true
     }

@@ -20,6 +20,11 @@ public struct SkeletalAnimationPlayer: Sendable {
     private var transitionSource: [SkeletalJointPose] = []
     private var transitionDuration: Double = 0
     private var transitionTime: Double = 0
+    private var graphState: CompiledAnimationGraph?
+    private var pendingGraphEvents: [AnimationGraphEvent] = []
+    /// Occurrences omitted when a frame or undrained queue exceeds the 1,024-event budget.
+    public private(set) var droppedGraphEventCount = 0
+    public var graph: AnimationGraph? { graphState?.graph }
 
     public init(rig: SkeletalRig, clips: [SkeletalAnimationClip]) throws(SkeletalAnimationError) {
         guard
@@ -44,6 +49,8 @@ public struct SkeletalAnimationPlayer: Sendable {
     /// Non-finite start times are treated as zero; looping and clamping follow `repeats`.
     public mutating func play(_ name: String, transitionDuration: Double = 0.15, startTime: Double) throws(SkeletalAnimationError) {
         guard let index = clips.firstIndex(where: { $0.name == name }) else { throw .unknownClip(name) }
+        graphState = nil
+        pendingGraphEvents.removeAll(keepingCapacity: true)
         self.transitionSource = poses
         self.transitionDuration = transitionDuration.isFinite ? max(0, transitionDuration) : 0
         self.transitionTime = 0
@@ -59,6 +66,7 @@ public struct SkeletalAnimationPlayer: Sendable {
             return
         }
         self.time = time
+        pendingGraphEvents.removeAll(keepingCapacity: true)
         transitionDuration = 0
         evaluate()
     }
@@ -74,16 +82,60 @@ public struct SkeletalAnimationPlayer: Sendable {
         guard nextTime.isFinite else {
             return
         }
+        let previousTime = time
         time = nextTime
         transitionTime += deltaTime
-        if let clipIndex, !repeats {
+        if let graphState, !graphState.loops {
+            time = min(max(time, 0), graphState.duration)
+            if speed >= 0 && time >= graphState.duration || speed < 0 && time <= 0 {
+                isPlaying = transitionTime < transitionDuration
+            }
+        } else if let clipIndex, !repeats {
             let duration = clips[clipIndex].duration
             if speed >= 0 && time >= duration || speed < 0 && time <= 0 {
                 time = min(max(time, 0), duration)
                 isPlaying = transitionTime < transitionDuration
             }
         }
+        let graphTime = time
+        let graphClips = clips
+        let eventCapacity = 1_024 - pendingGraphEvents.count
+        if let crossings = graphState?.events(from: previousTime, to: graphTime, clips: graphClips, capacity: eventCapacity) {
+            pendingGraphEvents.append(contentsOf: crossings.events)
+            droppedGraphEventCount += min(Int.max / 2 - droppedGraphEventCount, crossings.dropped)
+        }
         if evaluatePose { evaluate() }
+    }
+
+    /// Installs a validated graph atomically. Invalid edits leave current playback unchanged.
+    public mutating func play(_ graph: AnimationGraph, transitionDuration: Double = 0.15) throws(AnimationGraphError) {
+        let compiled = try CompiledAnimationGraph(graph: graph, rig: rig, clips: clips)
+        graphState = compiled
+        clipIndex = nil
+        transitionSource = poses
+        self.transitionDuration = transitionDuration.isFinite ? max(0, transitionDuration) : 0
+        transitionTime = 0
+        time = 0
+        isPlaying = true
+        pendingGraphEvents.removeAll(keepingCapacity: true)
+        droppedGraphEventCount = 0
+        evaluate()
+    }
+
+    /// Changes a blend/layer weight without restarting clocks or allocating a new graph.
+    public mutating func setGraphWeight(_ weight: Float, node: String, input: Int) throws(AnimationGraphError) {
+        guard weight.isFinite, (0...1_000).contains(weight) else { throw .invalidWeight }
+        guard let index = graphState?.graph.nodes.firstIndex(where: { $0.id == node }),
+            graphState?.graph.nodes[index].inputs.indices.contains(input) == true else { throw .invalidNode(node) }
+        graphState?.graph.nodes[index].inputs[input].weight = weight
+        evaluate()
+    }
+
+    /// Drains gameplay markers once. Pause, seek and visual-only sampling never emit crossings.
+    public mutating func drainGraphEvents() -> [AnimationGraphEvent] {
+        let events = pendingGraphEvents
+        pendingGraphEvents.removeAll(keepingCapacity: true)
+        return events
     }
 
     /// Evaluates the current playback clock without advancing gameplay time.
@@ -105,7 +157,14 @@ public struct SkeletalAnimationPlayer: Sendable {
 
     private mutating func evaluate() {
         for index in rig.nodes.indices { poses[index] = rig.nodes[index].restPose ?? SkeletalJointPose() }
-        if let clipIndex {
+        if graphState != nil {
+            let graphTime = time
+            let graphClips = clips
+            graphState?.evaluate(time: graphTime, clips: graphClips)
+            if let root = graphState?.root {
+                for index in poses.indices { poses[index] = graphState?.poses[root][index] ?? poses[index] }
+            }
+        } else if let clipIndex {
             let clip = clips[clipIndex]
             let remainder = clip.duration > 0 ? time.truncatingRemainder(dividingBy: clip.duration) : 0
             let localTime = repeats ? (remainder < 0 ? remainder + clip.duration : remainder) : min(max(time, 0), clip.duration)

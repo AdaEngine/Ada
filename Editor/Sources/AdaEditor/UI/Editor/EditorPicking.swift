@@ -2,6 +2,51 @@
 import Math
 
 enum EditorPicking {
+    /// Input can arrive before transform propagation after a scene edit or reload.
+    /// Compose current local transforms rather than reading a previous frame's global cache.
+    static func worldMatrix(for entity: Entity) -> Transform3D? {
+        guard let transform = entity.components[Transform.self] else {
+            return nil
+        }
+        var matrix = transform.matrix
+        var ancestor = entity.parent
+        var visited: Set<Entity.ID> = [entity.id]
+        while let parent = ancestor {
+            guard visited.insert(parent.id).inserted else {
+                return nil
+            }
+            guard let parentTransform = parent.components[Transform.self] else {
+                break
+            }
+            matrix = parentTransform.matrix * matrix
+            ancestor = parent.parent
+        }
+        return matrix
+    }
+
+    /// Unprojects the rendered camera's 0...1 depth interval, including blended projections.
+    static func ray(point: Point, viewportSize: Size, cameraTransform: Transform3D, projection: Transform3D) -> Ray? {
+        let determinant = projection.determinant
+        guard viewportSize.width.isFinite, viewportSize.height.isFinite,
+            viewportSize.width > 0, viewportSize.height > 0, determinant.isFinite, determinant != 0 else {
+            return nil
+        }
+        let ndc = Vector2(point.x / viewportSize.width * 2 - 1, 1 - point.y / viewportSize.height * 2)
+        let inverse = cameraTransform * projection.inverse
+        let near = inverse * Vector4(ndc.x, ndc.y, 0, 1)
+        let far = inverse * Vector4(ndc.x, ndc.y, 1, 1)
+        guard abs(near.w) > 0.000001, abs(far.w) > 0.000001 else {
+            return nil
+        }
+        let origin = near.xyz / near.w
+        let direction = far.xyz / far.w - origin
+        guard origin.x.isFinite, origin.y.isFinite, origin.z.isFinite,
+            direction.squaredLength.isFinite, direction.squaredLength > 0.000001 else {
+            return nil
+        }
+        return Ray(origin: origin, direction: direction.normalized)
+    }
+
     static func contains2D(_ point: Vector2, transform: Transform, bounds: BoundingComponent?) -> Bool {
         let aabb = localAABB(from: bounds)
         let fallbackHalfExtent: Float = 0.35

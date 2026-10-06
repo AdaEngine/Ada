@@ -21,6 +21,8 @@ struct MobileAgentHarnessSettings: Codable, Equatable, Sendable {
         for skill in enabledSkills {
             sections.append("[Enabled skill: \(skill.name)]\n\(skill.content)")
         }
+        let catalog = EditorAgentSkillStore.bundledSkills().map { "- \($0.id): \($0.description ?? $0.name)" }
+        sections.append((["[Bundled Ada Studio workflows]", "Load matching instructions with editor.skills.read; use editor.skills.list to search."] + catalog).joined(separator: "\n"))
         sections.append("[User request]\n\(userPrompt)")
         return sections.joined(separator: "\n\n")
     }

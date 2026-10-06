@@ -4,8 +4,20 @@ import AdaCorePipelines
 import AdaECS
 @_spi(Internal) import AdaRender
 import AdaTransform
+import AdaUtils
 import Foundation
 import Math
+
+/// A graph marker crossed by a model's playback clock. Receive with `Events<ModelAnimation3DEvent>`.
+public struct ModelAnimation3DEvent: Event, Sendable {
+    public let modelRoot: Entity.ID
+    public let animation: AnimationGraphEvent
+
+    public init(modelRoot: Entity.ID, animation: AnimationGraphEvent) {
+        self.modelRoot = modelRoot
+        self.animation = animation
+    }
+}
 
 /// Instance-local pose and named clip playback on the model root entity.
 public struct ModelAnimation3DComponent: Component {
@@ -71,6 +83,7 @@ public struct SkeletalAnimation3DSystem {
     @Query<ModelNode3DComponent, Ref<Transform>> private var nodes
     @Query<Ref<SkinnedMesh3DComponent>> private var skins
     @Res<DeltaTime> private var time
+    @EventsSender<ModelAnimation3DEvent> private var animationEvents
     @Query<Camera, CameraRenderGraph> private var cameras
     @Query<GlobalTransform> private var transformAccess
 
@@ -102,6 +115,9 @@ public struct SkeletalAnimation3DSystem {
                 )
             } else {
                 value.player.advance(by: Double(time.deltaTime))
+            }
+            for event in value.player.drainGraphEvents() {
+                animationEvents.send(ModelAnimation3DEvent(modelRoot: root.id, animation: event))
             }
             if value.appliedPlayer != value.player.instanceID || value.appliedGeneration != value.player.poseGeneration {
                 for (index, transform) in nodesByRoot[root.id] ?? [] {

@@ -121,6 +121,15 @@ PBR materials appear in edit and Play, with independent animation players and
 child-to-authored-entity picking. glTF imports copy local buffers/textures as a
 collision-free bundle. Save/reopen, duplicate and scene undo/redo retain references.
 
+Model preview and the selected model's Animator include skeletal graph authoring:
+clip/blend/additive nodes, connections, bone/subtree masks and clip event markers.
+Graphs preview through the production model renderer and save as structured
+`Model3DSource.animationGraph` scene payloads in one undoable transaction.
+Scene Animator adds Seek, preview transport, autoplay and latest-event display.
+This authors pose graphs; imported skeletal keyframe and retargeting tools remain
+separate gaps. See [AnimationGraphs.md](../Documentation/AnimationGraphs.md).
+Coverage: [EditorAnimationGraphTests.swift](Tests/AdaEditorTests/EditorAnimationGraphTests.swift).
+
 Entry points: [EditorModelAssetPreview.swift](Sources/AdaEditor/UI/Editor/EditorModelAssetPreview.swift),
 [EditorModelAssetImporter.swift](Sources/AdaEditor/EditorModelAssetImporter.swift),
 [Model3DSource.swift](../Sources/AdaScene/3D/Model3DSource.swift).
@@ -191,6 +200,20 @@ SloppyRuntime path when available. Editor MCP/host tools expose project/docs/API
 context, scene edits, diagnostics, build, simulation, visible Play, frame capture,
 web access and asset/image operations. Model texture assignment tools also exist;
 they do not constitute a visual 3D asset editor.
+
+Native AI model tools on desktop and mobile inspect/validate GLB/glTF through
+CPU native import, import project-local dependency bundles and patch PBR material
+factors. Offline docs/API/component/examples tools are shared; bundled workflow
+skills are readable on demand through `editor.skills.list/read`. `basic-3d-scene`
+is a complete camera/cube/light example. Import validation does not prove GPU
+rendering, clip playback or gameplay; Blender execution/generation and rig/clip
+authoring remain outside these tools. Desktop scene changes use document revisions
+and undo, and asset writes reject matching dirty open documents.
+
+Guide: [Agent3DWorkflow.md](Documentation/Agent3DWorkflow.md).
+Entry points: [EditorAgentModelToolService.swift](Sources/AdaEditor/Agent/EditorAgentModelToolService.swift),
+[EditorAgentAuthoringMCPTools.swift](Sources/AdaEditor/Agent/EditorAgentAuthoringMCPTools.swift).
+Coverage: [EditorAgentModelToolTests.swift](Tests/AdaEditorTests/EditorAgentModelToolTests.swift).
 
 Guides: [AgentCatalog.md](Documentation/AgentCatalog.md),
 [MobileAgentTools.md](Documentation/MobileAgentTools.md).

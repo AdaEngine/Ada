@@ -1,3 +1,4 @@
+import AdaAnimation
 import AdaAssets
 import AdaECS
 import Foundation
@@ -10,24 +11,35 @@ public struct Model3DSource: Codable, Equatable, Sendable {
     public var animation: String
     public var autoplay: Bool
     public var repeats: Bool
+    /// Optional authored pose graph. When present it takes precedence over the single clip.
+    public var animationGraph: AnimationGraph?
 
-    public init(source: String = "", animation: String = "", autoplay: Bool = false, repeats: Bool = true) {
+    public init(source: String = "", animation: String = "", autoplay: Bool = false, repeats: Bool = true, animationGraph: AnimationGraph? = nil) {
         self.source = source
         self.animation = animation
         self.autoplay = autoplay
         self.repeats = repeats
+        self.animationGraph = animationGraph
     }
 
     /// Installs an already loaded asset. Used by hosts that prepare models before their first frame.
     /// An invalid clip fails before creating entities. Each call creates an independent animation player.
     @discardableResult
     public func instantiate(_ model: ModelAsset3D, in world: World, under owner: Entity) throws -> Entity {
-        guard animation.isEmpty || model.animationClips.contains(where: { $0.name == animation }) else {
+        guard animationGraph != nil || animation.isEmpty || model.animationClips.contains(where: { $0.name == animation }) else {
             throw AssetError.message("Model has no animation named '\(animation)'.")
         }
+        if let animationGraph {
+            guard let rig = model.animationRig else { throw AssetError.message("Model has no animation rig.") }
+            try animationGraph.validate(rig: rig, clips: model.animationClips)
+        }
         let root = model.instantiate(in: world)
-        if var animationComponent = root.components[ModelAnimation3DComponent.self], !animation.isEmpty {
-            try animationComponent.player.play(animation, transitionDuration: 0)
+        if var animationComponent = root.components[ModelAnimation3DComponent.self], animationGraph != nil || !animation.isEmpty {
+            if let animationGraph {
+                try animationComponent.player.play(animationGraph, transitionDuration: 0)
+            } else {
+                try animationComponent.player.play(animation, transitionDuration: 0)
+            }
             animationComponent.player.isPlaying = autoplay
             animationComponent.player.repeats = repeats
             root.components[ModelAnimation3DComponent.self] = animationComponent

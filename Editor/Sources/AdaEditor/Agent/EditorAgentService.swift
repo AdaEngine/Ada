@@ -849,6 +849,9 @@ enum EditorAgentPromptContext {
             - Assets and project files: \(assets) and the project tree; project metadata is .ada/project.json.
             - AdaEditor MCP exposes scene, asset, build/test/play, output, Gravity LSP, runtime ECS, UI, render, trace, and profiler tools when project MCP is enabled.
             - Use editor.gravity.diagnostics/completion/hover/definition for .ada and .gravity; positions use zero-based UTF-16 LSP coordinates.
+            - For 3D work, use editor.model.inspect/validate for bounds, PBR material indexes, skins and exact clip names. Use editor.components.describe for serialized scene fields.
+            - Model validation is CPU import/profile validation; check visible Play and completed GPU frames for appearance and animation playback.
+            - Blender execution, 3D generation, rig editing and skeletal clip authoring are not provided by Studio tools.
             - After edits, run the narrowest relevant build or test, poll editor.task.status, read editor.output.read, and report failures precisely.
             """
     }
@@ -856,12 +859,12 @@ enum EditorAgentPromptContext {
     private static func skillCatalogBlock(_ skills: [EditorAgentSkill]) -> String {
         let entries = skills.map { skill in
             let description = skill.description?.trimmingCharacters(in: .whitespacesAndNewlines)
-            return "- /\(skill.id): \(description?.isEmpty == false ? description ?? skill.name : skill.name)"
+            return "- /\(skill.id): \(description?.isEmpty == false ? description ?? skill.name : skill.name) (\(skill.localPath))"
         }
         return
             ([
                 "[Available AdaEditor Skills]",
-                "Use a matching skill when its workflow applies. Full instructions for active skills follow below.",
+                "Read matching bundled workflows with editor.skills.read, or project skills at their local path. Active skill instructions follow below.",
             ] + entries)
             .joined(separator: "\n")
     }

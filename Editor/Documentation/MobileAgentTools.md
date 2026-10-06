@@ -61,3 +61,7 @@ The bell on the mobile projects screen opens Activity, persistent error/result h
 Model requests, project files, compilation and `editor.runtime` simulation can continue in the background. Play rendering and GPU frame capture require the foreground and return an explicit error when unavailable. Automatic preview opening is skipped when validation finishes in the background.
 
 Debug Simulator builds accept `--mobile-background-agent-qa` and the optional `--mobile-background-agent-qa-failure`. The diagnostic uses the same operation and system-background bridge, writes 45 verification records with UIKit application state to `Documents/background-agent-qa.txt`, and opens Activity. It uses no model credentials.
+
+## Native 3D tools and shared knowledge
+
+See [AI-assisted 3D work](Agent3DWorkflow.md) for `editor.model.inspect/validate/import/material.edit`, GLB/glTF validation through `editor.asset.validate`, and the shared desktop/mobile offline knowledge tools. `editor.skills.list/read` loads bundled 3D workflows on demand. The `basic-3d-scene` example includes a perspective camera, PBR cube, directional light and game3d configuration. Model validation is CPU import/profile evidence; visible Play and completed GPU captures remain required for rendering and clip playback.

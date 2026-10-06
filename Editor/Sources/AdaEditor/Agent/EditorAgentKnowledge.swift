@@ -57,6 +57,14 @@ enum EditorAgentKnowledge {
                 },
                 "total": components.count,
             ]
+        case "editor.skills.list":
+            let skills = EditorAgentSkillStore.bundledSkills().filter { matches($0.name + " " + ($0.description ?? ""), query) }
+            return ["skills": skills.map { ["id": $0.id, "name": $0.name, "description": $0.description ?? ""] }]
+        case "editor.skills.read":
+            guard let skill = EditorAgentSkillStore.bundledSkills().first(where: { $0.id == arguments["id"]?.stringValue }) else {
+                throw KnowledgeError("Unknown bundled skill. Call editor.skills.list for IDs.")
+            }
+            return ["id": skill.id, "content": skill.instructions]
         case "editor.examples.list":
             return ["examples": examples.map { ["id": $0.id, "description": $0.description, "files": $0.files.keys.sorted()] }]
         case "editor.examples.read":
@@ -66,7 +74,7 @@ enum EditorAgentKnowledge {
             return [
                 "id": example.id, "description": example.description, "files": example.files,
                 "instructions":
-                    "Adapt files with files.write and settings with editor.project.configure. Build and simulate, then add and test touch UI in Play.",
+                    "Write project files, configure runtime settings, build and check visible Play. Simulation only verifies logic.",
             ]
         default: throw KnowledgeError("Unknown knowledge operation.")
         }
@@ -80,6 +88,7 @@ enum EditorAgentKnowledge {
 
     static var examples: [Example] {
         [
+            basic3DExample(),
             example(
                 id: "keyboard-movement",
                 description: "Complete scene-based AdaScript example: MoveRight/MoveLeft keyboard actions move a player Transform. Includes exact scene payloads and input configuration.",
@@ -122,6 +131,42 @@ enum EditorAgentKnowledge {
                 actions: []
             ),
         ]
+    }
+
+    private static func basic3DExample() -> Example {
+        EditorComponentRegistry.registerBuiltIns()
+        var project = ProjectSystem.defaultProject(projectName: "Basic 3D", buildSystem: .adaScript)
+        project.runtime.entry = .init(scene: SceneDocumentFormat.defaultScenePath)
+        project.runtime.plugins.preset = .game3D
+        var scene = EditorSceneModel.default(projectName: "Basic 3D")
+        scene.entities = []
+        func entity(_ id: String, _ name: String, _ position: [Double], _ components: [String: EditorComponentPayload]) -> EditorSceneEntity {
+            var result = EditorSceneEntity(id: id, name: name, enabled: true, parent: nil, components: components)
+            var transform = EditorComponentRegistry.defaultPayload(for: EditorBuiltInComponentType.transform)
+            transform["position"] = .array(position.map(EditorSceneValue.double))
+            result.components[EditorBuiltInComponentType.transform] = transform
+            return result
+        }
+        var camera = EditorComponentRegistry.defaultPayload(for: EditorBuiltInComponentType.camera)
+        camera["projection"] = .string("perspective")
+        scene.editor = .init(selectedEntity: "cube", expandedEntities: [])
+        scene.entities = [
+            entity("camera", "Camera", [0, 0, 4], [EditorBuiltInComponentType.camera: camera]),
+            entity("cube", "Cube", [0, 0, 0], [
+                EditorBuiltInComponentType.mesh3D: EditorComponentRegistry.defaultPayload(for: EditorBuiltInComponentType.mesh3D),
+                EditorBuiltInComponentType.visibility: EditorComponentRegistry.defaultPayload(for: EditorBuiltInComponentType.visibility),
+            ]),
+            entity("light", "Sun", [0, 2, 2], [EditorBuiltInComponentType.directionalLight3D: EditorComponentRegistry.defaultPayload(for: EditorBuiltInComponentType.directionalLight3D)]),
+        ]
+        do {
+            return Example(id: "basic-3d-scene", description: "3D scene with perspective camera, PBR cube, directional light and game3d plugins. Verify rendering in visible Play.", files: [
+                ".ada/project.json": try EditorAgentToolEncoding.string(JSONEncoder().encode(project)),
+                "Sources/Game.ada": "// This example uses the built-in scene components. Add gameplay systems here.\n",
+                SceneDocumentFormat.defaultScenePath: try scene.encodedYAML(),
+            ])
+        } catch {
+            return Example(id: "basic-3d-scene", description: "Example could not be encoded: \(error.localizedDescription)", files: [:])
+        }
     }
 
     private static func example(id: String, description: String, source: String, actions: [InputAction]) -> Example {

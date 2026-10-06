@@ -27,11 +27,14 @@ public enum SkeletalAnimationError: Error, Equatable, Sendable {
 /// The entire model hierarchy, including non-joint nodes and matrix-authored nodes.
 public struct SkeletalRig: Sendable {
     public struct Node: Sendable {
+        /// Imported node name for authoring joint masks. Indices remain the runtime identity.
+        public let name: String?
         public let parentIndex: Int?
         public let restPose: SkeletalJointPose?
         public let restMatrix: Transform3D
 
-        public init(parentIndex: Int?, restPose: SkeletalJointPose?, restMatrix: Transform3D) {
+        public init(parentIndex: Int?, restPose: SkeletalJointPose?, restMatrix: Transform3D, name: String? = nil) {
+            self.name = name
             self.parentIndex = parentIndex
             self.restPose = restPose
             self.restMatrix = restMatrix

@@ -160,6 +160,7 @@ struct EditorModelPreviewViewport: View {
                             for event in input.getInputEvents() { camera.handleInput(event) }
                         }
                         camera.update()
+                        model.pollGraphEvents(in: world)
                     }
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)

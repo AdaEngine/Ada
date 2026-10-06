@@ -239,16 +239,17 @@ struct EditorSceneEditingTests {
         #expect(roundTrippedModel == model)
     }
 
-    @Test("middle mouse drag pans the 2D viewport without changing selection")
+    @Test("middle mouse drag pans the 2D viewport at the current zoom without changing selection", arguments: [Float(1), 2, 150])
     @MainActor
-    func middleMouseDragPans2DViewport() {
+    func middleMouseDragPans2DViewport(zoom: Float) {
         let viewportModel = EditorSceneViewportModel()
+        viewportModel.twoDZoom = zoom
         var selectedEntityID: String?
         viewportModel.onSelectEntity = { selectedEntityID = $0 }
 
         #expect(viewportModel.handleInput(mouseEvent(button: .middle, position: Point(x: 100, y: 100), phase: .began)))
         #expect(viewportModel.handleInput(mouseEvent(button: .middle, position: Point(x: 124, y: 88), phase: .changed)))
-        #expect(viewportModel.twoDCenter == Vector2(-24, -12))
+        #expect(viewportModel.twoDCenter == Vector2(-24 / zoom, -12 / zoom))
         #expect(viewportModel.handleInput(mouseEvent(button: .middle, position: Point(x: 124, y: 88), phase: .ended)))
         #expect(selectedEntityID == nil)
     }
@@ -346,6 +347,8 @@ struct EditorSceneEditingTests {
         viewportModel.setViewportSize(Size(width: 1280, height: 720))
         viewportModel.setDisplayMode(.threeD)
 
+        // This fixture places the target in front of the completed perspective camera.
+        viewportModel.perspectiveBlend = 1
         #expect(viewportModel.pick3D(at: Point(x: 640, y: 360)) == entityID)
         #expect(world.getEntityByID(camera.id) === camera)
     }
@@ -894,6 +897,14 @@ struct EditorSceneEditingTests {
         let viewport = EditorSceneViewportModel()
         viewport.attachSceneWorld(app.main, loadResult: .empty)
         viewport.setViewportSize(Size(width: 128, height: 128))
+        // At the Studio default 150 points/unit, this 128-point target only spans
+        // 0.85 world units: the sprite at x = 2 must correctly be culled.
+        try await app.update()
+        try await app.update()
+        let culledSprites = try #require(renderWorld.getResource(SortedRenderItems<Transparent2DRenderItem>.self))
+        #expect(!culledSprites.items.items.contains { $0.entity == sprite.id })
+        // Fit both authored objects in the orthographic control before checking mixed passes.
+        viewport.twoDZoom = 16
         for mode in [EditorSceneViewportDisplayMode.twoD, .threeD, .twoD] {
             viewport.setDisplayMode(mode)
             _ = viewport.update(deltaTime: 0.5)

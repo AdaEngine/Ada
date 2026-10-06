@@ -1,3 +1,4 @@
+@_spi(Internal) @testable import AdaRender
 import Foundation
 import MCP
 import Testing
@@ -65,13 +66,17 @@ struct EditorMobileAgentToolTests {
         let components = try await call(service, "editor.components.describe", ["query": "Transform"])
         #expect(String(describing: components).contains("defaultPayload"))
         let list = try await call(service, "editor.examples.list")
-        #expect((list["examples"] as? [[String: Any]])?.count == 2)
+        #expect((list["examples"] as? [[String: Any]])?.count == 3)
         let example = try await call(service, "editor.examples.read", ["id": "keyboard-movement"])
         #expect((example["files"] as? [String: String])?["Sources/Game.ada"]?.contains("@res var input") == true)
     }
 
-    @Test("Both bundled projects compile, load their scenes and execute real systems")
+    @Test("Bundled projects compile, load their scenes and execute real systems")
     func examplesRun() async throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            try RenderEngine.setupRenderEngine()
+        }
         for example in EditorAgentKnowledge.examples {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent("AgentExample-\(UUID())")
             defer { try? FileManager.default.removeItem(at: root) }
@@ -96,6 +101,9 @@ struct EditorMobileAgentToolTests {
                 let released = try await call(service, "editor.runtime.step", ["frames": 6, "keys": .array([])])
                 let after = try #require((released["entities"] as? [[String: Any]])?.first { $0["name"] as? String == "Player" })
                 #expect(abs(((after["position"] as? [Double])?.first ?? -1) - 12) < 0.01)
+            } else if example.id == "basic-3d-scene" {
+                #expect(entities.contains { $0["name"] as? String == "Cube" })
+                #expect(stepped["rendered"] as? Bool == false)
             } else {
                 #expect(String(describing: entities).contains("Counter"))
                 #expect(String(describing: entities).contains("6"))

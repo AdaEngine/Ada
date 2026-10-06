@@ -18,6 +18,11 @@ public struct Model3DPlugin: Plugin {
     public init() {}
 
     public func setup(in app: AppWorlds) {
+        // Model markers also work when hosts compose this plugin without DefaultPlugins.
+        if !app.main.supportsEventDelivery {
+            app.insertResource(HandledEvents())
+            app.addSystem(EventsUpdateSystem.self, on: .preUpdate)
+        }
         Model3DSource.registerComponent()
         Model3DSourceState.registerComponent()
         app.addSystem(Model3DSourceSystem.self, on: .preUpdate)

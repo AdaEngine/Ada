@@ -20,7 +20,8 @@ extension EditorComponentRegistry {
                 source: payload["source"]?.stringValue ?? "",
                 animation: payload["animation"]?.stringValue ?? "",
                 autoplay: payload["autoplay"]?.boolValue ?? false,
-                repeats: payload["repeats"]?.boolValue ?? true
+                repeats: payload["repeats"]?.boolValue ?? true,
+                animationGraph: try EditorAnimationGraphPayload.decode(payload["animationGraph"])
             )
         }
     )

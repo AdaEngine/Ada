@@ -33,6 +33,9 @@ final class EditorAgentAssetToolService {
     }
 
     func execute(name: String, arguments: [String: Value]) async throws -> [String: Any] {
+        if name.hasPrefix("editor.model."), name != "editor.model.texture.assign" {
+            return try EditorAgentModelToolService(projectURL: projectURL).execute(name: name, arguments: arguments)
+        }
         let path = try required("path", arguments, fallback: arguments["destination"]?.stringValue)
         switch name {
         case "editor.image.generate":
@@ -189,6 +192,8 @@ final class EditorAgentAssetToolService {
             )
         case "editor.asset.validate":
             switch URL(fileURLWithPath: path).pathExtension.lowercased() {
+            case "glb", "gltf":
+                return try EditorAgentModelToolService(projectURL: projectURL).execute(name: "editor.model.validate", arguments: arguments)
             case "atlas": return try await execute(name: "editor.atlas.read", arguments: arguments)
             case "tileset": return try await execute(name: "editor.tileset.read", arguments: arguments)
             case "tilemap": return try await execute(name: "editor.tilemap.read", arguments: arguments)

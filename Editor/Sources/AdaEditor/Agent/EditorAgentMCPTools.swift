@@ -147,7 +147,9 @@ final class EditorAgentMCPTools {
             "projectPath": project.path,
             "activeDocument": activeDocument,
             "workspaceStatus": viewModel.workspaceStatus.title,
-            "playMode": String(describing: viewModel.playModeState)
+            "playMode": String(describing: viewModel.playModeState),
+            "model3D": EditorAgentModelToolService.capabilities,
+            "authoringTools": EditorAgentAuthoringMCPTools.tools().map(\.name)
         ])
     }
 

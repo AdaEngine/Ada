@@ -114,6 +114,7 @@ final class EditorMobileAgentToolService {
             return [
                 "project": try JSONSerialization.jsonObject(with: JSONEncoder().encode(project)),
                 "tools": EditorMobileAgentTools.tools().map(\.name),
+                "model3D": EditorAgentModelToolService.capabilities,
                 "languageService": "embedded GravityWorkspace; current disk sources; zero-based UTF-16 positions",
                 "simulation": "AdaScript, scenes, keyboard input, transforms and physics; rendering, audio, networking and touch UI require visible Play",
                 "limitations": ["AdaScript @view and @resource declarations are currently unavailable in portable projects; use supported scene UI components and @res Input."],
@@ -122,7 +123,8 @@ final class EditorMobileAgentToolService {
             return try diagnostics(path: arguments["path"]?.stringValue)
         case "editor.gravity.completion", "editor.gravity.hover", "editor.gravity.definition":
             return try languageQuery(name: name, arguments: arguments)
-        case "editor.docs.search", "editor.docs.read", "editor.api.describe", "editor.components.describe", "editor.examples.list", "editor.examples.read":
+        case "editor.docs.search", "editor.docs.read", "editor.api.describe", "editor.components.describe",
+             "editor.examples.list", "editor.examples.read", "editor.skills.list", "editor.skills.read":
             return try EditorAgentKnowledge.query(name: name, arguments: arguments)
         case "editor.project.configure":
             return try configure(settings: requiredString("settingsJSON", arguments))

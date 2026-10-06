@@ -1,6 +1,11 @@
 import Foundation
 
 enum EditorAgentSkillStore {
+    static func bundledSkills() -> [EditorAgentSkill] {
+        guard let root = builtInSkillsRootURL() else { return [] }
+        return discoverSkills(in: root).sorted { $0.id < $1.id }
+    }
+
     static func discoverSkills(
         projectURL: URL,
         directories: [String],

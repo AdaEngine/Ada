@@ -4,15 +4,30 @@ import Math
 
 struct EditorAnimationPanel: View {
     let viewModel: EditorViewModel
+    @State private var usesSkeletalGraph = true
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            panelToolbar
-            RectangleShape().fill(theme.editorColors.border.opacity(0.65)).frame(height: 1)
-            panelContent
+            if let target = viewModel.skeletalAnimationTarget {
+                HStack(spacing: 8) {
+                    cycleButton(title: "Skeletal Graph", identifier: "AdaEditor.Animator.GraphMode") { usesSkeletalGraph = true }
+                    cycleButton(title: "Keyframes", identifier: "AdaEditor.Animator.KeyframeMode") { usesSkeletalGraph = false }
+                    Spacer()
+                }.padding(6)
+                if usesSkeletalGraph {
+                    EditorSkeletalAnimatorPanel(viewModel: viewModel, target: target).id(target.documentID + target.entityID)
+                } else {
+                    panelToolbar
+                    panelContent
+                }
+            } else {
+                panelToolbar
+                RectangleShape().fill(theme.editorColors.border.opacity(0.65)).frame(height: 1)
+                panelContent
+            }
         }
         .background {
             RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)

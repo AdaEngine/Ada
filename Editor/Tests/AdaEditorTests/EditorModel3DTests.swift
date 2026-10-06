@@ -25,7 +25,7 @@ struct EditorModel3DTests {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let source = try triangle(in: root.appendingPathComponent("Export"))
-        let project = try EditorProjectStore(storageURL: root.appendingPathComponent("projects.json"))
+        let project = try EditorProjectStore(storageURL: root.appendingPathComponent("projects.json"), distribution: .standalone)
             .createProject(named: "Model Import", at: root)
         let editor = EditorViewModel(project: project)
         if drop {
