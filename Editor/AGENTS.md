@@ -111,6 +111,10 @@ Coverage: [EditorUISceneTests.swift](Tests/AdaEditorTests/EditorUISceneTests.swi
 
 Image preview, texture-atlas editing, tile-source (`.tileset`) editing, and
 tile-map (`.tilemap`) painting/erasing, layers, pan and zoom.
+Tile sources author light-occlusion polygons visually; tile maps select cells to
+inherit, disable or replace their shadow shape. Shapes and sparse overrides
+persist into scene Play while static atlas rendering remains chunked.
+Coverage: [EditorTileOcclusionTests.swift](Tests/AdaEditorTests/EditorTileOcclusionTests.swift).
 Tile-source bulk creation skips fully transparent cells, respecting margins and
 spacing; individually authored tiles remain available.
 Tile-map layer controls and the tile palette live in the contextual Inspector,

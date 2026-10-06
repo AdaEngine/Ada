@@ -606,6 +606,7 @@ var targets: [Target] = [
             "AdaPhysics",
             "AdaSprite"
         ],
+        resources: [.copy("Assets")],
         swiftSettings: swiftSettings
     ),
     .adaTarget(

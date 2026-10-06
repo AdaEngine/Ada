@@ -41,6 +41,13 @@ struct EditorTileMapCanvas: View {
                     context.drawRect(rect, color: model.paletteColor(at: index))
                 }
             }
+            if let cell = model.selectedCell {
+                let rect = model.tileRect(atX: cell.x, y: cell.y, in: size)
+                context.drawLine(start: [rect.minX, rect.minY], end: [rect.maxX, rect.minY], lineWidth: 2, color: .white)
+                context.drawLine(start: [rect.maxX, rect.minY], end: [rect.maxX, rect.maxY], lineWidth: 2, color: .white)
+                context.drawLine(start: [rect.maxX, rect.maxY], end: [rect.minX, rect.maxY], lineWidth: 2, color: .white)
+                context.drawLine(start: [rect.minX, rect.maxY], end: [rect.minX, rect.minY], lineWidth: 2, color: .white)
+            }
             if showGrid {
                 // Avoid a dense, high-contrast mesh when zooming out or using tiny tiles.
                 let stepX = max(1, Int(ceil(12 / width)))

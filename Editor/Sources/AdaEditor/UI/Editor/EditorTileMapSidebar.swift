@@ -11,11 +11,37 @@ struct EditorTileMapSidebar: View {
             layers
                 .padding(12)
             RectangleShape().fill(theme.editorColors.border).frame(height: 1)
+            cellOcclusion
+                .padding(.horizontal, 12)
             palette
                 .padding(12)
                 .frame(maxHeight: .infinity)
         }
         .background(theme.editorColors.surfaceElevated)
+    }
+
+    @ViewBuilder private var cellOcclusion: some View {
+        if let cell = model.selectedCell {
+            VStack(alignment: .leading, spacing: 6) {
+                sectionTitle("Light occlusion", detail: "Cell \(cell.x), \(cell.y)")
+                EditorEnumField(cases: ["Inherit", "Disabled", "Custom"], selection: Binding(
+                    get: { model.occlusionMode }, set: { model.setOcclusionMode($0) }
+                ))
+                .accessibilityIdentifier("AdaEditor.TileMapEditor.Occlusion.Mode")
+                EditorTilePolygonEditor(model: model.occlusionDraft, identifier: "AdaEditor.TileMapEditor.Occlusion.Canvas")
+                    .disabled(model.occlusionMode != "Custom")
+                if model.occlusionMode == "Custom" {
+                    HStack(spacing: 5) {
+                        action("Rectangle", id: "Occlusion.Rectangle") { model.occlusionDraft.rectangle() }
+                        action("Clear", id: "Occlusion.Clear") { model.occlusionDraft.clear() }
+                        action("Remove point", id: "Occlusion.RemovePoint") { model.occlusionDraft.removeSelected() }
+                            .disabled(model.occlusionDraft.selectedVertex == nil)
+                    }
+                    action("Apply occlusion", id: "Occlusion.Apply") { model.applyCellOcclusion() }
+                }
+            }
+            .padding(.vertical, 8)
+        }
     }
 
     private var layers: some View {

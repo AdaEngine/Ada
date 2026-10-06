@@ -9,6 +9,7 @@ struct EditorTileMapResource: Codable, Equatable {
         var zIndex: Int
         var isEnabled: Bool
         var cells: [[Int]]
+        var cellOcclusion: [TileMapCellOcclusion]?
     }
 
     var atlasColors: [Color]
@@ -19,10 +20,11 @@ struct EditorTileMapResource: Codable, Equatable {
     var cells: [[Int]]
     /// Palette-indexed layers, distinct from the engine's source-ID-based `layers` format.
     var paletteLayers: [PaletteLayer]? = nil
+    var cellOcclusion: [TileMapCellOcclusion]?
 
     var effectiveLayers: [PaletteLayer] {
         if let paletteLayers, !paletteLayers.isEmpty { return paletteLayers }
-        return [PaletteLayer(name: "Layer 1", zIndex: 0, isEnabled: true, cells: cells)]
+        return [PaletteLayer(name: "Layer 1", zIndex: 0, isEnabled: true, cells: cells, cellOcclusion: cellOcclusion)]
     }
 
     var cellCount: Int { effectiveLayers.reduce(0) { $0 + $1.cells.count } }
@@ -49,14 +51,32 @@ struct EditorTileMapResource: Codable, Equatable {
             }),
             "cells": .array(cells.map { .array($0.map(EditorSceneValue.int)) }),
         ]
+        func encodedOcclusion(_ records: [TileMapCellOcclusion]) -> EditorSceneValue {
+            .array(records.map { record in
+                var value: [String: EditorSceneValue] = ["mode": .string(record.occlusion.mode.rawValue)]
+                if let points = record.occlusion.points {
+                    value["points"] = .array(points.map { .object(["x": .double(Double($0.x)), "y": .double(Double($0.y))]) })
+                }
+                if let size = record.occlusion.referenceSize {
+                    value["referenceSize"] = .object(["width": .double(Double(size.width)), "height": .double(Double(size.height))])
+                }
+                return .object([
+                    "position": .object(["x": .int(record.position.x), "y": .int(record.position.y)]),
+                    "occlusion": .object(value),
+                ])
+            })
+        }
+        if let cellOcclusion { payload["cellOcclusion"] = encodedOcclusion(cellOcclusion) }
         if let paletteLayers {
             payload["paletteLayers"] = .array(paletteLayers.map { layer in
-                .object([
+                var fields: [String: EditorSceneValue] = [
                     "name": .string(layer.name),
                     "zIndex": .int(layer.zIndex),
                     "isEnabled": .bool(layer.isEnabled),
                     "cells": .array(layer.cells.map { .array($0.map(EditorSceneValue.int)) }),
-                ])
+                ]
+                if let records = layer.cellOcclusion { fields["cellOcclusion"] = encodedOcclusion(records) }
+                return .object(fields)
             })
         }
         if let atlasTextures {
@@ -91,6 +111,7 @@ struct EditorTileSetPaletteTile {
     let reference: TileMapSourceTile
     let image: Image
     let sourceName: String
+    var occlusion: TileOcclusionOverride?
 }
 
 enum EditorTileSetPalette {
@@ -124,10 +145,18 @@ enum EditorTileSetPalette {
                         sliced.setPixel(in: [Float(column), Float(row)], color: image.getPixel(x: x + column, y: y + row))
                     }
                 }
+                let tileData = (tile["ad"] as? [String: Any])?["td"] as? [String: Any] ?? [:]
+                var occlusion: TileOcclusionOverride?
+                if let raw = tileData["occ"] {
+                    let points = try YAMLDecoder().decode([Vector2].self, from: Yams.dump(object: raw))
+                    let size = try tileData["occSize"].map { try YAMLDecoder().decode(Size.self, from: Yams.dump(object: $0)) }
+                    occlusion = try .polygon(points, referenceSize: size)
+                }
                 palette.append(EditorTileSetPaletteTile(
                     reference: TileMapSourceTile(sourceID: sourceID, atlasCoordinates: coordinates),
                     image: sliced,
-                    sourceName: data["name"] as? String ?? "Source \(sourceID)"
+                    sourceName: data["name"] as? String ?? "Source \(sourceID)",
+                    occlusion: occlusion
                 ))
             }
         }

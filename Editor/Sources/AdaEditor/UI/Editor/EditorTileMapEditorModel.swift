@@ -2,7 +2,7 @@
 import Foundation
 import Observation
 
-private struct TileMapCoordinate: Hashable {
+struct TileMapCoordinate: Hashable {
     let x: Int
     let y: Int
 }
@@ -27,6 +27,7 @@ final class EditorTileMapEditorModel {
         case paint = "Paint"
         case erase = "Erase"
         case pan = "Pan"
+        case select = "Select"
     }
 
     private(set) var map = EditorTileMapResource(atlasColors: [], cells: [])
@@ -37,6 +38,10 @@ final class EditorTileMapEditorModel {
     var newColorHex = "FFFFFF"
     var zoom: Float = 1
     var showGrid = true
+    private(set) var selectedCell: TileMapCoordinate?
+    private(set) var occlusionMode = "Inherit"
+    let occlusionDraft = EditorTilePolygonModel()
+    @ObservationIgnored private var linkedOcclusion: [TileOcclusionOverride?] = []
     private(set) var panOffset = Point.zero
     private(set) var revision = 0
     private(set) var paletteRevision = 0
@@ -101,6 +106,10 @@ final class EditorTileMapEditorModel {
             paletteRevision += 1
             revision += 1
             status = "\(map.cellCount) cells"
+            if let selectedCell {
+                let rect = tileRect(atX: selectedCell.x, y: selectedCell.y, in: viewportSize)
+                selectCell(at: Point(rect.midX, rect.midY), in: viewportSize)
+            }
         } catch { status = error.localizedDescription }
     }
 
@@ -176,6 +185,7 @@ final class EditorTileMapEditorModel {
         endStroke()
         guard layers.indices.contains(index) else { return }
         selectedLayer = index
+        selectedCell = nil
     }
 
     func addLayer() {
@@ -186,6 +196,7 @@ final class EditorTileMapEditorModel {
         while layers.contains(where: { $0.name == "Layer \(suffix)" }) { suffix += 1 }
         layers.append(.init(name: "Layer \(suffix)", zIndex: layers.count, isEnabled: true, cells: []))
         updated.cells = []
+        updated.cellOcclusion = nil
         updated.paletteLayers = layers
         guard save(updated) else { return }
         selectedLayer = layers.count - 1
@@ -202,6 +213,7 @@ final class EditorTileMapEditorModel {
         for index in layers.indices { layers[index].zIndex = index }
         updated.paletteLayers = layers
         updated.cells = []
+        updated.cellOcclusion = nil
         guard save(updated) else { return }
         selectedLayer = min(selectedLayer, layers.count - 1)
         reload()
@@ -218,6 +230,7 @@ final class EditorTileMapEditorModel {
         for index in layers.indices { layers[index].zIndex = index }
         updated.paletteLayers = layers
         updated.cells = []
+        updated.cellOcclusion = nil
         guard save(updated) else { return }
         selectedLayer = destination
         reload()
@@ -231,6 +244,7 @@ final class EditorTileMapEditorModel {
         layers[selectedLayer].isEnabled.toggle()
         updated.paletteLayers = layers
         updated.cells = []
+        updated.cellOcclusion = nil
         guard save(updated) else { return }
         reload()
     }
@@ -245,6 +259,7 @@ final class EditorTileMapEditorModel {
         layers[selectedLayer].name = trimmed
         updated.paletteLayers = layers
         updated.cells = []
+        updated.cellOcclusion = nil
         guard save(updated) else { return }
         reload()
     }
@@ -287,11 +302,13 @@ final class EditorTileMapEditorModel {
 
     func paint(at location: Point, in viewport: Size) {
         guard tool != .pan else { return }
+        if tool == .select { selectCell(at: location, in: viewport); return }
         applyStroke(at: location, in: viewport, erasing: tool == .erase)
     }
 
     /// Erase with the secondary mouse button without changing the selected paint tool.
     func erase(at location: Point, in viewport: Size) {
+        guard tool != .select else { return }
         applyStroke(at: location, in: viewport, erasing: true)
     }
 
@@ -320,15 +337,79 @@ final class EditorTileMapEditorModel {
         guard strokeChanged else { return }
         strokeChanged = false
         var updated = map
+        let previousCells = Dictionary(layers[selectedLayer].cells.compactMap { cell -> (TileMapCoordinate, [Int])? in
+            guard cell.count >= 3 else { return nil }
+            return (TileMapCoordinate(x: cell[0], y: cell[1]), cell)
+        }, uniquingKeysWith: { _, last in last })
         let cells = paintedCells[selectedLayer].sorted {
             $0.key.y == $1.key.y ? $0.key.x < $1.key.x : $0.key.y < $1.key.y
-        }.map { [$0.key.x, $0.key.y, $0.value] }
+        }.map { cell -> [Int] in
+            let old = previousCells[cell.key]
+            return old?.dropFirst(2).first == cell.value ? (old ?? []) : [cell.key.x, cell.key.y, cell.value]
+        }
+        let records = layers[selectedLayer].cellOcclusion?.filter { paintedCells[selectedLayer][TileMapCoordinate(x: $0.position.x, y: $0.position.y)] != nil }
         if updated.paletteLayers == nil {
             updated.cells = cells
+            updated.cellOcclusion = records
         } else {
             updated.paletteLayers?[selectedLayer].cells = cells
+            updated.paletteLayers?[selectedLayer].cellOcclusion = records
         }
         save(updated)
+        if let selectedCell, paintedCells[selectedLayer][selectedCell] == nil { self.selectedCell = nil }
+    }
+
+    func selectCell(at location: Point, in viewport: Size) {
+        let coordinate = cell(at: location, in: viewport)
+        let selected = TileMapCoordinate(x: coordinate.x, y: coordinate.y)
+        guard paintedCells.indices.contains(selectedLayer), let palette = paintedCells[selectedLayer][selected] else {
+            selectedCell = nil
+            return
+        }
+        selectedCell = selected
+        let override = layers[selectedLayer].cellOcclusion?.first { $0.position == PointInt(x: selected.x, y: selected.y) }?.occlusion
+        occlusionMode = override.map { $0.mode == .disabled ? "Disabled" : "Custom" } ?? "Inherit"
+        let linkedIndex = palette - legacyPaletteCount
+        let inherited = linkedOcclusion.indices.contains(linkedIndex) ? linkedOcclusion[linkedIndex] : nil
+        let shape = override?.mode == .polygon ? override : inherited
+        let size = shape?.referenceSize ?? displayTileSize
+        occlusionDraft.load(points: shape?.points ?? [], size: size, texture: texture(at: palette))
+        revision += 1
+    }
+
+    func setOcclusionMode(_ mode: String) {
+        guard selectedCell != nil else { return }
+        occlusionMode = mode
+        if mode == "Custom" {
+            if occlusionDraft.points.isEmpty { occlusionDraft.rectangle() }
+        } else {
+            applyCellOcclusion()
+        }
+    }
+
+    func applyCellOcclusion() {
+        guard let cell = selectedCell, layers.indices.contains(selectedLayer), paintedCells[selectedLayer][cell] != nil else {
+            return
+        }
+        do {
+            let override: TileOcclusionOverride?
+            switch occlusionMode {
+            case "Disabled": override = .disabled
+            case "Custom": override = try .polygon(occlusionDraft.points, referenceSize: occlusionDraft.referenceSize)
+            default: override = nil
+            }
+            var updated = map
+            var records = layers[selectedLayer].cellOcclusion ?? []
+            let position = PointInt(x: cell.x, y: cell.y)
+            records.removeAll { $0.position == position }
+            if let override { records.append(TileMapCellOcclusion(position: position, occlusion: override)) }
+            if updated.paletteLayers == nil { updated.cellOcclusion = records.isEmpty ? nil : records }
+            else { updated.paletteLayers?[selectedLayer].cellOcclusion = records.isEmpty ? nil : records }
+            guard save(updated) else { return }
+            // Reload the selected shape without rebuilding palette textures.
+            let rect = tileRect(atX: cell.x, y: cell.y, in: viewportSize)
+            selectCell(at: Point(rect.midX, rect.midY), in: viewportSize)
+        } catch { status = "Use a simple polygon with at least three distinct points and no crossing edges." }
     }
 
     func pan(by translation: Size) {
@@ -449,6 +530,7 @@ final class EditorTileMapEditorModel {
         linkedImages = Array(repeating: nil, count: tiles.count)
         linkedTextures = Array(repeating: nil, count: tiles.count)
         linkedNames = Array(repeating: "Tile Source", count: tiles.count)
+        linkedOcclusion = Array(repeating: nil, count: tiles.count)
         guard let tileSetURL = linkedTileSetURL() else {
             tileSetStatus = map.tileSetReference == nil ? "Link a Tile Source to add authored textures." : "Linked Tile Source is unavailable."
             return
@@ -461,6 +543,7 @@ final class EditorTileMapEditorModel {
                 linkedImages[index] = entry.image
                 linkedTextures[index] = Texture2D(image: entry.image)
                 linkedNames[index] = entry.sourceName
+                linkedOcclusion[index] = entry.occlusion
             }
             let missing = linkedImages.filter { $0 == nil }.count
             tileSetStatus = missing == 0
@@ -608,9 +691,17 @@ final class EditorTileMapEditorModel {
                 return result
             }
         }
+        func retainOcclusion(_ records: [TileMapCellOcclusion]?, in cells: [[Int]]) -> [TileMapCellOcclusion]? {
+            let coordinates = Set(cells.filter { $0.count >= 3 }.map { TileMapCoordinate(x: $0[0], y: $0[1]) })
+            return records?.filter { coordinates.contains(TileMapCoordinate(x: $0.position.x, y: $0.position.y)) }
+        }
         updated.cells = remap(updated.cells)
+        updated.cellOcclusion = retainOcclusion(updated.cellOcclusion, in: updated.cells)
         if var layers = updated.paletteLayers {
-            for index in layers.indices { layers[index].cells = remap(layers[index].cells) }
+            for index in layers.indices {
+                layers[index].cells = remap(layers[index].cells)
+                layers[index].cellOcclusion = retainOcclusion(layers[index].cellOcclusion, in: layers[index].cells)
+            }
             updated.paletteLayers = layers
         }
         guard save(updated) else { return }

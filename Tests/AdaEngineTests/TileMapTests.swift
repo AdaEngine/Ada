@@ -96,6 +96,8 @@ struct TileMapTests {
         #expect(world.getEntities().count == 1)
         #expect(owner.children.isEmpty)
         #expect(owner.components[TileMapComponent.self]?.renderedAtlasTiles[layer.id]?.count == 2)
+        // Keep explicit coverage of the reference per-tile sprite extraction path.
+        owner.components[TileMapComponent.self]?.renderMode = .sprites
 
         let renderWorld = World(name: "TileMapRenderWorld")
         renderWorld.addSchedulers(.extract, .preUpdate, .batching, .update)

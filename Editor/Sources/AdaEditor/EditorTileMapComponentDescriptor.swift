@@ -1,4 +1,5 @@
 @_spi(AdaEngine) import AdaEngine
+import Foundation
 
 extension EditorComponentRegistry {
     static let tileMapDescriptor = EditorComponentDescriptor(
@@ -119,6 +120,19 @@ extension EditorComponentRegistry {
                 try tileMap.installTileSetPalette(
                     linkedSet, palette: palette, cells: cells, firstPaletteIndex: legacyCount, cellsByLayer: cellsByLayer
                 )
+            }
+            func installOcclusion(_ value: EditorSceneValue?, on index: Int) throws {
+                guard let value else {
+                    return
+                }
+                let records = try JSONDecoder().decode([TileMapCellOcclusion].self, from: JSONEncoder().encode(value))
+                tileMap.installCellOcclusion(records, on: index)
+            }
+            try installOcclusion(payload["cellOcclusion"], on: 0)
+            if case let .array(values) = payload["paletteLayers"] {
+                for (index, value) in values.enumerated() {
+                    if case let .object(fields) = value { try installOcclusion(fields["cellOcclusion"], on: index) }
+                }
             }
             return TileMapComponent(
                 tileMap: tileMap,

@@ -26,6 +26,11 @@ public struct ExtractedLight2DInstance: Sendable {
 public struct ExtractedOccluder2DInstance: Sendable {
     public var worldPointsCCW: [Vector2]
     public var isEnabled: Bool
+
+    public init(worldPointsCCW: [Vector2], isEnabled: Bool = true) {
+        self.worldPointsCCW = worldPointsCCW
+        self.isEnabled = isEnabled
+    }
 }
 
 /// Data extracted from the main world for 2D lighting each frame.

@@ -272,6 +272,17 @@ struct EditorTileSourceAssetEditor: View {
                     model.verticalAnimation.toggle()
                 }
                 action("Apply animation", id: "ApplyAnimation") { model.applyAnimation() }
+                heading("Light occlusion")
+                Text("Drag points; click an edge to add a point. Clear removes the shadow shape.")
+                    .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+                EditorTilePolygonEditor(model: model.occlusionDraft, identifier: "AdaEditor.TileSourceEditor.Occlusion.Canvas")
+                HStack(spacing: 5) {
+                    action("Rectangle", id: "Occlusion.Rectangle") { model.occlusionDraft.rectangle() }
+                    action("Clear", id: "Occlusion.Clear") { model.occlusionDraft.clear() }
+                    action("Remove point", id: "Occlusion.RemovePoint") { model.occlusionDraft.removeSelected() }
+                        .disabled(model.occlusionDraft.selectedVertex == nil)
+                }
+                action("Apply occlusion", id: "Occlusion.Apply") { model.applyOcclusion() }
             }
         } else {
             Text("Select a cell in the image")

@@ -19,6 +19,9 @@ public struct TileMapComponent {
 
     /// The size to use for each tile
     public var tileDisplaySize: Size
+    /// Cached geometry for static atlas cells, or the per-tile sprite reference path.
+    /// Animated/entity cells retain sprite/entity behavior in either mode.
+    public var renderMode: TileMapRenderMode = .chunks
 
     /// Contains information about entities
     ///
@@ -36,9 +39,14 @@ public struct TileMapComponent {
 
     /// The tile display size used for this component's last render.
     internal var lastRenderedTileDisplaySize: Size?
+    internal var lastRenderedRenderMode: TileMapRenderMode?
+    internal var lastRenderedLayerFullRevisions: [TileMapLayer.ID: UInt64] = [:]
+    internal var renderedChunks: [TileMapLayer.ID: [TileMapChunkCoordinate: TileMapRenderedChunk]] = [:]
 
     /// Static atlas tiles extracted directly into the render world without child ECS entities.
-    internal var renderedAtlasTiles: [TileMapLayer.ID: [TileMapRenderedAtlasTile]] = [:]
+    internal var renderedAtlasTiles: [TileMapLayer.ID: [TileMapRenderedAtlasTile]] {
+        renderedChunks.mapValues { $0.values.flatMap { $0.atlasTiles + $0.dynamicTiles } }
+    }
 
     public init(tileMap: TileMap, tileDisplaySize: Size) {
         self.tileMap = tileMap

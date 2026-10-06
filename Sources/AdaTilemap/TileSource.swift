@@ -78,11 +78,13 @@ struct TileData: Codable {
         case flipH = "f_h"
         case flipV = "f_v"
         case occluderPolygon = "occ"
+        case occluderReferenceSize = "occSize"
     }
 
     var modulateColor = Color(1.0, 1.0, 1.0, 1.0)
     var flipH: Bool = false
     var flipV: Bool = false
-    /// Optional CCW polygon in tile **local** space for ``LightOccluder2D`` when the tile is spawned.
+    /// Optional polygon in centered tile space; atlas tiles cache it in chunk occlusion geometry.
     var occluderPolygon: [Vector2]?
+    var occluderReferenceSize: Size?
 }

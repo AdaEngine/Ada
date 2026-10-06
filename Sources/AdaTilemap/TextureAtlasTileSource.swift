@@ -215,6 +215,24 @@ public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
         return tiles[atlasCoordinates]?.tileData ?? TileData()
     }
 
+    /// Sets a simple shadow polygon for every placement of an atlas tile. Nil removes it.
+    /// Points are centered, with positive Y up. Supply the authored cell size to scale with display size.
+    public func setOccluderPolygon(_ points: [Vector2]?, at coordinates: PointInt, referenceSize: Size? = nil) throws {
+        if let points { try TileOcclusionPolygon.validate(points, referenceSize: referenceSize) }
+        guard let tile = tiles[coordinates] else {
+            return
+        }
+        guard tile.tileData.occluderPolygon != points || tile.tileData.occluderReferenceSize != referenceSize else {
+            return
+        }
+        tile.tileData.occluderPolygon = points
+        tile.tileData.occluderReferenceSize = points == nil ? nil : referenceSize
+        setNeedsUpdate()
+    }
+
+    /// Returns the authored polygon, before cell orientation or display-size scaling.
+    public func occluderPolygon(at coordinates: PointInt) -> [Vector2]? { tiles[coordinates]?.tileData.occluderPolygon }
+
     // Animation
 }
 
@@ -242,7 +260,7 @@ extension TextureAtlasTileSource {
         public var animationColumnsAlignment: Alignment = .horizontal
 
         /// The tile data of the atlas tile data.
-        internal private(set) var tileData: TileData
+        internal var tileData: TileData
 
         /// Initialize a new atlas tile data.
         ///

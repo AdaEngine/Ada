@@ -6,13 +6,10 @@
 //
 
 import AdaApp
-import AdaAssets
 import AdaECS
-import AdaPhysics
 import AdaRender
 import AdaSprite
 import AdaTransform
-import Logging
 import Math
 import OrderedCollections
 
@@ -26,50 +23,85 @@ public struct TileMapPlugin: Plugin {
         TileEntityAtlasSource.registerTileSource()
 
         app.addSystem(TileMapSystem.self)
-        app.getSubworldBuilder(by: .renderWorld)?
+        let renderWorld = app.getSubworldBuilder(by: .renderWorld)
+        if let world = renderWorld?.main, world.getResource(ExtractedLighting2D.self) == nil {
+            world.insertResource(ExtractedLighting2D())
+        }
+        renderWorld?
             .insertResource(AdditionalExtractedSprites())
+            .insertResource(ExtractedTileMapChunks())
+            .insertResource(TileMapChunkRenderData())
+            .insertResource(TileMapChunkGPUCache())
+            .initResource(RenderPipelines<TileMapChunkPipeline>.self)
             .addSystem(ExtractTileMapSpritesSystem.self, on: .extract)
+            .addSystem(ExtractLighting2DSystem.self, on: .extract)
+            .addSystem(ExtractTileMapOccludersSystem.self, on: .extract)
+            .addSystem(PrepareTileMapChunksSystem.self, on: .preUpdate)
     }
 }
 
 @PlainSystem
 struct ExtractTileMapSpritesSystem {
-    @Extract<Query<Entity, TileMapComponent, GlobalTransform>>
+    @Extract<Query<Entity, TileMapComponent, GlobalTransform, Visibility>>
     private var tileMaps
+
+    @Extract<Query<Entity, NoFrustumCulling>> private var unculled
 
     @ResMut<AdditionalExtractedSprites>
     private var extractedSprites
+    @ResMut<ExtractedTileMapChunks> private var extractedChunks
 
-    init(world _: World) {}
+    init(world: World) {
+        if world.getResource(ExtractedTileMapChunks.self) == nil {
+            world.insertResource(ExtractedTileMapChunks())
+        }
+    }
 
     func update(context _: UpdateContext) {
         extractedSprites.sprites.removeAll(keepingCapacity: true)
+        extractedChunks.chunks.removeAll(keepingCapacity: true)
         var renderID = Int.min
+        var unculledIDs: Set<Entity.ID> = []
+        unculled.wrappedValue.forEach { entity, _ in unculledIDs.insert(entity.id) }
 
-        tileMaps.wrappedValue.forEach { entity, component, globalTransform in
-            if case .some(.hidden) = entity.components[Visibility.self] {
+        tileMaps.wrappedValue.forEach { entity, component, globalTransform, visibility in
+            if visibility == .hidden {
                 return
             }
 
             for layer in component.tileMap.layers {
-                guard layer.isEnabled, let tiles = component.renderedAtlasTiles[layer.id] else {
+                guard layer.isEnabled, let chunks = component.renderedChunks[layer.id] else {
                     continue
                 }
 
-                for tile in tiles {
-                    let entityID = renderID
-                    renderID &+= 1
-                    extractedSprites.sprites[entityID] = ExtractedSprite(
-                        entityId: entityID,
-                        texture: tile.texture,
-                        size: component.tileDisplaySize,
-                        flipX: false,
-                        flipY: false,
-                        tintColor: tile.tintColor,
-                        transform: tile.transform,
-                        worldTransform: globalTransform.matrix * tile.transform.matrix,
-                        visibilityEntityId: entity.id
-                    )
+                // A tilted XY plane gives individual cells different world-Z painter keys.
+                // Retain the per-tile reference path rather than grouping those keys into one chunk.
+                let useChunks = component.renderMode == .chunks && globalTransform.matrix.x.z == 0 && globalTransform.matrix.y.z == 0
+                for chunk in chunks.values {
+                    if useChunks, !chunk.atlasTiles.isEmpty {
+                        extractedChunks.chunks.append(ExtractedTileMapChunk(
+                            ownerID: entity.id,
+                            chunk: chunk,
+                            model: globalTransform.matrix,
+                            ignoresFrustum: unculledIDs.contains(entity.id)
+                        ))
+                    }
+                    let tiles = useChunks ? chunk.dynamicTiles : chunk.atlasTiles + chunk.dynamicTiles
+                    for tile in tiles {
+                        let entityID = renderID
+                        renderID &+= 1
+                        extractedSprites.sprites[entityID] = ExtractedSprite(
+                            entityId: entityID,
+                            texture: tile.texture,
+                            size: component.tileDisplaySize,
+                            flipX: false,
+                            flipY: false,
+                            tintColor: tile.tintColor,
+                            transform: tile.transform,
+                            worldTransform: globalTransform.matrix * tile.transform.matrix,
+                            visibilityEntityId: entity.id
+                        )
+                    }
                 }
             }
         }
@@ -78,13 +110,8 @@ struct ExtractTileMapSpritesSystem {
 
 @PlainSystem
 public struct TileMapSystem: Sendable {
-    private let logger = Logger(label: "org.adaengine.tilemap")
-
     @Query<Entity, Ref<TileMapComponent>, Transform, Ref<BoundingComponent>>
     private var tileMap
-
-    @Res<Physics2DWorldHolder?>
-    private var physicsWorld
 
     @Commands
     private var commands
@@ -92,16 +119,17 @@ public struct TileMapSystem: Sendable {
     public init(world _: World) {}
 
     public func update(context _: UpdateContext) {
-        tileMap.forEach { entity, tileMapComponent, transform, bounds in
+        tileMap.forEach { entity, tileMapComponent, _, bounds in
             let tileMap = tileMapComponent.tileMap
 
             let displaySizeChanged = tileMapComponent.lastRenderedTileDisplaySize != tileMapComponent.tileDisplaySize
+            let renderModeChanged = tileMapComponent.lastRenderedRenderMode != tileMapComponent.renderMode
             let mapIdentityChanged = tileMapComponent.lastRenderedTileMapID != ObjectIdentifier(tileMap)
             let mapRevisionChanged = tileMapComponent.lastRenderedTileMapRevision != tileMap.updateRevision
             let layerRevisionChanged = tileMap.layers.contains {
                 tileMapComponent.lastRenderedLayerRevisions[$0.id] != $0.updateRevision
             }
-            guard tileMap.needsUpdate || displaySizeChanged || mapIdentityChanged || mapRevisionChanged || layerRevisionChanged else {
+            guard tileMap.needsUpdate || displaySizeChanged || renderModeChanged || mapIdentityChanged || mapRevisionChanged || layerRevisionChanged else {
                 return
             }
 
@@ -110,8 +138,9 @@ public struct TileMapSystem: Sendable {
                     self.removeTileRoot(rootID)
                 }
                 tileMapComponent.tileLayers.removeAll()
-                tileMapComponent.renderedAtlasTiles.removeAll()
+                tileMapComponent.renderedChunks.removeAll()
                 tileMapComponent.lastRenderedLayerRevisions.removeAll()
+                tileMapComponent.lastRenderedLayerFullRevisions.removeAll()
             }
 
             let layerIDs = Set(tileMap.layers.map(\.id))
@@ -119,61 +148,49 @@ public struct TileMapSystem: Sendable {
             for (layerID, rootID) in removedLayers {
                 self.removeTileRoot(rootID)
                 tileMapComponent.tileLayers[layerID] = nil
-                tileMapComponent.renderedAtlasTiles[layerID] = nil
+                tileMapComponent.renderedChunks[layerID] = nil
                 tileMapComponent.lastRenderedLayerRevisions[layerID] = nil
+                tileMapComponent.lastRenderedLayerFullRevisions[layerID] = nil
             }
-            for layerID in tileMapComponent.renderedAtlasTiles.keys where !layerIDs.contains(layerID) {
-                tileMapComponent.renderedAtlasTiles[layerID] = nil
+            for layerID in tileMapComponent.renderedChunks.keys where !layerIDs.contains(layerID) {
+                tileMapComponent.renderedChunks[layerID] = nil
+                tileMapComponent.lastRenderedLayerRevisions[layerID] = nil
+                tileMapComponent.lastRenderedLayerFullRevisions[layerID] = nil
             }
 
             for layer in tileMap.layers {
-                self.addTiles(
+                self.updateChunks(
                     for: layer,
                     tileMapComponent: tileMapComponent,
-                    transform: transform,
                     entity: entity,
                     forceUpdate: displaySizeChanged
                         || mapIdentityChanged
                         || mapRevisionChanged
-                        || tileMapComponent.lastRenderedLayerRevisions[layer.id] != layer.updateRevision
+                        || tileMapComponent.lastRenderedLayerFullRevisions[layer.id] != layer.fullUpdateRevision
                 )
                 tileMapComponent.lastRenderedLayerRevisions[layer.id] = layer.updateRevision
+                tileMapComponent.lastRenderedLayerFullRevisions[layer.id] = layer.fullUpdateRevision
             }
             tileMap.updateDidFinish()
             tileMapComponent.lastRenderedTileMapID = ObjectIdentifier(tileMap)
             tileMapComponent.lastRenderedTileMapRevision = tileMap.updateRevision
             tileMapComponent.lastRenderedTileDisplaySize = tileMapComponent.tileDisplaySize
-            bounds.bounds = .aabb(Self.bounds(for: tileMap, tileSize: tileMapComponent.tileDisplaySize))
+            tileMapComponent.lastRenderedRenderMode = tileMapComponent.renderMode
+            bounds.bounds = .aabb(Self.bounds(for: tileMapComponent.renderedChunks))
         }
     }
 
-    private static func bounds(for tileMap: TileMap, tileSize: Size) -> AABB {
-        guard let firstCell = tileMap.layers.lazy.compactMap({ layer in
-            layer.tileCells.keys.first.map { (layer, $0) }
-        }).first else {
-            return .empty
-        }
-
-        let halfWidth = tileSize.width * 0.5
-        let halfHeight = tileSize.height * 0.5
-        let firstCenter = Vector3(
-            Float(firstCell.1.x) * tileSize.width,
-            Float(firstCell.1.y) * tileSize.height,
-            Float(firstCell.0.zIndex)
-        )
-        var minimum = firstCenter - Vector3(halfWidth, halfHeight, 0)
-        var maximum = firstCenter + Vector3(halfWidth, halfHeight, 0)
-
-        for layer in tileMap.layers {
-            for position in layer.tileCells.keys {
-                let center = Vector3(
-                    Float(position.x) * tileSize.width,
-                    Float(position.y) * tileSize.height,
-                    Float(layer.zIndex)
-                )
-                minimum = min(minimum, center - Vector3(halfWidth, halfHeight, 0))
-                maximum = max(maximum, center + Vector3(halfWidth, halfHeight, 0))
+    private static func bounds(for layers: [TileMapLayer.ID: [TileMapChunkCoordinate: TileMapRenderedChunk]]) -> AABB {
+        var minimum: Vector3?
+        var maximum: Vector3?
+        for chunks in layers.values {
+            for chunk in chunks.values where !chunk.bounds.isEmpty {
+                minimum = minimum.map { min($0, chunk.bounds.min) } ?? chunk.bounds.min
+                maximum = maximum.map { max($0, chunk.bounds.max) } ?? chunk.bounds.max
             }
+        }
+        guard let minimum, let maximum else {
+            return .empty
         }
         return AABB(min: minimum, max: maximum)
     }
@@ -185,130 +202,109 @@ public struct TileMapSystem: Sendable {
         commands.entity(entityID).removeFromWorld(recursively: true)
     }
 
-    private func addTiles(
+    private func updateChunks(
         for layer: TileMapLayer,
         tileMapComponent: Ref<TileMapComponent>,
-        transform _: Transform,
         entity: Entity,
         forceUpdate: Bool
     ) {
-        let tileSize = tileMapComponent.wrappedValue.tileDisplaySize
-        guard let tileSet = layer.tileSet else {
-            logger.error(
-                "TileSet not found for tiles",
-                metadata: [
-                    "layer": .string(layer.id.description)
-                ]
-            )
+        guard forceUpdate || tileMapComponent.lastRenderedLayerRevisions[layer.id] != layer.updateRevision else {
             return
         }
-
-        if layer.needUpdates || forceUpdate {
-            if let rootID = tileMapComponent.tileLayers[layer.id] {
-                self.removeTileRoot(rootID)
-                tileMapComponent.tileLayers[layer.id] = nil
-            }
-
-            var atlasTiles: [TileMapRenderedAtlasTile] = []
-            var entityTiles: [Entity] = []
-
-            for (position, tile) in layer.tileCells {
-                guard let source = tileSet.sources[tile.sourceId] else {
-                    logger.critical(
-                        "TileSource not found for id: \(tile.sourceId)",
-                        metadata: [
-                            "layer": .string(layer.id.description),
-                            "tileSourceId": .string(tile.sourceId.description),
-                        ]
-                    )
-                    continue
-                }
-
-                let tileData = source.getTileData(at: tile.atlasCoordinates)
-                let position = Vector3(
-                    x: Float(position.x) * tileSize.width,
-                    y: Float(position.y) * tileSize.height,
-                    z: Float(layer.zIndex)
-                )
-                let tileTransform = tile.orientation.transform(at: position, tileSize: tileSize)
-
-                let tileEntity: Entity
-                switch source {
-                case let atlasSource as TextureAtlasTileSource:
-                    let texture = atlasSource.getTexture(at: tile.atlasCoordinates)
-                    if let ring = tileData.occluderPolygon, ring.count >= 3 {
-                        tileEntity = Entity {
-                            Sprite(
-                                texture: AssetHandle(texture),
-                                tintColor: tileData.modulateColor,
-                                size: tileSize
-                            )
-                            tileTransform
-                            LightOccluder2D(points: ring)
-                        }
-                    } else {
-                        atlasTiles.append(
-                            TileMapRenderedAtlasTile(
-                                texture: texture,
-                                tintColor: tileData.modulateColor,
-                                transform: tileTransform
-                            )
-                        )
-                        continue
-                    }
-                case let entitySource as TileEntityAtlasSource:
-                    tileEntity = entitySource.getEntity(at: tile.atlasCoordinates)
-                    tileEntity.components += tileTransform
-                    tileEntity.components[Sprite.self]?.size = tileSize
-                    if let ring = tileData.occluderPolygon, ring.count >= 3 {
-                        tileEntity.components += LightOccluder2D(points: ring)
-                    }
-                default:
-                    logger.warning("TileSource isn't supported for id: \(tile.sourceId)")
-                    continue
-                }
-
-                tileEntity.isActive = layer.isEnabled
-                entityTiles.append(tileEntity)
-            }
-
-            tileMapComponent.renderedAtlasTiles[layer.id] = atlasTiles
-
-            if !entityTiles.isEmpty {
-                let tileParent = Entity(name: "TileRoot<\((layer.id, layer.name))>") {
-                    RelationshipComponent()
-                    Transform()
-                }
-                tileParent.isActive = layer.isEnabled
-                _ = commands.insertEntity(tileParent)
-                let tileParentID = tileParent.id
-                let ownerID = entity.id
-                commands.queue.push { world in
-                    guard
-                        let owner = world.getEntityByID(ownerID),
-                        let parent = world.getEntityByID(tileParentID)
-                    else {
-                        return
-                    }
-                    owner.addChild(parent)
-                }
-
-                for tileEntity in entityTiles {
-                    _ = commands.insertEntity(tileEntity)
-                    let tileEntityID = tileEntity.id
-                    commands.queue.push { world in
-                        guard
-                            let parent = world.getEntityByID(tileParentID),
-                            let child = world.getEntityByID(tileEntityID)
-                        else {
-                            return
-                        }
-                        parent.addChild(child)
-                    }
-                }
-                tileMapComponent.tileLayers[layer.id] = tileParentID
-            }
-            layer.updateDidFinish()
+        var chunks = tileMapComponent.renderedChunks[layer.id] ?? [:]
+        var rebuildEntities = forceUpdate
+        for coordinate in Array(chunks.keys) where layer.chunkCells[coordinate] == nil {
+            rebuildEntities = rebuildEntities || chunks[coordinate]?.entityCells.isEmpty == false
+            chunks[coordinate] = nil
         }
+        for (coordinate, cells) in layer.chunkCells {
+            let revision = layer.chunkRevisions[coordinate] ?? layer.updateRevision
+            guard forceUpdate || chunks[coordinate]?.revision != revision else {
+                continue
+            }
+            rebuildEntities = rebuildEntities || chunks[coordinate]?.entityCells.isEmpty == false
+            let chunk = TileMapChunkBuilder.build(cells: cells, layer: layer, tileSize: tileMapComponent.tileDisplaySize, revision: revision)
+            rebuildEntities = rebuildEntities || !chunk.entityCells.isEmpty
+            chunks[coordinate] = chunk
+        }
+        tileMapComponent.renderedChunks[layer.id] = chunks
+        if rebuildEntities {
+            rebuildEntityTiles(for: layer, chunks: chunks, tileMapComponent: tileMapComponent, entity: entity)
+        }
+        layer.updateDidFinish()
+    }
+
+    private func rebuildEntityTiles(
+        for layer: TileMapLayer,
+        chunks: [TileMapChunkCoordinate: TileMapRenderedChunk],
+        tileMapComponent: Ref<TileMapComponent>,
+        entity: Entity
+    ) {
+        if let rootID = tileMapComponent.tileLayers[layer.id] {
+            removeTileRoot(rootID)
+            tileMapComponent.tileLayers[layer.id] = nil
+        }
+        let tileSize = tileMapComponent.tileDisplaySize
+        var entityTiles: [Entity] = []
+        for chunk in chunks.values {
+            for cell in chunk.entityCells {
+                guard let source = layer.tileSet?.sources[cell.data.sourceId] else {
+                    continue
+                }
+                let data = source.getTileData(at: cell.data.atlasCoordinates)
+                let position = Vector3(Float(cell.position.x) * tileSize.width, Float(cell.position.y) * tileSize.height, Float(layer.zIndex))
+                let transform = cell.data.orientation.transform(at: position, tileSize: tileSize)
+                let tile: Entity
+                if let source = source as? TextureAtlasTileSource {
+                    tile = Entity {
+                        Sprite(texture: source.getTexture(at: cell.data.atlasCoordinates), tintColor: data.modulateColor, size: tileSize)
+                        transform
+                    }
+                } else if let source = source as? TileEntityAtlasSource {
+                    tile = source.getEntity(at: cell.data.atlasCoordinates)
+                    tile.components += transform
+                    tile.components[Sprite.self]?.size = tileSize
+                } else {
+                    continue
+                }
+                if let override = cell.data.occlusion {
+                    if override.mode == .disabled {
+                        tile.components[LightOccluder2D.self] = nil
+                    } else if let ring = override.points {
+                        let scale = override.referenceSize.map { Vector2(tileSize.width / $0.width, tileSize.height / $0.height) } ?? Vector2(1, 1)
+                        tile.components += LightOccluder2D(points: ring.map { $0 * scale })
+                    }
+                } else if let ring = data.occluderPolygon, ring.count >= 3 {
+                    tile.components += LightOccluder2D(points: ring)
+                }
+                tile.isActive = layer.isEnabled
+                entityTiles.append(tile)
+            }
+        }
+        guard !entityTiles.isEmpty else {
+            return
+        }
+        let parent = Entity(name: "TileRoot<\((layer.id, layer.name))>") { RelationshipComponent(); Transform() }
+        parent.isActive = layer.isEnabled
+        _ = commands.insertEntity(parent)
+        let parentID = parent.id
+        let ownerID = entity.id
+        commands.queue.push { world in
+            guard let owner = world.getEntityByID(ownerID), let parent = world.getEntityByID(parentID) else {
+                return
+            }
+            owner.addChild(parent)
+        }
+        for tile in entityTiles {
+            _ = commands.insertEntity(tile)
+            let tileID = tile.id
+            commands.queue.push { world in
+                guard let parent = world.getEntityByID(parentID), let child = world.getEntityByID(tileID) else {
+                    return
+                }
+                parent.addChild(child)
+            }
+        }
+        tileMapComponent.tileLayers[layer.id] = parentID
     }
 }

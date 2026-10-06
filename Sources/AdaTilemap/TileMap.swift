@@ -133,7 +133,12 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
                     atlasCoordinates: tile.atlasPosition,
                     orientation: tile.orientation
                 )
+                newLayer.setCellOcclusion(tile.occlusion, at: tile.position)
             }
+        }
+        installCellOcclusion(fileContent.cellOcclusion ?? [], on: 0)
+        for (index, layer) in paletteLayers.enumerated() {
+            installCellOcclusion(layer.cellOcclusion ?? [], on: index)
         }
         tileSetDidChange()
     }
@@ -151,7 +156,8 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
                     position: position,
                     atlasPosition: data.atlasCoordinates,
                     sourceId: data.sourceId,
-                    orientation: data.orientation
+                    orientation: data.orientation,
+                    occlusion: data.occlusion
                 )
             }
 
@@ -201,6 +207,14 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
                 )
             }
         }
+    }
+
+    /// Applies portable overrides to existing cells of a palette layer. Missing cells are ignored.
+    public func installCellOcclusion(_ records: [TileMapCellOcclusion], on layerIndex: Int) {
+        guard layers.indices.contains(layerIndex) else {
+            return
+        }
+        for record in records { layers[layerIndex].setCellOcclusion(record.occlusion, at: record.position) }
     }
 
     /// Append palette tiles from an authored tile set while preserving the tile set asset itself.
@@ -379,6 +393,7 @@ extension TileMap {
             let zIndex: Int
             let isEnabled: Bool
             let cells: [[Int]]
+            var cellOcclusion: [TileMapCellOcclusion]?
         }
         struct Layer: Codable {
             let name: String
@@ -392,18 +407,21 @@ extension TileMap {
                 case atlasPosition = "ap"
                 case sourceId = "sid"
                 case orientation
+                case occlusion
             }
 
             let position: PointInt
             let atlasPosition: PointInt
             let sourceId: TileSource.ID
             let orientation: TileOrientation
+            let occlusion: TileOcclusionOverride?
 
-            init(position: PointInt, atlasPosition: PointInt, sourceId: TileSource.ID, orientation: TileOrientation = .identity) {
+            init(position: PointInt, atlasPosition: PointInt, sourceId: TileSource.ID, orientation: TileOrientation = .identity, occlusion: TileOcclusionOverride? = nil) {
                 self.position = position
                 self.atlasPosition = atlasPosition
                 self.sourceId = sourceId
                 self.orientation = orientation
+                self.occlusion = occlusion
             }
 
             init(from decoder: any Decoder) throws {
@@ -412,6 +430,7 @@ extension TileMap {
                 self.atlasPosition = try PointInt(container.decode([Int].self, forKey: Self.CodingKeys.atlasPosition))
                 self.sourceId = try container.decode(TileSource.ID.self, forKey: Self.CodingKeys.sourceId)
                 self.orientation = try container.decodeIfPresent(TileOrientation.self, forKey: .orientation) ?? .identity
+                self.occlusion = try container.decodeIfPresent(TileOcclusionOverride.self, forKey: .occlusion)
             }
 
             func encode(to encoder: any Encoder) throws {
@@ -419,6 +438,7 @@ extension TileMap {
                 try container.encode(self.sourceId, forKey: .sourceId)
                 try container.encode([position.x, position.y], forKey: .position)
                 try container.encode([atlasPosition.x, atlasPosition.y], forKey: .atlasPosition)
+                try container.encodeIfPresent(occlusion, forKey: .occlusion)
                 if orientation != .identity {
                     try container.encode(orientation, forKey: .orientation)
                 }
@@ -433,5 +453,6 @@ extension TileMap {
         let tileSetTiles: [TileMapSourceTile]?
         let cells: [[Int]]?
         let paletteLayers: [PaletteLayer]?
+        var cellOcclusion: [TileMapCellOcclusion]?
     }
 }

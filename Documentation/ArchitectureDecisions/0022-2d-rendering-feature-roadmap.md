@@ -95,7 +95,7 @@ Bevy examples or ecosystem plugins are not evidence of built-in engines.
 - [x] Visible sprite/tile reference scene and recorded backend validation (offscreen Metal).
 - [ ] Editor controls, resource round trips and AdaScript authoring exposure.
 - [x] Runtime picking and editor integration (native Swift and viewport event path).
-- [ ] Chunked tile-map rendering with realistic performance evidence.
+- [x] Chunked tile-map rendering with realistic performance evidence (debug/headless CPU preparation; Metal/native WGPU pixels).
 - [ ] Sprite instancing with ordering and backend coverage.
 - [ ] Alpha phases, sprite material convenience and UV transforms.
 - [ ] Pixel-perfect presentation preset.
@@ -281,6 +281,149 @@ and Tint/Dawn source `e75b7342117dbf775a80a6220f3876a3e4f180a3`. The native
 renderer must run in a fresh process with real GPU access. This verifies native
 WebGPU on macOS; it does not establish WASM/browser, Windows, Linux or Android
 rendering, nor physical-device touch behavior.
+
+### Tile-map chunk implementation
+
+Static atlas cells now use 32x32-cell spatial chunks and cached local GPU
+vertices/indices. `TileMapComponent.renderMode` defaults to `.chunks`; `.sprites`
+retains the production per-tile reference path. This is cached mesh geometry,
+not the one-quad/tile-data-texture design. The choice keeps existing atlases,
+samplers, tile orientations and materials without a new texture-array contract.
+
+Layers maintain a spatial cell index and chunk revision stamps. A cell edit
+rebuilds only its chunk; no-op writes do not invalidate. Structural/source,
+display-size and layer-depth changes fully invalidate the affected owner/layer.
+Shared owners compare their own revisions even after another consumer clears
+the layer's update flag. Empty chunks are removed. Aggregate map bounds use
+cached chunk bounds instead of scanning every cell after a local edit.
+
+Render extraction contributes chunk snapshots instead of one item per static
+tile. Preparation culls each transformed AABB against each camera's frustum,
+honors `NoFrustumCulling` and caches immutable GPU geometry by snapshot identity.
+Steady frames upload only the owner model uniform; static vertex/index upload
+is zero. GPU cache entries retain source identities and prune when snapshots
+disappear. Each draw is scoped to its camera, layer Z and backing texture/sampler.
+
+Animated atlas tiles retain individual sprite extraction. Entity tiles retain
+ECS children and their gameplay components. Atlas occluders use the chunk
+occlusion path described below, keeping their images in atlas geometry. A static edit
+in another chunk does not recreate those children. If the owner's XY plane is
+tilted into Z, extraction uses the sprite reference path to retain per-cell
+world-Z painter ordering. Ordinary sprites still interleave with flat layers;
+non-overlapping cells within a chunk may group by backing texture/sampler.
+
+Validation on 2026-10-06:
+
+- 28 focused chunk/tile/orientation tests passed, including the opt-in large-map
+  benchmark. Coverage includes negative coordinates, dirty/no-op/deleted chunks,
+  shared owners, camera isolation, reflected bounds, entity/animated fallbacks,
+  tilted ordering and layer/sprite interleaving.
+- Metal and native WebGPU reference-scene tests passed. In each backend, chunk
+  and sprite modes produced identical raw pixels, including all eight tile
+  orientations and a reflected two-layer map around an ordinary sprite.
+- The chunked Metal and WebGPU PNGs are byte-identical; the WGPU run reported
+  no validation errors.
+- 377 engine/render/sprite/ECS regression tests in 77 suites passed in the
+  WGPU-enabled configuration. Targeted SwiftLint and whitespace checks passed.
+
+The warmed debug/headless benchmark exercises actual extraction, preparation,
+sorting and sprite buffer construction for 65,536 cells (256x256), with a small
+camera viewport crossing four chunk boundaries. Eight measured frames averaged:
+
+| Path | Render preparation CPU | Render items | Per-frame sprite vertices | Static chunk upload |
+| --- | ---: | ---: | ---: | ---: |
+| Sprites reference | 418.08 ms | 65,536 | 262,144 | n/a |
+| Cached chunks | 0.35 ms | 4 | 0 | 0 bytes |
+
+The reference already batches the uniform atlas into one GPU submission;
+the visible chunk path uses four chunk draws. These measurements establish a
+CPU/preparation reduction in this workload, not GPU timing, display FPS,
+release-build performance or a universal speedup. Editing one cell preserved
+63 of 64 chunk identities. Reproduce with
+`ADAENGINE_TILE_CHUNK_BENCHMARK=1 swift test --filter TileMapChunkTests/largeMapBenchmark`.
+
+![Metal and WebGPU chunk reference](Images/0022-tilemap-chunks.png)
+
+The lower row exercises tile orientations; the green/red square beside the
+alpha picking sample exercises reflected layer/sprite ordering. Browser/WASM,
+physical mobile devices, chunk streaming/eviction budgets and GPU timing remain
+outside this validation. Sprite GPU instancing is a separate open checklist item.
+
+## Tile occlusion authoring and chunk cache
+
+Static wall occlusion is authored as atlas tile data, rather than as one ECS
+entity per painted cell. `TextureAtlasTileSource.setOccluderPolygon(_:at:referenceSize:)`
+validates and updates the definition. The `.tileset` tile's existing `ad.td.occ`
+field stores centered, positive-Y-up points; optional `occSize` stores their
+reference cell dimensions. New editor-authored polygons scale with
+`TileMapComponent.tileDisplaySize`. Legacy polygons without a reference size
+keep their original local-space coordinates. Both polygon windings are accepted;
+self-intersections, degenerate rings, nonfinite coordinates and more than 256
+vertices are rejected by the authoring API.
+
+`TileMapLayer.setCellOcclusion(_:at:)` applies a sparse override on an existing
+cell: nil inherits the tileset, `.disabled` removes occlusion, and `.polygon`
+replaces the shape. Overrides are independent of atlas selection and orientation,
+are retained on cell edits, and are removed when the cell is erased. Native
+source-ID cells encode an optional `occlusion`; editor palette resources encode
+optional `cellOcclusion` records at the single-layer root or inside each
+`paletteLayers` entry. Older files default to inheritance. Editor scene payloads
+and the native scene loader carry these records into Play.
+
+The immutable chunk snapshot contains transformed map-local occlusion rings
+alongside its atlas geometry. Atlas cells with polygons remain in static chunks
+(or the ordinary animation fallback); they no longer create Sprite/occluder
+children. A separate render-world cache retains world-space geometry keyed by
+chunk snapshot identity and owner transform. It is reused across steady frames,
+rebuilt for changed chunks/transforms and pruned for removed, hidden or disabled
+owners/layers. Cell orientations and parent reflection are applied before
+normalizing world winding to CCW. Extraction runs after ordinary light/occluder
+extraction and appends to the same shadow pipeline. Occluders are not camera
+frustum-culled: offscreen walls may cast visible shadows.
+
+Editor workflow:
+
+1. Open `.tileset`, select an authored tile, then use **Light occlusion** in the
+   Inspector. Start with **Rectangle** or **Clear**, drag vertices, click edges
+   to insert points, select/remove a point, then **Apply occlusion**.
+2. Open `.tilemap`, choose **Select**, and click a painted cell on the active
+   layer. In **Light occlusion**, choose **Inherit**, **Disabled**, or **Custom**.
+   Custom shapes use the same visual editor and **Apply occlusion**.
+3. Save/reopen and scene Play use the same persisted definitions and overrides.
+
+Chunk occlusion caches retain independent rings; contour union and elimination
+of internal edges between neighboring wall tiles are separate optimizations.
+Arbitrary gameplay components continue to use entity tiles. This change does not
+add generic component authoring or entity-tile serialization.
+
+Validation on 2026-10-06:
+
+- 385 engine/render/sprite/ECS tests in 78 suites passed in the native WGPU-enabled
+  build. Occlusion coverage includes local/reference-size scaling, both winding
+  orders, invalid rings, chunk reuse, cell exceptions, shared owners, reflected
+  transforms, hidden/disabled layers, removal, plugin setup and palette loading.
+- 31 editor tests in five suites passed, including production pointer-event
+  dragging, Inspector actions, save/reopen, per-cell overrides, layer moves,
+  palette removal, sparse-record cleanup and scene-file loading into runtime.
+  An unapplied tile-size field draft does not alter polygon authoring coordinates.
+- Metal and native WebGPU each passed the existing chunk/sprite reference render
+  and the new real shadow-fin pipeline test. The shadow masks check inherited,
+  disabled and custom polygon cells, GPU completion/readback and reflected
+  geometry. Their PNGs are byte-identical. The WebGPU adapter was Apple M3 Pro
+  using Dawn's Metal backend; no WGPU validation errors were reported.
+- Root/Metal and editor validation used Swift 6.2.4. Native WGPU used Swift 6.3.2,
+  task-owned scratch/cache paths, cached Dawn 147 artifacts and the existing Tint
+  executable. Dependency-resolution changes were validation-only and restored.
+- Targeted SwiftLint for the new files and `git diff --check` passed.
+
+![Metal and WebGPU tile occlusion mask](Images/0022-tile-occlusion-mask.png)
+
+The upper row is the disabled cell (white mask); middle and lower rows cast
+shadows to the right from inherited and custom shapes. This validates the real
+shadow-mask pass, not a browser export or physical-device editor session.
+Editor UI proof uses production AdaUI containers and pointer events; no native
+Studio window was manually exercised. Browser/WASM and physical mobile authoring
+remain outside this validation.
 
 ## References
 

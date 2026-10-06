@@ -36,6 +36,7 @@ final class EditorTileSourceEditorModel {
     @ObservationIgnored private var lastPanPosition: Point?
     @ObservationIgnored private var lastPinchScale: Float?
     var showGrid = true
+    let occlusionDraft = EditorTilePolygonModel()
 
     func setZoom(_ value: Float, around location: Point = .zero, in viewport: Size = .zero) {
         guard value.isFinite, location.x.isFinite, location.y.isFinite else { return }
@@ -312,6 +313,39 @@ final class EditorTileSourceEditorModel {
         frames = String(animation["anim_fr_clm"] as? Int ?? 1)
         duration = String(animation["anim_dur"] as? Double ?? 1)
         verticalAnimation = (animation["anim_alig"] as? Int ?? 1) == 0
+        let data = animation["td"] as? [String: Any] ?? [:]
+        let points = (try? data["occ"].map { try YAMLDecoder().decode([Vector2].self, from: Yams.dump(object: $0)) }) ?? []
+        let authoredSize = try? data["occSize"].map { try YAMLDecoder().decode(Size.self, from: Yams.dump(object: $0)) }
+        let cellSize = root["tileSize"] as? [String: Int] ?? [:]
+        let size = authoredSize ?? Size(width: Float(cellSize["x"] ?? 16), height: Float(cellSize["y"] ?? 16))
+        var texture: Texture2D?
+        if let image, let layout, layout.tileSize.width * layout.tileSize.height <= 1_048_576 {
+            var slice = Image(width: layout.tileSize.width, height: layout.tileSize.height)
+            let x = layout.margin.width + point.x * (layout.tileSize.width + layout.spacing.width)
+            let y = layout.margin.height + point.y * (layout.tileSize.height + layout.spacing.height)
+            for row in 0..<slice.height { for column in 0..<slice.width {
+                slice.setPixel(in: [Float(column), Float(row)], color: image.getPixel(x: x + column, y: y + row))
+            } }
+            texture = Texture2D(image: slice)
+        }
+        occlusionDraft.load(points: points, size: size, texture: texture)
+    }
+
+    func applyOcclusion() {
+        guard canEditSource, let selectedTile,
+              let index = tiles.firstIndex(where: { ($0["xy"] as? [Int]) == [selectedTile.x, selectedTile.y] }) else { return }
+        do {
+            let points = occlusionDraft.points
+            if !points.isEmpty { try TileOcclusionPolygon.validate(points, referenceSize: occlusionDraft.referenceSize) }
+            var updated = tiles
+            var animation = updated[index]["ad"] as? [String: Any] ?? [:]
+            var data = animation["td"] as? [String: Any] ?? [:]
+            data["occ"] = points.isEmpty ? nil : points.map { ["x": $0.x, "y": $0.y] }
+            data["occSize"] = points.isEmpty ? nil : ["width": occlusionDraft.referenceSize.width, "height": occlusionDraft.referenceSize.height]
+            animation["td"] = data
+            updated[index]["ad"] = animation
+            saveTiles(updated)
+        } catch { status = "Use a simple polygon with at least three distinct points and no crossing edges." }
     }
 
     func hasTile(_ point: PointInt) -> Bool { tiles.contains { ($0["xy"] as? [Int]) == [point.x, point.y] } }

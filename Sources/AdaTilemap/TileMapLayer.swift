@@ -31,20 +31,20 @@ public class TileMapLayer: Identifiable, @unchecked Sendable {
     }
 
     /// A data structure that contains the atlas coordinates and the source id of a tile.
-    struct TileCellData {
+    struct TileCellData: Equatable, Sendable {
         /// Position in atlas
         let atlasCoordinates: PointInt
         /// where get a tile
         let sourceId: TileSource.ID
         let orientation: TileOrientation
+        var occlusion: TileOcclusionOverride?
     }
 
     /// The tile cells of the tile map layer.
-    private(set) var tileCells: OrderedDictionary<PointInt, TileCellData> = [:] {
-        didSet {
-            self.setNeedsUpdate()
-        }
-    }
+    private(set) var tileCells: OrderedDictionary<PointInt, TileCellData> = [:]
+    private(set) var chunkCells: [TileMapChunkCoordinate: OrderedDictionary<PointInt, TileCellData>] = [:]
+    private(set) var chunkRevisions: [TileMapChunkCoordinate: UInt64] = [:]
+    private(set) var fullUpdateRevision: UInt64 = 0
 
     /// A Boolean value indicating whether the tile map layer is enabled.
     public var isEnabled: Bool = true {
@@ -73,23 +73,43 @@ public class TileMapLayer: Identifiable, @unchecked Sendable {
     ///   - atlasCoordinates: The atlas coordinates of the cell.
     ///   - orientation: The orientation inside the cell; identity preserves existing resources.
     public func setCell(at position: PointInt, sourceId: TileSource.ID, atlasCoordinates: PointInt, orientation: TileOrientation = .identity) {
-        self.tileCells[position] = TileCellData(
+        let cell = TileCellData(
             atlasCoordinates: atlasCoordinates,
             sourceId: sourceId,
-            orientation: orientation
+            orientation: orientation,
+            occlusion: tileCells[position]?.occlusion
         )
+        guard tileCells[position] != cell else {
+            return
+        }
+        tileCells[position] = cell
+        let coordinate = TileMapChunkCoordinate(cell: position)
+        chunkCells[coordinate, default: [:]][position] = cell
+        recordCellChange(in: coordinate)
     }
 
     /// Remove a cell from the tile map layer.
     ///
     /// - Parameter position: The position of the cell.
     public func removeCell(at position: PointInt) {
-        self.tileCells[position] = nil
+        guard tileCells.removeValue(forKey: position) != nil else {
+            return
+        }
+        let coordinate = TileMapChunkCoordinate(cell: position)
+        chunkCells[coordinate]?[position] = nil
+        recordCellChange(in: coordinate)
+        if chunkCells[coordinate]?.isEmpty == true {
+            chunkCells[coordinate] = nil
+            chunkRevisions[coordinate] = nil
+        }
     }
 
     /// Remove all cells from the tile map layer.
     public func removeAllCells() {
         self.tileCells = [:]
+        chunkCells.removeAll()
+        chunkRevisions.removeAll()
+        setNeedsUpdate()
     }
 
     /// Get the tile source of a cell.
@@ -118,7 +138,22 @@ public class TileMapLayer: Identifiable, @unchecked Sendable {
         guard let cell = tileCells[position], cell.orientation != orientation else {
             return
         }
-        tileCells[position] = TileCellData(atlasCoordinates: cell.atlasCoordinates, sourceId: cell.sourceId, orientation: orientation)
+        setCell(at: position, sourceId: cell.sourceId, atlasCoordinates: cell.atlasCoordinates, orientation: orientation)
+    }
+
+    /// Returns the cell override, or nil when it inherits its atlas tile's occlusion.
+    public func getCellOcclusion(at position: PointInt) -> TileOcclusionOverride? { tileCells[position]?.occlusion }
+
+    /// Overrides occlusion on an existing cell. Nil restores inheritance; only its chunk is invalidated.
+    public func setCellOcclusion(_ occlusion: TileOcclusionOverride?, at position: PointInt) {
+        guard var cell = tileCells[position], cell.occlusion != occlusion else {
+            return
+        }
+        cell.occlusion = occlusion
+        tileCells[position] = cell
+        let coordinate = TileMapChunkCoordinate(cell: position)
+        chunkCells[coordinate]?[position] = cell
+        recordCellChange(in: coordinate)
     }
 
     // MARK: - Internals
@@ -127,6 +162,13 @@ public class TileMapLayer: Identifiable, @unchecked Sendable {
     func setNeedsUpdate() {
         self.needUpdates = true
         self.updateRevision &+= 1
+        self.fullUpdateRevision &+= 1
+    }
+
+    private func recordCellChange(in coordinate: TileMapChunkCoordinate) {
+        needUpdates = true
+        updateRevision &+= 1
+        chunkRevisions[coordinate] = updateRevision
     }
 
     /// Update the tile map layer did finish.

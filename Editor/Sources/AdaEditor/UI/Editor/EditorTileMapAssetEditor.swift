@@ -135,6 +135,7 @@ struct EditorTileMapAssetEditor: View {
         case "Paint": "\u{E3AE}"
         case "Erase": "\u{E6D0}"
         case "Pan": "\u{E925}"
+        case "Select": "\u{E8B6}"
         case "ZoomOut": "\u{E900}"
         case "ZoomIn": "\u{E8FF}"
         case "Fit": "\u{E5D0}"
