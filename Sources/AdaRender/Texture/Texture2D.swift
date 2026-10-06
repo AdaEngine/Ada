@@ -9,10 +9,23 @@ import AdaAssets
 import AdaUtils
 import Foundation
 import Math
+import Synchronization
 
 /// The base class represents a 2D texture.
 /// If the texture isn't held by any object, then the GPU resource will freed immediately.
 open class Texture2D: Texture, @unchecked Sendable {
+    private let alphaMaskStorage = Mutex<TextureAlphaMask?>(nil)
+
+    /// CPU alpha captured when uploading an image. GPU-only/dynamically modified textures may return nil.
+    /// Atlas slices and proxies share their backing texture's mask, sampled using their GPU UVs.
+    open var pickingAlphaMask: TextureAlphaMask? {
+        alphaMaskStorage.withLock { $0 }
+    }
+
+    /// Discards stale CPU alpha after an external GPU write. Picking may then use its configured fallback.
+    open func invalidatePickingAlphaMask() {
+        alphaMaskStorage.withLock { $0 = nil }
+    }
     /// The width of the texture.
     public private(set) var width: Int
     /// The height of the texture.
@@ -53,6 +66,7 @@ open class Texture2D: Texture, @unchecked Sendable {
 
         super.init(gpuTexture: gpuTexture, sampler: sampler, textureType: descriptor.textureType)
         self.assetMetaInfo = image.assetMetaInfo
+        alphaMaskStorage.withLock { $0 = TextureAlphaMask(image: image) }
     }
 
     /// Initialize a new texture from a descriptor.
@@ -67,6 +81,10 @@ open class Texture2D: Texture, @unchecked Sendable {
         self.height = descriptor.height
 
         super.init(gpuTexture: gpuTexture, sampler: sampler, textureType: descriptor.textureType)
+        if let image = descriptor.image, descriptor.pixelFormat == image.format.toPixelFormat,
+            descriptor.width == image.width, descriptor.height == image.height {
+            alphaMaskStorage.withLock { $0 = TextureAlphaMask(image: image) }
+        }
     }
 
     // FIXME: (Vlad) Should remove it from Texture2D.
@@ -90,6 +108,7 @@ open class Texture2D: Texture, @unchecked Sendable {
     ///   - bytes: The data to replace the region with.
     ///   - bytesPerRow: The number of bytes per row of the data.
     public func replaceRegion(_ region: RectInt, mipmapLevel: Int = 0, withBytes bytes: UnsafeRawPointer, bytesPerRow: Int) {
+        invalidatePickingAlphaMask()
         unsafe self.gpuTexture.replaceRegion(region, mipmapLevel: mipmapLevel, withBytes: bytes, bytesPerRow: bytesPerRow)
     }
 

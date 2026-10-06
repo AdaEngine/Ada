@@ -230,6 +230,7 @@ public struct TileMapSystem: Sendable {
                     y: Float(position.y) * tileSize.height,
                     z: Float(layer.zIndex)
                 )
+                let tileTransform = tile.orientation.transform(at: position, tileSize: tileSize)
 
                 let tileEntity: Entity
                 switch source {
@@ -242,7 +243,7 @@ public struct TileMapSystem: Sendable {
                                 tintColor: tileData.modulateColor,
                                 size: tileSize
                             )
-                            Transform(position: position)
+                            tileTransform
                             LightOccluder2D(points: ring)
                         }
                     } else {
@@ -250,14 +251,14 @@ public struct TileMapSystem: Sendable {
                             TileMapRenderedAtlasTile(
                                 texture: texture,
                                 tintColor: tileData.modulateColor,
-                                transform: Transform(position: position)
+                                transform: tileTransform
                             )
                         )
                         continue
                     }
                 case let entitySource as TileEntityAtlasSource:
                     tileEntity = entitySource.getEntity(at: tile.atlasCoordinates)
-                    tileEntity.components += Transform(position: position)
+                    tileEntity.components += tileTransform
                     tileEntity.components[Sprite.self]?.size = tileSize
                     if let ring = tileData.occluderPolygon, ring.count >= 3 {
                         tileEntity.components += LightOccluder2D(points: ring)

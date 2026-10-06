@@ -59,6 +59,14 @@ public final class Texture2DProxy: Texture2D, @unchecked Sendable {
         source.withLock(\.sampler)
     }
 
+    override public var pickingAlphaMask: TextureAlphaMask? {
+        backingSource().pickingAlphaMask
+    }
+
+    override public func invalidatePickingAlphaMask() {
+        backingSource().invalidatePickingAlphaMask()
+    }
+
     @_spi(Internal)
     override public var gpuTexture: GPUTexture {
         source.withLock(\.gpuTexture)

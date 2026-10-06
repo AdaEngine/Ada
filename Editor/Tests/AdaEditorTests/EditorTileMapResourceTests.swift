@@ -45,7 +45,7 @@ struct EditorTileMapResourceTests {
         #expect(try EditorTileMapResource.read(from: url).effectiveLayers.map(\.cells) == [[[0, 0, 0]], []])
         editor.paint(at: Point(350, 300), in: Size(width: 700, height: 600))
         editor.endStroke()
-        let container = UIContainerView(rootView: EditorTileMapAssetEditor(document: document, model: editor))
+        let container = UIContainerView(rootView: EditorTileMapInspector(document: document, model: editor))
         container.frame = Rect(x: 0, y: 0, width: 1_000, height: 700)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
@@ -121,10 +121,14 @@ struct EditorTileMapResourceTests {
         let canvas = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Canvas"))
         #expect(canvas.absoluteFrame.width > 600)
         #expect(canvas.absoluteFrame.height > 500)
-        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Color.1"))
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Fit"))
-        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.LinkTileSet"))
-        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.NewTileSet"))
+        let inspector = UIContainerView(rootView: EditorTileMapInspector(document: document, model: painter))
+        inspector.frame = Rect(x: 0, y: 0, width: 320, height: 700)
+        inspector.bounds.size = inspector.frame.size
+        inspector.layoutIfNeeded()
+        _ = try inspector.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Color.1"))
+        _ = try inspector.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.LinkTileSet"))
+        _ = try inspector.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.NewTileSet"))
         let viewport = Size(width: 700, height: 600)
         painter.selectedColor = 1
         painter.paint(at: Point(350, 300), in: viewport)
@@ -352,7 +356,7 @@ struct EditorTileMapResourceTests {
         #expect(editor.map.tileSetReference == "@res://Tiles/Arena.tileset")
         #expect(editor.paletteCount == 3)
         #expect(editor.image(at: 2) != nil)
-        let container = UIContainerView(rootView: EditorTileMapAssetEditor(document: mapDocument, model: editor))
+        let container = UIContainerView(rootView: EditorTileMapInspector(document: mapDocument, model: editor))
         container.frame = Rect(x: 0, y: 0, width: 1_000, height: 700)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()

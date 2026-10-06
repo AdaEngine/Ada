@@ -117,6 +117,9 @@ public struct Camera: Sendable {
     /// Opt-in temporal reconstruction for 3D cameras. Increment resetGeneration after a camera cut.
     public var temporalUpscaling: TemporalUpscalingSettings?
 
+    /// Frame-local native foveation for 3D geometry. Temporal/spatial upscaling is disabled for this camera.
+    public var rasterizationRateMap: (any RasterizationRateMap)?
+
     public var viewMatrix: Transform3D = .identity
 
     // MARK: - Init

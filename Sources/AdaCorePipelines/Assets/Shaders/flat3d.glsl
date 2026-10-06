@@ -1,6 +1,13 @@
 #version 450 core
 #pragma stage : vert
 
+#ifdef ADA_METAL_RENDER_LAYER
+#extension GL_ARB_shader_viewport_layer_array : require
+layout (binding = 30) uniform RenderTargetLayer {
+    uint u_RenderTargetLayer;
+};
+#endif
+
 #include <AdaEngine/View.glsl>
 
 layout (binding = 1) uniform DirectionalLight3DUniform {
@@ -66,6 +73,9 @@ layout (location = 0) out VertexOut Output;
 [[main]]
 void flat3d_vertex()
 {
+#ifdef ADA_METAL_RENDER_LAYER
+    gl_Layer = int(u_RenderTargetLayer);
+#endif
     mat4 model = mat4(a_Model0, a_Model1, a_Model2, a_Model3) * skinTransform();
     mat3 basis = mat3(model);
     mat3 normalMatrix = abs(determinant(basis)) > 0.000001 ? transpose(inverse(basis)) : mat3(1.0);

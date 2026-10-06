@@ -22,9 +22,30 @@ active grip poses and optional selection rays. `SpatialInteractionSystem` update
 transforms and publishes `SpatialSelection` for inspectors. The platform-independent
 interaction path can be tested without ARKit or a headset.
 
-The initial host requires visionOS 26, disables foveation, and serializes its eye
-passes. It is intended for functional device validation before multiview and frame
-latency optimization. It does not yet render capture-target drawables.
+The host requires visionOS 26 and enables system foveation when supported. Use
+`ImmersiveLayerConfiguration(enablesFoveation: false)` for a full-resolution comparison.
+The simulator falls back to rendering without foveation. Each eye snapshots its
+current drawable rate map, including the correct layer in a layered layout.
+
+The main geometry pass renders four G-buffers and depth at variable rasterization
+rates. A nearest-sample resolve expands them into logical screen coordinates before
+SSAO, environment compositing, antialiasing and scene overlays. The final presentation
+pass applies the drawable map again and converts forward depth to reverse depth.
+Geometry scratch textures and resolve pipelines are reused; rate-map parameters
+are immutable per frame. Foveation replaces spatial/temporal upscaling for these cameras.
+
+Eye passes remain sequential with GPU fences because they share uniform scratch.
+Screen-space effects still run at full logical resolution, and resolving the buffers
+adds bandwidth cost. A performance gain requires measurement on Vision Pro; simulator
+launch alone cannot establish foveation quality, stereo alignment or gaze-driven savings.
+Capture-target drawables are not rendered yet.
+
+Custom geometry vertex shaders used with layered foveation must select the target
+layer explicitly. For the Metal backend, `ADA_METAL_RENDER_LAYER` is defined for
+vertex stages. The built-in shader reads a `uint` uniform at reserved binding 30
+(`GlobalBufferIndex.renderTargetLayer`) and writes `gl_Layer`; SPIRV-Cross maps that
+to Metal's `render_target_array_index`. Ordinary passes bind layer zero. Other
+backends do not define this macro.
 
 ## Reuse AdaUI panels in spatial windows
 

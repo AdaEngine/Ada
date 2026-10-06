@@ -16,14 +16,8 @@ struct EditorTileMapAssetEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbar
-            HStack(spacing: 0) {
-                canvas
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                EditorTileMapSidebar(model: model)
-                    .frame(width: 280)
-                    .frame(maxHeight: .infinity)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            canvas
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             footer
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -148,5 +142,31 @@ struct EditorTileMapAssetEditor: View {
         default: "\u{E5D5}"
         }
     }
+}
 
+struct EditorTileMapInspector: View {
+    let document: EditorAssetDocument
+    let model: EditorTileMapEditorModel
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            adaEditorInspectorTitle(theme: theme)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(document.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(theme.editorColors.text)
+                    .lineLimit(2)
+                Text(document.relativePath)
+                    .font(.system(size: 10))
+                    .foregroundColor(theme.editorColors.muted)
+                    .lineLimit(3)
+            }
+            .padding(12)
+            EditorTileMapSidebar(model: model)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityIdentifier("AdaEditor.TileMapEditor.Inspector")
+    }
 }

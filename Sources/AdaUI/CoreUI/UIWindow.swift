@@ -181,6 +181,42 @@ open class UIWindow: UIView {
         responder.onEvent(event)
     }
 
+    /// Uses the same hit testing and pointer capture as dispatch. The window itself is the scene fallback.
+    func blocksScenePicking(for event: any InputEvent) -> Bool {
+        guard canRespondToAction(event) else {
+            return false
+        }
+        if let mouse = event as? MouseEvent {
+            if mouse.phase != .began, mouse.button != .none,
+                let responder = capturedMouseResponders[mouse.button]?.value,
+                ownsResponder(responder), responder.canRespondToAction(event) {
+                return responder !== self
+            }
+            return findFirstResponder(for: event).map { $0 !== self } ?? false
+        }
+        if let touch = event as? TouchEvent {
+            if touch.phase != .began, let responder = capturedTouchResponders[touch.contactID]?.value,
+                ownsResponder(responder), responder.canRespondToAction(event) {
+                return responder !== self
+            }
+            return findFirstResponder(for: event).map { $0 !== self } ?? false
+        }
+        return false
+    }
+
+    func blocksScenePicking(pointer: InputPointerID, at position: Point) -> Bool {
+        switch pointer {
+        case .mouse:
+            let responders = capturedMouseResponders.values.compactMap(\.value).filter { ownsResponder($0) && $0.isInteractionEnabled && !$0.isHidden }
+            if !responders.isEmpty {
+                return responders.contains { $0 !== self }
+            }
+            return blocksScenePicking(for: MouseEvent(window: id, button: .none, mousePosition: position, phase: .changed, modifierKeys: [], time: 0))
+        case let .touch(_, contact):
+            return blocksScenePicking(for: TouchEvent(window: id, location: position, phase: .moved, time: 0, contactID: contact))
+        }
+    }
+
     /// Keep a drag with the view that received its press, even across sibling views or window bounds.
     private func routeCapturedMouseEvent(_ event: MouseEvent) -> Bool {
         if event.phase == .changed, event.button == .none {

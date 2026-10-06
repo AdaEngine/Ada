@@ -18,6 +18,11 @@ public struct Input: Resource, Sendable {
     @_spi(Internal)
     public internal(set) var eventsPool: [any InputEvent] = []
 
+    /// Current pointer locations, including a stationary mouse, for UI/game picking composition.
+    public internal(set) var pointerLocations: [InputPointerID: Point] = [:]
+    private var scenePickingBlockedPointers: Set<InputPointerID> = []
+    private var scenePickingBlockedEvents: Set<RID> = []
+
     @_spi(Internal)
     public var pendingEventsPool: [any InputEvent] = []
 
@@ -62,6 +67,26 @@ public struct Input: Resource, Sendable {
     /// Returns a set of input events.
     public func getInputEvents() -> [any InputEvent] {
         return self.eventsPool
+    }
+
+    /// Blocks scene picking for one routed pointer event without removing it from ordinary input APIs.
+    public mutating func blockScenePicking(for event: any InputEvent) {
+        if event is MouseEvent || event is TouchEvent {
+            scenePickingBlockedEvents.insert(event.id)
+        }
+    }
+
+    /// UI refreshes this state each frame so appearing overlays also block stationary pointers.
+    public mutating func blockScenePicking(for pointer: InputPointerID) {
+        scenePickingBlockedPointers.insert(pointer)
+    }
+
+    public func isScenePickingBlocked(eventID: RID) -> Bool {
+        scenePickingBlockedEvents.contains(eventID)
+    }
+
+    public func isScenePickingBlocked(pointer: InputPointerID) -> Bool {
+        scenePickingBlockedPointers.contains(pointer)
     }
 
     /// Returns text input events from software keyboard (iOS) or IME.
@@ -158,11 +183,20 @@ public struct Input: Resource, Sendable {
 
     @MainActor
     @_spi(Internal) public mutating func removeEvents() {
+        for event in eventsPool {
+            if let touch = event as? TouchEvent, touch.phase == .ended || touch.phase == .cancelled {
+                pointerLocations[.touch(window: touch.window, contact: touch.contactID)] = nil
+            } else if let mouse = event as? MouseEvent, mouse.phase == .cancelled {
+                pointerLocations[.mouse(window: mouse.window)] = nil
+            }
+        }
         self.eventsPool.removeAll()
     }
 
     @MainActor
     @_spi(Internal) public mutating func flushPendingEvents() {
+        scenePickingBlockedEvents.removeAll(keepingCapacity: true)
+        scenePickingBlockedPointers.removeAll(keepingCapacity: true)
         self.eventsPool.append(contentsOf: self.pendingEventsPool)
         self.pendingEventsPool.removeAll(keepingCapacity: true)
     }

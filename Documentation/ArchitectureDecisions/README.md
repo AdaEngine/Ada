@@ -57,3 +57,9 @@ describes the intended design even when its implementation is still planned.
 | [ADR-0019](0019-environment-lighting-and-postprocessing.md) | Accepted | Planned | Environment lighting and postprocessing |
 | [ADR-0020](0020-gpu-visibility-and-animation-lod.md) | Accepted | Planned | GPU visibility and animation LOD |
 | [ADR-0021](0021-hybrid-ray-tracing.md) | Accepted | Planned | Hybrid ray tracing |
+
+## 2D rendering decisions
+
+| ADR | Status | Implementation | Decision |
+| --- | --- | --- | --- |
+| [ADR-0022](0022-2d-rendering-feature-roadmap.md) | Accepted | Partial (local foundation; not released) | Sprite layout, tile orientation, picking, chunk rendering, instancing and 2D effects informed by Bevy |

@@ -119,21 +119,37 @@ struct EditorTileMapSidebar: View {
             }
             Text("Erase cells: eraser tool or right-drag. Remove color also clears its cells on all layers.")
                 .font(.system(size: 11)).foregroundColor(theme.editorColors.muted).lineLimit(3)
-            ScrollView(showsIndicators: true) {
-                LazyVStack(0..<((model.paletteCount + 2) / 3), id: \.self, spacing: 6, estimatedRowHeight: 80, overscan: 2) { row in
-                    HStack(spacing: 6) {
-                        ForEach(0..<3, id: \.self) { column in
-                            let index = row * 3 + column
-                            if index < model.paletteCount {
-                                tile(index)
-                            } else {
-                                Color.clear.frame(width: 80, height: 80)
+            GeometryReader { geometry in
+                // Leave space for the scroll indicator while filling the palette width.
+                let availableWidth = max(0, geometry.size.width - 12)
+                let columns = max(1, Int((availableWidth + 6) / 86))
+                let tileWidth = max(0, (availableWidth - Float(columns - 1) * 6) / Float(columns))
+                ScrollView(showsIndicators: true) {
+                    LazyVStack(
+                        0..<((model.paletteCount + columns - 1) / columns),
+                        id: \.self,
+                        alignment: .leading,
+                        spacing: 6,
+                        estimatedRowHeight: 80,
+                        overscan: 2
+                    ) { row in
+                        HStack(spacing: 6) {
+                            ForEach(0..<columns, id: \.self) { column in
+                                let index = row * columns + column
+                                if index < model.paletteCount {
+                                    tile(index, width: tileWidth)
+                                } else {
+                                    Color.clear.frame(width: tileWidth, height: 80)
+                                }
                             }
                         }
                     }
+                    .frame(width: availableWidth, alignment: .leading)
                 }
+                .frame(width: geometry.size.width, height: geometry.size.height)
             }
             .frame(maxHeight: .infinity)
+            .accessibilityIdentifier("AdaEditor.TileMapEditor.Palette")
             HStack(spacing: 6) {
                 TextField("Hex color", text: Binding(get: { model.newColorHex }, set: { model.newColorHex = $0 }))
                     .font(.system(size: 12))
@@ -145,7 +161,7 @@ struct EditorTileMapSidebar: View {
         }
     }
 
-    private func tile(_ index: Int) -> some View {
+    private func tile(_ index: Int, width: Float) -> some View {
         let selected = model.selectedColor == index && model.tool == .paint
         return Button(action: { model.selectedColor = index; model.tool = .paint }) {
             VStack(spacing: 5) {
@@ -161,7 +177,7 @@ struct EditorTileMapSidebar: View {
                         .foregroundColor(theme.editorColors.text)
                 }
             }
-            .frame(width: 80, height: 80)
+            .frame(width: width, height: 80)
         }
         .buttonStyle(EditorTileMapButtonStyle(theme: theme))
         .background(RoundedRectangleShape(cornerRadius: 6).fill(selected ? theme.editorColors.blue.opacity(0.16) : theme.editorColors.surface))

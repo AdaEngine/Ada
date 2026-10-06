@@ -108,6 +108,99 @@ struct EditorTileMapLifetimeTests {
         #expect(!drawnTextures().contains { $0 === textures[0] })
     }
 
+    @Test("Tile map controls in the contextual inspector edit the canvas document")
+    func contextualInspectorControls() async throws {
+        let fixture = try fixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let workbench = EditorWorkbenchViewModel()
+        workbench.open(.asset(fixture.document))
+        let model = workbench.tileMapModel(for: fixture.document)
+        let editor = UIContainerView(rootView: EditorTileMapAssetEditor(document: fixture.document, model: model))
+        editor.frame = Rect(x: 0, y: 0, width: 1_000, height: 700)
+        editor.bounds.size = editor.frame.size
+        editor.layoutIfNeeded()
+        #expect((try? editor.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.AddLayer"))) == nil)
+        let canvas = try editor.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Canvas"))
+        #expect(canvas.absoluteFrame.width == 1_000)
+
+        let inspector = UIContainerView(rootView: EditorContextualInspector(
+            document: workbench.activeDocument,
+            workbench: workbench,
+            sceneInspectorViewModel: EditorInspectorSidebarViewModel(),
+            resourceRootURL: fixture.root
+        ))
+        inspector.frame = Rect(x: 0, y: 0, width: 320, height: 800)
+        inspector.bounds.size = inspector.frame.size
+        inspector.layoutIfNeeded()
+        _ = try inspector.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Inspector"))
+        func tap(_ identifier: String) throws {
+            let node = try inspector.uiNode(matching: .accessibilityIdentifier(identifier))
+            let point = Point(x: node.absoluteFrame.midX, y: node.absoluteFrame.midY)
+            for phase: MouseEvent.Phase in [.began, .ended] {
+                inspector.onMouseEvent(MouseEvent(
+                    window: .empty, button: .left, mousePosition: point, phase: phase, modifierKeys: [], time: 0
+                ))
+            }
+        }
+        try tap("AdaEditor.TileMapEditor.Color.1")
+        #expect(model.selectedColor == 1)
+        try tap("AdaEditor.TileMapEditor.AddLayer")
+        #expect(model.selectedLayer == 1)
+        for _ in 0..<20 { await Task.yield() }
+        editor.update(1.0 / 60)
+        editor.layoutIfNeeded()
+        let point = Point(x: canvas.absoluteFrame.midX, y: canvas.absoluteFrame.midY)
+        for phase: MouseEvent.Phase in [.began, .ended] {
+            editor.onMouseEvent(MouseEvent(
+                window: .empty, button: .left, mousePosition: point, phase: phase, modifierKeys: [], time: 0
+            ))
+        }
+        let saved = try EditorTileMapResource.read(from: fixture.url)
+        #expect(saved.effectiveLayers.count == 2)
+        #expect(saved.effectiveLayers[1].cells == [[0, 0, 1]])
+        #expect(workbench.tileMapModel(for: fixture.document) === model)
+    }
+
+    @Test("Palette columns adapt to inspector resizing and retain selection and textures")
+    func adaptivePaletteColumns() async throws {
+        let fixture = try fixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        var map = fixture.map
+        map.atlasColors += Array(repeating: .green, count: 22)
+        try map.write(to: fixture.url)
+        let model = EditorTileMapEditorModel(document: fixture.document)
+        model.selectedColor = 7
+        let texture = try #require(model.texture(at: 0))
+        let container = UIContainerView(rootView: EditorTileMapInspector(document: fixture.document, model: model))
+        for (width, expectedColumns): (Float, Int) in [(320, 3), (520, 5), (760, 8), (320, 3)] {
+            container.frame = Rect(x: 0, y: 0, width: width, height: 900)
+            container.bounds.size = container.frame.size
+            container.layoutIfNeeded()
+            for _ in 0..<20 { await Task.yield() }
+            container.update(1.0 / 60)
+            container.layoutIfNeeded()
+            let palette = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Palette")).absoluteFrame
+            let first = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Color.0")).absoluteFrame
+            for index in 0..<expectedColumns {
+                let cell = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Color.\(index)")).absoluteFrame
+                #expect(abs(cell.minY - first.minY) < 0.1)
+                #expect(cell.minX >= palette.minX)
+                #expect(cell.maxX <= palette.maxX)
+                #expect(cell.width >= 80)
+            }
+            let last = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Color.\(expectedColumns - 1)")).absoluteFrame
+            #expect(palette.maxX - last.maxX < 13)
+            let nextRow = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Color.\(expectedColumns)")).absoluteFrame
+            #expect(nextRow.minY > first.maxY)
+            #expect(abs(nextRow.minX - first.minX) < 0.1)
+            _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Color.7"))
+            #expect(model.selectedColor == 7)
+            #expect(model.texture(at: 0) === texture)
+            _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.TileMapEditor.Color.1"))
+            #expect(model.selectedColor == 1)
+        }
+    }
+
     private func fixture(writeMap: Bool = true) throws -> (
         root: URL, url: URL, document: EditorAssetDocument, map: EditorTileMapResource
     ) {

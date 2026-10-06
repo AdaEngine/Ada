@@ -168,6 +168,11 @@ public final class NamedTextureAtlas: Asset, @unchecked Sendable {
 extension NamedTextureAtlas {
     /// A ``Texture2D`` view into one named region of the atlas.
     public final class Slice: Texture2D, @unchecked Sendable {
+        override public var pickingAlphaMask: TextureAlphaMask? { namedAtlas.texture.pickingAlphaMask }
+
+        override public func invalidatePickingAlphaMask() {
+            namedAtlas.texture.invalidatePickingAlphaMask()
+        }
         public private(set) var namedAtlas: NamedTextureAtlas
 
         private let uvMin: Vector2

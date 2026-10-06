@@ -85,7 +85,9 @@ struct EditorTileSourceTests {
         let fixture = try fixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let model = EditorTileSourceEditorModel(document: fixture.document)
-        model.addImages([fixture.png, fixture.png])
+        let opaquePNG = fixture.root.appendingPathComponent("opaque.png")
+        try Image(width: 32, height: 32, color: .white).pngData().write(to: opaquePNG)
+        model.addImages([opaquePNG, opaquePNG])
         #expect(model.sources.count == 2)
         model.selectSource(0)
         model.removeSource()
@@ -104,6 +106,77 @@ struct EditorTileSourceTests {
         let before = try Data(contentsOf: fixture.file)
         model.applySettings()
         #expect(try Data(contentsOf: fixture.file) == before)
+    }
+
+    @Test("Bulk tile creation skips transparent cells and preserves manual tiles") @MainActor
+    func bulkCreationSkipsTransparentCells() throws {
+        try setupRenderer()
+        let fixture = try fixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let png = fixture.root.appendingPathComponent("sparse.png")
+        var image = Image(width: 10, height: 7)
+        image.setPixel(in: Point(1, 1), color: Color(1, 0, 0, 0))
+        image.setPixel(in: Point(5, 2), color: Color(0, 0, 1, 1.0 / 255))
+        image.setPixel(in: Point(8, 5), color: .white)
+        // Pixels in the border and gaps must not make adjacent cells nonempty.
+        image.setPixel(in: Point(0, 0), color: .white)
+        image.setPixel(in: Point(3, 2), color: .white)
+        image.setPixel(in: Point(2, 3), color: .white)
+        try image.pngData().write(to: png)
+        let workbench = EditorWorkbenchViewModel()
+        workbench.open(.asset(fixture.document))
+        let model = workbench.tileSourceModel(for: fixture.document)
+        model.addImages([png])
+        model.width = "2"
+        model.height = "2"
+        model.marginX = "1"
+        model.marginY = "1"
+        model.spacingX = "1"
+        model.spacingY = "1"
+        model.applySettings()
+        #expect(model.gridSize == SizeInt(width: 3, height: 2))
+        model.selectTile([0, 1])
+        model.toggleTile()
+        model.frames = "2"
+        model.duration = "0.5"
+        model.applyAnimation()
+        let inspector = UIContainerView(rootView: EditorContextualInspector(
+            document: .asset(fixture.document),
+            workbench: workbench,
+            sceneInspectorViewModel: EditorInspectorSidebarViewModel(),
+            resourceRootURL: fixture.root
+        ))
+        inspector.frame = Rect(x: 0, y: 0, width: 320, height: 1_100)
+        inspector.bounds.size = inspector.frame.size
+        inspector.layoutIfNeeded()
+        _ = try inspector.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.TileSourceEditor.CreateAll"))
+        #expect(model.tiles.compactMap { $0["xy"] as? [Int] } == [[0, 1], [1, 0], [2, 1]])
+        #expect(model.status.contains("skipped 3 empty cells"))
+        model.createAllTiles()
+        #expect(model.tiles.count == 3)
+        let reloaded = EditorTileSourceEditorModel(document: fixture.document)
+        #expect(reloaded.tiles.compactMap { $0["xy"] as? [Int] } == [[0, 1], [1, 0], [2, 1]])
+        reloaded.selectTile([0, 1])
+        #expect(reloaded.frames == "2")
+        #expect(reloaded.duration == "0.5")
+    }
+
+    @Test("An entirely transparent image creates no automatic tiles") @MainActor
+    func transparentSourceCreatesNoTiles() throws {
+        try setupRenderer()
+        let fixture = try fixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let png = fixture.root.appendingPathComponent("empty.png")
+        try Image(width: 32, height: 32).pngData().write(to: png)
+        let model = EditorTileSourceEditorModel(document: fixture.document)
+        model.addImages([png])
+        model.createAllTiles()
+        #expect(model.tiles.isEmpty)
+        #expect(model.status.contains("skipped 4 empty cells"))
+        #expect(EditorTileSourceEditorModel(document: fixture.document).tiles.isEmpty)
+        model.selectTile([0, 0])
+        model.toggleTile()
+        #expect(model.hasTile([0, 0]))
     }
 
     @Test @MainActor

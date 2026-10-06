@@ -19,6 +19,7 @@
             descriptor.fragmentFunction = library.makeFunction(name: "immersiveFragment")
             descriptor.colorAttachments[0].pixelFormat = colorFormat
             descriptor.depthAttachmentPixelFormat = depthFormat
+            descriptor.inputPrimitiveTopology = .triangle
             pipeline = try queue.device.makeRenderPipelineState(descriptor: descriptor)
             let depth = MTLDepthStencilDescriptor()
             depth.depthCompareFunction = .always
@@ -41,19 +42,27 @@
                 let map = view.textureMap
                 let textureIndex = map.textureIndex
                 let pass = MTLRenderPassDescriptor()
+                let rateMaps = drawable.rasterizationRateMaps
+                let rateMap = rateMaps.indices.contains(textureIndex) ? rateMaps[textureIndex] : nil
+                pass.rasterizationRateMap = rateMap
+                let layeredFoveation = (rateMap?.layerCount ?? 1) > 1
+                pass.renderTargetArrayLength = layeredFoveation ? (rateMap?.layerCount ?? 1) : 1
                 pass.colorAttachments[0].texture = drawable.colorTextures[textureIndex]
-                pass.colorAttachments[0].slice = map.sliceIndex
-                pass.colorAttachments[0].loadAction = .clear
+                pass.colorAttachments[0].slice = layeredFoveation ? 0 : map.sliceIndex
+                let preserveOtherEye = layeredFoveation && drawable.views.prefix(index).contains { $0.textureMap.textureIndex == textureIndex }
+                pass.colorAttachments[0].loadAction = preserveOtherEye ? .load : .clear
                 pass.colorAttachments[0].storeAction = .store
                 pass.depthAttachment.texture = drawable.depthTextures[textureIndex]
-                pass.depthAttachment.slice = map.sliceIndex
+                pass.depthAttachment.slice = layeredFoveation ? 0 : map.sliceIndex
                 pass.depthAttachment.clearDepth = 0
-                pass.depthAttachment.loadAction = .clear
+                pass.depthAttachment.loadAction = preserveOtherEye ? .load : .clear
                 pass.depthAttachment.storeAction = .store
                 guard let encoder = commands.makeRenderCommandEncoder(descriptor: pass) else {
                     throw ImmersiveRendererError.metalResourceUnavailable
                 }
                 encoder.setViewport(map.viewport)
+                var layerIndex = UInt32(layeredFoveation ? map.sliceIndex : 0)
+                unsafe encoder.setVertexBytes(&layerIndex, length: MemoryLayout<UInt32>.stride, index: 0)
                 encoder.setRenderPipelineState(pipeline)
                 encoder.setDepthStencilState(depthState)
                 encoder.setFragmentTexture(color, index: 0)
@@ -87,10 +96,10 @@
         private static let shader = """
             #include <metal_stdlib>
             using namespace metal;
-            struct VertexOut { float4 position [[position]]; float2 uv; };
-            vertex VertexOut immersiveVertex(uint id [[vertex_id]]) {
+            struct VertexOut { float4 position [[position]]; float2 uv; uint layer [[render_target_array_index]]; };
+            vertex VertexOut immersiveVertex(uint id [[vertex_id]], constant uint &layer [[buffer(0)]]) {
                 float2 uv = float2((id << 1) & 2, id & 2);
-                return { float4(uv * float2(2, -2) + float2(-1, 1), 0, 1), uv };
+                return { float4(uv * float2(2, -2) + float2(-1, 1), 0, 1), uv, layer };
             }
             struct FragmentOut { float4 color [[color(0)]]; float depth [[depth(any)]]; };
             fragment FragmentOut immersiveFragment(VertexOut in [[stage_in]],

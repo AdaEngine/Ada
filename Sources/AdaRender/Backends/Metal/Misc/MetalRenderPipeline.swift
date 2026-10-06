@@ -19,6 +19,11 @@
         ) throws {
             let pipelineDescriptor = MTLRenderPipelineDescriptor()
             pipelineDescriptor.label = descriptor.debugName
+            switch descriptor.primitive {
+            case .points: pipelineDescriptor.inputPrimitiveTopology = .point
+            case .line, .lineStrip: pipelineDescriptor.inputPrimitiveTopology = .line
+            case .triangle, .triangleStrip: pipelineDescriptor.inputPrimitiveTopology = .triangle
+            }
 
             let vertexDescriptor = MTLVertexDescriptor()
 

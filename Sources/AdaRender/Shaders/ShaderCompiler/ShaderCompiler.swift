@@ -314,13 +314,14 @@ public final class ShaderCompiler {
     }
 
     private func getDefines(for stage: ShaderStage) -> String {
-        guard let macros = self.macros[stage] else {
-            return ""
-        }
-
         var defines = ""
+        #if METAL
+            if stage == .vertex, unsafe RenderEngine.shared.type == .metal {
+                defines += "#define ADA_METAL_RENDER_LAYER 1\n"
+            }
+        #endif
 
-        for macro in macros.values {
+        for macro in self.macros[stage, default: [:]].values {
             defines.append("#define \(macro.name.uppercased()) \(macro.value)\n")
         }
 

@@ -193,30 +193,32 @@ public struct Main3DRenderNode: RenderNode {
                 )
             }
 
-            let renderPass = commandBuffer.beginRenderPass(
-                RenderPassDescriptor(
-                    label: "Main 3d Render Pass",
-                    colorAttachments: [
-                        .init(
-                            texture: sceneColor,
-                            operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
-                            clearColor: clearColor
-                        ),
-                        .init(
-                            texture: normalRoughness,
-                            operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
-                            clearColor: .black
-                        ),
-                        .init(
-                            texture: viewPositionMetallic,
-                            operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
-                            clearColor: .black
-                        ),
-                        .init(texture: indirect, operation: OperationDescriptor(loadAction: .clear, storeAction: .store), clearColor: .black),
-                    ],
-                    depthStencilAttachment: depthAttachment
-                )
+            let descriptor = RenderPassDescriptor(
+                label: "Main 3d Render Pass",
+                colorAttachments: [
+                    .init(
+                        texture: sceneColor,
+                        operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
+                        clearColor: clearColor
+                    ),
+                    .init(
+                        texture: normalRoughness,
+                        operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
+                        clearColor: .black
+                    ),
+                    .init(
+                        texture: viewPositionMetallic,
+                        operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
+                        clearColor: .black
+                    ),
+                    .init(texture: indirect, operation: OperationDescriptor(loadAction: .clear, storeAction: .store), clearColor: .black),
+                ],
+                depthStencilAttachment: depthAttachment
             )
+            let foveatedPass = try camera.rasterizationRateMap.map {
+                try commandBuffer.beginFoveatedRenderPass(descriptor, rateMap: $0)
+            }
+            let renderPass = foveatedPass?.encoder ?? commandBuffer.beginRenderPass(descriptor)
 
             renderPass.setVertexBuffer(drawUniform, slot: GlobalBufferIndex.viewUniform)
             renderPass.setVertexBuffer(lightConstants, offset: 0, slot: 1)
@@ -290,6 +292,7 @@ public struct Main3DRenderNode: RenderNode {
             }
 
             renderPass.endRenderPass()
+            try foveatedPass?.resolve()
             if let metrics {
                 commandBuffer.addCompletedTimingHandler { metrics.record(pass: "geometry", seconds: $0) }
             }

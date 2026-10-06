@@ -142,8 +142,17 @@
             return WGPUGPUTexture(descriptor: descriptor, device: context.device)
         }
 
-        public func getImage(from texture: Texture) -> Image? {
-            return (texture.gpuTexture as? WGPUGPUTexture)?.getImage(device: context.device)
+        public func getImage(from _: Texture) -> Image? {
+            // WebGPU mapping is asynchronous. A synchronous read cannot safely access an unmapped staging buffer.
+            nil
+        }
+
+        public func readImage(from texture: Texture) async throws -> Image? {
+            #if WASM
+                return nil
+            #else
+                return try await (texture.gpuTexture as? WGPUGPUTexture)?.readImage(device: context.device)
+            #endif
         }
 
         public func createCommandQueue() -> any CommandQueue {

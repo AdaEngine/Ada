@@ -65,6 +65,17 @@ public func ExtractLighting2D(
             let transformed = matrix * Vector4(point.x, point.y, 0, 1)
             ring.append(Vector2(transformed.x, transformed.y))
         }
+        // A reflected tile or parent reverses winding. Shadow-fin edge tests require world-space CCW.
+        // Triangulate relative to one point to avoid cancellation from large world translations.
+        var signedArea: Float = 0
+        for index in 1..<(ring.count - 1) {
+            let first = ring[index] - ring[0]
+            let second = ring[index + 1] - ring[0]
+            signedArea += first.x * second.y - first.y * second.x
+        }
+        if signedArea < 0 {
+            ring.reverse()
+        }
         extracted.occluders.append(ExtractedOccluder2DInstance(worldPointsCCW: ring, isEnabled: true))
     }
 }

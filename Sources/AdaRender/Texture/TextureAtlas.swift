@@ -125,6 +125,11 @@ public final class TextureAtlas: Texture2D, @unchecked Sendable {
 extension TextureAtlas {
     /// A slice represents piece of the texture region. The slices is an efficient way to work with the texture.
     public final class Slice: Texture2D, @unchecked Sendable {
+        override public var pickingAlphaMask: TextureAlphaMask? { atlas.pickingAlphaMask }
+
+        override public func invalidatePickingAlphaMask() {
+            atlas.invalidatePickingAlphaMask()
+        }
         // We should store reference to the atlas, because if the altas deiniting from memory
         // then the GPU representation will be also deinited.
         // This also doesn't has reference cycle here, because the atlas doesn't store slices.

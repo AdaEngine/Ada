@@ -186,7 +186,7 @@ func ConfigurateRenderViewTarget(
 
         let viewportSize = resolveRenderSize(
             outputSize: outputSize,
-            mode: camera.temporalUpscaling.map { .spatial(renderScale: $0.renderScale) } ?? (unsafe RenderEngine.configurations.upscaling),
+            mode: camera.rasterizationRateMap != nil ? .disabled : camera.temporalUpscaling.map { .spatial(renderScale: $0.renderScale) } ?? (unsafe RenderEngine.configurations.upscaling),
             supportsSpatialUpscaling: renderDevice.renderDevice.supportsSpatialUpscaling || (camera.temporalUpscaling != nil && renderDevice.renderDevice.supportsTemporalUpscaling)
         )
         let viewportScale = Float(viewportSize.width) / Float(outputSize.width)

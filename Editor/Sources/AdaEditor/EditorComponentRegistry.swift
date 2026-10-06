@@ -478,12 +478,16 @@ extension EditorComponentRegistry {
                 texture = nil
             }
             let size = payload["size"]?.vector2Value.map { Size(width: $0.x, height: $0.y) }
+            let anchor = try payload["anchor"].map { try JSONDecoder().decode(SpriteAnchor.self, from: JSONEncoder().encode($0)) } ?? .center
+            let imageMode = try payload["imageMode"].map { try JSONDecoder().decode(SpriteImageMode.self, from: JSONEncoder().encode($0)) } ?? .stretch
             return Sprite(
                 texture: texture,
                 tintColor: payload["tintColor"]?.colorValue ?? .white,
                 flipX: payload["flipX"]?.boolValue ?? false,
                 flipY: payload["flipY"]?.boolValue ?? false,
-                size: size
+                size: size,
+                anchor: anchor,
+                imageMode: imageMode
             )
         }
     )

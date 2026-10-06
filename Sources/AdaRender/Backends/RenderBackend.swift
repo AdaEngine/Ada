@@ -102,6 +102,9 @@ public protocol RenderDevice: AnyObject, Sendable {
     /// Get image from texture rid.
     func getImage(from texture: Texture) -> Image?
 
+    /// Reads completed GPU pixels into owned CPU memory. Backends without readback may return nil.
+    func readImage(from texture: Texture) async throws -> Image?
+
     func createCommandQueue() -> CommandQueue
 
     /// Create a new swapchain for specific window.
@@ -120,6 +123,10 @@ public protocol Drawable: AnyObject, Sendable {
 }
 
 extension RenderDevice {
+    public func readImage(from texture: Texture) async throws -> Image? {
+        getImage(from: texture)
+    }
+
     public func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? { nil }
     public var supportsSpatialUpscaling: Bool { false }
     public var supportsTemporalUpscaling: Bool { false }

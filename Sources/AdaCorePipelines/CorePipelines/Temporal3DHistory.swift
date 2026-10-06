@@ -97,7 +97,7 @@ struct PrepareTemporal3DSystem {
         views.frame &+= 1
         var active: [Entity.ID] = []
         cameras.forEach { camera, graph, target, uniform, source in
-            guard camera.isActive, graph.subgraphLabel == .main3D,
+            guard camera.isActive, camera.rasterizationRateMap == nil, graph.subgraphLabel == .main3D,
                 let settings = camera.temporalUpscaling,
                 device.renderDevice.supportsTemporalUpscaling,
                 let input = target.mainTexture, let output = target.outputTexture

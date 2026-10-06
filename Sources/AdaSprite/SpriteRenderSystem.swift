@@ -80,6 +80,9 @@ public struct ExtractedSprite: Sendable {
     public var worldTransform: Transform3D
     /// The source entity used for per-camera visibility, or `nil` to render for every camera.
     public var visibilityEntityId: Entity.ID?
+    /// Local sprite layout, copied during extraction.
+    public var anchor: SpriteAnchor
+    public var imageMode: SpriteImageMode
 
     /// Initialize an extracted sprite.
     public init(
@@ -91,7 +94,9 @@ public struct ExtractedSprite: Sendable {
         tintColor: Color,
         transform: Transform,
         worldTransform: Transform3D,
-        visibilityEntityId: Entity.ID? = nil
+        visibilityEntityId: Entity.ID? = nil,
+        anchor: SpriteAnchor = .center,
+        imageMode: SpriteImageMode = .stretch
     ) {
         self.entityId = entityId
         self.texture = texture
@@ -102,6 +107,8 @@ public struct ExtractedSprite: Sendable {
         self.transform = transform
         self.worldTransform = worldTransform
         self.visibilityEntityId = visibilityEntityId
+        self.anchor = anchor
+        self.imageMode = imageMode
     }
 }
 
@@ -142,7 +149,9 @@ public func ExtractSprite(
             tintColor: sprite.tintColor,
             transform: transform,
             worldTransform: globalTransform.matrix,
-            visibilityEntityId: entity.id
+            visibilityEntityId: entity.id,
+            anchor: sprite.anchor,
+            imageMode: sprite.imageMode
         )
     }
 }
@@ -168,10 +177,15 @@ func UpdateBoundings(
             guard let size = (sprite.size ?? sprite.texture?.asset.size.toSize())?.asVector2 else {
                 return
             }
-            // Local quad is [-0.5,0.5]×size → centered at origin; AABB must match for frustum culling.
+            let geometry = SpriteGeometry(size: size, sourceSize: size, anchor: sprite.anchor, imageMode: sprite.imageMode)
+            guard geometry.isValid else {
+                bounds.bounds = .aabb(.empty)
+                return
+            }
+            // Fit can occupy less space; the nominal rectangle conservatively contains every mode.
             bounds.bounds = .aabb(
                 AABB(
-                    center: .zero,
+                    center: Vector3(-sprite.anchor.x * size.x, -sprite.anchor.y * size.y, 0),
                     halfExtents: Vector3(0.5 * size, 0)
                 )
             )
@@ -303,7 +317,6 @@ public struct SpriteRenderSystem {
             }
 
             let texture = sprite.texture ?? .whiteTexture
-            let worldTransform = sprite.worldTransform
 
             // Check if we need to start a new batch (texture changed)
             let needsNewBatch = currentTexture.map { !isSameTexture($0, texture) } ?? true
@@ -324,32 +337,18 @@ public struct SpriteRenderSystem {
                 flipY: sprite.flipY
             )
 
-            let size = sprite.size ?? texture.size.toSize()
-
-            // Add sprite vertices (4 vertices per quad)
-            let vertexOffset = UInt32(spriteData.vertexBuffer.count)
-            for vertexIndex in 0..<Self.quadPosition.count {
-                let quadPos = Self.quadPosition[vertexIndex]
-                let scaledPosition = Vector4(quadPos.x * size.width, quadPos.y * size.height, quadPos.z, quadPos.w)
-                let data = SpriteVertexData(
-                    position: worldTransform * scaledPosition,
-                    color: sprite.tintColor,
-                    textureCoordinate: textureCoords[vertexIndex]
-                )
-                spriteData.vertexBuffer.append(data)
+            let geometry = SpriteGeometry(
+                size: (sprite.size ?? texture.size.toSize()).asVector2,
+                sourceSize: texture.size.toSize().asVector2,
+                anchor: sprite.anchor,
+                imageMode: sprite.imageMode,
+                flipX: sprite.flipX,
+                flipY: sprite.flipY
+            )
+            geometry.forEachQuad { destination, source in
+                appendQuad(destination: destination, source: source, textureCoords: textureCoords, sprite: sprite)
+                instanceCount += 1
             }
-
-            // Add indices for this quad (6 indices for 2 triangles)
-            // Triangle 1: 0, 1, 2
-            // Triangle 2: 2, 3, 0
-            spriteData.indexBuffer.append(vertexOffset + 0)
-            spriteData.indexBuffer.append(vertexOffset + 1)
-            spriteData.indexBuffer.append(vertexOffset + 2)
-            spriteData.indexBuffer.append(vertexOffset + 2)
-            spriteData.indexBuffer.append(vertexOffset + 3)
-            spriteData.indexBuffer.append(vertexOffset + 0)
-
-            instanceCount += 1
         }
 
         finishCurrentBatch()
@@ -365,6 +364,35 @@ public struct SpriteRenderSystem {
     }
 
     // MARK: - Private
+
+    private func appendQuad(destination: Rect, source: Rect, textureCoords: [Vector2], sprite: ExtractedSprite) {
+        let vertexOffset = UInt32(spriteData.vertexBuffer.count)
+        for corner in Self.quadPosition {
+            let u = corner.x + 0.5
+            let v = corner.y + 0.5
+            let sourceU = source.origin.x + u * source.size.width
+            let sourceV = source.origin.y + v * source.size.height
+            // Interpolate the slice's own corners, never the full GPU atlas dimensions.
+            let bottom = textureCoords[0] + (textureCoords[1] - textureCoords[0]) * sourceU
+            let top = textureCoords[3] + (textureCoords[2] - textureCoords[3]) * sourceU
+            spriteData.vertexBuffer.append(SpriteVertexData(
+                position: sprite.worldTransform * Vector4(
+                    destination.origin.x + u * destination.size.width,
+                    destination.origin.y + v * destination.size.height,
+                    0,
+                    1
+                ),
+                color: sprite.tintColor,
+                textureCoordinate: bottom + (top - bottom) * sourceV
+            ))
+        }
+        spriteData.indexBuffer.append(vertexOffset)
+        spriteData.indexBuffer.append(vertexOffset + 1)
+        spriteData.indexBuffer.append(vertexOffset + 2)
+        spriteData.indexBuffer.append(vertexOffset + 2)
+        spriteData.indexBuffer.append(vertexOffset + 3)
+        spriteData.indexBuffer.append(vertexOffset)
+    }
 
     /// Get texture coordinates with flip support.
     @inline(__always)

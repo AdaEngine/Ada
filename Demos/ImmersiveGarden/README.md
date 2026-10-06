@@ -46,7 +46,10 @@ its original layout. Raw hand tracking and motion comfort require a physical dev
 ## Current limits and device acceptance
 
 This is an initial integration, not a performance-qualified shipping VR renderer.
-It disables foveation and serializes eye passes with asynchronous GPU fences because
+It enables system foveation on supported devices and falls back to full resolution
+in Simulator. Geometry uses each eye's current rasterization rate map; its G-buffers
+and depth are resolved before screen-space effects. The final compositor pass also
+uses the map. Eye passes remain serialized with asynchronous GPU fences because
 current 3D passes share per-view uniform scratch. The main game simulation advances
 once per displayed frame. A future multiview path can remove those fences.
 Only root entities are supported for manipulation; rigid-body throwing, collisions,
@@ -56,6 +59,11 @@ are system SwiftUI windows. Capture-target drawables are not rendered yet.
 Use real hardware to validate stereo orientation, head-motion stability, depth
 occlusion of the tools window, direct/indirect selection, two-hand manipulation,
 permission denial, tracking loss, Digital Crown dismissal and repeated reopening.
+Compare `ImmersiveLayerConfiguration()` with
+`ImmersiveLayerConfiguration(enablesFoveation: false)` on Vision Pro. Check both eyes,
+look across high-contrast object silhouettes, check depth occlusion, and record GPU
+geometry/resolve/frame timings. Screen-space effects remain full resolution, so
+reduced geometry work does not establish an overall frame-time improvement.
 The simulator cannot establish hand-tracking quality or motion comfort.
 
 Simulator smoke validation on visionOS 26.2 confirmed app launch, automatic

@@ -1001,26 +1001,42 @@ extension EditorSceneViewportModel {
             return nil
         }
 
-        let worldPoint = Vector2(
-            twoDCenter.x + (screenPoint.x - viewportSize.width * 0.5) / twoDZoom,
-            twoDCenter.y - (screenPoint.y - viewportSize.height * 0.5) / twoDZoom
+        let state = cameraState(for: viewportSize)
+        let camera = SpritePickingCamera(
+            entityID: cameraEntityID ?? 0,
+            viewport: Rect(origin: .zero, size: viewportSize),
+            projection: state.projection.makeClipView(),
+            worldTransform: state.transform.matrix
         )
+        guard let segment = camera.ray(at: screenPoint) else {
+            return nil
+        }
 
         return world.getEntities()
             .compactMap { entity -> (editorID: String, sortZ: Float)? in
                 guard
                     entity.id != cameraEntityID,
                     let editorID = editorIDsByEntityID[entity.id],
-                    let transform = entity.components[Transform.self]
+                    entity.isActive,
+                    entity.components[Visibility.self] != .hidden,
+                    let matrix = EditorPicking.worldMatrix(for: entity)
                 else {
                     return nil
                 }
 
-                let bounds = entity.components[BoundingComponent.self]
-                guard EditorPicking.contains2D(worldPoint, transform: transform, bounds: bounds) else {
-                    return nil
+                if let sprite = entity.components[Sprite.self] {
+                    let candidate = SpritePickingCandidate(entityID: entity.id, sprite: sprite, worldTransform: matrix)
+                    guard SpritePicker.hitTest(candidate, ray: segment.ray, maximumDistance: segment.maximumDistance, cameraID: camera.entityID) != nil else {
+                        return nil
+                    }
+                } else {
+                    // Keep camera/light/tile-map selection through the existing bounds fallback.
+                    guard let distance = EditorPicking.intersectionDistance(ray: segment.ray, matrix: matrix, bounds: entity.components[BoundingComponent.self]),
+                        distance <= segment.maximumDistance else {
+                        return nil
+                    }
                 }
-                return (editorID, transform.position.z)
+                return (editorID, matrix.origin.z)
             }
             .max { lhs, rhs in lhs.sortZ < rhs.sortZ }?
             .editorID

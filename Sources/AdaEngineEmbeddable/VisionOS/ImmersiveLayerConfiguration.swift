@@ -3,11 +3,15 @@
     import Metal
     import SwiftUI
 
-    /// Initial immersive configuration: full resolution, dedicated textures, finite clipping range.
-    /// Foveation is disabled until Ada's geometry passes support rasterization rate maps.
+    /// Immersive configuration with system foveation when the device supports it.
     @available(visionOS 26.0, *)
     public struct ImmersiveLayerConfiguration: CompositorLayerConfiguration {
-        public init() {}
+        public var enablesFoveation: Bool
+
+        /// Set to false to compare full-resolution rendering on a physical device.
+        public init(enablesFoveation: Bool = true) {
+            self.enablesFoveation = enablesFoveation
+        }
 
         public func makeConfiguration(
             capabilities: LayerRenderer.Capabilities,
@@ -15,8 +19,9 @@
         ) {
             configuration.colorFormat = .bgra8Unorm_srgb
             configuration.depthFormat = .depth32Float
-            configuration.isFoveationEnabled = false
-            configuration.layout = capabilities.supportedLayouts(options: []).contains(.dedicated) ? .dedicated : .layered
+            configuration.isFoveationEnabled = enablesFoveation && capabilities.supportsFoveation
+            let layouts = capabilities.supportedLayouts(options: configuration.isFoveationEnabled ? [.foveationEnabled] : [])
+            configuration.layout = layouts.contains(.dedicated) ? .dedicated : .layered
             configuration.defaultDepthRange = SIMD2<Float>(100, 0.1)
         }
     }

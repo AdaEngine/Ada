@@ -183,7 +183,7 @@ final class EditorTileSourceEditorModel {
         marginY = String(preview.layout.margin.height)
         spacingX = String(preview.layout.spacing.width)
         spacingY = String(preview.layout.spacing.height)
-        status = "Click a cell to inspect it. Add tiles individually or create the whole grid."
+        status = "Click a cell to inspect it. Add tiles individually or create all nonempty cells."
     }
 
     private func loadPreview(at index: Int) -> EditorTileSourcePreview? {
@@ -330,7 +330,7 @@ final class EditorTileSourceEditorModel {
     }
 
     func createAllTiles() {
-        guard canEditSource else {
+        guard canEditSource, let image, let layout else {
             return
         }
         let grid = gridSize
@@ -340,10 +340,17 @@ final class EditorTileSourceEditorModel {
         }
         var updated = tiles
         let existing = Set(tiles.compactMap { $0["xy"] as? [Int] })
+        var skippedEmptyCells = 0
         for y in 0..<grid.height {
-            for x in 0..<grid.width where !existing.contains([x, y]) { updated.append(newTile([x, y])) }
+            for x in 0..<grid.width where !existing.contains([x, y]) {
+                guard tileHasVisiblePixels([x, y], image: image, layout: layout) else {
+                    skippedEmptyCells += 1
+                    continue
+                }
+                updated.append(newTile([x, y]))
+            }
         }
-        saveTiles(updated)
+        saveTiles(updated, skippedEmptyCells: skippedEmptyCells)
     }
 
     func applyAnimation() {
@@ -384,6 +391,22 @@ final class EditorTileSourceEditorModel {
 }
 
 extension EditorTileSourceEditorModel {
+    private func tileHasVisiblePixels(_ point: PointInt, image: Image, layout: TileSourceImageDescriptor) -> Bool {
+        switch image.format {
+        case .rgb8, .gray:
+            return true
+        case .rgba8, .bgra8, .bgra8_sRGB:
+            let originX = layout.margin.width + point.x * (layout.tileSize.width + layout.spacing.width)
+            let originY = layout.margin.height + point.y * (layout.tileSize.height + layout.spacing.height)
+            for y in originY..<(originY + layout.tileSize.height) {
+                for x in originX..<(originX + layout.tileSize.width) where image.data[(y * image.width + x) * 4 + 3] > 0 {
+                    return true
+                }
+            }
+            return false
+        }
+    }
+
     private func nextSourceID(in sources: [[String: Any]]) throws -> Int {
         let ids = sources.compactMap { ($0["data"] as? [String: Any])?["id"] as? Int }
         guard (ids.max() ?? -1) < Int.max else {
@@ -392,7 +415,7 @@ extension EditorTileSourceEditorModel {
         return (ids.max() ?? -1) + 1
     }
 
-    private func saveTiles(_ tiles: [[String: Any]]) {
+    private func saveTiles(_ tiles: [[String: Any]], skippedEmptyCells: Int = 0) {
         var updated = sources
         var data = sourceData
         data["tiles"] = tiles
@@ -400,6 +423,9 @@ extension EditorTileSourceEditorModel {
         do {
             try save(updated)
             status = "Saved \(tiles.count) tiles"
+            if skippedEmptyCells > 0 {
+                status += " · skipped \(skippedEmptyCells) empty cells"
+            }
         } catch { status = error.localizedDescription }
     }
 

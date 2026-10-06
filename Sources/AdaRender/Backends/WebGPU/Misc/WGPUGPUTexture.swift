@@ -166,33 +166,40 @@
             self.device = device
         }
 
-        // TODO: (Vlad) think about it later
-        func getImage(device: WebGPU.GPUDevice) -> Image? {
-            #if WASM
-                return nil
-            #else
+        #if !WASM
+        /// Uses aligned texture-copy rows and the existing asynchronous owned buffer readback path.
+        func readImage(device: WebGPU.GPUDevice) async throws -> Image? {
+                guard texture.usage.contains(.copySrc) else {
+                    return nil
+                }
                 let imageFormat: Image.Format
-                let bytesInPixel: UInt32
 
                 switch self.texture.format {
                 case .BGRA8Unorm:
                     imageFormat = .bgra8
-                    bytesInPixel = 4
-                default:
+                case .BGRA8UnormSrgb:
+                    imageFormat = .bgra8_sRGB
+                case .RGBA8Unorm, .RGBA8UnormSrgb:
                     imageFormat = .rgba8
-                    bytesInPixel = 4
-                }
-
-                let bytesPerRow = self.texture.width * bytesInPixel
-                let pixelCount = UInt32(self.texture.width * self.texture.height)
-                let count = Int(pixelCount * bytesInPixel)
-                nonisolated(unsafe) var readbackBuffer: WebGPU.GPUBuffer?
-                webGPUDeviceLock.withLock { _ in
-                    readbackBuffer = device.createBuffer(descriptor: WebGPU.GPUBufferDescriptor(usage: .copyDst, size: UInt64(count)))
-                }
-                guard let buffer = readbackBuffer else {
+                default:
                     return nil
                 }
+
+                let bytesPerRow = Int(self.texture.width) * 4
+                let paddedBytesPerRow = (bytesPerRow + 255) & ~255
+                let count = paddedBytesPerRow * Int(self.texture.height)
+                let readback: WGPUBuffer? = webGPUDeviceLock.withLock { _ in
+                    guard let buffer = device.createBuffer(descriptor: WebGPU.GPUBufferDescriptor(usage: [.copyDst, .copySrc], size: UInt64(count))) else {
+                        return nil
+                    }
+                    // The existing Sendable wrapper owns the handle; device operations remain serialized by the GPU lock.
+                    return WGPUBuffer(buffer: buffer, device: device)
+                }
+                guard let readback else {
+                    throw WGPUBuffer.MapError.failedToMap("Cannot allocate texture readback buffer")
+                }
+                let buffer = readback.buffer
+                defer { buffer.destroy() }
                 let encoder = webGPUDeviceLock.withLock { _ in
                     device.createCommandEncoder(descriptor: nil as WebGPU.GPUCommandEncoderDescriptor?)
                 }
@@ -204,7 +211,7 @@
                         aspect: WebGPU.GPUTextureAspect.all
                     ),
                     destination: WebGPU.GPUTexelCopyBufferInfo(
-                        layout: WebGPU.GPUTexelCopyBufferLayout(offset: UInt64(0), bytesPerRow: UInt32(bytesPerRow), rowsPerImage: texture.height),
+                        layout: WebGPU.GPUTexelCopyBufferLayout(offset: UInt64(0), bytesPerRow: UInt32(paddedBytesPerRow), rowsPerImage: texture.height),
                         buffer: buffer
                     ),
                     copySize: WebGPU.GPUExtent3D(
@@ -218,20 +225,20 @@
                     device.queue.submit(commands: [commandBuffer])
                 }
 
-                return unsafe Image(
+                let padded = try await readback.readData()
+                var pixels = Data(capacity: bytesPerRow * Int(texture.height))
+                for row in 0..<Int(texture.height) {
+                    let offset = row * paddedBytesPerRow
+                    pixels.append(padded[offset..<(offset + bytesPerRow)])
+                }
+                return Image(
                     width: Int(self.texture.width),
                     height: Int(self.texture.height),
-                    data: Data(
-                        bytesNoCopy: buffer.getMappedRange(offset: 0, size: count),
-                        count: count,
-                        deallocator: .custom { [buffer] _, _ in
-                            buffer.unmap()
-                        }
-                    ),
+                    data: pixels,
                     format: imageFormat
                 )
-            #endif
         }
+        #endif
     }
 
     extension PixelFormat {

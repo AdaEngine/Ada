@@ -12,5 +12,14 @@
         public static func texture(_ texture: Texture) -> (any MTLTexture)? {
             (texture.gpuTexture as? MetalGPUTexture)?.texture
         }
+
+        /// Snapshot a drawable's map while reusing the previous eye's geometry targets and pipelines.
+        public static func rasterizationRateMap(
+            _ map: any MTLRasterizationRateMap,
+            layer: Int,
+            reusing previous: (any RasterizationRateMap)? = nil
+        ) throws -> any RasterizationRateMap {
+            try MetalRasterizationRateMap(map: map, layer: layer, previous: previous as? MetalRasterizationRateMap)
+        }
     }
 #endif

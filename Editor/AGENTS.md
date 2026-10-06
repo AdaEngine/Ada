@@ -64,6 +64,9 @@ entity templates, rename/delete/duplicate/copy/paste/reparent operations.
 Reusable nested scenes through `SceneInstance` already exist.
 2D/3D viewport modes, camera navigation, picking, grid/rulers/orientation helpers
 and Move/Scale/Rotate tools. Scene edits have undo/redo.
+2D sprite picking shares the runtime hit test: CPU alpha masks, atlas regions,
+anchors, image modes and composed parent transforms before ECS propagation.
+Coverage: [EditorSpritePickingTests.swift](Tests/AdaEditorTests/EditorSpritePickingTests.swift).
 
 Entry points: [EditorSceneDocumentEditor.swift](Sources/AdaEditor/UI/Editor/EditorSceneDocumentEditor.swift),
 [EditorSceneModel+Hierarchy.swift](Sources/AdaEditor/EditorSceneModel+Hierarchy.swift),
@@ -107,8 +110,14 @@ Coverage: [EditorUISceneTests.swift](Tests/AdaEditorTests/EditorUISceneTests.swi
 ### Assets and animation
 
 Image preview, texture-atlas editing, tile-source (`.tileset`) editing, and
-tile-map (`.tilemap`) painting/erasing, layers, pan and zoom. GLSL source editing
-and shader highlighting. Audio/generic assets currently use metadata previews.
+tile-map (`.tilemap`) painting/erasing, layers, pan and zoom.
+Tile-source bulk creation skips fully transparent cells, respecting margins and
+spacing; individually authored tiles remain available.
+Tile-map layer controls and the tile palette live in the contextual Inspector,
+sharing the active document's model with the full-width canvas.
+The tile palette adapts its column count to the Inspector width and builds only
+rows near the visible scroll viewport.
+GLSL source editing and shader highlighting. Audio/generic assets currently use metadata previews.
 Scene keyframe clips have timeline/curve modes, tracks, keyframe values/timing,
 interpolation and repeat modes. This is distinct from skeletal-animation tooling.
 

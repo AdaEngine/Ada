@@ -13,6 +13,8 @@ import OrderedCollections
 /// Global information about buffer index.
 public enum GlobalBufferIndex {
     public static let viewUniform: Int = 2
+    /// Reserved vertex-stage uniform for sequential layered rendering on Metal.
+    public static let renderTargetLayer: Int = 30
 }
 
 /// Controls whether the renderer draws at native resolution or upscales a lower-resolution frame.

@@ -28,6 +28,8 @@ extension SpriteRenderPipeline {
         var piplineDesc = RenderPipelineDescriptor(vertex: spriteShader.asset.requiredShader(for: .vertex))
         piplineDesc.fragment = spriteShader.asset.getShader(for: .fragment)
         piplineDesc.debugName = "Sprite Pipeline"
+        // Reflected tile/entity transforms must remain visible from either winding.
+        piplineDesc.backfaceCulling = false
         piplineDesc.vertexDescriptor.attributes.append([
             .attribute(.vector4, name: "a_Position"),
             .attribute(.vector4, name: "a_Color"),

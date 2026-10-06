@@ -25,9 +25,11 @@
             return state
         }()
 
-        init(renderEncoder: MTLRenderCommandEncoder, device: MTLDevice) {
+        init(renderEncoder: MTLRenderCommandEncoder, device: MTLDevice, renderTargetLayer: UInt32 = 0) {
             self.renderEncoder = renderEncoder
             self.device = device
+            var layer = renderTargetLayer
+            unsafe renderEncoder.setVertexBytes(&layer, length: MemoryLayout<UInt32>.stride, index: GlobalBufferIndex.renderTargetLayer)
         }
 
         func pushDebugName(_ string: String) {

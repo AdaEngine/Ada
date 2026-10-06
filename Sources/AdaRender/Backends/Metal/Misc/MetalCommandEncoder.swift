@@ -57,6 +57,8 @@
 
         func beginRenderPass(_ desc: RenderPassDescriptor) -> RenderCommandEncoder {
             let renderPassDescriptor = MTLRenderPassDescriptor()
+            // Built-in geometry shaders explicitly emit layer zero in ordinary passes.
+            renderPassDescriptor.renderTargetArrayLength = 1
             let attachments = desc.colorAttachments
 
             for (index, attachment) in attachments.enumerated() {
@@ -97,6 +99,13 @@
             }
             encoder.label = desc.label
             return MetalBlitCommandEncoder(blitEncoder: encoder)
+        }
+
+        func beginFoveatedRenderPass(_ desc: RenderPassDescriptor, rateMap: any RasterizationRateMap) throws -> FoveatedRenderPass {
+            guard let map = rateMap as? MetalRasterizationRateMap else {
+                throw FoveatedRenderingError.unsupportedBackend
+            }
+            return try map.beginPass(desc, commands: commandBuffer)
         }
 
         func encodeSpatialUpscale(source: Texture, destination: Texture) -> Bool {

@@ -36,6 +36,7 @@ public class TileMapLayer: Identifiable, @unchecked Sendable {
         let atlasCoordinates: PointInt
         /// where get a tile
         let sourceId: TileSource.ID
+        let orientation: TileOrientation
     }
 
     /// The tile cells of the tile map layer.
@@ -70,10 +71,12 @@ public class TileMapLayer: Identifiable, @unchecked Sendable {
     ///   - position: The position of the cell.
     ///   - sourceId: The source id of the cell.
     ///   - atlasCoordinates: The atlas coordinates of the cell.
-    public func setCell(at position: PointInt, sourceId: TileSource.ID, atlasCoordinates: PointInt) {
+    ///   - orientation: The orientation inside the cell; identity preserves existing resources.
+    public func setCell(at position: PointInt, sourceId: TileSource.ID, atlasCoordinates: PointInt, orientation: TileOrientation = .identity) {
         self.tileCells[position] = TileCellData(
             atlasCoordinates: atlasCoordinates,
-            sourceId: sourceId
+            sourceId: sourceId,
+            orientation: orientation
         )
     }
 
@@ -103,6 +106,19 @@ public class TileMapLayer: Identifiable, @unchecked Sendable {
     /// - Returns: The atlas coordinates of the cell.
     public func getCellAtlasCoordinates(at position: PointInt) -> PointInt {
         return self.tileCells[position]?.atlasCoordinates ?? PointInt(x: 0, y: 0)
+    }
+
+    /// Returns the cell's orientation, or identity for an empty cell.
+    public func getCellOrientation(at position: PointInt) -> TileOrientation {
+        self.tileCells[position]?.orientation ?? .identity
+    }
+
+    /// Changes an existing cell's orientation and invalidates every consumer of this layer.
+    public func setCellOrientation(_ orientation: TileOrientation, at position: PointInt) {
+        guard let cell = tileCells[position], cell.orientation != orientation else {
+            return
+        }
+        tileCells[position] = TileCellData(atlasCoordinates: cell.atlasCoordinates, sourceId: cell.sourceId, orientation: orientation)
     }
 
     // MARK: - Internals

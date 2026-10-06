@@ -78,7 +78,9 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
             let sourceID = tileSet.addTileSource(source)
             for (index, cells) in (cellsByLayer ?? [fileContent.cells ?? []]).enumerated() {
                 for cell in cells where cell.count >= 3 && colors.indices.contains(cell[2]) {
-                    layers[index].setCell(at: [cell[0], cell[1]], sourceId: sourceID, atlasCoordinates: [cell[2], 0])
+                    layers[index].setCell(
+                        at: [cell[0], cell[1]], sourceId: sourceID, atlasCoordinates: [cell[2], 0], orientation: try Self.orientation(in: cell)
+                    )
                 }
             }
         }
@@ -128,7 +130,8 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
                 newLayer.setCell(
                     at: tile.position,
                     sourceId: tile.sourceId,
-                    atlasCoordinates: tile.atlasPosition
+                    atlasCoordinates: tile.atlasPosition,
+                    orientation: tile.orientation
                 )
             }
         }
@@ -147,7 +150,8 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
                 FileContent.Tile(
                     position: position,
                     atlasPosition: data.atlasCoordinates,
-                    sourceId: data.sourceId
+                    sourceId: data.sourceId,
+                    orientation: data.orientation
                 )
             }
 
@@ -157,8 +161,14 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
         }
 
         let content = FileContent(
-            layers: layers, tileSet: self.tileSet, atlasColors: nil, atlasTextures: nil,
-            tileSetReference: nil, tileSetTiles: nil, cells: nil, paletteLayers: nil
+            layers: layers,
+            tileSet: self.tileSet,
+            atlasColors: nil,
+            atlasTextures: nil,
+            tileSetReference: nil,
+            tileSetTiles: nil,
+            cells: nil,
+            paletteLayers: nil
         )
         try encoder.encode(content)
     }
@@ -186,7 +196,9 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
         let sourceID = tileSet.addTileSource(source)
         for (layerIndex, layerCells) in (cellsByLayer ?? [cells]).enumerated() where layers.indices.contains(layerIndex) {
             for cell in layerCells where cell.count >= 3 && images.indices.contains(cell[2]) {
-                layers[layerIndex].setCell(at: [cell[0], cell[1]], sourceId: sourceID, atlasCoordinates: [cell[2], 0])
+                layers[layerIndex].setCell(
+                    at: [cell[0], cell[1]], sourceId: sourceID, atlasCoordinates: [cell[2], 0], orientation: try Self.orientation(in: cell)
+                )
             }
         }
     }
@@ -216,8 +228,10 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
                 let index = cell[2] - firstPaletteIndex
                 guard palette.indices.contains(index), let sourceID = copiedSources[palette[index].sourceID] else { continue }
                 layers[layerIndex].setCell(
-                    at: [cell[0], cell[1]], sourceId: sourceID,
-                    atlasCoordinates: PointInt(palette[index].atlasCoordinates)
+                    at: [cell[0], cell[1]],
+                    sourceId: sourceID,
+                    atlasCoordinates: PointInt(palette[index].atlasCoordinates),
+                    orientation: try Self.orientation(in: cell)
                 )
             }
         }
@@ -241,7 +255,9 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
             for cell in layerCells where cell.count >= 3 {
                 let index = cell[2] - firstPaletteIndex
                 guard sourceIDs.indices.contains(index) else { continue }
-                layers[layerIndex].setCell(at: [cell[0], cell[1]], sourceId: sourceIDs[index], atlasCoordinates: [0, 0])
+                layers[layerIndex].setCell(
+                    at: [cell[0], cell[1]], sourceId: sourceIDs[index], atlasCoordinates: [0, 0], orientation: try Self.orientation(in: cell)
+                )
             }
         }
     }
@@ -283,13 +299,14 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
     ///   - coordinates: The coordinates of the cell.
     ///   - sourceId: The source id of the cell.
     ///   - atlasCoordinates: The atlas coordinates of the cell.
-    public func setCell(for layerIndex: Int, coordinates: PointInt, sourceId: TileSource.ID, atlasCoordinates: PointInt) {
+    ///   - orientation: The orientation inside the cell.
+    public func setCell(for layerIndex: Int, coordinates: PointInt, sourceId: TileSource.ID, atlasCoordinates: PointInt, orientation: TileOrientation = .identity) {
         if !layers.indices.contains(layerIndex) {
             return
         }
 
         let layer = self.layers[layerIndex]
-        layer.setCell(at: coordinates, sourceId: sourceId, atlasCoordinates: atlasCoordinates)
+        layer.setCell(at: coordinates, sourceId: sourceId, atlasCoordinates: atlasCoordinates, orientation: orientation)
     }
 
     /// Remove a cell from a layer.
@@ -329,6 +346,17 @@ public class TileMap: @unsafe Asset, @unchecked Sendable {
 
     // MARK: - Private
 
+    /// Portable palette cells are [x, y, paletteIndex] with an optional fourth orientation ID.
+    private static func orientation(in cell: [Int]) throws -> TileOrientation {
+        guard cell.count > 3 else {
+            return .identity
+        }
+        guard let orientation = TileOrientation(rawValue: cell[3]) else {
+            throw AssetDecodingError.decodingProblem("Tile orientation must be between 0 and 7.")
+        }
+        return orientation
+    }
+
     /// The tile set did change.
     private func tileSetDidChange() {
         self.setNeedsUpdate(updateLayers: true)
@@ -363,16 +391,19 @@ extension TileMap {
                 case position = "p"
                 case atlasPosition = "ap"
                 case sourceId = "sid"
+                case orientation
             }
 
             let position: PointInt
             let atlasPosition: PointInt
             let sourceId: TileSource.ID
+            let orientation: TileOrientation
 
-            init(position: PointInt, atlasPosition: PointInt, sourceId: TileSource.ID) {
+            init(position: PointInt, atlasPosition: PointInt, sourceId: TileSource.ID, orientation: TileOrientation = .identity) {
                 self.position = position
                 self.atlasPosition = atlasPosition
                 self.sourceId = sourceId
+                self.orientation = orientation
             }
 
             init(from decoder: any Decoder) throws {
@@ -380,6 +411,7 @@ extension TileMap {
                 self.position = try PointInt(container.decode([Int].self, forKey: Self.CodingKeys.position))
                 self.atlasPosition = try PointInt(container.decode([Int].self, forKey: Self.CodingKeys.atlasPosition))
                 self.sourceId = try container.decode(TileSource.ID.self, forKey: Self.CodingKeys.sourceId)
+                self.orientation = try container.decodeIfPresent(TileOrientation.self, forKey: .orientation) ?? .identity
             }
 
             func encode(to encoder: any Encoder) throws {
@@ -387,6 +419,9 @@ extension TileMap {
                 try container.encode(self.sourceId, forKey: .sourceId)
                 try container.encode([position.x, position.y], forKey: .position)
                 try container.encode([atlasPosition.x, atlasPosition.y], forKey: .atlasPosition)
+                if orientation != .identity {
+                    try container.encode(orientation, forKey: .orientation)
+                }
             }
         }
 

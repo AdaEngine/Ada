@@ -109,6 +109,10 @@ public protocol CommandBuffer: AnyObject {
     /// - Returns: A ``RenderCommandEncoder`` for encoding rendering commands.
     func beginRenderPass(_ desc: RenderPassDescriptor) -> RenderCommandEncoder
 
+    /// Renders into compressed geometry attachments and resolves them before screen-space effects.
+    /// Layered Metal shaders select ``GlobalBufferIndex/renderTargetLayer`` through their render-target-array output.
+    func beginFoveatedRenderPass(_ desc: RenderPassDescriptor, rateMap: any RasterizationRateMap) throws -> FoveatedRenderPass
+
     /// Begins a blit pass and returns an encoder for recording memory transfer commands.
     ///
     /// - Parameter desc: The descriptor that configures the blit pass.
@@ -134,6 +138,10 @@ public protocol CommandBuffer: AnyObject {
 }
 
 extension CommandBuffer {
+    public func beginFoveatedRenderPass(_ desc: RenderPassDescriptor, rateMap: any RasterizationRateMap) throws -> FoveatedRenderPass {
+        throw FoveatedRenderingError.unsupportedBackend
+    }
+
     public func addCompletedTimingHandler(_ handler: @escaping @Sendable (Double?) -> Void) {
         addCompletedHandler { handler(nil) }
     }

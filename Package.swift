@@ -628,6 +628,7 @@ var targets: [Target] = [
             "AdaApp",
             "AdaAssets",
             "AdaECS",
+            "AdaInput",
             "AdaText",
             "AdaUtils",
             "Math",

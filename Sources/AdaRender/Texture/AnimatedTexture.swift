@@ -86,6 +86,12 @@ public final class AnimatedTexture: Texture2D, @unchecked Sendable {
         frames[currentFrame].texture.unwrap(message: "Animated texture frame \(currentFrame) has no texture.")
     }
 
+    override public var pickingAlphaMask: TextureAlphaMask? { currentTexture.pickingAlphaMask }
+
+    override public func invalidatePickingAlphaMask() {
+        currentTexture.invalidatePickingAlphaMask()
+    }
+
     /// Create animated texture with 256 frames.
     public init() {
         self.frames = [Frame].init(repeating: Frame(texture: nil, delay: 0), count: 256)

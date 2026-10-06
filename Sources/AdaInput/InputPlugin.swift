@@ -84,6 +84,7 @@ public struct InputEventParseSystem {
                     input.keyEvents.remove(keyEvent.keyCode)
                 }
             case let mouseEvent as MouseEvent:
+                input.pointerLocations[.mouse(window: mouseEvent.window)] = mouseEvent.mousePosition
                 input.mouseEvents[mouseEvent.button] = mouseEvent
                 if mouseEvent.button == .scrollWheel, mouseEvent.scrollDelta.y != 0 {
                     input.actionScrollDirections.insert(mouseEvent.scrollDelta.y > 0 ? .positive : .negative)
@@ -92,6 +93,7 @@ public struct InputEventParseSystem {
                     input.actionMouseMoved = true
                 }
             case let touchEvent as TouchEvent:
+                input.pointerLocations[.touch(window: touchEvent.window, contact: touchEvent.contactID)] = touchEvent.location
                 input.touches = input.touches.filter {
                     $0.contactID != touchEvent.contactID || $0.window != touchEvent.window
                 }
@@ -156,7 +158,7 @@ public struct InputEventParseSystem {
 @System
 @inline(__always)
 @MainActor
-func InputEventsCleanup(
+public func InputEventsCleanup(
     _ input: ResMut<Input>
 ) {
     input.wrappedValue.removeEvents()

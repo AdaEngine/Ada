@@ -18,11 +18,12 @@
         case incompatibleMetalDevice
         case missingEyeTarget
         case gpuSubmissionFailed
+        case missingRasterizationRateMap
     }
 
     /// An embedded immersive host. The caller owns its task and cancels it when the space closes.
     /// All ECS access is on the main actor; rendering is sequential with nonblocking GPU fences.
-    /// This initial path prioritizes correctness over throughput and does not enable foveation.
+    /// Geometry uses the compositor's foveation maps; screen-space effects consume resolved buffers.
     @available(visionOS 26.0, *)
     @MainActor
     public final class AdaImmersiveRenderer {
@@ -140,7 +141,7 @@
                         world.insertResource(DeltaTime(deltaTime: delta))
                         await world.runScheduler(.immersiveInput)
                         var renderedEyes: [(RenderTexture, RenderTexture)] = []
-                        for index in eyes.indices {
+                        for index in drawable.views.indices {
                             for (eyeIndex, eye) in eyes.enumerated() {
                                 if var camera = eye.components[Camera.self] {
                                     camera.isActive = eyeIndex == index
@@ -193,12 +194,26 @@
                 targets.append(target)
             }
             for (index, view) in drawable.views.enumerated() {
+                guard var camera = eyes[index].components[Camera.self] else { throw ImmersiveRendererError.missingEyeTarget }
                 let viewport = view.textureMap.viewport
-                let size = SizeInt(width: max(1, Int(viewport.width)), height: max(1, Int(viewport.height)))
+                if layer.configuration.isFoveationEnabled {
+                    let textureIndex = view.textureMap.textureIndex
+                    guard drawable.rasterizationRateMaps.indices.contains(textureIndex) else {
+                        throw ImmersiveRendererError.missingRasterizationRateMap
+                    }
+                    camera.rasterizationRateMap = try MetalInterop.rasterizationRateMap(
+                        drawable.rasterizationRateMaps[textureIndex],
+                        layer: view.textureMap.sliceIndex,
+                        reusing: camera.rasterizationRateMap
+                    )
+                } else {
+                    camera.rasterizationRateMap = nil
+                }
+                camera.temporalUpscaling = nil
+                let size = camera.rasterizationRateMap?.screenSize ?? SizeInt(width: max(1, Int(viewport.width)), height: max(1, Int(viewport.height)))
                 if targets[index].size != size {
                     targets[index] = RenderTexture(size: size, scaleFactor: 1, format: .bgra8, debugLabel: "Immersive Eye \(index)")
                 }
-                guard var camera = eyes[index].components[Camera.self] else { throw ImmersiveRendererError.missingEyeTarget }
                 camera.renderTarget = .texture(AssetHandle(targets[index]))
                 camera.projection = .custom(
                     ImmersiveProjection(

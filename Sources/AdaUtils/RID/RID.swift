@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Synchronization
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
     import Darwin
@@ -27,11 +28,18 @@ public struct RID: Identifiable, Equatable, Hashable, Codable, Sendable {
 
 extension RID {
 
+    // Clock resolution does not guarantee uniqueness, especially for batched pointer events.
+    private static let lastGeneratedID = Mutex<Int>(Int.min)
+
     public static let empty = RID(id: -1)
 
     /// Generate random unique rid
     public init() {
-        self.id = Self.readTime()
+        self.id = Self.lastGeneratedID.withLock { previous in
+            let next = previous == Int.max ? Int.min : previous + 1
+            previous = max(Self.readTime(), next)
+            return previous
+        }
     }
 
     private static func readTime() -> Int {

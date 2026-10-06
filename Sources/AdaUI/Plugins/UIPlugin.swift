@@ -299,7 +299,15 @@ public func UpdateWindowManager(
         menuBuilder?.updateIfNeeded()
 
         for event in input.wrappedValue.eventsPool where event.window == window.id {
+            if window.blocksScenePicking(for: event) {
+                input.wrappedValue.blockScenePicking(for: event)
+            }
             window.sendEvent(event)
+        }
+        for (pointer, position) in input.wrappedValue.pointerLocations where pointer.windowID == window.id {
+            if window.blocksScenePicking(pointer: pointer, at: position) {
+                input.wrappedValue.blockScenePicking(for: pointer)
+            }
         }
 
         window.internalUpdate(deltaTime)

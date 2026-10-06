@@ -108,13 +108,36 @@ extension UIComponentSystem {
         }
 
         let events = input.getInputEvents()
-        for event in events {
+        for event in events where event.window == component.windowRef.getWindowId(from: primaryWindowId) {
             guard view.canRespondToAction(event) else {
                 continue
             }
 
-            let responder = view.findFirstResponder(for: event) ?? view
+            let hit = view.findFirstResponder(for: event)
+            if let hit, hit !== view.window {
+                if case .overlay = behaviour {
+                    if view.window?.blocksScenePicking(for: event) == true {
+                        input.blockScenePicking(for: event)
+                    }
+                } else {
+                    input.blockScenePicking(for: event)
+                }
+            }
+            let responder = hit ?? view
             responder.onEvent(event)
+        }
+
+        for (pointer, position) in input.pointerLocations where pointer.windowID == component.windowRef.getWindowId(from: primaryWindowId) {
+            if case .overlay = behaviour {
+                if view.window?.blocksScenePicking(pointer: pointer, at: position) == true {
+                    input.blockScenePicking(for: pointer)
+                }
+            } else {
+                let event = MouseEvent(window: pointer.windowID, button: .none, mousePosition: position, phase: .changed, modifierKeys: [], time: 0)
+                if view.findFirstResponder(for: event) != nil {
+                    input.blockScenePicking(for: pointer)
+                }
+            }
         }
 
         view.update(deltaTime)

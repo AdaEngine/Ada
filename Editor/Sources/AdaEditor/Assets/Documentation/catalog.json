@@ -2117,7 +2117,25 @@
       },
       {
         "kind": "text",
-        "text": "The initial host requires visionOS 26, disables foveation, and serializes its eye\npasses. It is intended for functional device validation before multiview and frame\nlatency optimization. It does not yet render capture-target drawables.",
+        "text": "The host requires visionOS 26 and enables system foveation when supported. Use\n`ImmersiveLayerConfiguration(enablesFoveation: false)` for a full-resolution comparison.\nThe simulator falls back to rendering without foveation. Each eye snapshots its\ncurrent drawable rate map, including the correct layer in a layered layout.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The main geometry pass renders four G-buffers and depth at variable rasterization\nrates. A nearest-sample resolve expands them into logical screen coordinates before\nSSAO, environment compositing, antialiasing and scene overlays. The final presentation\npass applies the drawable map again and converts forward depth to reverse depth.\nGeometry scratch textures and resolve pipelines are reused; rate-map parameters\nare immutable per frame. Foveation replaces spatial/temporal upscaling for these cameras.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Eye passes remain sequential with GPU fences because they share uniform scratch.\nScreen-space effects still run at full logical resolution, and resolving the buffers\nadds bandwidth cost. A performance gain requires measurement on Vision Pro; simulator\nlaunch alone cannot establish foveation quality, stereo alignment or gaze-driven savings.\nCapture-target drawables are not rendered yet.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Custom geometry vertex shaders used with layered foveation must select the target\nlayer explicitly. For the Metal backend, `ADA_METAL_RENDER_LAYER` is defined for\nvertex stages. The built-in shader reads a `uint` uniform at reserved binding 30\n(`GlobalBufferIndex.renderTargetLayer`) and writes `gl_Layer`; SPIRV-Cross maps that\nto Metal's `render_target_array_index`. Ordinary passes bind layer zero. Other\nbackends do not define this macro.",
         "level": 0,
         "links": []
       },
