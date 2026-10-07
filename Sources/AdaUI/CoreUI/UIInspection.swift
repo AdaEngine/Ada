@@ -484,8 +484,8 @@ extension ViewNode {
         return UINodeSummary(
             runtimeId: self.uiRuntimeID,
             accessibilityIdentifier: self.accessibilityIdentifier,
-            nodeType: String(reflecting: type(of: self)),
-            viewType: String(reflecting: type(of: self.content)),
+            nodeType: UIInspectionTypeName.name(of: type(of: self)),
+            viewType: UIInspectionTypeName.name(of: type(of: self.content)),
             frame: self.frame,
             absoluteFrame: absoluteFrame,
             canBecomeFocused: self.canBecomeFocused,

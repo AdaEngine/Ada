@@ -15,7 +15,17 @@ if [[ "${ADA_EDITOR_STANDALONE_SWIFTPM:-0}" == "1" ]]; then
         if [[ "$editor_command" == "$editor_binary" || "$editor_command" == "$editor_binary "* ]]; then kill "$editor_pid"; fi
     done
     export ADAENGINE_ANDROID=0 ADAENGINE_DISABLE_SWAN=1 ADAENGINE_HEADLESS=1
-    "$editor_swift" build --package-path "$editor_package_root" --scratch-path "$editor_scratch" --product AdaEditor --jobs 6
+    mkdir -p "$editor_scratch/package-roots"
+    editor_canonical_engine="${ADAENGINE_PACKAGE_PATH:-$editor_scratch/package-roots/AdaEngine}"
+    if [[ ! -e "$editor_canonical_engine" ]]; then ln -s "$editor_engine_root" "$editor_canonical_engine"; fi
+    if [[ "$(cd "$editor_canonical_engine" && pwd -P)" != "$editor_engine_root" ]]; then
+        echo "The task build directory belongs to another engine checkout." >&2
+        exit 1
+    fi
+    export ADAENGINE_PACKAGE_PATH="$editor_canonical_engine"
+    export CLANG_MODULE_CACHE_PATH="$editor_scratch/clang-cache"
+    export SWIFTPM_MODULECACHE_OVERRIDE="$editor_scratch/swift-cache"
+    "$editor_swift" build --package-path "$editor_package_root" --scratch-path "$editor_scratch" --product AdaEditor --jobs 6 --disable-sandbox --skip-update
     editor_bin_directory="$("$editor_swift" build --package-path "$editor_package_root" --scratch-path "$editor_scratch" --show-bin-path)"
     mkdir -p "$editor_app/Contents/MacOS" "$editor_app/Contents/Resources"
     editor_signed_binary="$editor_scratch/AdaEditor-signed-dev"
@@ -27,7 +37,7 @@ if [[ "${ADA_EDITOR_STANDALONE_SWIFTPM:-0}" == "1" ]]; then
         [[ -e "$editor_resource" ]] || continue
         /usr/bin/ditto "$editor_resource" "$editor_app/$(basename "$editor_resource")"
     done
-    /usr/bin/python3 "$editor_package_root/scripts/stage-build-sdk.py" --engine-root "$editor_engine_root" --output "$editor_app/Contents/Resources/BuildSDK"
+    /usr/bin/python3 "$editor_package_root/scripts/stage-build-sdk.py" --engine-root "$editor_engine_root" --compiler-root "${ADAENGINE_GRAVITY_PACKAGE_PATH:-$editor_scratch/checkouts/gravity-lang}" --output "$editor_app/Contents/Resources/BuildSDK"
     /usr/bin/python3 - "$editor_app/Contents/Info.plist" "$editor_app_name" <<'PY_PLIST'
 import plistlib,sys
 with open(sys.argv[1],"wb") as stream:
@@ -38,7 +48,13 @@ PY_PLIST
     # SwiftPM's executable already has its linker-generated development signature.
     # This source-development bundle is not a notarized distribution artifact.
     case "$MODE" in
-        run|--verify|verify) /usr/bin/open -n "$editor_app" --args "${@:2}" ;;
+        run|--verify|verify)
+            if [[ -n "${ADA_EDITOR_LOG_PATH:-}" ]]; then
+                /usr/bin/open -n "$editor_app" --stdout "$ADA_EDITOR_LOG_PATH" --stderr "$ADA_EDITOR_LOG_PATH" --args "${@:2}"
+            else
+                /usr/bin/open -n "$editor_app" --args "${@:2}"
+            fi
+            ;;
         --debug|debug) lldb -- "$editor_binary" "${@:2}" ;;
         --logs|logs) /usr/bin/open -n "$editor_app" --args "${@:2}"; /usr/bin/log stream --info --predicate "process == \"$editor_app_name\"" ;;
         *) echo "usage: $0 [run|--verify|--debug|--logs] [Studio arguments]" >&2; exit 2 ;;

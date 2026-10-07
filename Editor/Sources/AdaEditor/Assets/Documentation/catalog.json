@@ -131,6 +131,18 @@
             "destination": "AdaScriptECS"
           }
         ]
+      },
+      {
+        "kind": "heading",
+        "text": "Interactive agent forms",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "On macOS, ACP agents can stream native AdaUI forms and previews directly into\nAgent Chat using the advertised A2UI catalog. Ask for an NPC configuration form,\nedit the controls, and submit after the agent's turn finishes. The current values\nreturn to the same conversation, and the agent can generate an editable preview.\n**Open in UI Designer** creates a new `.ui` asset under `Assets/UI/AgentPreviews`;\nrefine it through the normal designer, undo/redo, and save workflow. Local form\nedits persist with the chat. Invalid updates retain the last working form and\nshow an interface error; interrupted forms remain disabled until refreshed.\nThe separate iPhone chat path is not connected to these cards yet.",
+        "level": 0,
+        "links": []
       }
     ]
   },
@@ -2012,6 +2024,262 @@
     ]
   },
   {
+    "id": "Agent3DWorkflow",
+    "title": "AI-assisted 3D work in Ada Studio",
+    "section": "Editor",
+    "source": "Editor/Documentation/Agent3DWorkflow.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "The mobile agent and desktop editor MCP share native model tools and offline knowledge. Start with `editor.project.context`; its `model3D` field describes formats, tools and verification limits. Desktop context also lists `authoringTools`. Tools require an open project on desktop and operate inside the project's declared Assets root. Import sources may also be under project-local Downloads.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Inspect and validate",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`editor.model.inspect` and `editor.model.validate` accept a project-relative `path`, such as `Assets/Models/Robot.glb`. Both run the production `NativeGLTFLoader` without constructing GPU resources. They report geometry counts, selected-scene rest-pose bounds at the original scale, material indexes and PBR factors, texture/image mappings, nodes, skin joints, named clips and durations, and local dependencies. Large inventories are bounded and marked `truncated`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Validation checks dependency containment and byte budgets, native decoding, image decoding, scene hierarchy, primitive geometry and the current import profile. `editor.asset.validate` also routes GLB/glTF to this validation. This is not a complete Khronos conformance check, GPU rendering proof or animation-playback proof. It does not author or validate gameplay collision shapes.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This profile supports glTF 2.0 primitive topologies, UV0/UV1, one set of four skin influences and at most 128 joints per skin. Required Draco/Meshopt/KTX2 extensions are unsupported. Node TRS clips can use LINEAR, STEP and CUBICSPLINE interpolation; morph-weight animation is unsupported. Models and their local dependencies have a combined 128 MiB budget. JSON and decoded accessor inventories have additional bounds.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Import and place",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Call `editor.model.import` with `source: \"Downloads/Robot/Robot.gltf\"` and `destination: \"Assets/Models\"`. Validation runs before copying. Local buffers/textures are copied as one portable bundle; repeated imports choose new names and preserve existing files. Network references, missing dependencies and escaping paths/symlinks fail. The tool returns the imported `path` and `assetReference`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Read `editor.components.describe` with query `Model3DSource`. Its `source` uses the returned `@res://` reference. Keep the required Transform and use its scale intentionally. For simple playback, set the exact inspected `animation` name, `autoplay` and `repeats`. Preserve unrelated fields, including any project-authored animation graph. When `animationGraph` is present it takes precedence over the single `animation` clip; do not silently discard it to force clip playback. Pose-graph editing is distinct from skeletal keyframe/rig authoring.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Desktop agents should use `editor.scene.get/apply` with the latest revision to place models in open scenes and retain document undo. Mobile agents use their project file tools for scene YAML. Imported meshes do not automatically receive physics bodies or colliders; read the PhysicsBody3DComponent descriptor before adding one.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Materials and lighting",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`editor.model.material.edit` accepts `path`, zero-based `material` and `settingsJSON`. Supported patch keys are `baseColorFactor` (linear RGBA), `metallicFactor`, `roughnessFactor`, `emissiveFactor` (linear RGB), `alphaMode`, `alphaCutoff` and `doubleSided`. Invalid patches fail before writing. Unpatched material fields, hierarchy, animation data and GLB binary chunks are preserved.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`editor.model.texture.assign` binds an image to `baseColor`, `normal`, `metallicRoughness`, `emissive` or `occlusion`. Inspect material indexes first. glTF roughness uses G and metallic uses B; normal and material maps are linear data, while base-color/emission textures are sRGB. `editor.texture.render` can create procedural placeholders and flat normal maps. These operations do not unwrap a mesh or bake lighting. Editing a shared model asset affects all references to it; rebuild/reload before comparing appearance.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Read exact Camera, Mesh3DComponent, light, Environment3D and physics payloads from `editor.components.describe`. Camera framing, lighting, model scale and valid UVs all matter. Use the `basic-3d-scene` example for a perspective camera, PBR cube, directional light and game3d plugin configuration.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Knowledge and verification",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`editor.skills.list` returns bundled workflow descriptions; `editor.skills.read` loads instructions by ID. The 3D packs are `ada-3d-assets`, `ada-3d-materials` and `ada-3d-animation`. Their detailed instructions are loaded when needed. `editor.docs.search/read`, `editor.api.describe`, `editor.components.describe` and `editor.examples.list/read` also work offline on both hosts.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Desktop uses `editor.build.start`, `editor.play.start`, `editor.task.status`, `editor.output.read` and `render.capture_screenshot`. Mobile uses `editor.build`, `editor.play.start`, `editor.play.capture` and `editor.image.read`. Select the tools actually advertised by the current host. Desktop asset tools exclude mobile vision analysis and direct on-disk scene assignment; desktop scene edits go through the revision/undo workflow. Save dirty asset documents before tool writes.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "After validation and build, inspect a completed frame from visible Play. Exercise selected clips and compare frames at different times for animation. Isolated simulation verifies logic and keyboard/physics behavior; it does not install Model3D or prove rendering. Blender execution, 3D generation, rig editing and skeletal clip authoring are not exposed by these Studio tools.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "A2UI",
+    "title": "Interactive agent UI",
+    "section": "Editor",
+    "source": "Editor/Documentation/A2UI.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Studio's macOS ACP chat can display native AdaUI forms and previews using the\nA2UI v0.9.1 Ada forms catalog. Use **Run Studio A2UI** in this worktree or\n`./script/run_studio_a2ui.sh`, open a project, and connect an ACP agent normally.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "NPC configuration workflow",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Ask: “Create an interactive NPC configuration form, then generate an editable\ndialog preview from my submitted values.” The bundled `/ada-ui-forms` skill\nprovides the workflow to agents that need more explicit guidance.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "1\\. The assistant streams a form inside its reply. Edit its fields and toggles.\n2\\. After the agent's turn finishes, submit the form. Submission returns the\n   current values to the same ACP session; an unsent composer draft is preserved.\n3\\. The agent returns a new preview surface. Click **Open in UI Designer** to\n   create a new project-local `.ui` asset and open it in the normal workbench.\n4\\. Refine through the designer's controls or YAML view, use undo/redo, and save.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Export paths are `Assets/UI/AgentPreviews/<surface>-<unique-id>.ui`; each export\ncreates a new file, and symlinked destination directories are rejected. The\nsnapshot retains native components, bindings with current defaults, and named\nhost actions. It does not serialize the agent transport or action-context mapping.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Transport contract",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Studio advertises its custom catalog and compact component contract in ACP prompt\ncontext. Ordinary assistant text remains Markdown. A fenced `a2ui` block contains\none complete JSON envelope per line; complete lines render progressively.\nAn exact opening fence at the end of a prose line is accepted too, because some\nACP agents concatenate planner and final replies without an intervening newline.\nFences inside ordinary code blocks remain ordinary text.\nACP embedded resources using `application/vnd.a2ui+json` or\n`application/a2ui+json` are also accepted. This is an ACP text/resource binding;\nit does not require a new ACP extension or a second MCP server.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The catalog supports Text, Row, Column, Button, TextField, Toggle, a single-string\nChoicePicker, and numeric Slider, with absolute JSON Pointer bindings and server\nevent actions. Required/range checks show inline errors and disable invalid\nsubmit buttons. Checks and controls survive the `.ui` authoring handoff.\nIt does not advertise the Basic Catalog, executable code, general/local functions, collection templates, or\narbitrary modifiers. See the engine's `Documentation/A2UI.md` for schema details.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Button actions become an `[A2UI user action]` context block on the next prompt\nin the owning conversation, including the envelope and its transport metadata.\n`sendDataModel` sends only the originating surface's model. Other conversations\nand other configured agents cannot receive a surface's submission. Changing\nproviders disables older forms until their original agent is reconnected.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Malformed interfaces show an inline error while retaining the previous working\nsurface. Correction feedback accompanies the following prompt. Interrupted or\nfailed runs have explicit surface states. Updates to a submitted surface can\nmake it ready for another interaction; a completed one-shot form stays submitted.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The ACP adapter waits for all session notifications preceding a prompt response\nto reach the transcript before marking the turn complete. This handles bursty\nstreams and slow UI rendering without a timing-based completion delay.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Persistence and scope",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Compact surface state, including locally edited values, is saved in the existing\nproject chat session store. Switching chats preserves each live surface instance;\nreopening Studio reconstructs surfaces without replaying server defaults over\nlocal edits. Incomplete in-flight forms reopen as interrupted. Existing sessions\nwithout the new optional field remain readable.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This integration uses the shared `EditorAgentViewModel`/macOS ACP sidebar.\nThe iPhone's separate SloppyRuntime chat path is not wired to these cards.\nA designer snapshot is a one-way handoff; subsequent designer edits are not sent\nback to the agent automatically. The host owns gameplay effects of exported actions.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Validation",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Run the test targets from the repository root:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "ADAENGINE_DISABLE_SWAN=1 swift test --package-path Editor --disable-sandbox \\\n  --scratch-path /private/tmp/adaeditor-a2ui-build \\\n  --filter 'EditorAgentA2UITests|EditorAgentA2UITransportTests|EditorLoadingAnimationTests'",
+        "language": "sh",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "QA objects and mocks belong under `Editor/Tests`, not the app target. The Python\nACP fixture remains in `Editor/Tests/AdaEditorTests/Fixtures` and is excluded\nfrom package resources. Transport tests launch it through the production adapter,\nexercise burst delivery with a slow UI sink and file callbacks after setup, and\ncheck child-process cleanup after failed connections. UI tests mount real chat\ncards, submit edits, export previews, and exercise the normal designer model.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For manual native verification, launch Studio normally with\n`./script/run_studio_a2ui.sh`, connect your configured agent, and follow the NPC\nworkflow above. No fixture launch modes or QA-specific app state are installed.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Inspection memory",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Large Swift generic view types can expand into huge diagnostic names. UI inspection\nnow reports a bounded nominal type name from immutable Swift runtime descriptors,\nwith generic arguments omitted. This avoids constructing the reflected/mangled\nname tree. In the development fixture run, sampled RSS ranged from 333 to 567 MiB and settled near 337 MiB;\nthis is macOS workflow evidence, not a universal leak or performance guarantee.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Configured-agent context limits",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A Sloppy `protectedContextExceedsBudget` failure can happen before UI generation\nwhen the selected model has no context-window metadata and the runtime falls back\nto its smaller generic budget. Resolve the selected model against the active\nprovider catalog and configure its reported `contextWindowTokens`; use the same\nsupported model for the agent and planner. Do not raise limits based on an\nunverified model name. The task's configured-provider workflow was verified with\n`openai-oauth:gpt-5.5` and the provider-reported 272,000-token window. This is\nprovider/session evidence, not a guarantee for every agent or model.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
     "id": "ImageDecoders",
     "title": "Loading images and adding formats",
     "section": "AdaEngine",
@@ -3005,109 +3273,6 @@
         "kind": "text",
         "text": "Editor export tests run a real multi-source AOT compiler, link and execute its\narchive from a C host, detach scene payloads, parse the generated player and\ncheck that failure preserves the old export. Separate app/browser validation is\nneeded for rendering and deployment evidence. Browser AudioPlugin uses a\nminiaudio mixer with its device disabled and sends copied Float32 PCM to Web Audio.\nThe export bundles `engine-audio.js` for every product. Output waits for a trusted\npointer/key gesture to resume AudioContext; mixing does not advance while output\nis suspended. WAV data and playback copies use independent owned decoders.\nCloud relay Host/Peer acceptance remains separate validation work.",
         "level": 0,
-        "links": []
-      }
-    ]
-  },
-  {
-    "id": "Agent3DWorkflow",
-    "title": "AI-assisted 3D work in Ada Studio",
-    "section": "Editor",
-    "source": "Editor/Documentation/Agent3DWorkflow.md",
-    "blocks": [
-      {
-        "kind": "heading",
-        "text": "AI-assisted 3D work in Ada Studio",
-        "level": 1,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "The mobile agent and desktop editor MCP share native model tools and offline knowledge. Start with `editor.project.context`; its `model3D` field describes formats, tools and verification limits. Desktop context also lists `authoringTools`. Tools require an open project on desktop and operate inside the project's declared Assets root. Import sources may also be under project-local Downloads.",
-        "links": []
-      },
-      {
-        "kind": "heading",
-        "text": "Inspect and validate",
-        "level": 2,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "`editor.model.inspect` and `editor.model.validate` accept a project-relative `path`, such as `Assets/Models/Robot.glb`. Both run the production `NativeGLTFLoader` without constructing GPU resources. They report geometry counts, selected-scene rest-pose bounds at the original scale, material indexes and PBR factors, texture/image mappings, nodes, skin joints, named clips and durations, and local dependencies. Large inventories are bounded and marked `truncated`.",
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Validation checks dependency containment and byte budgets, native decoding, image decoding, scene hierarchy, primitive geometry and the current import profile. `editor.asset.validate` also routes GLB/glTF to this validation. This is not a complete Khronos conformance check, GPU rendering proof or animation-playback proof. It does not author or validate gameplay collision shapes.",
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "This profile supports glTF 2.0 primitive topologies, UV0/UV1, one set of four skin influences and at most 128 joints per skin. Required Draco/Meshopt/KTX2 extensions are unsupported. Node TRS clips can use LINEAR, STEP and CUBICSPLINE interpolation; morph-weight animation is unsupported. Models and their local dependencies have a combined 128 MiB budget. JSON and decoded accessor inventories have additional bounds.",
-        "links": []
-      },
-      {
-        "kind": "heading",
-        "text": "Import and place",
-        "level": 2,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Call `editor.model.import` with `source: \"Downloads/Robot/Robot.gltf\"` and `destination: \"Assets/Models\"`. Validation runs before copying. Local buffers/textures are copied as one portable bundle; repeated imports choose new names and preserve existing files. Network references, missing dependencies and escaping paths/symlinks fail. The tool returns the imported `path` and `assetReference`.",
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Read `editor.components.describe` with query `Model3DSource`. Its `source` uses the returned `@res://` reference. Keep the required Transform and use its scale intentionally. For simple playback, set the exact inspected `animation` name, `autoplay` and `repeats`. Preserve unrelated fields, including any project-authored animation graph. When `animationGraph` is present it takes precedence over the single `animation` clip; do not silently discard it to force clip playback. Pose-graph editing is distinct from skeletal keyframe/rig authoring.",
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Desktop agents should use `editor.scene.get/apply` with the latest revision to place models in open scenes and retain document undo. Mobile agents use their project file tools for scene YAML. Imported meshes do not automatically receive physics bodies or colliders; read the PhysicsBody3DComponent descriptor before adding one.",
-        "links": []
-      },
-      {
-        "kind": "heading",
-        "text": "Materials and lighting",
-        "level": 2,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "`editor.model.material.edit` accepts `path`, zero-based `material` and `settingsJSON`. Supported patch keys are `baseColorFactor` (linear RGBA), `metallicFactor`, `roughnessFactor`, `emissiveFactor` (linear RGB), `alphaMode`, `alphaCutoff` and `doubleSided`. Invalid patches fail before writing. Unpatched material fields, hierarchy, animation data and GLB binary chunks are preserved.",
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "`editor.model.texture.assign` binds an image to `baseColor`, `normal`, `metallicRoughness`, `emissive` or `occlusion`. Inspect material indexes first. glTF roughness uses G and metallic uses B; normal and material maps are linear data, while base-color/emission textures are sRGB. `editor.texture.render` can create procedural placeholders and flat normal maps. These operations do not unwrap a mesh or bake lighting. Editing a shared model asset affects all references to it; rebuild/reload before comparing appearance.",
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Read exact Camera, Mesh3DComponent, light, Environment3D and physics payloads from `editor.components.describe`. Camera framing, lighting, model scale and valid UVs all matter. Use the `basic-3d-scene` example for a perspective camera, PBR cube, directional light and game3d plugin configuration.",
-        "links": []
-      },
-      {
-        "kind": "heading",
-        "text": "Knowledge and verification",
-        "level": 2,
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "`editor.skills.list` returns bundled workflow descriptions; `editor.skills.read` loads instructions by ID. The 3D packs are `ada-3d-assets`, `ada-3d-materials` and `ada-3d-animation`. Their detailed instructions are loaded when needed. `editor.docs.search/read`, `editor.api.describe`, `editor.components.describe` and `editor.examples.list/read` also work offline on both hosts.",
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "Desktop uses `editor.build.start`, `editor.play.start`, `editor.task.status`, `editor.output.read` and `render.capture_screenshot`. Mobile uses `editor.build`, `editor.play.start`, `editor.play.capture` and `editor.image.read`. Select the tools actually advertised by the current host. Desktop asset tools exclude mobile vision analysis and direct on-disk scene assignment; desktop scene edits go through the revision/undo workflow. Save dirty asset documents before tool writes.",
-        "links": []
-      },
-      {
-        "kind": "text",
-        "text": "After validation and build, inspect a completed frame from visible Play. Exercise selected clips and compare frames at different times for animation. Isolated simulation verifies logic and keyboard/physics behavior; it does not install Model3D or prove rendering. Blender execution, 3D generation, rig editing and skeletal clip authoring are not exposed by these Studio tools.",
         "links": []
       }
     ]

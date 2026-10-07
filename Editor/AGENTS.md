@@ -12,6 +12,8 @@ and assess gaps before proposing new features.
   have separate platform boundaries; do not assume desktop/mobile feature parity.
 - [Package.swift](Package.swift) owns package dependencies and resources;
   [project.yml](project.yml) owns XcodeGen app configuration.
+- Keep mocks, fixtures, and QA harnesses in test targets or separate executables.
+  Do not add test-only objects or QA launch hooks to the main app, including Debug builds.
 - Use an isolated scratch/module cache when necessary; never delete the shared
   `.build`. Preserve unrelated engine, demo, and editor changes.
 - Debug macOS builds accept `--editor-project=<absolute-path>` to open the
@@ -208,6 +210,14 @@ Coverage: [EditorDebuggerLaunchTests.swift](Tests/AdaEditorTests/EditorDebuggerL
 Desktop Git status, staging, commit, stash, pull/push, branch creation/checkout,
 history and diff review. Agent Chat includes transcript/session persistence,
 attachments, context selection, permissions, skills and agent settings.
+macOS ACP replies can stream native A2UI form/preview cards; submissions return to
+the owning session, local edits persist, and Open in UI Designer creates an editable
+project-local `.ui` snapshot. This does not wire the separate iPhone chat path.
+Guide: [A2UI.md](Documentation/A2UI.md).
+Entry points: [EditorAgentA2UIController.swift](Sources/AdaEditor/Agent/EditorAgentA2UIController.swift),
+[EditorAgentA2UISurfaceCard.swift](Sources/AdaEditor/UI/Editor/EditorAgentA2UISurfaceCard.swift).
+Coverage: [EditorAgentA2UITests.swift](Tests/AdaEditorTests/EditorAgentA2UITests.swift),
+[EditorAgentA2UITransportTests.swift](Tests/AdaEditorTests/EditorAgentA2UITransportTests.swift).
 macOS ACP catalog discovers/installs/connects agents; mobile uses an in-process
 SloppyRuntime path when available. Editor MCP/host tools expose project/docs/API
 context, scene edits, diagnostics, build, simulation, visible Play, frame capture,

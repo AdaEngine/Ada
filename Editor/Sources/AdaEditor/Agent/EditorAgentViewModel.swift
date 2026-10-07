@@ -7,7 +7,13 @@ import Observation
 final class EditorAgentViewModel {
     var connectionState: EditorAgentConnectionState = .disconnected
     var sessions: [EditorAgentSessionSummary] = []
-    var activeSession: EditorAgentSession?
+    var activeSession: EditorAgentSession? {
+        didSet { if let activeSession { a2ui.restoreIfNeeded(activeSession) } }
+    }
+    let a2ui = EditorAgentA2UIController()
+    var isSubmittingA2UI = false
+    @ObservationIgnored private var a2uiSaveTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var onOpenA2UIPreview: (String) -> Void = { _ in }
     var prompt: String = ""
     var mode: EditorAgentChatMode = .build
     var autocompleteSuggestions: [EditorAgentCompletion] = []
@@ -74,6 +80,7 @@ final class EditorAgentViewModel {
     private let service: any EditorAgentServicing
     @ObservationIgnored
     private var store: EditorAgentSessionStore?
+    @ObservationIgnored private var sessionLoadTask: Task<Void, Never>?
     @ObservationIgnored
     private var baseProjectConfig: AdaProject?
     let settings: EditorAgentSettingsStore
@@ -107,10 +114,57 @@ final class EditorAgentViewModel {
         catalog.notificationAction.projectID = project?.id
         catalog.notificationProjectName = project?.name
         self.onProjectFileChanged = onProjectFileChanged
+        a2ui.onRecordsChanged = { [weak self] sessionID, records in self?.a2uiRecordsChanged(sessionID: sessionID, records: records) }
+        a2ui.onSubmission = { [weak self] submission in self?.submitA2UI(submission) }
         configureForProject()
         connectionSettings = settings.configuration
         if let error = settings.loadError {
             settingsStatusMessage = error
+        }
+    }
+
+    func setA2UIPreviewHandler(_ handler: @escaping (String) -> Void) { onOpenA2UIPreview = handler }
+
+    func openA2UIPreview(surfaceID: String) {
+        guard let sessionID = activeSession?.id, let ui = a2ui.sessions[sessionID],
+              let surface = ui.client.surfaces[surfaceID], let projectURL
+        else { return }
+        do {
+            let path = try EditorAgentA2UIPreviewWriter.write(surface.snapshot(), surfaceID: surfaceID, projectURL: projectURL, fileManager: fileManager)
+            onProjectFileChanged(path)
+            onOpenA2UIPreview(path)
+        } catch { ui.setError(error.localizedDescription, surfaceID: surfaceID) }
+    }
+
+    private func submitA2UI(_ submission: EditorAgentA2UISubmission) {
+        guard activeSession?.id == submission.sessionID, !isSending, !isSubmittingA2UI, settings.configuration.enabled,
+              submission.agentIdentity == settings.configuration.target.sessionIdentity
+        else {
+            a2ui.sessions[submission.sessionID]?.rejectSubmission("This interface belongs to another or unavailable agent session. Reconnect its agent before submitting.", surfaceID: submission.surfaceID)
+            return
+        }
+        isSubmittingA2UI = true
+        Task {
+            await sendPromptAsync(a2uiSubmission: submission)
+            isSubmittingA2UI = false
+        }
+    }
+
+    private func a2uiRecordsChanged(sessionID: String, records: [EditorAgentA2UISurfaceRecord]) {
+        if activeSession?.id == sessionID { activeSession?.a2uiSurfaces = records }
+        if runningSession?.id == sessionID { runningSession?.a2uiSurfaces = records; return }
+        a2uiSaveTasks[sessionID]?.cancel()
+        a2uiSaveTasks[sessionID] = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
+            guard let self, let store = self.store, self.runningSession?.id != sessionID else { return }
+            do {
+                var session: EditorAgentSession
+                if let active = self.activeSession, active.id == sessionID { session = active }
+                else { session = try await store.loadSession(id: sessionID) }
+                session.a2uiSurfaces = self.a2ui.sessions[sessionID]?.persistedRecords ?? records
+                guard !Task.isCancelled, self.a2ui.sessions[sessionID] != nil else { return }
+                try await store.saveSession(session, makeActive: self.activeSession?.id == sessionID)
+            } catch { self.statusMessage = error.localizedDescription }
         }
     }
 
@@ -224,6 +278,20 @@ final class EditorAgentViewModel {
     }
 
     func loadSessions() async {
+        if let task = sessionLoadTask {
+            await task.value
+            return
+        }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.loadSessionsImpl()
+        }
+        sessionLoadTask = task
+        await task.value
+        sessionLoadTask = nil
+    }
+
+    private func loadSessionsImpl() async {
         guard let store else {
             return
         }
@@ -301,7 +369,9 @@ final class EditorAgentViewModel {
         Task {
             do {
                 await service.cancel(sessionID: summary.id)
+                a2uiSaveTasks.removeValue(forKey: summary.id)?.cancel()
                 try await store.deleteSession(id: summary.id)
+                a2ui.remove(sessionID: summary.id)
                 sessions = try await store.listSessions()
                 if activeSession?.id == summary.id {
                     if let next = sessions.first {
@@ -710,7 +780,7 @@ final class EditorAgentViewModel {
         }
     }
 
-    func sendPromptAsync() async {
+    func sendPromptAsync(a2uiSubmission: EditorAgentA2UISubmission? = nil) async {
         guard !isSending else {
             return
         }
@@ -723,13 +793,17 @@ final class EditorAgentViewModel {
             return
         }
 
+        if let submission = a2uiSubmission {
+            guard submission.sessionID == session.id, submission.agentIdentity == settings.configuration.target.sessionIdentity else { return }
+        }
+        session.a2uiSurfaces = a2ui.restoreIfNeeded(session).persistedRecords
         connectionSettings = projectConfig.ai.agent
         refreshSkills()
         if session.agentTargetIdentity != settings.configuration.target.sessionIdentity {
             session.upstreamSessionID = nil
         }
         session.agentTargetIdentity = settings.configuration.target.sessionIdentity
-        let preparedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let preparedPrompt = a2uiSubmission?.summary ?? prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let invokedSkills = skillsInvokedByPrompt(preparedPrompt)
         let visibleRequestSkills = uniqueSkills(selectedSkills + invokedSkills)
         let coreSkills = availableSkills.filter { $0.id == "ada-project-orientation" }
@@ -747,7 +821,7 @@ final class EditorAgentViewModel {
                 }
                 return EditorAgentAttachmentContext.attachment(forFileAt: url, projectURL: projectURL, fileManager: fileManager)
             }
-        let attachmentsToSend = uniqueAttachments(pendingAttachments + tokenAttachments)
+        let attachmentsToSend = a2uiSubmission == nil ? uniqueAttachments(pendingAttachments + tokenAttachments) : []
 
         let userSegments =
             [
@@ -770,16 +844,20 @@ final class EditorAgentViewModel {
         session.selectedSkillIDs = Array(selectedSkillIDs).sorted()
         session.updatedAt = Date()
         activeSession = session
-        prompt = ""
-        autocompleteSuggestions = []
+        if a2uiSubmission == nil {
+            prompt = ""
+            autocompleteSuggestions = []
+            pendingAttachments = []
+        }
         let attachments = attachmentsToSend
-        let codeSelectionToSend = codeSelection
-        pendingAttachments = []
-        codeSelection = nil
+        let codeSelectionToSend = a2uiSubmission == nil ? codeSelection : nil
+        if a2uiSubmission == nil { codeSelection = nil }
         isSending = true
         connectionState = .connecting
         await saveActiveSession()
         runningSession = session
+        let ui = a2ui.restoreIfNeeded(session)
+        ui.beginRun(agentIdentity: session.agentTargetIdentity)
         let sessionID = session.id
         let activityID = notifications.activities.begin(
             .init(
@@ -811,7 +889,10 @@ final class EditorAgentViewModel {
                     sceneContext: sceneContext,
                     codeSelection: codeSelectionToSend,
                     skills: requestSkills,
-                    availableSkills: availableSkills
+                    availableSkills: availableSkills,
+                    a2uiAction: a2uiSubmission?.event,
+                    a2uiFeedback: Array(ui.eventErrors.values.sorted().prefix(4)),
+                    a2uiEnabled: true
                 ),
                 onEvent: { [weak self] event in
                     await MainActor.run {
@@ -836,6 +917,7 @@ final class EditorAgentViewModel {
                 sessionID: sessionID,
                 activityID: activityID
             )
+            ui.finishRun(cancelled: cancelled, submission: a2uiSubmission)
             notifications.activities.finish(activityID, state: cancelled ? .cancelled : .completed)
         } catch {
             let cancelled = !notifications.activities.active.contains { $0.id == activityID } || error is CancellationError
@@ -849,6 +931,7 @@ final class EditorAgentViewModel {
                 sessionID: sessionID,
                 activityID: activityID
             )
+            ui.finishRun(cancelled: cancelled, failed: !cancelled, submission: a2uiSubmission)
             notifications.activities.finish(activityID, state: cancelled ? .cancelled : .failed, detail: error.localizedDescription)
             if activeSession?.id == sessionID {
                 connectionState = cancelled ? .disconnected : .failed(error.localizedDescription)
@@ -892,6 +975,7 @@ final class EditorAgentViewModel {
             EditorAgentEventReducer.upsert(event, into: &session.events)
             session.updatedAt = Date()
             runningSession = session
+            if let merged = session.events.first(where: { $0.id == event.id }) { a2ui.sessions[sessionID]?.receive(merged) }
         }
     }
 
@@ -1005,12 +1089,14 @@ final class EditorAgentViewModel {
             session.title = String(userText.prefix(48)).nilIfEmpty ?? session.title
         }
         activeSession = session
+        if let merged = session.events.first(where: { $0.id == event.id }) { a2ui.restoreIfNeeded(session).receive(merged) }
     }
 
     private func saveActiveSession() async {
-        guard let store, let activeSession else {
+        guard let store, var activeSession else {
             return
         }
+        activeSession.a2uiSurfaces = a2ui.restoreIfNeeded(activeSession).persistedRecords
         do {
             try await store.saveSession(activeSession, makeActive: true)
             sessions = try await store.listSessions()

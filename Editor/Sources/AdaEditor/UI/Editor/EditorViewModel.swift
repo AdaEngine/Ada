@@ -280,6 +280,10 @@ final class EditorViewModel {
         self.agent.setProjectFileChangedHandler { [weak self] relativePath in
             self?.handleAgentProjectFileChanged(relativePath: relativePath, fileManager: fileManager)
         }
+        self.agent.setA2UIPreviewHandler { [weak self] path in
+            guard let self, let item = self.projectSidebar.items.first(where: { $0.relativePath == path }) else { return }
+            self.openProjectItem(item)
+        }
         self.workbench.setActiveDocumentWillChangeHandler { [weak self] in
             self?.saveActiveDocumentIfNeeded()
         }

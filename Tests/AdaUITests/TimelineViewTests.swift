@@ -5,10 +5,10 @@
 //  Created by AdaEngine on 28.05.2026.
 //
 
-import Foundation
-import Testing
 @testable import AdaPlatform
 @testable import AdaUI
+import Foundation
+import Testing
 
 @MainActor
 struct TimelineViewTests {
@@ -32,6 +32,23 @@ struct TimelineViewTests {
         #expect(recorder.dates.count == 2)
         #expect(recorder.dates[1] >= recorder.dates[0])
         #expect(recorder.cadences == [.live, .live])
+    }
+
+    @Test
+    func animationClockKeepsAdvancingAfterParentReconciliation() {
+        let recorder = TimelineRecorder()
+        let tester = ViewTester {
+            TimelineView(.animation) { context in
+                TimelineRecorderView(date: context.date, cadence: context.cadence, recorder: recorder)
+            }
+        }
+        tester.invalidateContent().performLayout()
+        recorder.dates.removeAll()
+        recorder.cadences.removeAll()
+        tester.containerView.update(1.0 / 60.0)
+        tester.containerView.update(1.0 / 60.0)
+        #expect(recorder.dates.count == 2)
+        #expect(recorder.dates[1] > recorder.dates[0])
     }
 
     @Test
@@ -96,7 +113,7 @@ private struct TimelineRecorderView: View, ViewNodeBuilder {
     let recorder: TimelineRecorder
 
     var body: Never {
-        fatalError()
+        fatalError("A test leaf builds its node directly.")
     }
 
     func buildViewNode(in context: BuildContext) -> ViewNode {
