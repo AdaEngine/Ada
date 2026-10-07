@@ -1,0 +1,860 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adaengine.org/a2ui/catalogs/forms/v1",
+  "catalogId": "https://adaengine.org/a2ui/catalogs/forms/v1",
+  "title": "AdaUI Forms Catalog v1",
+  "description": "A2UI v0.9.1. Static children, absolute bindings, server events, single-string choices, numeric sliders, bounded required/range validation checks. Host styling; no general functions or collection templates.",
+  "components": {
+    "Text": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common_types.json#/$defs/ComponentId"
+        },
+        "component": {
+          "const": "Text"
+        },
+        "text": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteBinding"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "component",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "Column": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common_types.json#/$defs/ComponentId"
+        },
+        "component": {
+          "const": "Column"
+        },
+        "children": {
+          "allOf": [
+            {
+              "$ref": "common_types.json#/$defs/ChildList"
+            },
+            {
+              "type": "array",
+              "uniqueItems": true
+            }
+          ]
+        },
+        "spacing": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 128
+        }
+      },
+      "required": [
+        "id",
+        "component",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "Row": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common_types.json#/$defs/ComponentId"
+        },
+        "component": {
+          "const": "Row"
+        },
+        "children": {
+          "allOf": [
+            {
+              "$ref": "common_types.json#/$defs/ChildList"
+            },
+            {
+              "type": "array",
+              "uniqueItems": true
+            }
+          ]
+        },
+        "spacing": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 128
+        }
+      },
+      "required": [
+        "id",
+        "component",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "TextField": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common_types.json#/$defs/ComponentId"
+        },
+        "component": {
+          "const": "TextField"
+        },
+        "text": {
+          "$ref": "#/$defs/AbsoluteBinding"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/Check"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "component",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "Toggle": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common_types.json#/$defs/ComponentId"
+        },
+        "component": {
+          "const": "Toggle"
+        },
+        "label": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteBinding"
+            }
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/AbsoluteBinding"
+        },
+        "checks": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/Check"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "component",
+        "label",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "Button": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common_types.json#/$defs/ComponentId"
+        },
+        "component": {
+          "const": "Button"
+        },
+        "text": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteBinding"
+            }
+          ]
+        },
+        "action": {
+          "$ref": "#/$defs/ServerAction"
+        },
+        "checks": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/Check"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "component",
+        "text",
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "ChoicePicker": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common_types.json#/$defs/ComponentId"
+        },
+        "component": {
+          "const": "ChoicePicker"
+        },
+        "label": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/AbsoluteBinding"
+            }
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/AbsoluteBinding"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "label",
+              "value"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "checks": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/Check"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "component",
+        "value",
+        "options"
+      ],
+      "additionalProperties": false
+    },
+    "Slider": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common_types.json#/$defs/ComponentId"
+        },
+        "component": {
+          "const": "Slider"
+        },
+        "value": {
+          "$ref": "#/$defs/AbsoluteBinding"
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        },
+        "step": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "checks": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/Check"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "component",
+        "value",
+        "min",
+        "max"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "functions": {
+    "required": {
+      "type": "object",
+      "properties": {
+        "call": {
+          "const": "required"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/AbsoluteBinding"
+                },
+                {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array",
+                    "null"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "call",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "range": {
+      "type": "object",
+      "properties": {
+        "call": {
+          "const": "range"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/AbsoluteBinding"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "value",
+            "min",
+            "max"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "call",
+        "args"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "theme": {
+    "type": "object",
+    "additionalProperties": false
+  },
+  "$defs": {
+    "AbsoluteBinding": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^/"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "ServerAction": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "context": {
+              "type": "object",
+              "additionalProperties": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/AbsoluteBinding"
+                  },
+                  {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "null",
+                      "array"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "not": {
+                      "required": [
+                        "path"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "event"
+      ],
+      "additionalProperties": false
+    },
+    "anyComponent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "common_types.json#/$defs/ComponentId"
+            },
+            "component": {
+              "const": "Text"
+            },
+            "text": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/AbsoluteBinding"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "component",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "common_types.json#/$defs/ComponentId"
+            },
+            "component": {
+              "const": "Column"
+            },
+            "children": {
+              "allOf": [
+                {
+                  "$ref": "common_types.json#/$defs/ChildList"
+                },
+                {
+                  "type": "array",
+                  "uniqueItems": true
+                }
+              ]
+            },
+            "spacing": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 128
+            }
+          },
+          "required": [
+            "id",
+            "component",
+            "children"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "common_types.json#/$defs/ComponentId"
+            },
+            "component": {
+              "const": "Row"
+            },
+            "children": {
+              "allOf": [
+                {
+                  "$ref": "common_types.json#/$defs/ChildList"
+                },
+                {
+                  "type": "array",
+                  "uniqueItems": true
+                }
+              ]
+            },
+            "spacing": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 128
+            }
+          },
+          "required": [
+            "id",
+            "component",
+            "children"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "common_types.json#/$defs/ComponentId"
+            },
+            "component": {
+              "const": "TextField"
+            },
+            "text": {
+              "$ref": "#/$defs/AbsoluteBinding"
+            },
+            "placeholder": {
+              "type": "string"
+            },
+            "checks": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "$ref": "#/$defs/Check"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "component",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "common_types.json#/$defs/ComponentId"
+            },
+            "component": {
+              "const": "Toggle"
+            },
+            "label": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/AbsoluteBinding"
+                }
+              ]
+            },
+            "value": {
+              "$ref": "#/$defs/AbsoluteBinding"
+            },
+            "checks": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "$ref": "#/$defs/Check"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "component",
+            "label",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "common_types.json#/$defs/ComponentId"
+            },
+            "component": {
+              "const": "Button"
+            },
+            "text": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/AbsoluteBinding"
+                }
+              ]
+            },
+            "action": {
+              "$ref": "#/$defs/ServerAction"
+            },
+            "checks": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "$ref": "#/$defs/Check"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "component",
+            "text",
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "common_types.json#/$defs/ComponentId"
+            },
+            "component": {
+              "const": "ChoicePicker"
+            },
+            "label": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/$defs/AbsoluteBinding"
+                }
+              ]
+            },
+            "value": {
+              "$ref": "#/$defs/AbsoluteBinding"
+            },
+            "options": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "label",
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "checks": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "$ref": "#/$defs/Check"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "component",
+            "value",
+            "options"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "common_types.json#/$defs/ComponentId"
+            },
+            "component": {
+              "const": "Slider"
+            },
+            "value": {
+              "$ref": "#/$defs/AbsoluteBinding"
+            },
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "step": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "checks": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "$ref": "#/$defs/Check"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "component",
+            "value",
+            "min",
+            "max"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "Check": {
+      "type": "object",
+      "properties": {
+        "condition": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "call": {
+                  "const": "required"
+                },
+                "args": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/$defs/AbsoluteBinding"
+                        },
+                        {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean",
+                            "array",
+                            "null"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "value"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "call",
+                "args"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "call": {
+                  "const": "range"
+                },
+                "args": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/$defs/AbsoluteBinding"
+                        },
+                        {
+                          "type": "number"
+                        }
+                      ]
+                    },
+                    "min": {
+                      "type": "number"
+                    },
+                    "max": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "min",
+                    "max"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "call",
+                "args"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      },
+      "required": [
+        "condition",
+        "message"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

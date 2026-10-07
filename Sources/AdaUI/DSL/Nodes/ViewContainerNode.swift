@@ -420,6 +420,11 @@ class ViewContainerNode: ViewNode {
         }
     }
 
+    /// Stateful subclasses can keep a builder tied to their mounted runtime state.
+    func updateContentBuilder(from container: ViewContainerNode) {
+        body = container.body
+    }
+
     override func update(from newNode: ViewNode) {
         super.update(from: newNode)
 
@@ -427,7 +432,7 @@ class ViewContainerNode: ViewNode {
             return
         }
 
-        self.body = container.body
+        updateContentBuilder(from: container)
         if self.stateContainer != nil || container.nodes.isEmpty {
             if Self.isLayoutPropagationSuppressed {
                 self.invalidateContent(propagateLayout: false)

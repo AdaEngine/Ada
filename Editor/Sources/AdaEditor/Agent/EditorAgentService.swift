@@ -1,3 +1,4 @@
+import AdaA2UI
 import Foundation
 
 #if canImport(ACP) && canImport(ACPModel)
@@ -16,6 +17,9 @@ struct EditorAgentRunRequest: Sendable {
     var codeSelection: EditorAgentCodeSelectionContext?
     var skills: [EditorAgentSkill]
     var availableSkills: [EditorAgentSkill] = []
+    var a2uiAction: A2UIClientEvent? = nil
+    var a2uiFeedback: [String] = []
+    var a2uiEnabled = false
 }
 
 struct EditorAgentRunResult: Sendable {
@@ -126,6 +130,8 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
     actor EditorACPAgentService: EditorAgentServicing {
         private struct ManagedSession {
             var client: Client
+            // ACP.Client and its request router keep weak delegate references.
+            let delegate: EditorACPClientDelegate
             var eventSink: EditorACPEventSink
             var agentSettings: AdaProjectAgent
             var mcpEnabled: Bool
@@ -133,6 +139,8 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             var supportsLoadSession: Bool
             var agentName: String?
             var notificationTask: Task<Void, Never>
+            var wireTask: Task<Void, Never>
+            var notificationDrain: EditorACPNotificationDrain
             var assistantText: String
             var assistantEventID: String
             var thinkingEventID: String
@@ -186,10 +194,15 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             managed.hasSentPrompt = true
             sessions[request.session.id] = managed
 
-            let response = try await managed.client.sendPrompt(
-                sessionId: managed.upstreamSessionID,
-                content: content
-            )
+            let ticket = await managed.notificationDrain.beginPrompt()
+            let response: SessionPromptResponse
+            do {
+                response = try await managed.client.sendPrompt(sessionId: managed.upstreamSessionID, content: content)
+                try await managed.notificationDrain.wait(for: ticket)
+            } catch {
+                await managed.notificationDrain.abandon(ticket)
+                throw error
+            }
 
             managed = sessions[request.session.id] ?? managed
             managed.assistantText = managed.assistantText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -270,6 +283,8 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             for preparation in sessionPreparations.values { preparation.cancel() }
             for session in sessions.values {
                 session.notificationTask.cancel()
+                session.wireTask.cancel()
+                await session.notificationDrain.close()
                 await session.client.terminate()
             }
             sessions.removeAll()
@@ -305,6 +320,8 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
                     return existing
                 }
                 existing.notificationTask.cancel()
+                existing.wireTask.cancel()
+                await existing.notificationDrain.close()
                 await existing.client.terminate()
                 sessions.removeValue(forKey: request.session.id)
             }
@@ -339,98 +356,120 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             let agentConfig = request.project.ai.agent
 
             let client = Client()
-            let eventSink = EditorACPEventSink(onEvent: onEvent, onFileChanged: onProjectFileChanged)
-            let projectURL = request.projectURL.standardizedFileURL
-            let delegate = EditorACPClientDelegate(
-                localSessionID: request.session.id,
-                projectURL: projectURL,
-                permissionMode: agentConfig.permissionMode,
-                permissionBroker: permissionBroker,
-                onEvent: { await eventSink.emit($0) },
-                onProjectFileChanged: { await eventSink.fileChanged($0) }
-            )
-            await client.setDelegate(delegate)
-
-            let workingDirectory = effectiveWorkingDirectory(projectURL: projectURL, target: agentConfig.target)
-            try await client.launch(
-                agentPath: command,
-                arguments: agentConfig.target.arguments,
-                workingDirectory: workingDirectory.path,
-                environment: agentConfig.target.environment
-            )
-            let initialized = try await client.initialize(
-                capabilities: ClientCapabilities(
-                    fs: FileSystemCapabilities(readTextFile: true, writeTextFile: true),
-                    terminal: true
-                ),
-                clientInfo: ClientInfo(name: "AdaEditor", title: "Ada Editor", version: "1.0.0"),
-                timeout: 30
-            )
-
-            let upstreamSessionID: SessionId
-            let modes: ModesInfo?
-            let models: ModelsInfo?
-            let configOptions: [SessionConfigOption]?
-            let supportsLoadSession = initialized.agentCapabilities.loadSession == true
-            let servers = EditorAgentMCPConnection.servers(
-                enabled: request.project.ai.mcp.enabled,
-                supportsHTTP: initialized.agentCapabilities.mcpCapabilities?.http == true
-            )
-            let localSessionID = request.session.id
-            // Consume load-session replay while the session is still being prepared,
-            // rather than leaving it buffered until the first new prompt starts.
-            let notificationTask = Task { [weak self] in
-                for await notification in await client.notifications {
-                    await self?.handleNotification(
-                        localSessionID: localSessionID,
-                        notification: notification,
-                        onEvent: { await eventSink.emit($0) }
-                    )
+            await client.enableDebugStream()
+            let notificationDrain = EditorACPNotificationDrain()
+            let wireTask = Task {
+                if let stream = await client.debugMessages {
+                    for await message in stream { await notificationDrain.observe(message) }
                 }
+                await notificationDrain.close()
             }
-            if let upstream = request.session.upstreamSessionID, supportsLoadSession, request.session.agentTargetIdentity == agentConfig.target.sessionIdentity {
-                let response = try await client.loadSession(sessionId: SessionId(upstream), cwd: workingDirectory.path, mcpServers: servers)
-                upstreamSessionID = response.sessionId
-                modes = response.modes
-                models = response.models
-                configOptions = response.configOptions
-            } else {
-                let response = try await client.newSession(
+            var preparingNotificationTask: Task<Void, Never>?
+            do {
+                let eventSink = EditorACPEventSink(onEvent: onEvent, onFileChanged: onProjectFileChanged)
+                let projectURL = request.projectURL.standardizedFileURL
+                let delegate = EditorACPClientDelegate(
+                    localSessionID: request.session.id,
+                    projectURL: projectURL,
+                    permissionMode: agentConfig.permissionMode,
+                    permissionBroker: permissionBroker,
+                    onEvent: { await eventSink.emit($0) },
+                    onProjectFileChanged: { await eventSink.fileChanged($0) }
+                )
+                await client.setDelegate(delegate)
+
+                let workingDirectory = effectiveWorkingDirectory(projectURL: projectURL, target: agentConfig.target)
+                try await client.launch(
+                    agentPath: command,
+                    arguments: agentConfig.target.arguments,
                     workingDirectory: workingDirectory.path,
-                    mcpServers: servers,
+                    environment: agentConfig.target.environment
+                )
+                let initialized = try await client.initialize(
+                    capabilities: ClientCapabilities(
+                        fs: FileSystemCapabilities(readTextFile: true, writeTextFile: true),
+                        terminal: true
+                    ),
+                    clientInfo: ClientInfo(name: "AdaEditor", title: "Ada Editor", version: "1.0.0"),
                     timeout: 30
                 )
-                upstreamSessionID = response.sessionId
-                modes = response.modes
-                models = response.models
-                configOptions = response.configOptions
-            }
 
-            let agentName = initialized.agentInfo?.title ?? initialized.agentInfo?.name
-            let managed = ManagedSession(
-                client: client,
-                eventSink: eventSink,
-                agentSettings: agentConfig,
-                mcpEnabled: request.project.ai.mcp.enabled,
-                upstreamSessionID: upstreamSessionID,
-                supportsLoadSession: supportsLoadSession,
-                agentName: agentName,
-                notificationTask: notificationTask,
-                assistantText: "",
-                assistantEventID: UUID().uuidString,
-                thinkingEventID: UUID().uuidString,
-                hasSentPrompt: false,
-                isPromptRunning: false,
-                configuration: Self.configuration(
-                    agentName: agentName,
-                    modes: modes,
-                    models: models,
-                    configOptions: configOptions
+                let upstreamSessionID: SessionId
+                let modes: ModesInfo?
+                let models: ModelsInfo?
+                let configOptions: [SessionConfigOption]?
+                let supportsLoadSession = initialized.agentCapabilities.loadSession == true
+                let servers = EditorAgentMCPConnection.servers(
+                    enabled: request.project.ai.mcp.enabled,
+                    supportsHTTP: initialized.agentCapabilities.mcpCapabilities?.http == true
                 )
-            )
-            sessions[localSessionID] = managed
-            await onEvent(EditorAgentEvent(kind: .runStatus, configuration: managed.configuration))
-            return managed
+                let localSessionID = request.session.id
+                // Consume load-session replay while the session is still being prepared,
+                // rather than leaving it buffered until the first new prompt starts.
+                let notificationTask = Task { [weak self] in
+                    for await notification in await client.notifications {
+                        await self?.handleNotification(
+                            localSessionID: localSessionID,
+                            notification: notification,
+                            onEvent: { await eventSink.emit($0) }
+                        )
+                        if notification.method == "session/update" { await notificationDrain.didProcessNotification() }
+                    }
+                }
+                preparingNotificationTask = notificationTask
+                if let upstream = request.session.upstreamSessionID, supportsLoadSession, request.session.agentTargetIdentity == agentConfig.target.sessionIdentity {
+                    let response = try await client.loadSession(sessionId: SessionId(upstream), cwd: workingDirectory.path, mcpServers: servers)
+                    upstreamSessionID = response.sessionId
+                    modes = response.modes
+                    models = response.models
+                    configOptions = response.configOptions
+                } else {
+                    let response = try await client.newSession(
+                        workingDirectory: workingDirectory.path,
+                        mcpServers: servers,
+                        timeout: 60
+                    )
+                    upstreamSessionID = response.sessionId
+                    modes = response.modes
+                    models = response.models
+                    configOptions = response.configOptions
+                }
+
+                let agentName = initialized.agentInfo?.title ?? initialized.agentInfo?.name
+                let managed = ManagedSession(
+                    client: client,
+                    delegate: delegate,
+                    eventSink: eventSink,
+                    agentSettings: agentConfig,
+                    mcpEnabled: request.project.ai.mcp.enabled,
+                    upstreamSessionID: upstreamSessionID,
+                    supportsLoadSession: supportsLoadSession,
+                    agentName: agentName,
+                    notificationTask: notificationTask,
+                    wireTask: wireTask,
+                    notificationDrain: notificationDrain,
+                    assistantText: "",
+                    assistantEventID: UUID().uuidString,
+                    thinkingEventID: UUID().uuidString,
+                    hasSentPrompt: false,
+                    isPromptRunning: false,
+                    configuration: Self.configuration(
+                        agentName: agentName,
+                        modes: modes,
+                        models: models,
+                        configOptions: configOptions
+                    )
+                )
+                sessions[localSessionID] = managed
+                await onEvent(EditorAgentEvent(kind: .runStatus, configuration: managed.configuration))
+                return managed
+            } catch {
+                preparingNotificationTask?.cancel()
+                wireTask.cancel()
+                await notificationDrain.close()
+                await client.terminate()
+                throw error
+            }
         }
 
         private static func configuration(
@@ -674,7 +713,11 @@ enum EditorAgentServiceError: Error, LocalizedError, Sendable {
             case let .text(text):
                 return text.text
             case let .resource(resource):
-                return resource.resource.text ?? ""
+                let text = resource.resource.text ?? ""
+                if ["application/vnd.a2ui+json", "application/a2ui+json"].contains(resource.resource.mimeType ?? "") {
+                    return "```a2ui\n" + text + "\n```\n"
+                }
+                return text
             case let .resourceLink(link):
                 return link.uri
             case .image,
@@ -793,7 +836,14 @@ enum EditorAgentPromptContext {
             text += "\n\n\(skillCatalogBlock(request.availableSkills))"
         }
 
+        if request.a2uiEnabled { text += "\n\n\(EditorAgentA2UIProtocol.promptContext())" }
         text += "\n\n\(request.prompt)"
+        if !request.a2uiFeedback.isEmpty {
+            text += "\n\n[A2UI validation feedback]\n" + request.a2uiFeedback.joined(separator: "\n")
+        }
+        if let action = request.a2uiAction {
+            text += "\n\n\(EditorAgentA2UIProtocol.actionContext(action))"
+        }
 
         for skill in request.skills where skill.userInvocable {
             text += "\n\n[Skill: \(skill.name)]\n\(skill.instructions)"

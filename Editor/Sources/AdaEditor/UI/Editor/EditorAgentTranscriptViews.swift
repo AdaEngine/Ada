@@ -1,4 +1,5 @@
 @_spi(AdaEngine) import AdaEngine
+import Foundation
 import Math
 
 /// Measure height at the final bubble width; HStack's ideal-width height can clip wrapped replies.
@@ -95,13 +96,34 @@ struct EditorAgentEventCard: View {
                 .foregroundColor(eventColor)
         }
         if let message = event.message {
-            ForEach(Array(message.segments.enumerated()), id: \.offset) { _, segment in
+            ForEach(Array(displaySegments(message).enumerated()), id: \.offset) { _, segment in
                 segmentView(segment)
             }
         } else if event.toolCall == nil, event.permission == nil, let details = event.details {
             Text(details)
                 .font(.system(size: 12))
                 .foregroundColor(theme.editorColors.muted)
+        }
+        if let model = viewModel, let sessionID = model.activeSession?.id, let ui = model.a2ui.sessions[sessionID] {
+            ForEach(ui.surfaceIDs(for: event.id), id: \.self) { surfaceID in
+                EditorAgentA2UISurfaceCard(viewModel: model, session: ui, surfaceID: surfaceID)
+            }
+            if let error = ui.eventErrors[event.id] {
+                Text("Interface error: \(error)").font(.system(size: 12)).foregroundColor(.red)
+            }
+        }
+    }
+
+    private func displaySegments(_ message: EditorAgentMessage) -> [EditorAgentMessageSegment] {
+        guard message.role == .assistant, let sessionID = viewModel?.activeSession?.id,
+              let text = viewModel?.a2ui.sessions[sessionID]?.displayTexts[event.id]
+        else { return message.segments }
+        var insertedText = false
+        return message.segments.compactMap { segment in
+            guard segment.kind == .text else { return segment }
+            guard !insertedText else { return nil }
+            insertedText = true
+            return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .init(kind: .text, text: text)
         }
     }
 

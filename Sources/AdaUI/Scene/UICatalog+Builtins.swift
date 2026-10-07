@@ -163,6 +163,33 @@ extension UICatalog {
                     })
                 )
             },
+            view("Toggle", [string("title", "Toggle"), .init("isOn", type: .bool, defaultValue: .bool(false), isBinding: true)]) { c in
+                guard let binding = c.bindings["isOn"] else {
+                    throw UIDiagnostic("Toggle requires an isOn binding.")
+                }
+                return AnyView(Toggle(c.string("title"), isOn: Binding(
+                    get: { binding.wrappedValue.bool ?? false },
+                    set: { binding.wrappedValue = .bool($0) }
+                )))
+            },
+            view("ChoicePicker", [string("label"), string("identifier"), .init("selection", type: .string, defaultValue: .string(""), isBinding: true), .init("options", type: .array, defaultValue: .array([.object(["label": .string("Option"), "value": .string("option")])]))]) { c in
+                guard let values = c.arguments["options"]?.array, !values.isEmpty, values.count <= 64 else {
+                    throw UIDiagnostic("ChoicePicker requires 1...64 options.")
+                }
+                let options = try values.map { item -> ChoicePicker.Option in
+                    guard case let .object(fields) = item, let label = fields["label"]?.string,
+                          let value = fields["value"]?.string, !value.isEmpty else { throw UIDiagnostic("Invalid ChoicePicker option.") }
+                    return .init(label: label, value: value)
+                }
+                guard Set(options.map(\.value)).count == options.count else { throw UIDiagnostic("ChoicePicker values must be unique.") }
+                return AnyView(ChoicePicker(c.string("label"), selection: c.textBinding("selection"), options: options, identifier: c.string("identifier")))
+            },
+            view("Slider", [.init("value", type: .number, defaultValue: .number(0), isBinding: true), number("min", 0), number("max", 1), number("step", 0)]) { c in
+                let lower = c.number("min"), upper = c.number("max"), step = c.number("step")
+                guard lower.isFinite, upper.isFinite, lower < upper, (upper - lower).isFinite,
+                      step.isFinite, step >= 0, let value = c.bindings["value"] else { throw UIDiagnostic("Invalid Slider bounds, step, or binding.") }
+                return AnyView(Slider(value: Binding(get: { value.wrappedValue.number ?? lower }, set: { value.wrappedValue = .number($0) }), in: lower...upper, step: step))
+            },
             view("TextField", [string("placeholder"), .init("text", type: .string, defaultValue: .string(""), isBinding: true)]) { c in
                 AnyView(TextField(c.string("placeholder"), text: c.textBinding("text")))
             },

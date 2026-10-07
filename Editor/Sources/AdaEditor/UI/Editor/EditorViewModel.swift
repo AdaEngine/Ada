@@ -30,6 +30,9 @@ final class EditorViewModel {
     var inspectorSidebar: EditorInspectorSidebarViewModel
     var animationPanel: EditorAnimationPanelViewModel
     var agent: EditorAgentViewModel
+    #if DEBUG && os(macOS)
+    var didRunA2UISmoke = false
+    #endif
     var sourceControl: EditorSourceControlViewModel
     var footer: EditorFooterViewModel
     var showsDebugOverlay: UIDebugOverlayMode?
@@ -230,7 +233,11 @@ final class EditorViewModel {
         inspectorSidebar.scriptableObjectCatalog = scriptableObjectSupport?.descriptors ?? []
         self.inspectorSidebar = inspectorSidebar
         self.animationPanel = animationPanel
+        #if DEBUG && os(macOS)
+        self.agent = agent ?? (EditorAgentA2UISmoke.enabled ? EditorAgentA2UISmoke.makeAgent(project: project) : EditorAgentViewModel(project: project, fileManager: fileManager))
+        #else
         self.agent = agent ?? EditorAgentViewModel(project: project, fileManager: fileManager)
+        #endif
         self.sourceControl = sourceControl
         self.activeOutputTab = activeOutputTab
         self.footer = footer
@@ -279,6 +286,10 @@ final class EditorViewModel {
         self.toolbar.searchableItems = self.projectSidebar.items
         self.agent.setProjectFileChangedHandler { [weak self] relativePath in
             self?.handleAgentProjectFileChanged(relativePath: relativePath, fileManager: fileManager)
+        }
+        self.agent.setA2UIPreviewHandler { [weak self] path in
+            guard let self, let item = self.projectSidebar.items.first(where: { $0.relativePath == path }) else { return }
+            self.openProjectItem(item)
         }
         self.workbench.setActiveDocumentWillChangeHandler { [weak self] in
             self?.saveActiveDocumentIfNeeded()

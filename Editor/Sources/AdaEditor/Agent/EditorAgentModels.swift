@@ -291,6 +291,7 @@ struct EditorAgentSession: Codable, Equatable, Identifiable, Sendable {
     var events: [EditorAgentEvent]
     var selectedSkillIDs: [String]
     var attachments: [EditorAgentAttachment]
+    var a2uiSurfaces: [EditorAgentA2UISurfaceRecord]?
 
     init(
         id: String = UUID().uuidString,

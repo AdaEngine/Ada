@@ -128,6 +128,9 @@ struct EditorView: View {
                 )
                 .onAppear {
                     viewModel.startEditorSessionIfNeeded()
+                    #if DEBUG && os(macOS)
+                    if EditorAgentA2UISmoke.enabled { Task { await EditorAgentA2UISmoke.run(editor: viewModel) } }
+                    #endif
                 }
                 .frame(height: metrics.topToolbarHeight)
                 .zIndex(10)

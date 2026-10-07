@@ -2,6 +2,7 @@
 import Foundation
 import PackageDescription
 
+let adaEngineLocalPath = ProcessInfo.processInfo.environment["ADAENGINE_PACKAGE_PATH"] ?? ".."
 let adaMCPLocalPath = ProcessInfo.processInfo.environment["ADA_MCP_LOCAL_PATH"] ?? "../../AdaMCP"
 let adaMCPURL = URL(fileURLWithPath: adaMCPLocalPath, relativeTo: URL(fileURLWithPath: #filePath).deletingLastPathComponent()).standardizedFileURL
 let hasAdaMCP = FileManager.default.fileExists(atPath: adaMCPURL.appendingPathComponent("Package.swift").path)
@@ -46,7 +47,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(name: "AdaEngine", path: ".."),
+        .package(name: "AdaEngine", path: adaEngineLocalPath),
         .package(name: "AdaDebugging", path: "Debugging"),
         .package(name: "AdaPlayerConnect", path: "PlayerConnect"),
         adaMCPPackage,
@@ -93,6 +94,7 @@ let package = Package(
                 .product(name: "AdaDebugging", package: "AdaDebugging"),
                 .product(name: "AdaPlayerConnect", package: "AdaPlayerConnect"),
                 .product(name: "AdaEngine", package: "AdaEngine"),
+                .product(name: "AdaA2UI", package: "AdaEngine"),
                 .product(name: "AdaMultiplayer", package: "AdaEngine"),
                 .product(name: "AdaScriptCompilerCore", package: "AdaEngine"),
                 .product(name: "Math", package: "AdaEngine"),
@@ -130,6 +132,7 @@ let package = Package(
                 "GravityLanguageCore",
                 "GravityLanguageServerProtocol",
                 .product(name: "AdaEngine", package: "AdaEngine"),
+                .product(name: "AdaA2UI", package: "AdaEngine"),
                 .product(name: "Math", package: "AdaEngine"),
                 .product(name: "SwiftTreeSitter", package: "swift-tree-sitter"),
                 .product(name: "TreeSitterSwift", package: "tree-sitter-swift"),

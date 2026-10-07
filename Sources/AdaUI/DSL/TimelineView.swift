@@ -328,6 +328,12 @@ private final class TimelineViewNode<Schedule: TimelineSchedule, Content: View>:
         nextDate = schedule.timelineNextDate(after: state.context.date, mode: mode)
     }
 
+    override func updateContentBuilder(from _: ViewContainerNode) {
+        // The mounted builder captures this node's long-lived clock state.
+        // Replacing it with an incoming node's builder would freeze the rendered
+        // date while update(_:) keeps advancing a different state object.
+    }
+
     override func update(_ deltaTime: AdaUtils.TimeInterval) {
         ensureTimelineContent()
 

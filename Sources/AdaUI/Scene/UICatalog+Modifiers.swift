@@ -101,6 +101,9 @@ extension UICatalog {
             modifier("fontSize", [number("value", 14)]) { AnyView($0.fontSize($1.number("value"))) },
             modifier("opacity", [number("value", 1)]) { AnyView($0.opacity(Float($1.number("value")))) },
             modifier("border", [color("color", "#ffffffff"), number("width", 1)]) { AnyView($0.border(try $1.color("color"), lineWidth: Float($1.number("width")))) },
+            modifier("formValidation", [.init("checks", type: .array, defaultValue: .array([])), bool("disablesContent")]) { view, c in
+                AnyView(UIFormValidation(content: view, checks: try UIFormCheck.decode(c.arguments["checks"] ?? .array([])), context: c.context, disablesContent: c.bool("disablesContent")))
+            },
             modifier("disabled", [bool("value", true)]) { AnyView($0.disabled($1.bool("value"))) },
             modifier("fixedSize", [bool("horizontal", true), bool("vertical", true)]) { AnyView($0.fixedSize(horizontal: $1.bool("horizontal"), vertical: $1.bool("vertical"))) },
             modifier("layoutPriority", [number("value", 0)]) { AnyView($0.layoutPriority($1.number("value"))) },

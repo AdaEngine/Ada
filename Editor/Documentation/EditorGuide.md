@@ -54,3 +54,16 @@ The offline library contains hand-written engine and AdaScript guides. Generated
 ## Start scripting
 
 Read <doc:GettingStartedWithAdaScript>, then <doc:AdaScriptLanguage> and <doc:AdaScriptECS>.
+
+
+## Interactive agent forms
+
+On macOS, ACP agents can stream native AdaUI forms and previews directly into
+Agent Chat using the advertised A2UI catalog. Ask for an NPC configuration form,
+edit the controls, and submit after the agent's turn finishes. The current values
+return to the same conversation, and the agent can generate an editable preview.
+**Open in UI Designer** creates a new `.ui` asset under `Assets/UI/AgentPreviews`;
+refine it through the normal designer, undo/redo, and save workflow. Local form
+edits persist with the chat. Invalid updates retain the last working form and
+show an interface error; interrupted forms remain disabled until refreshed.
+The separate iPhone chat path is not connected to these cards yet.

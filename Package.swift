@@ -67,6 +67,8 @@ var products: [Product] = [
     .executable(name: "AdaWebPlayer", targets: ["AdaWebPlayer"]),
     .executable(name: "AdaWebPlayerPackager", targets: ["AdaWebPlayerPackager"]),
     .library(name: "AdaUIDescription", targets: ["AdaUIDescription"]),
+    .library(name: "AdaA2UI", targets: ["AdaA2UI"]),
+    .executable(name: "A2UIFormDemo", targets: ["A2UIFormDemo"]),
     .library(
         name: "AdaEngine",
         targets: ["AdaEngine"]
@@ -546,6 +548,20 @@ var targets: [Target] = [
     ),
     .target(name: "AdaUIDescription", dependencies: [.product(name: "Yams", package: "Yams")], swiftSettings: swiftSettings),
     .testTarget(name: "AdaUIDescriptionTests", dependencies: ["AdaUIDescription"]),
+    .target(
+        name: "AdaA2UI",
+        dependencies: ["AdaUI", "AdaUIDescription"],
+        resources: [.copy("Resources")],
+        swiftSettings: swiftSettings
+    ),
+    .executableTarget(
+        name: "A2UIFormDemo",
+        dependencies: ["AdaA2UI", "AdaEngine", "AdaPlatform"],
+        path: "Demos/A2UIForm",
+        exclude: ["README.md", "script", "dist"],
+        resources: [.copy("Fixtures")],
+        swiftSettings: swiftSettings
+    ),
     .adaTarget(
         name: "AdaUI",
         dependencies: [
@@ -1265,6 +1281,7 @@ targets += [
     .testTarget(
         name: "AdaUITests",
         dependencies: [
+            "AdaA2UI",
             "AdaUI",
             "AdaPlatform",
             "AdaUtils",

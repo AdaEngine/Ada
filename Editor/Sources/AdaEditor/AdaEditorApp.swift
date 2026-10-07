@@ -21,6 +21,9 @@ import Logging
 enum AdaApplicationEntry {
     @MainActor static func main() async throws {
         #if os(macOS)
+            #if DEBUG
+            try EditorAgentA2UISmoke.prepareProjectIfNeeded()
+            #endif
             if EditorCLI.isInvocation(CommandLine.arguments) {
                 let code = await EditorCLI.run(arguments: CommandLine.arguments)
                 Foundation.exit(code)
@@ -99,7 +102,9 @@ struct AdaEditorApp: App {
     var body: some AppScene {
         WindowGroup {
             #if DEBUG && os(macOS)
-            if let launchProject {
+            if CommandLine.arguments.contains("--loading-animation-smoke") {
+                EditorLoadingAnimationSmoke()
+            } else if let launchProject {
                 EditorView(project: launchProject)
             } else {
                 ProjectOpeningView()
