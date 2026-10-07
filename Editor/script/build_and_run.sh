@@ -50,9 +50,7 @@ PY_PLIST
     case "$MODE" in
         run|--verify|verify)
             if [[ -n "${ADA_EDITOR_LOG_PATH:-}" ]]; then
-                editor_launch_args=(-n "$editor_app")
-                if [[ -n "${ADA_EDITOR_QA_SHELL:-}" ]]; then editor_launch_args+=(--env "SHELL=$ADA_EDITOR_QA_SHELL"); fi
-                /usr/bin/open "${editor_launch_args[@]}" --stdout "$ADA_EDITOR_LOG_PATH" --stderr "$ADA_EDITOR_LOG_PATH" --args "${@:2}"
+                /usr/bin/open -n "$editor_app" --stdout "$ADA_EDITOR_LOG_PATH" --stderr "$ADA_EDITOR_LOG_PATH" --args "${@:2}"
             else
                 /usr/bin/open -n "$editor_app" --args "${@:2}"
             fi

@@ -2225,25 +2225,31 @@
       },
       {
         "kind": "heading",
-        "text": "Repeatable validation",
+        "text": "Validation",
         "level": 2,
         "links": []
       },
       {
+        "kind": "text",
+        "text": "Run the test targets from the repository root:",
+        "level": 0,
+        "links": []
+      },
+      {
         "kind": "code",
-        "text": "./script/verify_studio_a2ui.sh --fixture\n./script/verify_studio_a2ui.sh",
+        "text": "ADAENGINE_DISABLE_SWAN=1 swift test --package-path Editor --disable-sandbox \\\n  --scratch-path /private/tmp/adaeditor-a2ui-build \\\n  --filter 'EditorAgentA2UITests|EditorAgentA2UITransportTests|EditorLoadingAnimationTests'",
         "language": "sh",
         "links": []
       },
       {
         "kind": "text",
-        "text": "The fixture mode launches a deterministic Python ACP process through the production\nadapter. The default uses Studio's saved agent configuration through an isolated\nin-memory settings copy. Both launch a disposable project, operate the actual\nwindow, clear a required field and verify blocked submission, choose a role,\nset health through the slider, submit the corrected form, open the returned preview, edit/undo/redo/save it, and\nrestore the persisted chat. Proof artifacts and logs are printed on completion.\nNeither mode changes the saved global agent settings.",
+        "text": "QA objects and mocks belong under `Editor/Tests`, not the app target. The Python\nACP fixture remains in `Editor/Tests/AdaEditorTests/Fixtures` and is excluded\nfrom package resources. Transport tests launch it through the production adapter,\nexercise burst delivery with a slow UI sink and file callbacks after setup, and\ncheck child-process cleanup after failed connections. UI tests mount real chat\ncards, submit edits, export previews, and exercise the normal designer model.",
         "level": 0,
         "links": []
       },
       {
         "kind": "text",
-        "text": "Focused suites: `EditorAgentA2UITests`, `EditorAgentA2UITransportTests`.\nThe transport suite sends a real subprocess burst into a deliberately slow UI sink\nand requests an actual file read after connection setup, checking that the ACP\ncallback delegate remains alive for the session. Cold session creation allows\n60 seconds independently of prompt generation.",
+        "text": "For manual native verification, launch Studio normally with\n`./script/run_studio_a2ui.sh`, connect your configured agent, and follow the NPC\nworkflow above. No fixture launch modes or QA-specific app state are installed.",
         "level": 0,
         "links": []
       },
@@ -2255,7 +2261,7 @@
       },
       {
         "kind": "text",
-        "text": "Large Swift generic view types can expand into huge diagnostic names. UI inspection\nnow reports a bounded nominal type name from immutable Swift runtime descriptors,\nwith generic arguments omitted. This avoids constructing the reflected/mangled\nname tree. The native QA snapshots also use a bounded subtree. In the task's\nfixture run, sampled RSS ranged from 333 to 567 MiB and settled near 337 MiB;\nthis is macOS workflow evidence, not a universal leak or performance guarantee.",
+        "text": "Large Swift generic view types can expand into huge diagnostic names. UI inspection\nnow reports a bounded nominal type name from immutable Swift runtime descriptors,\nwith generic arguments omitted. This avoids constructing the reflected/mangled\nname tree. In the development fixture run, sampled RSS ranged from 333 to 567 MiB and settled near 337 MiB;\nthis is macOS workflow evidence, not a universal leak or performance guarantee.",
         "level": 0,
         "links": []
       },

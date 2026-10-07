@@ -30,9 +30,6 @@ final class EditorViewModel {
     var inspectorSidebar: EditorInspectorSidebarViewModel
     var animationPanel: EditorAnimationPanelViewModel
     var agent: EditorAgentViewModel
-    #if DEBUG && os(macOS)
-    var didRunA2UISmoke = false
-    #endif
     var sourceControl: EditorSourceControlViewModel
     var footer: EditorFooterViewModel
     var showsDebugOverlay: UIDebugOverlayMode?
@@ -233,11 +230,7 @@ final class EditorViewModel {
         inspectorSidebar.scriptableObjectCatalog = scriptableObjectSupport?.descriptors ?? []
         self.inspectorSidebar = inspectorSidebar
         self.animationPanel = animationPanel
-        #if DEBUG && os(macOS)
-        self.agent = agent ?? (EditorAgentA2UISmoke.enabled ? EditorAgentA2UISmoke.makeAgent(project: project) : EditorAgentViewModel(project: project, fileManager: fileManager))
-        #else
         self.agent = agent ?? EditorAgentViewModel(project: project, fileManager: fileManager)
-        #endif
         self.sourceControl = sourceControl
         self.activeOutputTab = activeOutputTab
         self.footer = footer

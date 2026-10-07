@@ -12,6 +12,8 @@ and assess gaps before proposing new features.
   have separate platform boundaries; do not assume desktop/mobile feature parity.
 - [Package.swift](Package.swift) owns package dependencies and resources;
   [project.yml](project.yml) owns XcodeGen app configuration.
+- Keep mocks, fixtures, and QA harnesses in test targets or separate executables.
+  Do not add test-only objects or QA launch hooks to the main app, including Debug builds.
 - Use an isolated scratch/module cache when necessary; never delete the shared
   `.build`. Preserve unrelated engine, demo, and editor changes.
 - Debug macOS builds accept `--editor-project=<absolute-path>` to open the

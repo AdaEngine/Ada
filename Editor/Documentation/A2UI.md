@@ -69,35 +69,33 @@ The iPhone's separate SloppyRuntime chat path is not wired to these cards.
 A designer snapshot is a one-way handoff; subsequent designer edits are not sent
 back to the agent automatically. The host owns gameplay effects of exported actions.
 
-## Repeatable validation
+## Validation
+
+Run the test targets from the repository root:
 
 ```sh
-./script/verify_studio_a2ui.sh --fixture
-./script/verify_studio_a2ui.sh
+ADAENGINE_DISABLE_SWAN=1 swift test --package-path Editor --disable-sandbox \
+  --scratch-path /private/tmp/adaeditor-a2ui-build \
+  --filter 'EditorAgentA2UITests|EditorAgentA2UITransportTests|EditorLoadingAnimationTests'
 ```
 
-The fixture mode launches a deterministic Python ACP process through the production
-adapter. The default uses Studio's saved agent configuration through an isolated
-in-memory settings copy. Both launch a disposable project, operate the actual
-window, clear a required field and verify blocked submission, choose a role,
-set health through the slider, submit the corrected form, open the returned preview, edit/undo/redo/save it, and
-restore the persisted chat. Proof artifacts and logs are printed on completion.
-Neither mode changes the saved global agent settings.
+QA objects and mocks belong under `Editor/Tests`, not the app target. The Python
+ACP fixture remains in `Editor/Tests/AdaEditorTests/Fixtures` and is excluded
+from package resources. Transport tests launch it through the production adapter,
+exercise burst delivery with a slow UI sink and file callbacks after setup, and
+check child-process cleanup after failed connections. UI tests mount real chat
+cards, submit edits, export previews, and exercise the normal designer model.
 
-Focused suites: `EditorAgentA2UITests`, `EditorAgentA2UITransportTests`.
-The transport suite sends a real subprocess burst into a deliberately slow UI sink
-and requests an actual file read after connection setup, checking that the ACP
-callback delegate remains alive for the session. Cold session creation allows
-60 seconds independently of prompt generation.
-
+For manual native verification, launch Studio normally with
+`./script/run_studio_a2ui.sh`, connect your configured agent, and follow the NPC
+workflow above. No fixture launch modes or QA-specific app state are installed.
 
 ## Inspection memory
 
 Large Swift generic view types can expand into huge diagnostic names. UI inspection
 now reports a bounded nominal type name from immutable Swift runtime descriptors,
 with generic arguments omitted. This avoids constructing the reflected/mangled
-name tree. The native QA snapshots also use a bounded subtree. In the task's
-fixture run, sampled RSS ranged from 333 to 567 MiB and settled near 337 MiB;
+name tree. In the development fixture run, sampled RSS ranged from 333 to 567 MiB and settled near 337 MiB;
 this is macOS workflow evidence, not a universal leak or performance guarantee.
 
 ## Configured-agent context limits
