@@ -21,6 +21,12 @@ let isHeadlessCIEnabled: Bool = {
 
 let isAndroidBuildEnabled = ProcessInfo.processInfo.environment["ADAENGINE_ANDROID"] == "1"
 
+#if os(macOS) || os(Linux)
+let isECSBenchmarkEnabled = ProcessInfo.processInfo.environment["ADAENGINE_BENCHMARKS"] == "1"
+#else
+let isECSBenchmarkEnabled = false
+#endif
+
 let isWebExportEnabled: Bool = {
     let webExportValue = ProcessInfo.processInfo.environment["ADAENGINE_WEB_EXPORT"]?.lowercased()
     let enabledValues: Set<String> = ["1", "true", "yes", "on"]
@@ -1221,6 +1227,22 @@ targets += [
     )
 ]
 
+// MARK: - Benchmarks
+
+if isECSBenchmarkEnabled {
+    products.append(.executable(name: "AdaECSBenchmarks", targets: ["AdaECSBenchmarks"]))
+    targets.append(.executableTarget(
+        name: "AdaECSBenchmarks",
+        dependencies: [
+            "AdaECS",
+            .product(name: "Benchmark", package: "package-benchmark")
+        ],
+        path: "Benchmarks/AdaECSBenchmarks",
+        swiftSettings: swiftSettings,
+        plugins: [.plugin(name: "BenchmarkPlugin", package: "package-benchmark")]
+    ))
+}
+
 // MARK: - Tests
 
 targets += [
@@ -1437,6 +1459,13 @@ package.dependencies += [
     .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", from: "602.0.0"),
 ]
+
+if isECSBenchmarkEnabled {
+    package.dependencies.append(.package(
+        url: "https://github.com/ordo-one/package-benchmark",
+        .upToNextMinor(from: "1.29.0")
+    ))
+}
 
 if !isWebExportEnabled && !isAndroidBuildEnabled {
     package.dependencies.append(

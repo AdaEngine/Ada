@@ -49,3 +49,6 @@ Derived/
 
 # Isolated Android builds and debug signing keys
 .build-android*/
+
+# Local, machine-specific benchmark baselines
+.benchmarkBaselines/
