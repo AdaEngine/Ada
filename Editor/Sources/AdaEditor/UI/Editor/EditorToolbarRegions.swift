@@ -21,7 +21,8 @@ struct EditorTopToolbarRegion: View {
             onRun: viewModel.runFromToolbar,
             onStop: viewModel.stopFromToolbar,
             onDebug: debugAction,
-            onOpenCloud: { viewModel.presentSettings(.general) }
+            onOpenCloud: { viewModel.presentSettings(.general) },
+            interface: viewModel.interface
         )
     }
     private var canRun: Bool {

@@ -132,8 +132,18 @@ struct EditorView: View {
                 .frame(height: metrics.topToolbarHeight)
                 .zIndex(10)
 
+                #if os(macOS) || os(Windows) || os(Linux)
+                if viewModel.interface.mode == .agent {
+                    EditorAgentWorkspace(viewModel: viewModel)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    EditorWorkspaceRegion(viewModel: viewModel)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                #else
                 EditorWorkspaceRegion(viewModel: viewModel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #endif
 
                 EditorFooterRegion(viewModel: viewModel)
                     .frame(height: metrics.footerHeight)
@@ -380,82 +390,7 @@ private struct EditorWorkspaceRegion: View {
                         EditorLeftSidebarContent(viewModel: viewModel)
                     },
                     mainPanel: {
-                        ZStack {
-                            EditorCenterWorkbench(
-                                viewModel: viewModel.workbench,
-                                inspectorViewModel: viewModel.inspectorSidebar,
-                                playModeState: viewModel.playModeState,
-                                scenePlayRuntime: viewModel.scenePlayRuntime,
-                                sceneResourceRootURL: viewModel.projectAssetsURL,
-                                onPlayScene: viewModel.runActiveSceneInEditor,
-                                onStopScene: viewModel.stopPlayMode,
-                                onSceneEntitySelected: viewModel.presentSceneInspector,
-                                onSourceHover: { document, position in
-                                    viewModel.handleSourceHover(document: document, position: position)
-                                },
-                                onGoToDefinition: { document, position in
-                                    viewModel.goToDefinition(document: document, position: position)
-                                },
-                                onCompletionPosition: { document, position, text in
-                                    viewModel.handleCompletionPosition(document: document, position: position, text: text)
-                                },
-                                onCompletionRequest: { document, position, text in
-                                    viewModel.handleCompletionRequest(document: document, position: position, text: text)
-                                },
-                                onApplyCompletion: { item, document in
-                                    viewModel.applyCompletion(item, to: document)
-                                },
-                                onMoveCompletionSelection: { document, delta in
-                                    viewModel.moveCompletionSelection(in: document, by: delta)
-                                },
-                                onAcceptCompletion: { document in
-                                    viewModel.applySelectedCompletion(in: document)
-                                },
-                                onAcceptSnippetPlaceholder: { document, selection in
-                                    viewModel.acceptSnippetPlaceholder(in: document, selection: selection)
-                                },
-                                onTextSelection: { document, range, text in
-                                    viewModel.handleTextSelection(document: document, range: range, text: text)
-                                },
-                                onChatSelection: { document, range, text in
-                                    viewModel.chatAboutTextSelection(document: document, range: range, text: text)
-                                },
-                                sourceContextMenuItems: { document, position in
-                                    viewModel.sourceContextMenuItems(document: document, position: position)
-                                },
-                                onSelectDocument: { documentID in
-                                    viewModel.selectWorkbenchDocument(id: documentID)
-                                },
-                                onRevealDocument: { document in
-                                    viewModel.revealDocument(document)
-                                },
-                                onCopyDocumentPath: { document, relative in
-                                    viewModel.copyDocumentPath(document, relative: relative)
-                                },
-                                onSelectPreview: { declaration in
-                                    viewModel.selectPreview(declaration)
-                                },
-                                onRebuildPreview: {
-                                    viewModel.rebuildSelectedPreview()
-                                },
-                                onHidePreview: {
-                                    viewModel.hidePreview()
-                                },
-                                onShowPreviewBuildOutput: {
-                                    viewModel.showBuildOutput()
-                                },
-                                debugger: viewModel.debugger,
-                                projectItems: viewModel.projectSidebar.items,
-                                onOpenProjectItem: { item in
-                                    viewModel.openProjectItem(item)
-                                }
-                            )
-                            .frame(maxHeight: .infinity)
-                            .allowsHitTesting(!viewModel.performance.isExpanded)
-                            if viewModel.performance.isExpanded {
-                                EditorPerformancePanel(model: viewModel.performance, isWorkspace: true)
-                            }
-                        }
+                        EditorDocumentWorkbench(viewModel: viewModel)
                     },
                     rightPanel: {
                         EditorRightSidebarContent(viewModel: viewModel)

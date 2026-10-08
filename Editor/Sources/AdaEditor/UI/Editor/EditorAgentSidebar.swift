@@ -1,8 +1,15 @@
 @_spi(AdaEngine) import AdaEngine
 
+enum EditorAgentChatPresentation {
+    case sidebar
+    case workspace
+}
+
 struct EditorAgentSidebar: View {
     let viewModel: EditorAgentViewModel
     var onOpenCatalog: (() -> Void)?
+    var presentation: EditorAgentChatPresentation = .sidebar
+    var onOpenChangedFile: ((String) -> Void)?
 
     @State private var showsContextPicker = false
     @State private var contextSearchText = ""
@@ -13,9 +20,14 @@ struct EditorAgentSidebar: View {
         VStack(alignment: .leading, spacing: 0) {
             agentHeader
             conversationToolbar
-            transcript
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            composer
+            if presentation == .workspace {
+                chatContent
+                    .frame(maxWidth: Self.maximumContentWidth)
+                    .accessibilityIdentifier("AdaEditor.Agent.ContentColumn")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                chatContent
+            }
         }
         .background(
             RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
@@ -29,9 +41,33 @@ struct EditorAgentSidebar: View {
         .onDisappear { viewModel.panelDidDisappear() }
     }
 
+    static let maximumContentWidth: Float = 800
+
+    private var chatContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            transcript
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if presentation == .workspace, viewModel.activeSession?.events.isEmpty == false, let message = viewModel.statusMessage {
+                Text(message)
+                    .font(.system(size: 12))
+                    .foregroundColor(theme.editorColors.muted)
+                    .lineLimit(3)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 6)
+                    .accessibilityIdentifier("AdaEditor.Agent.StatusMessage")
+            }
+            if presentation == .workspace, let onOpenChangedFile {
+                EditorAgentChangesSummary(events: viewModel.activeSession?.events ?? [], onOpenFile: onOpenChangedFile)
+            }
+            composer
+                .padding(.bottom, presentation == .workspace ? 12 : 0)
+        }
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+    }
+
     private var agentHeader: some View {
         HStack(spacing: 8) {
-            Text(viewModel.projectName)
+            Text(presentation == .workspace ? (viewModel.activeSession?.title ?? "New session") : viewModel.projectName)
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(theme.editorColors.text)
                 .lineLimit(1)
@@ -39,7 +75,9 @@ struct EditorAgentSidebar: View {
                 EditorFlipLoadingIndicator(size: 12, color: theme.editorColors.blue)
                     .accessibilityIdentifier("AdaEditor.Agent.ConnectionFlip")
             }
-            Text(viewModel.isConnectingCatalogAgent ? "Connecting" : (viewModel.settings.configuration.enabled ? viewModel.currentConnectionState.title : "Choose an agent"))
+            Text(viewModel.isSending
+                ? (viewModel.runningSessionID == viewModel.activeSession?.id ? "Working" : "Another session is running")
+                : viewModel.isConnectingCatalogAgent ? "Connecting" : (viewModel.settings.configuration.enabled ? viewModel.currentConnectionState.title : "Choose an agent"))
                 .font(.system(size: 10))
                 .foregroundColor(theme.editorColors.muted)
                 .lineLimit(1)
@@ -71,6 +109,7 @@ struct EditorAgentSidebar: View {
                 }
                 .fixedSize(horizontal: true, vertical: false)
             }
+            .frame(minWidth: 0, maxWidth: .infinity)
             if case .failed = viewModel.currentConnectionState {
                 Button("Retry", action: viewModel.connect)
                     .font(.system(size: 12))
@@ -79,7 +118,11 @@ struct EditorAgentSidebar: View {
             }
             Button(action: {
                 Task {
-                    try? await viewModel.createSession()
+                    do {
+                        try await viewModel.createSession()
+                    } catch {
+                        viewModel.statusMessage = error.localizedDescription
+                    }
                 }
             }) {
                 Text("\u{E145}")
@@ -88,8 +131,10 @@ struct EditorAgentSidebar: View {
                     .frame(width: 30, height: 30)
             }
             .buttonStyle(DefaultButtonStyle())
+            .accessibilityIdentifier("AdaEditor.Agent.NewSession")
         }
         .padding(.horizontal, 8)
+        .frame(minWidth: 0, maxWidth: .infinity)
         .frame(height: 38)
         .background(theme.editorColors.surface)
         .overlay {
@@ -108,6 +153,7 @@ struct EditorAgentSidebar: View {
                 .font(.system(size: 13, weight: active ? .semibold : .regular))
                 .foregroundColor(active ? theme.editorColors.text : theme.editorColors.muted)
                 .lineLimit(1)
+                .frame(maxWidth: presentation == .workspace ? 220 : nil)
                 .padding(.horizontal, 12)
                 .frame(height: 32)
                 .background(RoundedRectangleShape(cornerRadius: 7).fill(active ? theme.editorColors.blue.opacity(0.20) : theme.editorColors.background))

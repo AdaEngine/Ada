@@ -25,8 +25,12 @@ extension EditorViewModel {
                 text: text
             )
         )
-        toolStrip.activeRightTool = "agentChat"
-        showRightPanel = true
+        if interface.mode == .agent {
+            interface.showsArtifact = false
+        } else {
+            toolStrip.activeRightTool = "agentChat"
+            showRightPanel = true
+        }
     }
 
     func openProjectFromMenu() {

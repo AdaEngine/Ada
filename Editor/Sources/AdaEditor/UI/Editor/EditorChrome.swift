@@ -190,6 +190,7 @@ enum AdaEditorMaterialSymbolFont {
         0xE25A,
         0xE264,
         0xE24B,
+        0xE24D,
         0xE2C7,
         0xE2C8,
         0xE30F,

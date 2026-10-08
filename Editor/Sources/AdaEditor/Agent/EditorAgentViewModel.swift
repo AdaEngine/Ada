@@ -36,6 +36,8 @@ final class EditorAgentViewModel {
     var selectedSkillIDs: Set<String> = []
     var statusMessage: String?
     var isSending = false
+    private(set) var runningSessionID: String?
+    @ObservationIgnored var sessionDrafts: [String: SessionDraft] = [:]
     private(set) var lastActivityID: String?
     @ObservationIgnored private var notificationSessionID: String?
     @ObservationIgnored private var runningSession: EditorAgentSession?
@@ -298,6 +300,9 @@ final class EditorAgentViewModel {
 
         do {
             sessions = try await store.listSessions()
+            guard activeSession == nil else {
+                return
+            }
             if let notificationSessionID {
                 activeSession = runningSession?.id == notificationSessionID ? runningSession : try await store.loadSession(id: notificationSessionID)
                 if isPanelVisible { connectIfNeeded() }
@@ -325,13 +330,12 @@ final class EditorAgentViewModel {
         guard let store else {
             return
         }
+        rememberSessionDraft()
         let session = try await store.createSession()
         activeSession = session
         sessions = try await store.listSessions()
         selectedSkillIDs = []
-        prompt = ""
-        pendingAttachments = []
-        codeSelection = nil
+        restoreSessionDraft()
         sessionConfiguration = .empty
         connectionState = .disconnected
         if connectAutomatically {
@@ -346,7 +350,10 @@ final class EditorAgentViewModel {
         }
         Task {
             do {
-                activeSession = runningSession?.id == summary.id ? runningSession : try await store.loadSession(id: summary.id)
+                let session = runningSession?.id == summary.id ? runningSession : try await store.loadSession(id: summary.id)
+                rememberSessionDraft()
+                activeSession = session
+                restoreSessionDraft()
                 selectedSkillIDs = Set(activeSession?.selectedSkillIDs ?? [])
                 sessionConfiguration = .empty
                 connectionState = .disconnected
@@ -372,10 +379,12 @@ final class EditorAgentViewModel {
                 a2uiSaveTasks.removeValue(forKey: summary.id)?.cancel()
                 try await store.deleteSession(id: summary.id)
                 a2ui.remove(sessionID: summary.id)
+                sessionDrafts.removeValue(forKey: summary.id)
                 sessions = try await store.listSessions()
                 if activeSession?.id == summary.id {
                     if let next = sessions.first {
                         activeSession = try await store.loadSession(id: next.id)
+                        restoreSessionDraft()
                         selectedSkillIDs = Set(activeSession?.selectedSkillIDs ?? [])
                         sessionConfiguration = .empty
                         connectionState = .disconnected
@@ -411,7 +420,7 @@ final class EditorAgentViewModel {
     }
 
     func connectIfNeeded() {
-        guard settings.configuration.enabled, activeSession != nil, currentConnectionState == .disconnected else {
+        guard !isSending, settings.configuration.enabled, activeSession != nil, currentConnectionState == .disconnected else {
             return
         }
         connect()
@@ -595,7 +604,10 @@ final class EditorAgentViewModel {
                 guard let store else {
                     return
                 }
-                activeSession = runningSession?.id == id ? runningSession : try await store.loadSession(id: id)
+                let session = runningSession?.id == id ? runningSession : try await store.loadSession(id: id)
+                rememberSessionDraft()
+                activeSession = session
+                restoreSessionDraft()
                 selectedSkillIDs = Set(activeSession?.selectedSkillIDs ?? [])
                 if runningSession?.id != id {
                     sessionConfiguration = .empty
@@ -856,6 +868,7 @@ final class EditorAgentViewModel {
         connectionState = .connecting
         await saveActiveSession()
         runningSession = session
+        runningSessionID = session.id
         let ui = a2ui.restoreIfNeeded(session)
         ui.beginRun(agentIdentity: session.agentTargetIdentity)
         let sessionID = session.id
@@ -944,9 +957,11 @@ final class EditorAgentViewModel {
             } catch { statusMessage = error.localizedDescription }
         }
         runningSession = nil
+        runningSessionID = nil
         runningActivityID = nil
         permissionActivityIDs = permissionActivityIDs.filter { $0.value != activityID }
         isSending = false
+        if activeSession?.id != sessionID, isPanelVisible { connectIfNeeded() }
     }
 
     private func receiveRunEvent(_ event: EditorAgentEvent, sessionID: String, activityID: String) {

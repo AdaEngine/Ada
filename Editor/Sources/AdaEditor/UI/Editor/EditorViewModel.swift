@@ -22,6 +22,7 @@ final class EditorViewModel {
     var notificationTab: EditorNotificationTab = .notifications
     var notificationWorkspaceRunID: String?
     let project: EditorProjectReference?
+    let interface: EditorInterfaceState
     let libraries = EditorLibrariesViewModel()
     var toolbar: EditorToolbarViewModel
     var toolStrip: EditorToolStripViewModel
@@ -171,6 +172,7 @@ final class EditorViewModel {
         inspectorSidebar: EditorInspectorSidebarViewModel = EditorInspectorSidebarViewModel(),
         animationPanel: EditorAnimationPanelViewModel = EditorAnimationPanelViewModel(),
         agent: EditorAgentViewModel? = nil,
+        interface: EditorInterfaceState? = nil,
         sourceControl: EditorSourceControlViewModel = EditorSourceControlViewModel(),
         footer: EditorFooterViewModel = EditorFooterViewModel(),
         activeOutputTab: String = "Problems",
@@ -211,6 +213,7 @@ final class EditorViewModel {
         }
 
         self.project = project
+        self.interface = interface ?? EditorInterfaceState(projectPath: project?.path)
         self.workspaceService = workspaceService
         self.sourceControlService = sourceControlService
         self.fileManager = fileManager
