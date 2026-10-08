@@ -34,6 +34,9 @@ extension EditorViewModel {
         }
         toolbar.clearSearch()
         openProjectItem(currentItem)
+        if interface.mode == .agent {
+            interface.showsArtifact = true
+        }
     }
 
     func findInProjectFolder(_ item: EditorProjectSidebarViewModel.Item) {

@@ -207,6 +207,20 @@ Coverage: [EditorDebuggerLaunchTests.swift](Tests/AdaEditorTests/EditorDebuggerL
 
 ### Git and agents
 
+Desktop Studio also offers an **Editor / Agent** interface switch in the top
+bar. Agent Interface uses a project session tree, conversation tabs, the existing
+agent transcript/composer and a document workspace opened on demand. Conversation
+content uses a centered column up to 800 points wide; Retry/New Session stay at
+the right edge of the full-width tab toolbar. Completed
+agent diff events expose changed files; opening one uses the production document
+loader. Both interfaces share document state, panel preferences and agent service;
+mode selection restores per project. Switching sessions retains in-memory drafts,
+attachments, selected-code context and chat mode. Running turns stay attached to
+their originating session; one turn runs at a time per project window.
+This interface switch is desktop-only; the dedicated iPhone flow is unchanged.
+Guide: [AgentInterface.md](Documentation/AgentInterface.md).
+Coverage: [EditorAgentWorkspaceTests.swift](Tests/AdaEditorTests/EditorAgentWorkspaceTests.swift).
+
 Desktop Git status, staging, commit, stash, pull/push, branch creation/checkout,
 history and diff review. Agent Chat includes transcript/session persistence,
 attachments, context selection, permissions, skills and agent settings.

@@ -18,6 +18,7 @@ struct EditorTopToolbar: View {
     let onStop: () -> Void
     var onDebug: (() -> Void)?
     var onOpenCloud: (() -> Void)?
+    var interface: EditorInterfaceState?
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
@@ -27,7 +28,7 @@ struct EditorTopToolbar: View {
             SearchBar(
                 text: viewModel.searchTextBinding,
                 prompt: viewModel.searchPrompt,
-                width: metrics.toolbarSearchWidth
+                width: searchWidth
             )
             .searchBarStyle(EditorToolbarSearchBarStyle(theme: theme))
             .accessibilityIdentifier(Self.searchAccessibilityIdentifier)
@@ -37,6 +38,11 @@ struct EditorTopToolbar: View {
                     .frame(width: metrics.toolbarWindowControlClearance, height: 1)
 
                 projectSwitcherButton
+                #if os(macOS) || os(Windows) || os(Linux)
+                if let interface {
+                    EditorInterfaceModePicker(state: interface)
+                }
+                #endif
 
                 Spacer()
 
@@ -58,6 +64,18 @@ struct EditorTopToolbar: View {
             .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var searchWidth: Float {
+        #if os(macOS) || os(Windows) || os(Linux)
+        guard interface != nil else {
+            return metrics.toolbarSearchWidth
+        }
+        let leadingControls = metrics.toolbarWindowControlClearance + metrics.toolbarProjectSwitcherWidth + 104 + 36
+        return min(metrics.toolbarSearchWidth, max(120, metrics.size.width - leadingControls * 2))
+        #else
+        return metrics.toolbarSearchWidth
+        #endif
     }
 
     private var projectSwitcherButton: some View {
