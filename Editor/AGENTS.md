@@ -224,9 +224,14 @@ Coverage: [EditorAgentWorkspaceTests.swift](Tests/AdaEditorTests/EditorAgentWork
 Desktop Git status, staging, commit, stash, pull/push, branch creation/checkout,
 history and diff review. Agent Chat includes transcript/session persistence,
 attachments, context selection, permissions, skills and agent settings.
-macOS ACP replies can stream native A2UI form/preview cards; submissions return to
-the owning session, local edits persist, and Open in UI Designer creates an editable
-project-local `.ui` snapshot. This does not wire the separate iPhone chat path.
+macOS ACP and iPhone SloppyRuntime replies stream native A2UI cards. Ordinary
+submissions return to the owning session; reserved local actions apply scene tools
+without a new model turn. NPC subtree spawning, color-field editing, structured
+scene batches and the system color palette are available. Scene revisions guard
+repeat Apply/Undo; desktop uses document history, iPhone uses atomic saved-scene
+changes with durable Undo. Card inputs and ownership persist. Desktop Open in UI
+Designer creates a project-local `.ui`; iPhone Open UI Source opens its YAML.
+Coverage: [EditorChatToolTests.swift](Tests/AdaEditorTests/EditorChatToolTests.swift).
 Guide: [A2UI.md](Documentation/A2UI.md).
 Entry points: [EditorAgentA2UIController.swift](Sources/AdaEditor/Agent/EditorAgentA2UIController.swift),
 [EditorAgentA2UISurfaceCard.swift](Sources/AdaEditor/UI/Editor/EditorAgentA2UISurfaceCard.swift).
@@ -271,6 +276,19 @@ Coverage: [GitReviewTests.swift](Tests/AdaEditorTests/GitReviewTests.swift),
 iPhone has dedicated project/files/code/scene/Play/chat/activity/settings screens,
 image attachments, screenshot markup and voice input. The shared workspace and
 mobile flow have separate implementations and tests.
+The iPhone project home and iPad launcher use Studio/Community tabs. Catalog,
+search, sorting, details, screenshots and navigation are shared AdaUI views under
+`UI/Community`, with no SwiftUI/UIKit dependency. The public client requests PNG
+media for the engine's portable decoder. Play rechecks the selected publication
+and delegates browser opening to `Application.openURL`; Android uses ACTION_VIEW.
+Browsing needs no Cloud sign-in. Studio and Community retain separate navigation;
+the last tab restores on launch, and workspace navigation focuses Studio while
+preserving its Build/Files/Play tabs. The public catalog currently returns up to
+100 entries. An Android Studio application shell is not provided by this change.
+Entry points: [EditorCommunityView.swift](Sources/AdaEditor/UI/Community/EditorCommunityView.swift),
+[MobileEditorHomeTabs.swift](Sources/AdaEditor/UI/Community/MobileEditorHomeTabs.swift),
+[EditorCommunityClient.swift](Sources/AdaEditor/Cloud/EditorCommunityClient.swift).
+Coverage: [EditorCommunityTests.swift](Tests/AdaEditorTests/EditorCommunityTests.swift).
 Bundled offline documentation provides search, sections, history and copyable
 examples. Appearance/input settings, notifications/background activities,
 achievements/Game Center, cloud account/settings and standalone update UI exist.

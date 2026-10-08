@@ -1,6 +1,6 @@
 # Interactive agent UI
 
-Studio's macOS ACP chat can display native AdaUI forms and previews using the
+Studio's macOS ACP and iPhone SloppyRuntime chats display native AdaUI forms and previews using the
 A2UI v0.9.1 Ada forms catalog. Use **Run Studio A2UI** in this worktree or
 `./script/run_studio_a2ui.sh`, open a project, and connect an ACP agent normally.
 
@@ -64,8 +64,8 @@ reopening Studio reconstructs surfaces without replaying server defaults over
 local edits. Incomplete in-flight forms reopen as interrupted. Existing sessions
 without the new optional field remain readable.
 
-This integration uses the shared `EditorAgentViewModel`/macOS ACP sidebar.
-The iPhone's separate SloppyRuntime chat path is not wired to these cards.
+Desktop uses `EditorAgentViewModel`/ACP; iPhone uses its project-scoped SloppyRuntime chat.
+Both render the same cards; see the local scene-tool contract below.
 A designer snapshot is a one-way handoff; subsequent designer edits are not sent
 back to the agent automatically. The host owns gameplay effects of exported actions.
 
@@ -108,3 +108,41 @@ supported model for the agent and planner. Do not raise limits based on an
 unverified model name. The task's configured-provider workflow was verified with
 `openai-oauth:gpt-5.5` and the provider-reported 272,000-token window. This is
 provider/session evidence, not a guarantee for every agent or model.
+
+## Tools inside chat (desktop and iPhone)
+
+Ask the agent to **create an NPC spawner tool in chat** or **create a color tool for
+this entity**. It reads the scene and presents a configurable card. Reserved
+`editor.*` button events run in the host immediately; they do not start another
+model turn. Other button events still submit data to the owning agent session.
+
+Supported local actions:
+
+| Event | Context | Effect |
+| --- | --- | --- |
+| `editor.scene.spawn` | `path`, `expectedRevision`, `revisionBinding`, `entityID`, `count`, `spacing` | Duplicate a non-root NPC subtree; count 1–100, X spacing per copy, at most 100 created entities including children. |
+| `editor.scene.setColor` | scene/revision fields, `entityID`, `typeName`, `field`, `color` | Set a registered color field from HEX/named color, preserving other component fields. |
+| `editor.scene.apply` | scene/revision fields, `operations` | Apply the existing structured scene-operation vocabulary as one transaction. |
+| `editor.color.pick` | `binding` (absolute data path), `value` | Open the system color palette; update the card's HEX value without changing the scene. |
+
+Initialize `/scene/revision` from `editor.scene.get`. Scene action contexts must
+use `expectedRevision:{"path":"/scene/revision"}` and
+`revisionBinding:"/scene/revision"`. The host updates that binding after Apply or
+Undo, allowing repeat use. A change outside the card rejects its stale revision;
+ask the agent to refresh the card. Unknown reserved actions produce an inline
+error. Cards are disabled while an agent turn is running or their original
+provider is unavailable.
+
+Desktop actions operate on the open scene document and its normal Undo/Redo
+history. On iPhone they operate on the saved project scene through the existing
+atomic scene service and durable change records. **Undo** on the card reverts its
+latest application only if the scene still matches that result. Card input,
+current revision and latest Undo record persist in `.ada/chat-ui`; restoring
+provider history rebinds card message IDs without replaying old form defaults.
+
+The iPhone SloppyRuntime chat streams these same native cards and advertises the
+same action contract. Ordinary submissions preserve the composer draft and
+attachments. **Open UI Source** exports an editable `.ui` snapshot and opens its
+YAML source in the mobile file editor; the desktop **Open in UI Designer** handoff
+continues to use the visual designer. Applying a scene tool affects authored scene
+content, not an already running Play world's entities; restart Play to see it.

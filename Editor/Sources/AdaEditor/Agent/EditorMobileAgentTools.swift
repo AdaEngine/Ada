@@ -25,6 +25,8 @@ enum EditorMobileAgentTools {
             "character": .object(["type": "integer", "minimum": 0, "description": "Zero-based UTF-16 column."]),
         ]
         return [
+            tool("editor.scene.list", "List project scenes for interactive chat tools."),
+            tool("editor.scene.get", "Read a project scene, entity/component payloads and current revision before creating a chat tool.", ["path": path], ["path"]),
             tool("editor.project.context", "Read project configuration, runtime capabilities, and available debugging tools."),
             tool("editor.gravity.diagnostics", "Analyze current AdaScript files with the embedded project-aware Gravity LSP. Omit path to check all project sources.", ["path": path]),
             tool("editor.gravity.completion", "Get AdaScript LSP completions at a zero-based UTF-16 position.", position, ["path", "line", "character"]),

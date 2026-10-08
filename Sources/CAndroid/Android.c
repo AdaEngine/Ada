@@ -229,6 +229,41 @@ __attribute__((visibility("default"))) void ANativeActivity_onCreate(ANativeActi
 }
 bool ada_android_is_main_thread(void) { return pthread_equal(pthread_self(),main_thread); }
 void ada_android_finish(void) { if (activity) ANativeActivity_finish(activity); }
+bool ada_android_open_url(const char *url) {
+    if (!activity || !resumed || !url || !url[0] || !ada_android_is_main_thread()) return false;
+    JNIEnv *env = activity->env;
+    if ((*env)->PushLocalFrame(env, 16) < 0) {
+        (*env)->ExceptionClear(env);
+        return false;
+    }
+    bool success = false;
+    jclass intent_class = (*env)->FindClass(env, "android/content/Intent");
+    if (!intent_class) goto cleanup;
+    jclass uri_class = (*env)->FindClass(env, "android/net/Uri");
+    if (!uri_class) goto cleanup;
+    jclass activity_class = (*env)->GetObjectClass(env, activity->clazz);
+    if (!activity_class) goto cleanup;
+    jmethodID parse = (*env)->GetStaticMethodID(env, uri_class, "parse", "(Ljava/lang/String;)Landroid/net/Uri;");
+    if (!parse) goto cleanup;
+    jmethodID constructor = (*env)->GetMethodID(env, intent_class, "<init>", "(Ljava/lang/String;Landroid/net/Uri;)V");
+    if (!constructor) goto cleanup;
+    jmethodID start = (*env)->GetMethodID(env, activity_class, "startActivity", "(Landroid/content/Intent;)V");
+    if (!start) goto cleanup;
+    jstring address = (*env)->NewStringUTF(env, url);
+    if (!address) goto cleanup;
+    jstring action = (*env)->NewStringUTF(env, "android.intent.action.VIEW");
+    if (!action) goto cleanup;
+    jobject uri = (*env)->CallStaticObjectMethod(env, uri_class, parse, address);
+    if (!uri || (*env)->ExceptionCheck(env)) goto cleanup;
+    jobject intent = (*env)->NewObject(env, intent_class, constructor, action, uri);
+    if (!intent || (*env)->ExceptionCheck(env)) goto cleanup;
+    (*env)->CallVoidMethod(env, activity->clazz, start, intent);
+    success = !(*env)->ExceptionCheck(env);
+cleanup:
+    if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+    (*env)->PopLocalFrame(env, NULL);
+    return success;
+}
 bool ada_android_has_surface(void) { pthread_mutex_lock(&window_lock); bool value=native_window!=NULL; pthread_mutex_unlock(&window_lock); return value; }
 int32_t ada_android_width(void) { pthread_mutex_lock(&window_lock); int value=width; pthread_mutex_unlock(&window_lock); return value; }
 int32_t ada_android_height(void) { pthread_mutex_lock(&window_lock); int value=height; pthread_mutex_unlock(&window_lock); return value; }
@@ -237,4 +272,5 @@ const char *ada_android_files_path(void) { return files_path; }
 #else
 // Host builds keep CAndroid importable without Android SDK headers.
 void ada_android_log(const char *message) { (void)message; }
+bool ada_android_open_url(const char *url) { (void)url; return false; }
 #endif

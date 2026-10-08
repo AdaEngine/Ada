@@ -1,9 +1,11 @@
+import AdaA2UI
 import Foundation
 
 enum MobileEditorAgentContext {
-    static func prompt(_ userPrompt: String, visiblePrompt: String? = nil) -> String {
+    static func prompt(_ userPrompt: String, visiblePrompt: String? = nil, a2uiAction: A2UIClientEvent? = nil) -> String {
         // Keep an exact display boundary even when skills or the request contain section markers.
         let displayBoundary = visiblePrompt.map { "[Chat request UTF-8 length: \($0.utf8.count)]\n" } ?? ""
+        let actionContext = a2uiAction.map { EditorAgentA2UIProtocol.actionContext($0) + "\n\n" } ?? ""
         return """
         [Mobile Studio requirements]
         \(displayBoundary)You are creating a playable AdaScript game for phones and tablets, with desktop input support.
@@ -41,8 +43,10 @@ enum MobileEditorAgentContext {
           Check both touch and desktop input paths.
         - Before finishing, report the build result, any runtime checks performed, and the touch controls and desktop bindings you implemented.
 
+        \(EditorAgentA2UIProtocol.promptContext())
+
         [User request]
-        \(userPrompt)
+        \(actionContext)\(userPrompt)
         """
     }
 

@@ -40,7 +40,7 @@ struct EditorPropertyHistoryTests {
         defer { ContextMenuPresentationCenter.present = previousPresenter }
         let document = UISceneDocument(root: .init(type: "VStack"))
         let model = EditorUISceneModel(content: try document.encodedYAML(), sourceURL: nil, resourceRoot: nil)
-        let container = UIContainerView(rootView: EditorUISceneEditor(model: model))
+        let container = UIContainerView(rootView: EditorUISceneEditor(model: model, presentation: .inspector))
         container.frame = Rect(x: 0, y: 0, width: 1440, height: 900)
         container.layoutSubviews()
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Enum.Toggle"))
@@ -74,7 +74,7 @@ struct EditorPropertyHistoryTests {
         model.edit { $0.inputs.append(.init("color", type: .string, defaultValue: .string("white"))) }
         model.updateSelected { $0.arguments["color"] = .init(value: .string(value.hexString)) }
         #expect(model.error == nil)
-        let container = UIContainerView(rootView: EditorUISceneEditor(model: model))
+        let container = UIContainerView(rootView: EditorUISceneEditor(model: model, presentation: .inspector))
         container.frame = Rect(x: 0, y: 0, width: 1440, height: 900)
         container.layoutSubviews()
         #expect(!container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.UIScene.ColorPicker")).isEmpty)

@@ -20,6 +20,7 @@ final class MobileEditorChatState {
         var activityID: String?
     }
 
+    let interfaces = EditorMobileA2UIStore()
     var activeProjectID: UUID?
     private(set) var runningProjectID: UUID?
     private var conversations: [UUID: Conversation] = [:]
@@ -80,7 +81,8 @@ final class MobileEditorChatState {
         return true
     }
 
-    func begin(_ id: UUID) {
+    func begin(_ id: UUID, agentIdentity: String? = nil) {
+        interfaces.controller.sessions[sessionID(for: id)]?.beginRun(agentIdentity: agentIdentity)
         runningProjectID = id
         conversations[id, default: Conversation()].activity = .working
         conversations[id, default: Conversation()].activityID = UUID().uuidString
@@ -88,6 +90,7 @@ final class MobileEditorChatState {
     }
 
     func record(_ event: EditorAgentEvent, for id: UUID) {
+        interfaces.controller.sessions[sessionID(for: id)]?.receive(event)
         var conversation = conversations[id, default: Conversation()]
         if let index = conversation.events.firstIndex(where: { $0.id == event.id }) {
             conversation.events[index] = event
@@ -103,7 +106,8 @@ final class MobileEditorChatState {
         conversations[id, default: Conversation()].status = status
     }
 
-    func finish(_ id: UUID, succeeded: Bool, status: String) {
+    func finish(_ id: UUID, succeeded: Bool, status: String, cancelled: Bool = false, submission: EditorAgentA2UISubmission? = nil) {
+        interfaces.controller.sessions[sessionID(for: id)]?.finishRun(cancelled: cancelled, failed: !succeeded && !cancelled, submission: submission)
         setStatus(status, for: id)
         conversations[id, default: Conversation()].activity = succeeded ? .completed : .failed
         if runningProjectID == id { runningProjectID = nil }
@@ -115,5 +119,6 @@ final class MobileEditorChatState {
             return
         }
         conversations[id, default: Conversation()].events = events
+        interfaces.controller.sessions[self.sessionID(for: id)]?.reconcileEvents(events)
     }
 }

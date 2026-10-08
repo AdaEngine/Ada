@@ -62,6 +62,8 @@ final class EditorAgentA2UISession {
         }
     }
 
+    var didPresentUIInCurrentRun: Bool { !touched.isEmpty }
+
     var persistedRecords: [EditorAgentA2UISurfaceRecord] { records.values.sorted { $0.id < $1.id } }
 
     func beginRun(agentIdentity: String?) {
@@ -125,6 +127,43 @@ final class EditorAgentA2UISession {
 
     func setError(_ message: String, surfaceID: String) {
         records[surfaceID]?.error = message
+        publish()
+    }
+
+    func completeLocal(surfaceID: String, result: EditorAgentA2UIToolResult? = nil, revisionBinding: String? = nil) {
+        records[surfaceID]?.state = .ready
+        records[surfaceID]?.error = nil
+        if let result {
+            records[surfaceID]?.lastApplication = result
+            records[surfaceID]?.revisionBinding = revisionBinding
+        }
+        publish()
+    }
+
+    func clearLocalApplication(surfaceID: String) {
+        records[surfaceID]?.lastApplication = nil
+        publish()
+    }
+
+    /// Stored Sloppy events have different IDs from live response streams. Rebind without replaying defaults.
+    func reconcileEvents(_ events: [EditorAgentEvent]) {
+        for event in events where event.message?.role == .assistant {
+            let text = event.message?.segments.filter { $0.kind == .text }.compactMap(\.text).joined() ?? ""
+            var stream = EditorAgentA2UIStream()
+            let frames = stream.append(text) + stream.finish()
+            for frame in frames {
+                guard let data = try? frame.get(), let message = try? JSONDecoder().decode(UIValue.self, from: data),
+                      case let .object(envelope) = message else { continue }
+                for key in ["createSurface", "updateComponents", "updateDataModel"] {
+                    if case let .object(body) = envelope[key], let id = body["surfaceId"]?.string, records[id] != nil {
+                        records[id]?.eventID = event.id
+                    }
+                }
+            }
+            streams[event.id] = stream
+            sourceTexts[event.id] = text
+            displayTexts[event.id] = stream.displayText
+        }
         publish()
     }
 

@@ -75,6 +75,7 @@ struct EditorAgentActionsDisclosure: View {
     let id: String
     let events: [EditorAgentEvent]
     let viewModel: EditorAgentViewModel?
+    var a2uiPresentation: EditorAgentA2UIPresentation?
     @State private var isExpanded = false
     @Environment(\.theme) private var theme
 
@@ -102,7 +103,7 @@ struct EditorAgentActionsDisclosure: View {
             .accessibilityIdentifier("AdaEditor.Agent.ToggleActions.\(id)")
             if isExpanded {
                 ForEach(events, id: \.id) { event in
-                    EditorAgentEventCard(event: event, viewModel: viewModel)
+                    EditorAgentEventCard(event: event, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
                 }
             }
         }
@@ -130,6 +131,7 @@ struct EditorAgentTranscript: View {
         self.standaloneSessionID = sessionID
     }
 
+    var a2uiPresentation: EditorAgentA2UIPresentation?
     var contentInsets = EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
     var scrollContentInsets: EdgeInsets?
     var scrollRespectsSafeArea = true
@@ -157,9 +159,9 @@ struct EditorAgentTranscript: View {
                         ForEach(EditorAgentTranscriptEntry.grouped(events)) { entry in
                             switch entry {
                             case let .event(event):
-                                EditorAgentEventCard(event: event, viewModel: viewModel)
+                                EditorAgentEventCard(event: event, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
                             case let .actions(id, events):
-                                EditorAgentActionsDisclosure(id: id, events: events, viewModel: viewModel)
+                                EditorAgentActionsDisclosure(id: id, events: events, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
                             }
                         }
                         Color.clear.frame(height: contentInsets.bottom + 1)

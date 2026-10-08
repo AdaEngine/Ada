@@ -80,46 +80,11 @@ struct MobileEditorRootView: View {
     private let logo = ProjectOpeningAssets.loadAdaEngineLogo()
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            MobileEditorProjectsScreen(projects: projects, create: createProject, open: openProject)
-                .navigationTitle("Ada Studio")
-                .navigationTitleFont(MobileEditorFont.navigationFont(size: 24))
-                .navigationTitlePosition(.leading)
-                .navigationBarTitleDisplayMode(.inline)
-                .navigationBarColor(theme.editorColors.background)
-                .navigationBarLeadingItems {
-                    if let logo {
-                        logo
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 32, height: 32)
-                    }
-                }
-                .navigationBarTrailingItems {
-                    HStack(spacing: 8) {
-                        EditorAICreditsBadge(compact: true, onOpen: {
-                            navigationPath.append(MobileEditorDestination.settings)
-                        })
-                        Button { navigationPath.append(MobileEditorDestination.activity) } label: {
-                            Text("\u{E7F4}")
-                                .foregroundColor(theme.editorColors.text)
-                                .frame(width: 40, height: 40)
-                                .font(AdaEditorMaterialSymbolFont.font(size: 24))
-                        }
-                        .accessibilityIdentifier("AdaEditor.Mobile.ActivityButton")
-                        Button {
-                            navigationPath.append(MobileEditorDestination.settings)
-                        } label: {
-                            Text("\u{E8B8}")
-                                .foregroundColor(theme.editorColors.text)
-                                .frame(width: 40, height: 40)
-                                .environment(\.font, AdaEditorMaterialSymbolFont.font(size: 24))
-                        }
-                        .accessibilityIdentifier("AdaEditor.Mobile.Settings")
-                    }
-                }
-                .navigate(for: MobileEditorDestination.self, destination: destination)
-        }
+        MobileEditorHomeTabs(
+            studio: studioNavigation,
+            showsTabBar: navigationPath.isEmpty,
+            server: URL(string: EditorCloudAccount.shared.server)
+        )
         .background(theme.editorColors.background.ignoresSafeArea())
         .onAppear {
             installMobileNotifications()
@@ -215,6 +180,49 @@ struct MobileEditorRootView: View {
         }
     }
 
+    private var studioNavigation: some View {
+        NavigationStack(path: $navigationPath) {
+            MobileEditorProjectsScreen(projects: projects, create: createProject, open: openProject)
+                .navigationTitle("Ada Studio")
+                .navigationTitleFont(MobileEditorFont.navigationFont(size: 24))
+                .navigationTitlePosition(.leading)
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarColor(theme.editorColors.background)
+                .navigationBarLeadingItems {
+                    if let logo {
+                        logo
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 32, height: 32)
+                    }
+                }
+                .navigationBarTrailingItems {
+                    HStack(spacing: 8) {
+                        EditorAICreditsBadge(compact: true, onOpen: {
+                            navigationPath.append(MobileEditorDestination.settings)
+                        })
+                        Button { navigationPath.append(MobileEditorDestination.activity) } label: {
+                            Text("\u{E7F4}")
+                                .foregroundColor(theme.editorColors.text)
+                                .frame(width: 40, height: 40)
+                                .font(AdaEditorMaterialSymbolFont.font(size: 24))
+                        }
+                        .accessibilityIdentifier("AdaEditor.Mobile.ActivityButton")
+                        Button {
+                            navigationPath.append(MobileEditorDestination.settings)
+                        } label: {
+                            Text("\u{E8B8}")
+                                .foregroundColor(theme.editorColors.text)
+                                .frame(width: 40, height: 40)
+                                .environment(\.font, AdaEditorMaterialSymbolFont.font(size: 24))
+                        }
+                        .accessibilityIdentifier("AdaEditor.Mobile.Settings")
+                    }
+                }
+                .navigate(for: MobileEditorDestination.self, destination: destination)
+        }
+    }
+
     @ViewBuilder
     private func destination(_ route: MobileEditorDestination) -> some View {
         switch route {
@@ -228,9 +236,10 @@ struct MobileEditorRootView: View {
                     pendingAttachments: pendingPromptAttachments,
                     chatEvents: chatEvents,
                     sessionID: chatState.sessionID(for: id),
+                    a2uiPresentation: mobileA2UIPresentation(for: project),
                     previousSession: chatState.previousSession,
                     resumePreviousSession: { Task { @MainActor in await resumePreviousSession(for: id) } },
-                    agentStatus: agentStatus,
+                    agentStatus: chatState.interfaces.persistenceError ?? agentStatus,
                     agentActivityState: agentActivityState,
                     agentActivityID: agentActivityID,
                     preparePlay: { preparePlay(for: id) },
@@ -399,6 +408,7 @@ struct MobileEditorRootView: View {
             playSession?.capture.stop()
             playSession = nil
             navigationPath.append(MobileEditorDestination.workspace(project.id))
+            prepareMobileA2UI(for: project.id)
             Task { @MainActor in await findPreviousSession(for: project.id) }
         }
     }
@@ -434,8 +444,15 @@ struct MobileEditorRootView: View {
         submitPrompt(for: id)
     }
 
-    private func submitPrompt(for id: UUID) {
-        let value = promptDraft.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func submitPrompt(for id: UUID, a2uiSubmission: EditorAgentA2UISubmission? = nil) {
+        var started = false
+        defer {
+            if !started, let a2uiSubmission {
+                chatState.interfaces.controller.sessions[a2uiSubmission.sessionID]?.rejectSubmission(
+                    agentStatus ?? "The agent could not start. Check its connection settings.", surfaceID: a2uiSubmission.surfaceID)
+            }
+        }
+        let value = a2uiSubmission?.summary ?? promptDraft.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (!value.isEmpty || !pendingPromptAttachments.isEmpty), !isAgentRunning,
               let index = projects.firstIndex(where: { $0.id == id }) else {
             return
@@ -459,7 +476,7 @@ struct MobileEditorRootView: View {
         let attachmentPaths: [String]
         let imageInputs: [SloppyImageInput]
         do {
-            attachmentPaths = try savePromptAttachments(into: workspaceURL)
+            attachmentPaths = a2uiSubmission == nil ? try savePromptAttachments(into: workspaceURL) : []
             imageInputs = try attachmentPaths.compactMap { path in
                 let url = workspaceURL.appendingPathComponent(path)
                 guard EditorImageAttachment.extensions.contains(url.pathExtension.lowercased()) else { return nil }
@@ -483,8 +500,10 @@ struct MobileEditorRootView: View {
             agentStatus = error.localizedDescription
             return
         }
-        promptDraft.text = ""
-        pendingPromptAttachments = []
+        if a2uiSubmission == nil {
+            promptDraft.text = ""
+            pendingPromptAttachments = []
+        }
         chatEvents.append(EditorAgentEvent(
             kind: .message,
             message: EditorAgentMessage(
@@ -492,12 +511,14 @@ struct MobileEditorRootView: View {
                 segments: [EditorAgentMessageSegment(kind: .text, text: outgoingPrompt)]
             )
         ))
-        chatState.begin(id)
+        prepareMobileA2UI(for: id)
+        chatState.begin(id, agentIdentity: mobileAgentIdentity)
         let sessionID = chatState.sessionID(for: id)
         let runSettings = harness.settings
         let streamID = "stream-\(UUID().uuidString)"
         let operation = MobileEditorAgentOperation(projectID: id)
         agentOperation = operation
+        started = true
         operation.start(
             projectName: projects[index].title,
             requestBackground: { activityID, coordinator in
@@ -552,7 +573,9 @@ struct MobileEditorRootView: View {
                     try await sloppyRuntime.configureOpenAI(apiKey: credentials.apiKey, model: credentials.model, apiURL: credentials.apiURL)
                 }
                 operation.completedStep()
-                var turnPrompt = MobileEditorAgentContext.prompt(runSettings.prompt(outgoingPrompt), visiblePrompt: outgoingPrompt)
+                var turnPrompt = MobileEditorAgentContext.prompt(
+                    runSettings.prompt(outgoingPrompt), visiblePrompt: outgoingPrompt, a2uiAction: a2uiSubmission?.event
+                )
                 for attempt in 0...runSettings.repairAttempts {
                     try Task.checkCancellation()
                     let responseStreamID = attempt == 0 ? streamID : "repair-\(UUID().uuidString)"
@@ -618,7 +641,8 @@ struct MobileEditorRootView: View {
                     try Task.checkCancellation()
                     operation.completedStep()
                     if validation.ok {
-                        if runSettings.opensPreview, UIApplication.shared.applicationState == .active { preparePlay(for: id) }
+                        let hasChatUI = chatState.interfaces.controller.sessions[sessionID]?.didPresentUIInCurrentRun == true
+                        if runSettings.opensPreview, !hasChatUI, UIApplication.shared.applicationState == .active { preparePlay(for: id) }
                         return .init(succeeded: true, detail: "AdaScript, scenes and simulation validated")
                     }
                     operation.reportError(validation.payload)
@@ -638,13 +662,55 @@ struct MobileEditorRootView: View {
                 return .init(succeeded: false, detail: "The agent could not validate the project.")
             },
             finished: { state, detail in
-                chatState.finish(id, succeeded: state == .completed, status: detail)
+                chatState.finish(id, succeeded: state == .completed, status: detail, cancelled: state == .cancelled || state == .interrupted, submission: a2uiSubmission)
                 await loadChat(for: id, sessionID: sessionID)
                 if state != .completed, chatState.sessionID(for: id) == sessionID {
                     chatState.record(EditorAgentEvent(kind: .runStatus, title: detail, isSuccessful: false), for: id)
                 }
             }
         )
+    }
+
+    private var mobileAgentIdentity: String? {
+        guard let credentials = MobileSloppyCredentialStore.load() else { return nil }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        guard let data = try? encoder.encode(credentials) else { return nil }
+        let account = MobileCodexCredentialStore.load()?.accountID ?? ""
+        return EditorAgentSceneToolService.revision(for: String(decoding: data, as: UTF8.self) + account)
+    }
+
+    private func prepareMobileA2UI(for id: UUID) {
+        do {
+            let root = try MobileAdaScriptProjectService.projectURL(for: id)
+            let ui = chatState.interfaces.prepare(sessionID: chatState.sessionID(for: id), projectURL: root,
+                events: chatState.events(for: id), identity: mobileAgentIdentity)
+            ui.onSubmission = { [weak ui] submission in
+                guard let ui else { return }
+                guard activeChatProjectID == id, !isAgentRunning, submission.sessionID == chatState.sessionID(for: id),
+                      submission.agentIdentity == mobileAgentIdentity else {
+                    ui.rejectSubmission("Reconnect the original agent and project before submitting.", surfaceID: submission.surfaceID)
+                    return
+                }
+                if !chatState.interfaces.performLocal(submission) { submitPrompt(for: id, a2uiSubmission: submission) }
+            }
+        } catch { agentStatus = error.localizedDescription }
+    }
+
+    private func mobileA2UIPresentation(for project: MobileEditorProject) -> EditorAgentA2UIPresentation? {
+        let id = chatState.sessionID(for: project.id)
+        guard let ui = chatState.interfaces.controller.sessions[id] else { return nil }
+        return .init(session: ui, isEnabled: !isAgentRunning, agentIdentity: mobileAgentIdentity,
+            onOpenPreview: { surfaceID in
+                do {
+                    let path = try chatState.interfaces.export(surfaceID: surfaceID, sessionID: id)
+                    presentedFile = MobileEditorFilePresentation(project: project, relativePath: path)
+                } catch { ui.setError(error.localizedDescription, surfaceID: surfaceID) }
+            },
+            onUndo: { surfaceID in
+                guard !isAgentRunning, ui.records[surfaceID]?.agentIdentity == mobileAgentIdentity else { return }
+                chatState.interfaces.undo(surfaceID: surfaceID, sessionID: id)
+            })
     }
 
     private func installMobileNotifications() {
@@ -690,6 +756,7 @@ struct MobileEditorRootView: View {
             let events = try await MobileEditorSessionStore(workspaceURL: directory).events(id: previous.id)
             guard activeChatProjectID == id,
                   chatState.resumePreviousSession(for: id, expectedSessionID: sessionID, events: events) else { return }
+            prepareMobileA2UI(for: id)
             promptDraft.text = ""
             pendingPromptAttachments = []
             workspaceTab = .build

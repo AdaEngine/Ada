@@ -109,6 +109,7 @@ struct MobileEditorSessionsScreen: View {
 
 struct MobileEditorSessionDetailScreen: View {
     @Environment(\.theme) private var theme
+    @State private var interfaces = EditorMobileA2UIStore(shouldPersist: false)
     @State private var events: [EditorAgentEvent] = []
     @State private var status = "Loading conversation…"
     @State private var loadTask: Task<Void, Never>?
@@ -129,6 +130,7 @@ struct MobileEditorSessionDetailScreen: View {
                 do {
                     let loaded = try await MobileEditorSessionStore(workspaceURL: workspaceURL).events(id: sessionID)
                     try Task.checkCancellation()
+                    _ = interfaces.prepare(sessionID: sessionID, projectURL: workspaceURL, events: loaded, identity: nil)
                     events = loaded
                     status = loaded.isEmpty ? "This session has no messages." : ""
                 } catch { if !Task.isCancelled { status = error.localizedDescription } }
@@ -139,6 +141,9 @@ struct MobileEditorSessionDetailScreen: View {
 
     private var transcript: some View {
         var view = EditorAgentTranscript(events: events, sessionID: sessionID)
+        if let ui = interfaces.controller.sessions[sessionID] {
+            view.a2uiPresentation = .init(session: ui, isEnabled: false, agentIdentity: ui.records.values.first?.agentIdentity)
+        }
         view.scrollRespectsSafeArea = false
         view.scrollExtendsUnderNavigationBar = true
         return view

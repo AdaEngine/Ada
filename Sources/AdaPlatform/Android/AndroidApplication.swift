@@ -113,6 +113,10 @@
             setResumed(false)
             unsafe ada_android_finish()
         }
+
+        override func openURL(_ url: URL) -> Bool {
+            unsafe url.absoluteString.withCString { unsafe ada_android_open_url($0) }
+        }
     }
 
     private final class AndroidScreen: SystemScreen, Sendable {}

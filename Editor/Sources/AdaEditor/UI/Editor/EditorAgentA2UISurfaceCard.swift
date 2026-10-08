@@ -3,15 +3,25 @@ import AdaA2UI
 import Foundation
 
 struct EditorAgentA2UISurfaceCard: View {
-    let viewModel: EditorAgentViewModel
+    var viewModel: EditorAgentViewModel? = nil
     let session: EditorAgentA2UISession
     let surfaceID: String
+    var presentation: EditorAgentA2UIPresentation? = nil
     @Environment(\.theme) private var theme
 
     private var record: EditorAgentA2UISurfaceRecord? { session.records[surfaceID] }
     private var canInteract: Bool {
-        record?.state == .ready && !viewModel.isSending && !viewModel.isSubmittingA2UI && viewModel.agentEnabled
-            && record?.agentIdentity == viewModel.settings.configuration.target.sessionIdentity
+        guard record?.state == .ready else { return false }
+        if let viewModel {
+            return !viewModel.isSending && !viewModel.isSubmittingA2UI && viewModel.agentEnabled
+                && record?.agentIdentity == viewModel.settings.configuration.target.sessionIdentity
+        }
+        return presentation?.isEnabled == true && record?.agentIdentity == presentation?.agentIdentity
+    }
+
+    private var canExport: Bool {
+        if let viewModel { return !viewModel.isSending && !viewModel.isSubmittingA2UI }
+        return presentation?.isEnabled == true
     }
 
     var body: some View {
@@ -31,10 +41,23 @@ struct EditorAgentA2UISurfaceCard: View {
             if let error = record?.error {
                 Text(error).font(.system(size: 12)).foregroundColor(.red)
             }
-            Button("Open in UI Designer") { viewModel.openA2UIPreview(surfaceID: surfaceID) }
+            if let result = record?.lastApplication {
+                Text(result.message).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
+                Button("Undo") {
+                    if let viewModel { viewModel.undoA2UITool(surfaceID: surfaceID) }
+                    else { presentation?.onUndo(surfaceID) }
+                }
                 .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, bordered: true))
-                .disabled(viewModel.isSending || session.client.surfaces[surfaceID]?.scene.document.root.type == "EmptyView")
-                .accessibilityIdentifier("AdaEditor.Agent.A2UI.OpenDesigner.\(surfaceID)")
+                .disabled(!canInteract)
+                .accessibilityIdentifier("AdaEditor.Agent.A2UI.Undo.\(surfaceID)")
+            }
+            Button(viewModel == nil ? "Open UI Source" : "Open in UI Designer") {
+                if let viewModel { viewModel.openA2UIPreview(surfaceID: surfaceID) }
+                else { presentation?.onOpenPreview(surfaceID) }
+            }
+            .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, bordered: true))
+            .disabled(!canExport || session.client.surfaces[surfaceID]?.scene.document.root.type == "EmptyView")
+            .accessibilityIdentifier("AdaEditor.Agent.A2UI.OpenDesigner.\(surfaceID)")
         }
         .foregroundColor(theme.editorColors.text)
         .padding(12)
@@ -44,12 +67,12 @@ struct EditorAgentA2UISurfaceCard: View {
     }
 
     private var stateTitle: String {
-        if record?.agentIdentity != viewModel.settings.configuration.target.sessionIdentity {
+        if record?.agentIdentity != (viewModel?.settings.configuration.target.sessionIdentity ?? presentation?.agentIdentity) {
             return "Reconnect the original agent"
         }
         switch record?.state {
         case .receiving: return "Preparing form…"
-        case .ready: return viewModel.isSending ? "Agent is working…" : "Ready"
+        case .ready: return viewModel?.isSending == true ? "Agent is working…" : "Ready"
         case .submitting: return "Submitting…"
         case .submitted: return "Submitted"
         case .cancelled: return "Interrupted"
@@ -67,4 +90,14 @@ private struct EditorAgentA2UIFieldStyle: TextFieldStyle {
             .background(theme.editorColors.background)
             .border(theme.editorColors.border, lineWidth: 1)
     }
+}
+
+/// The mobile chat uses the same cards without owning the desktop ACP view model.
+@MainActor
+struct EditorAgentA2UIPresentation {
+    let session: EditorAgentA2UISession
+    let isEnabled: Bool
+    let agentIdentity: String?
+    var onOpenPreview: (String) -> Void = { _ in }
+    var onUndo: (String) -> Void = { _ in }
 }

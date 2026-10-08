@@ -229,7 +229,7 @@ final class EditorAgentMCPTools {
         return try json(["assets": Array(paths)])
     }
 
-    private func decodeOperation(_ value: Value) throws -> EditorAgentSceneOperation {
+    func decodeOperation(_ value: Value) throws -> EditorAgentSceneOperation {
         guard case let .object(fields) = value, let operation = fields["op"]?.stringValue else { throw EditorAgentMCPToolError.invalidOperations }
         func required(_ key: String) throws -> String {
             guard let value = fields[key]?.stringValue, !value.isEmpty else { throw EditorAgentMCPToolError.missingArgument(key) }

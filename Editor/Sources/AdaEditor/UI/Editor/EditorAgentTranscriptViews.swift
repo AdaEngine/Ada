@@ -38,6 +38,7 @@ private struct EditorAgentMessageRowLayout: Layout {
 struct EditorAgentEventCard: View {
     let event: EditorAgentEvent
     let viewModel: EditorAgentViewModel?
+    var a2uiPresentation: EditorAgentA2UIPresentation? = nil
 
     @Environment(\.theme) private var theme
 
@@ -104,9 +105,9 @@ struct EditorAgentEventCard: View {
                 .font(.system(size: 12))
                 .foregroundColor(theme.editorColors.muted)
         }
-        if let model = viewModel, let sessionID = model.activeSession?.id, let ui = model.a2ui.sessions[sessionID] {
+        if let ui = a2uiSession {
             ForEach(ui.surfaceIDs(for: event.id), id: \.self) { surfaceID in
-                EditorAgentA2UISurfaceCard(viewModel: model, session: ui, surfaceID: surfaceID)
+                EditorAgentA2UISurfaceCard(viewModel: viewModel, session: ui, surfaceID: surfaceID, presentation: a2uiPresentation)
             }
             if let error = ui.eventErrors[event.id] {
                 Text("Interface error: \(error)").font(.system(size: 12)).foregroundColor(.red)
@@ -114,9 +115,12 @@ struct EditorAgentEventCard: View {
         }
     }
 
+    private var a2uiSession: EditorAgentA2UISession? {
+        a2uiPresentation?.session ?? viewModel?.activeSession.flatMap { viewModel?.a2ui.sessions[$0.id] }
+    }
+
     private func displaySegments(_ message: EditorAgentMessage) -> [EditorAgentMessageSegment] {
-        guard message.role == .assistant, let sessionID = viewModel?.activeSession?.id,
-              let text = viewModel?.a2ui.sessions[sessionID]?.displayTexts[event.id]
+        guard message.role == .assistant, let text = a2uiSession?.displayTexts[event.id]
         else { return message.segments }
         var insertedText = false
         return message.segments.compactMap { segment in

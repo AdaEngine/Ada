@@ -104,6 +104,8 @@ struct AdaEditorApp: App {
             } else {
                 ProjectOpeningView()
             }
+            #elseif os(iOS)
+            MobileEditorHomeTabs(studio: ProjectOpeningView())
             #else
             ProjectOpeningView()
             #endif

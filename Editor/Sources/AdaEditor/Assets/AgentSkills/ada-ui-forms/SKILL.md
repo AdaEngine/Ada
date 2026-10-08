@@ -28,3 +28,20 @@ Do not execute or interpolate user text as code. Do not write the `.ui` file:
 users choose Open in UI Designer, refine through normal designer controls, and
 save through Studio's document workflow. The ACP session and existing project
 tools remain the transport and authoring integration.
+
+## Reusable scene tools
+
+When asked for a spawner, color editor, or a tool inside chat, use the host's
+advertised local actions rather than asking the model to execute the change after
+submission. Read `editor.scene.get` before presenting a card. Bind the returned
+revision at `/scene/revision`, pass `expectedRevision:{path:"/scene/revision"}`
+and `revisionBinding:"/scene/revision"` on every scene action.
+
+Use `editor.scene.spawn` for an existing NPC subtree with entityID, count and
+spacing; `editor.scene.setColor` for entityID/typeName/field/color; or
+`editor.scene.apply` for structured operation batches. Keep the scene path fixed.
+Use `editor.color.pick` with binding:"/color" and value:{path:"/color"} plus a
+HEX TextField to choose a color. A separate Apply button applies it to the scene.
+Do not apply these operations before the user clicks. The host performs the action
+without a new model turn and exposes Undo. These cards work on desktop and iPhone;
+iPhone exports `.ui` to its source editor instead of the desktop visual designer.

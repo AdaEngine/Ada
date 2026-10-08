@@ -13,6 +13,7 @@ struct MobileEditorWorkspaceView: View {
     let pendingAttachments: [URL]
     let chatEvents: [EditorAgentEvent]
     let sessionID: String
+    var a2uiPresentation: EditorAgentA2UIPresentation? = nil
     let previousSession: MobileEditorChatSessionReference?
     let resumePreviousSession: () -> Void
     let agentStatus: String?
@@ -72,6 +73,7 @@ struct MobileEditorWorkspaceView: View {
                     attachmentURLs: pendingAttachments,
                     chatEvents: chatEvents,
                     sessionID: sessionID,
+                    a2uiPresentation: a2uiPresentation,
                     previousSession: previousSession,
                     agentStatus: agentStatus,
                     isWorking: agentActivityState == .working,
@@ -111,6 +113,7 @@ struct MobileEditorBuildScreen: View {
     let attachmentURLs: [URL]
     let chatEvents: [EditorAgentEvent]
     let sessionID: String
+    var a2uiPresentation: EditorAgentA2UIPresentation? = nil
     let previousSession: MobileEditorChatSessionReference?
     let agentStatus: String?
     let isWorking: Bool
@@ -173,6 +176,7 @@ struct MobileEditorBuildScreen: View {
 
     private var transcript: some View {
         var transcript = EditorAgentTranscript(events: chatEvents, sessionID: sessionID)
+        transcript.a2uiPresentation = a2uiPresentation
         transcript.contentInsets = EdgeInsets(top: previousSession == nil ? 0 : 54, leading: 16, bottom: agentStatus == nil ? 220 : 260, trailing: 16)
         transcript.scrollRespectsSafeArea = false
         transcript.scrollExtendsUnderNavigationBar = true

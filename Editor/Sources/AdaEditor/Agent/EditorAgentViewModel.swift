@@ -125,6 +125,29 @@ final class EditorAgentViewModel {
         }
     }
 
+    @ObservationIgnored private var onApplyA2UITool: ((EditorAgentA2UIToolRequest) throws -> EditorAgentA2UIToolResult)?
+    @ObservationIgnored private var onUndoA2UITool: ((EditorAgentA2UIToolResult) throws -> String)?
+
+    func setA2UIToolHandlers(
+        apply: @escaping (EditorAgentA2UIToolRequest) throws -> EditorAgentA2UIToolResult,
+        undo: @escaping (EditorAgentA2UIToolResult) throws -> String
+    ) {
+        onApplyA2UITool = apply
+        onUndoA2UITool = undo
+    }
+
+    func undoA2UITool(surfaceID: String) {
+        guard !isSending, !isSubmittingA2UI, let id = activeSession?.id, let ui = a2ui.sessions[id],
+              let record = ui.records[surfaceID], record.agentIdentity == settings.configuration.target.sessionIdentity,
+              let result = record.lastApplication, let binding = record.revisionBinding else { return }
+        do {
+            guard let onUndoA2UITool else { throw EditorAgentA2UIToolRequest.Failure("Scene tools are unavailable.") }
+            let revision = try onUndoA2UITool(result)
+            try ui.updateLocalValue(.string(revision), binding: binding, surfaceID: surfaceID)
+            ui.clearLocalApplication(surfaceID: surfaceID)
+        } catch { ui.setError(error.localizedDescription, surfaceID: surfaceID) }
+    }
+
     func setA2UIPreviewHandler(_ handler: @escaping (String) -> Void) { onOpenA2UIPreview = handler }
 
     func openA2UIPreview(surfaceID: String) {
@@ -145,6 +168,10 @@ final class EditorAgentViewModel {
             a2ui.sessions[submission.sessionID]?.rejectSubmission("This interface belongs to another or unavailable agent session. Reconnect its agent before submitting.", surfaceID: submission.surfaceID)
             return
         }
+        if let ui = a2ui.sessions[submission.sessionID], ui.performLocal(submission, apply: { request in
+            guard let onApplyA2UITool else { throw EditorAgentA2UIToolRequest.Failure("Scene tools are unavailable.") }
+            return try onApplyA2UITool(request)
+        }) { return }
         isSubmittingA2UI = true
         Task {
             await sendPromptAsync(a2uiSubmission: submission)

@@ -5,6 +5,7 @@
 void ada_android_enqueue_job(void *job);
 bool ada_android_is_main_thread(void);
 void ada_android_finish(void);
+bool ada_android_open_url(const char *url);
 bool ada_android_has_surface(void);
 int32_t ada_android_width(void);
 int32_t ada_android_height(void);

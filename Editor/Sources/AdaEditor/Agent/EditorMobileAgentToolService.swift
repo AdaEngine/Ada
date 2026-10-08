@@ -109,6 +109,11 @@ final class EditorMobileAgentToolService {
 
     private func execute(name: String, arguments: [String: Value]) async throws -> [String: Any] {
         switch name {
+        case "editor.scene.list":
+            return ["scenes": EditorAgentSceneToolService(projectURL: projectURL).listScenes()]
+        case "editor.scene.get":
+            let snapshot = try EditorAgentSceneToolService(projectURL: projectURL).snapshot(relativePath: requiredString("path", arguments))
+            return ["path": snapshot.relativePath, "revision": snapshot.revision, "yaml": try snapshot.model.encodedYAML()]
         case "editor.project.context":
             let project = try ProjectSystem.loadProject(at: projectURL)
             return [

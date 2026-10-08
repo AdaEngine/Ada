@@ -283,6 +283,16 @@ final class EditorViewModel {
         self.agent.setProjectFileChangedHandler { [weak self] relativePath in
             self?.handleAgentProjectFileChanged(relativePath: relativePath, fileManager: fileManager)
         }
+        self.agent.setA2UIToolHandlers(
+            apply: { [weak self] request in
+                guard let self else { throw EditorAgentA2UIToolRequest.Failure("The project window was closed.") }
+                return try self.applyChatTool(request)
+            },
+            undo: { [weak self] result in
+                guard let self else { throw EditorAgentA2UIToolRequest.Failure("The project window was closed.") }
+                return try self.undoChatTool(result)
+            }
+        )
         self.agent.setA2UIPreviewHandler { [weak self] path in
             guard let self, let item = self.projectSidebar.items.first(where: { $0.relativePath == path }) else { return }
             self.openProjectItem(item)
