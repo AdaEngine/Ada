@@ -112,6 +112,11 @@ struct ProjectOpeningView: View {
         .background {
             LauncherColor.window.ignoresSafeArea()
         }
+        .overlay(anchor: .topTrailing) {
+            EditorAICreditsBadge(onOpen: { presentSettings(.general) })
+                .padding(.top, 18)
+                .padding(.trailing, 18)
+        }
         .fullScreenCover(
             isPresented: Binding(
                 get: { viewModel.projectBeingRenamed != nil },

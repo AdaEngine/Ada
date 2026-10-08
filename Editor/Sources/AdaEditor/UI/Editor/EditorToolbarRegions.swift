@@ -20,7 +20,8 @@ struct EditorTopToolbarRegion: View {
             onToggleProjectSwitcher: onToggleProjectSwitcher,
             onRun: viewModel.runFromToolbar,
             onStop: viewModel.stopFromToolbar,
-            onDebug: debugAction
+            onDebug: debugAction,
+            onOpenCloud: { viewModel.presentSettings(.general) }
         )
     }
     private var canRun: Bool {

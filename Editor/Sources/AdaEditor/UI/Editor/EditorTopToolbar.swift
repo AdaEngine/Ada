@@ -17,6 +17,7 @@ struct EditorTopToolbar: View {
     let onRun: () -> Void
     let onStop: () -> Void
     var onDebug: (() -> Void)?
+    var onOpenCloud: (() -> Void)?
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
@@ -38,6 +39,8 @@ struct EditorTopToolbar: View {
                 projectSwitcherButton
 
                 Spacer()
+
+                EditorAICreditsBadge(compact: true, onOpen: onOpenCloud)
 
                 EditorUpdateButton()
 

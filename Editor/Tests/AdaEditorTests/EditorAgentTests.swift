@@ -243,6 +243,37 @@ struct EditorAgentTests {
         #expect(skills.map(\.id).contains("ada-project-orientation"))
         #expect(skills.map(\.id).contains("ada-scene-authoring"))
         #expect(skills.map(\.id).contains("ada-visual-verification"))
+        #expect(skills.map(\.id).contains("ada-game-builder"))
+    }
+
+    @Test("game builder is available in desktop and mobile prompts without manual selection")
+    func gameBuilderInSessionCatalogs() throws {
+        let projectURL = try makeAgentTemporaryDirectory(named: "GameBuilderCatalog")
+        defer { try? FileManager.default.removeItem(at: projectURL) }
+        let skills = EditorAgentSkillStore.discoverSkills(projectURL: projectURL, directories: [])
+        let skill = try #require(skills.first { $0.id == "ada-game-builder" })
+        #expect(!skill.instructions.isEmpty)
+        #expect(skill.description?.contains("playable 2D or 3D") == true)
+
+        let request = EditorAgentRunRequest(
+            project: ProjectSystem.defaultProject(projectName: "Game"),
+            projectURL: projectURL,
+            session: EditorAgentSession(),
+            mode: .build,
+            prompt: "Create a platformer",
+            attachments: [],
+            skills: [],
+            availableSkills: skills
+        )
+        let desktopPrompt = EditorAgentPromptContext.text(for: request)
+        #expect(desktopPrompt.contains("/ada-game-builder:"))
+        #expect(desktopPrompt.contains("editor.skills.read"))
+        #expect(!desktopPrompt.contains(skill.instructions))
+
+        let mobilePrompt = MobileAgentHarnessSettings().prompt("Create a platformer")
+        #expect(mobilePrompt.contains("- ada-game-builder:"))
+        #expect(mobilePrompt.contains("editor.skills.read"))
+        #expect(!mobilePrompt.contains(skill.instructions))
     }
 
     @Test("session store persists index and active session")

@@ -59,3 +59,24 @@ They can be edited without an open project. Relative working and skill directori
 against the current project; chat histories and file access remain project scoped.
 On first use, an existing project agent command is imported if no global settings have been
 saved yet. Subsequent projects cannot override the global selection; project metadata is preserved.
+
+## Built-in game building workflow
+
+`ada-game-builder` is bundled with Studio for desktop and mobile agents. Every
+desktop prompt advertises discovered workflows; mobile prompts advertise the
+bundled catalog. Agents load matching instructions with `editor.skills.read`
+using `id: "ada-game-builder"`; `editor.skills.list` also exposes the workflow.
+No per-project installation or manual skill selection is needed for discovery.
+The catalog instructs agents to load matching workflows; actual selection depends
+on the agent following that guidance. Full instructions are loaded on demand.
+
+The workflow covers a playable loop, persistent scene/script/resource wiring,
+2D/3D authoring, desktop/touch controls, HUD and restart, and separate build,
+simulation and visible Play checks. It reuses the current AdaScript or Swift
+project and tools advertised by the host. It does not add engine capabilities.
+
+For multi-session games, it reuses project design/progress notes and records
+remaining checks. It does not require a new planning ceremony for each feature.
+The public [make-game workflow](https://github.com/PlayableIntelligence/game-creator/tree/main/skills/make-game)
+was reviewed as a reference for game-development phases and iteration; the
+bundled instructions are written for AdaEngine's own authoring and runtime paths.

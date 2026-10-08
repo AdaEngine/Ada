@@ -50,7 +50,11 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
       if !value.isEmpty { values[key] = value }
     }
     for (key, value) in preferences ?? [:] where !value.isEmpty { values[key] = value }
-    let home = FileManager.default.homeDirectoryForCurrentUser
+    #if os(iOS) || os(tvOS) || os(visionOS)
+      let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+    #else
+      let home = FileManager.default.homeDirectoryForCurrentUser
+    #endif
     values["ANDROID_HOME"] =
       values["ANDROID_HOME"] ?? home.appendingPathComponent("Library/Android/sdk").path
     values["SWIFT_ANDROID_SDK"] = values["SWIFT_ANDROID_SDK"] ?? "swift-6.4.0-RELEASE_android"

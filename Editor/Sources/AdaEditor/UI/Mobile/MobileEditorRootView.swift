@@ -97,6 +97,9 @@ struct MobileEditorRootView: View {
                 }
                 .navigationBarTrailingItems {
                     HStack(spacing: 8) {
+                        EditorAICreditsBadge(compact: true, onOpen: {
+                            navigationPath.append(MobileEditorDestination.settings)
+                        })
                         Button { navigationPath.append(MobileEditorDestination.activity) } label: {
                             Text("\u{E7F4}")
                                 .foregroundColor(theme.editorColors.text)
@@ -244,6 +247,9 @@ struct MobileEditorRootView: View {
                 .navigationBarColor(theme.editorColors.background)
                 .navigationBarTrailingItems {
                     HStack(spacing: 8) {
+                        EditorAICreditsBadge(compact: true, onOpen: {
+                            navigationPath.append(MobileEditorDestination.settings)
+                        })
                         if runningProjectID == id, !isVoicePresented {
                             Button { agentOperation?.cancel() } label: {
                                 Text("\u{E047}")

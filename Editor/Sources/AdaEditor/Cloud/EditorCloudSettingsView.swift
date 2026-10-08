@@ -41,8 +41,9 @@ struct EditorCloudSettingsView: View {
                         .accessibilityIdentifier("AdaEditor.Cloud.AccountIdentity")
                 }
                 if let date = account.expiresAt {
-                    Text("Paid access until \(date.formatted())").font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
+                    Text("Cloud Pro paid until \(date.formatted())").font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
                 }
+                EditorAICreditsDetails()
                 HStack(spacing: 10) {
                     if account.cloudServicesAvailable {
                         actionButton("Sync now", id: "Sync") {
@@ -57,7 +58,7 @@ struct EditorCloudSettingsView: View {
                 }
                 HStack(spacing: 10) {
                     if account.billingAvailable {
-                        actionButton("Subscribe to Pro", id: "Subscribe") { account.perform { try await account.buyPro() } }
+                        actionButton("Subscribe to Cloud Pro", id: "Subscribe") { account.perform { try await account.buyPro() } }
                     }
                     actionButton("Restore purchases", id: "Restore") { account.perform { try await account.restorePurchases() } }
                 }

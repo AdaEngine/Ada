@@ -233,6 +233,12 @@ rendering, clip playback or gameplay; Blender execution/generation and rig/clip
 authoring remain outside these tools. Desktop scene changes use document revisions
 and undo, and asset writes reject matching dirty open documents.
 
+The bundled `ada-game-builder` workflow is advertised in desktop and mobile
+session catalogs without per-project installation. Agents load it on demand for
+game creation and iteration. It covers playable loops, persistent authoring,
+controls/HUD, and build/simulation/visible Play verification using the host's
+available tools; catalog discovery does not enforce model selection.
+
 Guide: [Agent3DWorkflow.md](Documentation/Agent3DWorkflow.md).
 Entry points: [EditorAgentModelToolService.swift](Sources/AdaEditor/Agent/EditorAgentModelToolService.swift),
 [EditorAgentAuthoringMCPTools.swift](Sources/AdaEditor/Agent/EditorAgentAuthoringMCPTools.swift).
@@ -254,6 +260,19 @@ mobile flow have separate implementations and tests.
 Bundled offline documentation provides search, sections, history and copyable
 examples. Appearance/input settings, notifications/background activities,
 achievements/Game Center, cloud account/settings and standalone update UI exist.
+
+Ada Cloud AI wallet integration uses the existing account session for catalog,
+balance, cursor-paginated usage, quotes, reservations, lookup and cancellation.
+Credit counters appear on the start screen, shared workspace toolbar and iPhone navigation;
+Cloud settings show available/used/reserved credits and cycle activity. AI credits
+are separate from Cloud publishing Pro. Missing/disabled service and signed-out
+states do not imply a zero balance. Provider execution, settlement and subscription
+SKU activation remain server responsibilities; this client integration does not
+turn external/BYOK agents into hosted AI.
+Entry points: [EditorCloudAIClient.swift](Sources/AdaEditor/Cloud/EditorCloudAIClient.swift),
+[EditorAICreditsModel.swift](Sources/AdaEditor/Cloud/EditorAICreditsModel.swift).
+Coverage: [EditorAICreditsTests.swift](Tests/AdaEditorTests/EditorAICreditsTests.swift),
+[EditorCloudAILiveTests.swift](Tests/AdaEditorTests/EditorCloudAILiveTests.swift).
 
 Entry points: [MobileEditorRootView.swift](Sources/AdaEditor/UI/Mobile/MobileEditorRootView.swift),
 [EditorDocumentation.swift](Sources/AdaEditor/Documentation/EditorDocumentation.swift),

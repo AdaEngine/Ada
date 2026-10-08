@@ -19,10 +19,15 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         environment: ProcessInfo.processInfo.environment["ADA_CLOUD_API_URL"],
         saved: UserDefaults.standard.string(forKey: "AdaEditor.cloud.server"),
         bundled: Bundle.main.object(forInfoDictionaryKey: "AdaCloudAPIURL") as? String
-    )
+    ) {
+        didSet { if server != oldValue { invalidateAISession() } }
+    }
     var status = ""
     var busy = false
-    var accountID: String?
+    var accountID: String? {
+        didSet { if accountID != oldValue { invalidateAISession() } }
+    }
+    let aiCredits = EditorAICreditsModel()
     var pro = false
     var cloudServicesAvailable = false
     var billingAvailable = false
@@ -37,6 +42,7 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
     @ObservationIgnored private var applying = false
     @ObservationIgnored private var syncing = false
     @ObservationIgnored private var refreshTask: Task<EditorCloudValue, Error>?
+    @ObservationIgnored private var sessionRevision = UUID()
     static let settingKeys = ["appearance.agentActivityGlowEnabled", "appearance.agentGlowAccent", "appearance.agentGlowRadius", "appearance.agentGlowOpacity", "editor.fontSize"]
 
     override init() {
@@ -45,6 +51,7 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
             credentials = value
             accountID = value["accountId"].string
         }
+        aiCredits.reset(signedIn: accountID != nil)
     }
     func start() {
         guard loop == nil else {
@@ -53,6 +60,7 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 if let self, self.accountID != nil {
+                    await self.refreshAICredits()
                     do { try await self.sync() } catch { self.status = "Settings saved locally. Sync will retry: \(error.localizedDescription)" }
                 }
                 try? await Task.sleep(for: .seconds(10))
@@ -154,6 +162,7 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
                 try applyLocal(baseline)
             }
         }
+        invalidateAISession()
         credentials = value
         credentials["server"] = .string(server)
         accountID = value["accountId"].string
@@ -172,6 +181,7 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         pro = plan["pro"].bool ?? false
         applyAvailability(plan["availability"])
         expiresAt = plan["expiresAt"].seconds > 0 ? Date(timeIntervalSince1970: plan["expiresAt"].seconds) : nil
+        await refreshAICredits(force: true)
     }
     private func applyAvailability(_ value: EditorCloudValue) {
         availability = value
@@ -190,6 +200,7 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         status = "Signed out on all devices."
     }
     private func clearSession() throws {
+        invalidateAISession()
         credentials = [:]
         accountID = nil
         pro = false
@@ -408,6 +419,8 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
     }
 
     func request(_ path: String, method: String = "GET", body: EditorCloudValue? = nil, authenticated: Bool = true, retry: Bool = true) async throws -> EditorCloudValue {
+        let revision = sessionRevision
+        let origin = server
         guard let base = URL(string: server), Self.isAllowedCloudURL(base), let url = URL(string: server.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/v1" + path) else {
             throw CloudError.message("Cloud server is not configured.")
         }
@@ -425,6 +438,7 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
             request.httpBody = try JSONEncoder().encode(body)
         }
         let (data, response) = try await URLSession.shared.data(for: request)
+        guard server == origin, sessionRevision == revision else { throw EditorAIError.sessionChanged }
         guard let http = response as? HTTPURLResponse else {
             throw CloudError.message("Invalid server response")
         }
@@ -436,18 +450,80 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
             guard let task = refreshTask else {
                 throw CloudError.message("Unable to refresh session")
             }
-            defer { refreshTask = nil }
+            defer { if sessionRevision == revision { refreshTask = nil } }
             let refreshed = try await task.value
+            guard server == origin, sessionRevision == revision else { throw EditorAIError.sessionChanged }
             credentials["accessToken"] = refreshed["accessToken"]
             credentials["refreshToken"] = refreshed["refreshToken"]
             try Self.keychainWrite(JSONEncoder().encode(credentials))
             return try await self.request(path, method: method, body: body, authenticated: authenticated, retry: false)
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw CloudError.message(result["error"]["message"].string ?? "Cloud request failed (\(http.statusCode))")
+            throw CloudError.http(http.statusCode, result["error"]["message"].string ?? "Cloud request failed (\(http.statusCode))")
         }
         return result
     }
+    private func invalidateAISession() {
+        sessionRevision = UUID()
+        refreshTask?.cancel()
+        refreshTask = nil
+        aiCredits.reset(signedIn: accountID != nil && credentials["server"].string == server)
+    }
+
+    private func aiClient() throws -> EditorCloudAIClient {
+        guard let owner = accountID, let identity = UUID(uuidString: owner),
+              credentials["accountId"].string.flatMap(UUID.init(uuidString:)) == identity,
+              credentials["server"].string == server else {
+            throw CloudError.message("Sign in to Ada Cloud to use AI credits.")
+        }
+        let revision = sessionRevision
+        return EditorCloudAIClient(owner: owner) { [weak self] path, method, body in
+            guard let self, self.sessionRevision == revision else { throw EditorAIError.sessionChanged }
+            let response = try await self.request(path, method: method, body: body)
+            guard self.sessionRevision == revision else { throw EditorAIError.sessionChanged }
+            return response
+        }
+    }
+
+    func refreshAICredits(force: Bool = false) async {
+        guard let client = try? aiClient() else {
+            aiCredits.reset(signedIn: false)
+            return
+        }
+        await aiCredits.refresh(client: client, force: force)
+    }
+
+    func loadAIUsage(restart: Bool = false) async {
+        guard let client = try? aiClient() else { return }
+        await aiCredits.loadHistory(client: client, restart: restart)
+    }
+
+    func aiCatalog() async throws -> EditorAICatalog { try await aiClient().catalog() }
+    func aiQuote(_ input: EditorAIQuoteRequest) async throws -> EditorAIQuote { try await aiClient().quote(input) }
+    func aiReservation(id: String) async throws -> EditorAIReservation { try await aiClient().reservation(id: id) }
+
+    func aiReserve(quoteID: String) async throws -> EditorAIReservation {
+        do {
+            let result = try await aiClient().reserve(quoteID: quoteID)
+            await refreshAICredits(force: true)
+            return result
+        } catch {
+            await refreshAICredits(force: true)
+            throw error
+        }
+    }
+
+    func aiCancel(id: String) async throws -> EditorAIReservation {
+        do {
+            let result = try await aiClient().cancel(id: id)
+            await refreshAICredits(force: true)
+            return result
+        } catch {
+            await refreshAICredits(force: true)
+            throw error
+        }
+    }
+
     func presentationAnchor(for _: ASWebAuthenticationSession) -> ASPresentationAnchor {
         #if os(macOS)
             NSApplication.shared.keyWindow ?? ASPresentationAnchor()
@@ -489,11 +565,10 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
     private static func keychainDelete() { SecItemDelete(keychainQuery as CFDictionary) }
     enum CloudError: LocalizedError {
         case message(String)
+        case http(Int, String)
         var errorDescription: String? {
-            if case let .message(message) = self {
-                message
-            } else {
-                nil
+            switch self {
+            case let .message(message), let .http(_, message): message
             }
         }
     }
