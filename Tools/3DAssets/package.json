@@ -1,0 +1,10 @@
+{
+  "name": "adaengine-3d-assets-tools",
+  "private": true,
+  "scripts": {
+    "validate": "node validate_glb.cjs"
+  },
+  "dependencies": {
+    "gltf-validator": "2.0.0-dev.3.10"
+  }
+}

@@ -7,14 +7,13 @@
 
 import AdaECS
 import AdaInput
-import AdaTransform
 import AdaRender
+import AdaTransform
 import AdaUtils
 import Math
 
 @PlainSystem
 public struct UIComponentSystem: Sendable {
-    
     @Query<Entity, UIComponent, GlobalTransform>
     private var uiComponents
 
@@ -22,7 +21,7 @@ public struct UIComponentSystem: Sendable {
     private var cameras
 
     @ResMut
-    private var input: Input?
+    private var input: Input
 
     @Res<DeltaTime>
     private var deltaTime
@@ -33,13 +32,16 @@ public struct UIComponentSystem: Sendable {
     @ResMut<UIWindowPendingDrawViews>
     private var pendingViews
 
+    @ResMut<UIRedrawRequest>
+    private var redrawRequest
+
     @Res<PrimaryWindowId>
     private var primaryWindowId
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
     @MainActor
-    public func update(context: UpdateContext) async {
+    public func update(context _: UpdateContext) async {
         self.uiComponents.forEach { entity, component, transform in
             update(
                 entity: entity,
@@ -51,21 +53,29 @@ public struct UIComponentSystem: Sendable {
     }
 }
 
-private extension UIComponentSystem {
+extension UIComponentSystem {
     @MainActor
     @inline(__always)
-    func update(
+    private func update(
         entity: Entity,
         component: UIComponent,
         globalTransform: GlobalTransform,
         deltaTime: TimeInterval
     ) {
-        let view = component.view
+        let view: UIView
+        do {
+            let runtime = entity.world?.getResource(UIComponentRuntimeResource.self)?.runtime
+            view = try component.resolveView(runtime: runtime)
+        } catch { return }
         let behaviour = component.behaviour
 
         if let viewOwner = (view as? ViewOwner) {
             var environment = EnvironmentValues()
-            environment.entity = WeakBox(value: entity)
+            environment.entity = entity
+            environment.windowManager = windowManager.windowManager
+            if let world = entity.world {
+                environment.world = world
+            }
             viewOwner.updateEnvironment(environment)
         }
 
@@ -74,39 +84,79 @@ private extension UIComponentSystem {
             if let window = windowManager
                 .windowManager
                 .windows[component.windowRef.getWindowId(from: primaryWindowId)] {
-                view.window = window
-                let newSize = component.view.sizeThatFits(ProposedViewSize(window.frame.size))
-                if view.frame.size != newSize {
-                    view.frame.size = newSize
+                // Do not assign `view.window` before `addSubview`: `UIWindow.addSubview`
+                // treats `view.window === self` as “already added” and asserts.
+                if view.parentView !== window {
+                    view.autoresizingRules = [.flexibleWidth, .flexibleHeight]
+                    window.addSubview(view)
+                }
+                // Overlay must match the window bounds during live resize. Using only
+                // `sizeThatFits` can under-fill the window while layout is settling, which
+                // breaks UI draw/compositing atop the scene (black or empty content region).
+                let newFrame = Rect(origin: .zero, size: window.frame.size)
+                if view.frame != newFrame {
+                    view.frame = newFrame
                     view.layoutSubviews()
+                    redrawRequest.needsRedraw = true
                 }
             }
         case .default:
-            view.transform3D = globalTransform.matrix
+            if view.transform3D != globalTransform.matrix {
+                view.transform3D = globalTransform.matrix
+                view.setNeedsDisplay()
+            }
         }
 
-        if let input = self.input {
-            for event in input.getInputEvents() {
-                guard view.canRespondToAction(event) else {
-                    continue
-                }
+        let events = input.getInputEvents()
+        for event in events where event.window == component.windowRef.getWindowId(from: primaryWindowId) {
+            guard view.canRespondToAction(event) else {
+                continue
+            }
 
-                let responder = view.findFirstResponder(for: event) ?? view
-                responder.onEvent(event)
+            let hit = view.findFirstResponder(for: event)
+            if let hit, hit !== view.window {
+                if case .overlay = behaviour {
+                    if view.window?.blocksScenePicking(for: event) == true {
+                        input.blockScenePicking(for: event)
+                    }
+                } else {
+                    input.blockScenePicking(for: event)
+                }
+            }
+            let responder = hit ?? view
+            responder.onEvent(event)
+        }
+
+        for (pointer, position) in input.pointerLocations where pointer.windowID == component.windowRef.getWindowId(from: primaryWindowId) {
+            if case .overlay = behaviour {
+                if view.window?.blocksScenePicking(pointer: pointer, at: position) == true {
+                    input.blockScenePicking(for: pointer)
+                }
+            } else {
+                let event = MouseEvent(window: pointer.windowID, button: .none, mousePosition: position, phase: .changed, modifierKeys: [], time: 0)
+                if view.findFirstResponder(for: event) != nil {
+                    input.blockScenePicking(for: pointer)
+                }
             }
         }
 
         view.update(deltaTime)
+
+        if view.consumeNeedsDisplay() {
+            redrawRequest.needsRedraw = true
+        }
     }
 }
 
-public extension EnvironmentValues {
-
+extension EnvironmentValues {
     /// The world where view attached.
-    @Entry internal(set) var world: WeakBox<World>?
+    @_spi(Internal) @Entry public package(set) var world: World?
 
     /// The game scene where view attached.
-    @Entry internal(set) var entity: WeakBox<Entity>?
+    @Entry internal var entity: Entity?
 
-    @Entry internal(set) var input: Ref<Input>?
+    @Entry internal var input: Ref<Input>?
+
+    /// The windowManager where view attached.
+    @_spi(Internal) @Entry public package(set) var windowManager: UIWindowManager?
 }

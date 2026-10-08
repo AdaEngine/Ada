@@ -1,5 +1,5 @@
 @Tutorial(time: 5) {
-    @Intro(title: "Player and Text in Ada Engine") {
+    @Intro(title: "Player and Text in Ada") {
         
         In this tutorial, you will learn how to add a player component that you can control and how to add text and various labels to your game scene.        
     }
@@ -9,13 +9,13 @@
     @Section(title: "Add Player component") {
         @ContentAndMedia {
             
-            Here we will start adding our Components and Entity, so that AdaEngine will correctly render our player and make him alive!
+        Here we will start adding our Components and Entity, so that Ada will correctly render our player and make him alive!
             
         }
         
         @Steps {
             @Step {
-                First of all you have to add the player component. For AdaEngine to understand you, just specify the following code.
+                First of all you have to add the player component. For Ada to understand you, just specify the following code.
                 
                 @Code(name: "PlayerComponent.swift", file: PAT-1-1-player-component.swift)
             }
@@ -36,21 +36,21 @@
             }
             
             @Step {
-                AdaEngine knows that the player has been added to the scene, but... he can't do anything and doesn't have any properties. Let's fix this! To begin with, we will give the player the opportunity to move and, in general, somehow change his size and position. Let's use the built-in Transform component and set some initial values.
+                Ada knows that the player has been added to the scene, but... he can't do anything and doesn't have any properties. Let's fix this! To begin with, we will give the player the opportunity to move and, in general, somehow change his size and position. Let's use the built-in Transform component and set some initial values.
                 
                 @Code(name: "MakePlayer.swift", file: PAT-1-4-makePlayer.swift)
             }
             
             @Step {
     
-                One more component is missing - what will the player look like? To do this, you can use sprites and the corresponding component in AdaEngine. We pass a `characterAtlas` parameter to get the texture for our player.
+                One more component is missing - what will the player look like? To do this, you can use sprites and the corresponding component in Ada. We pass a `characterAtlas` parameter to get the texture for our player.
                 
                 @Code(name: "MakePlayer.swift", file: PAT-1-5-makePlayer.swift)
             }
             
             @Step {
                 
-                After all the preparations, let's create a Plugin that will set up our player. The Plugin pattern is the recommended way to organize game logic in AdaEngine.
+                After all the preparations, let's create a Plugin that will set up our player. The Plugin pattern is the recommended way to organize game logic in Ada.
                 
                 @Code(name: "PlayerAndTextPlugin.swift", file: PAT-1-6-makeScene.swift)
             }
@@ -59,7 +59,7 @@
     
     @Section(title: "Add Text component") {
         @ContentAndMedia {
-            Let's dive deeper into the AdaEngine text component
+            Let's dive deeper into the Ada text component
         }
         
         @Steps {

@@ -17,13 +17,15 @@ jobs:
   build-and-deploy-docs:
     runs-on: macos-26
     env:
-      ADAENGINE_SKIP_WEBGPU_PLUGINS: "1"
+      ADAENGINE_DISABLE_SWAN: "1"
     steps:
       - name: Setup Xcode version
         uses: maxim-lobanov/setup-xcode@v1.6.0
         with:
           xcode-version: '26.1.1'
       - uses: actions/checkout@v4
+      - name: Verify editor offline documentation
+        run: python3 Editor/scripts/update-offline-documentation.py --check
       - name: Build Documentation
         run: |
           swift package \
@@ -31,10 +33,10 @@ jobs:
             generate-documentation \
             --output-path ./docs \
             --transform-for-static-hosting \
-            --hosting-base-path adaengine-docs \
             --enable-experimental-combined-documentation \
             --target AdaEngine \
             --target AdaECS \
+            --target AdaScripting \
             --target AdaRender \
             --target AdaUI \
             --target AdaApp \
@@ -50,6 +52,59 @@ jobs:
             --target AdaSprite \
             --target AdaUtils \
             --target Math
+
+      - name: Apply AdaEngine documentation theme
+        run: node scripts/apply-docc-theme.mjs docs
+
+      - name: Prepare documentation for search
+        run: node scripts/prepare-docc-search.mjs docs
+
+      - name: Add custom domain and redirects
+        run: |
+          printf 'docs.adaengine.org\n' > docs/CNAME
+
+          add_redirect() {
+            local path="$1"
+            local target="$2"
+
+            mkdir -p "docs/$path"
+            cat > "docs/$path/index.html" <<EOF
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0; url=$target">
+            <link rel="canonical" href="$target">
+            <script>window.location.replace("$target");</script>
+            <title>Redirecting...</title>
+          </head>
+          <body>
+            <p>Redirecting to <a href="$target">$target</a>.</p>
+          </body>
+          </html>
+          EOF
+          }
+
+          add_redirect "." "/documentation/adaengine/"
+          add_redirect "adaengine" "/documentation/adaengine/"
+          add_redirect "adaecs" "/documentation/adaecs/"
+          add_redirect "adascript" "/documentation/adascripting/"
+          add_redirect "adascripting" "/documentation/adascripting/"
+          add_redirect "adarender" "/documentation/adarender/"
+          add_redirect "adaui" "/documentation/adaui/"
+          add_redirect "adaapp" "/documentation/adaapp/"
+          add_redirect "adaplatform" "/documentation/adaplatform/"
+          add_redirect "adaassets" "/documentation/adaassets/"
+          add_redirect "adaaudio" "/documentation/adaaudio/"
+          add_redirect "adatransform" "/documentation/adatransform/"
+          add_redirect "adatext" "/documentation/adatext/"
+          add_redirect "adainput" "/documentation/adainput/"
+          add_redirect "adascene" "/documentation/adascene/"
+          add_redirect "adatilemap" "/documentation/adatilemap/"
+          add_redirect "adaphysics" "/documentation/adaphysics/"
+          add_redirect "adasprite" "/documentation/adasprite/"
+          add_redirect "adautils" "/documentation/adautils/"
+          add_redirect "math" "/documentation/math/"
 
       - name: Deploy to Github pages
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'

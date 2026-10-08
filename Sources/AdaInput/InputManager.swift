@@ -10,16 +10,21 @@ import AdaUtils
 import Foundation
 import Math
 
-// - TODO: (Vlad) Add actions list and method like `isActionPressed`
-
 /// An object that contains inputs from keyboards, mouse, touch screens and etc.
 public struct Input: Resource, Sendable {
-
     @_spi(Internal)
     public var mousePosition: Point = .zero
 
     @_spi(Internal)
     public internal(set) var eventsPool: [any InputEvent] = []
+
+    /// Current pointer locations, including a stationary mouse, for UI/game picking composition.
+    public internal(set) var pointerLocations: [InputPointerID: Point] = [:]
+    private var scenePickingBlockedPointers: Set<InputPointerID> = []
+    private var scenePickingBlockedEvents: Set<RID> = []
+
+    @_spi(Internal)
+    public var pendingEventsPool: [any InputEvent] = []
 
     // FIXME: (Vlad) Should think about capacity. We should store ~256 keycode events
     @_spi(Internal)
@@ -30,6 +35,17 @@ public struct Input: Resource, Sendable {
 
     @_spi(Internal)
     public var touches: Set<TouchEvent> = []
+
+    @_spi(Internal)
+    public internal(set) var keyboardState: KeyboardState = KeyboardState()
+
+    var actionDefinitions: [InputAction] = []
+    var actionStrengths: [String: Float] = [:]
+    var justPressedActions: Set<String> = []
+    var justReleasedActions: Set<String> = []
+    var actionScrollDirections: Set<InputAxisDirection> = []
+    var actionMouseMoved = false
+    var actionTouchPhases: Set<InputTouchPhase> = []
 
     var gamepads: [Int: Gamepad] = [:]
 
@@ -49,13 +65,43 @@ public struct Input: Resource, Sendable {
     }
 
     /// Returns a set of input events.
-    public func getInputEvents() -> Array<any InputEvent> {
+    public func getInputEvents() -> [any InputEvent] {
         return self.eventsPool
+    }
+
+    /// Blocks scene picking for one routed pointer event without removing it from ordinary input APIs.
+    public mutating func blockScenePicking(for event: any InputEvent) {
+        if event is MouseEvent || event is TouchEvent {
+            scenePickingBlockedEvents.insert(event.id)
+        }
+    }
+
+    /// UI refreshes this state each frame so appearing overlays also block stationary pointers.
+    public mutating func blockScenePicking(for pointer: InputPointerID) {
+        scenePickingBlockedPointers.insert(pointer)
+    }
+
+    public func isScenePickingBlocked(eventID: RID) -> Bool {
+        scenePickingBlockedEvents.contains(eventID)
+    }
+
+    public func isScenePickingBlocked(pointer: InputPointerID) -> Bool {
+        scenePickingBlockedPointers.contains(pointer)
     }
 
     /// Returns text input events from software keyboard (iOS) or IME.
     public func getTextInputEvents() -> [TextInputEvent] {
         return self.eventsPool.compactMap { $0 as? TextInputEvent }
+    }
+
+    /// Returns keyboard visibility/frame events from the software keyboard.
+    public func getKeyboardEvents() -> [KeyboardEvent] {
+        return self.eventsPool.compactMap { $0 as? KeyboardEvent }
+    }
+
+    /// Returns the latest known software keyboard state.
+    public func getKeyboardState() -> KeyboardState {
+        return keyboardState
     }
 
     /// Returns `true` if you are pressing the Latin key in the current keyboard layout.
@@ -85,28 +131,28 @@ public struct Input: Resource, Sendable {
     /// Get mouse mode for active window.
     @MainActor
     public func getMouseMode() -> MouseMode {
-//        Application.shared.windowManager.getMouseMode()
+        //        Application.shared.windowManager.getMouseMode()
         return .visible
     }
 
     /// Set mouse mode for active window.
     @MainActor
-    public mutating func setMouseMode(_ mode: MouseMode) {
-//        Application.shared.windowManager.setMouseMode(mode)
+    public mutating func setMouseMode(_: MouseMode) {
+        //        Application.shared.windowManager.setMouseMode(mode)
     }
 
     /// Set current cursor shape.
     @MainActor
     public mutating func setCursorShape(_ shape: CursorShape) {
         self.cursorStates = [shape]
-//        Application.shared.windowManager.setCursorShape(shape)
+        //        Application.shared.windowManager.setCursorShape(shape)
     }
 
     /// Pushes a new cursor shape onto the stack and sets it as the current cursor shape.
     @MainActor
     public mutating func pushCursorShape(_ shape: CursorShape) {
         self.cursorStates.append(shape)
-//        Application.shared.windowManager.setCursorShape(shape)
+        //        Application.shared.windowManager.setCursorShape(shape)
     }
 
     /// Pops the last cursor shape from the stack and sets it as the current cursor shape.
@@ -116,35 +162,48 @@ public struct Input: Resource, Sendable {
             self.cursorStates.removeLast()
         }
 
-//        let shape = self.cursorStates.last!
-//        Application.shared.windowManager.setCursorShape(shape)
+        //        let shape = self.cursorStates.last!
+        //        Application.shared.windowManager.setCursorShape(shape)
     }
 
-    /// Set custom image for cursor.
-    /// - Parameter shape: What cursor shape will update the texture.
-    /// - Parameter texture: Texture for cursor, also available ``TextureAtlas``. If you pass nil, then we remove saved image.
-    /// - Parameter hotSpot: The point to set as the cursor's hot spot.
-//    @MainActor
-//    public static func setCursorImage(for shape: Input.CursorShape, texture: Texture2D?, hotSpot: Vector2 = .zero) {
-//        Application.shared.windowManager.setCursorImage(for: shape, texture: texture, hotspot: hotSpot)
-//    }
+    // Set custom image for cursor.
+    // Parameters: cursor shape, optional texture, and hotspot.
+    //    @MainActor
+    //    public static func setCursorImage(for shape: Input.CursorShape, texture: Texture2D?, hotSpot: Vector2 = .zero) {
+    //        Application.shared.windowManager.setCursorImage(for: shape, texture: texture, hotspot: hotSpot)
+    //    }
 
-    /// Get current cursor shape.
-//    @MainActor
-//    public static func getCurrentCursorShape() -> CursorShape {
-//        Application.shared.windowManager.getCursorShape()
-//    }
+    // Get current cursor shape.
+    //    @MainActor
+    //    public static func getCurrentCursorShape() -> CursorShape {
+    //        Application.shared.windowManager.getCursorShape()
+    //    }
 
     // MARK: Internal
 
     @MainActor
     @_spi(Internal) public mutating func removeEvents() {
+        for event in eventsPool {
+            if let touch = event as? TouchEvent, touch.phase == .ended || touch.phase == .cancelled {
+                pointerLocations[.touch(window: touch.window, contact: touch.contactID)] = nil
+            } else if let mouse = event as? MouseEvent, mouse.phase == .cancelled {
+                pointerLocations[.mouse(window: mouse.window)] = nil
+            }
+        }
         self.eventsPool.removeAll()
     }
 
     @MainActor
+    @_spi(Internal) public mutating func flushPendingEvents() {
+        scenePickingBlockedEvents.removeAll(keepingCapacity: true)
+        scenePickingBlockedPointers.removeAll(keepingCapacity: true)
+        self.eventsPool.append(contentsOf: self.pendingEventsPool)
+        self.pendingEventsPool.removeAll(keepingCapacity: true)
+    }
+
+    @MainActor
     @_spi(Internal) public mutating func receiveEvent<T: InputEvent>(_ event: T) {
-        self.eventsPool.append(event)
+        self.pendingEventsPool.append(event)
     }
 
     // MARK: - Gamepad Public Methods
@@ -167,13 +226,12 @@ public struct Input: Resource, Sendable {
     }
 }
 
-public extension Input {
+extension Input {
     // GamepadInfo is now defined inside the Input class.
     // No need to redefine it here.
 
     /// Available list of mouse modes.
-    enum MouseMode {
-
+    public enum MouseMode {
         /// Captures the mouse. The mouse will be hidden and its position locked at the center of the window manager's window.
         /// - WARNING: Not supported.
         case captured
@@ -194,8 +252,7 @@ public extension Input {
     }
 
     /// Available list of cursor shapes.
-    enum CursorShape: Sendable {
-
+    public enum CursorShape: Sendable {
         /// Standard cursor.
         case arrow
 
@@ -252,13 +309,60 @@ public extension Input {
 extension Input {
     /// For test
     mutating func _removeAllStates() {
+        self.actionStrengths.removeAll()
+        self.justPressedActions.removeAll()
+        self.justReleasedActions.removeAll()
+        self.actionScrollDirections.removeAll()
+        self.actionTouchPhases.removeAll()
+        self.actionMouseMoved = false
         self.gamepads.removeAll()
         self.cursorStates.removeAll()
         self.eventsPool.removeAll()
+        self.pendingEventsPool.removeAll()
         self.keyEvents.removeAll()
         self.touches.removeAll()
         self.mouseEvents.removeAll()
         self.mousePosition = .zero
+        self.keyboardState = KeyboardState()
+    }
+}
+
+extension Input {
+    /// The latest known software keyboard geometry for the active window.
+    public struct KeyboardState: Hashable, Sendable {
+        public var isVisible: Bool
+        public var frame: Rect
+        public var occludedFrame: Rect
+        public var occludedHeight: Float
+        public var animationDuration: AdaUtils.TimeInterval
+        public var animationCurve: Int
+
+        public init(
+            isVisible: Bool = false,
+            frame: Rect = .zero,
+            occludedFrame: Rect = .zero,
+            occludedHeight: Float = 0,
+            animationDuration: AdaUtils.TimeInterval = 0,
+            animationCurve: Int = 0
+        ) {
+            self.isVisible = isVisible
+            self.frame = frame
+            self.occludedFrame = occludedFrame
+            self.occludedHeight = occludedHeight
+            self.animationDuration = animationDuration
+            self.animationCurve = animationCurve
+        }
+
+        public init(event: KeyboardEvent) {
+            self.init(
+                isVisible: event.isVisible,
+                frame: event.endFrame,
+                occludedFrame: event.occludedFrame,
+                occludedHeight: event.occludedHeight,
+                animationDuration: event.animationDuration,
+                animationCurve: event.animationCurve
+            )
+        }
     }
 }
 
@@ -277,7 +381,6 @@ public struct GamepadInfo: Hashable, Sendable {
 
 /// Represents a connected gamepad.
 public struct Gamepad: Sendable {
-
     /// The type alias for the gamepad ID.
     public typealias ID = Int
 
@@ -295,7 +398,7 @@ public struct Gamepad: Sendable {
     /// Gamepad IDs are typically assigned by the system.
     /// - Parameter gamepadId: The unique identifier of the gamepad.
     /// - Returns: A `GamepadInfo` struct containing details about the gamepad, or `nil` if the gamepad is not connected.
-    public internal(set) var info: GamepadInfo? // TODO: Populate this later
+    public internal(set) var info: GamepadInfo?  // TODO: Populate this later
 
     private let gameControllerEngine: GameControllerEngine?
 
@@ -347,19 +450,18 @@ public struct Gamepad: Sendable {
         highFrequency: Float,
         duration: Float
     ) {
-        gameControllerEngine?.rumbleGamepad(
-            gamepadId: gamepadId,
-            lowFrequency: lowFrequency,
-            highFrequency: highFrequency,
-            duration: duration
-        )
+        gameControllerEngine?
+            .rumbleGamepad(
+                gamepadId: gamepadId,
+                lowFrequency: lowFrequency,
+                highFrequency: highFrequency,
+                duration: duration
+            )
     }
 }
 
-
 /// A protocol that defines the interface for a game controller engine.
 public protocol GameControllerEngine: AnyObject, Sendable {
-
     func startMonitoring()
 
     func stopMonitoring()

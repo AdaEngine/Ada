@@ -6,12 +6,11 @@
 //
 
 import AdaECS
-import AdaRender
+@_spi(Internal) import AdaRender
 import Math
 
 /// This node is responsible for presenting the result to the screen.
 public struct UpscaleNode: RenderNode {
-
     public enum InputNode {
         public static let view: RenderSlot.Label = "view"
     }
@@ -34,15 +33,24 @@ public struct UpscaleNode: RenderNode {
             return []
         }
 
-        guard let upsalePipeline = context.world.getResource(UpscalePipeline.self) else {
-            return []
-        }
-
         if let mainTexture = target.mainTexture,
-           let outputTexture = target.outputTexture,
-           mainTexture !== outputTexture {
+            let outputTexture = target.outputTexture,
+            mainTexture !== outputTexture {
             let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
             commandBuffer.label = "Upscale Pass"
+
+            if commandBuffer.encodeSpatialUpscale(source: mainTexture, destination: outputTexture) {
+                commandBuffer.addCompletedHandler { [outputTexture] in
+                    outputTexture.notifyRenderCompleted()
+                }
+                commandBuffer.commit()
+                return []
+            }
+
+            guard let upscalePipeline = context.world.getResource(UpscalePipeline.self) else {
+                return []
+            }
+
             let renderPass = commandBuffer.beginRenderPass(
                 RenderPassDescriptor(
                     label: "Upscale Pass",
@@ -60,12 +68,6 @@ public struct UpscaleNode: RenderNode {
                 )
             )
 
-            let viewport = camera.viewport
-            // This code doesn't work
-            if Int(viewport.rect.width) == outputTexture.width && Int(viewport.rect.height) == outputTexture.height {
-                renderPass.setScissorRect(viewport.rect)
-            }
-
             let resourceSet = RenderResourceSet(
                 bindings: [
                     RenderResourceSet.Binding(
@@ -76,14 +78,17 @@ public struct UpscaleNode: RenderNode {
                     RenderResourceSet.Binding(
                         binding: 1,
                         shaderStages: .fragment,
-                        resource: .sampler(upsalePipeline.sampler)
-                    )
+                        resource: .sampler(upscalePipeline.sampler)
+                    ),
                 ]
             )
             renderPass.setResourceSet(resourceSet, index: 0)
-            renderPass.setRenderPipelineState(upsalePipeline.renderPipeline)
+            renderPass.setRenderPipelineState(upscalePipeline.renderPipeline)
             renderPass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
             renderPass.endRenderPass()
+            commandBuffer.addCompletedHandler { [outputTexture] in
+                outputTexture.notifyRenderCompleted()
+            }
             commandBuffer.commit()
         }
 

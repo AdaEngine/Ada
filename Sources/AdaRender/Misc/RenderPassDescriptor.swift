@@ -10,7 +10,6 @@ import Math
 
 /// An object that describes the configuration of a render pass.
 public struct RenderPassDescriptor: Sendable {
-
     /// An optional debug label for the render pass.
     ///
     /// This label appears in GPU debugging tools to help identify the pass.
@@ -32,7 +31,7 @@ public struct RenderPassDescriptor: Sendable {
     /// - Parameter colorAttachments: The color attachments for the render pass.
     /// - Parameter depthStencilAttachment: The depth stencil attachment for the render pass.
     public init(
-        label: String? = nil,
+        label _: String? = nil,
         colorAttachments: [RenderPassColorAttachmentDescriptor],
         depthStencilAttachment: DepthStencilAttachmentDescriptor? = nil
     ) {
@@ -43,7 +42,6 @@ public struct RenderPassDescriptor: Sendable {
 
 /// An object that describes a color attachment configuration for a render pass.
 public struct RenderPassColorAttachmentDescriptor: Sendable {
-
     /// The texture to use as the color attachment target.
     public var texture: Texture
 

@@ -21,8 +21,8 @@ public enum RenderResourceKind: String, Sendable {
     case entity
 }
 
-public extension RenderResource {
-    var resourceKind: RenderResourceKind {
+extension RenderResource {
+    public var resourceKind: RenderResourceKind {
         switch self {
         case .texture:
             return .texture
@@ -34,36 +34,36 @@ public extension RenderResource {
             return .entity
         }
     }
-    
-    var texture: Texture? {
-        guard case .texture(let texture) = self else {
+
+    public var texture: Texture? {
+        guard case let .texture(texture) = self else {
             return nil
         }
-        
+
         return texture
     }
-    
-    var buffer: Buffer? {
-        guard case .buffer(let buffer) = self else {
+
+    public var buffer: Buffer? {
+        guard case let .buffer(buffer) = self else {
             return nil
         }
-        
+
         return buffer
     }
-    
-    var sampler: Sampler? {
-        guard case .sampler(let sampler) = self else {
+
+    public var sampler: Sampler? {
+        guard case let .sampler(sampler) = self else {
             return nil
         }
-        
+
         return sampler
     }
-    
-    var entity: Entity? {
-        guard case .entity(let entity) = self else {
+
+    public var entity: Entity? {
+        guard case let .entity(entity) = self else {
             return nil
         }
-        
+
         return entity
     }
 }

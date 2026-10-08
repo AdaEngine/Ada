@@ -8,9 +8,9 @@
 import AdaUtils
 
 @_spi(Internal)
-package extension EnvironmentValues {
+extension EnvironmentValues {
     /// Configuration for AdaECS used for tests.
-    @Entry var ecs: ECSConfig = ECSConfig()
+    @Entry package var ecs: ECSConfig = ECSConfig()
 }
 
 /// Contains flags for AdaECS framework. Used for tests.

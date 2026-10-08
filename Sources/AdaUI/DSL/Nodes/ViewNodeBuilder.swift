@@ -6,7 +6,6 @@
 //
 
 protocol ViewNodeBuilder {
-
     typealias BuildContext = _ViewInputs
 
     @MainActor @preconcurrency

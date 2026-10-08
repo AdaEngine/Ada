@@ -8,49 +8,49 @@
 @frozen
 public struct Angle {
     public let degrees: Float
-    
+
     public var radians: Float {
         return self.degrees * .pi / 180
     }
-    
+
     init(radians: Float) {
         self.degrees = radians / .pi * 180
     }
-    
+
     init(degrees: Float) {
         self.degrees = degrees
     }
 }
 
-extension Angle: Hashable, Equatable, Codable { }
+extension Angle: Hashable, Equatable, Codable {}
 
-public extension Angle {
-    static func degrees(_ deg: Float) -> Angle {
+extension Angle {
+    public static func degrees(_ deg: Float) -> Angle {
         return Angle(degrees: deg)
     }
-    
-    static func radians(_ radians: Float) -> Angle {
+
+    public static func radians(_ radians: Float) -> Angle {
         return Angle(radians: radians)
     }
-    
-    static let zero: Angle = Angle(degrees: 0)
+
+    public static let zero: Angle = Angle(degrees: 0)
 }
 
-public extension Angle {
-    static func + (lhs: Angle, rhs: Angle) -> Angle {
+extension Angle {
+    public static func + (lhs: Angle, rhs: Angle) -> Angle {
         let newDegrees = lhs.degrees + rhs.degrees
-        return Angle.degrees(newDegrees)
+        return Self.degrees(newDegrees)
     }
-    
-    static func += (lhs: inout Angle, rhs: Angle) {
+
+    public static func += (lhs: inout Angle, rhs: Angle) {
         lhs = lhs + rhs
     }
-    
-    static func + (lhs: Angle, rhs: Float) -> Angle {
+
+    public static func + (lhs: Angle, rhs: Float) -> Angle {
         return Angle(radians: lhs.radians + rhs)
     }
-    
-    static func += (lhs: inout Angle, rhs: Float) {
+
+    public static func += (lhs: inout Angle, rhs: Float) {
         lhs = Angle(radians: lhs.radians + rhs)
     }
 }

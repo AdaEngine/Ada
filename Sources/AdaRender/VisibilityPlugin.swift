@@ -10,7 +10,6 @@ import AdaECS
 
 /// Visibility Plugin turn on a frustum culling for all entities on the screen.
 public struct VisibilityPlugin: Plugin {
-
     public init() {}
 
     public func setup(in app: AppWorlds) {

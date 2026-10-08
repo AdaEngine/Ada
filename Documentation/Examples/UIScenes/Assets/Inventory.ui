@@ -1,0 +1,60 @@
+format: ada.ui
+schemaVersion: 1
+inputs:
+  - name: items
+    type: array
+    isBinding: false
+    defaultValue:
+      - {id: sword, name: Sword}
+      - {id: shield, name: Shield}
+      - {id: potion, name: Potion}
+actions:
+  - name: selectItem
+    parameters: []
+root:
+  id: inventory
+  type: VStack
+  arguments:
+    spacing: {value: 16}
+  children:
+    - id: heading
+      type: Text
+      arguments:
+        text: {value: Inventory}
+      modifiers:
+        - id: heading-font
+          type: fontSize
+          arguments:
+            value: {value: 28}
+    - id: inventory-scroll
+      type: ScrollView
+      children:
+        - id: inventory-grid
+          type: Grid
+          arguments:
+            columns: {value: 3}
+            horizontalSpacing: {value: 12}
+            verticalSpacing: {value: 12}
+          children:
+            - id: items
+              type: ForEach
+              arguments:
+                items: {binding: items}
+                idKey: {value: id}
+              children:
+                - id: item-card
+                  type: UI
+                  arguments:
+                    path: {value: ItemCard.ui}
+                    name: {binding: item.name}
+                  actions:
+                    selected: selectItem
+  modifiers:
+    - id: inventory-padding
+      type: padding
+      arguments:
+        value: {value: 24}
+    - id: inventory-background
+      type: background
+      arguments:
+        color: {value: '#17212fff'}

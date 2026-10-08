@@ -8,7 +8,7 @@
 extension Sequence {
     @inlinable
     public func forEach(
-        isolated: (any Actor)? = #isolation,
+        isolated _: (any Actor)? = #isolation,
         _ body: (Self.Element) async throws -> Void
     ) async rethrows {
         for element in self {

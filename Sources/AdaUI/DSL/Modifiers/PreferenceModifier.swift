@@ -17,18 +17,18 @@ public protocol PreferenceKey {
     static func reduce(value: inout Value, nextValue: () -> Value)
 }
 
-public extension View {
-    func preference<K: PreferenceKey>(key: K.Type, value: K.Value) -> some View {
+extension View {
+    public func preference<K: PreferenceKey>(key: K.Type, value: K.Value) -> some View {
         self.transformPreference(key) {
             $0 = value
         }
     }
 
-    func transformPreference<K: PreferenceKey>(_ key: K.Type, _ block: @escaping (inout K.Value) -> Void) -> some View {
+    public func transformPreference<K: PreferenceKey>(_ key: K.Type, _ block: @escaping (inout K.Value) -> Void) -> some View {
         modifier(TransformPreference(content: self, key: key, block: block))
     }
 
-    func onPreferenceChange<K: PreferenceKey>(_ key: K.Type, perform action: @escaping (K.Value) -> Void) -> some View {
+    public func onPreferenceChange<K: PreferenceKey>(_ key: K.Type, perform action: @escaping (K.Value) -> Void) -> some View {
         modifier(PreferenceChangeModifier(content: self, key: key, action: action))
     }
 }
@@ -46,10 +46,9 @@ struct PreferenceChangeModifier<V: View, K: PreferenceKey>: ViewModifier, ViewNo
 }
 
 final class PreferenceChangeViewNode<Key: PreferenceKey>: ViewModifierNode {
-
     var action: (Key.Value) -> Void
 
-    init<Content>(contentNode: ViewNode, content: Content, action: @escaping (Key.Value) -> Void) where Content : View {
+    init<Content>(contentNode: ViewNode, content: Content, action: @escaping (Key.Value) -> Void) where Content: View {
         self.action = action
         super.init(contentNode: contentNode, content: content)
     }
@@ -64,7 +63,7 @@ final class PreferenceChangeViewNode<Key: PreferenceKey>: ViewModifierNode {
         action = node.action
     }
 
-    override func updatePreference<K>(key: K.Type, value: K.Value) where K : PreferenceKey {
+    override func updatePreference<K>(key: K.Type, value: K.Value) where K: PreferenceKey {
         super.updatePreference(key: key, value: value)
 
         if Key.self == K.self && Key.Value.self == K.Value.self {
@@ -74,7 +73,6 @@ final class PreferenceChangeViewNode<Key: PreferenceKey>: ViewModifierNode {
 }
 
 struct TransformPreference<V: View, K: PreferenceKey>: ViewModifier, ViewNodeBuilder {
-
     let content: V
     let key: K.Type
     let block: (inout K.Value) -> Void
@@ -87,11 +85,10 @@ struct TransformPreference<V: View, K: PreferenceKey>: ViewModifier, ViewNodeBui
 }
 
 final class TransformPreferenceViewNode<K: PreferenceKey>: ViewModifierNode {
-
     private(set) var block: (inout K.Value) -> Void
     private(set) var preferences = PreferenceValues()
 
-    init<Content>(contentNode: ViewNode, content: Content, block: @escaping (inout K.Value) -> Void) where Content : View {
+    init<Content>(contentNode: ViewNode, content: Content, block: @escaping (inout K.Value) -> Void) where Content: View {
         self.block = block
         super.init(contentNode: contentNode, content: content)
     }
@@ -113,10 +110,9 @@ final class TransformPreferenceViewNode<K: PreferenceKey>: ViewModifierNode {
         self.contentNode.updatePreference(key: K.self, value: value)
     }
 
-    override func didMove(to parent: ViewNode?) {
+    override func didMove(to _: ViewNode?) {
         self.performChangeBlock()
     }
-
 }
 
 struct PreferenceValues {

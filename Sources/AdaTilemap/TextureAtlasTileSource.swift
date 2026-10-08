@@ -8,17 +8,20 @@
 import AdaAssets
 import AdaRender
 import AdaUtils
-import OrderedCollections
 import Math
+import OrderedCollections
+
+import struct Foundation.URL
 
 /// A tile source that uses a texture atlas.
 public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
-
     /// The tiles of the texture atlas tile source.
     private var tiles: OrderedDictionary<PointInt, AtlasTileData> = [:]
 
     /// The texture atlas of the texture atlas tile source.
-    private let textureAtlas: TextureAtlas
+    private var textureAtlas: TextureAtlas?
+    private var imageDescriptor: TileSourceImageDescriptor?
+    private var atlasReference: AssetHandle<TextureAtlas>?
 
     /// Initialize a new texture atlas tile source from an image.
     ///
@@ -38,58 +41,107 @@ public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
         self.textureAtlas = atlas
         super.init()
     }
-    
-    // MARK: - Codable
-    
-    enum CodingKeys: CodingKey {
-        case id, name, tiles, textureAtlas
+
+    /// Copy a loaded source into another tile set without changing the original asset's owner.
+    func copyForTileMap() throws -> TextureAtlasTileSource {
+        guard let textureAtlas else {
+            throw AssetDecodingError.decodingProblem("Tile source image is not loaded.")
+        }
+        let copy = TextureAtlasTileSource(atlas: textureAtlas)
+        copy.name = name
+        copy.tiles = tiles
+        copy.imageDescriptor = imageDescriptor
+        return copy
     }
-    
+
+    func containsTile(at coordinates: PointInt) -> Bool {
+        tiles[coordinates] != nil
+    }
+
+    // MARK: - Codable
+
+    enum CodingKeys: CodingKey {
+        case id, name, tiles, textureAtlas, image
+    }
+
     struct TileCellData: Codable {
-        
         enum CodingKeys: String, CodingKey {
             case position = "xy"
             case data = "ad"
         }
-        
+
         let position: [Int]
         let data: AtlasTileData
     }
-    
+
     /// Initialize a new texture atlas tile source from a decoder.
     ///
     /// - Parameter decoder: The decoder to initialize the texture atlas tile source from.
     /// - Throws: An error if the texture atlas tile source cannot be initialized from the decoder.
     public required init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.textureAtlas = try container.decode(AssetHandle<TextureAtlas>.self, forKey: .textureAtlas).asset
-        
+        self.imageDescriptor = try container.decodeIfPresent(TileSourceImageDescriptor.self, forKey: .image)
+        try self.imageDescriptor?.validate()
+        if self.imageDescriptor == nil {
+            self.atlasReference = try container.decode(AssetHandle<TextureAtlas>.self, forKey: .textureAtlas)
+        }
+
         super.init()
-        
+
         self.name = try container.decode(String.self, forKey: .name)
         self.id = try container.decode(TileSource.ID.self, forKey: .id)
-        try container.decode([TileCellData].self, forKey: .tiles).forEach { data in
-            self.tiles[PointInt(data.position)] = data.data
-        }
+        try container.decode([TileCellData].self, forKey: .tiles)
+            .forEach { data in
+                self.tiles[PointInt(data.position)] = data.data
+            }
     }
-    
+
     /// Encode the texture atlas tile source to an encoder.
     ///
     /// - Parameter encoder: The encoder to encode the texture atlas tile source to.
     /// - Throws: An error if the texture atlas tile source cannot be encoded to the encoder.
-    public override func encode(to encoder: any Encoder) throws {
+    override public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(self.name, forKey: .name)
         try container.encode(self.id, forKey: .id)
-        try container.encode(AssetHandle(self.textureAtlas), forKey: .textureAtlas)
-        
-        let tiles = self.tiles.elements.map { (position, data) in
+        if let imageDescriptor {
+            try container.encode(imageDescriptor, forKey: .image)
+        } else if let textureAtlas {
+            try container.encode(AssetHandle(textureAtlas), forKey: .textureAtlas)
+        } else if let atlasReference {
+            try container.encode(atlasReference, forKey: .textureAtlas)
+        }
+
+        let tiles = self.tiles.elements.map { position, data in
             TileCellData(position: [position.x, position.y], data: data)
         }
-        
+
         try container.encode(tiles, forKey: .tiles)
     }
-    
+
+    /// Resolve referenced images asynchronously before TileSet exposes its sources.
+    func loadTextureAtlas(relativeTo directory: URL) async throws {
+        if let imageDescriptor {
+            let path = imageDescriptor.resolvedPath(relativeTo: directory)
+            let handle = try await AssetsManager.load(Image.self, at: path)
+            guard let image = handle.asset else {
+                throw AssetDecodingError.decodingProblem("Unable to load tile source image: \(path)")
+            }
+            self.textureAtlas = TextureAtlas(
+                from: image,
+                size: imageDescriptor.tileSize,
+                margin: imageDescriptor.spacing,
+                offset: imageDescriptor.margin
+            )
+        } else if let atlasReference {
+            try await atlasReference.load()
+            self.textureAtlas = atlasReference.asset
+        }
+        guard self.textureAtlas != nil else {
+            throw AssetDecodingError.decodingProblem("Tile source has no loaded texture atlas.")
+        }
+    }
+
     // Tiles
 
     /// Get the texture at the given atlas coordinates.
@@ -97,6 +149,9 @@ public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
     /// - Parameter atlasCoordinates: The atlas coordinates to get the texture at.
     /// - Returns: The texture.
     public func getTexture(at atlasCoordinates: PointInt) -> Texture2D {
+        guard let textureAtlas else {
+            fatalError("Load a serialized tile source through TileSet before accessing its textures.")
+        }
         guard let tileData = self.tiles[atlasCoordinates] else {
             fatalError("Tile Not Found for coordinates \(atlasCoordinates)")
         }
@@ -112,14 +167,14 @@ public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
                 let x = atlasCoordinates.x + (alignment == .horizontal ? index : 0)
                 let y = atlasCoordinates.y + (alignment == .vertical ? index : 0)
 
-                let slice = self.textureAtlas.textureSlice(at: [x, y])
+                let slice = textureAtlas.textureSlice(at: [x, y])
                 animatedTexture[index] = slice
             }
 
             return animatedTexture
         }
 
-        return self.textureAtlas.textureSlice(at: [atlasCoordinates.x, atlasCoordinates.y])
+        return textureAtlas.textureSlice(at: [atlasCoordinates.x, atlasCoordinates.y])
     }
 
     /// Create a tile for the texture atlas tile source.
@@ -160,13 +215,30 @@ public class TextureAtlasTileSource: TileSource, @unchecked Sendable {
         return tiles[atlasCoordinates]?.tileData ?? TileData()
     }
 
+    /// Sets a simple shadow polygon for every placement of an atlas tile. Nil removes it.
+    /// Points are centered, with positive Y up. Supply the authored cell size to scale with display size.
+    public func setOccluderPolygon(_ points: [Vector2]?, at coordinates: PointInt, referenceSize: Size? = nil) throws {
+        if let points { try TileOcclusionPolygon.validate(points, referenceSize: referenceSize) }
+        guard let tile = tiles[coordinates] else {
+            return
+        }
+        guard tile.tileData.occluderPolygon != points || tile.tileData.occluderReferenceSize != referenceSize else {
+            return
+        }
+        tile.tileData.occluderPolygon = points
+        tile.tileData.occluderReferenceSize = points == nil ? nil : referenceSize
+        setNeedsUpdate()
+    }
+
+    /// Returns the authored polygon, before cell orientation or display-size scaling.
+    public func occluderPolygon(at coordinates: PointInt) -> [Vector2]? { tiles[coordinates]?.tileData.occluderPolygon }
+
     // Animation
 }
 
 extension TextureAtlasTileSource {
     /// A tile data for a texture atlas tile source.
     public class AtlasTileData: Codable {
-        
         enum CodingKeys: String, CodingKey {
             case animationFrameDuration = "anim_dur"
             case animationFrameColumns = "anim_fr_clm"
@@ -188,7 +260,7 @@ extension TextureAtlasTileSource {
         public var animationColumnsAlignment: Alignment = .horizontal
 
         /// The tile data of the atlas tile data.
-        internal private(set) var tileData: TileData
+        internal var tileData: TileData
 
         /// Initialize a new atlas tile data.
         ///

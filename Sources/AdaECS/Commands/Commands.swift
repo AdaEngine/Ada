@@ -7,6 +7,7 @@
 
 import AdaUtils
 import Collections
+import DequeModule
 import Foundation
 
 public final class WorldCommandQueue: @unchecked Sendable {
@@ -78,6 +79,12 @@ public final class Commands: @unchecked Sendable {
 }
 
 extension Commands: SystemParameter {
+    public static var access: SystemAccessSet {
+        var access = SystemAccessSet()
+        access.addDeferredWorldAccess()
+        return access
+    }
+
     public convenience init(from world: World) {
         self.init(entities: world.entities, commandsQueue: world.commandQueue)
     }
@@ -91,13 +98,13 @@ extension Commands: SystemParameter {
     }
 }
 
-public extension Commands {
-    func append(_ commands: Commands) {
+extension Commands {
+    public func append(_ commands: Commands) {
         self.queue.commands.append(contentsOf: commands.queue.commands)
     }
 
     @discardableResult
-    func spawn(
+    public func spawn(
         _ name: String = "",
         @ComponentsBuilder components: @escaping @Sendable () -> ComponentsBundle
     ) -> EntityCommands {
@@ -109,7 +116,7 @@ public extension Commands {
     }
 
     @discardableResult
-    func spawn<T: ComponentsBundle>(
+    public func spawn<T: ComponentsBundle>(
         _ name: String = "",
         bundle: consuming T
     ) -> EntityCommands {
@@ -121,7 +128,7 @@ public extension Commands {
     }
 
     @discardableResult
-    func spawn(_ name: String = "") -> EntityCommands {
+    public func spawn(_ name: String = "") -> EntityCommands {
         let entity = entities.allocate(with: name)
         self.queue.push { world in
             world.insertNewEntity(entity, components: [])
@@ -130,7 +137,7 @@ public extension Commands {
     }
 
     @discardableResult
-    func insertEntity(_ entity: Entity) -> EntityCommands {
+    public func insertEntity(_ entity: Entity) -> EntityCommands {
         entities.addNotAllocatedEntity(entity)
         queue.push { world in
             world.addEntity(entity)
@@ -139,20 +146,37 @@ public extension Commands {
     }
 
     @discardableResult
-    func entity(_ entity: Entity.ID) -> EntityCommands {
+    public func entity(_ entity: Entity.ID) -> EntityCommands {
         EntityCommands(queue: queue, entityId: entity)
     }
 
-    func insertResource<T: Resource>(_ resource: T) {
+    public func insertResource<T: Resource>(_ resource: T) {
         self.queue.push {
             $0.insertResource(resource)
         }
     }
 
-    func removeResource<T: Resource>(_ resource: T.Type) {
+    public func removeResource<T: Resource>(_: T.Type) {
         self.queue.push {
             $0.removeResource(T.self)
         }
+    }
+
+    /// Enqueues an entity spawn from component values detached from a scripting VM.
+    @_spi(Scripting)
+    @discardableResult
+    public func spawn(detachedComponents components: [any Component]) -> EntityCommands {
+        spawn(bundle: ChainedComponentsBundle(components))
+    }
+
+    /// Enqueues a type-erased component value detached from a scripting VM.
+    @_spi(Scripting)
+    @discardableResult
+    public func insert(_ component: any Component, into entity: Entity.ID) -> EntityCommands {
+        func insert<T: Component>(_ component: T) -> EntityCommands {
+            self.entity(entity).insert(component)
+        }
+        return _openExistential(component, do: insert)
     }
 }
 
@@ -167,9 +191,9 @@ public final class EntityCommands {
     }
 }
 
-public extension EntityCommands {
+extension EntityCommands {
     @discardableResult
-    func insert<T: Component>(_ component: consuming T) -> Self {
+    public func insert<T: Component>(_ component: consuming T) -> Self {
         self.queue.push { [component, entityId] world in
             world.insert(component, for: entityId)
         }
@@ -177,7 +201,7 @@ public extension EntityCommands {
     }
 
     @discardableResult
-    func remove(_ componentId: ComponentId, from entity: Entity.ID) -> Self {
+    public func remove(_ componentId: ComponentId, from entity: Entity.ID) -> Self {
         self.queue.push { world in
             world.remove(componentId, from: entity)
         }
@@ -186,7 +210,7 @@ public extension EntityCommands {
 
     @discardableResult
     @inline(__always)
-    func addChild(
+    public func addChild(
         _ child: Entity
     ) -> Self {
         self.queue.push { [entityId] world in
@@ -198,7 +222,7 @@ public extension EntityCommands {
     }
 
     @inline(__always)
-    func removeFromWorld(recursively: Bool = false) {
+    public func removeFromWorld(recursively: Bool = false) {
         self.queue.push { [entityId] world in
             world.removeEntity(entityId, recursively: recursively)
         }
@@ -206,7 +230,7 @@ public extension EntityCommands {
 
     @discardableResult
     @inline(__always)
-    func remove<T: Component>(_ component: consuming T) -> Self {
+    public func remove<T: Component>(_: consuming T) -> Self {
         self.remove(T.identifier, from: entityId)
     }
 
@@ -215,7 +239,7 @@ public extension EntityCommands {
     /// - Parameter entity: The entity ID to remove the component from.
     @discardableResult
     @inline(__always)
-    func remove<T: Component>(_ componentType: T.Type, from entity: Entity.ID) -> Self {
+    public func remove<T: Component>(_: T.Type, from entity: Entity.ID) -> Self {
         self.remove(T.identifier, from: entity)
     }
 }

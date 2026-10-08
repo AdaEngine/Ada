@@ -1,0 +1,274 @@
+require "cfpropertylist"
+require "shellwords"
+require "open3"
+require "digest"
+require "fileutils"
+require_relative "update_feed"
+require_relative "standalone_signing"
+
+default_platform(:ios)
+opt_out_usage
+
+EDITOR_ROOT = File.expand_path("..", __dir__)
+APP_IDENTIFIER = "org.adaengine.editor"
+DEVELOPMENT_TEAM = "8PYCRS3EA3"
+
+def required_setting(name)
+  value = ENV[name].to_s.strip
+  UI.user_error!("Set #{name}; see fastlane/SETUP.md") if value.empty?
+  value
+end
+
+# Inspect the signed artifact, not just Xcode settings, before exporting or uploading.
+def verify_macos_distribution(app, channel)
+  info = File.join(app, "Contents", "Info.plist")
+  metadata = CFPropertyList.native_types(CFPropertyList::List.new(data: File.binread(info)).value)
+  UI.user_error!("Unexpected distribution channel in #{app}") unless metadata["AdaEditorDistribution"] == channel
+  stdout, stderr, status = Open3.capture3("/usr/bin/codesign", "-d", "--entitlements", ":-", app)
+  UI.user_error!("Cannot inspect app entitlements: #{stderr}") unless status.success?
+  entitlements = stdout.strip.empty? ? {} : CFPropertyList.native_types(CFPropertyList::List.new(data: stdout).value)
+  if channel == "standalone"
+    _, signature, signature_status = Open3.capture3("/usr/bin/codesign", "-dv", "--verbose=4", app)
+    unless signature_status.success? && signature.include?("Authority=Developer ID Application:") && signature.include?("(runtime)")
+      UI.user_error!("Standalone app requires Developer ID signing and Hardened Runtime")
+    end
+  end
+  if channel == "appStore"
+    %w[Sparkle.framework AdaEditorUpdater.framework].each do |name|
+      UI.user_error!("App Store archive contains #{name}") if File.exist?(File.join(app, "Contents/Frameworks", name))
+    end
+  end
+  sandboxed = entitlements["com.apple.security.app-sandbox"] == true
+  UI.user_error!("Unexpected App Sandbox entitlement for #{channel}") unless sandboxed == (channel == "appStore")
+  # App Store archives may still have development signing; Xcode replaces it during export.
+  if channel == "standalone" && entitlements["com.apple.security.get-task-allow"] == true
+    UI.user_error!("Standalone distribution app must not allow debugging")
+  end
+end
+
+desc "Archive and upload iOS or macOS using the Apple account configured in Xcode"
+lane :upload_xcode do |options|
+  target = options[:target].to_s
+  UI.user_error!("Use target:ios or target:macos") unless %w[ios macos].include?(target)
+  build_number = required_setting("BUILD_NUMBER")
+  version = required_setting("MARKETING_VERSION")
+  UI.user_error!("BUILD_NUMBER must be a positive integer") unless build_number.match?(/\A[1-9]\d*\z/)
+  UI.user_error!("MARKETING_VERSION must be numeric") unless version.match?(/\A\d+\.\d+(?:\.\d+)?\z/)
+
+  output = File.join(EDITOR_ROOT, "build", "appstore", target)
+  archive = File.join(output, "AdaEditor-#{version}-#{build_number}.xcarchive")
+  build_options = {
+    project: File.join(EDITOR_ROOT, "AdaEditor.xcodeproj"),
+    scheme: target == "ios" ? "AdaEditor-iPadOS" : "AdaEditor-Distribution",
+    configuration: "Release",
+    destination: target == "ios" ? "generic/platform=iOS" : "generic/platform=macOS",
+    archive_path: archive,
+    derived_data_path: ENV.fetch("ADAEDITOR_DERIVED_DATA", File.join(output, "DerivedData")),
+    output_directory: output,
+    buildlog_path: File.join(output, "logs"),
+    xcargs: "-allowProvisioningUpdates " + Shellwords.join([
+      "CURRENT_PROJECT_VERSION=#{build_number}", "MARKETING_VERSION=#{version}"
+    ])
+  }
+
+  unless options[:skip_archive]
+    Dir.chdir(EDITOR_ROOT) { sh("xcodegen", "generate", "--spec", "project.yml") }
+    build_app(**build_options, skip_package_ipa: true, skip_package_pkg: true)
+  end
+
+  app = File.join(archive, "Products", "Applications", "AdaEngine.app")
+  UI.user_error!("Archived AdaEngine.app is missing") unless File.directory?(app)
+  sh("/usr/bin/codesign", "--verify", "--strict", "--verbose=2", app)
+  verify_macos_distribution(app, "appStore") if target == "macos"
+  info = File.join(app, target == "macos" ? "Contents/Info.plist" : "Info.plist")
+  metadata = CFPropertyList.native_types(CFPropertyList::List.new(data: File.binread(info)).value)
+  {
+    "CFBundleIdentifier" => APP_IDENTIFIER,
+    "CFBundleShortVersionString" => version,
+    "CFBundleVersion" => build_number
+  }.each do |key, expected|
+    actual = metadata[key].to_s
+    UI.user_error!("Archive #{key} is #{actual.inspect}; expected #{expected.inspect}") unless actual == expected
+  end
+
+  build_app(
+    **build_options,
+    skip_build_archive: true,
+    export_method: "app-store",
+    export_team_id: DEVELOPMENT_TEAM,
+    skip_profile_detection: true,
+    export_options: {
+      destination: "upload",
+      signingStyle: "automatic",
+      manageAppVersionAndBuildNumber: true,
+      uploadSymbols: true
+    },
+    export_xcargs: "-allowProvisioningUpdates"
+  )
+end
+
+platform :ios do
+  desc "Build a signed App Store IPA using an installed distribution certificate and profile"
+  lane :build do
+    profile = required_setting("IOS_PROVISIONING_PROFILE")
+    build_number = required_setting("BUILD_NUMBER")
+    UI.user_error!("BUILD_NUMBER must be a positive integer") unless build_number.match?(/\A[1-9]\d*\z/)
+    version = ENV.fetch("MARKETING_VERSION", "0.1.0")
+    UI.user_error!("MARKETING_VERSION must be numeric, e.g. 1.0 or 1.2.3") unless version.match?(/\A\d+\.\d+(?:\.\d+)?\z/)
+
+    project = File.join(EDITOR_ROOT, "AdaEditor.xcodeproj")
+    output = File.join(EDITOR_ROOT, "build", "testflight")
+    Dir.chdir(EDITOR_ROOT) { sh("xcodegen", "generate", "--spec", "project.yml") }
+
+    # Only the generated app target needs a profile; SwiftPM dependencies do not.
+    project_file = File.join(project, "project.pbxproj")
+    original_project = File.binread(project_file)
+    begin
+      update_code_signing_settings(
+        path: project,
+        targets: ["AdaEditor-iPadOS"],
+        build_configurations: ["Release"],
+        use_automatic_signing: false,
+        team_id: DEVELOPMENT_TEAM,
+        code_sign_identity: "Apple Distribution",
+        profile_name: profile
+      )
+      build_app(
+        project: project,
+        scheme: "AdaEditor-iPadOS",
+        configuration: "Release",
+        destination: "generic/platform=iOS",
+        export_method: "app-store",
+        export_team_id: DEVELOPMENT_TEAM,
+        skip_profile_detection: true,
+        export_options: {
+          signingStyle: "manual",
+          signingCertificate: "Apple Distribution",
+          provisioningProfiles: { APP_IDENTIFIER => profile },
+          manageAppVersionAndBuildNumber: false
+        },
+        xcargs: Shellwords.join([
+          "CURRENT_PROJECT_VERSION=#{build_number}",
+          "MARKETING_VERSION=#{version}"
+        ]),
+        output_directory: output,
+        output_name: "AdaEditor.ipa",
+        archive_path: File.join(output, "AdaEditor.xcarchive"),
+        derived_data_path: File.join(output, "DerivedData"),
+        buildlog_path: File.join(output, "logs")
+      )
+    ensure
+      File.binwrite(project_file, original_project)
+    end
+  end
+
+  desc "Build and upload to TestFlight using an App Store Connect team API key from the environment"
+  lane :beta do
+    # Validate upload configuration before starting the expensive build.
+    key_id = required_setting("ASC_KEY_ID")
+    issuer_id = required_setting("ASC_ISSUER_ID")
+    key_path = ENV["ASC_KEY_FILEPATH"].to_s.strip
+    key_base64 = ENV["ASC_KEY_BASE64"].to_s.strip
+    if key_path.empty? == key_base64.empty?
+      UI.user_error!("Set exactly one of ASC_KEY_FILEPATH or ASC_KEY_BASE64")
+    end
+    unless key_path.empty?
+      key_path = File.expand_path(key_path, EDITOR_ROOT)
+      UI.user_error!("ASC_KEY_FILEPATH must point to a readable .p8 file") unless File.file?(key_path) && File.readable?(key_path)
+    end
+
+    ipa = build
+    # Create the short-lived token after archiving so it cannot expire during compilation.
+    key_options = { key_id: key_id, issuer_id: issuer_id, in_house: false }
+    if key_path.empty?
+      key_options.merge!(key_content: key_base64, is_key_content_base64: true)
+    else
+      key_options[:key_filepath] = key_path
+    end
+    api_key = app_store_connect_api_key(**key_options)
+    upload_to_testflight(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      ipa: ipa,
+      skip_waiting_for_build_processing: true,
+      distribute_external: false
+    )
+  end
+end
+
+platform :mac do
+  desc "Build and export a Developer ID signed macOS app for the website"
+  lane :standalone do
+    update_config = EditorUpdateFeed.configuration(ENV)
+    build_number = required_setting("BUILD_NUMBER")
+    version = required_setting("MARKETING_VERSION")
+    UI.user_error!("BUILD_NUMBER must be a positive integer") unless build_number.match?(/\A[1-9]\d*\z/)
+    UI.user_error!("MARKETING_VERSION must be numeric") unless version.match?(/\A\d+\.\d+(?:\.\d+)?\z/)
+    identities, _, identity_status = Open3.capture3("/usr/bin/security", "find-identity", "-v", "-p", "codesigning")
+    unless identity_status.success? && identities.lines.any? { |line| line.include?("Developer ID Application:") && line.include?("(#{DEVELOPMENT_TEAM})") }
+      UI.user_error!("Install a Developer ID Application certificate and private key for team #{DEVELOPMENT_TEAM}")
+    end
+    output = File.join(EDITOR_ROOT, "build", "standalone")
+    archive = File.join(output, "AdaEditor-#{version}-#{build_number}.xcarchive")
+    Dir.chdir(EDITOR_ROOT) { sh("xcodegen", "generate", "--spec", "project.yml") }
+    build_app(
+      project: File.join(EDITOR_ROOT, "AdaEditor.xcodeproj"),
+      scheme: "AdaEditor-Standalone",
+      configuration: "Release",
+      destination: "generic/platform=macOS",
+      archive_path: archive,
+      derived_data_path: ENV.fetch("ADAEDITOR_DERIVED_DATA", File.join(output, "DerivedData")),
+      output_directory: output,
+      buildlog_path: File.join(output, "logs"),
+      # Gym copies the Developer ID signed app out of the archive; no installer certificate is needed.
+      skip_package_pkg: true,
+      xcargs: "-allowProvisioningUpdates " + Shellwords.join([
+        "CURRENT_PROJECT_VERSION=#{build_number}", "MARKETING_VERSION=#{version}",
+        "CODE_SIGN_IDENTITY=Developer ID Application",
+        "CODE_SIGN_STYLE=Manual",
+        "DEVELOPMENT_TEAM=#{DEVELOPMENT_TEAM}",
+        "CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO",
+        "ADAEDITOR_UPDATE_FEED_URL=#{update_config[:feed]}",
+        "ADAEDITOR_UPDATE_PUBLIC_KEY=#{update_config[:public_key]}"
+      ]),
+      export_xcargs: "-allowProvisioningUpdates"
+    )
+    app = File.join(output, "AdaEngine.app")
+    UI.user_error!("Exported AdaEngine.app is missing") unless File.directory?(app)
+    EditorStandaloneSigning.sign(app: app, identity: "Developer ID Application", runner: ->(*arguments) { sh(*arguments) })
+    sh("/usr/bin/codesign", "--verify", "--deep", "--strict", "--verbose=2", app)
+    verify_macos_distribution(app, "standalone")
+    metadata = CFPropertyList.native_types(CFPropertyList::List.new(data: File.binread(File.join(app, "Contents/Info.plist"))).value)
+    UI.user_error!("Update feed/key were not embedded in the app") unless metadata["SUFeedURL"] == update_config[:feed] && metadata["SUPublicEDKey"] == update_config[:public_key]
+    %w[AdaEditorUpdater.framework Sparkle.framework].each do |name|
+      UI.user_error!("Missing updater framework #{name}") unless File.directory?(File.join(app, "Contents/Frameworks", name))
+    end
+    app
+  end
+
+  desc "Build, notarize, staple, and package the macOS website release"
+  lane :website do
+    update_config = EditorUpdateFeed.publishing_configuration(ENV)
+    # A named Keychain profile keeps notarization credentials out of the repository and logs.
+    profile = required_setting("NOTARYTOOL_PROFILE")
+    app = standalone
+    output = File.dirname(app)
+    zip = File.join(output, "AdaEngine-#{ENV.fetch('MARKETING_VERSION')}-#{ENV.fetch('BUILD_NUMBER')}-macOS.zip")
+    FileUtils.rm_f(zip)
+    sh("/usr/bin/ditto", "-c", "-k", "--keepParent", app, zip)
+    sh("/usr/bin/xcrun", "notarytool", "submit", zip, "--keychain-profile", profile, "--wait")
+    sh("/usr/bin/xcrun", "stapler", "staple", app)
+    sh("/usr/bin/xcrun", "stapler", "validate", app)
+    sh("/usr/sbin/spctl", "--assess", "--type", "execute", "--verbose=2", app)
+    FileUtils.rm_f(zip)
+    sh("/usr/bin/ditto", "-c", "-k", "--keepParent", app, zip)
+    File.write("#{zip}.sha256", "#{Digest::SHA256.file(zip).hexdigest}  #{File.basename(zip)}\n")
+    feed = EditorUpdateFeed.generate(
+      zip: zip, build: ENV.fetch("BUILD_NUMBER"), config: update_config,
+      runner: ->(*arguments) { sh(*arguments) },
+      previous_feed: ENV["SPARKLE_PREVIOUS_APPCAST"], release_notes: ENV["SPARKLE_RELEASE_NOTES"]
+    )
+    UI.success("Website release ready: #{zip}; update feed: #{feed}")
+    zip
+  end
+end

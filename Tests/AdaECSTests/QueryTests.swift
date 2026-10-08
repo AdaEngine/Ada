@@ -48,6 +48,26 @@ struct QueryTests {
             #expect(transform.wrappedValue.position.y == 10)
         }
     }
+
+    @Test("Parallel query forwards query target packs")
+    func parallelQueryForwardsQueryTargetPacks() async {
+        let world = World()
+
+        for index in 0..<64 {
+            world.spawn {
+                Transform(position: [Float(index), 0, 0])
+            }
+        }
+
+        let query = Query<Entity, Transform>()
+        query.update(from: world)
+
+        let positions = await query.parallel(batchSize: 1).map { _, transform in
+            transform.position.x
+        }
+
+        #expect(positions.sorted() == (0..<64).map(Float.init))
+    }
     
     @Test("Query with where clause")
     func queryWithWhereClause() {

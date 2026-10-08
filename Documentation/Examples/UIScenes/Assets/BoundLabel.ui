@@ -1,0 +1,14 @@
+format: ada.ui
+schemaVersion: 1
+inputs:
+  - name: title
+    type: string
+    defaultValue: Hello
+root:
+  id: hud
+  type: ZStack
+  children:
+    - id: title
+      type: Text
+      arguments:
+        text: {binding: title}

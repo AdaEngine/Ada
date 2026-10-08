@@ -1,0 +1,358 @@
+{
+  "format": "ada.ui",
+  "schemaVersion": 1,
+  "root": {
+    "type": "VStack",
+    "id": "menu",
+    "arguments": {
+      "spacing": {
+        "value": 16
+      }
+    },
+    "children": [
+      {
+        "type": "Text",
+        "id": "title",
+        "arguments": {
+          "text": {
+            "value": "GUI Demo"
+          }
+        },
+        "children": [],
+        "modifiers": [
+          {
+            "type": "fontSize",
+            "arguments": {
+              "value": {
+                "value": 28
+              }
+            },
+            "id": "title-0"
+          },
+          {
+            "id": "title-color",
+            "type": "foregroundColor",
+            "arguments": {
+              "color": {
+                "value": "#1f2b3dff"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "Button",
+        "id": "button0",
+        "arguments": {},
+        "children": [
+          {
+            "type": "Text",
+            "id": "label0",
+            "arguments": {
+              "text": {
+                "value": "Continue"
+              }
+            },
+            "children": [],
+            "modifiers": [
+              {
+                "type": "frame",
+                "arguments": {
+                  "width": {
+                    "value": 240
+                  },
+                  "height": {
+                    "value": 48
+                  }
+                },
+                "id": "label0-0"
+              }
+            ]
+          }
+        ],
+        "modifiers": [
+          {
+            "type": "textureButtonStyle",
+            "arguments": {
+              "normal": {
+                "value": "normal.png"
+              },
+              "highlighted": {
+                "value": "highlighted.png"
+              },
+              "pressed": {
+                "value": "pressed.png"
+              },
+              "disabled": {
+                "value": "disabled.png"
+              },
+              "capTop": {
+                "value": 8
+              },
+              "capLeading": {
+                "value": 8
+              },
+              "capBottom": {
+                "value": 8
+              },
+              "capTrailing": {
+                "value": 8
+              }
+            },
+            "id": "button0-0"
+          }
+        ],
+        "actions": {
+          "action": "action0"
+        }
+      },
+      {
+        "type": "Button",
+        "id": "button1",
+        "arguments": {},
+        "children": [
+          {
+            "type": "Text",
+            "id": "label1",
+            "arguments": {
+              "text": {
+                "value": "New Game"
+              }
+            },
+            "children": [],
+            "modifiers": [
+              {
+                "type": "frame",
+                "arguments": {
+                  "width": {
+                    "value": 240
+                  },
+                  "height": {
+                    "value": 48
+                  }
+                },
+                "id": "label1-0"
+              }
+            ]
+          }
+        ],
+        "modifiers": [
+          {
+            "type": "textureButtonStyle",
+            "arguments": {
+              "normal": {
+                "value": "normal.png"
+              },
+              "highlighted": {
+                "value": "highlighted.png"
+              },
+              "pressed": {
+                "value": "pressed.png"
+              },
+              "disabled": {
+                "value": "disabled.png"
+              },
+              "capTop": {
+                "value": 8
+              },
+              "capLeading": {
+                "value": 8
+              },
+              "capBottom": {
+                "value": 8
+              },
+              "capTrailing": {
+                "value": 8
+              }
+            },
+            "id": "button1-0"
+          }
+        ],
+        "actions": {
+          "action": "action1"
+        }
+      },
+      {
+        "type": "Button",
+        "id": "button2",
+        "arguments": {},
+        "children": [
+          {
+            "type": "Text",
+            "id": "label2",
+            "arguments": {
+              "text": {
+                "value": "Settings"
+              }
+            },
+            "children": [],
+            "modifiers": [
+              {
+                "type": "frame",
+                "arguments": {
+                  "width": {
+                    "value": 240
+                  },
+                  "height": {
+                    "value": 48
+                  }
+                },
+                "id": "label2-0"
+              }
+            ]
+          }
+        ],
+        "modifiers": [
+          {
+            "type": "textureButtonStyle",
+            "arguments": {
+              "normal": {
+                "value": "normal.png"
+              },
+              "highlighted": {
+                "value": "highlighted.png"
+              },
+              "pressed": {
+                "value": "pressed.png"
+              },
+              "disabled": {
+                "value": "disabled.png"
+              },
+              "capTop": {
+                "value": 8
+              },
+              "capLeading": {
+                "value": 8
+              },
+              "capBottom": {
+                "value": 8
+              },
+              "capTrailing": {
+                "value": 8
+              }
+            },
+            "id": "button2-0"
+          }
+        ],
+        "actions": {
+          "action": "action2"
+        }
+      },
+      {
+        "type": "Button",
+        "id": "button3",
+        "arguments": {},
+        "children": [
+          {
+            "type": "Text",
+            "id": "label3",
+            "arguments": {
+              "text": {
+                "value": "Quit"
+              }
+            },
+            "children": [],
+            "modifiers": [
+              {
+                "type": "frame",
+                "arguments": {
+                  "width": {
+                    "value": 240
+                  },
+                  "height": {
+                    "value": 48
+                  }
+                },
+                "id": "label3-0"
+              }
+            ]
+          }
+        ],
+        "modifiers": [
+          {
+            "type": "textureButtonStyle",
+            "arguments": {
+              "normal": {
+                "value": "normal.png"
+              },
+              "highlighted": {
+                "value": "highlighted.png"
+              },
+              "pressed": {
+                "value": "pressed.png"
+              },
+              "disabled": {
+                "value": "disabled.png"
+              },
+              "capTop": {
+                "value": 8
+              },
+              "capLeading": {
+                "value": 8
+              },
+              "capBottom": {
+                "value": 8
+              },
+              "capTrailing": {
+                "value": 8
+              }
+            },
+            "id": "button3-0"
+          },
+          {
+            "type": "disabled",
+            "arguments": {
+              "value": {
+                "value": true
+              }
+            },
+            "id": "button3-1"
+          }
+        ],
+        "actions": {
+          "action": "action3"
+        }
+      }
+    ],
+    "modifiers": [
+      {
+        "type": "padding",
+        "arguments": {
+          "value": {
+            "value": 24
+          }
+        },
+        "id": "menu-0"
+      },
+      {
+        "type": "background",
+        "children": [
+          {
+            "type": "Image",
+            "id": "panel",
+            "arguments": {
+              "path": {
+                "value": "panel.png"
+              },
+              "capTop": {
+                "value": 8
+              },
+              "capLeading": {
+                "value": 8
+              },
+              "capBottom": {
+                "value": 8
+              },
+              "capTrailing": {
+                "value": 8
+              }
+            },
+            "children": [],
+            "modifiers": []
+          }
+        ],
+        "id": "menu-1"
+      }
+    ]
+  }
+}

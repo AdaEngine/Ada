@@ -1,0 +1,257 @@
+import AdaEngine
+import AdaScriptCompilerCore
+import Foundation
+import GravityLanguageCore
+
+struct EditorSourceQuickFix: Equatable, Sendable {
+    let title: String
+    let range: EditorSourceRange
+    let originalText: String
+    let replacement: String
+}
+
+struct EditorGravityLanguageService: Sendable {
+    private static let annotationLabels: Set<String> = [
+        "access", "component", "environment", "export", "previewable", "query", "res",
+        "resource", "scriptable", "state", "strict", "system", "tool", "view",
+    ]
+
+    static func completions(
+        text: String,
+        position: EditorSourceLocation
+    ) -> [EditorCompletionItem] {
+        let lspPosition = lspPosition(from: position, in: text)
+        return completionItems(
+            languageService().completions(text: text, position: lspPosition),
+            text: text
+        )
+    }
+
+    static func semanticTokens(text: String) -> [EditorSemanticToken] {
+        languageService().semanticTokens(text: text)
+            .compactMap { token in
+                guard token.range.start.line == token.range.end.line else {
+                    return nil
+                }
+                let start = editorPosition(from: token.range.start, in: text)
+                let end = editorPosition(from: token.range.end, in: text)
+                return EditorSemanticToken(
+                    line: start.line,
+                    startCharacter: start.character,
+                    length: max(0, end.character - start.character),
+                    type: token.kind.rawValue,
+                    modifiers: []
+                )
+            }
+    }
+
+    static func hover(text: String, position: EditorSourceLocation) -> EditorSymbolHover? {
+        guard
+            let hover = languageService().hover(
+                text: text,
+                position: lspPosition(from: position, in: text)
+            )
+        else {
+            return nil
+        }
+        return EditorSymbolHover(
+            contents: hover.contents,
+            range: editorRange(from: hover.range, in: text)
+        )
+    }
+
+    static func definition(
+        workspace: GravityWorkspace,
+        uri: String,
+        text: String,
+        position: EditorSourceLocation
+    ) -> EditorSourceSymbolTarget? {
+        workspace.change(uri: uri, text: text, version: nil)
+        let sourcePosition = lspPosition(from: position, in: text)
+        guard let definition = workspace.definition(
+                uri: uri,
+                position: sourcePosition
+            ) else {
+            return AdaScriptSwiftSourceResolver.definition(text: text, position: position)
+        }
+        let targetText = workspace.text(for: definition.uri) ?? ""
+        let fileURL = URL(string: definition.uri)
+        return EditorSourceSymbolTarget(
+            uri: definition.uri,
+            filePath: fileURL?.path.removingPercentEncoding ?? fileURL?.path ?? definition.uri,
+            range: editorRange(from: definition.range, in: targetText),
+            selectionRange: editorRange(from: definition.selectionRange, in: targetText),
+            content: targetText
+        )
+    }
+
+    static func hover(
+        workspace: GravityWorkspace,
+        uri: String,
+        text: String,
+        position: EditorSourceLocation
+    ) -> EditorSymbolHover? {
+        workspace.setHostConstructors(hostConstructors())
+        workspace.change(uri: uri, text: text, version: nil)
+        guard let hover = workspace.hover(uri: uri, position: lspPosition(from: position, in: text)) else {
+            return AdaScriptSwiftSourceResolver.hover(text: text, position: position)
+        }
+        return EditorSymbolHover(contents: hover.contents, range: editorRange(from: hover.range, in: text))
+    }
+
+    static func diagnostics(workspace: GravityWorkspace, fileURL: URL, text: String) -> [EditorDiagnostic] {
+        workspace.setHostConstructors(hostConstructors())
+        workspace.setProjectTypeChecking(projectTypeChecking(for: fileURL))
+        let uri = fileURL.standardizedFileURL.absoluteString
+        workspace.change(uri: uri, text: text, version: nil)
+        return (workspace.analysis(for: uri)?.diagnostics ?? [])
+            .map { diagnostic in
+                EditorDiagnostic(
+                    filePath: fileURL.standardizedFileURL.path,
+                    range: editorRange(from: diagnostic.range, in: text),
+                    severity: diagnostic.severity == .error ? .error : .warning,
+                    message: diagnostic.message,
+                    source: "adascript-lsp"
+                )
+            }
+    }
+
+    static func editorLocation(lspLine: Int, utf16Character: Int, text: String) -> EditorSourceLocation {
+        editorPosition(
+            from: GravitySourcePosition(line: max(0, lspLine), utf16Column: max(0, utf16Character)),
+            in: text
+        )
+    }
+
+    static func lspPosition(from location: EditorSourceLocation, text: String) -> GravitySourcePosition {
+        lspPosition(from: location, in: text)
+    }
+
+    static func quickFixes(text: String, position: EditorSourceLocation) -> [EditorSourceQuickFix] {
+        let sourcePosition = lspPosition(from: position, in: text)
+        return languageService().quickFixes(
+            text: text,
+            range: GravitySourceRange(start: sourcePosition, end: sourcePosition)
+        ).map { fix in
+            EditorSourceQuickFix(
+                title: fix.title,
+                range: editorRange(from: fix.replacementRange, in: text),
+                originalText: fix.newText == "struct" ? "class" : "struct",
+                replacement: fix.newText
+            )
+        }
+    }
+
+    static func completions(
+        workspace: GravityWorkspace,
+        uri: String,
+        text: String,
+        position: EditorSourceLocation
+    ) -> [EditorCompletionItem] {
+        workspace.setHostConstructors(hostConstructors())
+        workspace.change(uri: uri, text: text, version: nil)
+        return completionItems(
+            workspace.completions(uri: uri, position: lspPosition(from: position, in: text)),
+            text: text
+        )
+    }
+
+    private static func hostConstructors() -> [GravityHostConstructor] {
+        return RuntimeTypeRegistry.registeredRuntimeComponentConstructors().map { constructor in
+            GravityHostConstructor(
+                name: constructor.name,
+                parameters: constructor.parameters.map(\.name)
+            )
+        }
+    }
+
+    private static func projectTypeChecking(for fileURL: URL) -> AdaScriptTypeCheckingMode {
+        var directory = fileURL.deletingLastPathComponent().standardizedFileURL
+        while directory.path != "/" {
+            let settingsURL = ProjectSystem.metadataURL(forProjectAt: directory)
+            if FileManager.default.fileExists(atPath: settingsURL.path) {
+                return (try? ProjectSystem.loadProject(at: directory).build.adaScriptTypeChecking) ?? .dynamic
+            }
+            let parent = directory.deletingLastPathComponent().standardizedFileURL
+            guard parent != directory else {
+                break
+            }
+            directory = parent
+        }
+        return .dynamic
+    }
+
+    private static func languageService() -> GravityLanguageService {
+        GravityLanguageService(hostConstructors: hostConstructors())
+    }
+
+    private static func completionItems(
+        _ completions: [GravityCompletion],
+        text: String
+    ) -> [EditorCompletionItem] {
+        completions.map { completion in
+            EditorCompletionItem(
+                label: completion.label,
+                detail: completion.detail,
+                insertText: completion.insertText,
+                replacementRange: editorRange(from: completion.replacementRange, in: text),
+                sortText: completion.sortText,
+                kind: completionKind(for: completion)
+            )
+        }
+    }
+
+    private static func completionKind(for completion: GravityCompletion) -> EditorCompletionKind {
+        if annotationLabels.contains(completion.label) {
+            return .annotation
+        }
+
+        return switch completion.kind {
+        case .class: .class
+        case .enum: .enum
+        case .function: .function
+        case .keyword: .keyword
+        case .method: .method
+        case .property: .property
+        case .snippet: .snippet
+        case .struct: .struct
+        case .variable: .variable
+        }
+    }
+
+    private static func lspPosition(from position: EditorSourceLocation, in text: String) -> GravitySourcePosition {
+        let lines = text.components(separatedBy: .newlines)
+        guard lines.indices.contains(position.line) else {
+            return GravitySourcePosition(line: position.line, utf16Column: position.character)
+        }
+        let line = lines[position.line]
+        let characterColumn = min(max(0, position.character), line.count)
+        let index = line.index(line.startIndex, offsetBy: characterColumn)
+        return GravitySourcePosition(line: position.line, utf16Column: line[..<index].utf16.count)
+    }
+
+    private static func editorRange(from range: GravitySourceRange, in text: String) -> EditorSourceRange {
+        EditorSourceRange(
+            start: editorPosition(from: range.start, in: text),
+            end: editorPosition(from: range.end, in: text)
+        )
+    }
+
+    private static func editorPosition(from position: GravitySourcePosition, in text: String) -> EditorSourceLocation {
+        let lines = text.components(separatedBy: .newlines)
+        guard lines.indices.contains(position.line) else {
+            return EditorSourceLocation(line: position.line, character: position.utf16Column)
+        }
+        var utf16Offset = 0
+        var characterOffset = 0
+        for character in lines[position.line] {
+            let characterLength = String(character).utf16.count
+            guard utf16Offset + characterLength <= position.utf16Column else {
+                break
+            }
+            utf16Offset += characterLength
+            characterOffset += 1
+        }
+        return EditorSourceLocation(line: position.line, character: characterOffset)
+    }
+}

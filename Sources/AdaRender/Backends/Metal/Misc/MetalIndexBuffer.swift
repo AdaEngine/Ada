@@ -7,18 +7,16 @@
 
 #if METAL
 
-import Metal
+    import Metal
 
-final class MetalIndexBuffer: MetalBuffer, IndexBuffer, @unchecked Sendable {
+    final class MetalIndexBuffer: MetalBuffer, IndexBuffer, @unchecked Sendable {
+        let indexFormat: IndexBufferFormat
 
-    let indexFormat: IndexBufferFormat
-    
-    init(buffer: MTLBuffer, indexFormat: IndexBufferFormat) {
-        self.indexFormat = indexFormat
-        
-        super.init(buffer: buffer)
+        init(buffer: MTLBuffer, indexFormat: IndexBufferFormat) {
+            self.indexFormat = indexFormat
+
+            super.init(buffer: buffer)
+        }
     }
-    
-}
 
 #endif

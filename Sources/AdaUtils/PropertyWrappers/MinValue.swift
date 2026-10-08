@@ -16,20 +16,19 @@
 /// ```
 @propertyWrapper
 public struct MinValue<T: Comparable & Codable>: Codable {
-    
     let minValue: T
-    
+
     public var wrappedValue: T {
         didSet {
             self.wrappedValue = Self.applyMinIfNeeded(self.minValue, for: self.wrappedValue)
         }
     }
-    
+
     public init(wrappedValue: T, _ minValue: T) {
         self.minValue = minValue
         self.wrappedValue = Self.applyMinIfNeeded(minValue, for: wrappedValue)
     }
-    
+
     static func applyMinIfNeeded(_ min: T, for value: T) -> T {
         return max(min, value)
     }

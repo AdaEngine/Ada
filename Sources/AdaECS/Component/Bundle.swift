@@ -22,14 +22,14 @@ public protocol ComponentsBundle: Sendable, ~Copyable {
     var components: [any Component] { get }
 }
 
-public extension ComponentsBundle {
+extension ComponentsBundle {
     // Extends components bundle with another components bundle.
-    func extend<T: ComponentsBundle>(_ bundle: T) -> ChainedComponentsBundle {
+    public func extend<T: ComponentsBundle>(_ bundle: T) -> ChainedComponentsBundle {
         ChainedComponentsBundle(self.components + bundle.components)
     }
 
     // Extends components bundle with components.
-    func extend(@ComponentsBuilder _ components: () -> ComponentsBundle) -> ChainedComponentsBundle {
+    public func extend(@ComponentsBuilder _ components: () -> ComponentsBundle) -> ChainedComponentsBundle {
         ChainedComponentsBundle(self.components + components().components)
     }
 }

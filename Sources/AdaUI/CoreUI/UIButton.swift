@@ -7,13 +7,12 @@
 
 import AdaInput
 import AdaRender
-import AdaUtils
 import AdaText
+import AdaUtils
 import Math
 
 /// A button UI element.
 open class UIButton: UIControl {
-
     /// A button style.
     private struct ButtonStyle {
         /// The icon of the button style.
@@ -42,6 +41,7 @@ open class UIButton: UIControl {
     ///   - state: The state to set the icon for.
     public func setIcon(_ texture: Texture2D?, for state: State) {
         self.styles[state, default: ButtonStyle()].icon = texture
+        setNeedsDisplay()
     }
 
     /// Set the background color for the button style.
@@ -51,6 +51,7 @@ open class UIButton: UIControl {
     ///   - state: The state to set the background color for.
     public func setBackgroundColor(_ color: Color, for state: State) {
         self.styles[state, default: ButtonStyle()].backgroundColor = color
+        setNeedsDisplay()
     }
 
     /// Set the attributed text for the button style.
@@ -60,6 +61,7 @@ open class UIButton: UIControl {
     ///   - state: The state to set the attributed text for.
     public func setAttributedText(_ text: AttributedText, for state: State) {
         self.styles[state, default: ButtonStyle()].textContainer.text = text
+        setNeedsDisplay()
     }
 
     /// Draw the button in the given rect with the given context.
@@ -67,7 +69,7 @@ open class UIButton: UIControl {
     /// - Parameters:
     ///   - rect: The rect to draw the button in.
     ///   - context: The context to draw the button in.
-    open override func draw(in rect: Rect, with context: UIGraphicsContext) {
+    override open func draw(in rect: Rect, with context: UIGraphicsContext) {
         let style = self.styles[self.state]
         let color = style?.backgroundColor ?? self.backgroundColor
         context.drawRect(rect, color: color)
@@ -84,7 +86,7 @@ open class UIButton: UIControl {
     /// Handle the mouse event.
     ///
     /// - Parameter event: The mouse event to handle.
-    open override func onMouseEvent(_ event: MouseEvent) {
+    override open func onMouseEvent(_ event: MouseEvent) {
         if !self.state.isEnabled {
             return
         }

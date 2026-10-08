@@ -1,9 +1,0 @@
-load("//utils/bazel:cc_ada_library.bzl", "cc_ada_library")
-
-cc_ada_library(
-    name = "SPIRVCompiler",
-    deps = [
-        "@swiftpkg_glslang//:glslang",
-        # "//Modules/glslang:glslang",
-    ],
-)

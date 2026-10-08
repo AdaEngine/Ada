@@ -1,0 +1,38 @@
+[package]
+name = "harfbuzz_rust"
+edition = "2021"
+rust-version = "1.87.0"
+
+[dependencies]
+harfrust = { version = "0.8.3", optional = true }
+# harfrust = { git = "https://github.com/harfbuzz/harfrust", optional = true }
+read-fonts = "0.39.*"
+skrifa = { version = "0.*", optional = true }
+smallvec = "1.*"
+
+[lib]
+name = "harfbuzz_rust"
+path = "lib.rs"
+crate-type = ["staticlib"]
+
+[features]
+default = ["paint", "draw", "hb-allocator"]
+font = ["dep:skrifa"]
+shape = ["dep:harfrust"]
+paint = []
+draw = []
+hb-allocator = []
+
+[profile.release]
+strip = true
+panic = "abort"
+overflow-checks = false
+lto = "fat"
+codegen-units = 1
+
+[profile.debugoptimized]
+inherits = "dev"
+panic = "abort"
+overflow-checks = false
+lto = "fat"
+codegen-units = 1

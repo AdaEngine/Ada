@@ -7,6 +7,7 @@
 
 import AdaUtils
 import Math
+import Observation
 
 // MARK: - Coordinate Space
 
@@ -78,7 +79,7 @@ public struct NamedViewCoordinateSpace: Equatable, ViewCoordinateSpaceProtocol {
     ///   - lhs: The left-hand side of the equality check.
     ///   - rhs: The right-hand side of the equality check.
     /// - Returns: A Boolean value indicating whether the two named view coordinate spaces are equal.
-    public static func == (lhs: NamedViewCoordinateSpace, rhs: NamedViewCoordinateSpace) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.name == rhs.name
     }
 
@@ -86,8 +87,8 @@ public struct NamedViewCoordinateSpace: Equatable, ViewCoordinateSpaceProtocol {
     ///
     /// - Parameter name: The name of the named view coordinate space.
     /// - Returns: A new named view coordinate space.
-    public static func named<H: Hashable>(_ name: H) -> NamedViewCoordinateSpace {
-        NamedViewCoordinateSpace(name)
+    public static func named<H: Hashable>(_ name: H) -> Self {
+        Self(name)
     }
 }
 
@@ -96,12 +97,19 @@ public struct NamedViewCoordinateSpace: Equatable, ViewCoordinateSpaceProtocol {
 /// A geometry proxy.
 @MainActor
 public struct GeometryProxy {
-
     /// The named coordinate space container.
     let namedCoordinateSpaceContainer: NamedViewCoordinateSpaceContainer
 
     /// The local frame of the geometry proxy.
     let localFrame: Rect
+
+    /// The global frame of the geometry proxy.
+    let globalFrame: Rect
+
+    /// The node that owns this proxy. When available, coordinate-space queries
+    /// resolve against the current tree position so ancestor relayouts do not
+    /// leave captured proxies with stale global origins.
+    weak var node: ViewNode?
 
     /// The size of the geometry proxy.
     ///
@@ -115,24 +123,43 @@ public struct GeometryProxy {
     /// - Parameter coordinateSpace: The coordinate space.
     /// - Returns: The frame of the geometry proxy in the given coordinate space.
     public func frame(in coordinateSpace: ViewCoordinateSpaceProtocol) -> Rect {
+        namedCoordinateSpaceContainer.compact()
         switch coordinateSpace.coordinateSpace {
         case .local:
             return self.localFrame
         case .global:
-            return namedCoordinateSpaceContainer.containers[ViewRootNode.rootCoordinateSpace.name]?.frame ?? .zero
+            return self.resolvedGlobalFrame
         case .scrollView:
-            return namedCoordinateSpaceContainer.containers[ViewCoordinateSpace.scrollViewId]?.frame ?? .zero
-        case .named(let value):
-            return namedCoordinateSpaceContainer.containers[value]?.frame ?? .zero
+            return frame(relativeTo: ViewCoordinateSpace.scrollViewId)
+        case let .named(value):
+            return frame(relativeTo: value)
         }
+    }
+
+    private var resolvedGlobalFrame: Rect {
+        node?.visualAbsoluteFrame() ?? globalFrame
+    }
+
+    private func frame(relativeTo coordinateSpace: AnyHashable) -> Rect {
+        guard let container = namedCoordinateSpaceContainer.containers[coordinateSpace]?.value else {
+            return .zero
+        }
+
+        let containerFrame = container.visualAbsoluteFrame()
+        let globalFrame = resolvedGlobalFrame
+        return Rect(
+            x: globalFrame.origin.x - containerFrame.origin.x,
+            y: globalFrame.origin.y - containerFrame.origin.y,
+            width: globalFrame.width,
+            height: globalFrame.height
+        )
     }
 }
 
 /// A geometry reader.
 public struct GeometryReader<Content: View>: View, ViewNodeBuilder {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let content: (GeometryProxy) -> Content
 
@@ -147,16 +174,24 @@ public struct GeometryReader<Content: View>: View, ViewNodeBuilder {
     ///
     /// - Parameter context: The build context.
     /// - Returns: The view node.
-    func buildViewNode(in context: BuildContext) -> ViewNode {
+    func buildViewNode(in _: BuildContext) -> ViewNode {
         GeometryReaderViewNode(contentProxy: content, content: self)
     }
 }
 
 /// A geometry reader view node.
 final class GeometryReaderViewNode<Content: View>: ViewContainerNode {
-
+    private var deferredTransaction: DeferredViewTransaction?
     /// The content proxy.
-    let contentProxy: (GeometryProxy) -> Content
+    private var contentProxy: (GeometryProxy) -> Content
+    private var lastContentSignature: ContentSignature?
+    private var contentNeedsRebuild = true
+
+    private struct ContentSignature: Equatable {
+        let frame: Rect
+        let globalFrame: Rect
+        let environmentVersion: UInt64
+    }
 
     /// Initialize a new geometry reader view node.
     ///
@@ -164,49 +199,176 @@ final class GeometryReaderViewNode<Content: View>: ViewContainerNode {
     /// - Parameter content: The content.
     init<Root: View>(contentProxy: @escaping (GeometryProxy) -> Content, content: Root) {
         self.contentProxy = contentProxy
-        super.init(content: content, body: { _ in fatalError() })
+        super.init(content: content, buildImmediately: false, body: { _ in _ViewListOutputs(outputs: []) })
+    }
+
+    override func update(from newNode: ViewNode) {
+        guard let geometryReaderNode = newNode as? GeometryReaderViewNode<Content> else {
+            super.update(from: newNode)
+            return
+        }
+
+        // GeometryReader content depends on its laid-out frame and must be rebuilt
+        // only from performLayout(), where a valid GeometryProxy is available.
+        // Calling ViewContainerNode.update(from:) here would install the placeholder
+        // empty body from the fresh node and immediately reconcile children to [],
+        // which can make the view disappear until the next layout pass.
+        self.contentProxy = geometryReaderNode.contentProxy
+        self.markInspectionRedraw()
+        self.environmentTransform = geometryReaderNode.environmentTransform
+        self.structuralIdentity = geometryReaderNode.structuralIdentity
+        self.accessibilityIdentifier = geometryReaderNode.accessibilityIdentifier
+
+        self.transactionTransform = geometryReaderNode.transactionTransform
+        self.applyResolvedEnvironmentSilently(geometryReaderNode.environment)
+        self.deferredTransaction = DeferredViewTransaction(for: self)
+        self.setContent(geometryReaderNode.content)
+
+        self.contentNeedsRebuild = true
+        self.markNeedsLayout()
+        self.invalidateNearestLayer()
+        owner?.containerView?.setNeedsLayout()
     }
 
     /// Perform the layout of the geometry reader view node.
     ///
     /// - Returns: The layout of the geometry reader view node.
     override func performLayout() {
-        self.invalidateContent()
-
-        for node in self.nodes {
-            node.performLayout()
+        if let transaction = deferredTransaction {
+            deferredTransaction = nil
+            transaction.perform(on: self) { performGeometryLayout() }
+            // Restoring the temporary animation environment is not a content
+            // change. Keep the measured geometry, but remember the restored
+            // environment revision so place() does not rebuild the body twice.
+            if let signature = lastContentSignature {
+                lastContentSignature = ContentSignature(
+                    frame: signature.frame,
+                    globalFrame: signature.globalFrame,
+                    environmentVersion: environment.version
+                )
+            }
+        } else {
+            performGeometryLayout()
         }
-        
-        super.performLayout()
+    }
+
+    private func performGeometryLayout() {
+        let signature = self.currentContentSignature()
+        if contentNeedsRebuild || lastContentSignature != signature {
+            self.rebuildContent(for: signature)
+        }
+
+        let proposal = ProposedViewSize(width: self.frame.width, height: self.frame.height)
+        for node in self.nodes {
+            node.place(in: .zero, anchor: .topLeading, proposal: proposal)
+        }
+
+        self.invalidateLayerIfNeeded()
+    }
+
+    override func place(in origin: Point, anchor: AnchorPoint, proposal: ProposedViewSize, measuredSize size: Size) {
+        super.place(in: origin, anchor: anchor, proposal: proposal, measuredSize: size)
+
+        let signature = self.currentContentSignature()
+        guard !contentNeedsRebuild, lastContentSignature != signature else {
+            return
+        }
+
+        self.performLayout()
+        self.markLayoutClean()
+    }
+
+    override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
+        let resolvedSize = proposal.replacingUnspecifiedDimensions()
+        return resolvedSize
     }
 
     /// Invalidate the content of the geometry reader view node.
     ///
     /// - Returns: The invalidated content of the geometry reader view node.
     override func invalidateContent() {
-        let context = _ViewInputs(parentNode: self, environment: self.environment)
-        let proxy = GeometryProxy(
-            namedCoordinateSpaceContainer: self.environment.coordinateSpaces,
-            localFrame: self.frame
-        )
-        let content = self.contentProxy(proxy)
-        let outputs = Content._makeListView(_ViewGraphNode(value: content), inputs: _ViewListInputs(input: context)).outputs
-        let nodes = outputs.map { $0.node }
+        self.deferredTransaction = DeferredViewTransaction(for: self)
+        self.contentNeedsRebuild = true
+        self.markNeedsLayout()
+        self.invalidateNearestLayer()
+        owner?.containerView?.setNeedsLayout()
+    }
 
-        for node in nodes {
-            node.parent = self
+    private func currentContentSignature() -> ContentSignature {
+        ContentSignature(
+            frame: self.frame,
+            globalFrame: self.visualAbsoluteFrame(),
+            environmentVersion: self.environment.version
+        )
+    }
+
+    private func rebuildContent(for signature: ContentSignature) {
+        UILayoutDebugCounters.recordContentInvalidation()
+        UILayoutDebugCounters.recordRebuild()
+        let observationRevision = beginContentObservation()
+        var environment = self.environment
+        let disablesAnimation = shouldDisableAnimation(for: signature)
+        if disablesAnimation {
+            environment.animationController = nil
+        }
+        let context = _ViewInputs(parentNode: self, environment: environment)
+        let proxy = GeometryProxy(
+            namedCoordinateSpaceContainer: environment.coordinateSpaces,
+            localFrame: Rect(origin: .zero, size: self.frame.size),
+            globalFrame: signature.globalFrame,
+            node: self
+        )
+        let outputs = withObservationTracking {
+            let content = self.contentProxy(proxy)
+            return Content._makeListView(_ViewGraphNode(value: content), inputs: _ViewListInputs(input: context)).outputs
+        } onChange: { [weak self] in
+            let transaction = UITransactionContext.current
+            Task { @MainActor in
+                self?.scheduleObservedContentInvalidation(revision: observationRevision, transaction: transaction)
+            }
+        }
+        let nodes = outputs.map(\.node)
+
+        if disablesAnimation {
+            var transaction = UITransactionContext.current ?? Transaction()
+            transaction.animation = nil
+            BindingAnimationTransaction.withController(nil, transaction: transaction) {
+                self.reconcileChildNodes(from: nodes)
+            }
+        } else {
+            self.reconcileChildNodes(from: nodes)
+        }
+        self.lastContentSignature = signature
+        self.contentNeedsRebuild = false
+    }
+
+    override func invalidateObservedContent() {
+        // Geometry-dependent bodies are rebuilt by the subsequent layout pass.
+        invalidateContent()
+    }
+
+    private func shouldDisableAnimation(for signature: ContentSignature) -> Bool {
+        guard let lastContentSignature else {
+            return false
         }
 
-        self.nodes = nodes
+        return lastContentSignature.frame.size != signature.frame.size
     }
 }
 
 // MARK: - Environment
 
 /// A named view coordinate space container.
+/// Environment propagation and coordinate-space registration run on the UI
+/// actor; the unchecked conformance only lets EnvironmentValues store the
+/// reference as a Sendable value.
 final class NamedViewCoordinateSpaceContainer: @unchecked Sendable {
     /// The containers of the named view coordinate space.
-    var containers: [AnyHashable: ViewNode] = [:]
+    var containers: [AnyHashable: WeakBox<ViewNode>] = [:]
+
+    func compact() {
+        containers = containers.filter { !$0.value.isEmpty }
+    }
 }
 
 /// A protocol that defines a coordinate space.
@@ -220,12 +382,12 @@ extension EnvironmentValues {
     @Entry var coordinateSpaces: NamedViewCoordinateSpaceContainer = NamedViewCoordinateSpaceContainer()
 }
 
-public extension View {
+extension View {
     /// The coordinate space of the view.
     ///
     /// - Parameter named: The named view coordinate space.
     /// - Returns: The coordinate space of the view.
-    func coordinateSpace(_ named: NamedViewCoordinateSpace) -> some View {
+    public func coordinateSpace(_ named: NamedViewCoordinateSpace) -> some View {
         self.modifier(CoordinateSpaceViewModifier(named: named, content: self))
     }
 }
@@ -237,13 +399,40 @@ struct CoordinateSpaceViewModifier<Content: View>: ViewModifier, ViewNodeBuilder
     let content: Content
 
     func buildViewNode(in context: BuildContext) -> ViewNode {
-        let node = context.makeNode(from: content)
+        let node = CoordinateSpaceViewModifierNode(
+            named: named,
+            contentNode: context.makeNode(from: content),
+            content: content
+        )
+        node.updateEnvironment(context.environment)
+        return node
+    }
+}
 
-        if node is ScrollViewNode {
-            context.environment.coordinateSpaces.containers[ViewCoordinateSpace.scrollViewId] = node
+private final class CoordinateSpaceViewModifierNode: ViewModifierNode {
+    private let named: NamedViewCoordinateSpace
+
+    init<Content: View>(named: NamedViewCoordinateSpace, contentNode: ViewNode, content: Content) {
+        self.named = named
+        super.init(contentNode: contentNode, content: content)
+    }
+
+    override func update(from newNode: ViewNode) {
+        super.update(from: newNode)
+        updateEnvironment(environment)
+    }
+
+    override func updateEnvironment(_ environment: EnvironmentValues) {
+        var environment = environment
+        let previousVersion = environment.version
+        environment.coordinateSpaces.compact()
+
+        if contentNode is ScrollViewNode {
+            environment.coordinateSpaces.containers[ViewCoordinateSpace.scrollViewId] = WeakBox(contentNode)
         }
 
-        context.environment.coordinateSpaces.containers[named.name] = node
-        return ViewModifierNode(contentNode: node, content: content)
+        environment.coordinateSpaces.containers[named.name] = WeakBox(contentNode)
+        environment.ensureVersionDiffers(from: previousVersion)
+        super.updateEnvironment(environment)
     }
 }

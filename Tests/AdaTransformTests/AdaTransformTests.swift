@@ -54,4 +54,23 @@ struct AdaTransformTests: Sendable {
 
         #expect(updatedChildGlobalTransform.getTransform().position == expectedUpdatedChildGlobalPosition)
     }
+
+    @Test("Child transform propagation with unchanged parent")
+    func childTransformPropagationWithUnchangedParent() async throws {
+        let parent = world.main.spawn {
+            Transform(position: Vector3(x: 10, y: 20, z: 30))
+        }
+        let child = world.main.spawn {
+            Transform(position: Vector3(x: 5, y: 0, z: 0))
+        }
+        parent.addChild(child)
+        await world.main.runScheduler(.postUpdate)
+        world.main.clearTrackers()
+
+        child.components[Transform.self]?.position = Vector3(x: 7, y: 8, z: 9)
+        await world.main.runScheduler(.postUpdate)
+
+        let globalTransform = try #require(child.components[GlobalTransform.self])
+        #expect(globalTransform.getTransform().position == Vector3(x: 17, y: 28, z: 39))
+    }
 }

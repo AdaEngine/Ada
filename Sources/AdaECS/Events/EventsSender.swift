@@ -9,7 +9,7 @@ import AdaUtils
 
 /// Events Sender. Allows you to send events to the world.
 /// Each event is stored in the world and can be received by the receiver and available for the next frame.
-/// 
+///
 /// Example:
 /// ```swift
 /// @System
@@ -21,7 +21,6 @@ import AdaUtils
 /// ```
 @propertyWrapper
 public final class EventsSender<T: Event>: @unchecked Sendable {
-
     @usableFromInline
     var storage: Ref<EventsStorage<T>>?
 
@@ -29,7 +28,7 @@ public final class EventsSender<T: Event>: @unchecked Sendable {
         self
     }
 
-    public init() { }
+    public init() {}
 
     /// Send a new event to the world.
     /// - Parameter event: The event to send.
@@ -61,7 +60,13 @@ public final class EventsSender<T: Event>: @unchecked Sendable {
 }
 
 extension EventsSender: SystemParameter {
-    public convenience init(from world: World) {
+    public static var access: SystemAccessSet {
+        var access = SystemAccessSet()
+        access.addResourceWrite(EventsStorage<T>.self)
+        return access
+    }
+
+    public convenience init(from _: World) {
         self.init()
     }
 

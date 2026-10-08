@@ -5,15 +5,15 @@
 //  Created by Vladislav Prusakov on 21.06.2024.
 //
 
+import AdaInput
 import Math
 
 /// A view type that supports immediate mode drawing.
 public struct Canvas: View, ViewNodeBuilder {
-
     public typealias RenderBlock = (inout UIGraphicsContext, Size) -> Void
 
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let render: RenderBlock
 
@@ -21,14 +21,13 @@ public struct Canvas: View, ViewNodeBuilder {
         self.render = render
     }
 
-    func buildViewNode(in context: BuildContext) -> ViewNode {
+    func buildViewNode(in _: BuildContext) -> ViewNode {
         return CanvasViewNode(content: self, drawBlock: self.render)
     }
 }
 
 @MainActor
 class CanvasViewNode: ViewNode {
-
     private(set) var drawBlock: Canvas.RenderBlock
 
     init<Content: View>(content: Content, drawBlock: @escaping Canvas.RenderBlock) {
@@ -51,11 +50,21 @@ class CanvasViewNode: ViewNode {
         guard let otherNode = newNode as? CanvasViewNode else {
             return
         }
-        
+
         self.drawBlock = otherNode.drawBlock
     }
 
     override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
         return proposal.replacingUnspecifiedDimensions()
+    }
+
+    override func hitTest(_: Point, with _: any InputEvent) -> ViewNode? {
+        // Canvas is a drawing-only primitive; it should not intercept pointer/touch events
+        // from interactive content rendered below (e.g. buttons in an overlayed card).
+        nil
+    }
+
+    override func point(inside _: Point, with _: any InputEvent) -> Bool {
+        false
     }
 }

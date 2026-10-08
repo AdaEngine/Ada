@@ -1,0 +1,4 @@
+interface:
+  display_name: "AdaEngine Development"
+  short_description: "Develop and validate the AdaEngine runtime and editor"
+  default_prompt: "Use $adaengine-development to implement and validate this AdaEngine change using the owning module, current repository APIs, and production-path tests."

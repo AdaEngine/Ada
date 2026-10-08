@@ -5,12 +5,13 @@
 //  Created by vladislav.prusakov on 06.08.2024.
 //
 
+import AdaAnimation
+import AdaInput
 import Math
 
-public extension View {
-
+extension View {
     /// Scales this view’s rendered output by the given vertical and horizontal size amounts.
-    func scaleEffect(_ scale: Vector2, anchor: AnchorPoint = .center) -> some View {
+    public func scaleEffect(_ scale: Vector2, anchor: AnchorPoint = .center) -> some View {
         modifier(
             TransformViewModifier(
                 value: scale,
@@ -24,7 +25,7 @@ public extension View {
     }
 
     /// Rotates a view’s rendered output in two dimensions around the specified point.
-    func rotationEffect(_ angle: Angle) -> some View {
+    public func rotationEffect(_ angle: Angle) -> some View {
         modifier(
             TransformViewModifier(
                 value: angle.radians,
@@ -69,7 +70,7 @@ final class TransformEffectViewNode<Value: VectorArithmetic>: ViewModifierNode {
         content: Content,
         value: Value,
         mapTransform: @escaping (inout Transform3D, Value) -> Void
-    ) where Content : View {
+    ) where Content: View {
         self.value = value
         self.mapTransform = mapTransform
         super.init(contentNode: contentNode, content: content)
@@ -77,26 +78,36 @@ final class TransformEffectViewNode<Value: VectorArithmetic>: ViewModifierNode {
     }
 
     private var localTransform = Transform3D.identity
+    private var targetValue: Value?
+    private weak var propertyController: UIAnimationController?
 
     override func update(from newNode: ViewNode) {
+        let animationController = animationControllerForUpdate
         super.update(from: newNode)
 
         guard let newNode = newNode as? Self else {
             return
         }
 
-        if let animationController = self.environment.animationController {
+        anchor = newNode.anchor
+        guard (newNode.value - (targetValue ?? value)).magnitudeSquared > 0 else {
+            return
+        }
+        targetValue = newNode.value
+        propertyController?.removeAnimation(label: id)
+        propertyController = animationController
+        if let animationController {
             animationController.addTweenAnimation(
                 from: TweenValue(animatableData: self.value),
                 to: TweenValue(animatableData: newNode.value),
                 label: self.id,
                 environment: self.environment,
                 updateBlock: { [weak self] value in
+                    self?.value = value.animatableData
                     self?.updateTransform(value.animatableData)
+                    self?.invalidateNearestLayer()
                 }
             )
-
-            self.value = newNode.value
         } else {
             self.value = newNode.value
             updateTransform(self.value)
@@ -111,7 +122,34 @@ final class TransformEffectViewNode<Value: VectorArithmetic>: ViewModifierNode {
 
     override func draw(with context: UIGraphicsContext) {
         var context = context
-        context.concatenate(self.localTransform)
+        context.environment = environment
+        applyLocalTransform(to: &context)
         contentNode.draw(with: context)
+    }
+
+    override func inspectionLocalContext(from context: UIGraphicsContext) -> UIGraphicsContext {
+        var context = context
+        context.environment = environment
+        applyLocalTransform(to: &context)
+        return context
+    }
+
+    private func applyLocalTransform(to context: inout UIGraphicsContext) {
+        let anchorPoint = Point(
+            x: self.frame.width * anchor.x,
+            y: self.frame.height * anchor.y
+        )
+
+        let frameTranslation = Transform3D(translation: [self.frame.origin.x, -self.frame.origin.y, 0])
+        let anchorTranslation = Transform3D(translation: [anchorPoint.x, -anchorPoint.y, 0])
+        let inverseAnchorTranslation = Transform3D(translation: [-anchorPoint.x, anchorPoint.y, 0])
+
+        context.setTransform(
+            context.transform
+                * frameTranslation
+                * anchorTranslation
+                * self.localTransform
+                * inverseAnchorTranslation
+        )
     }
 }

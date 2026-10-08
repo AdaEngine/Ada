@@ -1,0 +1,40 @@
+format: ada.ui
+schemaVersion: 1
+inputs:
+  - name: name
+    type: string
+    isBinding: false
+    defaultValue: Item
+actions:
+  - name: selected
+    parameters: []
+root:
+  id: card
+  type: VStack
+  arguments:
+    spacing: {value: 12}
+  children:
+    - id: item-badge
+      type: Game.Badge
+      arguments:
+        title: {binding: name}
+    - id: use-item
+      type: Button
+      arguments:
+        title: {value: Use item}
+      actions:
+        action: selected
+  modifiers:
+    - id: card-padding
+      type: padding
+      arguments:
+        value: {value: 16}
+    - id: card-frame
+      type: frame
+      arguments:
+        width: {value: 160}
+        height: {value: 120}
+    - id: card-background
+      type: background
+      arguments:
+        color: {value: '#25364aff'}

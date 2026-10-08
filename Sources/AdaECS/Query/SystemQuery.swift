@@ -7,6 +7,11 @@
 
 /// A protocol that describe a query for world from a system.
 public protocol SystemParameter: Sendable {
+    /// The world access required by this parameter.
+    static var access: SystemAccessSet { get }
+
+    /// The world access required by this parameter instance.
+    var access: SystemAccessSet { get }
 
     /// Initialize a new system query.
     /// - Parameter world: The world that will be used to initialize the query.
@@ -21,10 +26,20 @@ public protocol SystemParameter: Sendable {
     func finish(_ world: World)
 }
 
-public extension SystemParameter {
-    func update(from world: World) {
-        fatalError("Query should be implemented")
+extension SystemParameter {
+    public static var access: SystemAccessSet {
+        SystemAccessSet()
     }
 
-    func finish(_ world: World) { }
+    public var access: SystemAccessSet {
+        Self.access
+    }
+
+    // Protocol witness must remain callable; concrete query implementations override it.
+    // swiftlint:disable:next unavailable_function
+    public func update(from _: World) {
+        preconditionFailure("SystemQuery.update(from:) must be implemented by a concrete query.")
+    }
+
+    public func finish(_: World) {}
 }

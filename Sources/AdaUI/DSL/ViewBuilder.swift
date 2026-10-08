@@ -10,7 +10,6 @@
 /// You typically use ``ViewBuilder`` as a parameter attribute for child view-producing closure parameters, allowing those closures to provide multiple child views.
 @MainActor
 @resultBuilder public enum ViewBuilder {
-
     /// Builds an empty view from a block containing no statements.
     @_alwaysEmitIntoClient
     public static func buildBlock() -> EmptyView {
@@ -19,13 +18,15 @@
 
     /// Passes a single view written as a child view through unmodified.
     @_alwaysEmitIntoClient
-    public static func buildBlock<Content>(_ content: Content) -> Content where Content : View {
+    public static func buildBlock<Content>(_ content: Content) -> Content where Content: View {
         return content
     }
 
     /// Passes a single view written as a child view through unmodified.
     @_alwaysEmitIntoClient
-    public static func buildBlock<each Content>(_ content: repeat each Content) -> ViewTuple<(repeat each Content)> where repeat each Content : View {
+    public static func buildBlock<each Content>(
+        _ content: repeat each Content
+    ) -> ViewTuple<(repeat each Content)> where repeat each Content: View {
         return ViewTuple(value: (repeat each content))
     }
 
@@ -59,13 +60,12 @@ extension ViewBuilder {
 extension ViewBuilder {
     /// Processes view content for a conditional compiler-control
     /// statement that performs an availability check.
-    public static func buildLimitedAvailability<Content>(_ content: Content) -> AnyView where Content : View {
+    public static func buildLimitedAvailability<Content>(_ content: Content) -> AnyView where Content: View {
         AnyView(content)
     }
 }
 
 public struct _ConditionalContent<TrueContent, FalseContent> {
-
     public enum Storage {
         case trueContent(TrueContent)
         case falseContent(FalseContent)
@@ -79,27 +79,55 @@ public struct _ConditionalContent<TrueContent, FalseContent> {
 }
 
 extension _ConditionalContent: View where TrueContent: View, FalseContent: View {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     @MainActor @preconcurrency
     public static func _makeView(_ view: _ViewGraphNode<Self>, inputs: _ViewInputs) -> _ViewOutputs {
+        let branchIdentity = view.value.branchIdentity
+        var output: _ViewOutputs
         switch view[\.storage].value {
-        case .trueContent(let trueContent):
-            return TrueContent._makeView(_ViewGraphNode(value: trueContent), inputs: inputs)
-        case .falseContent(let falseContent):
-            return FalseContent._makeView(_ViewGraphNode(value: falseContent), inputs: inputs)
+        case let .trueContent(trueContent):
+            output = TrueContent._makeView(_ViewGraphNode(value: trueContent), inputs: inputs)
+        case let .falseContent(falseContent):
+            output = FalseContent._makeView(_ViewGraphNode(value: falseContent), inputs: inputs)
         }
+        output.node.prependStructuralIdentity(branchIdentity)
+        return output
     }
 
     @MainActor @preconcurrency
     public static func _makeListView(_ view: _ViewGraphNode<Self>, inputs: _ViewListInputs) -> _ViewListOutputs {
+        let branchIdentity = view.value.branchIdentity
+        var outputs: _ViewListOutputs
         switch view[\.storage].value {
-        case .trueContent(let trueContent):
-            return TrueContent._makeListView(_ViewGraphNode(value: trueContent), inputs: inputs)
-        case .falseContent(let falseContent):
-            return FalseContent._makeListView(_ViewGraphNode(value: falseContent), inputs: inputs)
+        case let .trueContent(trueContent):
+            outputs = TrueContent._makeListView(_ViewGraphNode(value: trueContent), inputs: inputs)
+        case let .falseContent(falseContent):
+            outputs = FalseContent._makeListView(_ViewGraphNode(value: falseContent), inputs: inputs)
+        }
+        for index in outputs.outputs.indices {
+            outputs.outputs[index].node.prependStructuralIdentity(branchIdentity)
+        }
+        return outputs
+    }
+
+    private var branchIdentity: AnyHashable {
+        switch storage {
+        case .trueContent:
+            return "_ConditionalContent.true:\(ObjectIdentifier(TrueContent.self)):\(ObjectIdentifier(FalseContent.self))"
+        case .falseContent:
+            return "_ConditionalContent.false:\(ObjectIdentifier(TrueContent.self)):\(ObjectIdentifier(FalseContent.self))"
+        }
+    }
+}
+
+extension ViewNode {
+    func prependStructuralIdentity(_ identity: AnyHashable) {
+        if let structuralIdentity {
+            self.structuralIdentity = "\(identity)|\(structuralIdentity)"
+        } else {
+            self.structuralIdentity = identity
         }
     }
 }

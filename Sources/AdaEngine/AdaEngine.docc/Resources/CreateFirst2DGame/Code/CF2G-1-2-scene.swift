@@ -1,7 +1,7 @@
 import AdaEngine
 
 struct FirstScene: Plugin {
-    func setup(in app: AppWorlds) {
-        
+    func setup(in _: AppWorlds) {
+
     }
 }

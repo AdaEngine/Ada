@@ -12,8 +12,15 @@ import SwiftSyntaxMacros
 struct AdaEngineMacrosPlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
         ComponentMacro.self,
+        AdaScriptInitMacro.self,
         EntryMacro.self,
         SystemMacro.self,
-        BundleMacro.self    
+        BundleMacro.self,
+        PreviewableMacro.self,
+        ReplicatedComponentMacro.self,
+        NetworkCommandMacro.self,
+        NetworkFieldMacro.self,
+        LocalOnlyMacro.self,
+        StateMacro.self,
     ]
 }

@@ -57,6 +57,75 @@ struct WindowTitleSceneModifier: SceneModifier {
     }
 }
 
+/// Set the preferred display for the window.
+struct WindowScreenSceneModifier: SceneModifier {
+    let preference: WindowScreenPreference
+
+    func body(content: Content) -> some AppScene {
+        content.updateResource(of: WindowSettings.self, keyPath: \.screenPreference, value: preference)
+    }
+}
+
+/// Set the native platform window shadow visibility.
+struct WindowShadowSceneModifier: SceneModifier {
+    let hasShadow: Bool
+
+    func body(content: Content) -> some AppScene {
+        content.updateResource(of: WindowSettings.self, keyPath: \.hasShadow, value: hasShadow)
+    }
+}
+
+/// Set whether the native platform window can be resized by the user.
+struct WindowResizableSceneModifier: SceneModifier {
+    let isResizable: Bool
+
+    func body(content: Content) -> some AppScene {
+        content.updateResource(of: WindowSettings.self, keyPath: \.isResizable, value: isResizable)
+    }
+}
+
+/// Set the title bar presentation for the window.
+struct WindowTitleBarSceneModifier: SceneModifier {
+    let titleBar: WindowTitleBar
+
+    func body(content: Content) -> some AppScene {
+        content.transformAppWorlds { worlds in
+            let resource = worlds.main.getRefResource(WindowSettings.self)
+            let existingOffset = resource.wrappedValue.titleBar.trafficLightOffset
+            var titleBar = titleBar
+            titleBar.trafficLightOffset = titleBar.trafficLightOffset ?? existingOffset
+            resource.wrappedValue.titleBar = titleBar
+        }
+    }
+}
+
+/// Set the native platform window chrome style.
+struct WindowChromeSceneModifier: SceneModifier {
+    let chrome: WindowChrome
+
+    func body(content: Content) -> some AppScene {
+        content.updateResource(of: WindowSettings.self, keyPath: \.chrome, value: chrome)
+    }
+}
+
+/// Set the native platform window background style.
+struct WindowBackgroundSceneModifier: SceneModifier {
+    let background: WindowBackground
+
+    func body(content: Content) -> some AppScene {
+        content.updateResource(of: WindowSettings.self, keyPath: \.background, value: background)
+    }
+}
+
+/// Offset macOS traffic light buttons.
+struct WindowTrafficLightOffsetSceneModifier: SceneModifier {
+    let offset: Point
+
+    func body(content: Content) -> some AppScene {
+        content.updateResource(of: WindowSettings.self, keyPath: \.titleBar.trafficLightOffset, value: offset)
+    }
+}
+
 /// Add plugins to app.
 struct AddPluginsModifier<each T: Plugin>: SceneModifier {
     let plugins: (repeat (each T))
@@ -70,11 +139,11 @@ struct AddPluginsModifier<each T: Plugin>: SceneModifier {
     }
 }
 
-public extension AppScene {
+extension AppScene {
     /// Transform the app worlds.
     /// - Parameter transform: The transform to apply to the app worlds.
     @MainActor
-    func transformAppWorlds(
+    public func transformAppWorlds(
         transform: @escaping @MainActor (AppWorlds) -> Void
     ) -> some AppScene {
         self.modifier(
@@ -90,8 +159,8 @@ public extension AppScene {
     /// - Parameter keyPath: The key path of the resource to update.
     /// - Parameter value: The value to update the resource with.
     @MainActor
-    func updateResource<T: Resource, Value>(
-        of type: T.Type,
+    public func updateResource<T: Resource, Value>(
+        of _: T.Type,
         keyPath: WritableKeyPath<T, Value>,
         value: Value
     ) -> some AppScene {

@@ -202,6 +202,16 @@ extension WorldTests {
         #expect(world.get(ComponentA.self, from: entity.id) == ComponentA(value: 0))
     }
 
+    @Test
+    func `insert component adds macro required dependencies`() {
+        let entity = world.spawn("Requires")
+
+        entity.components += ComponentWithRequirement()
+
+        #expect(world.get(ComponentWithRequirement.self, from: entity.id) != nil)
+        #expect(world.get(ComponentA.self, from: entity.id) == ComponentA(value: 0))
+    }
+
     @Test("Query all")
     func queryAll() {
         let e = world.spawn {
@@ -470,6 +480,40 @@ extension WorldTests {
         #expect(world.get(ComponentB.self, from: red.id)!.value == red.name)
         #expect(world.get(ComponentB.self, from: blue.id)!.value == blue.name)
         #expect(world.get(ComponentB.self, from: yellow.id)!.value == yellow.name)
+    }
+
+    @Test
+    func `moving entity across archetypes preserves locations when archetype and chunk swaps differ`() {
+        var entities: [Entity] = []
+        entities.reserveCapacity(300)
+
+        for index in 0..<300 {
+            entities.append(
+                world.spawn("Entity \(index)") {
+                    ComponentA(value: index)
+                }
+            )
+        }
+
+        let moved = entities[0]
+        let chunkSwapped = entities[249]
+        let archetypeSwapped = entities[299]
+
+        world.insert(ComponentB(value: "moved"), for: moved.id)
+
+        #expect(world.get(ComponentA.self, from: moved.id)?.value == 0)
+        #expect(world.get(ComponentB.self, from: moved.id)?.value == "moved")
+        #expect(world.get(ComponentA.self, from: chunkSwapped.id)?.value == 249)
+        #expect(world.get(ComponentA.self, from: archetypeSwapped.id)?.value == 299)
+
+        let query = world.performQuery(Query<Entity, ComponentA>())
+        let valuesByEntity = Dictionary(uniqueKeysWithValues: query.map { entity, component in
+            (entity.id, component.value)
+        })
+
+        #expect(valuesByEntity[moved.id] == 0)
+        #expect(valuesByEntity[chunkSwapped.id] == 249)
+        #expect(valuesByEntity[archetypeSwapped.id] == 299)
     }
 }
 

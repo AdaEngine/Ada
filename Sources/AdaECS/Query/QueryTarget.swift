@@ -12,6 +12,9 @@ public protocol WorldQueryTarget: Sendable, ~Copyable {
 
     associatedtype State: Sendable
 
+    /// The access this target requires when fetched by a system query.
+    static var access: SystemAccessSet { get }
+
     @inlinable
     static func _initState(world: World) -> State
 
@@ -32,9 +35,14 @@ public protocol WorldQueryTarget: Sendable, ~Copyable {
     ) -> Fetch
 }
 
+extension WorldQueryTarget {
+    public static var access: SystemAccessSet {
+        SystemAccessSet()
+    }
+}
+
 /// A protocol that allows to use components and entities as query targets.
 public protocol QueryTarget: WorldQueryTarget, ~Copyable {
-
     /// Check that entity contains target.
     /// - Parameter entity: The entity to check.
     /// - Returns: True if the entity contains the target, otherwise false.
@@ -60,25 +68,30 @@ public protocol QueryTarget: WorldQueryTarget, ~Copyable {
 }
 
 extension Component {
+    public static var access: SystemAccessSet {
+        var access = SystemAccessSet()
+        access.addComponentRead(Self.self)
+        return access
+    }
 
     @inlinable
-    public static func _initState(world: World) -> ComponentId {
+    public static func _initState(world _: World) -> ComponentId {
         return Self.identifier
     }
 
     @inlinable
     public static func _initFetch(
-        world: World,
-        state: ComponentId,
-        lastTick: Tick,
-        currentTick: Tick
+        world _: World,
+        state _: ComponentId,
+        lastTick _: Tick,
+        currentTick _: Tick
     ) -> ReadFetch<Self> {
         unsafe ReadFetch(data: nil)
     }
 
     public static func _queryFetch(
-        for entity: Entity,
-        state: ComponentId,
+        for _: Entity,
+        state _: ComponentId,
         fetch: ReadFetch<Self>,
         at row: Int
     ) -> Self? {
@@ -86,10 +99,10 @@ extension Component {
     }
 
     public static func _setData(
-        state: ComponentId,
+        state _: ComponentId,
         fetch: ReadFetch<Self>,
         chunk: Chunk,
-        archetype: Archetype
+        archetype _: Archetype
     ) -> ReadFetch<Self> {
         guard let slice = unsafe chunk.getComponentSlice(for: Self.self) else {
             return fetch
@@ -152,9 +165,15 @@ public struct ReadFetch<T> {
 
 extension Ref: WorldQueryTarget where T: Component {}
 extension Ref: QueryTarget where T: Component {
+    public static var access: SystemAccessSet {
+        var access = SystemAccessSet()
+        access.addComponentWrite(T.self)
+        return access
+    }
+
     public static func _initFetch(
-        world: World,
-        state: ComponentId,
+        world _: World,
+        state _: ComponentId,
         lastTick: Tick,
         currentTick: Tick
     ) -> RefFetch<T> {
@@ -167,7 +186,7 @@ extension Ref: QueryTarget where T: Component {
         )
     }
 
-    public static func _initState(world: World) -> ComponentId {
+    public static func _initState(world _: World) -> ComponentId {
         T.identifier
     }
 
@@ -177,10 +196,10 @@ extension Ref: QueryTarget where T: Component {
     }
 
     public static func _setData(
-        state: ComponentId,
+        state _: ComponentId,
         fetch: RefFetch<T>,
         chunk: Chunk,
-        archetype: Archetype
+        archetype _: Archetype
     ) -> RefFetch<T> {
         var newFetch = fetch
         guard
@@ -205,8 +224,8 @@ extension Ref: QueryTarget where T: Component {
     }
 
     public static func _queryFetch(
-        for entity: Entity,
-        state: ComponentId,
+        for _: Entity,
+        state _: ComponentId,
         fetch: RefFetch<T>,
         at row: Int
     ) -> Ref<T>? {
@@ -228,39 +247,43 @@ extension Ref: QueryTarget where T: Component {
 }
 
 extension Entity: QueryTarget {
+    public static var access: SystemAccessSet {
+        SystemAccessSet()
+    }
+
     public static func _setData(
-        state: Void,
-        fetch: Void,
-        chunk: Chunk,
-        archetype: Archetype
-    ) -> Void { }
+        state _: Void,
+        fetch _: Void,
+        chunk _: Chunk,
+        archetype _: Archetype
+    ) {}
 
     public static func _queryFetch(
         for entity: Entity,
-        state: (),
-        fetch: (),
-        at row: Int
+        state _: (),
+        fetch _: (),
+        at _: Int
     ) -> Self? {
         entity as? Self
     }
 
-    public static func _initState(world: World) -> Void { }
+    public static func _initState(world _: World) {}
 
     public static func _initFetch(
-        world: World,
-        state: Void,
-        lastTick: Tick,
-        currentTick: Tick
-    ) -> Void { }
+        world _: World,
+        state _: Void,
+        lastTick _: Tick,
+        currentTick _: Tick
+    ) {}
 
     @inlinable
-    public static func _queryTargetContains(in entity: Entity) -> Bool {
+    public static func _queryTargetContains(in _: Entity) -> Bool {
         return true
     }
-    
+
     /// Always returns true because entity is always present in an archetype.
     @inlinable
-    public static func _queryContains(in archetype: borrowing Archetype) -> Bool {
+    public static func _queryContains(in _: borrowing Archetype) -> Bool {
         return true
     }
 }
@@ -269,6 +292,10 @@ extension Optional: WorldQueryTarget where Wrapped: QueryTarget {}
 extension Optional: QueryTarget where Wrapped: QueryTarget {
     public typealias State = Wrapped.State
     public typealias Fetch = Wrapped.Fetch
+
+    public static var access: SystemAccessSet {
+        Wrapped.access
+    }
 
     @inlinable
     public static func _setData(
@@ -286,7 +313,7 @@ extension Optional: QueryTarget where Wrapped: QueryTarget {
         state: Wrapped.State,
         fetch: Wrapped.Fetch,
         at row: Int
-    ) -> Optional<Wrapped>? {
+    ) -> Wrapped?? {
         .some(
             Wrapped._queryFetch(for: entity, state: state, fetch: fetch, at: row)
         )

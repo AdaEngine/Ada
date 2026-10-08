@@ -7,19 +7,72 @@
 
 import Math
 
+@MainActor
+final class LayoutMeasurementCache {
+    private struct Key: Hashable {
+        let nodeID: ObjectIdentifier
+        let proposal: ProposedViewSize
+    }
+
+    private var sizes: [Key: Size] = [:]
+
+    func size(for node: ViewNode, proposal: ProposedViewSize) -> Size {
+        let key = Key(nodeID: node.id, proposal: proposal)
+        if let size = sizes[key] {
+            return size
+        }
+
+        if let size = compatibleCachedSize(for: node, proposal: proposal) {
+            sizes[key] = size
+            return size
+        }
+
+        let size = node.sizeThatFits(proposal)
+        sizes[key] = size
+        return size
+    }
+
+    private func compatibleCachedSize(for node: ViewNode, proposal: ProposedViewSize) -> Size? {
+        if let width = proposal.width, let height = proposal.height {
+            let widthOnlyKey = Key(nodeID: node.id, proposal: ProposedViewSize(width: width))
+            if let size = sizes[widthOnlyKey], size.height == height {
+                return size
+            }
+
+            let heightOnlyKey = Key(nodeID: node.id, proposal: ProposedViewSize(height: height))
+            if let size = sizes[heightOnlyKey], size.width == width {
+                return size
+            }
+        }
+
+        return nil
+    }
+}
+
 /// A layout subview.
 public struct LayoutSubview: Equatable {
-
     /// The node.
-    let node: ViewNode
+    unowned let node: ViewNode
+    private let measurementCache: LayoutMeasurementCache?
+
+    /// The priority this subview receives when its parent layout apportions space.
+    @MainActor
+    public var layoutPriority: Double {
+        node.layoutPriority
+    }
 
     /// Check if two layout subviews are equal.
     ///
     /// - Parameter lhs: The left layout subview.
     /// - Parameter rhs: The right layout subview.
     /// - Returns: A Boolean value indicating whether the two layout subviews are equal.
-    public static func == (lhs: LayoutSubview, rhs: LayoutSubview) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.node.id == rhs.node.id
+    }
+
+    init(node: ViewNode, measurementCache: LayoutMeasurementCache? = nil) {
+        self.node = node
+        self.measurementCache = measurementCache
     }
 
     /// Place the layout subview at a specific point.
@@ -29,7 +82,8 @@ public struct LayoutSubview: Equatable {
     /// - Parameter proposal: The proposed view size.
     @MainActor
     public func place(at point: Point, anchor: AnchorPoint, proposal: ProposedViewSize) {
-        node.place(in: point, anchor: anchor, proposal: proposal)
+        let size = self.sizeThatFits(proposal)
+        node.place(in: point, anchor: anchor, proposal: proposal, measuredSize: size)
     }
 
     /// Calculate the size that fits the proposal.
@@ -38,6 +92,10 @@ public struct LayoutSubview: Equatable {
     /// - Returns: The size that fits the proposal.
     @MainActor
     public func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
+        if let measurementCache {
+            return measurementCache.size(for: node, proposal: proposal)
+        }
+
         return self.node.sizeThatFits(proposal)
     }
 
@@ -46,13 +104,16 @@ public struct LayoutSubview: Equatable {
     /// - Parameter proposal: The proposed view size.
     /// - Returns: The dimensions of the layout subview.
     @MainActor
-    func dimensions(in proposal: ProposedViewSize) -> Size {
+    func dimensions(in _: ProposedViewSize) -> Size {
         return node.frame.size
     }
 }
 
 /// A layout subviews.
 public struct LayoutSubviews: Sequence, Collection {
+    /// The horizontal direction of the layout container.
+    public let layoutDirection: LayoutDirection
+
     /// Get the next index after the given index.
     ///
     /// - Parameter i: The index.
@@ -82,8 +143,9 @@ public struct LayoutSubviews: Sequence, Collection {
     /// Initialize a new layout subviews.
     ///
     /// - Parameter data: The data.
-    init(_ data: [Element]) {
+    init(_ data: [Element], layoutDirection: LayoutDirection) {
         self.data = data
+        self.layoutDirection = layoutDirection
     }
 
     public var startIndex: Int {

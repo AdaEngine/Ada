@@ -11,13 +11,29 @@ import AdaUtils
 import Math
 
 class ViewModifierNode: ViewNode {
-
     var contentNode: ViewNode
+
+    override var layoutPriority: Double {
+        contentNode.layoutPriority
+    }
+
+    override var transientEnvironmentChildren: [ViewNode] {
+        [contentNode]
+    }
 
     init<Content: View>(contentNode: ViewNode, content: Content) {
         self.contentNode = contentNode
         super.init(content: content)
         self.contentNode.parent = self
+    }
+
+    override func didMove(to parent: ViewNode?) {
+        super.didMove(to: parent)
+        if parent == nil {
+            contentNode.parent = nil
+        } else {
+            contentNode.parent = self
+        }
     }
 
     override func update(from newNode: ViewNode) {
@@ -26,12 +42,30 @@ class ViewModifierNode: ViewNode {
         }
 
         super.update(from: otherNode)
-        self.contentNode.update(from: otherNode.contentNode)
+        if otherNode.contentNode.canUpdate(self.contentNode) {
+            self.contentNode.updateEnvironment(self.environment)
+            self.contentNode.update(from: otherNode.contentNode)
+            self.contentNode.updateEnvironment(self.environment)
+        } else {
+            self.contentNode.parent = nil
+            self.contentNode = otherNode.contentNode
+            self.contentNode.parent = self
+            self.contentNode.updateLayoutProperties(layoutProperties)
+            self.contentNode.updateEnvironment(self.environment)
+            if let owner, self.contentNode.owner !== owner {
+                self.contentNode.updateViewOwner(owner)
+            }
+            self.contentNode.markInspectionRedraw()
+            self.markNeedsLayout()
+        }
     }
 
     override func performLayout() {
         let proposal = ProposedViewSize(self.frame.size)
-        let origin = Point(x: self.frame.midX, y: self.frame.midY)
+        // Child layout must use local coordinates of the modifier node.
+        // Using frame.midX/midY leaks parent origin into child placement and
+        // accumulates offsets through modifier chains.
+        let origin = Point(x: self.frame.width * 0.5, y: self.frame.height * 0.5)
 
         self.contentNode.place(
             in: origin,
@@ -54,10 +88,11 @@ class ViewModifierNode: ViewNode {
 
     override func invalidateContent() {
         contentNode.invalidateContent()
+        self.invalidateNearestLayer()
     }
 
     override func buildMenu(with builder: any UIMenuBuilder) {
-       contentNode.buildMenu(with: builder)
+        contentNode.buildMenu(with: builder)
     }
 
     override func update(_ deltaTime: TimeInterval) {
@@ -69,14 +104,48 @@ class ViewModifierNode: ViewNode {
     }
 
     override func updateEnvironment(_ environment: EnvironmentValues) {
-        contentNode.updateEnvironment(environment)
+        let prevVersion = self.environment.version
         super.updateEnvironment(environment)
+        guard self.environment.version != prevVersion else {
+            return
+        }
+        // Pass self.environment (post-transform) so content node inherits correctly.
+        contentNode.updateEnvironment(self.environment)
     }
 
     override func draw(with context: UIGraphicsContext) {
         var context = context
         context.environment = environment
+        context.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
         contentNode.draw(with: context)
+    }
+
+    override func drawInspectionChildLayoutBounds(with context: UIGraphicsContext) {
+        contentNode.drawInspectionLayoutBounds(with: context)
+    }
+
+    override func drawInspectionChildRedrawFlashes(
+        with context: UIGraphicsContext,
+        baselineRevision: UInt64
+    ) {
+        contentNode.drawInspectionRedrawFlashes(
+            with: context,
+            baselineRevision: baselineRevision
+        )
+    }
+
+    override func drawInspectionChildSelectionBounds(
+        with context: UIGraphicsContext,
+        mode: UIDebugOverlayMode,
+        focusedNode: ViewNode?,
+        hitTestNode: ViewNode?
+    ) {
+        contentNode.drawInspectionSelectionBounds(
+            with: context,
+            mode: mode,
+            focusedNode: focusedNode,
+            hitTestNode: hitTestNode
+        )
     }
 
     override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
@@ -84,12 +153,12 @@ class ViewModifierNode: ViewNode {
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
-        if super.point(inside: point, with: event) {
-            let newPoint = contentNode.convert(point, from: self)
-            return contentNode.hitTest(newPoint, with: event)
+        guard self.point(inside: point, with: event) else {
+            return nil
         }
 
-        return nil
+        let newPoint = contentNode.convert(point, from: self)
+        return contentNode.hitTest(newPoint, with: event)
     }
 
     override func updateViewOwner(_ owner: ViewOwner) {
@@ -99,15 +168,19 @@ class ViewModifierNode: ViewNode {
 
     override func point(inside point: Point, with event: any InputEvent) -> Bool {
         if super.point(inside: point, with: event) {
-            let newPoint = contentNode.convert(point, from: self)
-            return contentNode.point(inside: newPoint, with: event)
+            return true
         }
-        
-        return false
+
+        let newPoint = contentNode.convert(point, from: self)
+        return contentNode.point(inside: newPoint, with: event)
     }
 
     override func onMouseEvent(_ event: MouseEvent) {
         contentNode.onMouseEvent(event)
+    }
+
+    override func onMouseLeave() {
+        contentNode.onMouseLeave()
     }
 
     override func onReceiveEvent(_ event: any InputEvent) {
@@ -122,9 +195,9 @@ class ViewModifierNode: ViewNode {
         let identationStr = String(repeating: " ", count: hierarchy * identation)
         let value = super.debugDescription(hierarchy: hierarchy, identation: identation)
         return """
-        \(identationStr)-\(value)
-        \(identationStr)\(identationStr) - contentNode:
-        \(identationStr)\(identationStr) - \(contentNode.debugDescription(hierarchy: hierarchy, identation: identation + 1))
-        """
+            \(identationStr)-\(value)
+            \(identationStr)\(identationStr) - contentNode:
+            \(identationStr)\(identationStr) - \(contentNode.debugDescription(hierarchy: hierarchy, identation: identation + 1))
+            """
     }
 }

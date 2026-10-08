@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "native": [{
+    "source": "Sources/GameUI/InventoryUIExports.swift",
+    "provider": "InventoryUIExports",
+    "views": [{
+      "id": "Game.Badge", "version": 1, "name": "Item Badge",
+      "parameters": [{"name": "title", "type": "string", "defaultValue": "Item", "isBinding": false}],
+      "actions": [], "content": "none", "platforms": []
+    }],
+    "modifiers": []
+  }],
+  "scripts": []
+}

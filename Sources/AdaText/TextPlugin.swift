@@ -5,8 +5,8 @@
 //  Created by v.prusakov on 3/5/23.
 //
 
-import AdaAssets
 import AdaApp
+import AdaAssets
 import AdaECS
 import AdaRender
 import AdaUtils
@@ -14,7 +14,6 @@ import Math
 
 /// Append text rendering systems to the scene.
 public struct TextPlugin: Plugin {
-
     public init() {}
 
     public func setup(in app: AppWorlds) {
@@ -25,7 +24,7 @@ public struct TextPlugin: Plugin {
             .registerRequiredComponent(TextLayoutComponent.self, for: TextComponent.self) {
                 TextLayoutComponent(textLayout: TextLayoutManager())
             }
-            .addSystem(TextLayoutSystem.self, on: .update)
+            .addSystem(TextLayoutSystem.self, on: .postUpdate)
 
         guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else {
             return
@@ -40,26 +39,27 @@ public struct TextPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = try! AssetsManager.loadSync(
-            ShaderModule.self,
-            at: "Assets/text.glsl",
-            from: .module
-        )
+        self.shader = (try? ShaderModule.loadBundled(at: "Assets/text.glsl", from: .adaModule))
+            .unwrap(message: "Bundled text shader is missing.")
     }
 
     public func configurate(
-        with configuration: RenderPipelineEmptyConfiguration
+        with _: RenderPipelineEmptyConfiguration
     ) -> RenderPipelineDescriptor {
-        var piplineDesc = RenderPipelineDescriptor(vertex: shader.asset.getShader(for: .vertex)!)
+        let vertexShader = shader.asset.getShader(for: .vertex)
+            .unwrap(message: "Bundled text shader has no vertex stage.")
+        var piplineDesc = RenderPipelineDescriptor(vertex: vertexShader)
         piplineDesc.fragment = shader.asset.getShader(for: .fragment)
         piplineDesc.debugName = "Text Pipeline"
+        piplineDesc.backfaceCulling = false
 
         piplineDesc.vertexDescriptor.attributes.append([
-            .attribute(.vector4, name: "position"),
-            .attribute(.vector4, name: "foregroundColor"),
-            .attribute(.vector4, name: "outlineColor"),
-            .attribute(.vector2, name: "textureCoordinate"),
-            .attribute(.int, name: "textureIndex")
+            .attribute(.vector4, name: "a_Position"),
+            .attribute(.vector4, name: "a_ForegroundColor"),
+            .attribute(.vector4, name: "a_OutlineColor"),
+            .attribute(.float, name: "a_OutlineWidth"),
+            .attribute(.vector2, name: "a_TexCoordinate"),
+            .attribute(.int, name: "a_TextureIndex"),
         ])
 
         piplineDesc.vertexDescriptor.layouts[0].stride = MemoryLayout<GlyphVertexData>.stride
@@ -82,6 +82,8 @@ public struct GlyphVertexData: Sendable {
     public let foregroundColor: Color
     /// Outline color of the text (vec4).
     public let outlineColor: Color
+    /// Outline width in screen pixels.
+    public let outlineWidth: Float
     /// Texture coordinates for the glyph atlas (vec2).
     public let textureCoordinate: Vector2
     /// Index into the font atlas texture array.
@@ -91,12 +93,14 @@ public struct GlyphVertexData: Sendable {
         position: Vector4,
         foregroundColor: Color,
         outlineColor: Color,
+        outlineWidth: Float,
         textureCoordinate: Vector2,
         textureIndex: Int
     ) {
         self.position = position
         self.foregroundColor = foregroundColor
         self.outlineColor = outlineColor
+        self.outlineWidth = outlineWidth
         self.textureCoordinate = textureCoordinate
         self.textureIndex = textureIndex
     }

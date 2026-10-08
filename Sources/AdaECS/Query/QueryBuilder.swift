@@ -7,7 +7,6 @@
 
 /// A protocol for building queries.
 public protocol QueryBuilder: Sendable {
-
     /// The components of the query builder.
     associatedtype Components
 
@@ -19,6 +18,8 @@ public protocol QueryBuilder: Sendable {
 
     /// The component states of the query builder.
     associatedtype ComponentsStates
+
+    static var access: SystemAccessSet { get }
 
     static func initState(world: World) -> ComponentsStates
 
@@ -34,6 +35,12 @@ public protocol QueryBuilder: Sendable {
         states: ComponentsStates,
         lastTick: Tick
     ) -> ComponentsFetches
+}
+
+extension QueryBuilder {
+    public static var access: SystemAccessSet {
+        SystemAccessSet()
+    }
 }
 
 /// A protocol for building target queries.
@@ -53,6 +60,12 @@ public protocol QuertyTargetBuilder: QueryBuilder {
 
 /// A protocol for building filter queries.
 public protocol FilterTargetBuilder: QueryBuilder {
+    /// Predicate for filtering archetypes before row iteration starts.
+    static func predicate(in archetype: borrowing Archetype) -> Bool
+
+    /// True when the filter must be checked for each row in a matching archetype.
+    static var requiresRowEvaluation: Bool { get }
+
     static func condition(
         states: ComponentsStates,
         fetches: ComponentsFetches,
@@ -72,6 +85,14 @@ public struct QueryBuilderTargets<each T>: QueryBuilder where repeat each T: Wor
     public typealias ComponentsFetches = (repeat (each T).Fetch)
     public typealias ComponentsStates = (repeat (each T).State)
 
+    public static var access: SystemAccessSet {
+        var access = SystemAccessSet()
+        for target in repeat (each T).self {
+            access.formUnion(target.access)
+        }
+        return access
+    }
+
     @inlinable
     @inline(__always)
     public static func initState(world: World) -> ComponentsStates {
@@ -86,11 +107,11 @@ public struct QueryBuilderTargets<each T>: QueryBuilder where repeat each T: Wor
         lastTick: Tick
     ) -> ComponentsFetches {
         return (repeat (each T)._initFetch(
-            world: world,
-            state: each states,
-            lastTick: lastTick,
-            currentTick: world.currentTick
-        ))
+                world: world,
+                state: each states,
+                lastTick: lastTick,
+                currentTick: world.currentTick
+            ))
     }
 
     @inlinable
@@ -101,12 +122,14 @@ public struct QueryBuilderTargets<each T>: QueryBuilder where repeat each T: Wor
         chunk: borrowing Chunk,
         archetype: borrowing Archetype
     ) {
-        fetches = (repeat (each T)._setData(
-            state: each states,
-            fetch: each fetches,
-            chunk: chunk,
-            archetype: archetype
-        ))
+        fetches =
+            (repeat (each T)
+                ._setData(
+                    state: each states,
+                    fetch: each fetches,
+                    chunk: chunk,
+                    archetype: archetype
+                ))
     }
 }
 
@@ -115,7 +138,7 @@ extension QueryBuilderTargets: QuertyTargetBuilder where repeat each T: QueryTar
     @inline(__always)
     public static func predicate(in archetype: Archetype) -> Bool {
         for element in repeat (each T).self {
-            if !element._queryContains(in: archetype) {
+            if !element._queryContains(in: archetype) { // swiftlint:disable:this for_where
                 return false
             }
         }
@@ -132,7 +155,7 @@ extension QueryBuilderTargets: QuertyTargetBuilder where repeat each T: QueryTar
         at row: Int
     ) -> Components? {
         @inline(__always)
-        func fetch<Q: QueryTarget>(_ type: Q.Type, state: Q.State, fetch: Q.Fetch) throws -> Q {
+        func fetch<Q: QueryTarget>(_: Q.Type, state: Q.State, fetch: Q.Fetch) throws -> Q {
             guard let value = Q._queryFetch(for: entity, state: state, fetch: fetch, at: row) else {
                 throw QueryBuilderTargetsError.failedToFetch
             }
@@ -149,13 +172,35 @@ extension QueryBuilderTargets: QuertyTargetBuilder where repeat each T: QueryTar
 extension QueryBuilderTargets: FilterTargetBuilder where repeat each T: Filter {
     @inlinable
     @inline(__always)
+    public static var requiresRowEvaluation: Bool {
+        for filter in repeat (each T).self {
+            if filter.requiresRowEvaluation { // swiftlint:disable:this for_where
+                return true
+            }
+        }
+        return false
+    }
+
+    @inlinable
+    @inline(__always)
+    public static func predicate(in archetype: borrowing Archetype) -> Bool {
+        for filter in repeat (each T).self {
+            if !filter.predicate(in: archetype) { // swiftlint:disable:this for_where
+                return false
+            }
+        }
+        return true
+    }
+
+    @inlinable
+    @inline(__always)
     public static func condition(
         states: ComponentsStates,
         fetches: ComponentsFetches,
         at row: Int
     ) -> Bool {
         for (filter, state, fetch) in repeat ((each T).self, each states, each fetches) {
-            if !filter.condition(state: state, fetch: fetch, at: row) {
+            if !filter.condition(state: state, fetch: fetch, at: row) { // swiftlint:disable:this for_where
                 return false
             }
         }

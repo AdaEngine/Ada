@@ -32,22 +32,12 @@ struct WebGPUBuildPlugin: BuildToolPlugin {
     #if os(Windows)
     private func createWindowsCommands(context: PluginContext, target: Target) throws -> [Command] {
         let buildDirectory = context.pluginWorkDirectory
-        let dllNames = ["vulkan-1.dll", "D3DCompiler.dll"]
+        let dllNames = ["D3DCompiler.dll"]
         var searchPaths: [String] = [
             "C:\\Windows\\System32",
             "C:\\Windows\\SysWOW64"
         ]
-        
-        // Добавляем пути из переменных окружения
-        if let vulkanSDK = ProcessInfo.processInfo.environment["VULKAN_SDK"], !vulkanSDK.isEmpty {
-            searchPaths.append(vulkanSDK)
-            searchPaths.append("\(vulkanSDK)\\Bin")
-        }
-        if let vkSDKPath = ProcessInfo.processInfo.environment["VK_SDK_PATH"], !vkSDKPath.isEmpty {
-            searchPaths.append(vkSDKPath)
-            searchPaths.append("\(vkSDKPath)\\Bin")
-        }
-        
+
         var commands: [Command] = []
         
         for dllName in dllNames {

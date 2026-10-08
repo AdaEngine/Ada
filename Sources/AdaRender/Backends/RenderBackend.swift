@@ -22,7 +22,6 @@ public enum RenderBackendType: String, Sendable {
 
 /// This protocol describe interface for GPU.
 protocol RenderBackend: AnyObject, Sendable {
-    
     var type: RenderBackendType { get }
 
     /// Returns global ``RenderDevice``.
@@ -52,6 +51,17 @@ protocol RenderBackend: AnyObject, Sendable {
 
 /// The GPU device instance resposible for rendering and computing.
 public protocol RenderDevice: AnyObject, Sendable {
+    /// Returns whether this device can encode a backend-native spatial upscale.
+    var supportsSpatialUpscaling: Bool { get }
+
+    /// Whether the device supports temporal reconstruction of color, depth and motion.
+    var supportsTemporalUpscaling: Bool { get }
+
+    /// Creates an independent temporal history for fixed input/output sizes, or nil when unavailable.
+    func createTemporalUpscaler(inputSize: SizeInt, outputSize: SizeInt) -> (any TemporalUpscaler)?
+
+    /// Creates a per-camera GPU occlusion processor, or nil for the CPU visibility fallback.
+    func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)?
 
     // MARK: - Buffers
 
@@ -92,11 +102,14 @@ public protocol RenderDevice: AnyObject, Sendable {
     /// Get image from texture rid.
     func getImage(from texture: Texture) -> Image?
 
+    /// Reads completed GPU pixels into owned CPU memory. Backends without readback may return nil.
+    func readImage(from texture: Texture) async throws -> Image?
+
     func createCommandQueue() -> CommandQueue
 
     /// Create a new swapchain for specific window.
     @MainActor
-    func createSwapchain(from window: WindowID) -> Swapchain
+    func createSwapchain(from window: WindowID) -> (any Swapchain)?
 }
 
 public protocol Swapchain: AnyObject, Sendable {
@@ -109,28 +122,37 @@ public protocol Drawable: AnyObject, Sendable {
     func present() throws
 }
 
-public extension RenderDevice {
+extension RenderDevice {
+    public func readImage(from texture: Texture) async throws -> Image? {
+        getImage(from: texture)
+    }
+
+    public func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? { nil }
+    public var supportsSpatialUpscaling: Bool { false }
+    public var supportsTemporalUpscaling: Bool { false }
+    public func createTemporalUpscaler(inputSize _: SizeInt, outputSize _: SizeInt) -> (any TemporalUpscaler)? { nil }
+
     /// Create a new GPU buffer with specific length and options.
     @inline(__always)
-    func createBuffer(length: Int, options: ResourceOptions) -> Buffer {
+    public func createBuffer(length: Int, options: ResourceOptions) -> Buffer {
         createBuffer(label: nil, length: length, options: options)
     }
 
     /// Create a new GPU buffer with specific data, length and options.
     @inline(__always)
-    func createBuffer(bytes: UnsafeRawPointer, length: Int, options: ResourceOptions) -> Buffer {
+    public func createBuffer(bytes: UnsafeRawPointer, length: Int, options: ResourceOptions) -> Buffer {
         unsafe createBuffer(label: nil, bytes: bytes, length: length, options: options)
     }
 
     /// Create a new index buffer with specific index, format, data and length.
     @inline(__always)
-    func createIndexBuffer(format: IndexBufferFormat, bytes: UnsafeRawPointer, length: Int) -> IndexBuffer {
+    public func createIndexBuffer(format: IndexBufferFormat, bytes: UnsafeRawPointer, length: Int) -> IndexBuffer {
         unsafe createIndexBuffer(label: nil, format: format, bytes: bytes, length: length)
     }
 
     /// Create a new vertex buffer for specific length and binding.
     @inline(__always)
-    func createVertexBuffer(length: Int, binding: Int) -> VertexBuffer {
+    public func createVertexBuffer(length: Int, binding: Int) -> VertexBuffer {
         createVertexBuffer(label: nil, length: length, binding: binding)
     }
 }

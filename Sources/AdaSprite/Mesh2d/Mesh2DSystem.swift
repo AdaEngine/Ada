@@ -6,18 +6,17 @@
 //
 
 import AdaApp
+import AdaCorePipelines
 import AdaECS
+@_spi(Internal) import AdaRender
 import AdaTransform
 import AdaUtils
-@_spi(Internal) import AdaRender
-import AdaCorePipelines
 import Math
 
 // MARK: - Mesh 2D Plugin -
 
 /// Plugin to exctract meshes to RenderWorld.
 public struct Mesh2DPlugin: Plugin {
-
     /// Initialize a new mesh 2D plugin.
     public init() {}
 
@@ -81,9 +80,9 @@ public struct ExctractMesh2DSystem {
     @ResMut<ExctractedMeshes2D>
     private var extractedMeshes
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         extractedMeshes.meshes.removeAll(keepingCapacity: true)
         self.query.wrappedValue.forEach { entity, mesh, transform, globalTransform, visibility in
             if visibility == .hidden {
@@ -107,7 +106,6 @@ public struct ExctractMesh2DSystem {
 /// System in RenderWorld for rendering 2D meshes.
 @PlainSystem
 public struct Mesh2DRenderSystem: Sendable {
-
     @FilterQuery<
         VisibleEntities,
         With<Camera>
@@ -129,9 +127,9 @@ public struct Mesh2DRenderSystem: Sendable {
     @Commands
     private var commands
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         self.query.forEach { visibleEntities in
             self.draw(
                 visibleEntities: visibleEntities,
@@ -157,22 +155,26 @@ public struct Mesh2DRenderSystem: Sendable {
                 for part in model.parts {
                     let material = mesh.mesh.materials[part.materialIndex]
 
-                    guard let pipeline = material.getOrCreatePipeline(
-                        for: part.vertexDescriptor,
-                        keys: keys,
-                        device: renderDevice.renderDevice
-                    ) else {
+                    guard
+                        let pipeline = material.getOrCreatePipeline(
+                            for: part.vertexDescriptor,
+                            keys: keys,
+                            device: renderDevice.renderDevice
+                        )
+                    else {
                         assertionFailure("No render pipeline for mesh")
                         continue
                     }
 
-                    let entity = commands.spawn() {
-                        ExctractedMeshPart2d(
-                            part: part,
-                            material: material,
-                            modelUniform: modelUniform
-                        )
-                    }.entityId
+                    let entity =
+                        commands.spawn {
+                            ExctractedMeshPart2d(
+                                part: part,
+                                material: material,
+                                modelUniform: modelUniform
+                            )
+                        }
+                        .entityId
 
                     renderItems.items.append(
                         Transparent2DRenderItem(
@@ -202,7 +204,7 @@ struct MaterialMesh2dKey: Hashable {
 }
 
 public class Mesh2dMaterialStorageData: MaterialStorageData {
-    var pipelines: [MaterialMesh2dKey : RenderPipeline] = [:]
+    var pipelines: [MaterialMesh2dKey: RenderPipeline] = [:]
 }
 
 // TODO: Think about it, maybe we should move it to other dir.

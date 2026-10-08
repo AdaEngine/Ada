@@ -23,7 +23,5 @@
 !CMakeLists.txt
 !LICENSES/*.txt
 
-/bazel-*
-/MODULE.bazel.lock
 .build/
 .swiftpm/

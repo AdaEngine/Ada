@@ -13,6 +13,8 @@ builder:
     target: AdaEngine
   - platform: visionos
     target: AdaEngine
+  - platform: wasm
+    target: AdaEngine
   - platform: windows
     target: AdaEngine
   - documentation_targets: [AdaEngine, AdaEngineMacros, Math, AdaApp, AdaECS, AdaRender, AdaText, AdaUI, AdaInput]

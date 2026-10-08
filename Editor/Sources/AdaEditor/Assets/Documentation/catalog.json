@@ -1,0 +1,3280 @@
+[
+  {
+    "id": "EditorGuide",
+    "title": "AdaEditor Guide",
+    "section": "Editor",
+    "source": "Editor/Documentation/EditorGuide.md",
+    "blocks": [
+      {
+        "kind": "heading",
+        "text": "Open or create a project",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use **Create new project** on the welcome screen, or choose **File > Open Project** to open an existing project. AdaScript projects use `.ada` source files. Projects with native Swift code also use Swift Package Manager.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Explore and edit",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The Project Navigator shows project files. Select a source file to edit it, or a `.ascn` scene to open the scene viewport. Use the scene hierarchy to select entities and the Inspector to edit their components. Use **File > New File** to create files and **File > Import Assets** to bring assets into the project.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use **File > Save** to save the active document, or **File > Save All** to save all documents. The Code menu includes tab actions and editor font size controls.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Import and place a 3D model",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use **File > Import Assets** or drop a `.glb`/`.gltf` into the project navigator.\nModels open in a 3D preview with camera navigation, mesh/material/skin counts,\nand a named animation picker with Play/Pause. Preview framing fits the model;\nplacing it in a scene preserves its original scale.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Open the destination `.ascn` scene, then open the model and choose\n**Add to Scene…**. Select the destination from the open scenes. The new entity\nstores a portable resource reference, so Save, reopening, duplicate and undo/redo\nretain the model without copying imported nodes into the authored scene file.\nThe selected preview clip and playback setting become the entity's initial\nanimation settings.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Alternatively, add **Imported Model 3D** from the entity palette or add a\n**Model 3D** component to an existing entity. In the Inspector, choose a project\nmodel, enter a clip name shown in its preview, and set **Play animation** and\n**Loop animation**. Imported nodes/materials are instantiated in both the scene\nviewport and Play. Each placed model has its own animation player.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "glTF imports with external buffers or textures are copied into a new model folder\nwith those dependencies. Keep dependencies beneath the source model's directory;\nremote URLs and references escaping that directory are rejected. Missing files\nfail the bundle import. Repeated imports create another bundle without replacing\nthe original. Imported materials are preserved; visual material editing and\nskeleton/clip authoring are not part of this workflow yet.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Build and run",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Choose **Build > Build Project** to build the project. **Build > Run** runs the active scene inside the editor when a scene is selected; otherwise it runs the selected target. **Build > Stop** stops the current operation. Build Output and Problems show progress and diagnostics.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Settings",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Open **Settings** for editor preferences and **Project > Project Settings** for project configuration. Project Dependencies and Swift Package Tasks are available in the Project menu.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Read documentation offline",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Choose **Help > AdaEngine Documentation** or use the **Documentation** button. These guides ship with the editor and are available without a network connection or an engine checkout. Search matches article titles and contents. Use the article list, section links, and Back and Forward buttons to navigate. Code examples and complete articles can be copied.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The offline library contains hand-written engine and AdaScript guides. Generated API reference pages and external websites are not included. External links are marked as requiring internet.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Start scripting",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Read Getting Started with AdaScript, then AdaScript Language and AdaScript ECS.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Getting Started with AdaScript",
+            "destination": "GettingStartedWithAdaScript"
+          },
+          {
+            "title": "AdaScript Language",
+            "destination": "AdaScriptLanguage"
+          },
+          {
+            "title": "AdaScript ECS",
+            "destination": "AdaScriptECS"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Interactive agent forms",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "On macOS, ACP agents can stream native AdaUI forms and previews directly into\nAgent Chat using the advertised A2UI catalog. Ask for an NPC configuration form,\nedit the controls, and submit after the agent's turn finishes. The current values\nreturn to the same conversation, and the agent can generate an editable preview.\n**Open in UI Designer** creates a new `.ui` asset under `Assets/UI/AgentPreviews`;\nrefine it through the normal designer, undo/redo, and save workflow. Local form\nedits persist with the chat. Invalid updates retain the last working form and\nshow an interface error; interrupted forms remain disabled until refreshed.\nThe separate iPhone chat path is not connected to these cards yet.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "AdaEngine",
+    "title": "AdaEngine",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/AdaEngine.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Bringing simple and powerful game engine for your awesome games.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Additional Resources",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• GitHub Repo\n• Discussions\n• Ada Website",
+        "level": 0,
+        "links": [
+          {
+            "title": "GitHub Repo",
+            "destination": "https://github.com/adaengine/adaengine"
+          },
+          {
+            "title": "Discussions",
+            "destination": "https://github.com/adaengine/adaengine/discussions"
+          },
+          {
+            "title": "Ada Website",
+            "destination": "https://www.adaengine.org/"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Overview",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Ada is a modern, open-source game engine written in Swift, designed for building 2D and 3D games with simplicity and performance in mind. Its architecture leverages the Entity Component System (ECS) paradigm, enabling developers to create games and interactive experiences using a modular and scalable approach.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Ada provides a suite of built-in features, including:\n• High-level rendering system supporting 2D and 3D graphics\n• Physics, animation, input handling, audio, and UI systems\n• Asset management pipeline and streamlined workflows\n• Cross-platform support across Apple platforms and Linux\n• Hot-reload capabilities for assets and scripts\n• Modern Swift API with async/await, property wrappers, and result builders",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "With Ada, both beginners and experienced Swift developers can build games rapidly, focusing on gameplay instead of low-level boilerplate. Extensive documentation and tutorials make it easy to get started, from setting up your first scene to advanced gameplay mechanics.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Ada is actively developed, and contributions from the community are welcome.\nFor more details and guides, check out the tutorials below.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Topics",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Tutorials",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• AdaEngine",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaEngine",
+            "destination": "AdaEngine"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Guides",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• visionOS Windowed Mode",
+        "level": 0,
+        "links": [
+          {
+            "title": "Building Ada",
+            "destination": "Building"
+          },
+          {
+            "title": "Contributing to Ada",
+            "destination": "Contributing"
+          },
+          {
+            "title": "AdaUI View Identity",
+            "destination": "AdaUIIdentity"
+          },
+          {
+            "title": "Loading images and adding formats",
+            "destination": "ImageDecoders"
+          },
+          {
+            "title": "visionOS Windowed Mode",
+            "destination": "VisionOSWindowed"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "Building",
+    "title": "Building Ada",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Building.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "This guide covers two scenarios:\n• Development build for working on Ada itself.\n• Using Ada as a dependency in your own app.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Requirements",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• Swift 6.2 toolchain\n• Xcode 26.3 (macOS) or Visual Studio Code with the Swift extension\n• Git",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Development build",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "1\\. Clone the repository:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "git clone https://github.com/AdaEngine/AdaEngine.git\ncd AdaEngine",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "2\\. WebGPU (first build). If you plan to use WebGPU, run the tint build plugin once (this executes `Plugins/WebGPUTintPlugin/WebGPUTintPlugin.swift`):",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "swift package plugin build-tint",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This command downloads the Dawn/Tint sources from GitHub and builds the `tint` binary. SwiftPM will ask to allow network access for the plugin. Confirm the prompt to proceed.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "3\\. Open `Package.swift` in Xcode 26.3, or build from the command line:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "swift build",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "4\\. Run tests:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "swift test --parallel",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "5\\. (Optional) Run SwiftLint if you have it installed locally:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "swiftlint --config .swiftlint.yml",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Using Ada in your app",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Xcode",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "1\\. Open your project in Xcode 26.3.\n2\\. Go to `File > Add Packages...`.\n3\\. Enter the package URL: `https://github.com/AdaEngine/AdaEngine.git`.\n4\\. Choose a version range and add the package to your app target.\n5\\. Import the module in your code:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Swift Package Manager",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Add Ada to your `Package.swift`:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "// Package.swift\nlet package = Package(\n    name: \"MyGame\",\n    dependencies: [\n        .package(url: \"https://github.com/AdaEngine/AdaEngine.git\", from: \"X.Y.Z\")\n    ],\n    targets: [\n        .target(\n            name: \"MyGame\",\n            dependencies: [\"AdaEngine\"]\n        )\n    ]\n)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Replace `X.Y.Z` with the latest release tag.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "If your app enables WebGPU, run the tint build plugin once in the Ada package directory before the first build:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "swift package plugin build-tint",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "SwiftPM will ask to allow network access for the plugin. Confirm the prompt to let it download the Dawn/Tint sources.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Exporting a Web app",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Ada includes an experimental WebAssembly export command for browser-hosted games.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Requirements:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• Swift 6.3.2 release toolchain.\n• `swift-6.3.2-RELEASE_wasm` installed with `swift sdk install`.\n• A game executable product that depends on `AdaEngine`. Add `AdaWeb` if the app needs browser-specific helpers.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Swift.org documents the current WebAssembly SDK installation flow at:\nhttps://www.swift.org/documentation/articles/wasm-getting-started.html",
+        "level": 0,
+        "links": [
+          {
+            "title": "https://www.swift.org/documentation/articles/wasm-getting-started.html",
+            "destination": "https://www.swift.org/documentation/articles/wasm-getting-started.html"
+          }
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Export a package product:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "swift package --allow-writing-to-package-directory \\\n  export-web \\\n  --product MyGame \\\n  --output dist/web",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "If several WASM SDKs are installed, pass the SDK id explicitly:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "swift package --allow-writing-to-package-directory \\\n  export-web \\\n  --product MyGame \\\n  --swift-sdk swift-6.3.2-RELEASE_wasm",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The plugin emits `index.html`, `main.js`, `runtime.mjs`, the built `.wasm`, `package.json`, `ada-web-manifest.json`, `ada-resource-manifest.json`, copied SwiftPM resource bundles, and copies a package-level `Assets` directory when present. Use `npm install && npm run serve` in the output directory to serve the bundle locally.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "AdaUIIdentity",
+    "title": "AdaUI View Identity",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/Developers/AdaUIIdentity.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "AdaUI reconciles a new view tree against the mounted `ViewNode` tree. A node is preserved only when the new node and old node describe the same identity and the new node can update the old node. Preserved nodes keep their `@State`, focus state, in-flight animation controllers, layers, and other node-local runtime state. Recreated nodes start with fresh runtime state.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Identity Model",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For every sibling list, AdaUI resolves identity in this order:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "1\\. Explicit identity from `.id(_:)` or `ForEach` data IDs.\n2\\. Structural identity from result-builder constructs, including the active branch of `if` / `else`.\n3\\. Structural sibling position for children without explicit IDs.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Explicit IDs are scoped to the current sibling list. IDs must be unique within that list; duplicate IDs are ambiguous and are not a stable state-preservation contract.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "`.id(_:)`",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`.id(_:)` binds a node to a hashable identity value. If the value is unchanged, AdaUI may move that node to a different sibling index and preserve its runtime state. If the value changes, AdaUI treats the view as a different node and recreates it.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The view type still participates in matching. A node with the same explicit ID but an incompatible concrete node type is recreated instead of being updated in place.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "`ForEach`",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`ForEach` wraps each generated child in an explicit identity:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• `ForEach(data)` uses each element's `Identifiable.id`.\n• `ForEach(data, id: keyPath)` uses the key-path value.\n• `ForEach(0..<n)` is position-based and is intended for constant ranges.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Reordering identified data preserves the child nodes associated with those IDs, so row `@State`, focus, and animations follow the data item rather than the visual index. Inserting or deleting an item only creates or removes nodes for the affected IDs.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Conditional Branches",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`if` / `else` branches add a structural branch discriminator. This prevents state from moving between two branches that happen to produce the same view type at the same sibling position. Switching from one branch to the other recreates that branch's node; explicit IDs are still scoped by the active branch structure.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "`@State` Properties",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@State` storage belongs to the preserved view node and to the exact property wrapper slot inside that view. The slot key includes the wrapper's declaration order among state-like wrappers, its reflected property label, and its value type.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Renaming a `@State` property creates a new storage slot. Reordering `@State` properties also creates new slots for the moved wrappers. Adding or removing a state wrapper preserves only wrappers whose slot key is unchanged.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This rule intentionally resets state after source-level declaration edits rather than migrating values between properties. It prevents a rebuild from moving state between different properties or between different view instances. Dynamic or reorderable view instances still need `.id(_:)` or `ForEach(_:id:)` so the owning view node has stable identity.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Unkeyed Children",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Children without explicit IDs are matched by structural sibling position. AdaUI uses common-prefix and common-suffix matching for unkeyed runs, which preserves unaffected nodes around an insertion or deletion in the middle. Reordering unkeyed siblings has no semantic identity signal, so state is not guaranteed to follow a particular data item; use `.id(_:)` or `ForEach(_:id:)` for reorderable content.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Mixed Keyed And Unkeyed Children",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In a mixed sibling list, keyed nodes are matched by ID first. The remaining unkeyed nodes are reconciled by their structural order with the same prefix/suffix rules. This keeps static unkeyed content stable around keyed inserts, deletes, and reorders, while still requiring explicit IDs for dynamic reorderable items.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "VisionOSWindowed",
+    "title": "visionOS Windowed Mode",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/VisionOSWindowed.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Run Ada apps in visionOS Shared Space using the existing `WindowGroup` scene model.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Overview",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Ada's first visionOS milestone is windowed rendering. Apps launch as normal visionOS windows backed by UIKit scenes, `MTKView`, and the Metal render backend. Existing apps that use `WindowGroup` do not need a new public API for this mode.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\n\n@main\nstruct VisionOSWindowedApp: App {\n    var body: some AppScene {\n        WindowGroup {\n            Text(\"Ada on visionOS\")\n                .padding()\n        }\n    }\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Windowed mode intentionally does not create a Full Space, stereo renderer, ARKit session, or `CompositorServices.LayerRenderer` surface. Those belong to a later immersive rendering milestone.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "SPMDebug",
+    "title": "Known issues and how to debug SPM targets",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/Developers/SPMDebug.md",
+    "blocks": [
+      {
+        "kind": "heading",
+        "text": "Xcode Instruments: \"Required kernel recording resources are in use by another document\"",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "When profiling an SPM project (without an xcodeproj) in Instruments, you may see a message about kernel recording resources being in use, even when no other Instruments documents are open.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Cause:** The message is misleading. The real cause is that the binary does not have the `get-task-allow` entitlement. SPM does not distinguish between “release” and “profiling,” so profiling uses a release build without this entitlement.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Solution:** Re-sign the binary with the `get-task-allow` entitlement before launching Instruments.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "1\\. Open your scheme (Cmd-Shift-,).\n2\\. In **Profile → Pre-actions**, add a Pre-action.\n3\\. Set the shell to `/bin/zsh`.\n4\\. Paste the re-sign script below (the `=(...)` syntax is zsh process substitution):",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "# For Instruments, re-sign binary with get-task-allow entitlement\ncodesign -s - -v -f --entitlements =(echo -n '<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"https://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n    <dict>\n        <key>com.apple.security.get-task-allow</key>\n        <true/>\n    </dict>\n</plist>') ${TARGET_BUILD_DIR}/${PRODUCT_NAME}",
+        "language": "zsh",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "See also: Solving \"Required kernel recording resources...\" in Instruments (Rob Napier).",
+        "level": 0,
+        "links": [
+          {
+            "title": "Solving \"Required kernel recording resources...\" in Instruments",
+            "destination": "https://cocoaphony.micro.blog/2022/10/29/solving-required-kernel.html"
+          }
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "The script is stored in `.swiftpm/xcode/xcshareddata/xcschemes/<schemename>.xcscheme`. The pre-action runs only for Profile, so it does not affect normal builds.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Note:** Pre-action scripts do not receive `SRCROOT`; if the script fails, Xcode will not show details—check Console.app for logs.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "Contributing",
+    "title": "Contributing to Ada",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Contributing.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "We welcome contributions of all kinds: bug fixes, features, documentation, and examples.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Quick start",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "1\\. Fork the repository and create a topic branch from `main`.\n2\\. Make your changes and keep commits focused.\n3\\. Run the test suite:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "swift test --parallel",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "4\\. Open a pull request with a clear description of the change.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Requirements",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• Swift 6.2 toolchain\n• Xcode 26.3 (macOS) or Visual Studio Code with the Swift extension",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Code style",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• SwiftLint is enforced via the SwiftPM build tool plugin.\n• If you have SwiftLint installed locally, you can run it directly:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "swiftlint --config .swiftlint.yml",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Tests",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• Add or update tests for behavioral changes when practical.\n• Prefer targeted tests over broad refactors.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "More details",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For the full contributing guide, see:\\n- CONTRIBUTING.md",
+        "level": 0,
+        "links": [
+          {
+            "title": "CONTRIBUTING.md",
+            "destination": "https://github.com/AdaEngine/AdaEngine/blob/main/CONTRIBUTING.md"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "AdaScripting",
+    "title": "AdaScript",
+    "section": "AdaScript",
+    "source": "Sources/AdaScripting/AdaScripting.docc/AdaScripting.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Write gameplay systems in AdaScript while keeping entity filtering and access planning in AdaEngine's native ECS.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Overview",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript is AdaEngine's scripting layer for gameplay and ECS integration. Its source files use the `.ada` extension. The current implementation uses an embedded language runtime, while the public API, diagnostics, and tooling consistently present AdaScript concepts.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Annotations are not only syntax. AdaEngine resolves every query into native archetypes and component columns and publishes its component access to the scheduler.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use AdaScript for gameplay rules that benefit from quick iteration. Keep rendering backends, custom data structures, and other low-level or performance-critical facilities in Swift.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system(scheduler: \"update\")\nclass MovementSystem {\n    @query(Transform, Movement)\n    var movers;\n\n    func update(context) {\n        for (var entity in movers) {\n            var position = entity.transform.position;\n            var velocity = entity.movement.velocity;\n            position[0] += velocity[0] * context.deltaTime;\n            position[1] += velocity[1] * context.deltaTime;\n            entity.transform.position = position;\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaEditor projects configure automatic script discovery by default. For an existing Swift package, follow Getting Started with AdaScript to enable the build plugin and register the generated script plugins.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Getting Started with AdaScript",
+            "destination": "GettingStartedWithAdaScript"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Topics",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Essentials",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• Getting Started with AdaScript\n• AdaScript Basics\n• AdaScript Language\n• AdaScript Annotation Reference\n• AdaScript Libraries",
+        "level": 0,
+        "links": [
+          {
+            "title": "Getting Started with AdaScript",
+            "destination": "GettingStartedWithAdaScript"
+          },
+          {
+            "title": "AdaScript Basics",
+            "destination": "AdaScriptBasics"
+          },
+          {
+            "title": "AdaScript Language",
+            "destination": "AdaScriptLanguage"
+          },
+          {
+            "title": "AdaScript Annotation Reference",
+            "destination": "AdaScriptAnnotations"
+          },
+          {
+            "title": "AdaScript Libraries",
+            "destination": "AdaScriptLibraries"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "ECS Integration",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• AdaScript ECS\n• AdaScript Diagnostics and Performance",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript ECS",
+            "destination": "AdaScriptECS"
+          },
+          {
+            "title": "AdaScript Diagnostics and Performance",
+            "destination": "AdaScriptDiagnosticsAndPerformance"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Runtime API",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• `AdaScriptPlugin`\n• `AdaScriptSource`\n• `AdaScriptError`",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "GettingStartedWithAdaScript",
+    "title": "Getting Started with AdaScript",
+    "section": "AdaScript",
+    "source": "Sources/AdaScripting/AdaScripting.docc/GettingStartedWithAdaScript.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Add an `.ada` file to an AdaEngine executable and run its systems without manually loading each script.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Overview",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaEngine provides two ways to install AdaScript plugins:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• **Automatic discovery** embeds every `.ada` file in an executable target at\n  build time and generates one plugin backed by one target-level script module.\n• **Manual loading** creates an `AdaScriptPlugin` from source text or a file URL at runtime.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaEditor-created projects use automatic discovery. Use manual loading when scripts live outside the Swift target, come from a downloaded package, or need explicit error handling.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Create a script",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Add `Movement.ada` anywhere below the executable target's source directory, for example:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "Sources/MyGame/\n├── main.swift\n└── Scripts/\n    └── Movement.ada",
+        "language": "text",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Declare a system and its query with annotations:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system(scheduler: \"update\")\nclass MovementSystem {\n    @query(Transform)\n    var transforms;\n\n    func update(context) {\n        for (var entity in transforms) {\n            var position = entity.transform.position;\n            position[0] += 100 * context.deltaTime;\n            entity.transform.position = position;\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaEngine discovers `@system` and `@query` metadata and calls `update(context)` whenever the selected scheduler runs.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Enable automatic discovery",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Expose `AdaScriptBuildPlugin` to your executable target in `Package.swift`:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "// swift-tools-version: 6.2\nimport PackageDescription\n\nlet package = Package(\n    name: \"MyGame\",\n    platforms: [\n        .macOS(.v15)\n    ],\n    dependencies: [\n        .package(\n            url: \"https://github.com/AdaEngine/AdaEngine.git\",\n            branch: \"main\"\n        )\n    ],\n    targets: [\n        .executableTarget(\n            name: \"MyGame\",\n            dependencies: [\n                .product(name: \"AdaEngine\", package: \"AdaEngine\")\n            ],\n            plugins: [\n                .plugin(name: \"AdaScriptBuildPlugin\", package: \"AdaEngine\")\n            ]\n        )\n    ]\n)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "> Important: Choose a version requirement appropriate for your project instead of a branch dependency when consuming a released AdaEngine version.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The build plugin finds `.ada` files through SwiftPM, sorts them by target-relative\npath, and generates `AdaScriptPluginsGenerated.swift` in the plugin work\ndirectory. The generated plugin passes one source map to one\n`AdaScriptPlugin`. Script source is embedded in the executable; the\noriginal files are not read at runtime.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Install the generated plugin in your app scene:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\n\n@main\nstruct MyGame: App {\n    var body: some AppScene {\n        WindowGroup {\n            GameView()\n        }\n        .addPlugins(AdaScriptPluginsGenerated())\n    }\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Rebuilding the target after adding, removing, renaming, or editing an `.ada` file refreshes the generated source.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In a portable AdaScript project running in AdaEditor's macOS game window, edits\nto `.ada` files hot reload after a short pause, including unsaved editor buffers.\nThe current ECS world remains active. A failed candidate leaves the last valid\ncode running and reports the error in Output. System instances and ordinary\nscript globals restart, and startup systems run once for the new version;\nexported scriptable-object fields survive. Changes to\ncomponent, resource, network, or scriptable-object schemas require restarting\nthe game.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The same generated source contains native backing structs and registration for\nscalar `@component` and `@resource` declarations. Because these declarations\nchange Swift layout, adding or editing their stored fields requires rebuilding\nthe target rather than source-only reload.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Register custom components",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript resolves component names while plugins are set up. Register custom Swift components before the generated script plugin:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\n\n@Component\nstruct Movement: Codable, Sendable {\n    var velocity: Vector2\n}\n\nstruct GameComponentsPlugin: Plugin {\n    @MainActor\n    func setup(in app: borrowing AppWorlds) {\n        Movement.registerComponent()\n    }\n}\n\n@main\nstruct MyGame: App {\n    var body: some AppScene {\n        WindowGroup {\n            GameView()\n        }\n        .addPlugins(\n            GameComponentsPlugin(),\n            AdaScriptPluginsGenerated()\n        )\n    }\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The `@Component` macro supplies field reflection for supported property types. A plain `Component` can participate in query matching, but its fields are not automatically available through the script bridge.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Load a script manually",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Create an `AdaScriptPlugin` when you need control over the source location or loading failure:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\n\nstruct RuntimeScriptsPlugin: Plugin {\n    let scriptURL: URL\n\n    @MainActor\n    func setup(in app: borrowing AppWorlds) {\n        do {\n            let script = try AdaScriptPlugin(contentsOf: scriptURL)\n            app.addPlugin(script)\n        } catch {\n            print(\"Could not load Ada Script: \\(error)\")\n        }\n    }\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "You can also use `AdaScriptPlugin/init(source:name:)` when one source is\nalready in memory, or `AdaScriptPlugin/init(sources:name:)` with\n`AdaScriptSource` values for a multi-file module. Script compilation,\nimport resolution, and annotation validation happen during initialization.\nNative component resolution happens later during plugin setup.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Next steps",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Read AdaScript Language for annotation syntax, then AdaScript ECS for queries, component fields, and native iterator behavior.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Language",
+            "destination": "AdaScriptLanguage"
+          },
+          {
+            "title": "AdaScript ECS",
+            "destination": "AdaScriptECS"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "AdaScriptLanguage",
+    "title": "AdaScript Language",
+    "section": "AdaScript",
+    "source": "Sources/AdaScripting/AdaScripting.docc/AdaScriptLanguage.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Use AdaScript syntax with AdaEngine declaration annotations. New to the\nlanguage? Start with AdaScript Basics for values, functions, types,\nproperties, control flow, asynchronous work, and annotations.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Basics",
+            "destination": "AdaScriptBasics"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Source files",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript uses `.ada` files. A file contains classes,\nfunctions, variables, and control flow. AdaScript modules do not declare a\n`main()` function and do not assemble plugin manifests.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system(scheduler: \"update\")\nclass CounterSystem {\n    @query(Counter)\n    var counters;\n\n    func update(context) {\n        for (var entity in counters) {\n            entity.counter.value += 1;\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Optional strict type checking",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript remains dynamically typed by default. Enable strict checking for a\nsingle source by placing `@strict` before its first declaration:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@strict\n\nfunc addScore(score: Int, amount: Int) -> Int {\n    return score + amount;\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In an AdaEditor project, **Project Settings → Runtime → Type Checking → Strict**\nenables the same analysis for every `.ada` source. The serialized setting is:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "{\n  \"build\": {\n    \"system\": \"adascript\",\n    \"adaScriptTypeChecking\": \"strict\"\n  }\n}",
+        "language": "json",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Strict checking validates annotated assignments, function arguments, member\naccess, and return values before the module runs. Use `Any` for an intentional\ndynamic boundary. Untyped code and projects using `\"dynamic\"` keep normal\nAdaScript runtime behavior.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Imports",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Files with discovery annotations such as `@system` are module roots. Import a\nhelper declaration explicitly from another target-relative source file:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import {\n    clampSpeed,\n    MovementSettings\n} from \"../Shared/Movement\";",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Relative imports are resolved from the importing file. The `.ada` extension is\noptional. Absolute paths and imports which escape the Swift target source map\nare rejected. A reachable source is compiled once, and an import cycle reports\nthe complete cycle.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The current implementation supports selected relative imports. Namespace\nimports, public/private visibility enforcement, and the `AdaEngine` / `AdaUI`\nvirtual-module declarations remain part of the next module-language slice.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Annotations",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript declaration annotations have three forms:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@name\n@name(value)\n@name(key: value, other: [a, b])",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Arguments are compile-time constants or symbolic identifiers. They do not run\nuser code during module discovery.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "See AdaScript Annotation Reference for supported annotations, declaration targets,\narguments, defaults, and lifetimes. A one-time world initializer is a\n`@system(scheduler: \"startup\")` class with `update(context)`; there is no\nfunction-level `@init` annotation yet.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Annotation Reference",
+            "destination": "AdaScriptAnnotations"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Script-defined data",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The build plugin generates native backing types for scalar component and\nresource schemas:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@component(id: \"game.health\")\nstruct Health {\n    @export var current = 100.0;\n    @export var maximum = 120;\n}\n\n@resource(id: \"game.balance\", autoInsert: true)\nstruct GameBalance {\n    @export var acceleration = 9.8;\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Generated Swift symbol names are private implementation details. Runtime lookup\naccepts both the AdaScript declaration name (`Health`) and the stable ID\n(`game.health`). `autoInsert: true` inserts the resource before systems are\ninstalled. SwiftPM targets use generated backing types; AdaEditor can register\nsupported runtime-defined component layouts for pure AdaScript projects.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Bind a resource directly on a system with `@res`. The binding uses a native ECS\nresource pointer during `update(context)`; field writes update the resource\nchange tick:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system(id: \"physics.system\")\nclass PhysicsSystem {\n    @res\n    var balance: GameBalance;\n\n    func update(context) {\n        balance.acceleration += 0.1;\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A missing required resource is reported through plugin diagnostics. Optional\nresources can be guarded with `available()`:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@res(optional: true)\nvar debugSettings: DebugSettings;\n\nif (debugSettings.available()) {\n    debugSettings.enabled = true;\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Resource access is currently conservative: each `@res` requests scheduler write\naccess. Static read/write inference and explicit access overrides are planned.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "World commands",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Systems receive a capability-scoped world facade. Structural changes are\nqueued through `context.world.commands` and applied only after the current\nsystem parameters finish, so an active query iterator cannot be invalidated:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system(id: \"cleanup.system\")\nclass CleanupSystem {\n    @query(Expired)\n    var expired;\n\n    func update(context) {\n        for (var entity in expired) {\n            context.world.commands.despawn(entity.id);\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The initial command API creates registered component defaults by AdaScript name\nor stable ID:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "var entity = context.world.commands.spawn([\"game.health\"]);\ncontext.world.commands.insert(entity, \"game.poison\");\ncontext.world.commands.remove(entity, \"game.poison\");\ncontext.world.commands.despawn(entity);",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Direct command use is inferred per system and declares deferred-world access to\nthe scheduler. Command facades expire when `update(context)` returns; using a\nretained or undeclared facade reports a plugin diagnostic and performs no\nmutation. Typed component constructors can be passed to\n`context.world.spawn([...])`; the legacy string-based command form remains\navailable. Explicit dynamic `@access` and exclusive immediate world access\nare not implemented.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "SwiftPM generation of native backing types requires `AdaScriptBuildPlugin`;\nsupported pure AdaScript layouts can be registered by the runtime.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Swift and Editor tooling can attach the generated default without naming its\nprivate backing type:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "world.insertDefaultComponent(named: \"game.health\", into: entity.id)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Field types and serialization support vary by schema and bridge. Check the\nnearest compiler diagnostic when a constructor argument or field default is\nunsupported.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Scriptable objects",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use `@scriptable` for low-cardinality behavior attached to one entity. Systems\nremain the scalable path for processing large entity sets.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@scriptable(\n    id: \"game.player-controller\",\n    version: 2,\n    aliases: [\"PlayerController\"]\n)\nclass PlayerController {\n    @export var speed = 8.0;\n    @component(required: true) var transform: Transform;\n    @res(optional: true) var settings: PlayerSettings;\n\n    func ready(context) {}\n\n    func update(context) {\n        transform.position += speed * context.deltaTime;\n    }\n\n    func fixedUpdate(context) {}\n    func event(events, context) {}\n    func destroy(context) {}\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The build plugin registers stable IDs, versions, aliases, exported scalar\ndefaults, and transient component/resource bindings. Required components are\nchecked before `ready`. Optional resources expose `available()`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`ScriptableComponents` encodes a polymorphic envelope containing only `type`,\n`version`, and detached `payload`. Entity bindings, resources, VM instances,\nworld contexts, and lifecycle state are never serialized. Decoding does not run\ngameplay; attachment runs `ready` once and detachment runs `destroy` once.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Scriptable contexts expose the same expiring deferred commands facade as\nsystems. Retaining it after a callback produces a diagnostic. Scriptable\nobjects intentionally have no user-interface callback; compose interfaces in\nSwift with AdaUI.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Multiplayer schemas",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use a typed command for peer intent. Field tags, rather than declaration order\nor source names, define the wire schema:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@network_command(\n    id: \"game.player-input\",\n    delivery: \"unreliable_sequenced\",\n    channel: \"input\"\n)\nstruct PlayerInput {\n    @network_field(1) var moveX = 0.0;\n    @network_field(2) var moveY = 0.0;\n    @network_field(3) var attackSequence = 0;\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Peers send the generated value through the scoped multiplayer resource. Host\nsystems receive typed values and an authenticated transport source:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system\nclass InputSystem {\n    @res var multiplayer: Multiplayer;\n    @remote_commands(PlayerInput) var inputs;\n\n    func update(context) {\n        multiplayer.send(PlayerInput(1.0, 0.0, 4));\n        for (var message in inputs) {\n            var peer = message.source;\n            var movement = message.value.moveX;\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The runtime owns packet sequences and command envelopes. `message.source`\ncannot be supplied by script payload data. Swift and AdaScript declarations\nwith matching IDs, versions, tags, types, direction, delivery, and channel\nproduce the same compatibility schema.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@replicated_component` uses `@network_field` plus optional `@local` fields.\nSwiftPM targets receive a generated native ECS backing component through\n`AdaScriptBuildPlugin`. Portable AdaEditor projects register each component as\na distinct runtime ECS layout without compiling Swift.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@rpc` declares both a typed wire command and an optional receiver method:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system class InputSystem {\n    @res var multiplayer: Multiplayer;\n    @res var playerInput: PlayerInputState;\n\n    @rpc(id: \"arena.input\", delivery: \"unreliable_sequenced\", channel: \"input\")\n    func input(@network_field(1) moveX = 0.0, @network_field(2) attack = 0) {\n        playerInput.peer = source;\n        playerInput.moveX = moveX;\n        playerInput.attack = attack;\n    }\n\n    func update(context) {\n        multiplayer.send(input(1.0, 2));\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Calling `input(...)` constructs a typed command; `multiplayer.send(...)` sends\nit. The authored body does not run on the sender. On receipt, the system invokes\nit before `update`, with `source` bound to the authenticated transport peer ID.\nFields remain tagged and require constant defaults. An empty or bodyless method\nstill works as a command constructor; `@remote_commands(input)` remains available\nfor explicit message processing. Request/response and local echo are not yet\nsupported.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Asynchronous work",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Declare a function that can suspend with `async func`. Use `await` inside that\nfunction; a synchronous action starts it explicitly with `Tasks.start(...)`.\nThe action returns immediately while the game or UI continues updating.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "async func loadShop() {\n    var result = await Assets.loadAsync(\"@res://Catalog/shop.json\");\n    if (result.isSuccess()) {\n        System.print(\"Shop asset: \" + result.value());\n    } else {\n        System.print(result.errorCode() + \": \" + result.message());\n    }\n}\n\n@system class ShopSystem {\n    var started = false;\n\n    func update(context) {\n        if (!started) {\n            started = true;\n            Tasks.start(loadShop());\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Assets.loadAsync` and `Assets.saveAsync` use the native asset registry and\nreturn an awaitable result. `Saves.writeAsync(\"@user://save.txt\", text)` writes\nan immutable string in the background and reports `committed()` after its\natomic file replacement. For data that cannot be copied in one callback, use\nbounded chunks:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "async func saveLargeData() {\n    var writer = Saves.begin(\"@user://save.txt\");\n    var first = await writer.appendAsync(\"first chunk\");\n    if (!first.isSuccess()) { writer.cancel(); return; }\n    var committed = await writer.finishAsync();\n    if (!committed.committed()) { System.print(committed.message()); }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Each chunk is limited to 256 KiB. The writer appends to a temporary file and\nreplaces the destination only after `finishAsync()` succeeds. Build large ECS\nsnapshots in bounded pieces; do not retain a query row or live component view\nin a task.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Mark a script-owned type with `@nonsendable` when its instances are tied to a\ncallback or another short lifetime. AdaScript rejects a typed async parameter\nor method that would capture that type. Before a task starts, the runtime also\nchecks actual arguments, nested lists, returned values, and promise results;\nthis catches borrowed engine values passed through an untyped alias. Maps are\nconservatively rejected until their entries can be inspected. See\nAdaScript Annotation Reference.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Annotation Reference",
+            "destination": "AdaScriptAnnotations"
+          }
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "`await Time.sleep(seconds)` advances with the scheduler's `deltaTime` and stops\nadvancing when that scheduler is paused. AdaEngine does not yet expose a\nseparate game time-scale resource.\n`await Time.sleepRealTime(seconds)` uses a monotonic clock; continuation still\nwaits for a script dispatch point. `Tasks.promise()` creates a one-shot wait\nthat another script callback can resolve with `complete(value)`.\n`Tasks.start(...)` returns a handle with `status()` and `cancel()`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript callbacks such as `update(context)` remain synchronous. Do not mark\nthem `async`; start a separate async function and pass\ndetached values. Callback contexts, queries, resources, and commands expire at\ncallback exit. Awaited work resumes in the serialized script runtime, not on\nthe native I/O worker. Cancelling a save does not roll back\na file that was already committed.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Fallible operations return a result with `isSuccess()`, `value()`,\n`errorCode()`, and `message()`; inspect it after `await`. A script VM trap\ncurrently stops that module and cancels its pending tasks. Diagnostics include\nthe failing task, owner, and trace ID; reload the module to continue. Other\nmodule instances and native gameplay remain separate.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "System context",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`update(context)` receives a scoped system context. `context.deltaTime` is the\ncurrent scheduler delta. Context and query values must not be retained after\nthe callback.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "State",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Fields on a system instance persist between scheduler updates:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system(scheduler: \"update\")\nclass LifetimeSystem {\n    var elapsed = 0.0;\n\n    func update(context) {\n        elapsed += context.deltaTime;\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use local variables for per-call calculations. Store ECS gameplay state in\ncomponents and shared singleton state in resources rather than global mutable\nvariables.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Common language patterns",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The syntax primer in AdaScript Basics covers functions, conditions,\nloops, structs, classes, static members, initializers, and accessors. In an ECS\nsystem, use those language features together with query bindings:",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Basics",
+            "destination": "AdaScriptBasics"
+          }
+        ]
+      },
+      {
+        "kind": "code",
+        "text": "func clampHealth(value, maximum) {\n    if (value < 0) { return 0; }\n    if (value > maximum) { return maximum; }\n    return value;\n}\n\n@system\nclass DamageSystem {\n    @query(Health, without: Invulnerable)\n    var targets;\n\n    func update(context) {\n        for (var target in targets) {\n            target.health.current = clampHealth(target.health.current - 1, 100);\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Functions called by a system are ordinary helpers; they do not become\nscheduler callbacks. A system's `update(context)` is the entry point selected\nby `@system`. A scriptable object's `ready(context)` instead belongs to that\nentity's attachment lifecycle. For one-time world setup, use the `startup`\nscheduler described in AdaScript Annotation Reference.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Annotation Reference",
+            "destination": "AdaScriptAnnotations"
+          }
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "An `import { name } from \"./Helpers\";` brings a helper into the target-level\nmodule. Importing a file does not create a second world or a second run of its\nsystems. A library can contribute its own annotated declarations; keep IDs\nunique across the assembled module. See AdaScript Libraries.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Libraries",
+            "destination": "AdaScriptLibraries"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Values crossing the bridge",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript bridge values are detached booleans, integers, finite floating-point\nnumbers, strings, lists, and null. ECS component views are borrowed native\ncapabilities rather than detached values.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Unsupported values and invalid numeric conversions are rejected without\npartially mutating a component.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "System `update(context)` callbacks are command-style. Their return values are\nignored; observable behavior belongs in components, resources, events, or\ndiagnostics.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "AdaScriptECS",
+    "title": "AdaScript ECS",
+    "section": "AdaScript",
+    "source": "Sources/AdaScripting/AdaScripting.docc/AdaScriptECS.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Declare annotation-driven systems and iterate native AdaECS component columns.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Declare a system",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Apply `@system` to a class and implement `update(context)`:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system(scheduler: \"update\", id: \"game.movement\")\nclass MovementSystem {\n    func update(context) {\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The scheduler defaults to `update`. System identifiers must be unique within a\nscript module.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For one-time world setup, use `@system(scheduler: \"startup\")`. Its\n`update(context)` runs on the default scheduler runner's first update, before\nthe regular frame stages. A script class constructor does not receive a world\ncontext. See AdaScript Annotation Reference for all annotation arguments.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Annotation Reference",
+            "destination": "AdaScriptAnnotations"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Order systems",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use repeatable `@after` and `@before` annotations when component and resource\naccess alone does not express the required execution order:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@after(id: \"game.input\")\n@before(id: \"game.physics\")\n@system(scheduler: \"update\", id: \"game.movement\")\nclass MovementSystem {\n    func update(context) {\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Dependency IDs resolve within the same AdaScript module. Both systems must use\nthe same scheduler. AdaScript rejects unknown IDs, self-dependencies, and\ndependency cycles while loading the module.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Declare a query",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Apply `@query` to a stored system property:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@query(\n    Health,\n    Movement,\n    with: Movable,\n    without: Frozen\n)\nvar entities;",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Positional components are fetched and available on each row. `with` and\n`without` only filter matching archetypes.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Aliases use lower-camel-case component names:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "for (var entity in entities) {\n    var position = entity.movement.position;\n    entity.health.current -= 1.0;\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`entity.id` exposes the native entity identifier.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Iterator behavior",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript queries are native iterators. AdaECS resolves matching archetypes,\nbinds component columns when entering a chunk, and advances their pointers by\nrow stride. The bridge does not create an entity proxy for every result and\ndoes not perform a world component lookup for every field access.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A query row and its component views are borrowed. Do not retain them after the\nloop or system update returns. Structural changes must use deferred commands.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Inactive entities are skipped. Empty queries execute zero loop iterations.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Component fields",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The `@Component` Swift macro generates the runtime field accessors used by Ada\nScript. Register native components before the script plugin is set up.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Supported field values include booleans, integers, finite floating-point\nvalues, strings, vectors, quaternions, colors, and reflected enums. A rejected\nwrite leaves the component unchanged and appends a development diagnostic.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Access planning",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The current implementation conservatively declares write access for fetched\ncomponents. This keeps scheduling correct while compiler-level read/write\ninference is completed. Filter-only components do not receive write access.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The intended final behavior derives read and write sets from row field usage,\nwith explicit `@access` metadata as the escape hatch for dynamic code.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Multiple queries",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "One system may declare multiple independent iterators:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system(scheduler: \"update\")\nclass TargetingSystem {\n    @query(Player, Transform)\n    var players;\n\n    @query(Enemy, Target, without: Dead)\n    var enemies;\n\n    func update(context) {\n        for (var enemy in enemies) {\n            for (var player in players) {\n                enemy.target.entity = player.id;\n                break;\n            }\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Queries are refreshed by the scheduler before each system execution.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Project input actions",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In **Project Settings → Input Bindings**, add an action such as `Jump`, then add\nkeyboard, mouse, gamepad or touch bindings. Click **Save Project Settings**.\nActions are stored in `.ada/project.json` and loaded by both Play Mode and the\nAdaScript project runtime. Multiple bindings act as alternatives: releasing one\ninput does not release the action while another binding is held.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Systems and scriptable components declare input as a read-only resource dependency\nwith `@res var input: Input;`. Only declarations that request Input receive it.\nUse `@res(optional: true) var input: Input;` and `input.available()` when the\nresource may be absent; a missing required resource produces a diagnostic.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@res var input: Input;\n\nfunc update(context) {\n    if (input.isActionJustPressed(\"Jump\")) {\n        // Start a jump once per press.\n    }\n    var movement = input.getActionStrength(\"MoveRight\");\n}",
+        "language": "adascript",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• `isActionPressed(name)` remains true while an input is held.\n• `isActionJustPressed(name)` and `isActionJustReleased(name)` describe transitions\n  during the current frame. Both can be true for a tap completed within one frame.\n• `getActionStrength(name)` returns 0...1. Gamepad axes use a direction and the\n  action's dead zone; buttons and touch return either zero or one.\n• Gamepad bindings match any connected controller. `Any Finger Held` stays active\n  until every contact ends or is cancelled. Touch lifecycle events, mouse motion,\n  and wheel bindings produce frame pulses.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Input snapshots are scoped to a callback; query input again on the next update.\nUnknown action names return false or zero. Names are case-sensitive.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Swift systems use the same methods on their `Input` resource. `InputPlugin()`\nloads the `inputActions` section from `.ada/project.json` in the current working\ndirectory, including games launched from the editor. Packaged Swift applications\ncan decode `[InputAction]` from an included resource and pass it to\n`InputPlugin(actions:)`, or call `try input.setInputActions(actions)` on an existing\nresource. Explicit `InputPlugin(actions: [])` disables automatic project loading.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "AdaScriptDiagnosticsAndPerformance",
+    "title": "AdaScript Diagnostics and Performance",
+    "section": "AdaScript",
+    "source": "Sources/AdaScripting/AdaScripting.docc/AdaScriptDiagnosticsAndPerformance.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Understand annotation, setup, and runtime failures and keep ECS work on the\nnative chunk path.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Compilation diagnostics",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`AdaScriptPlugin` compiles the source and reads declaration metadata\nwithout executing a `main()` manifest. Initialization throws\n`AdaScriptError/compilation(_:)` for syntax or semantic errors and\n`AdaScriptError/invalidManifest(_:)` for invalid AdaEngine annotations.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Examples include `@system` on a non-class declaration, duplicate system\nidentifiers, `@query` outside a system class, a query with no fetched\ncomponents, and a system class that cannot be initialized.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Setup diagnostics",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Native component identifiers are resolved during plugin setup so earlier\nplugins can register game components. Unknown or ambiguous component names skip\nthe affected system and append a diagnostic.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Runtime diagnostics",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Runtime diagnostics include unknown component aliases, unknown fields,\nunsupported values, invalid numeric conversions, and query capabilities used\noutside their callback lifetime.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Inspect `AdaScriptPlugin/diagnostics` after setup and during development.\nSystem `update(context)` callbacks are command-style; their return values are\nignored. Tests should assert observable ECS state and diagnostics.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Performance model",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript query execution traverses native archetypes and chunks. Component\ncolumns are bound once per chunk, and field access advances a typed pointer by\nrow stride. A successful write mutates the component in place and updates its\nchange tick.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The hot path avoids arrays of matched entity identifiers, one Swift bridge\nobject per entity, repeated entity-location lookups, existential component\ncopies, and whole-component reinsertion.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The current embedded C runtime is globally shared and non-reentrant, so runtime entry remains\nserialized. Scalability comes from native filtering, column iteration, cached\nmetadata, and narrow bridge calls rather than multiple concurrent VMs.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Benchmark scripting changes with multiple archetypes and chunks and compare\nthem with a typed Swift query. Validate semantics before drawing performance\nconclusions.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "Agent3DWorkflow",
+    "title": "AI-assisted 3D work in Ada Studio",
+    "section": "Editor",
+    "source": "Editor/Documentation/Agent3DWorkflow.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "The mobile agent and desktop editor MCP share native model tools and offline knowledge. Start with `editor.project.context`; its `model3D` field describes formats, tools and verification limits. Desktop context also lists `authoringTools`. Tools require an open project on desktop and operate inside the project's declared Assets root. Import sources may also be under project-local Downloads.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Inspect and validate",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`editor.model.inspect` and `editor.model.validate` accept a project-relative `path`, such as `Assets/Models/Robot.glb`. Both run the production `NativeGLTFLoader` without constructing GPU resources. They report geometry counts, selected-scene rest-pose bounds at the original scale, material indexes and PBR factors, texture/image mappings, nodes, skin joints, named clips and durations, and local dependencies. Large inventories are bounded and marked `truncated`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Validation checks dependency containment and byte budgets, native decoding, image decoding, scene hierarchy, primitive geometry and the current import profile. `editor.asset.validate` also routes GLB/glTF to this validation. This is not a complete Khronos conformance check, GPU rendering proof or animation-playback proof. It does not author or validate gameplay collision shapes.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This profile supports glTF 2.0 primitive topologies, UV0/UV1, one set of four skin influences and at most 128 joints per skin. Required Draco/Meshopt/KTX2 extensions are unsupported. Node TRS clips can use LINEAR, STEP and CUBICSPLINE interpolation; morph-weight animation is unsupported. Models and their local dependencies have a combined 128 MiB budget. JSON and decoded accessor inventories have additional bounds.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Import and place",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Call `editor.model.import` with `source: \"Downloads/Robot/Robot.gltf\"` and `destination: \"Assets/Models\"`. Validation runs before copying. Local buffers/textures are copied as one portable bundle; repeated imports choose new names and preserve existing files. Network references, missing dependencies and escaping paths/symlinks fail. The tool returns the imported `path` and `assetReference`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Read `editor.components.describe` with query `Model3DSource`. Its `source` uses the returned `@res://` reference. Keep the required Transform and use its scale intentionally. For simple playback, set the exact inspected `animation` name, `autoplay` and `repeats`. Preserve unrelated fields, including any project-authored animation graph. When `animationGraph` is present it takes precedence over the single `animation` clip; do not silently discard it to force clip playback. Pose-graph editing is distinct from skeletal keyframe/rig authoring.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Desktop agents should use `editor.scene.get/apply` with the latest revision to place models in open scenes and retain document undo. Mobile agents use their project file tools for scene YAML. Imported meshes do not automatically receive physics bodies or colliders; read the PhysicsBody3DComponent descriptor before adding one.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Materials and lighting",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`editor.model.material.edit` accepts `path`, zero-based `material` and `settingsJSON`. Supported patch keys are `baseColorFactor` (linear RGBA), `metallicFactor`, `roughnessFactor`, `emissiveFactor` (linear RGB), `alphaMode`, `alphaCutoff` and `doubleSided`. Invalid patches fail before writing. Unpatched material fields, hierarchy, animation data and GLB binary chunks are preserved.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`editor.model.texture.assign` binds an image to `baseColor`, `normal`, `metallicRoughness`, `emissive` or `occlusion`. Inspect material indexes first. glTF roughness uses G and metallic uses B; normal and material maps are linear data, while base-color/emission textures are sRGB. `editor.texture.render` can create procedural placeholders and flat normal maps. These operations do not unwrap a mesh or bake lighting. Editing a shared model asset affects all references to it; rebuild/reload before comparing appearance.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Read exact Camera, Mesh3DComponent, light, Environment3D and physics payloads from `editor.components.describe`. Camera framing, lighting, model scale and valid UVs all matter. Use the `basic-3d-scene` example for a perspective camera, PBR cube, directional light and game3d plugin configuration.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Knowledge and verification",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`editor.skills.list` returns bundled workflow descriptions; `editor.skills.read` loads instructions by ID. The 3D packs are `ada-3d-assets`, `ada-3d-materials` and `ada-3d-animation`. Their detailed instructions are loaded when needed. `editor.docs.search/read`, `editor.api.describe`, `editor.components.describe` and `editor.examples.list/read` also work offline on both hosts.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Desktop uses `editor.build.start`, `editor.play.start`, `editor.task.status`, `editor.output.read` and `render.capture_screenshot`. Mobile uses `editor.build`, `editor.play.start`, `editor.play.capture` and `editor.image.read`. Select the tools actually advertised by the current host. Desktop asset tools exclude mobile vision analysis and direct on-disk scene assignment; desktop scene edits go through the revision/undo workflow. Save dirty asset documents before tool writes.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "After validation and build, inspect a completed frame from visible Play. Exercise selected clips and compare frames at different times for animation. Isolated simulation verifies logic and keyboard/physics behavior; it does not install Model3D or prove rendering. Blender execution, 3D generation, rig editing and skeletal clip authoring are not exposed by these Studio tools.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "A2UI",
+    "title": "Interactive agent UI",
+    "section": "Editor",
+    "source": "Editor/Documentation/A2UI.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Studio's macOS ACP chat can display native AdaUI forms and previews using the\nA2UI v0.9.1 Ada forms catalog. Use **Run Studio A2UI** in this worktree or\n`./script/run_studio_a2ui.sh`, open a project, and connect an ACP agent normally.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "NPC configuration workflow",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Ask: “Create an interactive NPC configuration form, then generate an editable\ndialog preview from my submitted values.” The bundled `/ada-ui-forms` skill\nprovides the workflow to agents that need more explicit guidance.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "1\\. The assistant streams a form inside its reply. Edit its fields and toggles.\n2\\. After the agent's turn finishes, submit the form. Submission returns the\n   current values to the same ACP session; an unsent composer draft is preserved.\n3\\. The agent returns a new preview surface. Click **Open in UI Designer** to\n   create a new project-local `.ui` asset and open it in the normal workbench.\n4\\. Refine through the designer's controls or YAML view, use undo/redo, and save.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Export paths are `Assets/UI/AgentPreviews/<surface>-<unique-id>.ui`; each export\ncreates a new file, and symlinked destination directories are rejected. The\nsnapshot retains native components, bindings with current defaults, and named\nhost actions. It does not serialize the agent transport or action-context mapping.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Transport contract",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Studio advertises its custom catalog and compact component contract in ACP prompt\ncontext. Ordinary assistant text remains Markdown. A fenced `a2ui` block contains\none complete JSON envelope per line; complete lines render progressively.\nAn exact opening fence at the end of a prose line is accepted too, because some\nACP agents concatenate planner and final replies without an intervening newline.\nFences inside ordinary code blocks remain ordinary text.\nACP embedded resources using `application/vnd.a2ui+json` or\n`application/a2ui+json` are also accepted. This is an ACP text/resource binding;\nit does not require a new ACP extension or a second MCP server.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The catalog supports Text, Row, Column, Button, TextField, Toggle, a single-string\nChoicePicker, and numeric Slider, with absolute JSON Pointer bindings and server\nevent actions. Required/range checks show inline errors and disable invalid\nsubmit buttons. Checks and controls survive the `.ui` authoring handoff.\nIt does not advertise the Basic Catalog, executable code, general/local functions, collection templates, or\narbitrary modifiers. See the engine's `Documentation/A2UI.md` for schema details.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Button actions become an `[A2UI user action]` context block on the next prompt\nin the owning conversation, including the envelope and its transport metadata.\n`sendDataModel` sends only the originating surface's model. Other conversations\nand other configured agents cannot receive a surface's submission. Changing\nproviders disables older forms until their original agent is reconnected.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Malformed interfaces show an inline error while retaining the previous working\nsurface. Correction feedback accompanies the following prompt. Interrupted or\nfailed runs have explicit surface states. Updates to a submitted surface can\nmake it ready for another interaction; a completed one-shot form stays submitted.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The ACP adapter waits for all session notifications preceding a prompt response\nto reach the transcript before marking the turn complete. This handles bursty\nstreams and slow UI rendering without a timing-based completion delay.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Persistence and scope",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Compact surface state, including locally edited values, is saved in the existing\nproject chat session store. Switching chats preserves each live surface instance;\nreopening Studio reconstructs surfaces without replaying server defaults over\nlocal edits. Incomplete in-flight forms reopen as interrupted. Existing sessions\nwithout the new optional field remain readable.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This integration uses the shared `EditorAgentViewModel`/macOS ACP sidebar.\nThe iPhone's separate SloppyRuntime chat path is not wired to these cards.\nA designer snapshot is a one-way handoff; subsequent designer edits are not sent\nback to the agent automatically. The host owns gameplay effects of exported actions.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Validation",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Run the test targets from the repository root:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "ADAENGINE_DISABLE_SWAN=1 swift test --package-path Editor --disable-sandbox \\\n  --scratch-path /private/tmp/adaeditor-a2ui-build \\\n  --filter 'EditorAgentA2UITests|EditorAgentA2UITransportTests|EditorLoadingAnimationTests'",
+        "language": "sh",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "QA objects and mocks belong under `Editor/Tests`, not the app target. The Python\nACP fixture remains in `Editor/Tests/AdaEditorTests/Fixtures` and is excluded\nfrom package resources. Transport tests launch it through the production adapter,\nexercise burst delivery with a slow UI sink and file callbacks after setup, and\ncheck child-process cleanup after failed connections. UI tests mount real chat\ncards, submit edits, export previews, and exercise the normal designer model.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For manual native verification, launch Studio normally with\n`./script/run_studio_a2ui.sh`, connect your configured agent, and follow the NPC\nworkflow above. No fixture launch modes or QA-specific app state are installed.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Inspection memory",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Large Swift generic view types can expand into huge diagnostic names. UI inspection\nnow reports a bounded nominal type name from immutable Swift runtime descriptors,\nwith generic arguments omitted. This avoids constructing the reflected/mangled\nname tree. In the development fixture run, sampled RSS ranged from 333 to 567 MiB and settled near 337 MiB;\nthis is macOS workflow evidence, not a universal leak or performance guarantee.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Configured-agent context limits",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A Sloppy `protectedContextExceedsBudget` failure can happen before UI generation\nwhen the selected model has no context-window metadata and the runtime falls back\nto its smaller generic budget. Resolve the selected model against the active\nprovider catalog and configure its reported `contextWindowTokens`; use the same\nsupported model for the agent and planner. Do not raise limits based on an\nunverified model name. The task's configured-provider workflow was verified with\n`openai-oauth:gpt-5.5` and the provider-reported 272,000-token window. This is\nprovider/session evidence, not a guarantee for every agent or model.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "ImageDecoders",
+    "title": "Loading images and adding formats",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/Developers/ImageDecoders.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Load PNG, JPEG (`jpg` or `jpeg`), BMP and TGA images as CPU pixels using\n`Image`, or load a GPU texture through `Texture2D`:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\n\nlet image = try await AssetsManager.load(Image.self, at: \"@res://Textures/ground.tga\")\nlet texture = try await AssetsManager.load(Texture2D.self, at: \"@res://Textures/ground.tga\")",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Image(contentsOf:)`, `Image.decode(from:)` and `AssetsManager` use the same\ndecoder registry. File extensions are case insensitive and act as hints;\nthe encoded bytes identify the format. Built-in decoders produce RGBA8 pixels.\nTGA decoding includes indexed colors, RLE, alpha and top- or bottom-origin rows.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Registering another raster format",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Implement `ImageDecoder` when another file format should produce an ordinary\n`Image`. This example defines a tiny custom format: four signature bytes,\none byte each for width and height, then RGBA8 pixels in row-major order.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\nimport Foundation\n\nstruct RawRGBAImageDecoder: ImageDecoder {\n    let supportedExtensions = [\"rawrgba\"]\n\n    func canDecode(_ data: Data) -> Bool {\n        data.starts(with: [65, 68, 65, 73]) // \"ADAI\"\n    }\n\n    func decode(_ data: Data) throws -> Image {\n        let bytes = Array(data)\n        guard canDecode(data), bytes.count >= 6 else {\n            throw ImageDecodingError.invalidData\n        }\n        let width = Int(bytes[4])\n        let height = Int(bytes[5])\n        guard width > 0, height > 0, bytes.count == 6 + width * height * 4 else {\n            throw ImageDecodingError.invalidData\n        }\n        return Image(width: width, height: height, data: Data(bytes.dropFirst(6)))\n    }\n}\n\nImage.registerDecoder(RawRGBAImageDecoder())\nlet image = try await AssetsManager.load(Image.self, at: \"@res://Sprites/player.rawrgba\")",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Register before loading assets or building the editor's project tree. The editor\nclassifies image files using `Image.extensions()`, which reflects the registry.\nExtensions are returned lowercase and without duplicates.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Registry access is synchronized. Decoder callbacks execute outside the lock\nand may run concurrently, so implementations must protect their own mutable state.\nNewer registrations take precedence among matching decoders. Registering the\nsame concrete decoder type replaces its previous instance; already cached assets\nare unaffected. A decoder's error propagates once it recognizes the input.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Registration adds decoding only; it does not add an image encoder. WebP, GIF,\nTIFF, HDR/EXR and KTX2 are not built-in raster decoders.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Adding a different resource type",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use `Asset` and `AssetsManager.registerAssetType` for resources with a different\nruntime structure, such as an Aseprite animation containing frames, durations\nand tags. A custom asset type does not automatically extend the formats accepted\nby `Image`. GPU texture containers with mipmaps or compressed blocks should\npreserve those contents through a dedicated texture asset/loading path.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "VisionOSImmersive",
+    "title": "visionOS Immersive Rendering",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/VisionOSImmersive.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Use `AdaEngineEmbeddable` from a SwiftUI visionOS application to display an AdaEngine\nworld in a full immersive space. `Demos/ImmersiveGarden` contains a runnable host.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Create an `ImmersiveSpace` containing a `CompositorLayer` configured with\n`ImmersiveLayerConfiguration`. In the layer's callback, start a main-actor task,\ncreate `AdaImmersiveRenderer`, and await its `run(setup:)`. Instantiate scene models\nin `setup`, after renderer plugins and asset loading are ready. Keep and cancel the\ntask when the immersive space closes. `performWorldAccess` queues inspector edits\nbetween frames; do not mutate the world from arbitrary SwiftUI callbacks.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The host converts ARKit world poses to Ada's +Z-forward coordinates and uses the\ncompositor's asymmetric per-eye projections. Native projections accept right-handed\nview-space input, so the host explicitly mirrors input Z before adapting their depth;\nthe compositor's NDC convention alone does not convert camera handedness. Ada's offscreen pipelines use forward\nZ; the final Metal pass converts depth back to reverse Z for system composition.\nThe host uses the engine's Metal command queue to preserve GPU resource ordering.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`SpatialGrabbable` marks root entities with local bounds. `SpatialInput` provides\nactive grip poses and optional selection rays. `SpatialInteractionSystem` updates\ntransforms and publishes `SpatialSelection` for inspectors. The platform-independent\ninteraction path can be tested without ARKit or a headset.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The host requires visionOS 26 and enables system foveation when supported. Use\n`ImmersiveLayerConfiguration(enablesFoveation: false)` for a full-resolution comparison.\nThe simulator falls back to rendering without foveation. Each eye snapshots its\ncurrent drawable rate map, including the correct layer in a layered layout.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The main geometry pass renders four G-buffers and depth at variable rasterization\nrates. A nearest-sample resolve expands them into logical screen coordinates before\nSSAO, environment compositing, antialiasing and scene overlays. The final presentation\npass applies the drawable map again and converts forward depth to reverse depth.\nGeometry scratch textures and resolve pipelines are reused; rate-map parameters\nare immutable per frame. Foveation replaces spatial/temporal upscaling for these cameras.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Eye passes remain sequential with GPU fences because they share uniform scratch.\nScreen-space effects still run at full logical resolution, and resolving the buffers\nadds bandwidth cost. A performance gain requires measurement on Vision Pro; simulator\nlaunch alone cannot establish foveation quality, stereo alignment or gaze-driven savings.\nCapture-target drawables are not rendered yet.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Custom geometry vertex shaders used with layered foveation must select the target\nlayer explicitly. For the Metal backend, `ADA_METAL_RENDER_LAYER` is defined for\nvertex stages. The built-in shader reads a `uint` uniform at reserved binding 30\n(`GlobalBufferIndex.renderTargetLayer`) and writes `gl_Layer`; SPIRV-Cross maps that\nto Metal's `render_target_array_index`. Ordinary passes bind layer zero. Other\nbackends do not define this macro.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Reuse AdaUI panels in spatial windows",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "SwiftUI owns window scenes and immersive presentation. Existing AdaUI panels keep\ntheir view models, `@State`, bindings, input handling and rendering inside `AdaUIHost`\nfrom `AdaEngineEmbeddable` (UIKit platforms, including visionOS).",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Inside a visionOS editor target, an existing panel can be composed as follows:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "SwiftUI.WindowGroup(id: \"inspector\") {\n    AdaUIHost(assetBundle: .module) {\n        EditorInspectorSidebar(viewModel: sharedInspectorViewModel)\n    }\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Add the `AdaEngineEmbeddable` product to that target's dependencies. Share the same\neditor view model with the scene and other panels; do not mirror editor state into\na second SwiftUI implementation. The host reconciles updated root content while\nretaining AdaUI local state and node identity. It owns a separate input/window\nmanager, acquires only its own drawable, and stops when SwiftUI dismantles the view.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`ImmersiveGarden` demonstrates this split with an AdaUI tools panel and the original\n`GardenWorkspace`. This validates the bridge; it does not yet port the full Ada Studio\napplication or all native panel controls to visionOS.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "AdaScriptAnnotations",
+    "title": "AdaScript Annotation Reference",
+    "section": "AdaScript",
+    "source": "Sources/AdaScripting/AdaScripting.docc/AdaScriptAnnotations.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Choose an annotation by the declaration it describes. Annotation arguments\nare literals, identifiers, or lists of those values, not runtime expressions.\nThe same spelling can have different roles: `@component` declares a struct,\nwhile `@component(required: true)` binds an existing component to a scriptable\ninstance.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "File type checking",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@strict` before the first declaration enables strict type checking for that\nsource file. It does not change runtime representation or require the rest of\nthe project to use static types. An explicit `Any` annotation keeps a value\ndynamic inside a strict file. Project-wide strict checking is configured by\n`build.adaScriptTypeChecking` in `.ada/project.json`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Suspension policy",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@nonsendable` marks a class, struct, or enum whose values must not be captured\nby an async task or delivered through an awaited result. A typed async\nparameter or async method on a marked type is rejected while compiling;\nuntyped values are checked when the task is created. AdaEngine marks its\ncallback-scoped world, query, resource, and input bridge types the same way.\nThis is a suspension lifetime rule, separate from Swift's `Sendable` protocol.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@nonsendable\nclass TemporarySelection {}\n\n// Invalid: the parameter cannot live in an async function.\nasync func inspect(selection: TemporarySelection) {}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Systems and scheduling",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Annotation | Target | Effect |\n| --- | --- | --- |\n| `@system(scheduler: \"update\", id: \"...\")` | Class | Registers `update(context)` with an ECS scheduler. `scheduler` defaults to `update`; `id` defaults to the class name. |\n| `@after(id: \"...\")` | System class | Runs after another system in the same module and scheduler. Repeatable. |\n| `@before(id: \"...\")` | System class | Runs before another system in the same module and scheduler. Repeatable. |\n| `@query(Component, with: Filter, without: Filter)` | Stored system property | Fetches one or more components. `with` and `without` filter without exposing a row field. |\n| `@res` or `@res(optional: true)` | Typed system property | Binds an ECS resource during `update(context)`. Optional bindings support `available()`. |\n| `@remote_commands(CommandType)` | Stored system property | Exposes received typed network commands. |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Every `@system` class defines `update(context)`, including a startup system.\n`@system(scheduler: \"startup\")` runs when the world's default scheduler runner\nfirst updates. It runs once for that runner's lifetime, before `preUpdate`,\n`update`, and `postUpdate`. Restarting the world creates a new startup run.\n`startupSystem` in project runtime settings selects an existing startup system\nID and places it first among the module's startup plans. It does not turn an\nordinary update system into a one-time callback.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@system(scheduler: \"startup\", id: \"game.seed-world\")\nclass SeedWorld {\n    func update(context) {\n        context.world.spawn([Transform()]);\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "There is currently no `@init` function annotation. A class constructor\ninitializes its script instance when the module loads; it does not receive a\nworld context. Use a startup system for one-time world setup.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "An unknown dependency ID, self-dependency, cross-scheduler dependency, or\ncycle is rejected during module validation. Fetched query components reserve\nwrite access conservatively; filter-only components do not. `@access` is\nreserved for future explicit access declarations and is not a supported\nscheduling override yet. See AdaScript ECS for row lifetime and deferred\nstructural changes.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript ECS",
+            "destination": "AdaScriptECS"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Data and attached behavior",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Annotation | Target | Effect |\n| --- | --- | --- |\n| `@component(id: \"...\")` | Struct | Declares a component with a stable ID. |\n| `@resource(id: \"...\", autoInsert: true)` | Struct | Declares a resource; `autoInsert` defaults to `false`. |\n| `@export` | Stored field | Gives a component or resource field a constant default, or makes a scriptable field persistent and inspectable. |\n| `@scriptable(id: \"...\", version: 1, aliases: [\"...\"])` | Class | Registers per-entity behavior. `id` is required. |\n| `@component(required: true)` | Typed scriptable property | Binds a component from the attached entity. `required` defaults to `false`. |\n| `@res(optional: true)` | Typed scriptable property | Binds a resource. `optional` defaults to `false`. |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@component` and `@resource` structs need at least one `@export` field. Their\nfields use constant defaults. `@scriptable` export values are serialized in its\npayload, while component and resource bindings are transient. A required\ncomponent is checked before `ready(context)`. Attachment calls `ready` once;\ndetachment calls `destroy` once. `update`, `fixedUpdate`, and `event` have\ntheir own lifecycle callbacks.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@component(id: \"game.health\")\nstruct Health {\n    @export var current = 100;\n}\n\n@scriptable(id: \"game.player\")\nclass Player {\n    @export var speed = 8.0;\n    @component(required: true) var transform: Transform;\n\n    func ready(context) {}\n    func update(context) {}\n    func destroy(context) {}\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "SwiftPM targets generate native backing types through `AdaScriptBuildPlugin`.\nAdaEditor can register supported runtime-defined component layouts in pure\nAdaScript projects. A Swift component must be registered before the AdaScript\nplugin resolves it. See AdaScript Language for more on scriptable objects.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Language",
+            "destination": "AdaScriptLanguage"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Multiplayer",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Annotation | Target | Effect |\n| --- | --- | --- |\n| `@network_command(id: \"...\", ...)` | Struct | Defines a typed command schema; every field needs `@network_field`. |\n| `@rpc(id: \"...\", ...)` | Function or system method | Defines a typed command from tagged parameters. Write `;` or an empty body; the implementation is generated. |\n| `@network_field(tag, mode: \"state\", interpolate: \"none\")` | Command or replicated field; RPC parameter | Gives a stable positive UInt16 wire tag. |\n| `@replicated_component(id: \"...\", version: 1, authority: \"host\", visibility: \"all_peers\")` | Struct | Declares a replicated component; it already implies component behavior. |\n| `@local` | Replicated component field | Keeps a field local rather than assigning it a wire tag. |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@network_command` and `@rpc` accept `id`, `version`, `direction`, `delivery`,\n`channel`, and `maximumPayloadSize`. Defaults are version `1`, direction\n`peer_to_host`, delivery `reliable_ordered`, channel `command`, and maximum\npayload size `65536` bytes. Directions are `peer_to_host`, `host_to_peer`, and\n`bidirectional`; delivery is `reliable_ordered`, `unreliable`, or\n`unreliable_sequenced`. `id` is required. Versions and payload limits are\npositive integers.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For replicated components, authority is `host` or `any_peer`; supported\nvisibility is `all_peers`. Network fields accept mode `state`, `latest`, or\n`initial_only` and interpolation `none`, `linear`, or `custom`. Wire tags are\nunique within a declaration. A replicated field cannot also be `@local`.\n`@remote_commands` receives a command; the runtime supplies authenticated\n`message.source` separately from payload fields. Install the multiplayer\nruntime plugin before registering network declarations.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@network_command(id: \"game.input\", delivery: \"unreliable_sequenced\")\nstruct PlayerInput {\n    @network_field(1) var moveX = 0.0;\n}\n\n@system\nclass InputSystem {\n    @remote_commands(PlayerInput) var inputs;\n\n    func update(context) {\n        for (var message in inputs) {\n            var requestedMovement = message.value.moveX;\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Editor tools",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Annotation | Target | Effect |\n| --- | --- | --- |\n| `@tool(id: \"...\", ...)` | Class | Declares AdaEditor tool metadata; `id` is required. |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@tool` accepts optional `name`, `version`, `api`, `platforms`, and\n`permissions`. Defaults are a humanized class name, version `1.0.0`, API `1`,\nplatforms `[\"macos\", \"ipados\"]`, and no permissions. The version has three\nnumeric components. Supported permissions are `clipboard.read`,\n`clipboard.write`, `editor.documents.read`, `editor.documents.write`,\n`workspace.read`, `workspace.write`, `network`, and `process`. A tool class\ncannot combine `@tool` with another declaration annotation.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Common mistakes",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• `@query` must annotate a stored property in an `@system` class and fetch at\n  least one component. `@with`, `@without`, `@changed`, and `@added` are not\n  standalone annotations.\n• System and scriptable `@res` bindings use `var name: Type;`. A scriptable\n  `@component` binding uses the same typed property form.\n• `@remote_commands` uses exactly one positional command type and an untyped\n  `var name;` property.\n• A class constructor, `ready(context)`, and a startup system have different\n  lifetimes. Use the callback that matches the data being initialized.\n• Borrowed contexts and component views expire after their callback.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "AdaScriptBasics",
+    "title": "AdaScript Basics",
+    "section": "AdaScript",
+    "source": "Sources/AdaScripting/AdaScripting.docc/AdaScriptBasics.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Learn the syntax of AdaScript before connecting a script to a scene or ECS\nworld. AdaScript files use the `.ada` extension. The examples on this page are\nsmall pieces you can combine in one file; a game does not need a `main()`\nfunction. Start with Getting Started with AdaScript to run a complete system.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Getting Started with AdaScript",
+            "destination": "GettingStartedWithAdaScript"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "A first look",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "// A class keeps state between calls.\nclass Counter {\n    var value = 0;\n\n    func increment() {\n        value += 1;\n        return value;\n    }\n}\n\nvar counter = Counter();\nvar first = counter.increment(); // 1",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`//` starts a line comment; `/* ... */` surrounds a block comment. Braces\ndelimit blocks. Semicolons can separate statements and are used throughout\nAdaEngine's examples. Names are case-sensitive: `Counter` and `counter` are\ndifferent names.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Values and basic types",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript is dynamically typed. A `var` holds a value, and later assignments\ncan replace it. Type annotations such as `var score: Int` describe an API and\nsupport tooling. They are enforced only when strict type checking is enabled\nfor the project or source file; dynamic mode remains the default.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Type | Example | What it represents |\n| --- | --- | --- |\n| `Bool` | `true`, `false` | A condition. |\n| `Int` | `42`, `-3` | An integer. |\n| `Float` | `3.5` | A fractional number. |\n| `String` | `\"player\"` | Text. |\n| `Null` | `null` | No value. |\n| `List` | `[10, 20, 30]` | An indexed sequence, starting at index `0`. |\n| `Map` | `[\"hp\": 100, \"mp\": 20]` | Values looked up by key. Use `[:]` for an empty map. |\n| `Range` | `0..<3`, `1...3` | An exclusive or inclusive integer range. |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "var name = \"Ada\";\nvar lives: Int = 3;\nvar inventory = [\"key\", \"torch\"];\nvar healthByPlayer = [\"ada\": 100, \"lee\": 80];\n\ninventory[0] = \"map\";\nhealthByPlayer[\"ada\"] -= 10;\n\nconst startingLives = 3;",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`const` declares a value you do not reassign. A list has a `count` property;\nmaps have `keys()` and `hasKey(key)`. A range `0..<3` visits `0`, `1`, and\n`2`; `1...3` also includes `3`. Engine types such as `Vector3`, `Transform`,\nand `Sprite` come from registered AdaEngine APIs rather than the basic language\ntypes. Values passed to Swift or stored in ECS fields have narrower supported\ntypes than arbitrary script values; see AdaScript Language.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Language",
+            "destination": "AdaScriptLanguage"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Functions",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Declare a function with `func`, pass arguments in parentheses, and use\n`return` to send a value back. A function without an explicit `return`\nreturns `null`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "func doubled(value) { return value * 2; }\nvar next = doubled(5); // 10",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Parameters can have defaults and type annotations:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "func addPoints(score: Int, bonus = 10) {\n    return score + bonus;\n}\n\nvar updated = addPoints(5); // 15",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Annotations on parameters describe types for tooling; runtime calls still\nneed values of the form the function expects. A helper function is ordinary\ncode. An ECS callback such as `update(context)` runs only because its class is\nregistered as a system.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript provides `print(...)`, `put(...)`, `input(removeTrailingNewline = true)`,\n`nanotime()`, and `exit(code = 0)` as free functions. They forward to the\ncorresponding `System` methods. `assert(condition, message = \"Assertion failed\")`\nstops the current script with a diagnostic when its condition is false.\nThe `System` spellings remain available for existing scripts. Avoid `input`\nand `exit` in game callbacks because they block for console input or terminate\nthe host process.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript also supports `Math.clamp`, `Math.saturate`, `Math.addVector`,\n`Math.subtractVector`, `Math.scaleVector`, `Math.dot`, `Math.cross`,\n`Math.length`, `Math.normalize`, `Math.distance`, `Math.lerpVector`, and\n`Math.clampVector`. Vectors are lists of numbers;\n`cross` requires three components. Matrices are nonempty lists of equal-length\nrows. `Math.identityMatrix(size)`, `transposeMatrix(matrix)`,\n`multiplyMatrix(left, right)`, and `transformVector(matrix, vector)` use row-major\norder and treat vectors as columns:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "var safeHealth = Math.clamp(120, 0, 100); // 100\nvar point = [3.0, 4.0, 1.0];\nvar translation = [[1.0, 0.0, 2.0], [0.0, 1.0, 5.0], [0.0, 0.0, 1.0]];\nvar moved = Math.transformVector(translation, point); // [5.0, 9.0, 1.0]",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Structs and classes",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use `struct` for a small value that should be copied on assignment. Use\n`class` when several names should refer to the same mutable instance.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "struct Point {\n    var x = 0;\n    var y = 0;\n}\n\nclass Player {\n    var health = 100;\n}\n\nvar point = Point();\nvar otherPoint = point;\notherPoint.x = 5; // point.x stays 0\n\nvar player = Player();\nvar teammate = player;\nteammate.health = 80; // player.health is now 80",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Classes can inherit from one parent class with `class Child : Parent`.\nBoth kinds of declaration can contain stored properties and methods. A plain\nscript `struct` is not automatically an ECS component or resource: use\n`@component` or `@resource` and the supported exported field schema for that.\nSee AdaScript ECS.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript ECS",
+            "destination": "AdaScriptECS"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Static members",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "An instance member belongs to one object. A `static` member belongs to the\ndeclaration itself and is accessed through its type name:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "class Difficulty {\n    static var multiplier = 2;\n\n    static func apply(baseScore) {\n        return baseScore * multiplier;\n    }\n}\n\nvar points = Difficulty.apply(10); // 20",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use static state sparingly for gameplay. ECS components hold per-entity state,\nand resources hold shared world state with an explicit lifecycle.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Initialization and cleanup",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`func init(...)` is called when a class or struct instance is created.\n`func deinit()` runs when a class instance is reclaimed; its timing depends on\nthe script runtime, so it is not a reliable place for a gameplay event.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "class TimerLabel {\n    var title;\n\n    func init(name) {\n        title = name;\n    }\n\n    func deinit() {\n        System.print(\"TimerLabel released\");\n    }\n}\n\nvar label = TimerLabel(\"Countdown\");",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Neither method receives an ECS `context`. To initialize a world once, create\nan `@system(scheduler: \"startup\")` class with `update(context)`. To react to\nper-entity attachment or detachment, use a `@scriptable` class's\n`ready(context)` or `destroy(context)`. There is currently no function-level\n`@init` annotation. See AdaScript Annotation Reference for these lifetimes.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Annotation Reference",
+            "destination": "AdaScriptAnnotations"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Stored and computed properties",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`var` inside a type is a stored property. A computed property runs `get` when\nread and `set` when assigned. Inside `set`, `value` is the new value unless\nyou give the setter parameter another name.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "class HealthBar {\n    private var storedHealth = 100;\n\n    var health {\n        get { return storedHealth; }\n        set (newHealth) {\n            if (newHealth < 0) {\n                storedHealth = 0;\n            } else if (newHealth > 100) {\n                storedHealth = 100;\n            } else {\n                storedHealth = newHealth;\n            }\n        }\n    };\n}\n\nvar bar = HealthBar();\nbar.health = 120;\nvar visibleHealth = bar.health; // 100",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A property with only `get` is read-only. These accessors are ordinary script\nbehavior. They do not by themselves export an Inspector property or define an\nECS field; `@export` on a supported stored field does that. See\nAdaScript Annotation Reference.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Annotation Reference",
+            "destination": "AdaScriptAnnotations"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Conditions and loops",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use `if`, `else if`, and `else` to choose a branch. `&&`, `||`, and `!` combine\nBoolean conditions.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "func healthMessage(health) {\n    if (health <= 0) {\n        return \"defeated\";\n    } else if (health < 25) {\n        return \"critical\";\n    } else {\n        return \"ready\";\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use `for (var item in collection)` for a list, range, or ECS query. `while`\nchecks before each iteration; `repeat ... while` checks after one iteration.\n`break` ends a loop, and `continue` skips to its next iteration.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "var total = 0;\nfor (var number in 1...3) {\n    total += number; // 1 + 2 + 3\n}\n\nvar attempts = 0;\nwhile (attempts < 3) {\n    attempts += 1;\n}\n\nrepeat {\n    attempts -= 1;\n} while (attempts > 0);",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`switch (value)` selects `case` branches and an optional `default`. Add\n`break` to stop at the end of a case when no `return` exits it; execution can\notherwise continue into the next case.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "func teamName(team) {\n    switch (team) {\n        case 1:\n            return \"blue\";\n        case 2:\n            return \"red\";\n        default:\n            return \"unknown\";\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Async functions and `await`",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "An `async func` may suspend at `await`. Awaiting an operation pauses that\nscript task while the game keeps updating. A synchronous callback starts an\nasync function with `Tasks.start(...)`:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "async func announceLater() {\n    await Time.sleep(1.0);\n    System.print(\"One game-time second passed\");\n}\n\n@system\nclass AnnouncementSystem {\n    var started = false;\n\n    func update(context) {\n        if (!started) {\n            started = true;\n            Tasks.start(announceLater());\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`update(context)` and scriptable callbacks remain\nsynchronous. Do not keep `context`, query rows, resource views, or commands\nacross `await`: those values expire when the callback returns. Pass detached\nvalues into the task. `Time.sleep` uses game time; `Time.sleepRealTime` uses a\nmonotonic clock. Read AdaScript Language for asset operations, save\nresults, cancellation, and task lifetimes.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Language",
+            "destination": "AdaScriptLanguage"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Scene navigation",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "With `ScenePlugin` installed, an AdaScript system or scriptable callback can\nrequest a level change through its scoped world context:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "context.world.changeScene(\"@res://Scenes/Level02.ascn\");\ncontext.world.reloadScene(); // Restart after game over.",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Both calls return `Bool` to indicate whether the request was accepted. Scene\nloading happens asynchronously, and the prepared scene replaces the old one\nafter an update pass. The current scene remains active if loading fails.\n`reloadScene()` loads a fresh copy of the active scene, recreating its entities\nand scene resources. Entities spawned through AdaScript world commands are\ntracked as part of that scene and removed on reload. Application resources\nand entities created outside the scene remain available across transitions.\nAdaScript tasks for the outgoing world are canceled and `@system` instances\nare recreated; module globals remain part of the application session.\nWorld contexts expire when their callback returns, so do not retain one in an\nasync task.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Annotations",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Annotations begin with `@` and attach metadata to a declaration. They are\nAdaEngine features, not ordinary function calls:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@component(id: \"game.health\")\nstruct Health {\n    @export var current = 100;\n}\n\n@system(scheduler: \"startup\")\nclass CreatePlayer {\n    func update(context) {\n        context.world.spawn([Health(current: 100)]);\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@component` tells AdaEngine to register data; `@export` gives a supported\nfield a default. `@system` registers an ECS callback. Other annotations define\nqueries, resources, scriptable behavior, editor tools, and multiplayer\nmessages. Arguments are constants or symbolic identifiers used during module\ndiscovery. See AdaScript Annotation Reference for their valid targets, arguments,\ndefaults, and limitations.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Annotation Reference",
+            "destination": "AdaScriptAnnotations"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "AdaScriptLibraries",
+    "title": "AdaScript Libraries",
+    "section": "AdaScript",
+    "source": "Sources/AdaScripting/AdaScripting.docc/AdaScriptLibraries.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Share reusable AdaScript functions, systems, and scriptable objects through a GitHub repository.\nAdaEditor installs the library and its transitive dependencies into the project. Run, Play Mode,\nPreview, and `AdaScriptBuildPlugin` load the same installed sources without network access.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Create a library",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Place `ada-library.json` in the repository root:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "{\n  \"schemaVersion\": 1,\n  \"id\": \"example.gameplay\",\n  \"version\": \"1.0.0\",\n  \"api\": 1,\n  \"sources\": [\"Sources/Health.ada\"],\n  \"dependencies\": []\n}",
+        "language": "json",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "IDs use lowercase letters, digits, dots, and hyphens. Versions are exact `major.minor.patch`\nvalues; API and schema versions currently equal `1`. List every `.ada` source explicitly,\nincluding helpers imported by other files. Files must be regular UTF-8 files inside the repository.\nA library can contain up to 256 sources, 1 MB per file and 8 MB total.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For example, `Sources/Health.ada` can contain:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "func remainingHealth(current, damage) {\n    if (damage >= current) { return 0; }\n    return current - damage;\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Publish the repository and optionally tag its commit `v1.0.0`. The repository name and library ID\ncan differ. The manifest's version describes the release; the resolved commit pins its exact content.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Install and use",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Open **Settings → Project → AdaScript Libraries**, enter `owner/repository` or its\n`https://github.com/owner/repository` URL, enter a tag or commit, and select **Install / Update**.\nRebuild or restart Play to activate the installed code.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Import helpers from any game source without depending on its directory depth:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import { remainingHealth } from \"@example.gameplay/Sources/Health\";",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Imports inside a library can use relative paths such as `./Shared/Math`, or the same `@id/path`\nform for another library. Extensions are optional in imports. Library paths are exposed as\n`Libraries/<id>/<source-path>` in diagnostics.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Library `@system` and `@scriptable` declarations participate in the game's normal\ndiscovery and registration. Systems run automatically with the game's plugin. Enable the native\nengine features they need in Runtime Settings. Libraries share the game's module: use distinct\nclass names, function names, and annotation IDs to avoid collisions. Imports do not create namespaces.\nLibrary authors should not declare `main()`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Pure AdaScript projects can register supported runtime-defined component layouts. SwiftPM games\ngenerate native backing types through `AdaScriptBuildPlugin`. Installing a library does not compile\narbitrary Swift or install native binaries. See AdaScript Annotation Reference for schema rules.",
+        "level": 0,
+        "links": [
+          {
+            "title": "AdaScript Annotation Reference",
+            "destination": "AdaScriptAnnotations"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Dependencies and reproducibility",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Declare transitive dependencies using exact, lowercase 40-character GitHub commit SHAs:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "\"dependencies\": [\n  {\n    \"id\": \"example.math\",\n    \"source\": {\n      \"provider\": \"github\",\n      \"location\": \"owner/math-library\",\n      \"revision\": \"0123456789abcdef0123456789abcdef01234567\"\n    }\n  }\n]",
+        "language": "json",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The SHA above illustrates the format; replace it with a commit from the dependency repository.\nUse lowercase `owner/repository` locations in dependencies. Version ranges are not supported.\nCycles, missing libraries, identity mismatches, and conflicting commits fail the complete operation.\nInstallation downloads code without executing it. It activates a complete graph through one atomic lock write.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Commit `.ada/libraries.lock.json` and `.ada/libraries/` to share a fully offline project.\nAlternatively commit the lock and use **Restore Locked Libraries** on another machine. Restoration\nfetches the pinned commits, even if a tag has moved. Reinstall a root library to explicitly update it.\nBuilds never resolve tags or download packages. Missing files produce an actionable restore error.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Remove** removes a direct dependency. Dependencies still needed by another root stay active.\nUnreferenced installation directories remain cached; they are not loaded by the lock.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For SwiftPM games, apply `AdaScriptBuildPlugin` to the game target and install libraries in that\npackage's root. The generator embeds the locked sources alongside the target's `.ada` files, so the\nbuilt executable does not need the installation directories. Each target using the plugin consumes\nthe package's library set; avoid registering that set again from another target in the same game.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Providers",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The initial provider supports public GitHub repositories through the GitHub REST API, including\non hosts without a Git executable. Private repositories and authentication are not implemented.\nGitHub API rate limits are surfaced as installation errors.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The editor's `AdaScriptLibraryProvider` protocol accepts a provider/location/revision reference and\nreturns a pinned manifest plus source files. An Assets Store adapter can implement this same contract\nwithout changing source imports, runtime loading, or the lock format. The store service, catalog,\nauthentication, and purchasing flows are future work.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "NativeAOT",
+    "title": "Native AdaScript (experimental)",
+    "section": "AdaScript",
+    "source": "Sources/AdaScripting/AdaScripting.docc/Guides/NativeAOT.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Compile supported AdaScript into native code with Gravity, then install metadata\nand callbacks through `AdaScriptNativePlugin`. Gravity owns C11 generation, the\nC ABI and native memory. AdaEngine owns world capabilities and the ECS adapters.\nNative execution does not use Gravity bytecode or fall back to the VM.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Development dependency",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The pinned Gravity revision includes `GravityAOT` for ordinary engine and Editor\nbuilds. To develop the compiler or run export tests against a local checkout:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "export ADAENGINE_GRAVITY_PACKAGE_PATH=/Users/vlad-prusakov/Developer/gravity-lang-aot",
+        "language": "sh",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The Editor package explicitly depends on `GravityAOT` and `CGravity`. A packaged\nEditor also needs access to the engine checkout, Python, make, Clang and Swift.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Automatic Editor export",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For an AdaScript project, choose **Build → Export AdaScript to macOS…** or\n**Build → Export AdaScript to Web…**. Documents are saved before exporting.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The exporter loads project and locked library sources, performs type checking,\nprepares native host conveniences and calls Gravity's `tools/aot_build.py`.\nIt creates the native archive, C accessor target, game executable package,\nresource bundle and detached scene payloads. It checks the generated module's\nmetadata, component/resource bindings and startup-system configuration before building the player. macOS\nexports include an `.app`; Web exports invoke the existing `export-web` plugin\nfor the engine/game WASM, JavaScript loader and resource manifests.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Outputs go to `Exports/macOS` or `Exports/Web`. Compilation and packaging happen\nin an unpublished directory. Failed exports preserve previous output. An\nexisting directory is replaced only if it has the native-export marker. The\narchive and generated SwiftPM package remain available alongside the player.\nRebuild that package with `ADAENGINE_GRAVITY_PACKAGE_PATH` set to the same checkout.\nThe `.a` in the package is a host-platform archive; Web builds compile its C\nsource for the WASI target rather than linking the host archive.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Web uses Swift 6.3.2 and `swift-6.3.2-RELEASE_wasm` by default. The generated package pins JavaScriptKit 0.53 for the engine's current Swan binding. Override with\n`ADA_WEB_SWIFT_EXECUTABLE` and `ADA_WEB_SWIFT_SDK`. Exporting does not publish a\nwebsite, sign an app, create an XCFramework or deploy to an iOS device.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Runtime capabilities",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• `@component` and `@replicated_component` structs register world-local native\n  schemas. Queries reuse the existing dynamic cursor and resolve with/without\n  filters; component writes update normal ECS change ticks.\n• `@resource` declarations use `AdaScriptNativeResources`. `autoInsert: true`\n  supplies missing defaults. Registered Swift resources use reflected access;\n  `@resource(Input)` supplies the existing input-action snapshot.\n• `@system` installs native callbacks in the declared scheduler. Before/after\n  dependencies and an explicit startup system are validated. Structural commands\n  declare deferred world access; source-defined resources use one conservative\n  write-access carrier.\n• `context.world` supports spawn, insert, remove, despawn, changeScene and\n  reloadScene. Structural mutations use `Commands`, and scene-spawned entities\n  are tracked by `SceneNavigator` for replacement/reload.\n• Native component constructors use registered engine constructor descriptors.\n  Editor preparation resolves named arguments and defaults to those descriptors.\n• `Assets.load`, typed loads/preloads and saves use AdaAssets handles and its\n  scoped cache. Web player assets preload asynchronously during plugin setup;\n  callbacks can then resolve cached references synchronously. Uncached Web loads\n  and Web filesystem saves report errors. `Assets.loadAsync` and typed async loads\n  run through the same cache without blocking callbacks. Native async saves use\n  AdaAssets on supported filesystems and report a detached failure result on Web.\n• Typed commands and replicated schemas register in the existing multiplayer\n  registry. Native systems send through its outgoing queue, bind received\n  commands, and dispatch RPC handlers with the authenticated source. Editor\n  preparation retains declarations while adapting RPC parameter metadata.\n  Networking requires source schema metadata through the plugin's `sources`\n  initializer argument and `MultiplayerPlugin` installed first.\n• `async`/`await` execute compiled coroutines. `Tasks.start`, `Tasks.promise`,\n  `Tasks.nextFrame`, `Time.sleep` (game time) and `Time.sleepRealTime` work in\n  native systems and scriptable objects. Locals, expression temporaries and loop\n  cursors survive suspension. Each owner resumes inside its declared scheduler\n  or lifecycle access. Removing an owner, replacing a scene or stopping the plugin\n  cancels pending tasks and operations; task count, resume count and execution fuel\n  are bounded.\n• `@scriptable` supplies native ready/update/fixedUpdate/event/destroy callbacks,\n  required components, exported state and the existing Codable registry envelope.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Exported scenes preserve hierarchy and prefabs, persist camera settings while rebuilding transient camera render components, and resolve tile map handles after asynchronous asset preloading. Transform position/scale animations are serialized\nas versioned `KeyframeClip` JSON, including interpolation curves and once/loop/\nping-pong modes, and restored as `KeyframeAnimator` components. Nested prefabs\npreserve their clips.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The exported player installs the project's input actions, feature plugins,\nphysics configuration and scene entry. macOS multiplayer uses LocalTCPTransport;\nWeb accepts the existing browser-lobby session and CloudWebSocketTransport, or\nruns solo with InMemoryTransport when no lobby session is supplied.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Host capabilities expire after the synchronous callback. World/resource/input\nhandles and component drafts cannot be used after suspension. A receiver can\nread freshly rebound declared resources; aliases to earlier callback capabilities\nfail with a stale-handle error. Explicit `@nonsendable` values are rejected at\nsuspension, including values nested in objects/lists. Timer/asset operation results\nare detached and may survive suspension. The Gravity\nfacade serializes native storage and host callbacks with a per-module lock and\nkeeps code owners alive for all metadata reads. Its default allocation limit is\n64 MiB. Detached Swift operation handles are traced from live native owners and\ntask frames so per-frame timers remain bounded; C arena garbage collection and\nnative hot reload are not implemented.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Limits and validation",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This remains an experimental compiler subset. Unsupported Gravity constructs,\nAdaScript views/tools remain unavailable and fail explicitly.\nNo unsupported construct silently switches to interpreted execution.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Movement.ada` validates native ECS/lifecycle integration.\n`HostAdapters.ada` goes through the native source preparation step and validates\nworld commands, Input, constructor capabilities and multiplayer round trips.\n`Async.ada` validates coroutine state, native promises, clocks, cancellation,\nborrowed capability expiry and scriptable lifecycle. Gravity executes the same\nasync C host proof under sanitizers and in freestanding WASM with no VM imports.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "ADAENGINE_DISABLE_SWAN=1 swift test --filter AdaScriptNative",
+        "language": "sh",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Editor export tests run a real multi-source AOT compiler, link and execute its\narchive from a C host, detach scene payloads, parse the generated player and\ncheck that failure preserves the old export. Separate app/browser validation is\nneeded for rendering and deployment evidence. Browser AudioPlugin uses a\nminiaudio mixer with its device disabled and sends copied Float32 PCM to Web Audio.\nThe export bundles `engine-audio.js` for every product. Output waits for a trusted\npointer/key gesture to resume AudioContext; mixing does not advance while output\nis suspended. WAV data and playback copies use independent owned decoders.\nCloud relay Host/Peer acceptance remains separate validation work.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  }
+]

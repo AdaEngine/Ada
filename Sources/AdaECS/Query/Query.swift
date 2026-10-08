@@ -50,7 +50,7 @@ public struct FilterQuery<each T: QueryTarget, F: Filter>: Sequence, Sendable {
     public typealias Element = Builder.Components
 
     /// The iterator type of the query result.
-    public typealias Iterator = FilterQueryIterator<Builder, QueryBuilderTargets<F>>
+    public typealias Iterator = FilterQueryIterator<Builder, F>
 
     public typealias Builder = QueryBuilderTargets<repeat each T>
 
@@ -65,7 +65,7 @@ public struct FilterQuery<each T: QueryTarget, F: Filter>: Sequence, Sendable {
     public init() {
         self.state = QueryState(
             predicate: .init(
-                evaluate: { Builder.predicate(in: $0) }
+                evaluate: { Builder.predicate(in: $0) && QueryBuilderTargets<F>.predicate(in: $0) }
             ),
             filter: .all
         )
@@ -74,7 +74,7 @@ public struct FilterQuery<each T: QueryTarget, F: Filter>: Sequence, Sendable {
     public init(from world: World) {
         self.state = QueryState(
             predicate: .init(
-                evaluate: { Builder.predicate(in: $0) }
+                evaluate: { Builder.predicate(in: $0) && QueryBuilderTargets<F>.predicate(in: $0) }
             ),
             filter: .all
         )
@@ -83,8 +83,7 @@ public struct FilterQuery<each T: QueryTarget, F: Filter>: Sequence, Sendable {
 }
 
 /// Contains array of entities matched for the given EntityQuery request.
-extension FilterQuery  {
-
+extension FilterQuery {
     /// Returns first element of collection.
     public var first: Element? {
         return self.first { _ in return true }
@@ -96,7 +95,7 @@ extension FilterQuery  {
         return self.count { _ in return true }
     }
 
-        /// A Boolean value indicating whether the collection is empty.
+    /// A Boolean value indicating whether the collection is empty.
     public var isEmpty: Bool {
         return self.state.archetypeIndecies.isEmpty
     }
@@ -134,6 +133,10 @@ extension FilterQuery  {
 }
 
 extension FilterQuery: SystemParameter {
+    public static var access: SystemAccessSet {
+        Builder.access.union(QueryBuilderTargets<F>.access)
+    }
+
     public func update(from world: World) {
         self.state.updateArchetypes(in: world)
     }
@@ -168,8 +171,9 @@ final class QueryState: @unchecked Sendable {
     @usableFromInline
     func updateArchetypes(in world: World) {
         self.entities = world.entities
-        self.archetypeIndecies = world.archetypes.archetypes.enumerated().compactMap {
-            self.predicate.evaluate($0.element) ? $0.offset : nil
+        self.archetypeIndecies.removeAll(keepingCapacity: true)
+        for (index, archetype) in world.archetypes.archetypes.enumerated() where self.predicate.evaluate(archetype) {
+            self.archetypeIndecies.append(index)
         }
         self.lastTick = world.lastTick
         self.world = world
@@ -179,7 +183,7 @@ final class QueryState: @unchecked Sendable {
 /// This iterator iterate by each entity in passed archetype array
 public struct FilterQueryIterator<
     B: QuertyTargetBuilder,
-    F: FilterTargetBuilder
+    F: Filter
 >: IteratorProtocol {
     public typealias Element = B.Components
 
@@ -219,10 +223,13 @@ public struct FilterQueryIterator<
     var states: B.ComponentsStates
 
     @usableFromInline
-    var filterStates: F.ComponentsStates
+    var filterState: F.State
 
     @usableFromInline
-    var filterFetches: F.ComponentsFetches
+    var filterFetch: F.Fetch
+
+    @usableFromInline
+    let requiresRowEvaluation: Bool
 
     @usableFromInline
     var needsUpdateData = true
@@ -240,12 +247,14 @@ public struct FilterQueryIterator<
             states: self.states,
             lastTick: state.lastTick
         )
-        self.filterStates = F.initState(world: state.world)
-        self.filterFetches = F.initFetches(
+        self.filterState = F._initState(world: state.world)
+        self.filterFetch = F._initFetch(
             world: state.world,
-            states: filterStates,
-            lastTick: state.lastTick
+            state: filterState,
+            lastTick: state.lastTick,
+            currentTick: state.world.currentTick
         )
+        self.requiresRowEvaluation = F.requiresRowEvaluation
     }
 
     @inlinable
@@ -289,26 +298,15 @@ public struct FilterQueryIterator<
 
             let currentChunk = archetype.chunks.chunks[cursor.currentChunkIndex]
             if needsUpdateData {
-                // #region agent log
-                DebugBenchmarkLogCounter.querySetChunkCount += 1
-                if DebugBenchmarkLogCounter.querySetChunkCount % 100 == 0 {
-                    DebugBenchmarkLog.write(
-                        location: "Query.swift:next setChunk",
-                        message: "query_set_chunk",
-                        data: ["count": DebugBenchmarkLogCounter.querySetChunkCount],
-                        hypothesisId: "H4"
-                    )
-                }
-                // #endregion
                 B.setChunk(
                     states: states,
                     fetches: &fetches,
                     chunk: currentChunk,
                     archetype: archetype
                 )
-                F.setChunk(
-                    states: filterStates,
-                    fetches: &filterFetches,
+                filterFetch = F._setData(
+                    state: filterState,
+                    fetch: filterFetch,
                     chunk: currentChunk,
                     archetype: archetype
                 )
@@ -321,30 +319,23 @@ public struct FilterQueryIterator<
                 cursor.currentRow += 1
             }
 
-            guard F.condition(
-                states: filterStates,
-                fetches: filterFetches,
-                at: cursor.currentRow
-            ) else {
-                continue
+            if requiresRowEvaluation {
+                guard
+                    F.condition(
+                        state: filterState,
+                        fetch: filterFetch,
+                        at: cursor.currentRow
+                    )
+                else {
+                    continue
+                }
             }
 
-            // #region agent log
-            DebugBenchmarkLogCounter.queryEntityLookupCount += 1
-            if DebugBenchmarkLogCounter.queryEntityLookupCount % 25_000 == 0 {
-                DebugBenchmarkLog.write(
-                    location: "Query.swift:next entityLookup",
-                    message: "query_entity_lookup",
-                    data: ["count": DebugBenchmarkLogCounter.queryEntityLookupCount],
-                    hypothesisId: "H3"
-                )
-            }
-            // #endregion
             guard let location = state.entities.entities[entityId] else {
                 continue
             }
             let entity = archetype.entities[location.archetypeRow]
-            
+
             if let value = B.getQueryTargets(
                 for: entity,
                 states: states,
@@ -364,11 +355,12 @@ public struct FilterQueryIterator<
             states: states,
             lastTick: state.lastTick
         )
-        filterStates = F.initState(world: state.world)
-        filterFetches = F.initFetches(
+        filterState = F._initState(world: state.world)
+        filterFetch = F._initFetch(
             world: state.world,
-            states: filterStates,
-            lastTick: state.lastTick
+            state: filterState,
+            lastTick: state.lastTick,
+            currentTick: state.world.currentTick
         )
     }
 }

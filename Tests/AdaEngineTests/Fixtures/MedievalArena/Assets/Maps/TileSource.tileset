@@ -1,0 +1,36 @@
+sources:
+- data:
+    id: 0
+    image:
+      margin:
+        height: 0
+        width: 0
+      path: TileSource.images/tile_0000.png
+      spacing:
+        height: 0
+        width: 0
+      tileSize:
+        height: 16
+        width: 16
+    name: tile_0000
+    tiles: []
+  type: AdaTilemap.TextureAtlasTileSource
+- data:
+    id: 1
+    image:
+      margin:
+        height: 0
+        width: 0
+      path: TileSource.images/tile_0014.png
+      spacing:
+        height: 0
+        width: 0
+      tileSize:
+        height: 16
+        width: 16
+    name: tile_0014
+    tiles: []
+  type: AdaTilemap.TextureAtlasTileSource
+tileSize:
+  x: 16
+  y: 16

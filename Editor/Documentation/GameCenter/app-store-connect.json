@@ -1,0 +1,401 @@
+{
+  "appID": "6809145006",
+  "bundleID": "org.adaengine.editor",
+  "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter",
+  "verifiedAt": "2026-09-09T18:16:18.683814+00:00",
+  "verification": "Each saved detail page was reopened; points, hidden and repeatable flags, both localized titles and processed image filenames were checked against the local catalog.",
+  "submittedForReview": false,
+  "liveGameKitSyncVerified": false,
+  "achievements": [
+    {
+      "id": "firstProject",
+      "gameCenterID": "org.adaengine.editor.achievement.firstProject",
+      "appStoreConnectID": "d7298bb0-b32e-4ff1-bd3f-48ec0b19812b",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/d7298bb0-b32e-4ff1-bd3f-48ec0b19812b",
+      "points": 10,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "firstProject.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "firstScene",
+      "gameCenterID": "org.adaengine.editor.achievement.firstScene",
+      "appStoreConnectID": "241fedb3-9427-48f3-91c3-a37fe768e394",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/241fedb3-9427-48f3-91c3-a37fe768e394",
+      "points": 10,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "firstScene.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "firstRun",
+      "gameCenterID": "org.adaengine.editor.achievement.firstRun",
+      "appStoreConnectID": "7bff663f-18cc-4b45-b4a2-7fbf990d3f27",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/7bff663f-18cc-4b45-b4a2-7fbf990d3f27",
+      "points": 10,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "firstRun.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "firstImport",
+      "gameCenterID": "org.adaengine.editor.achievement.firstImport",
+      "appStoreConnectID": "6dbb6270-de1a-4f6f-b5fc-d3a770bcf719",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/6dbb6270-de1a-4f6f-b5fc-d3a770bcf719",
+      "points": 10,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "firstImport.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "firstSprite",
+      "gameCenterID": "org.adaengine.editor.achievement.firstSprite",
+      "appStoreConnectID": "e015bc84-2ddc-4eb0-8850-8cc8e9b0163c",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/e015bc84-2ddc-4eb0-8850-8cc8e9b0163c",
+      "points": 10,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "firstSprite.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "firstLight",
+      "gameCenterID": "org.adaengine.editor.achievement.firstLight",
+      "appStoreConnectID": "9b676045-9172-46c1-bd41-e8d0aa4e299d",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/9b676045-9172-46c1-bd41-e8d0aa4e299d",
+      "points": 10,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "firstLight.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "camera",
+      "gameCenterID": "org.adaengine.editor.achievement.camera",
+      "appStoreConnectID": "c60b99ec-52d6-4154-a392-7b13e78a7916",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/c60b99ec-52d6-4154-a392-7b13e78a7916",
+      "points": 10,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "camera.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "hierarchy",
+      "gameCenterID": "org.adaengine.editor.achievement.hierarchy",
+      "appStoreConnectID": "a9bef158-075a-4952-9994-dd112f8610a9",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/a9bef158-075a-4952-9994-dd112f8610a9",
+      "points": 20,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "hierarchy.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "components",
+      "gameCenterID": "org.adaengine.editor.achievement.components",
+      "appStoreConnectID": "ea789ba2-6019-4919-be1b-d7b5d3d37015",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/ea789ba2-6019-4919-be1b-d7b5d3d37015",
+      "points": 20,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "components.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "physics",
+      "gameCenterID": "org.adaengine.editor.achievement.physics",
+      "appStoreConnectID": "ea0bbe76-d00a-4831-a70a-420ac53f4d90",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/ea0bbe76-d00a-4831-a70a-420ac53f4d90",
+      "points": 20,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "physics.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "script",
+      "gameCenterID": "org.adaengine.editor.achievement.script",
+      "appStoreConnectID": "9eea40d0-f132-43e3-93a9-3f46f94bbb59",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/9eea40d0-f132-43e3-93a9-3f46f94bbb59",
+      "points": 20,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "script.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "scriptField",
+      "gameCenterID": "org.adaengine.editor.achievement.scriptField",
+      "appStoreConnectID": "cc3f024e-3c5a-4338-82eb-b99cb1d8e801",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/cc3f024e-3c5a-4338-82eb-b99cb1d8e801",
+      "points": 20,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "scriptField.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "animation",
+      "gameCenterID": "org.adaengine.editor.achievement.animation",
+      "appStoreConnectID": "9beda6c9-dad5-4723-96cd-15e64b69732a",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/9beda6c9-dad5-4723-96cd-15e64b69732a",
+      "points": 20,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "animation.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "choreography",
+      "gameCenterID": "org.adaengine.editor.achievement.choreography",
+      "appStoreConnectID": "08f3d3f4-64ca-4084-9e28-e338cc2cc782",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/08f3d3f4-64ca-4084-9e28-e338cc2cc782",
+      "points": 30,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "choreography.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "firstUI",
+      "gameCenterID": "org.adaengine.editor.achievement.firstUI",
+      "appStoreConnectID": "75c31061-86e6-4786-a7fa-8342d9cfdf53",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/75c31061-86e6-4786-a7fa-8342d9cfdf53",
+      "points": 10,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "firstUI.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "layout",
+      "gameCenterID": "org.adaengine.editor.achievement.layout",
+      "appStoreConnectID": "e4fedc72-03f3-40ed-abeb-5ea4a14b8699",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/e4fedc72-03f3-40ed-abeb-5ea4a14b8699",
+      "points": 30,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "layout.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "binding",
+      "gameCenterID": "org.adaengine.editor.achievement.binding",
+      "appStoreConnectID": "e5c22b05-4c66-4c8f-b9ed-cd20ecd0e6ce",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/e5c22b05-4c66-4c8f-b9ed-cd20ecd0e6ce",
+      "points": 30,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "binding.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "sceneInstance",
+      "gameCenterID": "org.adaengine.editor.achievement.sceneInstance",
+      "appStoreConnectID": "b24e78ed-4086-42e4-82c1-7b5f6a6e1f3c",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/b24e78ed-4086-42e4-82c1-7b5f6a6e1f3c",
+      "points": 20,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "sceneInstance.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "population",
+      "gameCenterID": "org.adaengine.editor.achievement.population",
+      "appStoreConnectID": "e04bf55f-cf7b-46cc-a57d-41241852753f",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/e04bf55f-cf7b-46cc-a57d-41241852753f",
+      "points": 40,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "population.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "activeDays",
+      "gameCenterID": "org.adaengine.editor.achievement.activeDays",
+      "appStoreConnectID": "6fab4a97-d550-42b5-a3db-eef5e921253c",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/6fab4a97-d550-42b5-a3db-eef5e921253c",
+      "points": 40,
+      "hidden": false,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "activeDays.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "answer42",
+      "gameCenterID": "org.adaengine.editor.achievement.answer42",
+      "appStoreConnectID": "76b8870c-8446-4d2b-9736-f7cf32e837c3",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/76b8870c-8446-4d2b-9736-f7cf32e837c3",
+      "points": 20,
+      "hidden": true,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "answer42.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "newton",
+      "gameCenterID": "org.adaengine.editor.achievement.newton",
+      "appStoreConnectID": "fbf24ff2-a8b3-4675-9011-e47cb1a9f587",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/fbf24ff2-a8b3-4675-9011-e47cb1a9f587",
+      "points": 20,
+      "hidden": true,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "newton.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "inception",
+      "gameCenterID": "org.adaengine.editor.achievement.inception",
+      "appStoreConnectID": "ab5fccbe-78b2-4842-a8e6-042197407027",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/ab5fccbe-78b2-4842-a8e6-042197407027",
+      "points": 30,
+      "hidden": true,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "inception.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "redo",
+      "gameCenterID": "org.adaengine.editor.achievement.redo",
+      "appStoreConnectID": "9c2f1c85-ce65-4531-a9ce-6d7faac6682a",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/9c2f1c85-ce65-4531-a9ce-6d7faac6682a",
+      "points": 10,
+      "hidden": true,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "redo.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "flip",
+      "gameCenterID": "org.adaengine.editor.achievement.flip",
+      "appStoreConnectID": "58337cf4-adcc-4193-8550-f0304306139c",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/58337cf4-adcc-4193-8550-f0304306139c",
+      "points": 10,
+      "hidden": true,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "flip.png",
+      "status": "Prepare for Submission"
+    },
+    {
+      "id": "helloAda",
+      "gameCenterID": "org.adaengine.editor.achievement.helloAda",
+      "appStoreConnectID": "d0c71d2c-1b2a-4780-a6db-bbb83d32d2be",
+      "url": "https://appstoreconnect.apple.com/apps/6809145006/distribution/gamecenter/achievements/d0c71d2c-1b2a-4780-a6db-bbb83d32d2be",
+      "points": 10,
+      "hidden": true,
+      "repeatable": false,
+      "localizations": [
+        "en-US",
+        "ru"
+      ],
+      "imageFile": "helloAda.png",
+      "status": "Prepare for Submission"
+    }
+  ]
+}

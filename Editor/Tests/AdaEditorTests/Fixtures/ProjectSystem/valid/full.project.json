@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "id": "com.example.spacegame",
+    "name": "SpaceGame",
+    "displayName": "Space Game",
+    "bundleIdentifier": "com.example.spacegame"
+  },
+  "engine": {
+    "minimumVersion": "0.1.0",
+    "package": "AdaEngine"
+  },
+  "paths": {
+    "sources": "Sources",
+    "assets": "Assets",
+    "build": ".build",
+    "generated": ".ada/generated",
+    "run": {
+      "workingDirectory": "Demos/Games/SpaceGame"
+    }
+  },
+  "build": {
+    "system": "swiftpm",
+    "configuration": "debug",
+    "targets": ["Demos/Games/SpaceGame"]
+  },
+  "run": {
+    "executable": ".build/debug/SpaceGame",
+    "arguments": ["--debug"],
+    "environment": {
+      "ADA_LOG_LEVEL": "debug"
+    },
+    "workingDirectory": "Demos/Games/SpaceGame"
+  },
+  "editor": {
+    "startupScene": "Assets/Scenes/Main.scene"
+  },
+  "ai": {
+    "mcp": {
+      "enabled": true,
+      "allowedResourceRoots": ["Sources", "Assets", "Docs"]
+    }
+  }
+}

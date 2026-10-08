@@ -1,6 +1,6 @@
 import AdaUtils
-import Tracing
 import Logging
+import Tracing
 
 /// Represents a scheduler stage in the ECS update loop.
 public struct SchedulerName: Hashable, Equatable, RawRepresentable, CustomStringConvertible, Sendable {
@@ -24,25 +24,25 @@ extension SchedulerName: ExpressibleByStringLiteral {
 }
 
 /// Default schedulers.
-public extension SchedulerName {
+extension SchedulerName {
     /// The startup scheduler that will run once per world.
-    static let startup = SchedulerName(rawValue: "startup")
+    public static let startup = SchedulerName(rawValue: "startup")
 
     /// The pre-update scheduler.
-    static let preUpdate = SchedulerName(rawValue: "preUpdate")
+    public static let preUpdate = SchedulerName(rawValue: "preUpdate")
 
     /// The update scheduler.
-    static let update = SchedulerName(rawValue: "update")
+    public static let update = SchedulerName(rawValue: "update")
 
     /// The post-update scheduler.
-    static let postUpdate = SchedulerName(rawValue: "postUpdate")
+    public static let postUpdate = SchedulerName(rawValue: "postUpdate")
 
     /// The default scheduler order.
-    static var `default`: [SchedulerName] {
+    public static var `default`: [SchedulerName] {
         return [
             .preUpdate,
             .update,
-            .postUpdate
+            .postUpdate,
         ]
     }
 }
@@ -67,7 +67,7 @@ public final class Schedulers: @unchecked Sendable {
     public func setSchedulers(_ schedulers: [SchedulerName]) {
         self.schedulerLabels = schedulers
         self.schedulers = Dictionary(
-            uniqueKeysWithValues: schedulerLabels.enumerated().map { ($1, Scheduler(name: $1)) }
+            uniqueKeysWithValues: schedulerLabels.map { ($0, Scheduler(name: $0)) }
         )
     }
 
@@ -203,7 +203,6 @@ public struct DefaultSchedulerOrder: Resource {
 /// A system that runs the default scheduler.
 @PlainSystem
 public struct DefaultSchedulerRunner: Sendable {
-
     @Res
     private var order: DefaultSchedulerOrder?
 
@@ -213,7 +212,7 @@ public struct DefaultSchedulerRunner: Sendable {
     @Local
     private var isFirstRun = true
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
     public func update(context: UpdateContext) async {
         let world = context.world
@@ -233,6 +232,14 @@ public struct DefaultSchedulerRunner: Sendable {
 public struct Scheduler: Sendable {
     public typealias RunnerBlock = (any System) -> Void
 
+    private static func defaultGraphExecutor() -> any SystemsGraphExecutor {
+        #if WASI || SINGLE_THREAD_SCHEDULER
+            return SingleThreadedSystemsGraphExecutor()
+        #else
+            return MultiThreadedSystemsGraphExecutor()
+        #endif
+    }
+
     /// The name of the scheduler.
     public let name: SchedulerName
 
@@ -240,21 +247,35 @@ public struct Scheduler: Sendable {
     public var systemGraph: SystemsGraph = SystemsGraph()
 
     /// The graph executor of the scheduler.
-    public var graphExecutor: any SystemsGraphExecutor = SingleThreadedSystemsGraphExecutor()
+    public var graphExecutor: any SystemsGraphExecutor
 
     /// The last update time of the scheduler.
     @Local private var lastUpdate: LongTimeInterval = 0
 
     /// Initialize a new scheduler.
     /// - Parameter name: The name of the scheduler.
-    public init(name: SchedulerName) {
+    public init(
+        name: SchedulerName,
+        graphExecutor: (any SystemsGraphExecutor)? = nil
+    ) {
         self.name = name
+        self.graphExecutor = graphExecutor ?? Self.defaultGraphExecutor()
     }
 
     /// Run the scheduler.
     /// - Parameter world: The world to run the scheduler on.
     public mutating func run(world: World) async {
-        let now = Time.absolute
+        await run(world: world, deltaTime: nil)
+    }
+
+    /// Runs systems with an explicit time step for simulation tools. Passing nil uses wall time.
+    public mutating func run(world: World, deltaTime suppliedDelta: AdaUtils.TimeInterval?) async {
+        let now: LongTimeInterval
+        if let suppliedDelta {
+            now = self.lastUpdate + LongTimeInterval(suppliedDelta.isFinite ? max(0, suppliedDelta) : 0)
+        } else {
+            now = Time.absolute
+        }
         let deltaTime = TimeInterval(max(0, now - self.lastUpdate))
         self.lastUpdate = now
 
@@ -268,7 +289,14 @@ public struct Scheduler: Sendable {
         var executor = self.graphExecutor
         let graph = self.systemGraph
 
-        let span = AdaTrace.startSpan("Scheduler.run.\(name.rawValue)")
+        let span = AdaTrace.startSpan(
+            lazyName: "Scheduler.run.\(name.rawValue)",
+            attributes: [
+                "ada.profile.category": "scheduler",
+                "ada.scheduler.name": .string(name.rawValue),
+                "ada.world.name": .string(world.name ?? "UnknownWorld"),
+            ]
+        )
         defer {
             span.end()
         }

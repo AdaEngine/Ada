@@ -7,10 +7,16 @@
 
 /// An object that describes the data of a buffer.
 public struct BufferData<T> {
+    private var storage: [T]
+
     /// The elements of the buffer data.
     public var elements: [T] {
-        didSet {
-            self.isChanged = true
+        _read {
+            yield storage
+        }
+        _modify {
+            isChanged = true
+            yield &storage
         }
     }
     /// The buffer associated with the buffer data.
@@ -26,7 +32,7 @@ public struct BufferData<T> {
     /// - Parameter elements: The elements of the buffer data.
     public init(label: String? = nil, elements: [T]) {
         self.label = label
-        self.elements = elements
+        self.storage = elements
     }
 }
 
@@ -45,7 +51,7 @@ extension BufferData: Hashable where T: Hashable {
 extension BufferData: ExpressibleByArrayLiteral {
     public init(arrayLiteral elements: T...) {
         self.label = nil
-        self.elements = elements
+        self.storage = elements
     }
 }
 
@@ -71,26 +77,25 @@ extension BufferData: RandomAccessCollection {
     }
 }
 
-public extension BufferData {
-
+extension BufferData {
     /// Whether the buffer data is empty.
-    var isEmpty: Bool {
+    public var isEmpty: Bool {
         self.elements.isEmpty
     }
 
     /// The count of elements in the buffer data.
-    var count: Int {
+    public var count: Int {
         self.elements.count
     }
 
     /// The length of the buffer.
-    var bufferLength: Int {
+    public var bufferLength: Int {
         self.buffer?.length ?? 0
     }
 
     /// Write the buffer data to the buffer.
     /// - Parameter renderDevice: The render device to write the buffer data to.
-    mutating func write(to renderDevice: RenderDevice) {
+    public mutating func write(to renderDevice: RenderDevice) {
         reserveCapacity(self.elements.count, for: renderDevice)
         guard let buffer else {
             return
@@ -101,7 +106,7 @@ public extension BufferData {
     /// Reserve capacity for the buffer data.
     /// - Parameter count: The count of elements to reserve capacity for.
     /// - Parameter renderDevice: The render device to reserve capacity for.
-    mutating func reserveCapacity(_ count: Int, for renderDevice: RenderDevice) {
+    public mutating func reserveCapacity(_ count: Int, for renderDevice: RenderDevice) {
         let newCapacity = MemoryLayout<T>.stride * count
         if bufferLength >= newCapacity {
             return
@@ -112,18 +117,17 @@ public extension BufferData {
 
     /// Append an element to the buffer data.
     /// - Parameter element: The element to append.
-    mutating func append(_ element: T) {
+    public mutating func append(_ element: T) {
         self.elements.append(element)
         self.isChanged = true
     }
 
     /// Remove all elements from the buffer data.
-    mutating func removeAll() {
+    public mutating func removeAll() {
         self.elements.removeAll()
     }
 }
 
-extension BufferData: Sequence { }
+extension BufferData: Sequence {}
 
-extension BufferData: Sendable where T: Sendable { }
-
+extension BufferData: Sendable where T: Sendable {}

@@ -51,5 +51,5 @@ void circle_fragment() {
     float alpha = 1.0 - smoothstep(1.0f - fade, 1.0f, dist);
     alpha *= smoothstep(1.0 - Input.Thickness - fade, 1.0 - Input.Thickness, dist);
     color = Input.Color;
-    color.a = alpha;
+    color.a *= alpha;
 }

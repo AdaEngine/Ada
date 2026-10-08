@@ -25,6 +25,7 @@ struct VisibilitySystemTests {
 
     init() {
         self.world = World()
+        self.world.addSystem(TransformSystem.self, on: .preUpdate)
         self.world.addSystem(VisibilitySystem.self, on: .preUpdate)
     }
 
@@ -93,6 +94,22 @@ struct VisibilitySystemTests {
         }
     }
 
+    private func createEntityWithLocalBounds(
+        in world: World,
+        name: String = "Entity",
+        position: Vector3,
+        localCenter: Vector3 = .zero,
+        halfExtents: Vector3 = Vector3(0.5, 0.5, 0.5),
+        visibility: Visibility = .visible
+    ) -> Entity {
+        let aabb = AABB(center: localCenter, halfExtents: halfExtents)
+        return world.spawn(name) {
+            Transform(position: position)
+            BoundingComponent(bounds: .aabb(aabb))
+            visibility
+        }
+    }
+
     // MARK: - Tests
     
     @Test("Entity inside frustum should be visible")
@@ -112,6 +129,24 @@ struct VisibilitySystemTests {
         let visibleEntities = camera.components[VisibleEntities.self]!
         #expect(visibleEntities.entityIds.contains(entity.id))
         #expect(visibleEntities.entities.contains(where: { $0.id == entity.id }))
+    }
+
+    @Test("Entity local bounds are tested using global transform")
+    func entityLocalBoundsAreTestedUsingGlobalTransform() async {
+        let frustum = createTestFrustum()
+        let camera = createCameraEntity(in: world, frustum: frustum)
+
+        let entity = createEntityWithLocalBounds(
+            in: world,
+            name: "Translated Entity",
+            position: Vector3(0, 0, -10)
+        )
+
+        await world.runScheduler(.preUpdate)
+        await world.runScheduler(.preUpdate)
+
+        let visibleEntities = camera.components[VisibleEntities.self]!
+        #expect(visibleEntities.entityIds.contains(entity.id))
     }
     
     @Test("Entity outside frustum (behind camera) should be culled")

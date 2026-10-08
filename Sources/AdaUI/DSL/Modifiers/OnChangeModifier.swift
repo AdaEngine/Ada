@@ -5,11 +5,11 @@
 //  Created by Vladislav Prusakov on 17.07.2024.
 //
 
-public extension View {
+extension View {
     /// Adds a modifier for this view that fires an action when a specific value changes.
     /// - Parameter value: The value to check against when determining whether to run the closure.
     /// - Parameter action: A closure to run when the value changes.
-    func onChange<T: Equatable>(
+    public func onChange<T: Equatable>(
         of value: T,
         perform action: @escaping (T, T) -> Void
     ) -> some View {
@@ -51,8 +51,11 @@ final class OnChangeModifierViewNode<T: Equatable>: ViewModifierNode {
         self.onChangeAction = node.onChangeAction
 
         if node.currentStoredValue != self.currentStoredValue {
-            onChangeAction(self.currentStoredValue, node.currentStoredValue)
+            let previousValue = self.currentStoredValue
+            // Actions can update state and synchronously re-enter this node.
+            // Commit the observed value before notifying to avoid duplicate callbacks.
             self.currentStoredValue = node.currentStoredValue
+            onChangeAction(previousValue, node.currentStoredValue)
         }
     }
 }

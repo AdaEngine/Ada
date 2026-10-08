@@ -10,6 +10,8 @@ import AdaUtils
 
 /// The plugin that sets up the main scheduler.
 package struct MainSchedulerPlugin: Plugin {
+    package init() {}
+
     /// Setup the main scheduler.
     /// - Parameter app: The app to setup the main scheduler for.
     package func setup(in app: AppWorlds) {
@@ -23,12 +25,18 @@ package struct MainSchedulerPlugin: Plugin {
             .fixed,
 
             // Update
+            .networkReceive,
             .preUpdate,
             .update,
+            .networkSend,
+            .networkInterpolate,
             .postUpdate,
 
             // Fixed
             .fixedPreUpdate,
+            .physicsSync,
+            .physicsStep,
+            .physicsWriteback,
             .fixedUpdate,
             .fixedPostUpdate
         )
@@ -39,10 +47,15 @@ package struct MainSchedulerPlugin: Plugin {
         app.insertResource(
             DefaultSchedulerOrder(
                 order: [
+                    .networkReceive,
                     .preUpdate,
                     .update,
+                    // Apply fixed-step writes before post-update systems derive
+                    // render state such as GlobalTransform.
+                    .fixed,
+                    .networkSend,
+                    .networkInterpolate,
                     .postUpdate,
-                    .fixed
                 ]
             )
         )
@@ -61,24 +74,28 @@ extension SchedulerName {
 func GameLoopBegan(
     _ deltaTime: Res<DeltaTime?>
 ) {
-    guard let deltaTime = deltaTime.wrappedValue else { return }
+    guard let deltaTime = deltaTime.wrappedValue else {
+        return
+    }
     EventManager.default.send(EngineEvents.MainLoopBegan(deltaTime: deltaTime.deltaTime))
 }
 
 /// The system that runs the fixed time scheduler.
 @PlainSystem
 public struct FixedTimeSchedulerSystem {
-
     @Local
     private var fixedTimestep: FixedTimestep
 
     let order: [SchedulerName] = [
         .fixedPreUpdate,
+        .physicsSync,
+        .physicsStep,
+        .physicsWriteback,
         .fixedUpdate,
-        .fixedPostUpdate
+        .fixedPostUpdate,
     ]
 
-    public init(world: World) {
+    public init(world _: World) {
         self.fixedTimestep = FixedTimestep(stepsPerSecond: 60)
     }
 
@@ -93,14 +110,37 @@ public struct FixedTimeSchedulerSystem {
             let step = self.fixedTimestep.step
             let world = context.world
             world.insertResource(FixedTime(deltaTime: step))
-            for scheduler in order {
-                await world.runScheduler(scheduler)
+            // Preserve simulation speed below the render refresh rate. Bound catch-up work after
+            // a stall so one expensive frame cannot trigger an unbounded physics backlog.
+            let tickCount = min(8, max(1, Int((result.fixedTime / step).rounded())))
+            for _ in 0..<tickCount {
+                for scheduler in order {
+                    await world.runScheduler(scheduler, deltaTime: step)
+                }
             }
         }
     }
 }
 
 extension SchedulerName {
+    /// Receives and applies network data before gameplay systems run.
+    public static let networkReceive = SchedulerName(rawValue: "networkReceive")
+
+    /// Captures authoritative state after fixed simulation and sends network data.
+    public static let networkSend = SchedulerName(rawValue: "networkSend")
+
+    /// Applies client presentation interpolation before transform propagation.
+    public static let networkInterpolate = SchedulerName(rawValue: "networkInterpolate")
+
+    /// The scheduler that synchronizes ECS state into physics backends.
+    public static let physicsSync = SchedulerName(rawValue: "physicsSync")
+
+    /// The scheduler that advances physics backends.
+    public static let physicsStep = SchedulerName(rawValue: "physicsStep")
+
+    /// The scheduler that writes physics results back into ECS state.
+    public static let physicsWriteback = SchedulerName(rawValue: "physicsWriteback")
+
     /// The fixed pre-update scheduler.
     public static let fixedPreUpdate = SchedulerName(rawValue: "fixedPreUpdate")
 

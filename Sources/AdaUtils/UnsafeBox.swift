@@ -9,7 +9,6 @@
 @propertyWrapper
 @safe
 public struct UnsafeBox<T> {
-
     @usableFromInline
     let box: _UnsafeBox
 
@@ -87,7 +86,7 @@ extension UnsafeBox: Hashable where T: Hashable {
 
 extension UnsafeBox: Codable where T: Codable {
     public init(from decoder: any Decoder) throws {
-        let value = try T.init(from: decoder)
+        let value = try T(from: decoder)
         unsafe self.box = _UnsafeBox(value)
     }
 
@@ -96,9 +95,9 @@ extension UnsafeBox: Codable where T: Codable {
     }
 }
 
-public extension UnsafeMutablePointer {
+extension UnsafeMutablePointer {
     @inlinable
-    func unsafeBox() -> UnsafeBox<Pointee> {
+    public func unsafeBox() -> UnsafeBox<Pointee> {
         unsafe UnsafeBox(self)
     }
 }
@@ -171,7 +170,7 @@ public struct UnsafeAnyBox {
         unsafe self.box = _UnsafeBox(pointer)
     }
 
-    public func bind<T>(to type: T.Type) -> UnsafeBox<T> {
+    public func bind<T>(to _: T.Type) -> UnsafeBox<T> {
         return unsafe UnsafeBox(box)
     }
 }

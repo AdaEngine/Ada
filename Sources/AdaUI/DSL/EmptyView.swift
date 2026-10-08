@@ -10,18 +10,18 @@ import Math
 /// A view that doesn’t contain any content.
 public struct EmptyView: View, ViewNodeBuilder {
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     /// Creates an empty view.
     public init() {}
 
-    func buildViewNode(in context: BuildContext) -> ViewNode {
+    func buildViewNode(in _: BuildContext) -> ViewNode {
         EmptyViewNode(content: self)
     }
 }
 
 final class EmptyViewNode: ViewNode {
-    override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
+    override func sizeThatFits(_: ProposedViewSize) -> Size {
         return .zero
     }
 }

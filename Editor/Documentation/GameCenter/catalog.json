@@ -1,0 +1,577 @@
+{
+  "achievements" : [
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.firstProject",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "firstProject",
+      "image" : "images\/firstProject.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: A Beginning.",
+          "preEarnedDescription" : "Create your first project.",
+          "title" : "A Beginning"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Начало положено.",
+          "preEarnedDescription" : "Создайте первый проект.",
+          "title" : "Начало положено"
+        }
+      },
+      "points" : 10,
+      "referenceName" : "A Beginning",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.firstScene",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "firstScene",
+      "image" : "images\/firstScene.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: First World.",
+          "preEarnedDescription" : "Edit and save a scene.",
+          "title" : "First World"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Первый мир.",
+          "preEarnedDescription" : "Измените и сохраните сцену.",
+          "title" : "Первый мир"
+        }
+      },
+      "points" : 10,
+      "referenceName" : "First World",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.firstRun",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "firstRun",
+      "image" : "images\/firstRun.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: It's Alive!.",
+          "preEarnedDescription" : "Successfully load a scene in Play Mode.",
+          "title" : "It's Alive!"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Оно живое!.",
+          "preEarnedDescription" : "Успешно запустите сцену в редакторе.",
+          "title" : "Оно живое!"
+        }
+      },
+      "points" : 10,
+      "referenceName" : "It's Alive!",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.firstImport",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "firstImport",
+      "image" : "images\/firstImport.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Your Materials.",
+          "preEarnedDescription" : "Import an asset into a project.",
+          "title" : "Your Materials"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Свои материалы.",
+          "preEarnedDescription" : "Импортируйте ресурс в проект.",
+          "title" : "Свои материалы"
+        }
+      },
+      "points" : 10,
+      "referenceName" : "Your Materials",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.firstSprite",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "firstSprite",
+      "image" : "images\/firstSprite.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: First Pixel.",
+          "preEarnedDescription" : "Assign a local texture to a sprite and save.",
+          "title" : "First Pixel"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Первый пиксель.",
+          "preEarnedDescription" : "Назначьте спрайту свою текстуру и сохраните сцену.",
+          "title" : "Первый пиксель"
+        }
+      },
+      "points" : 10,
+      "referenceName" : "First Pixel",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.firstLight",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "firstLight",
+      "image" : "images\/firstLight.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Let There Be Light.",
+          "preEarnedDescription" : "Add a 2D light and save the scene.",
+          "title" : "Let There Be Light"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Да будет свет.",
+          "preEarnedDescription" : "Добавьте источник света 2D и сохраните сцену.",
+          "title" : "Да будет свет"
+        }
+      },
+      "points" : 10,
+      "referenceName" : "Let There Be Light",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.camera",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "camera",
+      "image" : "images\/camera.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: In the Frame.",
+          "preEarnedDescription" : "Change camera settings and save.",
+          "title" : "In the Frame"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Всё в кадре.",
+          "preEarnedDescription" : "Измените настройки камеры и сохраните сцену.",
+          "title" : "Всё в кадре"
+        }
+      },
+      "points" : 10,
+      "referenceName" : "In the Frame",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.hierarchy",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "hierarchy",
+      "image" : "images\/hierarchy.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Family Tree.",
+          "preEarnedDescription" : "Save a parent with three children.",
+          "title" : "Family Tree"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Семейное дерево.",
+          "preEarnedDescription" : "Сохраните сущность с тремя дочерними.",
+          "title" : "Семейное дерево"
+        }
+      },
+      "points" : 20,
+      "referenceName" : "Family Tree",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.components",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "components",
+      "image" : "images\/components.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Made of Parts.",
+          "preEarnedDescription" : "Save an entity with three extra components.",
+          "title" : "Made of Parts"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Из деталей.",
+          "preEarnedDescription" : "Сохраните сущность с тремя компонентами сверх стандартных.",
+          "title" : "Из деталей"
+        }
+      },
+      "points" : 20,
+      "referenceName" : "Made of Parts",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.physics",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "physics",
+      "image" : "images\/physics.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Laws of Nature.",
+          "preEarnedDescription" : "Run a scene with a dynamic body and collision shape.",
+          "title" : "Laws of Nature"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Законы природы.",
+          "preEarnedDescription" : "Запустите сцену с динамическим телом и коллайдером.",
+          "title" : "Законы природы"
+        }
+      },
+      "points" : 20,
+      "referenceName" : "Laws of Nature",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.script",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "script",
+      "image" : "images\/script.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: First Spell.",
+          "preEarnedDescription" : "Run a scene with an AdaScript component.",
+          "title" : "First Spell"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Первое заклинание.",
+          "preEarnedDescription" : "Запустите сцену с AdaScript-компонентом.",
+          "title" : "Первое заклинание"
+        }
+      },
+      "points" : 20,
+      "referenceName" : "First Spell",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.scriptField",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "scriptField",
+      "image" : "images\/scriptField.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Control Knobs.",
+          "preEarnedDescription" : "Edit an AdaScript field in the Inspector and save.",
+          "title" : "Control Knobs"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Ручки управления.",
+          "preEarnedDescription" : "Измените поле AdaScript в Inspector и сохраните сцену.",
+          "title" : "Ручки управления"
+        }
+      },
+      "points" : 20,
+      "referenceName" : "Control Knobs",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.animation",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "animation",
+      "image" : "images\/animation.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Action!.",
+          "preEarnedDescription" : "Preview an animation with two different keyframes.",
+          "title" : "Action!"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Мотор!.",
+          "preEarnedDescription" : "Включите предпросмотр анимации с двумя различающимися ключевыми кадрами.",
+          "title" : "Мотор!"
+        }
+      },
+      "points" : 20,
+      "referenceName" : "Action!",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.choreography",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "choreography",
+      "image" : "images\/choreography.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Choreographer.",
+          "preEarnedDescription" : "Save a clip animating three properties.",
+          "title" : "Choreographer"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Хореограф.",
+          "preEarnedDescription" : "Сохраните клип с анимацией трёх свойств.",
+          "title" : "Хореограф"
+        }
+      },
+      "points" : 30,
+      "referenceName" : "Choreographer",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.firstUI",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "firstUI",
+      "image" : "images\/firstUI.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: First Screen.",
+          "preEarnedDescription" : "Add an element to a UI document and save.",
+          "title" : "First Screen"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Первый экран.",
+          "preEarnedDescription" : "Добавьте элемент в UI Designer и сохраните документ.",
+          "title" : "Первый экран"
+        }
+      },
+      "points" : 10,
+      "referenceName" : "First Screen",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.layout",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "layout",
+      "image" : "images\/layout.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Everything in Place.",
+          "preEarnedDescription" : "Save a UI with nested containers and five content elements.",
+          "title" : "Everything in Place"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Всё по полочкам.",
+          "preEarnedDescription" : "Сохраните UI с вложенными контейнерами и пятью элементами.",
+          "title" : "Всё по полочкам"
+        }
+      },
+      "points" : 30,
+      "referenceName" : "Everything in Place",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.binding",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "binding",
+      "image" : "images\/binding.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Connected.",
+          "preEarnedDescription" : "Run a scene with a UI bound to an AdaScript field.",
+          "title" : "Connected"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Связь установлена.",
+          "preEarnedDescription" : "Запустите сцену с UI, привязанным к полю AdaScript.",
+          "title" : "Связь установлена"
+        }
+      },
+      "points" : 30,
+      "referenceName" : "Connected",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.sceneInstance",
+      "goal" : 1,
+      "hidden" : false,
+      "id" : "sceneInstance",
+      "image" : "images\/sceneInstance.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: World Within a World.",
+          "preEarnedDescription" : "Save a scene containing another scene.",
+          "title" : "World Within a World"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Мир внутри мира.",
+          "preEarnedDescription" : "Добавьте экземпляр другой сцены и сохраните.",
+          "title" : "Мир внутри мира"
+        }
+      },
+      "points" : 20,
+      "referenceName" : "World Within a World",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.population",
+      "goal" : 50,
+      "hidden" : false,
+      "id" : "population",
+      "image" : "images\/population.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Growing World.",
+          "preEarnedDescription" : "Save a scene with 50 entities, excluding its root.",
+          "title" : "Growing World"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Набирая масштаб.",
+          "preEarnedDescription" : "Сохраните сцену с 50 сущностями, не считая корня.",
+          "title" : "Набирая масштаб"
+        }
+      },
+      "points" : 40,
+      "referenceName" : "Growing World",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.activeDays",
+      "goal" : 7,
+      "hidden" : false,
+      "id" : "activeDays",
+      "image" : "images\/activeDays.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Returning Author.",
+          "preEarnedDescription" : "Edit and save on seven different days. No streak required.",
+          "title" : "Returning Author"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Возвращение автора.",
+          "preEarnedDescription" : "Редактируйте и сохраняйте в 7 разных дней. Подряд не требуется.",
+          "title" : "Возвращение автора"
+        }
+      },
+      "points" : 40,
+      "referenceName" : "Returning Author",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.answer42",
+      "goal" : 1,
+      "hidden" : true,
+      "id" : "answer42",
+      "image" : "images\/answer42.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: The Answer.",
+          "preEarnedDescription" : "Save exactly 42 entities, excluding the root.",
+          "title" : "The Answer"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Ответ на главный вопрос.",
+          "preEarnedDescription" : "Сохраните ровно 42 сущности, не считая корня.",
+          "title" : "Ответ на главный вопрос"
+        }
+      },
+      "points" : 20,
+      "referenceName" : "The Answer",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.newton",
+      "goal" : 1,
+      "hidden" : true,
+      "id" : "newton",
+      "image" : "images\/newton.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Newton Approves.",
+          "preEarnedDescription" : "Run a dynamic body named Apple with a collision shape.",
+          "title" : "Newton Approves"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Ньютон одобряет.",
+          "preEarnedDescription" : "Запустите динамическое тело Apple с коллайдером.",
+          "title" : "Ньютон одобряет"
+        }
+      },
+      "points" : 20,
+      "referenceName" : "Newton Approves",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.inception",
+      "goal" : 1,
+      "hidden" : true,
+      "id" : "inception",
+      "image" : "images\/inception.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Inception.",
+          "preEarnedDescription" : "Save a chain of three nested scenes: A → B → C.",
+          "title" : "Inception"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Начало.",
+          "preEarnedDescription" : "Сохраните три уровня вложенных сцен: A → B → C.",
+          "title" : "Начало"
+        }
+      },
+      "points" : 30,
+      "referenceName" : "Inception",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.redo",
+      "goal" : 1,
+      "hidden" : true,
+      "id" : "redo",
+      "image" : "images\/redo.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: As Intended.",
+          "preEarnedDescription" : "Undo an edit, redo it, then save the document.",
+          "title" : "As Intended"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Я так и задумал.",
+          "preEarnedDescription" : "Отмените изменение, верните через Redo и сохраните.",
+          "title" : "Я так и задумал"
+        }
+      },
+      "points" : 10,
+      "referenceName" : "As Intended",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.flip",
+      "goal" : 1,
+      "hidden" : true,
+      "id" : "flip",
+      "image" : "images\/flip.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Inside Out.",
+          "preEarnedDescription" : "Save a sprite with both Flip X and Flip Y enabled.",
+          "title" : "Inside Out"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Наизнанку.",
+          "preEarnedDescription" : "Сохраните спрайт с включёнными Flip X и Flip Y.",
+          "title" : "Наизнанку"
+        }
+      },
+      "points" : 10,
+      "referenceName" : "Inside Out",
+      "repeatable" : false
+    },
+    {
+      "gameCenterID" : "org.adaengine.editor.achievement.helloAda",
+      "goal" : 1,
+      "hidden" : true,
+      "id" : "helloAda",
+      "image" : "images\/helloAda.png",
+      "localizations" : {
+        "en-US" : {
+          "earnedDescription" : "Achievement earned: Hello, Ada.",
+          "preEarnedDescription" : "Save a UI Text element saying Hello, Ada!",
+          "title" : "Hello, Ada"
+        },
+        "ru" : {
+          "earnedDescription" : "Достижение получено: Привет, Ада.",
+          "preEarnedDescription" : "Сохраните текстовый элемент UI со строкой Hello, Ada!",
+          "title" : "Привет, Ада"
+        }
+      },
+      "points" : 10,
+      "referenceName" : "Hello, Ada",
+      "repeatable" : false
+    }
+  ],
+  "bundleID" : "org.adaengine.editor"
+}

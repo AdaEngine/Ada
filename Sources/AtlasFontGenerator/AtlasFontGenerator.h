@@ -30,6 +30,10 @@ public:
     
     /// Returns bitmap representation.
     AtlasBitmap* generateAtlasBitmap();
+
+    bool isValid() const {
+        return m_FontData != nullptr && m_AtlasInfo.width > 0 && m_AtlasInfo.height > 0;
+    }
     
     
     /// For some reasons we should store font data on Swift side.
@@ -51,4 +55,3 @@ private:
 
 }
 #endif /* AtlasFontGenerator_h */
-

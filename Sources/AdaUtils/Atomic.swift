@@ -6,13 +6,11 @@
 //
 
 import Foundation
-import Dispatch
 
 /// A property wrapper that allows you to isolate a value with a lock.
 @propertyWrapper
 @dynamicMemberLookup
 public final class LocalIsolated<Value> {
-
     /// The lock-isolated value.
     public var wrappedValue: Value {
         get {

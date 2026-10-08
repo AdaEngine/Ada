@@ -5,7 +5,7 @@
 //  Created by Vladislav Prusakov on 16.11.2025.
 //
 
-public extension Array {
+extension Array {
     /// Removes an element from the array and returns it.
     ///
     /// # Examples
@@ -20,7 +20,7 @@ public extension Array {
     /// assert(array == ["baz", "qux"])
     /// ```
     @discardableResult
-    mutating func swapRemove(at index: Int) -> Element {
+    public mutating func swapRemove(at index: Int) -> Element {
         let length = self.count
         precondition(index <= length, "swapRemove index is \(index) should be < len (is \(length))")
         let tmp = self[index]
@@ -30,7 +30,7 @@ public extension Array {
     }
 }
 
-public extension ContiguousArray {
+extension ContiguousArray {
     /// Removes an element from the array and returns it.
     ///
     /// # Examples
@@ -45,7 +45,7 @@ public extension ContiguousArray {
     /// assert(array == ["baz", "qux"])
     /// ```
     @discardableResult
-    mutating func swapRemove(at index: Int) -> Element {
+    public mutating func swapRemove(at index: Int) -> Element {
         let length = self.count
         precondition(index <= length, "swapRemove index is \(index) should be < len (is \(length))")
         let tmp = self[index]

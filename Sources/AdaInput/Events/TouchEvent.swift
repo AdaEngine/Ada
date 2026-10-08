@@ -8,14 +8,12 @@
 import AdaUtils
 import Math
 
-// TODO: (Vlad) Number of taps?
 // TODO: (Vlad) finger index?
 // TODO: (Vlad) Angles?
 // TODO: (Vlad) radius of pressure?
 
 /// Event describing the status of a finger touching the screen.
 public struct TouchEvent: InputEvent {
-
     /// Describe the phase of a finger touch
     public enum Phase: Hashable, Sendable {
         case began
@@ -29,17 +27,25 @@ public struct TouchEvent: InputEvent {
 
     /// Describe the phase of a finger touch
     public let phase: Phase
-    
+
     public let id: RID = RID()
+
+    /// Stable identity of a finger from began through ended/cancelled; distinct from the event ID.
+    public let contactID: RID
 
     public let window: RID
 
     public let time: TimeInterval
 
-    public init(window: RID, location: Point, phase: Phase, time: TimeInterval) {
+    /// Number of successive taps recognized by the platform for this contact.
+    public let tapCount: Int
+
+    public init(window: RID, location: Point, phase: Phase, time: TimeInterval, contactID: RID? = nil, tapCount: Int = 1) {
         self.location = location
         self.phase = phase
+        self.contactID = contactID ?? window
         self.window = window
         self.time = time
+        self.tapCount = tapCount
     }
 }

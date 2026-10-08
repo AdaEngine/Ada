@@ -7,7 +7,6 @@
 
 /// This protocol describe vertex buffer created for GPU usage.
 public protocol VertexBuffer: Buffer {
-    
     /// Contains group binding for shader.
     var binding: Int { get }
 }

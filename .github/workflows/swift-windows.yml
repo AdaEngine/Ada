@@ -14,8 +14,11 @@ defaults:
 jobs:
   Windows:
     name: Windows with SwiftPM
-    runs-on: windows-latest
+    # Swift 6.2.3 ships Clang 19, while the Visual Studio 2026 STL on
+    # windows-latest requires Clang 20 or newer.
+    runs-on: windows-2022
     env:
+      ADAENGINE_HEADLESS: "1"
       ADAENGINE_SKIP_WEBGPU_PLUGINS: "1"
     steps:
         - name: Setup
@@ -30,4 +33,7 @@ jobs:
           run: swift -version
 
         - name: Test
-          run: swift test --parallel
+          # Swift Testing 6.2.3 on Windows becomes unstable when all tests are
+          # scheduled at once. Keep bounded parallelism so the suite still
+          # makes progress without exhausting the runner.
+          run: swift test -j 2 --parallel --num-workers 2

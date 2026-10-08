@@ -1,5 +1,0 @@
-module CVulkan [system] {
-    header "cvulkan.h"
-    link "vulkan"
-    export *
-}

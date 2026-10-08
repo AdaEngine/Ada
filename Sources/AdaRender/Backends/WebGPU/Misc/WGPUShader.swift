@@ -5,46 +5,75 @@
 //  Created by v.prusakov on 1/18/23.
 //
 
-#if canImport(WebGPU)
-import WebGPU
-import CWebGPU
-import Foundation
-import AdaUtils
+#if WEBGPU_ENABLED && canImport(WebGPU)
+    import AdaUtils
+    import Foundation
+    import Synchronization
+    @unsafe @preconcurrency import WebGPU
 
-@_spi(Internal)
-public final class WGPUShader: CompiledShader {
-    public let shader: WebGPU.ShaderModule
+    @_spi(Internal)
+    public final class WGPUShader: CompiledShader {
+        public let shader: WebGPU.GPUShaderModule
+        public let entryPoint: String
 
-    init(shader: Shader, device: WebGPU.Device) {
-        let shaderData: any WebGPU.Chained
+        init(shader: Shader, device: WebGPU.GPUDevice) {
+            #if WASM
+                let code: String
+                let entryPoint: String
 
-        switch shader.source {
-        case .code(let code):
-            shaderData = ShaderSourceWgsl(code: code)
-        case .spirv:
-           fatalError("SPIR-V shaders are not supported for WebGPU")
-        }
-        
-        let module = device.createShaderModule(
-            descriptor: ShaderModuleDescriptor(
-                label: shader.entryPoint,
-                nextInChain: shaderData
-            )
-        )
-        
-        // Check for compilation errors
-        module.getCompilationInfo { result in
-            switch result {
-            case .success(let compilationInfo):
-                for message in compilationInfo.messages {
-                    print("[WebGPU] Shader message [\(message.type)]: \(message.message) at line \(message.lineNum)")
+                switch shader.source {
+                case let .code(source):
+                    code = source
+                    entryPoint = shader.entryPoint
+                case .spirv:
+                    fatalError("SPIR-V shader modules are not supported by browser WebGPU.")
                 }
-            case .failure(let error):
-                print("[WebGPU] Shader compilation failed: \(error)")
-            }
-        }
 
-        self.shader = module
+                let module = webGPUDeviceLock.withLock { _ in
+                    device.createShaderModule(
+                        descriptor: WebGPU.GPUShaderModuleDescriptor(
+                            label: shader.entryPoint,
+                            code: code
+                        )
+                    )
+                }
+            #else
+                let shaderData: any WebGPU.GPUChainedStruct
+                let entryPoint: String
+
+                switch shader.source {
+                case let .code(code):
+                    shaderData = WebGPU.GPUShaderSourceWGSL(code: code)
+                    entryPoint = shader.entryPoint
+                case let .spirv(data):
+                    let code = data.withUnsafeBytes { buffer in
+                        Array(buffer.bindMemory(to: UInt32.self))
+                    }
+                    #if os(Android)
+                        // Native GLSL permits texture sampling in divergent control flow.
+                        // Preserve that SPIR-V behavior when Dawn translates through WGSL.
+                        shaderData = WebGPU.GPUShaderSourceSPIRV(
+                            code: code,
+                            nextInChain: WebGPU.DawnShaderModuleSPIRVOptionsDescriptor(allowNonUniformDerivatives: true)
+                        )
+                    #else
+                        shaderData = WebGPU.GPUShaderSourceSPIRV(code: code)
+                    #endif
+                    entryPoint = "main"
+                }
+
+                let module = webGPUDeviceLock.withLock { _ in
+                    device.createShaderModule(
+                        descriptor: WebGPU.GPUShaderModuleDescriptor(
+                            label: shader.entryPoint,
+                            nextInChain: shaderData
+                        )
+                    )
+                }
+            #endif
+
+            self.shader = module
+            self.entryPoint = entryPoint
+        }
     }
-}
 #endif

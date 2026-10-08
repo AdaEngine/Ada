@@ -231,7 +231,14 @@ bool setFontVariationAxis(FreetypeHandle *library, FontHandle *font, const char 
             std::vector<FT_Fixed> coords(master->num_axis);
             if (!FT_Get_Var_Design_Coordinates(font->face, FT_UInt(coords.size()), &coords[0])) {
                 for (FT_UInt i = 0; i < master->num_axis; ++i) {
-                    if (!strcmp(name, master->axis[i].name)) {
+                    char tagName[5] = {
+                        char((master->axis[i].tag >> 24) & 0xff),
+                        char((master->axis[i].tag >> 16) & 0xff),
+                        char((master->axis[i].tag >> 8) & 0xff),
+                        char(master->axis[i].tag & 0xff),
+                        '\0'
+                    };
+                    if (!strcmp(name, master->axis[i].name) || !strcmp(name, tagName)) {
                         coords[i] = DOUBLE_TO_F16DOT16(coordinate);
                         success = true;
                         break;

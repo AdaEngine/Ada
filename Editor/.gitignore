@@ -1,0 +1,24 @@
+# Local Fastlane configuration and signing material must stay out of Git.
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.pem
+*.key
+*.cer
+*.mobileprovision
+*.provisionprofile
+*.keychain
+*.keychain-db
+.bundle/
+vendor/bundle/
+fastlane/report.xml
+fastlane/README.md
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+fastlane/api_key*.json
+*.ipa
+*.dSYM.zip
+*.xcarchive/

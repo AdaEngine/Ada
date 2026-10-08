@@ -10,9 +10,12 @@ import AdaUtils
 import box2d
 import Math
 
+#if canImport(Dispatch)
+    import Dispatch
+#endif
+
 /// A protocol that defines a delegate for the physics world.
 public protocol PhysicsWorld2DDelegate: AnyObject, Sendable {
-
     /// Called when the physics world is about to solve a collision.
     ///
     /// - Parameters:
@@ -27,7 +30,7 @@ public protocol PhysicsWorld2DDelegate: AnyObject, Sendable {
         entityB: Entity,
         manifold: Manifold2D?
     ) -> Bool
-    
+
     /// Called when the physics world is about to filter a collision.
     ///
     /// - Parameters:
@@ -44,19 +47,18 @@ public protocol PhysicsWorld2DDelegate: AnyObject, Sendable {
 
 /// An object that holds and simulates all 2D physics bodies.
 public final class PhysicsWorld2D: Codable, @unchecked Sendable {
-
     /// The coding keys for the physics world.
     enum CodingKeys: CodingKey {
         case substepIterations
         case gravity
     }
-    
+
     /// The delegate of the physics world.
     public weak var delegate: PhysicsWorld2DDelegate?
-    
+
     /// The substep iterations.
     public var substepIterations: Int = 4
-    
+
     /// Contains world gravity.
     public var gravity: Vector2 {
         get {
@@ -66,7 +68,7 @@ public final class PhysicsWorld2D: Codable, @unchecked Sendable {
             b2World_SetGravity(worldId, newValue.b2Vec)
         }
     }
-    
+
     /// Enable/disable continuous collision between dynamic and static bodies.
     /// Generally you should keep continuous collision enabled to prevent fast moving objects from
     /// going through static objects. The performance gain from disabling continuous collision is minor.
@@ -78,7 +80,7 @@ public final class PhysicsWorld2D: Codable, @unchecked Sendable {
             b2World_EnableContinuous(worldId, newValue)
         }
     }
-    
+
     /// Enable/disable constraint warm starting. Advanced feature for testing.
     /// Disabling sleeping greatly reduces stability and provides no performance gain.
     public var isWarmStartingEnabled: Bool {
@@ -89,7 +91,7 @@ public final class PhysicsWorld2D: Codable, @unchecked Sendable {
             b2World_EnableWarmStarting(worldId, newValue)
         }
     }
-    
+
     /// Enable/disable sleep. If your application does not need sleeping, you can gain
     /// some performance by disabling sleep completely at the world level.
     public var isSleepEnabled: Bool {
@@ -101,8 +103,8 @@ public final class PhysicsWorld2D: Codable, @unchecked Sendable {
         }
     }
 
-   /// Adjust the restitution threshold. It is recommended not to make this value very small
-   /// because it will prevent bodies from sleeping. Usually in meters per second.
+    /// Adjust the restitution threshold. It is recommended not to make this value very small
+    /// because it will prevent bodies from sleeping. Usually in meters per second.
     public var restitutionThreshold: Float {
         get {
             b2World_GetRestitutionThreshold(worldId)
@@ -124,26 +126,43 @@ public final class PhysicsWorld2D: Codable, @unchecked Sendable {
     }
     private let worldId: b2WorldId
     var eventManager: EventManager = .default
-    
+    #if canImport(Dispatch)
+        private let taskScheduler: Box2DTaskScheduler?
+    #endif
+
     /// - Parameter gravity: default gravity is 9.8.
-    nonisolated init(gravity: Vector2 = [0, -9.81]) {
+    nonisolated init(
+        gravity: Vector2 = [0, -9.81],
+        workerCount: Int = PhysicsSimulationThreading.recommendedWorkerCount
+    ) {
         var worldDef = unsafe b2DefaultWorldDef()
         unsafe worldDef.gravity = gravity.b2Vec
         unsafe worldDef.enableSleep = true
         unsafe worldDef.enableContinuous = true
+        #if canImport(Dispatch)
+            let clampedWorkerCount = max(1, workerCount)
+            let scheduler = clampedWorkerCount > 1 ? Box2DTaskScheduler(workerCount: clampedWorkerCount) : nil
+            if let scheduler {
+                unsafe worldDef.workerCount = Int32(clampedWorkerCount)
+                unsafe worldDef.enqueueTask = PhysicsSimulationThreading_Box2DEnqueueTask
+                unsafe worldDef.finishTask = PhysicsSimulationThreading_Box2DFinishTask
+                unsafe worldDef.userTaskContext = Unmanaged.passUnretained(scheduler).toOpaque()
+            }
+            self.taskScheduler = scheduler
+        #endif
         self.worldId = unsafe b2CreateWorld(&worldDef)
         b2World_EnableWarmStarting(worldId, true)
-        
+
         let unsafeWorldPtr = unsafe Unmanaged.passUnretained(self).toOpaque()
         unsafe b2World_SetPreSolveCallback(worldId, PhysicsWorld2D_PreSolve, unsafeWorldPtr)
         unsafe b2World_SetCustomFilterCallback(worldId, PhysicsWorld2D_CustomFilterCallback, unsafeWorldPtr)
     }
-    
+
     deinit {
         b2DestroyWorld(worldId)
     }
-    
-    public nonisolated convenience init(from decoder: Decoder) throws {
+
+    nonisolated public convenience init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let gravity = try container.decode(Vector2.self, forKey: .gravity)
 
@@ -151,15 +170,15 @@ public final class PhysicsWorld2D: Codable, @unchecked Sendable {
 
         self.substepIterations = try container.decode(Int.self, forKey: .substepIterations)
     }
-    
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(self.gravity, forKey: .gravity)
         try container.encode(self.substepIterations, forKey: .substepIterations)
     }
-    
+
     // MARK: - Raycasting
-    
+
     /// An array of collision cast hit results.
     /// Each hit indicates where the ray, starting at a given point and traveling in a given direction, hit a particular entity in the scene.
     public func raycast(
@@ -187,17 +206,19 @@ public final class PhysicsWorld2D: Codable, @unchecked Sendable {
 
             let distance = (startPoint - endPoint).squaredLength * result.fraction
 
-            return [Raycast2DHit(
-                entity: entity,
-                point: result.point.asVector2,
-                normal: result.normal.asVector2,
-                distance: distance
-            )]
+            return [
+                Raycast2DHit(
+                    entity: entity,
+                    point: result.point.asVector2,
+                    normal: result.normal.asVector2,
+                    distance: distance
+                )
+            ]
         case .all:
             return []
         }
     }
-    
+
     /// An array of collision cast hit results.
     /// Each hit indicates where the ray, starting at a given point and traveling in a given direction, hit a particular entity in the world.
     public func raycast(
@@ -207,9 +228,9 @@ public final class PhysicsWorld2D: Codable, @unchecked Sendable {
     ) -> [Raycast2DHit] {
         return self.raycast(from: ray.origin.xy, to: ray.direction.xy, query: query, mask: mask)
     }
-    
+
     // MARK: - Internal
-    
+
     @MainActor
     func updateSimulation(_ delta: TimeInterval) {
         b2World_Step(
@@ -217,6 +238,45 @@ public final class PhysicsWorld2D: Codable, @unchecked Sendable {
             Float(delta), /* timeStep */
             Int32(self.substepIterations) /* velocityIterations */
         )
+    }
+
+    func recordPerformance(into metrics: PhysicsPerformanceMetrics) {
+        metrics.record(
+            b2World_GetProfile(worldId),
+            counters: b2World_GetCounters(worldId)
+        )
+    }
+
+    /// Iterates the contiguous Box2D move-event stream produced by the latest simulation step.
+    func forEachMovedBody(_ body: (Entity, Vector2, Quat) -> Void) {
+        let events = unsafe b2World_GetBodyEvents(worldId)
+        guard unsafe events.moveCount > 0, let moveEvents = unsafe events.moveEvents else {
+            return
+        }
+
+        for index in unsafe 0..<Int(events.moveCount) {
+            let event = unsafe moveEvents[index]
+            guard let userData = unsafe event.userData else {
+                continue
+            }
+
+            let runtimeBody = unsafe Unmanaged<Body2D>.fromOpaque(userData).takeUnretainedValue()
+            guard let entity = runtimeBody.entity else {
+                continue
+            }
+
+            let position = unsafe event.transform.p.asVector2
+            let rotation = unsafe Quat(
+                axis: [0, 0, 1],
+                angle: -b2Rot_GetAngle(event.transform.q)
+            )
+
+            body(
+                entity,
+                position,
+                rotation
+            )
+        }
     }
 
     func debugDraw(with definitions: b2DebugDraw) {
@@ -262,12 +322,12 @@ public final class PhysicsWorld2D: Codable, @unchecked Sendable {
     nonisolated func destroyBody(_ body: Body2D) {
         b2DestroyBody(body.bodyId)
     }
-    
+
     func createBody(with definition: b2BodyDef, for entity: Entity) -> Body2D {
         let body = unsafe withUnsafePointer(to: definition) {
             unsafe b2CreateBody(self.worldId, $0)
         }
-        
+
         let body2d = Body2D(world: self, bodyId: body, entity: entity)
         let pointer = unsafe Unmanaged.passUnretained(body2d).toOpaque()
         unsafe b2Body_SetUserData(body, pointer)
@@ -276,8 +336,7 @@ public final class PhysicsWorld2D: Codable, @unchecked Sendable {
     }
 }
 
-private extension PhysicsWorld2D {
-
+extension PhysicsWorld2D {
     @MainActor
     private func onSensorBeginContact(_ contact: b2SensorBeginTouchEvent) {
         let shapeIdA = BoxShape2D(shape: contact.sensorShapeId)
@@ -366,7 +425,7 @@ private extension PhysicsWorld2D {
         self.eventManager.send(event)
     }
 
-    private func onHitContact(_ contact: b2ContactHitEvent) {
+    private func onHitContact(_: b2ContactHitEvent) {
         // TODO: Not implemented
     }
 }
@@ -387,29 +446,28 @@ private func PhysicsWorld2D_PreSolve(
             rollingImpulse: ptr.pointee.rollingImpulse
         )
     }
-    
-    return MainActor.assumeIsolated {
-        let shapeIdA = BoxShape2D(shape: shapeA)
-        let shapeIdB = BoxShape2D(shape: shapeB)
 
-        guard shapeIdA.isValid && shapeIdB.isValid else {
-            return false
-        }
+    let shapeIdA = BoxShape2D(shape: shapeA)
+    let shapeIdB = BoxShape2D(shape: shapeB)
 
-        let bodyA = shapeIdA.body
-        let bodyB = shapeIdB.body
+    guard shapeIdA.isValid && shapeIdB.isValid else {
+        return false
+    }
 
-        guard let entityA = bodyA?.entity, let entityB = bodyB?.entity else {
-            return false
-        }
-        
-        return world.delegate?.physicsWorldOnPreSolve(
+    let bodyA = shapeIdA.body
+    let bodyB = shapeIdB.body
+
+    guard let entityA = bodyA?.entity, let entityB = bodyB?.entity else {
+        return false
+    }
+
+    return world.delegate?
+        .physicsWorldOnPreSolve(
             world,
             entityA: entityA,
             entityB: entityB,
             manifold: manifold
-        ) ?? false
-    }
+        ) ?? true
 }
 
 private func PhysicsWorld2D_CustomFilterCallback(
@@ -421,28 +479,26 @@ private func PhysicsWorld2D_CustomFilterCallback(
         return true
     }
     let world = unsafe Unmanaged<PhysicsWorld2D>.fromOpaque(context).takeUnretainedValue()
-    return MainActor.assumeIsolated {
-        
-        let shapeIdA = BoxShape2D(shape: shapeA)
-        let shapeIdB = BoxShape2D(shape: shapeB)
+    let shapeIdA = BoxShape2D(shape: shapeA)
+    let shapeIdB = BoxShape2D(shape: shapeB)
 
-        guard shapeIdA.isValid && shapeIdB.isValid else {
-            return true
-        }
+    guard shapeIdA.isValid && shapeIdB.isValid else {
+        return true
+    }
 
-        let bodyA = shapeIdA.body
-        let bodyB = shapeIdB.body
+    let bodyA = shapeIdA.body
+    let bodyB = shapeIdB.body
 
-        guard let entityA = bodyA?.entity, let entityB = bodyB?.entity else {
-            return true
-        }
-        
-        return world.delegate?.physicsWorldOnCustomFilterCalled(
+    guard let entityA = bodyA?.entity, let entityB = bodyB?.entity else {
+        return true
+    }
+
+    return world.delegate?
+        .physicsWorldOnCustomFilterCalled(
             world,
             entityA: entityA,
             entityB: entityB
         ) ?? true
-    }
 }
 
 // MARK: - Casting
@@ -452,7 +508,7 @@ extension Vector2 {
         get {
             return unsafe unsafeBitCast(self, to: b2Vec2.self)
         }
-        
+
         set {
             self = unsafe unsafeBitCast(newValue, to: Vector2.self)
         }
@@ -489,34 +545,32 @@ extension PhysicsBodyMode {
 
 /// A hit result of a collision cast.
 public struct Raycast2DHit {
-    
     /// The entity that was hit.
     public let entity: Entity
-    
+
     /// The point of the hit.
     public let point: Vector2
-    
+
     /// The normal of the hit.
     public let normal: Vector2
-    
+
     /// The distance from the ray origin to the hit, or the convex shape travel distance.
     public let distance: Float
 }
 
-fileprivate final class _Raycast2DCallback {
-    
+private final class _Raycast2DCallback {
     var results: [Raycast2DHit] = []
-    
+
     let startPoint: Vector2
     let endPoint: Vector2
     let query: CollisionCastQueryType
     let mask: CollisionGroup
-    
+
     enum RaycastReporting {
         static let `continue`: Float = 1.0
         static let terminate: Float = 0.0
     }
-    
+
     init(startPoint: Vector2, endPoint: Vector2, query: CollisionCastQueryType, mask: CollisionGroup) {
         self.startPoint = startPoint
         self.endPoint = endPoint
@@ -524,76 +578,76 @@ fileprivate final class _Raycast2DCallback {
         self.mask = mask
     }
 
-//    func reportFixture(_ fixture: b2Fixture, point: b2Vec2, normal: b2Vec2, fraction: Float) -> Float {
-//        let fixtureBody = fixture.GetBody()!
-//        let userData = fixtureBody.GetUserData().pointee
-//        
-//        let filterData = fixture.GetFilterData().pointee
-//        
-//        if !(filterData.maskBits == self.mask.rawValue) {
-//            return RaycastReporting.continue
-//        }
-//        
-//        let pointer = UnsafeRawPointer(OpaquePointer(bitPattern: userData.pointer)!)
-//        let body = Unmanaged<Body2D>.fromOpaque(pointer).takeUnretainedValue()
-//        
-//        guard let entity = body.entity else {
-//            return RaycastReporting.continue
-//        }
-//        
-//        // FIXME: Check distance
-//        let distance = (self.startPoint - self.endPoint).squaredLength * fraction
-//        
-//        let result = Raycast2DHit(
-//            entity: entity,
-//            point: point.asVector2,
-//            normal: normal.asVector2,
-//            distance: distance
-//        )
-//        
-//        self.results.append(result)
-//        
-//        if query == .first {
-//            return RaycastReporting.terminate
-//        } else {
-//            return RaycastReporting.continue
-//        }
-//    }
+    //    func reportFixture(_ fixture: b2Fixture, point: b2Vec2, normal: b2Vec2, fraction: Float) -> Float {
+    //        let fixtureBody = fixture.GetBody()!
+    //        let userData = fixtureBody.GetUserData().pointee
+    //
+    //        let filterData = fixture.GetFilterData().pointee
+    //
+    //        if !(filterData.maskBits == self.mask.rawValue) {
+    //            return RaycastReporting.continue
+    //        }
+    //
+    //        let pointer = UnsafeRawPointer(OpaquePointer(bitPattern: userData.pointer)!)
+    //        let body = Unmanaged<Body2D>.fromOpaque(pointer).takeUnretainedValue()
+    //
+    //        guard let entity = body.entity else {
+    //            return RaycastReporting.continue
+    //        }
+    //
+    //        // FIXME: Check distance
+    //        let distance = (self.startPoint - self.endPoint).squaredLength * fraction
+    //
+    //        let result = Raycast2DHit(
+    //            entity: entity,
+    //            point: point.asVector2,
+    //            normal: normal.asVector2,
+    //            distance: distance
+    //        )
+    //
+    //        self.results.append(result)
+    //
+    //        if query == .first {
+    //            return RaycastReporting.terminate
+    //        } else {
+    //            return RaycastReporting.continue
+    //        }
+    //    }
 }
 
 //
-//func testScene() {
+// func testScene() {
 //    var worldDef = b2DefaultWorldDef()
 //    let world = b2CreateWorld(&worldDef)
-//    
+//
 //    var groundDef = b2DefaultBodyDef()
 //    groundDef.position = b2Vec2(x: 0, y: -10)
 //    let groundId = b2CreateBody(world, &groundDef)
-//    
+//
 //    var groundBox = b2MakeBox(50, 10)
-//    
+//
 //    var groundShapeDef = b2DefaultShapeDef()
 //    b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
-//    
+//
 //    var dynamicDef = b2DefaultBodyDef()
 //    dynamicDef.position = b2Vec2(x: 0, y: 4)
 //    dynamicDef.type = b2_dynamicBody
 //    dynamicDef.fixedRotation = true
 //    let dynamicId = b2CreateBody(world, &dynamicDef)
-//    
+//
 //    var dynamicBox = b2MakeBox(1, 1)
 //    var dynamicShapeDef = b2DefaultShapeDef()
 //    dynamicShapeDef.density = 1
 //    b2CreatePolygonShape(dynamicId, &dynamicShapeDef, &dynamicBox)
-//    
+//
 //    let timespamp: Float = 1.0 / 60.0
-//    
+//
 //    for _ in 0..<130 {
 //        b2World_Step(world, timespamp, 4)
 //        var dynamicPosition = b2Body_GetPosition(dynamicId)
 //        print("Dynamic position: \(dynamicPosition.x) \(dynamicPosition.y)")
 //    }
-//}
+// }
 
 /// A manifold of a collision.
 public struct Manifold2D: Sendable {

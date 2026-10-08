@@ -17,13 +17,12 @@
 
 /// A set of masks that determine whether entities can collide during simulations.
 public struct CollisionFilter: Codable, Sendable {
-    
     /// The collision group or groups, stored as a bit mask, to which the entity belongs.
     public var categoryBitMask: CollisionGroup
-    
+
     /// The collision group or groups, stored as a bitmask, with which the entity can collide.
     public var collisionBitMask: CollisionGroup
-    
+
     /// Creates a collision filter.
     public init(
         categoryBitMask: CollisionGroup = .default,
@@ -36,22 +35,21 @@ public struct CollisionFilter: Codable, Sendable {
 
 /// A bitmask used to define the collision group to which an entity belongs.
 public struct CollisionGroup: OptionSet, Codable, Sendable {
-    
     public var rawValue: UInt64
-    
+
     /// Creates an empty option set.
     public init() {
         self.rawValue = 0
     }
-    
+
     /// Creates a collision group from a raw value.
     public init(rawValue: UInt64) {
         self.rawValue = rawValue
     }
-    
+
     /// The default collision group for objects.
-    public static let `default` = CollisionGroup(rawValue: 1 << 0)
-    
+    public static let `default` = Self(rawValue: 1 << 0)
+
     /// The collision group that represents all groups.
-    public static let all = CollisionGroup(rawValue: .max)
+    public static let all = Self(rawValue: .max)
 }

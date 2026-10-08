@@ -1,4 +1,4 @@
-# Contributing to AdaEngine
+# Contributing to Ada
 
 We welcome contributions of all kinds: bug fixes, features, documentation, and examples.
 

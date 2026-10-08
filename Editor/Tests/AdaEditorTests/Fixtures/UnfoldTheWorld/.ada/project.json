@@ -1,0 +1,88 @@
+{
+  "ai" : {
+    "mcp" : {
+      "allowedResourceRoots" : [
+
+      ],
+      "enabled" : true
+    }
+  },
+  "build" : {
+    "excludedFiles" : [
+
+    ],
+    "includedFiles" : [
+
+    ],
+    "system" : "adascript",
+    "targets" : [
+
+    ]
+  },
+  "editor" : {
+    "displayPreview" : {
+      "expanded" : true,
+      "mode" : "foldable"
+    },
+    "startupScene" : "Assets/Scenes/Main.ascn"
+  },
+  "engine" : {
+
+  },
+  "paths" : {
+    "assets" : "Assets",
+    "resourceRoots" : [
+      "Assets"
+    ],
+    "run" : {
+
+    },
+    "sources" : "Sources"
+  },
+  "project" : {
+    "bundleIdentifier" : "org.adaengine.unfold",
+    "displayName" : "Unfold the world",
+    "name" : "UnfoldTheWorld"
+  },
+  "run" : {
+    "arguments" : [
+
+    ],
+    "destination" : "macos",
+    "environment" : {
+
+    }
+  },
+  "runtime" : {
+    "entry" : {
+      "scene" : "Assets/Scenes/Main.ascn"
+    },
+    "moduleName" : "UnfoldTheWorld",
+    "plugins" : {
+      "disable" : [
+
+      ],
+      "enable" : [
+
+      ],
+      "preset" : "game2d",
+      "presetVersion" : 1,
+      "settings" : {
+        "physics2d" : {
+          "gravity" : [
+            0,
+            -9.81
+          ]
+        }
+      }
+    },
+    "window" : {
+      "isResizable" : true,
+      "size" : {
+        "height" : 700,
+        "width" : 1024
+      }
+    }
+  },
+  "schemaVersion" : 3
+}

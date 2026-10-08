@@ -1,0 +1,155 @@
+import AdaECS
+import Foundation
+
+/// The kind of value described by a multiplayer schema.
+public enum NetworkTypeKind: String, Codable, Hashable, Sendable {
+    case component
+    case command
+    case event
+    case request
+}
+
+/// The peer allowed to author a network value.
+public enum NetworkAuthority: String, Codable, Hashable, Sendable {
+    case host
+    case anyPeer
+}
+
+/// Delivery semantics requested by a network schema.
+public enum NetworkDelivery: String, Codable, Hashable, Sendable {
+    case reliableOrdered
+    case unreliable
+    case unreliableSequenced
+}
+
+/// Visibility applied before a replication policy performs per-peer filtering.
+public enum NetworkVisibility: String, Codable, Hashable, Sendable {
+    case allPeers
+}
+
+/// The convergence behavior of one replicated field.
+public enum FieldReplicationMode: String, Codable, Hashable, Sendable {
+    case state
+    case latest
+    case initialOnly
+}
+
+/// Presentation interpolation requested for one replicated field.
+public enum FieldInterpolationMode: String, Codable, Hashable, Sendable {
+    case none
+    case linear
+    case custom
+}
+
+/// Stable, language-independent wire representation of a field type.
+public struct NetworkWireType: Codable, Hashable, RawRepresentable, Sendable {
+    public let rawValue: String
+
+    public init(rawValue: String) {
+        self.rawValue = rawValue
+    }
+
+    public static let bool = Self(rawValue: "bool")
+    public static let signedInteger = Self(rawValue: "sint")
+    public static let unsignedInteger = Self(rawValue: "uint")
+    public static let floatingPoint = Self(rawValue: "float")
+    public static let string = Self(rawValue: "string")
+    public static let vector2 = Self(rawValue: "vector2")
+    public static let vector3 = Self(rawValue: "vector3")
+    public static let vector4 = Self(rawValue: "vector4")
+
+    public static func named(_ name: String) -> Self {
+        Self(rawValue: "named:\(name)")
+    }
+}
+
+/// Portable metadata for one field in a generated network schema.
+public struct NetworkFieldDescriptor: Codable, Hashable, Sendable {
+    public let tag: UInt16
+    public let wireType: NetworkWireType
+    public let replication: FieldReplicationMode
+    public let interpolation: FieldInterpolationMode
+
+    public init(
+        tag: UInt16,
+        wireType: NetworkWireType,
+        replication: FieldReplicationMode = .state,
+        interpolation: FieldInterpolationMode = .none
+    ) {
+        precondition(tag > 0, "Network field tags must be positive")
+        self.tag = tag
+        self.wireType = wireType
+        self.replication = replication
+        self.interpolation = interpolation
+    }
+}
+
+/// Portable schema shared by Swift macros, AdaScript generation, and handshake validation.
+public struct NetworkTypeDescriptor: Codable, Hashable, Sendable {
+    public let typeID: String
+    public let version: UInt16
+    public let kind: NetworkTypeKind
+    public let authority: NetworkAuthority
+    public let direction: RPCDirection?
+    public let delivery: NetworkDelivery
+    public let channel: String
+    public let maximumPayloadSize: Int
+    public let visibility: NetworkVisibility
+    public let fields: [NetworkFieldDescriptor]
+
+    public init(
+        typeID: String,
+        version: UInt16 = 1,
+        kind: NetworkTypeKind,
+        authority: NetworkAuthority,
+        direction: RPCDirection? = nil,
+        delivery: NetworkDelivery = .reliableOrdered,
+        channel: String = "state",
+        maximumPayloadSize: Int = 64 * 1_024,
+        visibility: NetworkVisibility = .allPeers,
+        fields: [NetworkFieldDescriptor]
+    ) {
+        precondition(!typeID.isEmpty, "Network type identifiers must not be empty")
+        precondition(version > 0, "Network type versions must be positive")
+        precondition(maximumPayloadSize > 0, "Network payload limits must be positive")
+        precondition(Set(fields.map(\.tag)).count == fields.count, "Network field tags must be unique")
+        self.typeID = typeID
+        self.version = version
+        self.kind = kind
+        self.authority = authority
+        self.direction = direction
+        self.delivery = delivery
+        self.channel = channel
+        self.maximumPayloadSize = maximumPayloadSize
+        self.visibility = visibility
+        self.fields = fields.sorted { $0.tag < $1.tag }
+    }
+
+    var compatibilitySignature: String {
+        let fieldSignature = fields.map {
+            "\($0.tag):\($0.wireType.rawValue):\($0.replication.rawValue):\($0.interpolation.rawValue)"
+        }.joined(separator: ",")
+        return [
+            typeID,
+            String(version),
+            kind.rawValue,
+            authority.rawValue,
+            direction?.rawValue ?? "none",
+            delivery.rawValue,
+            channel,
+            String(maximumPayloadSize),
+            visibility.rawValue,
+            fieldSignature,
+        ].joined(separator: ":")
+    }
+}
+
+/// A component whose ECS and wire conformances are generated by ``ReplicatedComponent``.
+public protocol NetworkReplicatedComponent: Component, Codable, Sendable {
+    static var networkDescriptor: NetworkTypeDescriptor { get }
+}
+
+/// A typed RPC model with generated portable schema metadata.
+public protocol NetworkDescribedMessage: NetworkMessage {
+    static var networkDescriptor: NetworkTypeDescriptor { get }
+}

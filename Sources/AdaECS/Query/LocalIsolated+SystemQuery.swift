@@ -10,7 +10,6 @@ import AdaUtils
 @propertyWrapper
 @dynamicMemberLookup
 public final class Local<Value> {
-
     public var wrappedValue: Value {
         _read {
             yield _value
@@ -20,7 +19,7 @@ public final class Local<Value> {
         }
     }
 
-    private nonisolated var _value: Value
+    nonisolated private var _value: Value
 
     /// Initializes lock-isolated state around a value.
     ///
@@ -63,14 +62,16 @@ extension Local: Equatable where Value: Equatable {
 }
 
 extension Local: SystemParameter {
-    public convenience init(from world: World) {
-        fatalError("Can't be initialized from world")
+    // SystemParameter requires this initializer, while Local requires an explicit value.
+    // swiftlint:disable:next unavailable_function
+    public convenience init(from _: World) {
+        preconditionFailure("Local values must be initialized with an explicit value.")
     }
 
     /// Updates the query state with the given world.
-    public func update(from world: World) { }
+    public func update(from _: World) {}
 
-    public func finish(_ world: World) { }
+    public func finish(_: World) {}
 }
 
 extension Local: ExpressibleByBooleanLiteral where Value == Bool {

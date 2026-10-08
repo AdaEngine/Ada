@@ -7,14 +7,13 @@
 
 import Math
 
-public extension View {
-    func opacity(_ opacity: Float) -> some View {
+extension View {
+    public func opacity(_ opacity: Float) -> some View {
         modifier(_OpacityView(opacity: opacity, content: self))
     }
 }
 
 struct _OpacityView<Content: View>: ViewModifier, ViewNodeBuilder {
-
     typealias Body = Never
 
     let opacity: Float
@@ -29,16 +28,45 @@ struct _OpacityView<Content: View>: ViewModifier, ViewNodeBuilder {
 
 final class OpacityViewNodeModifier: ViewModifierNode {
     var opacity: Float = 1
+    private var targetOpacity: Float?
+    private weak var propertyController: UIAnimationController?
+
+    override func update(from newNode: ViewNode) {
+        let animationController = animationControllerForUpdate
+        super.update(from: newNode)
+
+        guard let node = newNode as? OpacityViewNodeModifier else {
+            return
+        }
+
+        guard node.opacity != (targetOpacity ?? opacity) else {
+            return
+        }
+        targetOpacity = node.opacity
+        propertyController?.removeAnimation(label: id)
+        propertyController = animationController
+        if let animationController {
+            animationController.addTweenAnimation(
+                from: TweenValue(animatableData: self.opacity),
+                to: TweenValue(animatableData: node.opacity),
+                label: self.id,
+                environment: self.environment,
+                updateBlock: { [weak self] value in
+                    self?.opacity = value.animatableData
+                    self?.invalidateNearestLayer()
+                }
+            )
+        } else {
+            self.opacity = node.opacity
+            self.invalidateNearestLayer()
+        }
+    }
 
     override func draw(with context: UIGraphicsContext) {
-        if let layer = layer {
+        if let layer {
             var context = context
             context.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
             layer.drawLayer(in: context)
-        }
-
-        if context.environment.debugViewDrawingOptions.contains(.drawViewOverlays) {
-            context.drawDebugBorders(frame.size, color: debugNodeColor)
         }
     }
 
@@ -54,8 +82,7 @@ final class OpacityViewNodeModifier: ViewModifierNode {
             }
 
             var context = context
-            context.translateBy(x: -self.frame.origin.x, y: self.frame.origin.y)
-            context.opacity = self.opacity
+            context.opacity *= self.opacity
             self.contentNode.draw(with: context)
         }
         layer.debugLabel = "opacity"

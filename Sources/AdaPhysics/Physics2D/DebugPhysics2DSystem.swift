@@ -5,13 +5,13 @@
 //  Created by v.prusakov on 2/26/23.
 //
 
-import AdaECS
-import AdaUtils
-import AdaTransform
 import AdaCorePipelines
+import AdaECS
+@_spi(Internal) import AdaRender
+import AdaTransform
+import AdaUtils
 import box2d
 import Math
-@_spi(Internal) import AdaRender
 
 public struct PhysicsDebugOptions: OptionSet, Resource {
     public var rawValue: UInt16
@@ -21,9 +21,9 @@ public struct PhysicsDebugOptions: OptionSet, Resource {
     }
 
     /// Draw physics collision shapes for physics object.
-    public static let showPhysicsShapes = PhysicsDebugOptions(rawValue: 1 << 0)
+    public static let showPhysicsShapes = Self(rawValue: 1 << 0)
 
-    public static let showBoundingBoxes = PhysicsDebugOptions(rawValue: 1 << 1)
+    public static let showBoundingBoxes = Self(rawValue: 1 << 1)
 }
 
 // MARK: - Extracted Debug Shapes
@@ -56,7 +56,7 @@ public struct PhysicsDebugDrawData: Resource, DefaultValue {
     public var circleIndexBuffer: BufferData<UInt32>
 
     public static let defaultValue: PhysicsDebugDrawData = {
-        PhysicsDebugDrawData(
+        Self(
             lineVertexBuffer: .init(label: "PhysicsDebug_LineVertexBuffer", elements: []),
             lineIndexBuffer: .init(label: "PhysicsDebug_LineIndexBuffer", elements: []),
             circleVertexBuffer: .init(label: "PhysicsDebug_CircleVertexBuffer", elements: []),
@@ -110,8 +110,11 @@ private func DebugPhysicsExctract2DSystem_DrawSolidCircle(
     _ color: b2HexColor,
     _ context: UnsafeMutableRawPointer?
 ) {
+    guard let context else {
+        return
+    }
     let debugContext = unsafe Unmanaged<WorldDebugDrawContext>
-        .fromOpaque(context!)
+        .fromOpaque(context)
         .takeUnretainedValue()
 
     let color = Color.fromHex(Int(color.rawValue))
@@ -123,7 +126,7 @@ private func DebugPhysicsExctract2DSystem_DrawSolidCircle(
     // Draw direction indicator line
     let direction = Vector2(
         transform.q.c * radius,  // cos(angle) * radius
-        transform.q.s * radius   // sin(angle) * radius
+        transform.q.s * radius  // sin(angle) * radius
     )
 
     let start = center
@@ -136,22 +139,26 @@ private func DebugPhysicsExctract2DSystem_DrawSolidPolygon(
     _ transform: b2Transform,
     _ verticies: UnsafePointer<b2Vec2>?,
     _ vertexCount: Int32,
-    _ radius: Float,
+    _: Float,
     _ color: b2HexColor,
     _ context: UnsafeMutableRawPointer?
 ) {
     guard let verticies = unsafe verticies else {
         return
     }
+    guard let context else {
+        return
+    }
 
     let debugContext = unsafe Unmanaged<WorldDebugDrawContext>
-        .fromOpaque(context!)
+        .fromOpaque(context)
         .takeUnretainedValue()
     let color = Color.fromHex(Int(color.rawValue))
 
-    let vertices = (0..<vertexCount).map { index in
-        unsafe verticies[Int(index)].asVector2
-    }
+    let vertices = (0..<vertexCount)
+        .map { index in
+            unsafe verticies[Int(index)].asVector2
+        }
 
     for i in 0..<vertexCount {
         let start = vertices[Int(i)]
@@ -209,7 +216,6 @@ public func ExtractPhysicsDebug(
 /// System for preparing physics debug render items.
 @PlainSystem
 public struct PreparePhysicsDebugSystem: Sendable {
-
     @ResMut<RenderItems<Transparent2DRenderItem>>
     private var renderItems
 
@@ -231,9 +237,9 @@ public struct PreparePhysicsDebugSystem: Sendable {
     @Res
     private var circleDrawPass: PhysicsDebugCircleDrawPass
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         // Skip if no shapes to render
         if extractedShapes.lines.isEmpty && extractedShapes.circles.isEmpty {
             return
@@ -276,13 +282,12 @@ public struct PreparePhysicsDebugSystem: Sendable {
 /// System for tessellating and batching physics debug shapes.
 @PlainSystem
 public struct PhysicsDebugRenderSystem: Sendable {
-
     /// Quad corner positions for circle SDF rendering.
     private let quadPositions: [Vector4] = [
         [-0.5, -0.5, 0.0, 1.0],
-        [ 0.5, -0.5, 0.0, 1.0],
-        [ 0.5,  0.5, 0.0, 1.0],
-        [-0.5,  0.5, 0.0, 1.0]
+        [0.5, -0.5, 0.0, 1.0],
+        [0.5, 0.5, 0.0, 1.0],
+        [-0.5, 0.5, 0.0, 1.0],
     ]
 
     @Res<ExtractedPhysicsDebugShapes>
@@ -297,9 +302,9 @@ public struct PhysicsDebugRenderSystem: Sendable {
     @Res<RenderDeviceHandler>
     private var renderDevice
 
-    public init(world: World) {}
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         // Clear previous frame data
         drawData.lineVertexBuffer.elements.removeAll(keepingCapacity: true)
         drawData.lineIndexBuffer.elements.removeAll(keepingCapacity: true)
@@ -369,7 +374,7 @@ public struct PhysicsDebugRenderSystem: Sendable {
                             worldPosition: worldPos.xyz,
                             localPosition: Vector2(localPos.x, localPos.y),
                             thickness: 0.05,  // Stroke thickness
-                            fade: 0.01,       // Anti-aliasing fade
+                            fade: 0.01,  // Anti-aliasing fade
                             color: circle.color
                         )
                     )
@@ -403,7 +408,7 @@ public struct PhysicsDebugLineDrawPass: DrawPass, Resource {
     public func render(
         with renderEncoder: RenderCommandEncoder,
         world: World,
-        view: Entity,
+        view _: Entity,
         item: Transparent2DRenderItem
     ) throws {
         guard
@@ -445,7 +450,7 @@ public struct PhysicsDebugCircleDrawPass: DrawPass, Resource {
     public func render(
         with renderEncoder: RenderCommandEncoder,
         world: World,
-        view: Entity,
+        view _: Entity,
         item: Transparent2DRenderItem
     ) throws {
         guard

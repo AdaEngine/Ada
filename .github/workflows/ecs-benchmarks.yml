@@ -1,0 +1,38 @@
+name: ECS Benchmark Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'Benchmarks/**'
+      - 'Sources/AdaECS/**'
+      - 'Sources/AdaUtils/**'
+      - 'Sources/AdaEngineMacros/**'
+      - 'Package.swift'
+      - '.github/workflows/ecs-benchmarks.yml'
+  workflow_dispatch:
+
+jobs:
+  benchmark-smoke:
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.1.1.app
+      ADAENGINE_BENCHMARKS: '1'
+      ADAENGINE_BENCHMARK_SMOKE: '1'
+      ADAENGINE_HEADLESS: '1'
+      ADAENGINE_SKIP_WEBGPU_PLUGINS: '1'
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install allocator
+        run: brew install jemalloc
+      - name: Run Release benchmarks
+        run: |
+          set -o pipefail
+          swift --version | tee benchmark-smoke.log
+          swift package --allow-writing-to-package-directory benchmark run --target AdaECSBenchmarks --no-progress 2>&1 | tee -a benchmark-smoke.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ecs-benchmark-smoke
+          path: benchmark-smoke.log

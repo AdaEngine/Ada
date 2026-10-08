@@ -40,24 +40,15 @@ public final class Entities: @unchecked Sendable {
     }
 
     func addNotAllocatedEntity(_ entity: Entity) {
-        guard entity.id == Entity.notAllocatedId else { return }
+        guard entity.id == Entity.notAllocatedId else {
+            return
+        }
         let newId = currentId.loadThenWrappingIncrement(ordering: .relaxed)
         entity.id = newId
         entity.components.entity = newId
     }
 
     func insert(_ location: EntityLocation, for entity: Entity.ID) {
-        // #region agent log
-        DebugBenchmarkLogCounter.entitiesInsertCount += 1
-        if DebugBenchmarkLogCounter.entitiesInsertCount % 25_000 == 0 {
-            DebugBenchmarkLog.write(
-                location: "Archetype.swift:Entities.insert",
-                message: "entities_insert",
-                data: ["count": DebugBenchmarkLogCounter.entitiesInsertCount],
-                hypothesisId: "H1"
-            )
-        }
-        // #endregion
         lock.sync {
             entities[entity] = location
         }
@@ -82,8 +73,8 @@ public final class Archetypes: @unchecked Sendable {
     public var archetypes: ContiguousArray<Archetype>
 
     public init(
-        componentsIndex: [ComponentMaskSet: Archetype.ID] = [:],
-        archetypes: ContiguousArray<Archetype> = []
+        componentsIndex _: [ComponentMaskSet: Archetype.ID] = [:],
+        archetypes _: ContiguousArray<Archetype> = []
     ) {
         let emptyArchetype = Archetype.new(index: 0, componentLayout: ComponentLayout(components: []))
         self.componentsIndex = [ComponentMaskSet(): emptyArchetype.id]
@@ -110,21 +101,32 @@ public final class Archetypes: @unchecked Sendable {
 }
 
 public struct ComponentLayout: Hashable, Sendable {
-    public private(set) var components: [any Component.Type]
+    public struct Entry: @unchecked Sendable {
+        public let componentType: any Component.Type
+        public let identifier: ComponentId
+
+        init(componentType: any Component.Type, identifier: ComponentId) {
+            self.componentType = componentType
+            self.identifier = identifier
+        }
+    }
+
+    public private(set) var components: [Entry]
     public private(set) var maskSet: ComponentMaskSet
     public var componentsSize: Int {
-        components.reduce(0) { partialResult, type in
-            partialResult + MemoryLayout.size(ofValue: type)
+        components.reduce(0) { partialResult, entry in
+            partialResult + MemoryLayout.size(ofValue: entry.componentType)
         }
     }
 
     public init(components: [any Component]) {
-        var componentTypes = [any Component.Type]()
+        var componentTypes: [Entry] = []
         var maskSet = ComponentMaskSet(reservingCapacity: components.count)
         for component in components {
             let componentType = type(of: component)
-            componentTypes.append(componentType)
-            maskSet.insert(componentType.identifier)
+            let identifier = componentIdentifier(of: component)
+            componentTypes.append(Entry(componentType: componentType, identifier: identifier))
+            maskSet.insert(identifier)
         }
         self.maskSet = maskSet
         self.components = componentTypes
@@ -136,15 +138,17 @@ public struct ComponentLayout: Hashable, Sendable {
             set.insert(component.identifier)
         }
         self.maskSet = set
-        self.components = componentTypes
+        self.components = componentTypes.map {
+            Entry(componentType: $0, identifier: $0.identifier)
+        }
     }
 
-    public init<each T: Component>(components: repeat each T) {
-        var components = [any Component.Type]()
+    public init<each T: Component>(components _: repeat each T) {
+        var components: [Entry] = []
         var maskSet = ComponentMaskSet()
         for component in repeat (each T).self {
             let id = component.identifier
-            components.append(component)
+            components.append(Entry(componentType: component, identifier: id))
             maskSet.insert(id)
         }
         self.components = components
@@ -153,12 +157,17 @@ public struct ComponentLayout: Hashable, Sendable {
 
     public mutating func insert<T: Component>(_ component: T.Type) {
         self.maskSet.insert(component)
-        self.components.append(component)
+        self.components.append(Entry(componentType: component, identifier: component.identifier))
     }
 
     public mutating func insert(_ component: any Component.Type) {
         self.maskSet.insert(component)
-        self.components.append(component)
+        self.components.append(Entry(componentType: component, identifier: component.identifier))
+    }
+
+    public mutating func insert(runtime componentID: ComponentId) {
+        self.maskSet.insert(componentID)
+        self.components.append(Entry(componentType: RuntimeComponentPayload.self, identifier: componentID))
     }
 
     public mutating func remove(_ component: ComponentId) {
@@ -166,7 +175,7 @@ public struct ComponentLayout: Hashable, Sendable {
         self.components.removeAll { $0.identifier == component }
     }
 
-    public static func == (lhs: ComponentLayout, rhs: ComponentLayout) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.maskSet == rhs.maskSet
     }
 
@@ -185,7 +194,7 @@ public struct Archetype: Identifiable, Sendable {
 
     /// The entities in the archetype.
     public internal(set) var entities: ContiguousArray<Entity> = []
-    
+
     /// The edge of the archetype.
     @usableFromInline
     var edges: Edges = Edges()
@@ -197,7 +206,7 @@ public struct Archetype: Identifiable, Sendable {
     /// - Parameter id: The unique identifier of the archetype.
     /// - Parameter entities: The entities in the archetype.
     private init(
-        id: Archetype.ID,
+        id: Self.ID,
         entities: [Entity] = [],
         componentLayout: ComponentLayout
     ) {
@@ -208,10 +217,9 @@ public struct Archetype: Identifiable, Sendable {
     }
 }
 
-public extension Archetype {
-
+extension Archetype {
     /// Checks if the archetype has any entities.
-    var isEmpty: Bool {
+    public var isEmpty: Bool {
         self.entities.isEmpty
     }
 
@@ -219,7 +227,7 @@ public extension Archetype {
     /// - Parameter index: The index of the archetype.
     /// - Returns: A new archetype.
     @inline(__always)
-    static func new(index: Int, componentLayout: ComponentLayout) -> Archetype {
+    public static func new(index: Int, componentLayout: ComponentLayout) -> Archetype {
         return Archetype(id: index, componentLayout: componentLayout)
     }
 
@@ -227,7 +235,7 @@ public extension Archetype {
     /// - Parameter entity: The entity to append.
     /// - Returns: The record of the entity.
     @inline(__always)
-    mutating func append(_ entity: consuming Entity) -> Int {
+    public mutating func append(_ entity: consuming Entity) -> Int {
         self.entities.append(entity)
         return self.entities.count - 1
     }
@@ -236,7 +244,7 @@ public extension Archetype {
     /// - Parameter index: The index of the entity to remove.
     @discardableResult
     @inline(__always)
-    mutating func swapRemove(at index: Int) -> ArchetypeSwapAndRemoveResult {
+    public mutating func swapRemove(at index: Int) -> ArchetypeSwapAndRemoveResult {
         let isLast = index == self.entities.count - 1
         _ = self.entities.swapRemove(at: index)
 
@@ -248,7 +256,7 @@ public extension Archetype {
 
     /// Clear the archetype.
     @inline(__always)
-    mutating func clear() {
+    public mutating func clear() {
         self.chunks.clear()
         self.entities.removeAll()
         self.edges = Edges()
@@ -258,7 +266,6 @@ public extension Archetype {
 // MARK: - Hashable
 
 extension Archetype: Hashable {
-
     /// Hash the archetype.
     /// - Parameter hasher: The hasher to hash the archetype.
     public func hash(into hasher: inout Hasher) {
@@ -272,8 +279,7 @@ extension Archetype: Hashable {
     /// - Parameter rhs: The right archetype.
     /// - Returns: True if the two archetypes are equal, otherwise false.
     public static func == (lhs: Archetype, rhs: Archetype) -> Bool {
-        return lhs.entities == rhs.entities &&
-        lhs.id == rhs.id && lhs.componentLayout == rhs.componentLayout
+        return lhs.entities == rhs.entities && lhs.id == rhs.id && lhs.componentLayout == rhs.componentLayout
     }
 }
 
@@ -283,7 +289,7 @@ extension Archetype: CustomStringConvertible {
         """
         Archetype(
             id: \(id)
-            entityIds: \(entities.compactMap { $0.id })
+            entityIds: \(entities.compactMap(\.id))
             componentsLayout: \(componentLayout)
         )
         """
@@ -347,7 +353,7 @@ public struct ComponentMaskSet: Hashable, Sendable {
     }
 
     @inlinable
-    mutating func insert<T: Component>(_ component: T.Type) {
+    mutating func insert<T: Component>(_: T.Type) {
         self.mask.insert(T.identifier)
     }
 
@@ -357,7 +363,7 @@ public struct ComponentMaskSet: Hashable, Sendable {
     }
 
     @inlinable
-    mutating func remove<T: Component>(_ component: T.Type) {
+    mutating func remove<T: Component>(_: T.Type) {
         self.mask.remove(T.identifier)
     }
 
@@ -372,7 +378,7 @@ public struct ComponentMaskSet: Hashable, Sendable {
     }
 
     @inlinable
-    func contains<T: Component>(_ component: T.Type) -> Bool {
+    func contains<T: Component>(_: T.Type) -> Bool {
         return self.mask.contains(T.identifier)
     }
 }
@@ -381,7 +387,7 @@ extension Array where Element == any Component {
     var maskSet: ComponentMaskSet {
         var set = ComponentMaskSet(reservingCapacity: self.count)
         for component in self {
-            set.insert(type(of: component).identifier)
+            set.insert(componentIdentifier(of: component))
         }
         return set
     }

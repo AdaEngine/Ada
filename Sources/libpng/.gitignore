@@ -6,6 +6,3 @@ xcuserdata/
 DerivedData/
 .swiftpm/
 .netrc
-
-/bazel-*
-/MODULE.bazel.lock

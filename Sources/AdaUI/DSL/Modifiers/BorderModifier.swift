@@ -8,14 +8,13 @@
 import AdaUtils
 import Math
 
-public extension View {
-    func border(_ color: Color, lineWidth: Float = 1) -> some View {
+extension View {
+    public func border(_ color: Color, lineWidth: Float = 1) -> some View {
         modifier(_BorderModifier(color: color, lineWidth: lineWidth))
     }
 }
 
 struct _BorderModifier: ViewModifier {
-
     let color: Color
     let lineWidth: Float
 

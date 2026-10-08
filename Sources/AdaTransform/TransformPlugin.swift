@@ -11,7 +11,6 @@ import Math
 
 /// Add support for ``Transform`` and ``GlobalTransform`` components.
 public struct TransformPlugin: Plugin {
-
     public init() {}
 
     public func setup(in app: AppWorlds) {

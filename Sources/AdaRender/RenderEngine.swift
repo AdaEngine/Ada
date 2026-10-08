@@ -6,18 +6,31 @@
 //
 
 import AdaUtils
-import OrderedCollections
+import Foundation
 import Math
+import OrderedCollections
 
 /// Global information about buffer index.
 public enum GlobalBufferIndex {
     public static let viewUniform: Int = 2
+    /// Reserved vertex-stage uniform for sequential layered rendering on Metal.
+    public static let renderTargetLayer: Int = 30
+}
+
+/// Controls whether the renderer draws at native resolution or upscales a lower-resolution frame.
+public enum RenderUpscalingMode: Sendable, Equatable {
+    /// Render directly at the output resolution.
+    case disabled
+
+    /// Use the backend's spatial upscaler when it is available.
+    ///
+    /// The scale is clamped to `0.5...1`. Backends without a native spatial
+    /// upscaler render at native resolution instead of applying a generic filter.
+    case spatial(renderScale: Float)
 }
 
 /// Render Engine is object that manage a GPU.
 public final class RenderEngine: RenderBackend, Sendable {
-
-    
     public struct Configuration {
         /// The maximum number of frames in flight.
         public var maxFramesInFlight: Int = 3
@@ -25,23 +38,35 @@ public final class RenderEngine: RenderBackend, Sendable {
         /// The preferred backend to use for rendering.
         public var preferredBackend: RenderBackendType?
 
+        /// The upscaling mode used for window render targets.
+        ///
+        /// iOS defaults to MetalFX spatial upscaling from 75% linear resolution.
+        /// Other platforms keep native resolution unless explicitly configured.
+        public var upscaling: RenderUpscalingMode = {
+            #if os(iOS)
+                .spatial(renderScale: 0.75)
+            #else
+                .disabled
+            #endif
+        }()
+
         public init() {}
     }
-    
+
     /// Setup configuration for render engine
     nonisolated(unsafe) public static var configurations: Configuration = Configuration()
-    
+
     /// Return instance of render engine for specific backend.
-    public fileprivate(set) nonisolated(unsafe) static var shared: RenderEngine!
-    
+    nonisolated(unsafe) public private(set) static var shared: RenderEngine!
+
     private let renderBackend: RenderBackend
-    
+
     init(renderBackend: RenderBackend) {
         self.renderBackend = renderBackend
     }
-    
+
     // MARK: - RenderBackend
-    
+
     public var type: RenderBackendType {
         self.renderBackend.type
     }
@@ -58,11 +83,23 @@ public final class RenderEngine: RenderBackend, Sendable {
     public func createWindow(_ windowId: WindowID, for surface: RenderSurface, size: SizeInt) throws {
         try self.renderBackend.createWindow(windowId, for: surface, size: size)
     }
-    
+
     public func resizeWindow(_ windowId: WindowID, newSize: SizeInt) throws {
         try self.renderBackend.resizeWindow(windowId, newSize: newSize)
     }
-    
+
+    @MainActor
+    public func resizeWindow(_ windowId: WindowID, newSize: SizeInt, scaleFactor: Float) throws {
+        #if WEBGPU_ENABLED && canImport(WebGPU)
+            if let webGPUBackend = self.renderBackend as? WebGPURenderBackend {
+                try webGPUBackend.resizeWindow(windowId, newSize: newSize, scaleFactor: scaleFactor)
+                return
+            }
+        #endif
+
+        try self.renderBackend.resizeWindow(windowId, newSize: newSize)
+    }
+
     public func destroyWindow(_ windowId: WindowID) throws {
         try self.renderBackend.destroyWindow(windowId)
     }
@@ -76,45 +113,76 @@ public final class RenderEngine: RenderBackend, Sendable {
     }
 }
 
-public extension RenderDevice {
-    func createUniformBuffer<T>(_ uniformType: T.Type, count: Int = 1, binding: Int) -> UniformBuffer {
+extension RenderDevice {
+    public func createUniformBuffer<T>(_: T.Type, count: Int = 1, binding: Int) -> UniformBuffer {
         self.createUniformBuffer(length: MemoryLayout<T>.stride * count, binding: binding)
     }
 }
 
 extension RenderEngine {
     package static func setupRenderEngine() throws {
-        let preferredBackend = unsafe RenderEngine.configurations.preferredBackend ?? Self.defaultBackendType()
+        // Guard: only the first caller creates the engine; subsequent callers (e.g. SceneView
+        // subworld) reuse the existing instance so the main window registration is preserved.
+        guard unsafe Self.shared == nil else {
+            return
+        }
+        let preferredBackend = unsafe Self.configurations.preferredBackend ?? Self.defaultBackendType()
         let renderBackend: RenderBackend
         switch preferredBackend {
         case .webgpu:
-        #if WEBGPU_ENABLED
-            renderBackend = try UnsafeTask {
-                return try await WebGPURenderBackend.createBackend()
-            }.get()
-        #else
-            fallthrough
-        #endif
+            #if WEBGPU_ENABLED && canImport(WebGPU)
+                renderBackend = try WebGPURenderBackend.createBackend()
+            #else
+                #if os(Android)
+                    throw RenderEngineSetupError.androidWebGPUBackendUnavailable
+                #elseif WASM
+                    throw RenderEngineSetupError.browserWebGPUBackendUnavailable
+                #else
+                    fallthrough
+                #endif
+            #endif
         case .metal:
-        #if METAL
-            renderBackend = MetalRenderBackend()
-        #else
-            fallthrough
-        #endif
+            #if METAL
+                renderBackend = MetalRenderBackend()
+            #else
+                fallthrough
+            #endif
         case .headless:
-            fatalErrorMethodNotImplemented()
+            renderBackend = HeadlessRenderBackend()
         }
         let engine = RenderEngine(renderBackend: renderBackend)
-        unsafe RenderEngine.shared = engine
+        unsafe Self.shared = engine
     }
 
     private static func defaultBackendType() -> RenderBackendType {
-        #if WEBGPU_ENABLED
-        return .webgpu
+        #if os(Android)
+            return .webgpu
+        #elseif WASM
+            #if WEBGPU_ENABLED && canImport(WebGPU)
+                return .webgpu
+            #else
+                return .headless
+            #endif
+        #elseif WEBGPU_ENABLED && canImport(WebGPU)
+            return .webgpu
         #elseif METAL
-        return .metal
+            return .metal
         #else
-        return .headless
+            return .headless
         #endif
+    }
+}
+
+private enum RenderEngineSetupError: LocalizedError {
+    case androidWebGPUBackendUnavailable
+    case browserWebGPUBackendUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .androidWebGPUBackendUnavailable:
+            "Android WebGPU requires Swan and an Android Dawn/Vulkan artifact bundle."
+        case .browserWebGPUBackendUnavailable:
+            "Browser WebGPU backend is not linked. Add a WASM/browser WebGPU implementation before using RenderWorldPlugin in web exports."
+        }
     }
 }

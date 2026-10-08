@@ -5,13 +5,13 @@
 //  Created by v.prusakov on 5/10/22.
 //
 
-import AdaECS
-import AdaRender
-import AdaUtils
-import AdaTransform
-import AdaCorePipelines
-import Math
 import AdaAssets
+import AdaCorePipelines
+import AdaECS
+@_spi(Internal) import AdaRender
+import AdaTransform
+import AdaUtils
+import Math
 
 // MARK: - Sprite Batching
 
@@ -49,6 +49,17 @@ public struct ExtractedSprites: Resource {
     }
 }
 
+/// Sprite data contributed by render features that do not materialize one ECS entity per sprite.
+public struct AdditionalExtractedSprites: Resource {
+    /// Extracted sprites keyed by their frame-local render identifier.
+    public var sprites: [Entity.ID: ExtractedSprite]
+
+    /// Initialize additional extracted sprites.
+    public init(sprites: [Entity.ID: ExtractedSprite] = [:]) {
+        self.sprites = sprites
+    }
+}
+
 /// A sprite that contains the extracted sprite.
 public struct ExtractedSprite: Sendable {
     /// The entity id of the extracted sprite.
@@ -67,6 +78,38 @@ public struct ExtractedSprite: Sendable {
     public var transform: Transform
     /// The world transform of the extracted sprite.
     public var worldTransform: Transform3D
+    /// The source entity used for per-camera visibility, or `nil` to render for every camera.
+    public var visibilityEntityId: Entity.ID?
+    /// Local sprite layout, copied during extraction.
+    public var anchor: SpriteAnchor
+    public var imageMode: SpriteImageMode
+
+    /// Initialize an extracted sprite.
+    public init(
+        entityId: Entity.ID,
+        texture: Texture2D?,
+        size: Size?,
+        flipX: Bool,
+        flipY: Bool,
+        tintColor: Color,
+        transform: Transform,
+        worldTransform: Transform3D,
+        visibilityEntityId: Entity.ID? = nil,
+        anchor: SpriteAnchor = .center,
+        imageMode: SpriteImageMode = .stretch
+    ) {
+        self.entityId = entityId
+        self.texture = texture
+        self.size = size
+        self.flipX = flipX
+        self.flipY = flipY
+        self.tintColor = tintColor
+        self.transform = transform
+        self.worldTransform = worldTransform
+        self.visibilityEntityId = visibilityEntityId
+        self.anchor = anchor
+        self.imageMode = imageMode
+    }
 }
 
 /// A data for drawing sprites.
@@ -75,7 +118,7 @@ public struct SpriteDrawData: Resource, DefaultValue {
     public var indexBuffer: BufferData<UInt32>
 
     public static let defaultValue: SpriteDrawData = {
-        SpriteDrawData(
+        Self(
             vertexBuffer: .init(label: "SpriteRenderSystem_VertexBuffer", elements: []),
             indexBuffer: .init(label: "SpriteRenderSystem_IndexBuffer", elements: [])
         )
@@ -86,7 +129,7 @@ public struct SpriteDrawData: Resource, DefaultValue {
 @System
 @inline(__always)
 public func ExtractSprite(
-    _ world: World,
+    _: World,
     _ sprites: Extract<
         Query<Entity, Sprite, GlobalTransform, Transform, Visibility>
     >,
@@ -105,7 +148,10 @@ public func ExtractSprite(
             flipY: sprite.flipY,
             tintColor: sprite.tintColor,
             transform: transform,
-            worldTransform: globalTransform.matrix
+            worldTransform: globalTransform.matrix,
+            visibilityEntityId: entity.id,
+            anchor: sprite.anchor,
+            imageMode: sprite.imageMode
         )
     }
 }
@@ -115,28 +161,40 @@ public func ExtractSprite(
 func UpdateBoundings(
     _ sprites: FilterQuery<
         Entity, Sprite, Ref<BoundingComponent>,
-        And<With<Sprite>, Changed<Transform>, Without<NoFrustumCulling>>,
+        And<
+            With<Sprite>,
+            Or<Changed<Transform>, Changed<Sprite>>,
+            Without<NoFrustumCulling>
+        >,
     >,
     _ meshes: FilterQuery<
         Mesh2D, Ref<BoundingComponent>,
         Or<Changed<Mesh2D>, Without<NoFrustumCulling>>
     >
 ) async {
-    await sprites.parallel().forEach { entity, sprite, bounds in
-        guard let size = (sprite.size ?? sprite.texture?.asset.size.toSize())?.asVector2 else {
-            return
-        }
-        bounds.bounds = .aabb(
-            AABB(
-                center: Vector3(size, 0),
-                halfExtents: Vector3(0.5 * size, 0)
+    await sprites.parallel()
+        .forEach { _, sprite, bounds in
+            guard let size = (sprite.size ?? sprite.texture?.asset.size.toSize())?.asVector2 else {
+                return
+            }
+            let geometry = SpriteGeometry(size: size, sourceSize: size, anchor: sprite.anchor, imageMode: sprite.imageMode)
+            guard geometry.isValid else {
+                bounds.bounds = .aabb(.empty)
+                return
+            }
+            // Fit can occupy less space; the nominal rectangle conservatively contains every mode.
+            bounds.bounds = .aabb(
+                AABB(
+                    center: Vector3(-sprite.anchor.x * size.x, -sprite.anchor.y * size.y, 0),
+                    halfExtents: Vector3(0.5 * size, 0)
+                )
             )
-        )
-    }
+        }
 
-    await meshes.parallel().forEach { mesh2d, bounds in
-        bounds.bounds = .aabb(mesh2d.mesh.bounds)
-    }
+    await meshes.parallel()
+        .forEach { mesh2d, bounds in
+            bounds.bounds = .aabb(mesh2d.mesh.bounds)
+        }
 }
 
 @System
@@ -149,9 +207,10 @@ func PrepareSprites(
     _ spriteRenderPipeline: ResMut<RenderPipelines<SpriteRenderPipeline>>,
     _ renderDevice: Res<RenderDeviceHandler>,
     _ extractedSprites: Res<ExtractedSprites>,
+    _ additionalSprites: Res<AdditionalExtractedSprites>,
     _ spriteDrawPass: Res<SpriteDrawPass>
 ) {
-    camera.forEach { camera, entities in
+    camera.forEach { _, entities in
         for sprite in extractedSprites.sprites {
             if !entities.entityIds.contains(sprite.entityId) {
                 continue
@@ -163,7 +222,24 @@ func PrepareSprites(
                     entity: sprite.entityId,
                     drawPass: spriteDrawPass.wrappedValue,
                     renderPipeline: pipeline,
-                    sortKey: sprite.transform.position.z,
+                    sortKey: sprite.worldTransform.w.z,
+                    batchRange: 0..<0
+                )
+            )
+        }
+
+        for sprite in additionalSprites.sprites.values {
+            if let visibilityEntityId = sprite.visibilityEntityId,
+                !entities.entityIds.contains(visibilityEntityId) {
+                continue
+            }
+            let pipeline = spriteRenderPipeline.wrappedValue.pipeline(device: renderDevice.renderDevice)
+            renderItems.items.append(
+                Transparent2DRenderItem(
+                    entity: sprite.entityId,
+                    drawPass: spriteDrawPass.wrappedValue,
+                    renderPipeline: pipeline,
+                    sortKey: sprite.worldTransform.w.z,
                     batchRange: 0..<0
                 )
             )
@@ -173,7 +249,6 @@ func PrepareSprites(
 
 @PlainSystem
 public struct SpriteRenderSystem {
-
     @ResMut<SortedRenderItems<Transparent2DRenderItem>>
     private var renderItems
 
@@ -182,6 +257,9 @@ public struct SpriteRenderSystem {
 
     @Res<ExtractedSprites>
     private var extractedSprites
+
+    @Res<AdditionalExtractedSprites>
+    private var additionalSprites
 
     @ResMut
     private var spriteRenderPipeline: RenderPipelines<SpriteRenderPipeline>
@@ -196,15 +274,15 @@ public struct SpriteRenderSystem {
     private var spriteData: SpriteDrawData
 
     static let quadPosition: [Vector4] = [
-        [-0.5, -0.5,  0.0, 1.0],
-        [ 0.5, -0.5,  0.0, 1.0],
-        [ 0.5,  0.5,  0.0, 1.0],
-        [-0.5,  0.5,  0.0, 1.0]
+        [-0.5, -0.5, 0.0, 1.0],
+        [0.5, -0.5, 0.0, 1.0],
+        [0.5, 0.5, 0.0, 1.0],
+        [-0.5, 0.5, 0.0, 1.0],
     ]
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
+    public func update(context _: UpdateContext) {
         spriteBatches.batches.removeAll(keepingCapacity: true)
         let device = renderDevice.renderDevice
 
@@ -214,34 +292,41 @@ public struct SpriteRenderSystem {
 
         var currentTexture: Texture2D?
         var batchStartIndex: Int32 = 0
-        var batchImageSize: Size = .zero
         var instanceCount: Int32 = 0
         var batchEntityId: Entity.ID?
 
+        func finishCurrentBatch() {
+            if let batchEntity = batchEntityId,
+                let texture = currentTexture,
+                batchStartIndex < instanceCount {
+                spriteBatches.batches[batchEntity] = SpriteBatch(
+                    texture: texture,
+                    range: batchStartIndex..<instanceCount
+                )
+            }
+        }
+
         for index in renderItems.items.items.indices {
-            guard let sprite = extractedSprites.sprites[renderItems.items.items[index].entity] else {
+            let renderEntityID = renderItems.items.items[index].entity
+            guard let sprite = extractedSprites.sprites[renderEntityID] ?? additionalSprites.sprites[renderEntityID] else {
+                finishCurrentBatch()
+                currentTexture = nil
+                batchEntityId = nil
+                batchStartIndex = instanceCount
                 continue
             }
 
             let texture = sprite.texture ?? .whiteTexture
-            let worldTransform = sprite.worldTransform
 
             // Check if we need to start a new batch (texture changed)
-            let needsNewBatch = currentTexture == nil || !isSameTexture(currentTexture!, texture)
+            let needsNewBatch = currentTexture.map { !isSameTexture($0, texture) } ?? true
 
             if needsNewBatch {
-                // Finish current batch if exists
-                if let batchEntity = batchEntityId, batchStartIndex < instanceCount {
-                    spriteBatches.batches[batchEntity] = SpriteBatch(
-                        texture: currentTexture!,
-                        range: batchStartIndex..<instanceCount
-                    )
-                }
+                finishCurrentBatch()
 
                 // Start new batch
                 currentTexture = texture
                 batchStartIndex = instanceCount
-                batchImageSize = texture.size.toSize()
                 batchEntityId = renderItems.items.items[index].entity
             }
 
@@ -252,41 +337,21 @@ public struct SpriteRenderSystem {
                 flipY: sprite.flipY
             )
 
-            let size = sprite.size ?? batchImageSize
-
-            // Add sprite vertices (4 vertices per quad)
-            let vertexOffset = UInt32(spriteData.vertexBuffer.count)
-            for vertexIndex in 0..<Self.quadPosition.count {
-                let quadPos = Self.quadPosition[vertexIndex]
-                let scaledPosition = Vector4(quadPos.x * size.width, quadPos.y * size.height, quadPos.z, quadPos.w)
-                let data = SpriteVertexData(
-                    position: worldTransform * scaledPosition,
-                    color: sprite.tintColor,
-                    textureCoordinate: textureCoords[vertexIndex]
-                )
-                spriteData.vertexBuffer.append(data)
-            }
-
-            // Add indices for this quad (6 indices for 2 triangles)
-            // Triangle 1: 0, 1, 2
-            // Triangle 2: 2, 3, 0
-            spriteData.indexBuffer.append(vertexOffset + 0)
-            spriteData.indexBuffer.append(vertexOffset + 1)
-            spriteData.indexBuffer.append(vertexOffset + 2)
-            spriteData.indexBuffer.append(vertexOffset + 2)
-            spriteData.indexBuffer.append(vertexOffset + 3)
-            spriteData.indexBuffer.append(vertexOffset + 0)
-
-            instanceCount += 1
-        }
-
-        // Finish last batch
-        if let batchEntity = batchEntityId, let texture = currentTexture, batchStartIndex < instanceCount {
-            spriteBatches.batches[batchEntity] = SpriteBatch(
-                texture: texture,
-                range: batchStartIndex..<instanceCount
+            let geometry = SpriteGeometry(
+                size: (sprite.size ?? texture.size.toSize()).asVector2,
+                sourceSize: texture.size.toSize().asVector2,
+                anchor: sprite.anchor,
+                imageMode: sprite.imageMode,
+                flipX: sprite.flipX,
+                flipY: sprite.flipY
             )
+            geometry.forEachQuad { destination, source in
+                appendQuad(destination: destination, source: source, textureCoords: textureCoords, sprite: sprite)
+                instanceCount += 1
+            }
         }
+
+        finishCurrentBatch()
 
         // Early exit if no sprites to render
         if spriteData.vertexBuffer.isEmpty {
@@ -299,6 +364,35 @@ public struct SpriteRenderSystem {
     }
 
     // MARK: - Private
+
+    private func appendQuad(destination: Rect, source: Rect, textureCoords: [Vector2], sprite: ExtractedSprite) {
+        let vertexOffset = UInt32(spriteData.vertexBuffer.count)
+        for corner in Self.quadPosition {
+            let u = corner.x + 0.5
+            let v = corner.y + 0.5
+            let sourceU = source.origin.x + u * source.size.width
+            let sourceV = source.origin.y + v * source.size.height
+            // Interpolate the slice's own corners, never the full GPU atlas dimensions.
+            let bottom = textureCoords[0] + (textureCoords[1] - textureCoords[0]) * sourceU
+            let top = textureCoords[3] + (textureCoords[2] - textureCoords[3]) * sourceU
+            spriteData.vertexBuffer.append(SpriteVertexData(
+                position: sprite.worldTransform * Vector4(
+                    destination.origin.x + u * destination.size.width,
+                    destination.origin.y + v * destination.size.height,
+                    0,
+                    1
+                ),
+                color: sprite.tintColor,
+                textureCoordinate: bottom + (top - bottom) * sourceV
+            ))
+        }
+        spriteData.indexBuffer.append(vertexOffset)
+        spriteData.indexBuffer.append(vertexOffset + 1)
+        spriteData.indexBuffer.append(vertexOffset + 2)
+        spriteData.indexBuffer.append(vertexOffset + 2)
+        spriteData.indexBuffer.append(vertexOffset + 3)
+        spriteData.indexBuffer.append(vertexOffset)
+    }
 
     /// Get texture coordinates with flip support.
     @inline(__always)
@@ -324,8 +418,7 @@ public struct SpriteRenderSystem {
         return coords
     }
 
-    @inlinable
     func isSameTexture(_ lhs: Texture2D, _ rhs: Texture2D) -> Bool {
-        return lhs.assetMetaInfo?.assetId != .empty && lhs.assetMetaInfo?.assetId == rhs.assetMetaInfo?.assetId
+        return lhs.gpuTexture === rhs.gpuTexture && lhs.sampler === rhs.sampler
     }
 }

@@ -14,6 +14,17 @@ protocol MaterialValueDelegate: AnyObject {
     func updateTexture(_ texture: MaterialTexture, for name: String)
 }
 
+private enum CustomMaterialError: LocalizedError {
+    case missingShaderStage(ShaderStage, material: String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .missingShaderStage(stage, material):
+            return "Missing \(stage.rawValue) shader source for \(material)."
+        }
+    }
+}
+
 /// This material supports user declared materials.
 ///
 /// It's very powerful tool for creating your own materials using power of Swift.
@@ -88,7 +99,6 @@ protocol MaterialValueDelegate: AnyObject {
 @propertyWrapper
 @dynamicMemberLookup
 public final class CustomMaterial<T: ReflectedMaterial>: Material, MaterialValueDelegate, @unchecked Sendable {
-
     public var wrappedValue: T {
         get {
             return material
@@ -116,83 +126,107 @@ public final class CustomMaterial<T: ReflectedMaterial>: Material, MaterialValue
     /// Create a new CustomMaterial instance from user ``ReflectedMaterial``.
     public init(_ material: T) {
         self.material = material
-        
+
         let shaderSource = ShaderSource()
-        
+
         do {
             let vertexShaderSource = try T.vertexShader()
             let fragmentShaderSource = try T.fragmentShader()
 
-            assert(vertexShaderSource.asset.getSource(for: .vertex) != nil, "Failed to load vertex data")
-            assert(fragmentShaderSource.asset.getSource(for: .fragment) != nil, "Failed to load fragment data")
-            
-            shaderSource.setSource(vertexShaderSource.asset.getSource(for: .vertex)!, for: .vertex)
-            shaderSource.setSource(fragmentShaderSource.asset.getSource(for: .fragment)!, for: .fragment)
-            
+            guard let vertexSource = vertexShaderSource.asset.getSource(for: .vertex) else {
+                throw CustomMaterialError.missingShaderStage(.vertex, material: String(reflecting: T.self))
+            }
+
+            guard let fragmentSource = fragmentShaderSource.asset.getSource(for: .fragment) else {
+                throw CustomMaterialError.missingShaderStage(.fragment, material: String(reflecting: T.self))
+            }
+
+            shaderSource.setSource(
+                vertexSource,
+                for: .vertex,
+                fileURL: vertexShaderSource.asset.getSourceFileURL(for: .vertex)
+            )
+            shaderSource.setSource(
+                fragmentSource,
+                for: .fragment,
+                fileURL: fragmentShaderSource.asset.getSourceFileURL(for: .fragment)
+            )
+
             shaderSource.includeSearchPaths.append(contentsOf: vertexShaderSource.asset.includeSearchPaths)
             shaderSource.includeSearchPaths.append(contentsOf: fragmentShaderSource.asset.includeSearchPaths)
         } catch {
             assertionFailure("[CustomMaterial] \(error)")
         }
 
-        shaderSource.fileURL = try? ShaderCache
+        shaderSource.fileURL =
+            try? ShaderCache
             .getCacheDirectory()
             .appending(path: String(reflecting: type(of: material)), directoryHint: .isDirectory)
         super.init(shaderSource: shaderSource)
         self.reflectMaterial(from: material)
     }
-    
-    public required init(from decoder: AssetDecoder) throws {
-        fatalError("init(asset:) has not been implemented")
+
+    public required init(from _: AssetDecoder) throws {
+        throw AssetError.message("CustomMaterial cannot be decoded as an asset.")
     }
-    
+
     public subscript<Value>(dynamicMember keyPath: WritableKeyPath<T, Value>) -> Value {
         get {
             return self.material[keyPath: keyPath]
         }
-        
+
         set {
             self.material[keyPath: keyPath] = newValue
         }
     }
-    
+
     // MARK: - Mesh
-    
-    public override func collectDefines(for vertexDescriptor: VertexDescriptor, keys: Set<String>) -> [ShaderDefine] {
+
+    override public func collectDefines(for vertexDescriptor: VertexDescriptor, keys: Set<String>) -> [ShaderDefine] {
         return T.configureShaderDefines(keys: keys, vertexDescriptor: vertexDescriptor)
     }
-    
-    public override func configureRenderPipeline(
+
+    override public func configureRenderPipeline(
         for vertexDescriptor: VertexDescriptor,
         keys: Set<String>,
         shaderModule: ShaderModule
     ) -> RenderPipelineDescriptor? {
         do {
+            guard let vertexShader = shaderModule.getShader(for: .vertex) else {
+                assertionFailure("[CustomMaterial] \(CustomMaterialError.missingShaderStage(.vertex, material: String(reflecting: T.self)))")
+                return nil
+            }
+
+            guard let fragmentShader = shaderModule.getShader(for: .fragment) else {
+                assertionFailure("[CustomMaterial] \(CustomMaterialError.missingShaderStage(.fragment, material: String(reflecting: T.self)))")
+                return nil
+            }
+
             let pipeline = try T.configurePipeline(
                 keys: keys,
-                vertex: shaderModule.getShader(for: .vertex)!,
-                fragment: shaderModule.getShader(for: .fragment)!,
+                vertex: vertexShader,
+                fragment: fragmentShader,
                 vertexDescriptor: vertexDescriptor
             )
-            
+
             return pipeline
         } catch {
             assertionFailure("[CustomMaterial] \(error)")
             return nil
         }
     }
-    
+
     /// Find and link shader bind properties.
     func reflectMaterial(from material: T) {
         self.bindableValues.removeAll()
 
         let reflection = Mirror(reflecting: material)
-        
+
         for child in reflection.children {
             guard let bindProperty = child.value as? _ShaderBindProperty else {
                 continue
             }
-            
+
             if bindProperty.propertyName.isEmpty {
                 // Get the propertyName of the property. By syntax, the property name is
                 // in the form: "_name". Dropping the "_" -> "name"
@@ -205,32 +239,32 @@ public final class CustomMaterial<T: ReflectedMaterial>: Material, MaterialValue
 
                 bindProperty.propertyName = propertyName
             }
-            
+
             // For update buffers
             bindProperty.delegate = self
-            
+
             self.bindableValues.append(bindProperty)
         }
     }
-    
-    public override func update() {
+
+    override public func update() {
         self.bindableValues.forEach {
             $0.update()
         }
     }
-    
+
     // MARK: Delegate
-    
+
     func updateValue(_ value: Any, for name: String) {
         self.setValue(value, for: name)
     }
-    
+
     func updateTexture(_ texture: MaterialTexture, for name: String) {
         self.setTexture(texture, for: name)
     }
 }
 
-private extension String {
+extension String {
     func capitalizingFirstLetter() -> String {
         return prefix(1).uppercased() + dropFirst()
     }

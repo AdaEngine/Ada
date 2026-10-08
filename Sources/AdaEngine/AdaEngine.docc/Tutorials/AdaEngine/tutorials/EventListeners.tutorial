@@ -1,6 +1,6 @@
 @Tutorial(time: 5) {
-    @Intro(title: "Event Listeners in Ada Engine") {
-        In this tutorial you will learn about the event listeners system in Ada Engine. 
+    @Intro(title: "Event Listeners in Ada") {
+        In this tutorial you will learn about the event listeners system in Ada.
         How can you catch events and process them
     }
     
@@ -8,7 +8,7 @@
     
     @Section(title: "Base of Event-Subscriber pattern") {
         @ContentAndMedia {
-            Event listeners in Ada Engine are built on the Observer pattern. 
+            Event listeners in Ada are built on the Observer pattern.
             Its main concept is based on the fact that there is a certain Subject that can send any events. 
             And there is an Observer that can receive and process this event. 
             In addition, Observer "subscribes" to events, as if you had subscribed to your favorite blog or magazine - as soon as an event occurs, Observer immediately knows about it. 
@@ -53,14 +53,14 @@
     
     @Section(title: "Type of events") {
         @ContentAndMedia {
-            What events can we use? Let's look at a couple of code examples in AdaEngine.
+            What events can we use? Let's look at a couple of code examples in Ada.
             
         }
         
         @Steps {            
             @Step {
                 In the previous section, we saw the `SceneEvents.OnReady` event. 
-                AdaEngine has several available events that you can handle. 
+                Ada has several available events that you can handle.
                 For example, you can find out what state your current game scene is in. 
                 You can add your own additional logic when any built-in event occurs.
                 

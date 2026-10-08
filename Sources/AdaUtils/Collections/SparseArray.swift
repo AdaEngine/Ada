@@ -16,11 +16,11 @@ public struct SparseArray<Element> {
     public init(capacity: Int) {
         self.values = [Element?].init(repeating: nil, count: capacity)
     }
-    
+
     @inlinable
     public init<T: Sequence>(_ sequence: T) where T.Element == Element {
         self.values = [Element?].init(repeating: nil, count: sequence.underestimatedCount)
-        
+
         for (index, element) in sequence.enumerated() {
             self.values[index] = element
         }
@@ -38,7 +38,7 @@ extension SparseArray {
             self.insert(newValue, at: index)
         }
     }
-    
+
     /// Removes all keys and their associated values from the sparse set.
     ///
     /// - Parameter keepingCapacity: If `true` then the underlying storage's
@@ -48,14 +48,14 @@ extension SparseArray {
     @inlinable
     public mutating func removeAll(keepingCapacity: Bool = false) {
         if keepingCapacity {
-            for index in 0 ..< self.values.count {
+            for index in 0..<self.values.count {
                 self.values[index] = nil
             }
         } else {
             self.values.removeAll()
         }
     }
-    
+
     /// - Complexity: O(1)
     @inlinable
     @discardableResult
@@ -64,7 +64,7 @@ extension SparseArray {
         self.values[index] = nil
         return element
     }
-    
+
     @inlinable
     @discardableResult
     public mutating func removeLast() -> Element? {
@@ -73,12 +73,12 @@ extension SparseArray {
         }
         return remove(at: index)
     }
-    
+
     @inlinable
     public mutating func insert(_ element: Element?, at index: Index) {
         self.values[index] = element
     }
-    
+
     @inlinable
     public mutating func append(_ element: Element) {
         if count >= values.count {
@@ -125,10 +125,11 @@ extension SparseArray: Sequence {
     public var count: Int {
         return self.values.count(where: { $0 != nil })
     }
-    
+
     /// - Complexity: O(n)
     @inlinable
     public var isEmpty: Bool {
+        // swiftlint:disable:next empty_count
         return self.count == 0
     }
 
@@ -143,19 +144,19 @@ extension SparseArray: Sequence {
         init(values: [Element?]) {
             self.values = values
         }
-        
+
         public mutating func next() -> Element? {
             while true {
                 self.pointer += 1
-                
+
                 if self.pointer >= self.values.count {
                     return nil
                 }
-                
+
                 guard let item = self.values[self.pointer] else {
                     continue
                 }
-                
+
                 return item
             }
         }
@@ -168,7 +169,7 @@ extension SparseArray: Equatable where Element: Equatable {
     }
 }
 
-extension SparseArray: Sendable where Element: Sendable { }
+extension SparseArray: Sendable where Element: Sendable {}
 
 extension SparseArray: Hashable where Element: Hashable {
     public func hash(into hasher: inout Hasher) {

@@ -7,37 +7,42 @@
 
 import AdaUtils
 import Foundation
+
 #if canImport(Glibc)
-import Glibc
+    import Glibc
 #endif
 #if canImport(Darwin)
-import Darwin.C
+    import Darwin.C
 #endif
 #if os(Windows)
-import WinSDK
+    import WinSDK
 #endif
 
 @MainActor
 final class ViewGraph {
-
     private static var viewsTypeToDebug: Set<ObjectIdentifier> = []
 
-    static func registerViewToDebugUpdate<V: View>(_ type: V.Type) {
+    static func registerViewToDebugUpdate<V: View>(_: V.Type) {
         viewsTypeToDebug.insert(ObjectIdentifier(V.self))
     }
 
-    static func shouldNotifyAboutChanges<V: View>(_ content: V.Type) -> Bool {
-        viewsTypeToDebug.contains(ObjectIdentifier(V.self))
+    static func shouldNotifyAboutChanges(_ content: any View.Type) -> Bool {
+        viewsTypeToDebug.contains(ObjectIdentifier(content))
     }
 }
 
 @MainActor
 public struct _ViewInputs {
-    var parentNode: ViewNode?
+    weak var parentNode: ViewNode?
     var layout: any Layout = VStackLayout()
     var environment: EnvironmentValues
     var propertyStorages: [PropertyStoragable] = []
     var gestures: [_Gesture] = []
+
+    /// Accumulated environment transform from `.environment()` / `.transformEnvironment()` modifiers
+    /// in the current modifier chain. Set by `_ViewInputsViewModifier._makeModifier` and consumed by
+    /// `_ViewInputsViewModifier._makeView` to store on the resulting node.
+    var pendingEnvironmentTransform: ((inout EnvironmentValues) -> Void)?
 
     func makeNode<T: View>(from content: T) -> ViewNode {
         T._makeView(_ViewGraphNode(value: content), inputs: self).node
@@ -45,13 +50,28 @@ public struct _ViewInputs {
 
     /// Method can find and register ``State``, ``Binding``, ``Environment`` property wrappers
     /// in new _ViewInputs value.
-    func resolveStorages<T>(in content: T) -> _ViewInputs {
+    func resolveStorages<T>(in content: T, stateContainer: ViewStateContainer? = nil) -> Self {
         var newSelf = self
         let mirror = Mirror(reflecting: content)
+        var stateOrdinal = 0
 
         let storages = mirror.children.compactMap { label, property -> PropertyStoragable? in
             guard let storagable = property as? PropertyStoragable else {
                 return nil
+            }
+
+            if let bindable = property as? ViewStateBindable {
+                let key = ViewStatePropertyKey(
+                    ordinal: stateOrdinal,
+                    label: label ?? "",
+                    valueType: bindable.stateValueType
+                )
+                stateOrdinal += 1
+
+                guard let stateContainer else {
+                    return nil
+                }
+                bindable.bind(to: stateContainer, key: key)
             }
 
             if let env = storagable.storage as? ViewContextStorage {
@@ -66,10 +86,20 @@ public struct _ViewInputs {
         return newSelf
     }
 
+    func requiresStateContainer<T>(for content: T) -> Bool {
+        let mirror = Mirror(reflecting: content)
+        return mirror.children.contains { _, property in
+            property is ViewStateBindable
+        }
+    }
+
     /// Inflate all found storages to view node.
     @MainActor
     func registerNodeForStorages(_ node: ViewNode) {
         for storage in propertyStorages {
+            if let viewContextStorage = storage.storage as? ViewContextStorage {
+                viewContextStorage.values = node.environment
+            }
             storage.storage.registerNodeToUpdate(node)
         }
     }
@@ -92,12 +122,7 @@ public struct _ViewListOutputs {
 }
 
 public struct _ViewGraphNode<Value>: Equatable {
-
     let value: Value
-
-    init(value: Value) {
-        self.value = value
-    }
 
     subscript<U>(keyPath: KeyPath<Value, U>) -> _ViewGraphNode<U> {
         _ViewGraphNode<U>(value: self.value[keyPath: keyPath])

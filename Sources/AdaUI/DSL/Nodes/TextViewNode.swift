@@ -5,16 +5,22 @@
 //  Created by Vladislav Prusakov on 07.06.2024.
 //
 
+import AdaInput
 import AdaText
+import AdaUtils
 import Math
 
 final class TextViewNode: ViewNode {
-
     var layoutManager: TextLayoutManager
+    private var drawLayoutManager: TextLayoutManager
     private var textContainer: TextContainer {
         didSet {
+            guard self.textContainer != oldValue else {
+                return
+            }
+
             self.layoutManager.setTextContainer(self.textContainer)
-            self.layoutManager.invalidateLayout()
+            self.drawLayoutManager.setTextContainer(self.textContainer)
             self.sizeCache = [:]
         }
     }
@@ -22,16 +28,15 @@ final class TextViewNode: ViewNode {
     private var textRenderer: any TextRenderer
 
     init(inputs: _ViewInputs, content: Text) {
-        let text = content.storage.applyingEnvironment(inputs.environment)
-        self.textContainer = TextContainer(text: text)
-        self.textContainer.numberOfLines = content.storage.lineLimit
+        self.textContainer = Self.makeTextContainer(content: content, environment: inputs.environment)
         self.layoutManager = TextLayoutManager()
         self.layoutManager.setTextContainer(self.textContainer)
-        self.layoutManager.invalidateLayout()
+        self.drawLayoutManager = TextLayoutManager()
+        self.drawLayoutManager.setTextContainer(self.textContainer)
         self.textRenderer = inputs.environment.textRenderer ?? DefaultRichTextRenderer()
 
         super.init(content: content)
-        self.updateEnvironment(inputs.environment)
+        self.applyResolvedEnvironmentSilently(inputs.environment)
     }
 
     /// Cache the sizes while layoutmanager is consistent.
@@ -55,45 +60,80 @@ final class TextViewNode: ViewNode {
     override func draw(with context: UIGraphicsContext) {
         var context = context
         context.environment = environment
-        context.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
-        
-        // Calculate vertical offset to center text within the frame
-        // Text positions are calculated relative to y=0, but we need to center them vertically
+        super.draw(with: context)
+        self.drawLayoutManager.fitToSize(self.frame.size)
+
+        let scale = max(environment.scaleFactor, 1)
+        func snapToPixel(_ value: Float) -> Float {
+            ((value * scale).rounded()) / scale
+        }
+
+        context.translateBy(
+            x: snapToPixel(self.frame.origin.x),
+            y: -snapToPixel(self.frame.origin.y)
+        )
+
+        // Preserve the layout manager's horizontal alignment and side bearings.
+        // Optical centering is only appropriate for explicitly centered text.
+        var horizontalOffset: Float = 0
         var verticalOffset: Float = 0
-        if !self.layoutManager.textLines.isEmpty {
-            // Find the maximum pt (top) and minimum pb (bottom) values among all glyphs
+        var exceedsBounds = self.drawLayoutManager.boundingSize().height > self.frame.height
+        if !self.drawLayoutManager.textLines.isEmpty {
+            var minX: Float = .infinity
+            var maxX: Float = -.infinity
             var maxTopY: Float = -Float.infinity
             var minBottomY: Float = Float.infinity
-            
-            for line in self.layoutManager.textLines {
+
+            for line in self.drawLayoutManager.textLines {
                 for run in line {
                     for glyph in run {
-                        // glyph.position.w is pt (top Y coordinate), glyph.position.y is pb (bottom Y coordinate)
+                        exceedsBounds = exceedsBounds || glyph.advanceX > self.frame.width
+                        minX = min(minX, glyph.position.x)
+                        maxX = max(maxX, glyph.position.z)
                         maxTopY = max(maxTopY, glyph.position.w)
                         minBottomY = min(minBottomY, glyph.position.y)
                     }
                 }
             }
-            
-            // Calculate text height
-            let textHeight = maxTopY - minBottomY
-            
-            // Center text vertically within the frame
-            // Frame center is at frame.height / 2 from the top
-            // Text center should be at textHeight / 2 from maxTopY
-            // So we need to offset: frame.height / 2 - (maxTopY - textHeight / 2)
-            // Which simplifies to: frame.height / 2 - maxTopY + textHeight / 2
-            let frameCenterY = self.frame.size.height
-            let textCenterY = maxTopY - textHeight / 2
-            verticalOffset = frameCenterY - textCenterY
+
+            if self.drawLayoutManager.resolvedTextAlignment == .center, minX.isFinite, maxX.isFinite {
+                let textCenterX = (minX + maxX) / 2
+                let frameCenterX = self.frame.size.width / 2
+                horizontalOffset = frameCenterX - textCenterX
+            }
+
+            if maxTopY.isFinite, minBottomY.isFinite {
+                let textCenterY = (maxTopY + minBottomY) / 2
+                let frameCenterY = -self.frame.size.height / 2
+                verticalOffset = frameCenterY - textCenterY
+            }
         }
-        
-        context.translateBy(x: 0, y: -verticalOffset)
 
-        let layout = Text.Layout(lines: self.layoutManager.textLines)
+        self.drawLayout(
+            in: &context,
+            offset: Point(x: snapToPixel(horizontalOffset), y: snapToPixel(verticalOffset)),
+            clipsToBounds: exceedsBounds
+        )
+    }
+
+    private func drawLayout(in context: inout UIGraphicsContext, offset: Point, clipsToBounds: Bool) {
+        // A proposal can be smaller than one glyph or one line. Keep drawing
+        // within that constraint without treating atlas padding as overflow.
+        let clipBounds = Rect(origin: .zero, size: self.frame.size)
+        let usesClipRect = clipsToBounds && context.pushTransformedClipRect(clipBounds)
+        let usesClipPath = clipsToBounds && !usesClipRect
+        if usesClipPath {
+            context.pushClipPath(RectangleShape().path(in: clipBounds))
+        }
+        context.translateBy(x: offset.x, y: offset.y)
+
+        let layout = Text.Layout(lines: self.drawLayoutManager.textLines)
         self.textRenderer.draw(layout: layout, in: &context)
-
-        super.draw(with: context)
+        if usesClipRect {
+            context.popClipRect()
+        } else if usesClipPath {
+            context.popClipPath()
+        }
     }
 
     override func update(from newNode: ViewNode) {
@@ -105,7 +145,55 @@ final class TextViewNode: ViewNode {
 
         self.textRenderer = textNode.textRenderer
         self.textContainer = textNode.textContainer
-        self.updateEnvironment(textNode.environment)
+    }
+
+    override func updateEnvironment(_ environment: EnvironmentValues) {
+        let previousEnvironment = self.environment
+        super.updateEnvironment(environment)
+        guard Self.textEnvironmentDidChange(from: previousEnvironment, to: self.environment) else {
+            return
+        }
+
+        self.refreshTextContainer()
+    }
+
+    override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {
+        if self.point(inside: point, with: event) {
+            return self
+        }
+        return nil
+    }
+
+    private func refreshTextContainer() {
+        guard let content = self.content as? Text else {
+            return
+        }
+
+        self.textContainer = Self.makeTextContainer(content: content, environment: self.environment)
+        self.invalidateNearestLayer()
+        owner?.containerView?.setNeedsLayout()
+    }
+
+    private static func makeTextContainer(content: Text, environment: EnvironmentValues) -> TextContainer {
+        let text = content.storage.applyingEnvironment(environment)
+        var container = TextContainer(text: text)
+        container.numberOfLines = content.storage.lineLimit
+        container.lineBreakMode = content.storage.lineBreakMode ?? .byWordWrapping
+        container.textAlignment = content.storage.multilineTextAlignment ?? .center
+        container.writingDirection = environment.layoutDirection == .rightToLeft ? .rightToLeft : .leftToRight
+        return container
+    }
+
+    private static func textEnvironmentDidChange(
+        from previous: EnvironmentValues,
+        to current: EnvironmentValues
+    ) -> Bool {
+        previous.font != current.font
+            || previous.foregroundColor != current.foregroundColor
+            || previous.lineLimit != current.lineLimit
+            || previous.lineBreakMode != current.lineBreakMode
+            || previous.multilineTextAlignment != current.multilineTextAlignment
+            || previous.layoutDirection != current.layoutDirection
     }
 }
 

@@ -15,7 +15,7 @@ import AdaRender
 public struct Mesh2D: Sendable {
     public var mesh: Mesh
     public var materials: [Material]
-    
+
     public init(mesh: Mesh, materials: [Material]) {
         self.mesh = mesh
         self.materials = materials

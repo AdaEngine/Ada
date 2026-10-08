@@ -7,13 +7,12 @@
 
 /// A type-erased view.
 ///
-/// An ``AnyView`` allows changing the type of view used in a given view hierarchy. 
+/// An ``AnyView`` allows changing the type of view used in a given view hierarchy.
 /// Whenever the type of view used with an AnyView changes, the old hierarchy is destroyed
 /// and a new hierarchy is created for the new type.
 @frozen public struct AnyView: View {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     let content: any View
 

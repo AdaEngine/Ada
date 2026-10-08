@@ -1,0 +1,91 @@
+#ifdef HB_FEATURES_H
+#include HB_FEATURES_H
+#endif
+
+#ifdef HB_HAS_CORETEXT
+#define HAVE_CORETEXT 1
+#endif
+#ifdef HB_HAS_DIRECTWRITE
+#define HAVE_DIRECTWRITE 1
+#endif
+#ifdef HB_HAS_FREETYPE
+#define HAVE_FREETYPE 1
+#endif
+#ifdef HB_HAS_GDI
+#define HAVE_GDI 1
+#endif
+#ifdef HB_HAS_GLIB
+#define HAVE_GLIB 1
+#endif
+#ifdef HB_HAS_GRAPHITE
+#define HAVE_GRAPHITE 1
+#endif
+#ifdef HB_HAS_UNISCRIBE
+#define HAVE_UNISCRIBE 1
+#define HAVE_GDI 1
+#endif
+#ifdef HB_HAS_WASM
+#define HAVE_WASM 1
+#endif
+
+
+/* Core library. */
+%%BASE_SOURCES%%
+
+#ifdef HB_HAS_CAIRO
+%%CAIRO_SOURCES%%
+#endif
+
+#ifdef HB_HAS_CORETEXT
+%%CORETEXT_SOURCES%%
+#endif
+
+#ifdef HB_HAS_DIRECTWRITE
+%%DIRECTWRITE_SOURCES%%
+#endif
+
+#ifdef HB_HAS_FREETYPE
+%%FREETYPE_SOURCES%%
+#endif
+
+#ifdef HB_HAS_GDI
+#ifndef HAVE_GDI
+%%GDI_SOURCES%%
+#endif
+#endif
+
+#ifdef HB_HAS_GLIB
+%%GLIB_SOURCES%%
+#endif
+
+#ifdef HB_HAS_GRAPHITE
+%%GRAPHITE_SOURCES%%
+#endif
+
+#ifdef HB_HAS_GPU
+%%GPU_SOURCES%%
+#endif
+
+#ifdef HB_HAS_ICU
+%%ICU_SOURCES%%
+#endif
+
+#ifdef HB_HAS_RASTER
+%%RASTER_SOURCES%%
+#endif
+
+#ifdef HB_HAS_SUBSET
+%%SUBSET_SOURCES%%
+#endif
+
+#ifdef HB_HAS_UNISCRIBE
+%%UNISCRIBE_SOURCES%%
+#endif
+
+#ifdef HB_HAS_VECTOR
+%%VECTOR_SOURCES%%
+#endif
+
+#ifdef HB_HAS_WASM
+%%WASM_SOURCES%%
+#endif

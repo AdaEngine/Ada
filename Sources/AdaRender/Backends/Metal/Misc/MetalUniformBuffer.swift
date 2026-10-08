@@ -6,17 +6,16 @@
 //
 
 #if METAL
-import MetalKit
+    import MetalKit
 
-// TODO: (Vlad) think about inheretence and how it affect type casting and vtables
-final class MetalUniformBuffer: MetalBuffer, UniformBuffer, @unchecked Sendable {
-    
-    let binding: Int
-    
-    init(buffer: MTLBuffer, binding: Int) {
-        self.binding = binding
-        super.init(buffer: buffer)
+    // TODO: (Vlad) think about inheretence and how it affect type casting and vtables
+    final class MetalUniformBuffer: MetalBuffer, UniformBuffer, @unchecked Sendable {
+        let binding: Int
+
+        init(buffer: MTLBuffer, binding: Int) {
+            self.binding = binding
+            super.init(buffer: buffer)
+        }
     }
-}
 
 #endif

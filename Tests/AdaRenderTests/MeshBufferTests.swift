@@ -6,8 +6,12 @@
 //
 
 import Testing
-import AdaRender
+@_spi(Internal) @testable import AdaRender
+import AdaUtils
 import Math
+#if canImport(Metal)
+import Metal
+#endif
 
 @Suite
 struct MeshBufferTests {
@@ -142,6 +146,170 @@ struct MeshBufferTests {
         #expect(buffer.count == 3)
         #expect(buffer.elements == values)
     }
+
+    @Test func `mesh vertex descriptor keeps standard shader locations for sparse attributes`() {
+        var mesh = MeshDescriptor(name: "colored mesh")
+        mesh.positions = MeshBuffer<Vector3>([
+            Vector3(x: 0, y: 0, z: 0),
+            Vector3(x: 1, y: 0, z: 0),
+        ])
+        mesh.colors = MeshBuffer<Color>([
+            .red,
+            .blue,
+        ])
+
+        let attributes = Array(mesh.getMeshVertexBufferDescriptor().attributes)
+
+        #expect(attributes.count == 4)
+        #expect(attributes[0].name == MeshDescriptor.positions.id.name)
+        #expect(attributes[0].format == .vector3)
+        #expect(attributes[0].offset == 0)
+        #expect(attributes[1].format == .invalid)
+        #expect(attributes[2].format == .invalid)
+        #expect(attributes[3].name == MeshDescriptor.colors.id.name)
+        #expect(attributes[3].format == .vector4)
+        #expect(attributes[3].offset == MemoryLayout<Vector3>.stride)
+    }
+
+    @Test func `mesh vertex descriptor keeps tangent at shader location four`() {
+        var mesh = MeshDescriptor(name: "tangent mesh")
+        mesh.positions = MeshBuffer<Vector3>([.zero])
+        mesh.normals = MeshBuffer<Vector3>([.up])
+        mesh.tangents = MeshBuffer<Vector4>([[1, 0, 0, 1]])
+
+        let attributes = Array(mesh.getMeshVertexBufferDescriptor().attributes)
+
+        #expect(attributes.count == 5)
+        #expect(attributes[2].format == .invalid)
+        #expect(attributes[3].format == .invalid)
+        #expect(attributes[4].name == MeshDescriptor.tangents.id.name)
+        #expect(attributes[4].format == .vector4)
+    }
+
+    @Test func `shader reflection keeps internal uniforms in descriptor layout only`() throws {
+        let source = try ShaderSource(source: """
+        #version 450 core
+        #pragma stage : vert
+
+        layout (binding = 2) uniform AE_GlobalView {
+            mat4 u_ViewProjection;
+        };
+
+        layout (binding = 3) uniform AE_Mesh2dUniform {
+            mat4 u_MeshModel;
+        };
+
+        [[main]]
+        void test_vertex()
+        {
+            gl_Position = u_ViewProjection * u_MeshModel * vec4(0.0, 0.0, 0.0, 1.0);
+        }
+        """)
+        let compiler = ShaderCompiler(shaderSource: source)
+        let spirv = try compiler.compileSpirvBin(for: .vertex, ignoreCache: true)
+        let reflection = try SpirvCompiler(
+            spriv: spirv.data,
+            stage: .vertex,
+            deviceLang: .glsl
+        ).reflection()
+
+        let descriptorSet = try #require(reflection.descriptorSets.first)
+        #expect(descriptorSet.uniformsBuffers.keys.contains(2))
+        #expect(descriptorSet.uniformsBuffers.keys.contains(3))
+        #expect(reflection.shaderBuffers["AE_GlobalView"] == nil)
+        #expect(reflection.shaderBuffers["AE_Mesh2dUniform"] == nil)
+    }
+
+    @Test func `shader reflection grows descriptor sets for nonzero set resources`() throws {
+        let source = try ShaderSource(source: """
+        #version 450 core
+        #pragma stage : frag
+
+        layout (location = 0) out vec4 color;
+        layout (set = 1, binding = 0) uniform texture2D customTexture;
+        layout (set = 1, binding = 1) uniform sampler customSampler;
+
+        [[main]]
+        void test_fragment()
+        {
+            color = texture(sampler2D(customTexture, customSampler), vec2(0.5));
+        }
+        """)
+        let compiler = ShaderCompiler(shaderSource: source)
+        let spirv = try compiler.compileSpirvBin(for: .fragment, ignoreCache: true)
+        let reflection = try SpirvCompiler(
+            spriv: spirv.data,
+            stage: .fragment,
+            deviceLang: .glsl
+        ).reflection()
+
+        #expect(reflection.descriptorSets.count == 2)
+        #expect(reflection.descriptorSets[1].sampledImages.keys.contains(0))
+        #expect(reflection.descriptorSets[1].samplers.keys.contains(1))
+    }
+
+    #if canImport(Metal)
+    @Test func `mesh2d positions and colors pipeline compiles on Metal`() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            return
+        }
+
+        var mesh = MeshDescriptor(name: "colored mesh")
+        mesh.positions = MeshBuffer<Vector3>([
+            Vector3(x: 0, y: 0, z: 0),
+            Vector3(x: 1, y: 0, z: 0),
+        ])
+        mesh.colors = MeshBuffer<Color>([
+            .red,
+            .blue,
+        ])
+
+        let shaderURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("Sources/AdaRender/Assets/Shaders/mesh2d/mesh2d.glsl")
+        let shaderSource = try ShaderSource(from: shaderURL)
+        let compiler = ShaderCompiler(shaderSource: shaderSource)
+        for stage in [ShaderStage.vertex, .fragment] {
+            compiler.setMacro("VERTEX_POSITIONS", value: "1", for: stage)
+            compiler.setMacro("VERTEX_COLORS", value: "1", for: stage)
+        }
+
+        let vertexShader = try Self.makeMetalShader(stage: .vertex, compiler: compiler, device: device)
+        let fragmentShader = try Self.makeMetalShader(stage: .fragment, compiler: compiler, device: device)
+
+        let descriptor = RenderPipelineDescriptor(
+            vertex: vertexShader,
+            fragment: fragmentShader,
+            vertexDescriptor: mesh.getMeshVertexBufferDescriptor(),
+            colorAttachments: [
+                RenderPipelineColorAttachmentDescriptor(format: .bgra8),
+            ]
+        )
+
+        _ = try MetalRenderPipeline(descriptor: descriptor, device: device)
+    }
+
+    private static func makeMetalShader(
+        stage: ShaderStage,
+        compiler: ShaderCompiler,
+        device: MTLDevice
+    ) throws -> Shader {
+        let spirv = try compiler.compileSpirvBin(for: stage, ignoreCache: true)
+        let compiled = try SpirvCompiler(
+            spriv: spirv.data,
+            stage: stage,
+            deviceLang: .msl
+        ).compile()
+        let entryPoint = try #require(compiled.entryPoints.first?.name)
+        let shader = Shader(
+            source: compiled.source,
+            entryPoint: entryPoint,
+            stage: stage,
+            reflectionData: compiled.reflection
+        )
+        shader.compiledShader = try MetalShader(shader: shader, device: device)
+        return shader
+    }
+    #endif
 
     // MARK: - Iterator Tests
 
@@ -382,5 +550,32 @@ struct MeshBufferTests {
             #expect(elements[index].z == original.z)
             #expect(elements[index].w == original.w)
         }
+    }
+
+    @Test func `sphere UVs follow the ECEF longitude direction`() throws {
+        try Self.setupHeadlessRenderEngineIfNeeded()
+
+        let mesh = Mesh.generateSphere(
+            radius: 1,
+            segments: 4,
+            rings: 2,
+            renderDevice: unsafe RenderEngine.shared.renderDevice
+        )
+        let descriptor = try #require(mesh.models.first?.parts.first?.meshDescriptor)
+        let textureCoordinates = try #require(descriptor.textureCoordinates?.elements)
+
+        // Equator at +Z is 90 degrees west in the app's ECEF coordinate system.
+        let positiveZVertex = 6
+        #expect(abs(descriptor.positions.elements[positiveZVertex].z - 1) < 0.0001)
+        #expect(textureCoordinates[positiveZVertex] == Vector2(0.25, 0.5))
+    }
+
+    private static func setupHeadlessRenderEngineIfNeeded() throws {
+        guard unsafe RenderEngine.shared == nil else {
+            return
+        }
+
+        unsafe RenderEngine.configurations.preferredBackend = .headless
+        try RenderEngine.setupRenderEngine()
     }
 }

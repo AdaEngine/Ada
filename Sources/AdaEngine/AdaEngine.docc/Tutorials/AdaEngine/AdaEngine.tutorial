@@ -1,6 +1,6 @@
-@Tutorials(name: "Ada Engine") {
-    @Intro(title: "Meet AdaEngine") {
-        Learn the basics of AdaEngine and starts to develop your own games!
+@Tutorials(name: "Ada") {
+    @Intro(title: "Meet Ada") {
+        Learn the basics of Ada and start developing your own games!
     }
     
     @Chapter(name: "Create your first 2D game project.") {

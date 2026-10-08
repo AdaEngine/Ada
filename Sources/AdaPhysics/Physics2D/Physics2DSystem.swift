@@ -15,13 +15,21 @@ import Math
 @System
 public func Physics2DUpdate(
     _ physicsWorld: Res<Physics2DWorldHolder>,
+    _ performance: Res<PhysicsPerformanceMetrics?>,
     _ fixedTime: Res<FixedTime>
 ) {
     let deltaTime = fixedTime.deltaTime
     let world = physicsWorld.world
     world.updateSimulation(deltaTime)
+    performance.wrappedValue?.recordPerformance(from: world)
     world.processContacts()
     world.processSensors()
+}
+
+extension PhysicsPerformanceMetrics {
+    func recordPerformance(from world: PhysicsWorld2D) {
+        world.recordPerformance(into: self)
+    }
 }
 
 // - TODO: (Vlad) Runtime update shape resource
@@ -29,29 +37,28 @@ public func Physics2DUpdate(
 /// A system for simulate and update physics bodies on the scene.
 @PlainSystem
 public struct Physics2DSyncSystem: Sendable {
-
     @Query<Entity, Ref<PhysicsBody2DComponent>, Ref<Transform>>
     private var physicsBodyQuery
-    
+
     @Query<Entity, Ref<Collision2DComponent>, Ref<Transform>>
     private var collisionQuery
-    
+
     @Query<Entity, Ref<PhysicsJoint2DComponent>, Ref<Transform>>
     private var jointsQuery
 
     @Res<Physics2DWorldHolder>
     private var physicsWorld
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
-    public func update(context: UpdateContext) {
-        self.updatePhysicsBodyEntities(in: physicsWorld.world)
-        self.updateCollisionEntities(in: physicsWorld.world)
+    public func update(context _: UpdateContext) {
+        self.syncPhysicsBodyEntities(in: physicsWorld.world)
+        self.syncCollisionEntities(in: physicsWorld.world)
     }
-    
+
     // MARK: - Private
 
-    private func updatePhysicsBodyEntities(in world: PhysicsWorld2D) {
+    private func syncPhysicsBodyEntities(in world: PhysicsWorld2D) {
         self.physicsBodyQuery.forEach { entity, physicsBody, transform in
             if let body = physicsBody.runtimeBody {
                 if physicsBody.mode == .static {
@@ -59,19 +66,17 @@ public struct Physics2DSyncSystem: Sendable {
                         position: transform.position.xy,
                         angle: transform.rotation.angle2D
                     )
-                } else {
-                    let position = body.getPosition()
-                    transform.position.x = position.x
-                    transform.position.y = position.y
-                    transform.rotation = Quat(axis: [0, 0, 1], angle: -body.getAngle().radians)
                 }
-                
-                body.massData.mass = physicsBody.massProperties.mass
+
+                applyMassProperties(physicsBody.massProperties, fixedRotation: physicsBody.fixedRotation, to: body)
             } else {
                 var def = unsafe b2DefaultBodyDef()
                 unsafe def.fixedRotation = physicsBody.fixedRotation
                 unsafe def.position = transform.position.xy.b2Vec
                 unsafe def.type = physicsBody.mode.b2Type
+                unsafe def.gravityScale = physicsBody.gravityScale
+                unsafe def.linearVelocity = physicsBody.linearVelocity.b2Vec
+                unsafe def.angularVelocity = physicsBody.angularVelocity
 
                 let body = unsafe world.createBody(with: def, for: entity)
                 physicsBody.runtimeBody = body
@@ -86,11 +91,11 @@ public struct Physics2DSyncSystem: Sendable {
                     if physicsBody.wrappedValue.isTrigger {
                         unsafe shapeDef.isSensor = true
                     }
-                    
+
                     if let debugColor = physicsBody.debugColor {
                         unsafe shapeDef.customColor = UInt32(debugColor.toHex)
                     }
-                    
+
                     unsafe body.appendShape(
                         shapeResource,
                         transform: transform.wrappedValue,
@@ -98,7 +103,7 @@ public struct Physics2DSyncSystem: Sendable {
                     )
                 }
 
-                body.massData.mass = physicsBody.massProperties.mass
+                applyMassProperties(physicsBody.massProperties, fixedRotation: physicsBody.fixedRotation, to: body)
             }
 
             if let shapes = physicsBody.runtimeBody?.getShapes() {
@@ -108,7 +113,7 @@ public struct Physics2DSyncSystem: Sendable {
                     let filterData = shape.filter
 
                     if !(filterData.categoryBits == collisionFilter.categoryBitMask.rawValue
-                         && filterData.maskBits == collisionFilter.collisionBitMask.rawValue) {
+                        && filterData.maskBits == collisionFilter.collisionBitMask.rawValue) {
                         shape.filter = collisionFilter.b2Filter
                     }
                 }
@@ -116,8 +121,19 @@ public struct Physics2DSyncSystem: Sendable {
         }
     }
 
-    private func updateCollisionEntities(in world: PhysicsWorld2D) {
-        collisionQuery.forEach { (entity, collisionBody, transform) in
+    private func applyMassProperties(_ properties: PhysicsMassProperties, fixedRotation: Bool, to body: Body2D) {
+        var data = body.massData
+        data.mass = properties.mass
+        if fixedRotation {
+            data.rotationalInertia = 0
+        } else if properties.inertia.z > 0 {
+            data.rotationalInertia = properties.inertia.z
+        }
+        body.massData = data
+    }
+
+    private func syncCollisionEntities(in world: PhysicsWorld2D) {
+        collisionQuery.forEach { entity, collisionBody, transform in
             if let body = collisionBody.runtimeBody {
                 if body.getPosition() != transform.position.xy {
                     body.setTransform(
@@ -157,8 +173,7 @@ public struct Physics2DSyncSystem: Sendable {
                 for shape in shapes {
                     let filterData = shape.filter
 
-                    if !(filterData.categoryBits == collisionFilter.categoryBitMask.rawValue &&
-                         filterData.maskBits == collisionFilter.collisionBitMask.rawValue) {
+                    if !(filterData.categoryBits == collisionFilter.categoryBitMask.rawValue && filterData.maskBits == collisionFilter.collisionBitMask.rawValue) {
                         shape.filter = collisionFilter.b2Filter
                     }
                 }
@@ -167,7 +182,35 @@ public struct Physics2DSyncSystem: Sendable {
     }
 }
 
-private extension CollisionFilter {
+/// A system for writing back simulated 2D physics state into scene components.
+@PlainSystem
+public struct Physics2DWritebackSystem: Sendable {
+    @Res<Physics2DWorldHolder>
+    private var physicsWorld
+
+    public init(world _: World) {}
+
+    public func update(context _: UpdateContext) {
+        physicsWorld.world.forEachMovedBody { entity, position, rotation in
+            guard var transform = entity.components[Transform.self] else {
+                return
+            }
+
+            guard
+                transform.position.x != position.x || transform.position.y != position.y || transform.rotation != rotation
+            else {
+                return
+            }
+
+            transform.position.x = position.x
+            transform.position.y = position.y
+            transform.rotation = rotation
+            entity.components[Transform.self] = transform
+        }
+    }
+}
+
+extension CollisionFilter {
     var b2Filter: b2Filter {
         var filter = b2DefaultFilter()
         filter.categoryBits = categoryBitMask.rawValue
@@ -176,7 +219,7 @@ private extension CollisionFilter {
     }
 }
 
-private extension Quat {
+extension Quat {
     var angle2D: Angle {
         let rads = Math.atan2(
             2 * (self.w * self.z + self.x * self.y),

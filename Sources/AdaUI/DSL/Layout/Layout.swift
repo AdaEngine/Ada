@@ -5,10 +5,11 @@
 //  Created by Vladislav Prusakov on 22.06.2024.
 //
 
+import AdaAnimation
 import Math
 
 /// Layout-specific properties of a layout container.
-public struct LayoutProperties {
+public struct LayoutProperties: Equatable {
     /// The orientation of the containing stack-like container.
     var stackOrientation: Axis?
 
@@ -21,7 +22,6 @@ public struct LayoutProperties {
 @MainActor
 @preconcurrency
 public protocol Layout: Animatable {
-    
     /// The cache of the layout.
     associatedtype Cache = Void
 
@@ -64,14 +64,14 @@ public protocol Layout: Animatable {
     static var layoutProperties: LayoutProperties { get }
 }
 
-public extension Layout {
-    func updateCache(_ cache: inout Cache, subviews: Subviews) { }
+extension Layout {
+    public func updateCache(_: inout Cache, subviews _: Subviews) {}
 
-    static var layoutProperties: LayoutProperties { LayoutProperties() }
+    public static var layoutProperties: LayoutProperties { LayoutProperties() }
 }
 
-public extension Layout where Cache == Void {
-    func makeCache(subviews: Subviews) -> Cache {
+extension Layout where Cache == Void {
+    public func makeCache(subviews _: Subviews) -> Cache {
         return
     }
 }
@@ -89,7 +89,6 @@ extension Layout {
 // MARK: - Internal
 
 struct CustomLayoutContainer<T: Layout, Content: View>: View {
-
     typealias Body = Never
 
     let layout: T
@@ -101,8 +100,9 @@ struct CustomLayoutContainer<T: Layout, Content: View>: View {
 
         var inputs = inputs
         inputs.layout = layout
-        let node = LayoutViewContainerNode(layout: layout, content: content.value)
+        let node = ObservedLayoutViewContainerNode(layout: layout, content: content.value)
         node.updateEnvironment(inputs.environment)
+        node.invalidateContent()
         return _ViewOutputs(node: node)
     }
 }

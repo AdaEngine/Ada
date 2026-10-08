@@ -61,6 +61,6 @@ extension RenderPipelines where T.Configuration == RenderPipelineEmptyConfigurat
 extension RenderPipelines: WorldInitable where T: WorldInitable {
     @inlinable
     public init(from world: World) {
-        self.configurator = T.init(from: world)
+        self.configurator = T(from: world)
     }
 }

@@ -16,12 +16,12 @@ public final class Extract<T: SystemParameter>: @unchecked Sendable {
     }
 
     /// Initialize a new extract.
-    public init() { }
+    public init() {}
 
     /// Initialize a new extract.
     /// - Parameter from: The world to extract the resource from.
     public init(from world: World) {
-        self._value = T.init(from: world)
+        self._value = T(from: world)
     }
 
     /// Call the extract.
@@ -35,7 +35,7 @@ extension Extract: SystemParameter {
     public func update(from world: World) {
         if let mainWorld = world.getResource(MainWorld.self)?.world {
             if _value == nil {
-                _value = T.init(from: mainWorld)
+                _value = T(from: mainWorld)
             }
             _value?.update(from: mainWorld)
         }

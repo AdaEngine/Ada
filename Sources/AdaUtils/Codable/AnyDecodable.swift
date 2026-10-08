@@ -31,7 +31,7 @@ extension _AnyDecodable {
             #if canImport(Darwin)
                 self.init(NSNull())
             #else
-                self.init(Optional<Self>.none)
+                self.init(Self?.none)
             #endif
         } else if let bool = try? container.decode(Bool.self) {
             self.init(bool)
@@ -44,7 +44,7 @@ extension _AnyDecodable {
         } else if let string = try? container.decode(String.self) {
             self.init(string)
         } else if let array = try? container.decode([AnyDecodable].self) {
-            self.init(array.map { $0.value })
+            self.init(array.map(\.value))
         } else if let dictionary = try? container.decode([String: AnyDecodable].self) {
             self.init(dictionary.mapValues { $0.value })
         } else {
@@ -56,10 +56,11 @@ extension _AnyDecodable {
 extension AnyDecodable: Equatable {
     public static func == (lhs: AnyDecodable, rhs: AnyDecodable) -> Bool {
         switch (lhs.value, rhs.value) {
-#if canImport(Darwin)
-        case is (NSNull, NSNull), is (Void, Void):
-            return true
-#endif
+        #if canImport(Darwin)
+            case is (NSNull, NSNull),
+                is (Void, Void):
+                return true
+        #endif
         case let (lhs as Bool, rhs as Bool):
             return lhs == rhs
         case let (lhs as Int, rhs as Int):

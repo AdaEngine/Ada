@@ -1,0 +1,396 @@
+actions: []
+format: ada.ui
+inputs:
+- defaultValue: false
+  isBinding: false
+  name: gateOpen
+  type: bool
+- defaultValue: AIRLOCK / LOCKED
+  isBinding: false
+  name: status
+  type: string
+- defaultValue: 1.1e+2
+  isBinding: false
+  name: droneOffset
+  type: number
+- defaultValue: '#ff9659ff'
+  isBinding: false
+  name: gateColor
+  type: string
+- defaultValue: COMPACT
+  isBinding: false
+  name: posture
+  type: string
+root:
+  actions: {}
+  arguments:
+    alignment:
+      value: leading
+    spacing:
+      value: 1.6e+1
+  children:
+  - actions: {}
+    arguments:
+      text:
+        value: MISSION CONTROL
+    children: []
+    id: eyebrow
+    modifiers:
+    - actions: {}
+      arguments:
+        value:
+          value: 1e+1
+      children: []
+      id: fontSize
+      type: fontSize
+      version: 1
+    - actions: {}
+      arguments:
+        color:
+          value: '#50eacbff'
+      children: []
+      id: foregroundColor
+      type: foregroundColor
+      version: 1
+    type: Text
+    version: 1
+  - actions: {}
+    arguments:
+      text:
+        value: A second perspective.
+    children: []
+    id: heading
+    modifiers:
+    - actions: {}
+      arguments:
+        value:
+          value: 2.5e+1
+      children: []
+      id: fontSize
+      type: fontSize
+      version: 1
+    - actions: {}
+      arguments:
+        color:
+          value: '#f0fafaff'
+      children: []
+      id: foregroundColor
+      type: foregroundColor
+      version: 1
+    type: Text
+    version: 1
+  - actions: {}
+    arguments:
+      text:
+        value: The same world. A new way to act.
+    children: []
+    id: description
+    modifiers:
+    - actions: {}
+      arguments:
+        value:
+          value: 1.2e+1
+      children: []
+      id: fontSize
+      type: fontSize
+      version: 1
+    - actions: {}
+      arguments:
+        color:
+          value: '#A62EB5FF'
+      children: []
+      id: foregroundColor
+      type: foregroundColor
+      version: 1
+    type: Text
+    version: 1
+  - actions: {}
+    arguments: {}
+    children:
+    - actions: {}
+      arguments:
+        color:
+          value: '#102634ff'
+        cornerRadius:
+          value: 1.8e+1
+      children: []
+      id: map-background
+      modifiers:
+      - actions: {}
+        arguments:
+          height:
+            value: 3.14e+2
+          width:
+            value: 3.16e+2
+        children: []
+        id: frame
+        type: frame
+        version: 1
+      type: RoundedRectangle
+      version: 1
+    - actions: {}
+      arguments:
+        color:
+          value: '#29505bff'
+      children: []
+      id: map-route
+      modifiers:
+      - actions: {}
+        arguments:
+          height:
+            value: 2.5e+2
+          width:
+            value: 3e+0
+        children: []
+        id: frame
+        type: frame
+        version: 1
+      type: Rectangle
+      version: 1
+    - actions: {}
+      arguments:
+        color:
+          value: '#1c555bff'
+        cornerRadius:
+          value: 6e+0
+      children: []
+      id: map-destination
+      modifiers:
+      - actions: {}
+        arguments:
+          height:
+            value: 3.2e+1
+          width:
+            value: 7.8e+1
+        children: []
+        id: frame
+        type: frame
+        version: 1
+      - actions: {}
+        arguments:
+          y:
+            value: -1.16e+2
+        children: []
+        id: offset
+        type: offset
+        version: 1
+      type: RoundedRectangle
+      version: 1
+    - actions: {}
+      arguments:
+        isOn:
+          binding: gateOpen
+      children:
+      - actions: {}
+        arguments:
+          color:
+            binding: gateColor
+          cornerRadius:
+            value: 5e+0
+        children: []
+        id: gate-shape
+        modifiers:
+        - actions: {}
+          arguments:
+            height:
+              value: 3.2e+1
+            width:
+              value: 2.06e+2
+          children: []
+          id: frame
+          type: frame
+          version: 1
+        type: RoundedRectangle
+        version: 1
+      - actions: {}
+        arguments:
+          text:
+            value: AIRLOCK
+        children: []
+        id: gate-caption
+        modifiers:
+        - actions: {}
+          arguments:
+            value:
+              value: 1.1e+1
+          children: []
+          id: fontSize
+          type: fontSize
+          version: 1
+        - actions: {}
+          arguments:
+            color:
+              value: '#081923ff'
+          children: []
+          id: foregroundColor
+          type: foregroundColor
+          version: 1
+        type: Text
+        version: 1
+      id: map-gate
+      modifiers:
+      - actions: {}
+        arguments:
+          value:
+            value: Unfold.Map.Gate
+        children: []
+        id: accessibilityIdentifier
+        type: accessibilityIdentifier
+        version: 1
+      type: ToggleButton
+      version: 1
+    - actions: {}
+      arguments:
+        color:
+          value: '#b3fff2ff'
+      children: []
+      id: map-drone
+      modifiers:
+      - actions: {}
+        arguments:
+          height:
+            value: 1.3e+1
+          width:
+            value: 1.3e+1
+        children: []
+        id: frame
+        type: frame
+        version: 1
+      - actions: {}
+        arguments:
+          y:
+            binding: droneOffset
+        children: []
+        id: offset
+        type: offset
+        version: 1
+      - actions: {}
+        arguments:
+          value:
+            value: false
+        children: []
+        id: allowsHitTesting
+        type: allowsHitTesting
+        version: 1
+      type: Circle
+      version: 1
+    id: map
+    modifiers:
+    - actions: {}
+      arguments:
+        height:
+          value: 3.14e+2
+        width:
+          value: 3.16e+2
+      children: []
+      id: frame
+      type: frame
+      version: 1
+    type: ZStack
+    version: 1
+  - actions: {}
+    arguments:
+      text:
+        binding: status
+    children: []
+    id: status
+    modifiers:
+    - actions: {}
+      arguments:
+        value:
+          value: 1.3e+1
+      children: []
+      id: fontSize
+      type: fontSize
+      version: 1
+    - actions: {}
+      arguments:
+        color:
+          value: '#f0fafaff'
+      children: []
+      id: foregroundColor
+      type: foregroundColor
+      version: 1
+    type: Text
+    version: 1
+  - actions: {}
+    arguments:
+      text:
+        value: Tap the airlock to change the flight deck.
+    children: []
+    id: instruction
+    modifiers:
+    - actions: {}
+      arguments:
+        value:
+          value: 1.1e+1
+      children: []
+      id: fontSize
+      type: fontSize
+      version: 1
+    - actions: {}
+      arguments:
+        color:
+          value: '#B5402CFF'
+      children: []
+      id: foregroundColor
+      type: foregroundColor
+      version: 1
+    type: Text
+    version: 1
+  - actions: {}
+    arguments:
+      text:
+        binding: posture
+    children: []
+    id: posture
+    modifiers:
+    - actions: {}
+      arguments:
+        value:
+          value: 1e+1
+      children: []
+      id: fontSize
+      type: fontSize
+      version: 1
+    - actions: {}
+      arguments:
+        color:
+          value: '#50eacbff'
+      children: []
+      id: foregroundColor
+      type: foregroundColor
+      version: 1
+    type: Text
+    version: 1
+  id: map-root
+  modifiers:
+  - actions: {}
+    arguments:
+      value:
+        value: 3.2e+1
+    children: []
+    id: padding
+    type: padding
+    version: 1
+  - actions: {}
+    arguments:
+      height:
+        value: 6.4e+2
+      width:
+        value: 4e+2
+    children: []
+    id: frame
+    type: frame
+    version: 1
+  - actions: {}
+    arguments:
+      color:
+        value: '#0c1b28ff'
+    children: []
+    id: background
+    type: background
+    version: 1
+  type: VStack
+  version: 1
+schemaVersion: 1

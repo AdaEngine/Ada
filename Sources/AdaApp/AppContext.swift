@@ -9,6 +9,10 @@ import AdaECS
 import AdaUtils
 import Logging
 
+#if WASM && canImport(JavaScriptEventLoop)
+    import JavaScriptEventLoop
+#endif
+
 /// The context of the app.
 @MainActor
 @_spi(Internal)
@@ -19,9 +23,9 @@ public struct AppContext<T: App>: ~Copyable {
     /// Initialize a new app context.
     /// - Throws: An error if the app cannot be initialized.
     init() throws {
-        self.app = T.init()
+        self.app = T()
     }
-    
+
     /// Initialize a new app context.
     /// - Parameter app: The app to initialize the context with.
     @_spi(Internal)
@@ -33,27 +37,30 @@ public struct AppContext<T: App>: ~Copyable {
     /// - Throws: An error if the app cannot be run.
     @_spi(Internal)
     public func run() async throws {
+        #if WASM && canImport(JavaScriptEventLoop)
+            JavaScriptEventLoop.installGlobalExecutor()
+        #endif
+
         LoggingSystem.bootstrap {
-            MultiplexLogHandler([
-                StreamLogHandler.standardError(label: $0),
-                StreamLogHandler.standardOutput(label: $0)
-            ])
+            MultiplexLogHandler([StreamLogHandler.standardError(label: $0), RuntimeLogHandler(label: $0)])
         }
         let appWorlds = AppWorlds(main: World(name: "MainWorld"))
+        AppWorldsSession.current = appWorlds
         appWorlds
             .insertResource(WindowSettings())
+            .insertResource(SimulationControl())
             .addPlugin(MainSchedulerPlugin())
 
         let inputs = _SceneInputs(appWorlds: appWorlds)
         let node = _AppSceneNode(value: app.body)
-        let _ = T.Content._makeView(node, inputs: inputs)
-        
+        _ = T.Content._makeView(node, inputs: inputs)
+
         try await appWorlds.build()
 
         #if ENABLE_RUN_IN_CONCURRENCY
-        await appWorlds.runner?()
+            await appWorlds.runner?()
         #else
-        appWorlds.runner?()
+            appWorlds.runner?()
         #endif
     }
 }

@@ -2,8 +2,10 @@
 #include "Workload.h"
 
 #include <vector>
+#if !defined(__wasi__)
 #include <thread>
 #include <atomic>
+#endif
 #include <algorithm>
 
 namespace msdf_atlas {
@@ -20,6 +22,10 @@ bool Workload::finishSequential() {
 }
 
 bool Workload::finishParallel(int threadCount) {
+#if defined(__wasi__)
+    (void)threadCount;
+    return finishSequential();
+#else
     bool result = true;
     std::atomic<int> next(0);
     std::function<void(int)> threadWorker = [this, &result, &next](int threadNo) {
@@ -35,6 +41,7 @@ bool Workload::finishParallel(int threadCount) {
     for (std::thread &thread : threads)
         thread.join();
     return result;
+#endif
 }
 
 bool Workload::finish(int threadCount) {

@@ -1,0 +1,117 @@
+format: ada.scene
+schemaVersion: 1
+scene:
+  id: medieval-arena
+  name: Medieval Arena
+entities:
+- id: arena-tilemap
+  name: Arena Tile Map
+  enabled: true
+  components:
+    AdaTilemap.TileMapComponent:
+      tileDisplaySize:
+      - 48
+      - 48
+      map: '@res://Maps/Arena.tilemap'
+    AdaTransform.Transform:
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+      position:
+      - 0
+      - 0
+      - 0
+      scale:
+      - 1
+      - 1
+      - 1
+- id: host-spawn
+  name: Host Spawn
+  enabled: true
+  components:
+    AdaRender.Visibility:
+      value: hidden
+    AdaTransform.Transform:
+      position:
+      - -72
+      - 0
+      - 2
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+      scale:
+      - 1
+      - 1
+      - 1
+- id: peer-spawn
+  name: Peer Spawn
+  enabled: true
+  components:
+    AdaRender.Visibility:
+      value: hidden
+    AdaTransform.Transform:
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+      scale:
+      - 1
+      - 1
+      - 1
+      position:
+      - 72
+      - 0
+      - 2
+- id: north-spawn
+  name: North Spawn
+  enabled: true
+  components:
+    AdaTransform.Transform:
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+      scale:
+      - 1
+      - 1
+      - 1
+      position:
+      - 0
+      - 100
+      - 2
+    AdaRender.Visibility:
+      value: hidden
+- id: south-spawn
+  name: South Spawn
+  enabled: true
+  components:
+    AdaRender.Visibility:
+      value: hidden
+    AdaTransform.Transform:
+      position:
+      - 0
+      - -100
+      - 2
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+      scale:
+      - 1
+      - 1
+      - 1
+editor:
+  selectedEntity: arena-tilemap
+  expandedEntities:
+  - arena-tilemap
+  - host-spawn
+  - north-spawn
+  - south-spawn
+  - peer-spawn

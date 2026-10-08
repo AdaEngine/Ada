@@ -4,15 +4,19 @@
 # Ignore Swift Package Manager build artifacts directory.
 .build/
 **/.build/
+.build-codex/
+.build-web-*/
+.zed/
+
+
+dist/
 
 # Ignore generated Xcode projects
 *.xcodeproj
 # Ignore SwiftPM state, such as the generated xcodeproj when opening the project directly
 .swiftpm
 .sourcekit-lsp/
-bazel/swiftpm/deps_index.json
-bazel/swiftpm/deps.bzl
-Package.resolved
+.codegraph/
 
 
 # Ignore user state in Xcode Projects
@@ -28,10 +32,6 @@ xcuserdata/
 # Ignore cmake build configuration and output
 build/
 
-# Ignore bazel symlinks
-/bazel-*
-/MODULE.bazel.lock
-
 # Documentation
 /docs
 .docs/
@@ -43,5 +43,12 @@ Derived/
 .idea/
 .ijwb/
 
-# Compiled Shaders
-/Sources/AdaEngine/Rendering/Shaders/*.spv
+# Sloppy
+.sloppy/
+.sloppy-worktrees/
+
+# Isolated Android builds and debug signing keys
+.build-android*/
+
+# Local, machine-specific benchmark baselines
+.benchmarkBaselines/

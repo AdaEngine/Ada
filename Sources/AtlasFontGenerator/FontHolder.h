@@ -26,6 +26,7 @@ public:
     }
     
     bool loadFont(const char* fontPath);
+    bool setVariationAxis(const char* axis, double value);
     
     msdfgen::FontHandle* getFont() {
         return font;

@@ -18,12 +18,12 @@ public enum WindowRef: Codable, Sendable, Hashable {
     case windowId(WindowID)
 }
 
-public extension WindowRef {
-    func getWindowId(from primary: PrimaryWindowId) -> WindowID {
+extension WindowRef {
+    public func getWindowId(from primary: PrimaryWindowId) -> WindowID {
         switch self {
         case .primary:
             primary.windowId
-        case .windowId(let windowID):
+        case let .windowId(windowID):
             windowID
         }
     }
@@ -57,10 +57,10 @@ public struct CameraClearFlags: OptionSet, Codable, Sendable {
     }
 
     /// The solid flag.
-    public static let solid = CameraClearFlags(rawValue: 1 << 0)
+    public static let solid = Self(rawValue: 1 << 0)
 
     /// The depth buffer flag.
-    public static let depthBuffer = CameraClearFlags(rawValue: 1 << 1)
+    public static let depthBuffer = Self(rawValue: 1 << 1)
 
     /// The nothing flag.
     public static let nothing: CameraClearFlags = []
@@ -71,10 +71,8 @@ public struct CameraClearFlags: OptionSet, Codable, Sendable {
 /// Each camera has frustum, projection data.
 @Component
 public struct Camera: Sendable {
-
     /// Render target where camera will render.
     public enum RenderTarget: Codable, Sendable {
-
         /// Render camera to window.
         case window(WindowRef)
 
@@ -116,6 +114,12 @@ public struct Camera: Sendable {
     /// The render order.
     public var renderOrder: Int = 0
 
+    /// Opt-in temporal reconstruction for 3D cameras. Increment resetGeneration after a camera cut.
+    public var temporalUpscaling: TemporalUpscalingSettings?
+
+    /// Frame-local native foveation for 3D geometry. Temporal/spatial upscaling is disabled for this camera.
+    public var rasterizationRateMap: (any RasterizationRateMap)?
+
     public var viewMatrix: Transform3D = .identity
 
     // MARK: - Init
@@ -140,22 +144,30 @@ public struct Camera: Sendable {
     }
 }
 
-public extension Camera {
+extension Camera {
+    public func targetWindowId(from primary: PrimaryWindowId) -> WindowID? {
+        switch renderTarget {
+        case let .window(windowRef):
+            return windowRef.getWindowId(from: primary)
+        case .texture:
+            return nil
+        }
+    }
 
     /// Normalized Device Coordinate to world point
-    func ndcToWorld(cameraGlobalTransform: Transform3D, ndc: Vector3) -> Vector3 {
+    public func ndcToWorld(cameraGlobalTransform: Transform3D, ndc: Vector3) -> Vector3 {
         let matrix = cameraGlobalTransform * self.computedData.projectionMatrix.inverse
         return (matrix * Vector4(ndc, 1)).xyz
     }
 
     /// Return point from world to Normalized Device Coordinate.
-    func worldToNdc(cameraGlobalTransform: Transform3D, worldPosition: Vector3) -> Vector3 {
+    public func worldToNdc(cameraGlobalTransform: Transform3D, worldPosition: Vector3) -> Vector3 {
         let matrix = self.computedData.projectionMatrix * cameraGlobalTransform.inverse
         return (matrix * Vector4(worldPosition, 1)).xyz
     }
 
     /// Return point from viewport to 2D world.
-    func viewportToWorld2D(cameraGlobalTransform: Transform3D, viewportPosition: Vector2) -> Vector2? {
+    public func viewportToWorld2D(cameraGlobalTransform: Transform3D, viewportPosition: Vector2) -> Vector2? {
         let ndc = viewportPosition * 2 / logicalViewport.rect.size.asVector2 - Vector2.one
         let worldPlane = self.ndcToWorld(cameraGlobalTransform: cameraGlobalTransform, ndc: Vector3(ndc, 1))
 
@@ -163,25 +175,38 @@ public extension Camera {
     }
 
     /// Return ray from viewport to world. More prefer for 3D space.
-    func viewportToWorld(cameraGlobalTransform: Transform3D, point: Vector2) -> Ray? {
+    public func viewportToWorld(cameraGlobalTransform: Transform3D, point: Vector2) -> Ray? {
         let ndc = point * 2 / logicalViewport.rect.size.asVector2 - Vector2.one
         let ndcToWorld = cameraGlobalTransform * self.computedData.projectionMatrix.inverse
 
-        let worldPlaneNear = ndcToWorld * Vector4(Vector3(ndc, 1), 1)
-        let worldPlaneFar = ndcToWorld * Vector4(Vector3(ndc, Float.greatestFiniteMagnitude), 1)
+        let worldPlaneNear = ndcToWorld * Vector4(Vector3(ndc, 0), 1)
+        let worldPlaneFar = ndcToWorld * Vector4(Vector3(ndc, 1), 1)
 
-        if worldPlaneNear.isNaN && worldPlaneFar.isNaN {
+        guard
+            !worldPlaneNear.isNaN,
+            !worldPlaneFar.isNaN,
+            worldPlaneNear.w != 0,
+            worldPlaneFar.w != 0
+        else {
+            return nil
+        }
+
+        let nearPoint = worldPlaneNear.xyz / worldPlaneNear.w
+        let farPoint = worldPlaneFar.xyz / worldPlaneFar.w
+        let direction = farPoint - nearPoint
+
+        guard !direction.isNaN, direction != .zero else {
             return nil
         }
 
         return Ray(
-            origin: worldPlaneNear.xyz,
-            direction: (worldPlaneFar - worldPlaneNear).xyz.normalized
+            origin: nearPoint,
+            direction: direction.normalized
         )
     }
 
     /// Return point from world to viewport.
-    func worldToViewport(cameraGlobalTransform: Transform3D, worldPosition: Vector3) -> Vector2? {
+    public func worldToViewport(cameraGlobalTransform: Transform3D, worldPosition: Vector3) -> Vector2? {
         let size = logicalViewport.rect.size.asVector2
         let ndcSpace = self.worldToNdc(cameraGlobalTransform: cameraGlobalTransform, worldPosition: worldPosition)
 
@@ -191,7 +216,6 @@ public extension Camera {
 
         return ndcSpace.xy + Vector2.one / 2.0 * size
     }
-
 }
 
 extension Camera {

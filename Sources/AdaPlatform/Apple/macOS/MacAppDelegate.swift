@@ -6,11 +6,15 @@
 //
 
 #if MACOS
-import AppKit
-import MetalKit
+    import AppKit
+    import MetalKit
 
-final class MacAppDelegate: NSObject, NSApplicationDelegate {
-    
-}
+    final class MacAppDelegate: NSObject, NSApplicationDelegate {
+        func application(_: NSApplication, open urls: [URL]) {
+            for url in urls {
+                NotificationCenter.default.post(name: .adaEngineOpenURL, object: url)
+            }
+        }
+    }
 
 #endif

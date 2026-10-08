@@ -13,17 +13,17 @@ import Math
 public struct TextComponent {
     /// Text with style attributes.
     public var text: AttributedText
-    
+
     public var textAlignment: TextAlignment
-    
+
     /// Specify render bounds for text. If bounds has infinity width and/or height, than text will render without restrictions.
     /// If bounds has restricted size, than text will clipped.
     public var bounds: Rect
-    
+
     public var lineBreakMode: LineBreakMode
-    
+
     public var lineSpacing: Float
-    
+
     public init(
         text: AttributedText,
         textAlignment: TextAlignment = .center,

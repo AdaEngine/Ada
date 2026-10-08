@@ -31,7 +31,7 @@ extension AttributeSyntax {
 extension IfConfigClauseSyntax.Elements {
     var availability: IfConfigClauseSyntax.Elements? {
         switch self {
-        case .attributes(let attributes):
+        case let .attributes(attributes):
             if let availability = attributes.availability {
                 return .attributes(availability)
             } else {
@@ -51,7 +51,7 @@ extension IfConfigClauseSyntax {
             return nil
         }
     }
-    
+
     var clonedAsIf: IfConfigClauseSyntax {
         detached.with(\.poundKeyword, .poundIfToken())
     }
@@ -74,18 +74,17 @@ extension IfConfigDeclSyntax {
         } else {
             return with(\.clauses, IfConfigClauseListSyntax(elements))
         }
-        
     }
 }
 
 extension AttributeListSyntax.Element {
     var availability: AttributeListSyntax.Element? {
         switch self {
-        case .attribute(let attribute):
+        case let .attribute(attribute):
             if let availability = attribute.availability {
                 return .attribute(availability)
             }
-        case .ifConfigDecl(let ifConfig):
+        case let .ifConfigDecl(ifConfig):
             if let availability = ifConfig.availability {
                 return .ifConfigDecl(availability)
             }
@@ -96,7 +95,7 @@ extension AttributeListSyntax.Element {
 
 extension AttributeListSyntax {
     var availability: AttributeListSyntax? {
-        var elements = [AttributeListSyntax.Element]()
+        var elements = [Self.Element]()
         for element in self {
             if let availability = element.availability {
                 elements.append(availability)
@@ -122,7 +121,7 @@ extension TypeSyntax {
     var identifier: String? {
         for token in tokens(viewMode: .all) {
             switch token.tokenKind {
-            case .identifier(let identifier):
+            case let .identifier(identifier):
                 return identifier
             default:
                 break
@@ -134,12 +133,12 @@ extension TypeSyntax {
 
 extension FreestandingMacroExpansionSyntax {
     func argument(for label: String) -> ExprSyntax? {
-        arguments.filter({ $0.label?.text == label }).first?.expression
+        arguments.first(where: { $0.label?.text == label })?.expression
     }
 }
 
 extension AttributeSyntax {
     func argument(for label: String) -> ExprSyntax? {
-        arguments?.as(LabeledExprListSyntax.self)?.filter({ $0.label?.text == label }).first?.expression
+        arguments?.as(LabeledExprListSyntax.self)?.first(where: { $0.label?.text == label })?.expression
     }
 }

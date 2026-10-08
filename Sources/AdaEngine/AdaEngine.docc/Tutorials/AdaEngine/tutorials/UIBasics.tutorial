@@ -1,6 +1,6 @@
 @Tutorial(time: 15) {
     @Intro(title: "UI Basics") {
-        Build a simple UI screen using AdaEngine views. You will create a window, layout a few elements, and add a button with state.
+        Build a simple UI screen using Ada views. You will create a window, layout a few elements, and add a button with state.
     }
 
     @XcodeRequirement(title: "Xcode 26.3 or later", destination: "https://developer.apple.com/download/")

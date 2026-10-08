@@ -1,0 +1,68 @@
+@system(scheduler: "update", id: "gravity.swarm")
+class GravitySwarmSystem {
+    @query(Transform, GravityVelocity)
+    var movers;
+
+    @query(Transform, GravityPulse)
+    var pulses;
+
+    func update(context) {
+        var frameTime = context.deltaTime;
+        if (frameTime < 0) frameTime = 0;
+        if (frameTime > 0.05) frameTime = 0.05;
+
+        var moverCount = 0;
+        for (var entity in movers) {
+            var position = entity.transform.position;
+            var velocity = entity.gravityVelocity.velocity;
+            var boundsMin = entity.gravityVelocity.boundsMin;
+            var boundsMax = entity.gravityVelocity.boundsMax;
+
+            var nextX = position[0] + velocity[0] * frameTime;
+            var nextY = position[1] + velocity[1] * frameTime;
+
+            if (nextX < boundsMin[0]) {
+                nextX = boundsMin[0];
+                velocity = [-velocity[0], velocity[1]];
+            } else if (nextX > boundsMax[0]) {
+                nextX = boundsMax[0];
+                velocity = [-velocity[0], velocity[1]];
+            }
+
+            if (nextY < boundsMin[1]) {
+                nextY = boundsMin[1];
+                velocity = [velocity[0], -velocity[1]];
+            } else if (nextY > boundsMax[1]) {
+                nextY = boundsMax[1];
+                velocity = [velocity[0], -velocity[1]];
+            }
+
+            entity.transform.position = [nextX, nextY, position[2]];
+            entity.gravityVelocity.velocity = velocity;
+            moverCount += 1;
+        }
+
+        var pulseCount = 0;
+        for (var entity in pulses) {
+            var phase = entity.gravityPulse.phase;
+            var speed = entity.gravityPulse.speed;
+            var minimumScale = entity.gravityPulse.minimumScale;
+            var maximumScale = entity.gravityPulse.maximumScale;
+
+            phase += frameTime * speed;
+            if (phase >= 1) phase -= 1;
+
+            var scale = 1;
+            if (phase < 0.5) {
+                scale = minimumScale + (maximumScale - minimumScale) * phase * 2;
+            } else {
+                scale = maximumScale - (maximumScale - minimumScale) * (phase - 0.5) * 2;
+            }
+
+            entity.transform.scale = [scale, scale, 1];
+            entity.gravityPulse.phase = phase;
+            pulseCount += 1;
+        }
+
+    }
+}

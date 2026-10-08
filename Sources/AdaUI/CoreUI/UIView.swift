@@ -16,6 +16,15 @@ import Math
 // - TODO: (Vlad) Interaction (hit testing)
 // - TODO: (Vlad) Cropping
 
+/// A type-erased interface that allows the platform layer to push safe area insets
+/// into a UIContainerView without knowing its generic Content type.
+@_spi(Internal)
+@MainActor
+public protocol SafeAreaProvider: AnyObject {
+    var safeAreaInsets: EdgeInsets { get set }
+    func setNeedsLayout()
+}
+
 /// An object that manages the content for a rectangular area on the screen.
 ///
 /// Views are the fundamental building blocks of your app’s user interface, and the ``UIView`` class defines the behaviors that are common to all views.
@@ -23,13 +32,26 @@ import Math
 /// - Warning: Under development and currently doesn't work as expected.
 @MainActor
 open class UIView {
-
     // MARK: - Public Fields -
 
     /// Contains size and position coordinates relative to parent local coordinates
     open var frame: Rect {
         didSet {
             self.setFrame(self.frame)
+        }
+    }
+
+    /// The safe area insets reported by the platform.
+    /// Set this from the platform layer; it is injected into the view environment on every layout pass.
+    public var safeAreaInsets: EdgeInsets = EdgeInsets()
+
+    /// The vertical window area currently covered by the software keyboard.
+    /// Set this from the platform layer; AdaUI merges it into the bottom safe area inset.
+    public var keyboardOccludedHeight: Float = 0 {
+        didSet {
+            if oldValue != keyboardOccludedHeight {
+                setNeedsLayout()
+            }
         }
     }
 
@@ -45,18 +67,51 @@ open class UIView {
     /// A Boolean value indicating whether the view is interactive.
     open var isInteractionEnabled: Bool = true
 
+    /// Whether an embedded view can receive keyboard focus from the AdaUI hierarchy.
+    open var acceptsKeyboardFocus: Bool { false }
+
+    /// Called when an embedded native view gains or loses keyboard focus.
+    open func onFocusChanged(isFocused _: Bool) {}
+
+    public var userInterfaceIdiom: UserInterfaceIdiom = .desktop {
+        didSet {
+            if oldValue != userInterfaceIdiom {
+                self.setNeedsLayout()
+            }
+        }
+    }
+
+    public var colorScheme: ColorScheme = .light {
+        didSet {
+            if oldValue != colorScheme {
+                self.setNeedsLayout()
+            }
+        }
+    }
+
     /// A Boolean value indicating whether the view is hidden.
-    open var isHidden: Bool = false
+    open var isHidden: Bool = false {
+        didSet {
+            if oldValue != isHidden {
+                setNeedsDisplay()
+            }
+        }
+    }
 
     /// The z-index of the view.
     open var zIndex: Int = 0 {
         didSet {
             self.parentView?.needsResortZPositionForChildren = true
+            setNeedsDisplay()
         }
     }
 
     /// The background color of the view.
-    public var backgroundColor: Color = .white
+    public var backgroundColor: Color = .white {
+        didSet {
+            setNeedsDisplay()
+        }
+    }
 
     /// The debug view color of the view.
     private let debugViewColor = Color.random()
@@ -88,6 +143,7 @@ open class UIView {
 
     /// A Boolean value indicating whether the view needs to be laid out.
     private var needsLayout = true
+    internal var needsDisplay = true
 
     /// A Boolean value indicating whether the view needs to be resorted by z-index.
     var needsResortZPositionForChildren = false
@@ -124,7 +180,7 @@ open class UIView {
     /// - Parameters:
     ///   - rect: The rect to draw the view in.
     ///   - context: The context to draw the view in.
-    open func draw(in rect: Rect, with context: UIGraphicsContext) { }
+    open func draw(in _: Rect, with _: UIGraphicsContext) {}
 
     /// Internal method for drawing.
     @_spi(AdaEngine)
@@ -132,7 +188,7 @@ open class UIView {
         if self.isHidden {
             return
         }
-        
+
         var context = context
 
         if affineTransform != .identity {
@@ -145,10 +201,6 @@ open class UIView {
         context.drawRect(self.bounds, color: self.backgroundColor)
 
         self.draw(in: self.bounds, with: context)
-
-        if context.environment.debugViewDrawingOptions.contains(.drawViewOverlays) {
-            context.drawDebugBorders(frame.size, color: debugViewColor)
-        }
 
         for subview in self.zSortedChildren {
             subview.draw(with: context)
@@ -177,11 +229,50 @@ open class UIView {
     }
 
     /// Called when the frame of the view changes.
-    open func frameDidChange() { }
+    open func frameDidChange() {}
 
     /// Set the needs layout flag.
     public func setNeedsLayout() {
         self.needsLayout = true
+        setNeedsDisplay()
+    }
+
+    /// Set the needs layout flag while limiting the scheduled redraw to a known dirty rect.
+    func setNeedsLayout(in rect: Rect) {
+        self.needsLayout = true
+        setNeedsDisplay(in: rect)
+    }
+
+    /// Set the needs display flag.
+    public func setNeedsDisplay() {
+        setNeedsDisplay(in: bounds)
+    }
+
+    /// Set the needs display flag for specific rect.
+    public func setNeedsDisplay(in rect: Rect) {
+        UILayoutDebugCounters.recordDisplayInvalidation()
+        self.needsDisplay = true
+        guard let window else {
+            return
+        }
+
+        window.markDirty(rectInWindow(rect))
+        window.needsDisplay = true
+    }
+
+    internal func consumeNeedsDisplay() -> Bool {
+        defer { needsDisplay = false }
+        return needsDisplay
+    }
+
+    internal func consumeNeedsDisplayInHierarchy() -> Bool {
+        let isCurrentViewDirty = consumeNeedsDisplay()
+        var isSubviewDirty = false
+        for subview in subviews {
+            isSubviewDirty = subview.consumeNeedsDisplayInHierarchy() || isSubviewDirty
+        }
+
+        return isCurrentViewDirty || isSubviewDirty
     }
 
     /// Layout the view if needed.
@@ -224,13 +315,15 @@ open class UIView {
     /// Build the menu.
     ///
     /// - Parameter builder: The builder to build the menu with.
-    open func buildMenu(with builder: UIMenuBuilder) { }
+    open func buildMenu(with _: UIMenuBuilder) {}
 
     /// Layout the subviews.
     open func layoutSubviews() {
         self.updateAutoresizingFrameIfNeeded()
 
         for subview in subviews {
+            subview.userInterfaceIdiom = userInterfaceIdiom
+            subview.colorScheme = colorScheme
             subview.layoutSubviews()
         }
     }
@@ -242,15 +335,14 @@ open class UIView {
 
     /// The autoresizing rules of the view.
     public struct AutoresizingRule: OptionSet, Sendable {
-
         public var rawValue: UInt
 
         public init(rawValue: UInt) {
             self.rawValue = rawValue
         }
 
-        public static let flexibleWidth = AutoresizingRule(rawValue: 1 << 0)
-        public static let flexibleHeight = AutoresizingRule(rawValue: 1 << 1)
+        public static let flexibleWidth = Self(rawValue: 1 << 0)
+        public static let flexibleHeight = Self(rawValue: 1 << 1)
     }
 
     /// The autoresizing rules of the view.
@@ -285,13 +377,13 @@ open class UIView {
     }
 
     /// Called when the view is moved to a parent view.
-    open func viewDidMoveToParentView() { }
+    open func viewDidMoveToParentView() {}
 
     /// Called when the view is moved to a window.
-    open func viewDidMoveToWindow() { }
+    open func viewDidMoveToWindow() {}
 
     /// Called when the view is moved to a window.
-    open func viewWillMove(to window: UIWindow?) { }
+    open func viewWillMove(to _: UIWindow?) {}
 
     /// Called when the view is moved to a window.
     private func willMoveToWindow(_ window: UIWindow?) {
@@ -307,6 +399,14 @@ open class UIView {
             subview.window = window
             subview.viewWillMove(to: window)
         }
+
+        if let window {
+            safeAreaInsets = window.safeAreaInsets
+            keyboardOccludedHeight = window.keyboardOccludedHeight
+            setNeedsLayout()
+        }
+
+        viewDidMoveToWindow()
     }
 
     // MARK: - Interaction
@@ -328,7 +428,7 @@ open class UIView {
             return self
         }
 
-        for subview in self.subviews.reversed() {
+        for subview in self.zSortedChildren.reversed() {
             let newPoint = subview.convert(point, from: self)
             if let view = subview.hitTest(newPoint, with: event) {
                 return view
@@ -344,7 +444,7 @@ open class UIView {
     ///   - point: The point to check.
     ///   - event: The event to check with.
     /// - Returns: true if point is inside the receiver’s bounds; otherwise, false.
-    open func point(inside point: Point, with event: any InputEvent) -> Bool {
+    open func point(inside point: Point, with _: any InputEvent) -> Bool {
         return self.bounds.contains(point: point)
     }
 
@@ -375,25 +475,62 @@ open class UIView {
         return view?.convert(point, to: self) ?? point
     }
 
+    private func rectInWindow(_ rect: Rect) -> Rect {
+        guard let window else {
+            return rect
+        }
+
+        let origin = convert(rect.origin, to: window)
+        let maxPoint = convert(Point(x: rect.maxX, y: rect.maxY), to: window)
+        let minX = min(origin.x, maxPoint.x)
+        let minY = min(origin.y, maxPoint.y)
+        let maxX = max(origin.x, maxPoint.x)
+        let maxY = max(origin.y, maxPoint.y)
+        return Rect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
+
     /// Called when the view can respond to an action.
     ///
     /// - Parameter event: The event to check.
     /// - Returns: A Boolean value indicating whether the view can respond to an action.
-    open func canRespondToAction(_ event: any InputEvent) -> Bool {
+    open func canRespondToAction(_: any InputEvent) -> Bool {
         return true
     }
 
     /// Called when the touches event is received.
     ///
     /// - Parameter touches: The touches event.
-    open func onTouchesEvent(_ touches: Set<TouchEvent>) { }
+    open func onTouchesEvent(_: Set<TouchEvent>) {}
 
     /// Called when the mouse event is received.
     ///
     /// - Parameter event: The mouse event.
-    open func onMouseEvent(_ event: MouseEvent) { }
+    open func onMouseEvent(_: MouseEvent) {}
 
-    open func onKeyPressed(_ event: Set<KeyEvent>) { }
+    /// Called when the key event is received.
+    ///
+    /// - Parameter event: The key event.
+    open func onKeyEvent(_: KeyEvent) {}
+
+    /// Called when the text input event is received.
+    ///
+    /// - Parameter event: The text input event.
+    open func onTextInputEvent(_: TextInputEvent) {}
+
+    /// Called when an input event is received without a more specific handler.
+    ///
+    /// - Parameter event: The input event.
+    open func onReceiveEvent(_: any InputEvent) {}
+
+    /// Called when a set of key events is received.
+    ///
+    /// - Parameter event: The key events.
+    @available(*, deprecated, message: "Use onKeyEvent(_:) instead.")
+    open func onKeyPressed(_ event: Set<KeyEvent>) {
+        for keyEvent in event {
+            self.onKeyEvent(keyEvent)
+        }
+    }
 
     /// Called when the event is received.
     ///
@@ -402,12 +539,14 @@ open class UIView {
         switch event {
         case let event as MouseEvent:
             self.onMouseEvent(event)
-        case is TouchEvent:
-            let window = self.window?.id
-//            let touches = Input.shared.touches.filter({ $0.window == window })
-//            self.onTouchesEvent(touches)
+        case let event as KeyEvent:
+            self.onKeyEvent(event)
+        case let event as TextInputEvent:
+            self.onTextInputEvent(event)
+        case let event as TouchEvent:
+            self.onTouchesEvent(Set([event]))
         default:
-            return
+            self.onReceiveEvent(event)
         }
     }
 
@@ -428,20 +567,23 @@ open class UIView {
     /// - Parameter event: The event to find the first responder for.
     /// - Returns: The first responder.
     func findFirstResponder(for event: any InputEvent) -> UIView? {
-        let responder: UIView? = switch event {
-        case let event as MouseEvent:
-            self.hitTest(
-                convert(event.mousePosition, to: self),
-                with: event
-            )
-        case let event as TouchEvent:
-            self.hitTest(
-                event.location,
-                with: event
-            )
-        default:
-            nil
-        }
+        let responder: UIView? =
+            switch event {
+            case let event as MouseEvent:
+                self.hitTest(
+                    convert(event.mousePosition, to: self),
+                    with: event
+                )
+            case let event as PinchEvent:
+                self.hitTest(convert(event.location, to: self), with: event)
+            case let event as TouchEvent:
+                self.hitTest(
+                    event.location,
+                    with: event
+                )
+            default:
+                nil
+            }
 
         if responder?.canRespondToAction(event) == false {
             return nil
@@ -456,12 +598,14 @@ open class UIView {
     ///
     /// - Parameter view: The view to add.
     open func addSubview(_ view: UIView) {
-        if self === view {
-            fatalError("Can't add self as subview")
+        guard self !== view else {
+            assertionFailure("Can't add self as subview")
+            return
         }
 
-        if view.parentView != nil {
-            fatalError("Can't add view if view attached to another view")
+        guard view.parentView == nil else {
+            assertionFailure("Can't add view if view attached to another view")
+            return
         }
 
         view.viewWillMove(to: self)
@@ -489,7 +633,9 @@ open class UIView {
     ///
     /// - Parameter view: The view to remove.
     open func removeSubview(_ view: UIView) {
-        guard let index = self.subviews.firstIndex(where: { $0 === view }) else { return }
+        guard let index = self.subviews.firstIndex(where: { $0 === view }) else {
+            return
+        }
         let deletedView = self.subviews.remove(at: index)
         view.viewWillMove(to: nil)
         view.window = nil
@@ -507,14 +653,30 @@ open class UIView {
 
         for subview in self.subviews {
             subview.internalUpdate(deltaTime)
-            subview.update(deltaTime)
+        }
+    }
+
+    func updateHierarchy(_ deltaTime: TimeInterval) {
+        self.layoutIfNeeded()
+        self.update(deltaTime)
+
+        for subview in self.subviews {
+            subview.updateHierarchy(deltaTime)
         }
     }
 
     /// Called each frame.
     ///
     /// - Parameter deltaTime: The delta time.
-    open func update(_ deltaTime: TimeInterval) { }
+    open func update(_: TimeInterval) {}
+}
+
+extension UIView {
+    var effectiveSafeAreaInsets: EdgeInsets {
+        var insets = safeAreaInsets
+        insets.bottom = max(insets.bottom, keyboardOccludedHeight)
+        return insets
+    }
 }
 
 /// During layout in AdaEngine UI, views choose their own size, but they do that in response to a size proposal from their parent view.
@@ -526,13 +688,13 @@ public struct ProposedViewSize: Hashable, Equatable, Sendable {
     public var height: Float?
 
     /// A size proposal that contains zero in both dimensions.
-    public static let zero = ProposedViewSize(width: 0, height: 0)
+    public static let zero = Self(width: 0, height: 0)
 
     /// A size proposal that contains infinity in both dimensions.
-    public static let infinity = ProposedViewSize(width: .infinity, height: .infinity)
+    public static let infinity = Self(width: .infinity, height: .infinity)
 
     /// The proposed size with both dimensions left unspecified.
-    public static let unspecified = ProposedViewSize(width: nil, height: nil)
+    public static let unspecified = Self(width: nil, height: nil)
 
     /// Creates a new proposal that replaces unspecified dimensions in this proposal with the corresponding dimension of the specified size.
     public func replacingUnspecifiedDimensions(by size: Size = Size(width: 10, height: 10)) -> Size {
@@ -548,5 +710,7 @@ public struct ProposedViewSize: Hashable, Equatable, Sendable {
         self.width = size.width
         self.height = size.height
     }
-
 }
+
+@_spi(Internal)
+extension UIView: SafeAreaProvider {}

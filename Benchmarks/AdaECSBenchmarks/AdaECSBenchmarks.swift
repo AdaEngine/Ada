@@ -1,5 +1,6 @@
 import AdaECS
 import Benchmark
+import Foundation
 
 // MARK: - Components
 
@@ -43,15 +44,42 @@ private struct Matrix4x4 {
     var m30: Float, m31: Float, m32: Float, m33: Float
 }
 
+extension Matrix4x4 {
+    /// Rotate the first two columns of every row; values stay bounded across samples.
+    mutating func rotate() {
+        let cosine: Float = 0.9998000
+        let sine: Float = 0.019998667
+        let x0 = m00 * cosine - m01 * sine
+        m01 = m00 * sine + m01 * cosine
+        m00 = x0
+        let x1 = m10 * cosine - m11 * sine
+        m11 = m10 * sine + m11 * cosine
+        m10 = x1
+        let x2 = m20 * cosine - m21 * sine
+        m21 = m20 * sine + m21 * cosine
+        m20 = x2
+        let x3 = m30 * cosine - m31 * sine
+        m31 = m30 * sine + m31 * cosine
+        m30 = x3
+    }
+}
+
+@Component
+private struct CoWData {
+    var values: [Int]
+    var label: String
+}
+
 // MARK: - Constants
 
 private enum BenchConstants {
-    static let spawnEntities = 100_000
-    static let simpleIterEntities = 100_000
-    static let fragmentedEntitiesPerType = 33_334
-    static let heavyComputeEntities = 1_000
+    static let smoke = ProcessInfo.processInfo.environment["ADAENGINE_BENCHMARK_SMOKE"] == "1"
+    static let spawnEntities = smoke ? 1_000 : 100_000
+    static let simpleIterEntities = smoke ? 1_000 : 100_000
+    static let fragmentedEntitiesPerType = smoke ? 334 : 33_334
+    static let heavyComputeEntities = smoke ? 100 : 1_000
     static let heavyComputeIterations = 100
-    static let addRemoveEntities = 100_000
+    static let addRemoveEntities = smoke ? 1_000 : 100_000
 }
 
 // MARK: - Setup Helpers
@@ -68,6 +96,7 @@ private func makeSimpleIterWorld(entityCount: Int) -> (World, Query<Ref<Position
     let query = Query<Ref<Position>, Velocity>()
     query.update(from: world)
 
+    precondition(query.count == entityCount, "Benchmark query must visit every fixture entity")
     return (world, query)
 }
 
@@ -96,6 +125,7 @@ private func makeFragmentedIterWorld(entitiesPerType: Int) -> (World, Query<Ref<
     let query = Query<Ref<FragData>>()
     query.update(from: world)
 
+    precondition(query.count == entitiesPerType * 3, "Fragmented query must visit all three archetypes")
     return (world, query)
 }
 
@@ -115,6 +145,7 @@ private func makeHeavyComputeWorld(entityCount: Int) -> (World, Query<Ref<Matrix
     let query = Query<Ref<Matrix4x4>>()
     query.update(from: world)
 
+    precondition(query.count == entityCount, "Heavy-compute query must visit every fixture entity")
     return (world, query)
 }
 
@@ -136,28 +167,31 @@ private func makeAddRemoveWorld(entityCount: Int) -> (World, [Entity.ID]) {
 // MARK: - Benchmarks
 
 let benchmarks: @Sendable () -> Void = {
+    Benchmark.defaultConfiguration = .init(
+        metrics: [.wallClock, .cpuTotal, .mallocCountTotal, .retainCount, .releaseCount],
+        warmupIterations: 1,
+        scalingFactor: .one,
+        maxDuration: BenchConstants.smoke ? .milliseconds(100) : .seconds(2),
+        maxIterations: BenchConstants.smoke ? 3 : 100
+    )
+
     Benchmark("AdaECS.Spawn") { benchmark in
-        // #region agent log
-        DebugBenchmarkLog.benchmarkPhase(name: "Spawn", phase: "start")
-        // #endregion
-        for _ in benchmark.scaledIterations {
-            let world = World()
-            for _ in 0..<BenchConstants.spawnEntities {
-                world.spawn()
-            }
-            blackHole(world)
+        let world = World()
+        benchmark.startMeasurement()
+        for _ in 0..<BenchConstants.spawnEntities {
+            world.spawn()
         }
-        // #region agent log
-        DebugBenchmarkLog.benchmarkPhase(name: "Spawn", phase: "end")
-        // #endregion
+        benchmark.stopMeasurement()
+        blackHole(world)
+        if BenchConstants.smoke {
+            precondition(world.getEntities().count == BenchConstants.spawnEntities)
+        }
+        world.clear()
     }
 
     Benchmark(
         "AdaECS.SimpleIter",
         closure: { benchmark, state in
-            // #region agent log
-            DebugBenchmarkLog.benchmarkPhase(name: "SimpleIter", phase: "start")
-            // #endregion
             let (world, query) = state
             for _ in benchmark.scaledIterations {
                 query.forEach { position, velocity in
@@ -165,10 +199,11 @@ let benchmarks: @Sendable () -> Void = {
                     position.y += velocity.y
                 }
             }
+            benchmark.stopMeasurement()
             blackHole(world)
-            // #region agent log
-            DebugBenchmarkLog.benchmarkPhase(name: "SimpleIter", phase: "end")
-            // #endregion
+            if BenchConstants.smoke {
+                precondition((query.first?.0.x ?? 0) > 0)
+            }
         },
         setup: {
             makeSimpleIterWorld(entityCount: BenchConstants.simpleIterEntities)
@@ -178,19 +213,17 @@ let benchmarks: @Sendable () -> Void = {
     Benchmark(
         "AdaECS.FragmentedIter",
         closure: { benchmark, state in
-            // #region agent log
-            DebugBenchmarkLog.benchmarkPhase(name: "FragmentedIter", phase: "start")
-            // #endregion
             let (world, query) = state
             for _ in benchmark.scaledIterations {
                 for data in query {
-                    data.value *= 2.0
+                    data.value += 1.0
                 }
             }
+            benchmark.stopMeasurement()
             blackHole(world)
-            // #region agent log
-            DebugBenchmarkLog.benchmarkPhase(name: "FragmentedIter", phase: "end")
-            // #endregion
+            if BenchConstants.smoke {
+                precondition((query.first?.value ?? 0) > 0)
+            }
         },
         setup: {
             makeFragmentedIterWorld(entitiesPerType: BenchConstants.fragmentedEntitiesPerType)
@@ -203,12 +236,19 @@ let benchmarks: @Sendable () -> Void = {
             let (world, query) = state
             for _ in benchmark.scaledIterations {
                 for transform in query {
+                    var matrix = transform.wrappedValue
                     for _ in 0..<BenchConstants.heavyComputeIterations {
-                        transform.m00 += 1.0
+                        matrix.rotate()
                     }
+                    transform.wrappedValue = matrix
                 }
             }
+            benchmark.stopMeasurement()
             blackHole(world)
+            if BenchConstants.smoke {
+                precondition(query.first?.m00.isFinite == true)
+                precondition(query.first?.m00 != 1)
+            }
         },
         setup: {
             makeHeavyComputeWorld(entityCount: BenchConstants.heavyComputeEntities)
@@ -218,9 +258,6 @@ let benchmarks: @Sendable () -> Void = {
     Benchmark(
         "AdaECS.AddRemove",
         closure: { benchmark, state in
-            // #region agent log
-            DebugBenchmarkLog.benchmarkPhase(name: "AddRemove", phase: "start")
-            // #endregion
             let (world, ids) = state
             for _ in benchmark.scaledIterations {
                 for id in ids {
@@ -230,10 +267,36 @@ let benchmarks: @Sendable () -> Void = {
                     world.remove(Velocity.self, from: id)
                 }
             }
+            benchmark.stopMeasurement()
             blackHole(world)
-            // #region agent log
-            DebugBenchmarkLog.benchmarkPhase(name: "AddRemove", phase: "end")
-            // #endregion
+            if BenchConstants.smoke {
+                precondition(ids.allSatisfy { !world.has(Velocity.self, in: $0) })
+                precondition(Query<Position>(from: world).count == ids.count)
+            }
+        },
+        setup: {
+            makeAddRemoveWorld(entityCount: BenchConstants.addRemoveEntities)
+        }
+    )
+
+    Benchmark(
+        "AdaECS.InsertCoW",
+        closure: { benchmark, state in
+            let (world, ids) = state
+            benchmark.startMeasurement()
+            for (index, id) in ids.enumerated() {
+                let component = CoWData(values: Array(repeating: index, count: 32), label: String(repeating: "ownership-", count: 4))
+                world.insert(consume component, for: id)
+            }
+            benchmark.stopMeasurement()
+            blackHole(world)
+            if BenchConstants.smoke, let first = ids.first {
+                precondition(world.get(CoWData.self, from: first)?.values == Array(repeating: 0, count: 32))
+            }
+            // Restore the fixture outside measurement; do not overwrite live component storage.
+            for id in ids {
+                world.remove(CoWData.self, from: id)
+            }
         },
         setup: {
             makeAddRemoveWorld(entityCount: BenchConstants.addRemoveEntities)

@@ -15,10 +15,9 @@ public protocol ChangeDetectionable: Sendable {
     func setChanged()
 }
 
-public extension ChangeDetectionable {
-
+extension ChangeDetectionable {
     @inline(__always)
-    var isAdded: Bool {
+    public var isAdded: Bool {
         return self.changeTick
             .added?
             .wrappedValue
@@ -29,7 +28,7 @@ public extension ChangeDetectionable {
     }
 
     @inline(__always)
-    var isChanged: Bool {
+    public var isChanged: Bool {
         return self.changeTick.change?
             .wrappedValue
             .isNewerThan(
@@ -38,7 +37,7 @@ public extension ChangeDetectionable {
             ) ?? false
     }
 
-    func setChanged() {
+    public func setChanged() {
         unsafe self.changeTick
             .change?
             .getPointer()

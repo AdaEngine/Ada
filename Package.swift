@@ -9,14 +9,45 @@ import CompilerPluginSupport
 import AppleProductTypes
 #endif
 
+let isHeadlessCIEnabled: Bool = {
+    let environment = ProcessInfo.processInfo.environment
+    let headlessValue = environment["ADAENGINE_HEADLESS"]?.lowercased()
+    let disableSwanValue = environment["ADAENGINE_DISABLE_SWAN"]?.lowercased()
+    let enabledValues: Set<String> = ["1", "true", "yes", "on"]
+
+    return headlessValue.map(enabledValues.contains) == true
+        || disableSwanValue.map(enabledValues.contains) == true
+}()
+
+let isAndroidBuildEnabled = ProcessInfo.processInfo.environment["ADAENGINE_ANDROID"] == "1"
+
+#if os(macOS) || os(Linux)
+let isECSBenchmarkEnabled = ProcessInfo.processInfo.environment["ADAENGINE_BENCHMARKS"] == "1"
+#else
+let isECSBenchmarkEnabled = false
+#endif
+
+let isWebExportEnabled: Bool = {
+    let webExportValue = ProcessInfo.processInfo.environment["ADAENGINE_WEB_EXPORT"]?.lowercased()
+    let enabledValues: Set<String> = ["1", "true", "yes", "on"]
+
+    return webExportValue.map(enabledValues.contains) == true
+}()
+
+// Local compiler development can override the Gravity default branch.
+let gravityDevelopmentPath = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"]
+let gravityAOTDependencies: [Target.Dependency] = [
+    .product(name: "GravityAOT", package: "gravity-lang")
+]
+
 #if canImport(Darwin)
 import Darwin.C
 
 /// Only xcode can import AppleProductTypes and we can use it as checker
 #if canImport(AppleProductTypes)
-let isWGPUEnabled = false // We can't build wgpu from xcode
+let isWGPUEnabled = isWebExportEnabled || isAndroidBuildEnabled // We can't build wgpu from xcode, except web export builds.
 #else
-let isWGPUEnabled = false
+let isWGPUEnabled = isWebExportEnabled || isAndroidBuildEnabled
 #endif
 
 #else
@@ -29,7 +60,7 @@ import Glibc
 import WinSDK
 #endif
 
-let isWGPUEnabled = true
+let isWGPUEnabled = !isHeadlessCIEnabled
 #endif
 
 extension String {
@@ -39,59 +70,98 @@ extension String {
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS, .watchOS, .visionOS]
 
 var products: [Product] = [
-    .executable(
-        name: "AdaEditor",
-        targets: ["AdaEditor"]
-    ),
+    .executable(name: "AdaWebPlayer", targets: ["AdaWebPlayer"]),
+    .executable(name: "AdaWebPlayerPackager", targets: ["AdaWebPlayerPackager"]),
+    .library(name: "AdaUIDescription", targets: ["AdaUIDescription"]),
+    .library(name: "AdaA2UI", targets: ["AdaA2UI"]),
+    .executable(name: "A2UIFormDemo", targets: ["A2UIFormDemo"]),
     .library(
         name: "AdaEngine",
         targets: ["AdaEngine"]
+    ),
+    .library(
+        name: "AdaApp",
+        targets: ["AdaApp"]
     ),
     .library(
         name: "AdaECS",
         targets: ["AdaECS"]
     ),
     .library(
+        name: "AdaMultiplayer",
+        targets: ["AdaMultiplayer"]
+    ),
+    .library(
+        name: "AdaScripting",
+        targets: ["AdaScripting"]
+    ),
+    .library(
+        name: "AdaScriptCompilerCore",
+        targets: ["AdaScriptCompilerCore"]
+    ),
+    .library(
+        name: "AdaUI",
+        targets: ["AdaUI"]
+    ),
+    .library(
         name: "AdaRender",
         targets: ["AdaRender"]
+    ),
+    .library(
+        name: "AdaScene",
+        targets: ["AdaScene"]
+    ),
+    .library(
+        name: "AdaSprite",
+        targets: ["AdaSprite"]
+    ),
+    .library(
+        name: "AdaText",
+        targets: ["AdaText"]
+    ),
+    .library(
+        name: "AdaTransform",
+        targets: ["AdaTransform"]
+    ),
+    .library(
+        name: "AdaUtils",
+        targets: ["AdaUtils"]
+    ),
+    .library(
+        name: "Math",
+        targets: ["Math"]
+    ),
+    .library(
+        name: "AdaAnimation",
+        targets: ["AdaAnimation"]
     ),
     .library(
         name: "AdaEngineEmbeddable",
         targets: ["AdaEngineEmbeddable"]
     ),
+    .library(
+        name: "AdaWeb",
+        targets: ["AdaWeb"]
+    ),
     .plugin(name: "WebGPUBuildPlugin", targets: [
         "WebGPUBuildPlugin"
+    ]),
+    .executable(
+        name: "TextureAtlasBuilderTool",
+        targets: ["TextureAtlasBuilderTool"]
+    ),
+    .plugin(name: "TextureAtlasBuildPlugin", targets: [
+        "TextureAtlasBuildPlugin"
+    ]),
+    .plugin(name: "TextureAtlasCommandPlugin", targets: [
+        "TextureAtlasCommandPlugin"
+    ]),
+    .plugin(name: "AdaScriptBuildPlugin", targets: [
+        "AdaScriptBuildPlugin"
     ])
 ]
 
-// Check that we target on vulkan dependency
-
-// TODO: It's works if we wrap sources to .swiftpm container and run in Swift Plaground App
-#if canImport(AppleProductTypes)
-let ios = Product.iOSApplication(
-    name: "AdaEditor-iOS",
-    targets: ["AdaEditor"],
-    bundleIdentifier: "com.adaengine.editor",
-    teamIdentifier: "",
-    displayVersion: "1.0",
-    bundleVersion: "1",
-    iconAssetName: "AppIcon",
-    accentColorAssetName: "AccentColor",
-    supportedDeviceFamilies: [
-        .pad,
-        .phone
-    ],
-    supportedInterfaceOrientations: [
-        .portrait,
-        .landscapeRight,
-        .landscapeLeft,
-        .portraitUpsideDown(.when(deviceFamilies: [.pad]))
-    ]
-)
-
-// Xcode crashed after that move...
-// products.append(ios)
-#endif
+products.append(.library(name: "AndroidDemo", type: .dynamic, targets: ["AndroidDemo"]))
 
 // MARK: - Targets
 
@@ -100,9 +170,11 @@ let ios = Product.iOSApplication(
 var commonPlugins: [Target.PluginUsage] = []
 
 #if os(macOS) || os(Linux)
-commonPlugins.append(
-    .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
-)
+if !isWebExportEnabled && !isAndroidBuildEnabled {
+    commonPlugins.append(
+        .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
+    )
+}
 #endif
 
 var swiftSettings: [SwiftSetting] = [
@@ -117,6 +189,7 @@ var swiftSettings: [SwiftSetting] = [
     .define("METAL", .when(platforms: applePlatforms)),
     .define("WEBGPU_ENABLED", .when(traits: [.wgpuTrait])),
     .define("WASM", .when(platforms: [.wasi])),
+    .define("BROWSER", .when(platforms: [.wasi])),
     .define("ENABLE_DEBUG_DYLIB", .when(configuration: .debug)),
     .define("ENABLE_RUN_IN_CONCURRENCY", .when(platforms: [.windows, .wasi, .android, .linux])),
     .enableUpcomingFeature("MemberImportVisibility"),
@@ -124,30 +197,16 @@ var swiftSettings: [SwiftSetting] = [
     .unsafeFlags(["-Xfrontend", "-validate-tbd-against-ir=none"]),
 ]
 
-let editorTarget: Target = .executableTarget(
-    name: "AdaEditor",
-    dependencies: ["AdaEngine", "Math"],
-    exclude: [
-        "BUILD.bazel",
-        "Platforms/iOS/Info.plist",
-        "Platforms/macOS/Info.plist"
-    ],
-    resources: [
-        .copy("Assets")
-    ],
-    swiftSettings: swiftSettings + [
-        .define("EDITOR_DEBUG", .when(configuration: .debug)),
-
-        // List of defines availables only for editor
-        .define("EDITOR_MACOS", .when(platforms: [.macOS])),
-        .define("EDITOR_WINDOWS", .when(platforms: [.windows])),
-        .define("EDITOR_IOS", .when(platforms: [.iOS])),
-        .define("EDITOR_TVOS", .when(platforms: [.tvOS])),
-        .define("EDITOR_ANDROID", .when(platforms: [.android])),
-        .define("EDITOR_LINUX", .when(platforms: [.linux])),
-    ],
-    plugins: commonPlugins
-)
+let wasmExecutableLinkerSettings: [LinkerSetting] = [
+    .unsafeFlags([
+        "-Xclang-linker",
+        "-mexec-model=reactor",
+        "-Xlinker",
+        "--export-if-defined=main",
+        "-Xlinker",
+        "--export-if-defined=__main_argc_argv"
+    ], .when(platforms: [.wasi]))
+]
 
 // MARK: Ada Engine SDK
 
@@ -159,23 +218,74 @@ var adaEngineDependencies: [Target.Dependency] = [
     .product(name: "BitCollections", package: "swift-collections"),
     "AdaApp",
     "AdaECS",
+    "AdaAnimation",
     "AdaUI",
     "AdaEngineMacros",
     "AdaAssets",
     "AdaPlatform",
     "AdaAudio",
+    "AdaCorePipelines",
     "AdaTransform",
     "AdaRender",
     "AdaText",
     "AdaInput",
     "AdaScene",
+    "AdaScripting",
+    "AdaSprite",
     "AdaTilemap",
-    "AdaPhysics"
+    "AdaPhysics",
+    "AdaSpatial"
 ]
 
 #if os(Linux)
-adaEngineDependencies += ["X11"]
+adaEngineDependencies += [.target(name: "X11", condition: .when(platforms: [.linux]))]
 #endif
+
+var adaRenderDependencies: [Target.Dependency] = [
+    .target(name: "CAndroid", condition: .when(platforms: [.android])),
+    "AdaApp",
+    "AdaECS",
+    "AdaAssets",
+    "AdaTransform",
+    "Math",
+    .product(
+        name: "Yams",
+        package: "Yams",
+        condition: .when(platforms: applePlatforms + [.linux, .windows, .android])
+    ),
+    "SPIRV-Cross",
+    "SPIRVCompiler",
+    "libpng",
+    "CImageDecoder",
+    .product(
+        name: "Subprocess",
+        package: "swift-subprocess",
+        condition: .when(platforms: [
+            .macOS,
+            .linux,
+            .windows
+        ], traits: [
+            .wgpuTrait
+        ])
+    ),
+    .product(
+        name: "JavaScriptKit",
+        package: "JavaScriptKit",
+        condition: .when(platforms: [.wasi])
+    ),
+]
+
+if !isHeadlessCIEnabled {
+    adaRenderDependencies.append(
+        .product(
+            name: "WebGPU",
+            package: "swan",
+            condition: .when(traits: [
+                .wgpuTrait
+            ])
+        )
+    )
+}
 
 let adaEngineTarget: Target = .adaTarget(
     name: "AdaEngine",
@@ -204,25 +314,42 @@ let adaEngineMacros: Target = .macro(
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
         .product(name: "SwiftCompilerPlugin", package: "swift-syntax")
     ],
-    exclude: [
-        "BUILD.bazel"
-    ]
 )
 
 // MARK: Other Targets
 
 var targets: [Target] = [
-    editorTarget,
+    .target(
+        name: "CAndroid",
+        linkerSettings: [
+            .linkedLibrary("android", .when(platforms: [.android])),
+            .linkedLibrary("log", .when(platforms: [.android])),
+        ]
+    ),
+    .target(
+        name: "AndroidDemo",
+        dependencies: ["AdaEngine", "CAndroid"],
+        path: "Demos/AndroidDemo",
+        exclude: ["README.md"],
+        resources: [.copy("Assets")],
+        swiftSettings: swiftSettings
+    ),
     adaEngineTarget,
     adaEngineEmbeddable,
     adaEngineMacros,
     .adaTarget(name: "Math"),
+    .adaTarget(name: "AdaSpatial", dependencies: ["AdaECS", "AdaTransform", "Math"]),
+    .testTarget(name: "AdaSpatialTests", dependencies: ["AdaSpatial", "AdaECS", "AdaTransform", "Math"], swiftSettings: swiftSettings),
     .adaTarget(
         name: "AdaApp",
         dependencies: [
             "AdaUtils",
             "AdaECS",
-            "Yams"
+            .product(
+                name: "JavaScriptEventLoop",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            )
         ],
         swiftSettings: swiftSettings
     ),
@@ -232,7 +359,40 @@ var targets: [Target] = [
             "AdaUtils",
             "AdaECS",
             "AdaApp",
-            "AdaUI"
+            .target(name: "CAndroid", condition: .when(platforms: [.android])),
+            "AdaUI",
+            .product(
+                name: "JavaScriptKit",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            ),
+            .product(
+                name: "JavaScriptEventLoop",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            )
+        ],
+        swiftSettings: swiftSettings
+    ),
+    .adaTarget(
+        name: "AdaMultiplayer",
+        dependencies: [
+            "AdaApp",
+            "AdaECS",
+            "AdaEngineMacros",
+            "AdaTransform",
+            "AdaUtils",
+            "Math",
+            .product(
+                name: "JavaScriptKit",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            ),
+            .product(
+                name: "JavaScriptFoundationCompat",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            )
         ],
         swiftSettings: swiftSettings
     ),
@@ -243,16 +403,53 @@ var targets: [Target] = [
             .product(name: "BitCollections", package: "swift-collections"),
             .product(name: "Atomics", package: "swift-atomics"),
             "AdaEngineMacros",
-            "AdaUtils"
+            "AdaUtils",
+            "Math"
         ],
+        swiftSettings: swiftSettings
+    ),
+    .target(
+        name: "AdaScriptCompilerCore",
+        swiftSettings: swiftSettings
+    ),
+    .adaTarget(
+        name: "AdaScripting",
+        dependencies: [
+            "AdaScriptCompilerCore",
+            "AdaApp",
+            "AdaAssets",
+            "AdaECS",
+            "AdaInput",
+            "AdaMultiplayer",
+            "AdaRender",
+            "AdaTilemap",
+            "AdaScene",
+            "AdaUI",
+            .product(name: "Gravity", package: "gravity-lang")
+        ] + gravityAOTDependencies,
         swiftSettings: swiftSettings
     ),
     .adaTarget(
         name: "AdaUtils",
         dependencies: [
+            .target(name: "CAndroid", condition: .when(platforms: [.android])),
             .product(name: "Collections", package: "swift-collections"),
             .product(name: "BitCollections", package: "swift-collections"),
             "AdaEngineMacros",
+            "Math",
+            .product(
+                name: "JavaScriptEventLoop",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            )
+        ],
+        swiftSettings: swiftSettings
+    ),
+    .adaTarget(
+        name: "AdaAnimation",
+        dependencies: [
+            "AdaECS",
+            "AdaUtils",
             "Math"
         ],
         swiftSettings: swiftSettings
@@ -263,6 +460,7 @@ var targets: [Target] = [
             "AdaECS",
             "AdaApp",
             "AdaRender",
+            "AdaUtils",
             "Math"
         ],
         resources: [
@@ -282,7 +480,22 @@ var targets: [Target] = [
         dependencies: [
             "AdaApp",
             "AdaUtils",
-            "Yams"
+            "Math",
+            .product(
+        name: "Yams",
+        package: "Yams",
+        condition: .when(platforms: applePlatforms + [.linux, .windows, .android])
+    ),
+            .product(
+                name: "JavaScriptKit",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            ),
+            .product(
+                name: "JavaScriptFoundationCompat",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            )
         ],
         swiftSettings: swiftSettings
     ),
@@ -295,9 +508,14 @@ var targets: [Target] = [
             "AdaAssets",
             "AdaTransform",
             "miniaudio",
-            "Math"
+            "Math",
+            .product(name: "Atomics", package: "swift-atomics"),
+            .product(name: "JavaScriptKit", package: "JavaScriptKit", condition: .when(platforms: [.wasi]))
         ],
-        swiftSettings: swiftSettings
+        // Swift's Clang importer must see the same miniaudio layout as its C target.
+        swiftSettings: swiftSettings + [
+            .unsafeFlags(["-Xcc", "-DMA_NO_DEVICE_IO", "-Xcc", "-DMA_NO_THREADING"], .when(platforms: [.wasi]))
+        ]
     ),
     .adaTarget(
         name: "AdaTransform",
@@ -310,44 +528,12 @@ var targets: [Target] = [
     ),
     .adaTarget(
         name: "AdaRender",
-        dependencies: [
-            "AdaApp",
-            "AdaECS",
-            "AdaAssets",
-            "AdaTransform",
-            "Math",
-            "Yams",
-            "SPIRV-Cross",
-            "SPIRVCompiler",
-            "libpng",
-            .product(
-                name: "Subprocess",
-                package: "swift-subprocess",
-                condition: .when(platforms: [
-                    .macOS,
-                    .linux,
-                    .windows,
-                    .wasi
-                ])
-            ),
-            .product(
-                name: "WebGPU",
-                package: "swift-webgpu",
-                condition: .when(traits: [
-                    .wgpuTrait
-                ])
-            ),
-        ],
+        dependencies: adaRenderDependencies,
         resources: [
             .copy("Assets/Shaders")
         ],
         swiftSettings: swiftSettings,
-        plugins: {
-           if isWGPUEnabled {
-                return ["WebGPUBuildPlugin"]
-           }
-           return []
-        }()
+        plugins: commonPlugins
     ),
     .adaTarget(
         name: "AdaText",
@@ -358,24 +544,50 @@ var targets: [Target] = [
             "Math",
             "AdaRender",
             "AtlasFontGenerator",
+            "AdaTextShaper",
+            .product(name: "Markdown", package: "swift-markdown"),
         ],
         resources: [
             .copy("Assets")
         ],
         swiftSettings: swiftSettings
     ),
+    .target(name: "AdaUIDescription", dependencies: [.product(name: "Yams", package: "Yams")], swiftSettings: swiftSettings),
+    .testTarget(name: "AdaUIDescriptionTests", dependencies: ["AdaUIDescription"]),
+    .target(
+        name: "AdaA2UI",
+        dependencies: ["AdaUI", "AdaUIDescription"],
+        resources: [.copy("Resources")],
+        swiftSettings: swiftSettings
+    ),
+    .executableTarget(
+        name: "A2UIFormDemo",
+        dependencies: ["AdaA2UI", "AdaEngine", "AdaPlatform"],
+        path: "Demos/A2UIForm",
+        exclude: ["README.md", "script", "dist"],
+        resources: [.copy("Fixtures")],
+        swiftSettings: swiftSettings
+    ),
     .adaTarget(
         name: "AdaUI",
         dependencies: [
+            "AdaUIDescription",
+            "AdaAssets",
+            "AdaAnimation",
             "AdaApp",
             "AdaECS",
             "AdaTransform",
             "AdaText",
+            "AdaUtils",
             "Math",
             "AdaRender",
             "AdaCorePipelines",
             "AdaInput",
             "AdaEngineMacros",
+        ],
+        resources: [
+            .copy("Assets/Icons"),
+            .copy("Assets/Shaders"),
         ],
         swiftSettings: swiftSettings
     ),
@@ -392,7 +604,9 @@ var targets: [Target] = [
         name: "AdaScene",
         dependencies: [
             "AdaApp",
+            "AdaAssets",
             "AdaECS",
+            "AdaAnimation",
             "box2d",
             "AdaTransform",
             "AdaText",
@@ -414,6 +628,7 @@ var targets: [Target] = [
             "AdaPhysics",
             "AdaSprite"
         ],
+        resources: [.copy("Assets")],
         swiftSettings: swiftSettings
     ),
     .adaTarget(
@@ -424,6 +639,7 @@ var targets: [Target] = [
             "AdaECS",
             "Math",
             "box2d",
+            "box3d",
             "AdaRender",
             "AdaCorePipelines"
         ],
@@ -435,7 +651,9 @@ var targets: [Target] = [
             "AdaApp",
             "AdaAssets",
             "AdaECS",
+            "AdaInput",
             "AdaText",
+            "AdaUtils",
             "Math",
             "AdaRender",
             "AdaCorePipelines"
@@ -445,7 +663,91 @@ var targets: [Target] = [
         ],
         swiftSettings: swiftSettings
     ),
+    .adaTarget(
+        name: "AdaWeb",
+        dependencies: [
+            "AdaApp",
+            "AdaAssets",
+            "AdaPlatform",
+            "AdaRender",
+            "AdaUI",
+            .product(
+                name: "JavaScriptKit",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            ),
+            .product(
+                name: "JavaScriptEventLoop",
+                package: "JavaScriptKit",
+                condition: .when(platforms: [.wasi])
+            )
+        ],
+        swiftSettings: swiftSettings
+    ),
 ]
+
+targets.append(
+    .executableTarget(
+        name: "AdaWebPlayerPackager",
+        dependencies: ["AdaScriptCompilerCore"],
+        path: "Tools/AdaWebPlayerPackager"
+    )
+)
+
+targets.append(
+    .executableTarget(
+        name: "AdaWebPlayer",
+        dependencies: [
+            "AdaEngine", "AdaScriptCompilerCore",
+            .product(name: "Yams", package: "Yams"),
+            "AdaMultiplayer",
+            .product(name: "JavaScriptKit", package: "JavaScriptKit", condition: .when(platforms: [.wasi])),
+            .product(name: "JavaScriptEventLoop", package: "JavaScriptKit", condition: .when(platforms: [.wasi]))
+        ],
+        path: "Tools/AdaWebPlayer",
+        linkerSettings: wasmExecutableLinkerSettings + [
+            .unsafeFlags(["-Xlinker", "--strip-debug"], .when(platforms: [.wasi], configuration: .release))
+        ]
+    )
+)
+
+if isWebExportEnabled {
+    products.append(
+        .plugin(name: "AdaWebExportPlugin", targets: [
+            "AdaWebExportPlugin"
+        ])
+    )
+
+    targets.append(
+        .executableTarget(
+            name: "AdaShaderTranspilerTool",
+            dependencies: [
+                "SPIRVCompiler"
+            ],
+            path: "Plugins/AdaShaderTranspilerTool"
+        )
+    )
+
+    targets.append(
+        .plugin(
+            name: "AdaWebExportPlugin",
+            capability: .command(
+                intent: .custom(
+                    verb: "export-web",
+                    description: "Export an AdaEngine executable target as a browser WebAssembly app"
+                ),
+                permissions: [
+                    .writeToPackageDirectory(reason: "Write the exported web app bundle to the requested output directory"),
+                    .allowNetworkConnections(scope: .all(), reason: "Download Dawn/Tint when Tint is not installed and shaders need WGSL generation")
+                ]
+            ),
+            dependencies: [
+                .target(name: "AdaShaderTranspilerTool")
+            ],
+            path: "Plugins/AdaWebExportPlugin"
+        )
+    )
+}
 
 targets.append(
     .plugin(
@@ -455,9 +757,66 @@ targets.append(
     )
 )
 
+targets.append(
+    .executableTarget(
+        name: "TextureAtlasBuilderTool",
+        dependencies: ["AdaRender"],
+        path: "Plugins/TextureAtlasBuilderTool",
+        swiftSettings: swiftSettings
+    )
+)
+
+targets.append(
+    .plugin(
+        name: "TextureAtlasBuildPlugin",
+        capability: .buildTool(),
+        dependencies: [
+            .target(name: "TextureAtlasBuilderTool")
+        ],
+        path: "Plugins/TextureAtlasBuildPlugin"
+    )
+)
+
+targets.append(
+    .plugin(
+        name: "TextureAtlasCommandPlugin",
+        capability: .command(
+            intent: .custom(
+                verb: "build-texture-atlas",
+                description: "Run TextureAtlasBuilderTool (pass --config and --output-swift)"
+            ),
+            permissions: []
+        ),
+        dependencies: [
+            .target(name: "TextureAtlasBuilderTool")
+        ],
+        path: "Plugins/TextureAtlasCommandPlugin"
+    )
+)
+
+targets.append(
+    .executableTarget(
+        name: "AdaScriptGeneratorTool",
+        dependencies: ["AdaScriptCompilerCore"],
+        path: "Plugins/AdaScriptGeneratorTool"
+    )
+)
+
+targets.append(
+    .plugin(
+        name: "AdaScriptBuildPlugin",
+        capability: .buildTool(),
+        dependencies: [
+            .target(name: "AdaScriptGeneratorTool")
+        ],
+        path: "Plugins/AdaScriptBuildPlugin"
+    )
+)
+
 // MARK: Build Plugins
 if isWGPUEnabled {
 
+    products.append(.plugin(name: "WebGPUTintPlugin", targets: ["WebGPUTintPlugin"]))
     targets.append(
         .plugin(
             name: "WebGPUTintPlugin",
@@ -476,6 +835,7 @@ if isWGPUEnabled {
 
 #if os(Android) || os(Linux)
 targets += [
+    .testTarget(name: "AdaScriptCompilerCoreTests", dependencies: ["AdaScriptCompilerCore"]),
     .systemLibrary(
         name: "X11",
         pkgConfig: "x11",
@@ -513,6 +873,33 @@ targets += [
         ]
     ),
 
+    // Box3d
+
+    .target(
+        name: "box3d",
+        exclude: [
+            ".github",
+            "benchmark",
+            "data",
+            "docs",
+            "extern",
+            "samples",
+            "shared",
+            "test",
+            "build.sh",
+            "build_vs2026.bat",
+            "CMakeLists.txt",
+            "CMakePresets.json",
+            "deploy_docs.sh",
+            "LICENSE",
+            "README.md"
+        ],
+        publicHeadersPath: "include",
+        cSettings: [
+            .unsafeFlags(["-w", "-std=c17"])
+        ]
+    ),
+
     // GLSLang & SPIRV
 
     .adaTarget(
@@ -521,6 +908,10 @@ targets += [
             "glslang"
         ],
         publicHeadersPath: ".",
+        cxxSettings: [
+            .unsafeFlags(["-fno-exceptions"], .when(platforms: [.wasi])),
+            .unsafeFlags(["-w"])
+        ],
         linkerSettings: [
             .linkedLibrary("m", .when(platforms: [.linux]))
         ]
@@ -575,7 +966,7 @@ targets += [
             glslangSources.append("glslang/OSDependent/Windows/ossource.cpp")
             #endif
 
-            #if os(Linux) || os(android) || os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
+            #if os(Linux) || os(android) || os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS) || os(WASI)
             glslangSources.append("glslang/OSDependent/Unix/ossource.cpp")
             #endif
 
@@ -584,7 +975,12 @@ targets += [
         publicHeadersPath: ".",
         cxxSettings: [
             .define("ENABLE_OPT", to: "0"),
+            .define("_WASI_EMULATED_PROCESS_CLOCKS", .when(platforms: [.wasi])),
+            .unsafeFlags(["-fno-exceptions"], .when(platforms: [.wasi])),
             .unsafeFlags(["-w"])
+        ],
+        linkerSettings: [
+            .linkedLibrary("wasi-emulated-process-clocks", .when(platforms: [.wasi]))
         ]
     ),
     .target(
@@ -620,11 +1016,20 @@ targets += [
             .define("SPIRV_CROSS_C_API_HLSL", to: "1"),
             .define("SPIRV_CROSS_C_API_MSL", to: "1"),
             .define("SPIRV_CROSS_C_API_REFLECT", to: "1"),
+            .define("SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS", .when(platforms: [.wasi])),
+            .unsafeFlags(["-fno-exceptions"], .when(platforms: [.wasi])),
             .unsafeFlags(["-w"])
         ]
     ),
 
     // LibPNG
+
+    .target(
+        name: "CImageDecoder",
+        exclude: ["README.md"],
+        sources: ["CImageDecoder.c"],
+        publicHeadersPath: "include"
+    ),
 
     .target(
         name: "libpng",
@@ -647,27 +1052,34 @@ targets += [
             "libpng/pngwrite.c",
             "libpng/pngwtran.c",
             "libpng/pngwutil.c",
-            "libpng/arm/arm_init.c",
-            "libpng/arm/filter_neon_intrinsics.c",
-            "libpng/arm/palette_neon_intrinsics.c",
         ],
         publicHeadersPath: "libpng/include",
         cSettings: [
-            .define("PNG_ARM_NEON_OPT", to: {
-#if (arch(arm64) || arch(arm))
-                return "2"
-#else
-                return "0"
-#endif
-            }()),
+            .define("PNG_ARM_NEON_OPT", to: "0"),
+            .define("PNG_SETJMP_NOT_SUPPORTED", .when(platforms: [.wasi])),
+            .unsafeFlags(["-mllvm", "-wasm-enable-sjlj"], .when(platforms: [.wasi])),
             .unsafeFlags(["-w"])
+        ],
+        linkerSettings: [
+            .linkedLibrary("setjmp", .when(platforms: [.wasi]))
         ]
+    ),
+    // Select Objective-C implementation by destination, not the manifest host.
+    .target(
+        name: "miniaudioApple",
+        path: "Sources/miniaudioApple",
+        sources: ["AppleImplementation.m"],
+        publicHeadersPath: "include",
+        cSettings: [.unsafeFlags(["-w"])]
     ),
     .target(
         name: "miniaudio",
+        dependencies: [.target(name: "miniaudioApple", condition: .when(platforms: applePlatforms))],
         sources: ["miniaudio.c"],
         publicHeadersPath: "include",
         cSettings: [
+            .define("MA_NO_DEVICE_IO", .when(platforms: [.wasi])),
+            .define("MA_NO_THREADING", .when(platforms: [.wasi])),
             .unsafeFlags(["-w"])
         ],
         linkerSettings: [
@@ -680,9 +1092,41 @@ targets += [
     .adaTarget(
         name: "AtlasFontGenerator",
         dependencies: [
-            "MSDFAtlasGen"
+            "MSDFAtlasGen",
+            "HarfBuzz"
         ],
-        publicHeadersPath: "include"
+        publicHeadersPath: "include",
+        cxxSettings: [
+            .headerSearchPath("../harfbuzz"),
+            .unsafeFlags(["-fno-exceptions"], .when(platforms: [.wasi])),
+            .unsafeFlags(["-w"])
+        ]
+    ),
+    .target(
+        name: "AdaTextShaper",
+        dependencies: [
+            "HarfBuzz"
+        ],
+        publicHeadersPath: "include",
+        cxxSettings: [
+            .headerSearchPath("../harfbuzz"),
+            .unsafeFlags(["-w"])
+        ]
+    ),
+    .target(
+        name: "HarfBuzz",
+        path: "Sources/harfbuzz",
+        sources: [
+            "harfbuzz.cc"
+        ],
+        publicHeadersPath: ".",
+        cxxSettings: [
+            .headerSearchPath("."),
+            .define("HB_NO_PRAGMA_GCC_DIAGNOSTIC_ERROR"),
+            // The browser WASI profile uses a single-threaded event loop.
+            .define("HB_NO_MT", .when(platforms: [.wasi])),
+            .unsafeFlags(["-w"])
+        ]
     ),
     .target(
         name: "MSDFGen",
@@ -695,8 +1139,10 @@ targets += [
         cxxSettings: [
             .define("MSDFGEN_USE_CPP11"),
             .headerSearchPath(".."),
+            .unsafeFlags(["-fno-exceptions"], .when(platforms: [.wasi])),
+            .unsafeFlags(["-mllvm", "-wasm-enable-sjlj"], .when(platforms: [.wasi])),
             .unsafeFlags(["-w"])
-        ]
+        ],
     ),
     .target(
         name: "MSDFAtlasGen",
@@ -708,8 +1154,9 @@ targets += [
         cxxSettings: [
             .define("_CRT_SECURE_NO_WARNINGS"),
             .headerSearchPath(".."),
+            .unsafeFlags(["-fno-exceptions"], .when(platforms: [.wasi])),
             .unsafeFlags(["-w"])
-        ]
+        ],
     ),
     .target(
         name: "freetype",
@@ -762,7 +1209,12 @@ targets += [
             .define("FT2_BUILD_LIBRARY"),
             .define("_CRT_SECURE_NO_WARNINGS"),
             .define("_CRT_NONSTDC_NO_WARNINGS"),
+            .define("HAVE_UNISTD_H", to: "1", .when(platforms: [.wasi])),
+            .unsafeFlags(["-mllvm", "-wasm-enable-sjlj"], .when(platforms: [.wasi])),
             .unsafeFlags(["-w"])
+        ],
+        linkerSettings: [
+            .linkedLibrary("setjmp", .when(platforms: [.wasi]))
         ]
     ),
     .target(
@@ -777,19 +1229,19 @@ targets += [
 
 // MARK: - Benchmarks
 
-targets += [
-    .executableTarget(
+if isECSBenchmarkEnabled {
+    products.append(.executable(name: "AdaECSBenchmarks", targets: ["AdaECSBenchmarks"]))
+    targets.append(.executableTarget(
         name: "AdaECSBenchmarks",
         dependencies: [
-            .product(name: "Benchmark", package: "package-benchmark"),
-            "AdaECS"
+            "AdaECS",
+            .product(name: "Benchmark", package: "package-benchmark")
         ],
         path: "Benchmarks/AdaECSBenchmarks",
-        plugins: [
-            .plugin(name: "BenchmarkPlugin", package: "package-benchmark")
-        ]
-    )
-]
+        swiftSettings: swiftSettings,
+        plugins: [.plugin(name: "BenchmarkPlugin", package: "package-benchmark")]
+    ))
+}
 
 // MARK: - Tests
 
@@ -797,9 +1249,6 @@ targets += [
     .testTarget(
         name: "AdaEngineTests",
         dependencies: ["AdaEngine"],
-        exclude: [
-            "BUILD.bazel"
-        ]
     ),
     .testTarget(
         name: "MathTests",
@@ -807,16 +1256,21 @@ targets += [
             .product(name: "Numerics", package: "swift-numerics"),
             "Math"
         ],
-        exclude: [
-            "BUILD.bazel"
-        ]
     ),
     .testTarget(
         name: "AdaECSTests",
         dependencies: ["AdaECS", "Math"],
-        exclude: [
-            "BUILD.bazel"
-        ]
+    ),
+    .testTarget(
+        name: "AdaMultiplayerTests",
+        dependencies: ["AdaApp", "AdaECS", "AdaMultiplayer", "AdaTransform", "Math"],
+    ),
+    .testTarget(
+        name: "AdaScriptingTests",
+        dependencies: [
+            "AdaScriptCompilerCore", "AdaScripting", "AdaApp", "AdaECS", "AdaInput", "AdaMultiplayer", "AdaRender", "AdaScene", "AdaSprite", "AdaTransform", "AdaUI", "Math",
+            .product(name: "Yams", package: "Yams"),
+        ] + ["AdaScriptAOTFixture"],
     ),
     .testTarget(
         name: "AdaAssetsTests",
@@ -824,8 +1278,18 @@ targets += [
             "AdaAssets",
             "Math"
         ],
-        exclude: [
-            "BUILD.bazel"
+        resources: [.copy("Fixtures")],
+    ),
+    .testTarget(
+        name: "AdaAudioTests",
+        dependencies: [
+            "AdaAudio"
+        ]
+    ),
+    .testTarget(
+        name: "AdaTextTests",
+        dependencies: [
+            "AdaText"
         ]
     ),
     .testTarget(
@@ -835,29 +1299,40 @@ targets += [
             "AdaTransform",
             "Math"
         ],
-        exclude: [
-            "BUILD.bazel"
-        ]
     ),
     .testTarget(
         name: "AdaUITests",
         dependencies: [
+            "AdaA2UI",
             "AdaUI",
             "AdaPlatform",
             "AdaUtils",
             "AdaInput",
+            "AdaRender",
+            "AdaCorePipelines",
             "Math"
         ],
-        exclude: [
-            "BUILD.bazel"
+        resources: [
+            .process("Resources")
+        ],
+    ),
+    .testTarget(
+        name: "AdaAnimationTests",
+        dependencies: [
+            "AdaAnimation",
+            "Math"
         ]
     ),
     .testTarget(
         name: "AdaRenderTests",
         dependencies: [
+            "AdaAssets",
             "AdaRender",
             "Math",
             "AdaUtilsTesting"
+        ],
+        resources: [
+            .copy("Fixtures/Images")
         ]
     ),
     .testTarget(
@@ -867,9 +1342,6 @@ targets += [
             "AdaUI",
             "Math"
         ],
-        exclude: [
-            "BUILD.bazel"
-        ]
     ),
     .testTarget(
         name: "AdaUtilsTests",
@@ -877,8 +1349,23 @@ targets += [
             "AdaUtils",
             "Math"
         ],
-        exclude: [
-            "BUILD.bazel"
+    ),
+    .testTarget(
+        name: "AdaSpriteTests",
+        dependencies: [
+            "AdaSprite",
+            "Math"
+        ]
+    ),
+    .testTarget(
+        name: "AdaSceneTests",
+        dependencies: [
+            "AdaApp",
+            "AdaAssets",
+            "AdaScene",
+            "AdaAnimation",
+            "AdaECS",
+            "AdaInput"
         ]
     )
 ]
@@ -887,14 +1374,41 @@ targets += [
 //targets.append(contentsOf: swiftLintTargets)
 #endif
 
+// Native skeletal animation development demo.
+products.append(isAndroidBuildEnabled
+    ? .library(name: "SkeletalGarden", type: .dynamic, targets: ["SkeletalGarden"])
+    : .executable(name: "SkeletalGarden", targets: ["SkeletalGarden"]))
+if isAndroidBuildEnabled {
+    targets.append(.target(
+        name: "SkeletalGarden",
+        dependencies: ["AdaEngine"],
+        path: "Demos/SkeletalGarden",
+        exclude: ["script", "README.md", "RenderQualityValidation.md", "VisibilityValidation.md", "MetalFXValidation.md", "LocalLightingValidation.md", "WebGPUValidation.md", "PerformanceValidation.md", "dist", "SourceAssets", "Tests"],
+        resources: [.copy("Assets")],
+        swiftSettings: swiftSettings
+    ))
+} else {
+    targets.append(.executableTarget(
+        name: "SkeletalGarden",
+        dependencies: ["AdaEngine"],
+        path: "Demos/SkeletalGarden",
+        exclude: ["script", "README.md", "RenderQualityValidation.md", "VisibilityValidation.md", "MetalFXValidation.md", "LocalLightingValidation.md", "WebGPUValidation.md", "PerformanceValidation.md", "dist", "SourceAssets", "Tests"],
+        resources: [.copy("Assets")],
+        swiftSettings: swiftSettings,
+        linkerSettings: wasmExecutableLinkerSettings
+    ))
+}
+
+targets.append(.testTarget(name: "SkeletalGardenTests", dependencies: ["SkeletalGarden", "AdaEngine"], path: "Demos/SkeletalGarden/Tests"))
+
 // MARK: - Package -
 
 let package = Package(
     name: "AdaEngine",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v17),
-        .tvOS(.v17),
+        .iOS(.v18),
+        .tvOS(.v18),
         .visionOS(.v2),
         .macOS(.v15),
     ],
@@ -911,26 +1425,60 @@ let package = Package(
     cxxLanguageStandard: .cxx17
 )
 
+if let gravityDevelopmentPath {
+    package.dependencies.append(.package(name: "gravity-lang", path: gravityDevelopmentPath))
+} else {
+    package.dependencies.append(.package(
+        url: "https://github.com/AdaEngine/gravity-lang.git",
+        branch: "master"
+    ))
+}
+
+package.targets.append(.target(
+    name: "AdaScriptAOTFixture",
+    dependencies: [.product(name: "CGravity", package: "gravity-lang")],
+    path: "Tests/AdaScriptAOTFixture",
+    exclude: ["Movement.ada", "HostAdapters.ada", "Async.ada"],
+    publicHeadersPath: "include"
+))
+
 package.dependencies += [
     .package(url: "https://github.com/apple/swift-collections", from: "1.3.0"),
     .package(url: "https://github.com/apple/swift-log", from: "1.8.0"),
     .package(url: "https://github.com/apple/swift-distributed-tracing", from: "1.0.0"),
+    .package(url: "https://github.com/apple/swift-service-context", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-numerics", from: "1.1.1"),
     .package(url: "https://github.com/apple/swift-atomics", from: "1.3.0"),
     .package(url: "https://github.com/the-swift-collective/zlib.git", from: "1.3.2"),
     .package(url: "https://github.com/swiftlang/swift-subprocess.git", branch: "0.2.1"),
-    .package(url: "https://github.com/ordo-one/package-benchmark", from: "1.29.0"),
+    .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.7.3"),
+    .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.36.0"),
     // TODO: SpectralDragon packages should move to AdaEngine
     .package(url: "https://github.com/SpectralDragon/Yams.git", revision: "fb676da"),
-    .package(
-        url: "https://github.com/SpectralDragon/swift-webgpu",
-        branch: "update_bindings"
-    ),
     // Plugins
     .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", from: "602.0.0"),
-    .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.62.1"),
 ]
+
+if isECSBenchmarkEnabled {
+    package.dependencies.append(.package(
+        url: "https://github.com/ordo-one/package-benchmark",
+        .upToNextMinor(from: "1.29.0")
+    ))
+}
+
+if !isWebExportEnabled && !isAndroidBuildEnabled {
+    package.dependencies.append(
+        .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.62.1")
+    )
+}
+
+if !isHeadlessCIEnabled {
+    package.dependencies.append(
+        ProcessInfo.processInfo.environment["ADAENGINE_SWAN_PACKAGE_PATH"].map { .package(name: "swan", path: $0) }
+            ?? .package(url: "https://github.com/adobe/swan", .upToNextMinor(from: "0.0.8"))
+    )
+}
 
 private extension Target {
     /// Creates a regular target.
@@ -978,9 +1526,10 @@ private extension Target {
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "ServiceContextModule", package: "swift-service-context"),
             ] + dependencies,
             path: path,
-            exclude: ["BUILD.bazel"] + exclude,
+            exclude: exclude,
             sources: sources,
             resources: resources,
             publicHeadersPath: publicHeadersPath,
@@ -993,64 +1542,7 @@ private extension Target {
         )
     }
 
-    static func exampleTarget(
-        name: String,
-        path: String,
-    ) -> Target {
-        .executableTarget(
-            name: name,
-            dependencies: [
-                "AdaEngine"
-            ],
-            path: "Demos/",
-            sources: [
-                "\(path)/\(name).swift"
-            ],
-            resources: [
-                .copy("Resources/")
-            ],
-            packageAccess: false
-        )
-    }
 }
-
-// MARK: - Examples
-
-let examplesTargets: [Target] = [
-    // MARK: 2d
-    .exampleTarget(name: "BunniesStressExample", path: "2d"),
-    .exampleTarget(name: "TransformEntChildrenExample", path: "2d"),
-    .exampleTarget(name: "CustomMaterialExample", path: "2d"),
-    .exampleTarget(name: "TransparencyExample", path: "2d"),
-    .exampleTarget(name: "ManySpritesExample", path: "2d"),
-    .exampleTarget(name: "Text2dExample", path: "2d"),
-    .exampleTarget(name: "SpriteExample", path: "2d"),
-    .exampleTarget(name: "WGSLExample", path: "2d"),
-
-    // MARK: Input
-    .exampleTarget(name: "GamepadExample", path: "Input"),
-
-    // MARK: Scene
-    .exampleTarget(name: "LoadSceneExample", path: "Scene"),
-    .exampleTarget(name: "LdtkTilemapExample", path: "Scene"),
-    .exampleTarget(name: "CustomTileMapExample", path: "Scene"),
-    .exampleTarget(name: "ScriptableComponentExample", path: "Scene"),
-
-    // MARK: Games
-    .exampleTarget(name: "SnowmanAttacksExample", path: "Games"),
-
-    // MARK: UI
-    .exampleTarget(name: "UITestSceneExample", path: "UI"),
-    .exampleTarget(name: "AnimatedTextRendererExample", path: "UI"),
-    .exampleTarget(name: "ButtonExample", path: "UI"),
-
-    // MARK: Example
-    .exampleTarget(name: "SimpleCollideEventExample", path: "Events"),
-]
-
-package.targets.append(contentsOf: examplesTargets)
-
-// MARK:  Examples -
 
 // MARK: - Traits
 

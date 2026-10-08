@@ -5,8 +5,7 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
 
 ## Project Overview
 - Language: Swift 6.2 (swift-tools-version: 6.2).
-- Build system: Swift Package Manager (SwiftPM). Bazel exists but is
-  experimental and not used in CI.
+- Build system: Swift Package Manager (SwiftPM).
 - CI: SwiftPM tests on macOS 26 and Windows using `swift test --parallel`.
 - Linting: SwiftLint via SwiftLintPlugins and `.swiftlint.yml`.
 
@@ -16,13 +15,19 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
 - SwiftPM build: `swift build`
 - Build docs: see Documentation section below.
 
+#### Swift Toolchain Cache Compatibility
+- The shared `.build` directory may contain modules produced by a different Swift toolchain. If the first build or test reports that a module was compiled with another Swift version and cannot be imported, treat it as a stale-cache/toolchain mismatch rather than a source failure.
+- Do not delete or rewrite the user's shared `.build` directory. Immediately retry with an isolated scratch directory, for example: `swift test --scratch-path /tmp/adaengine-swift-build --filter SomeSuiteName` or `swift build --scratch-path /tmp/adaengine-swift-build`.
+- Reuse the same scratch path for subsequent commands in the task so the clean build remains incremental.
+
 ### Test
+- **Use Swift Testing** for AdaEngine package tests: `import Testing`, `@Suite`, `@Test`, and `#expect` / `#require`. Do not add new **XCTest**-based tests in `AdaEngine/Tests/`.
 - Run all tests: `swift test --parallel`
 - Run a single test target:
   - `swift test --parallel --filter AdaEngineTests`
-- Run a single test case (SwiftPM filter supports type or type/method):
-  - `swift test --filter AdaEngineTests/SomeTestCase`
-  - `swift test --filter AdaEngineTests/SomeTestCase/testMethod`
+- Run a single test (SwiftPM `--filter` matches symbol names; Swift Testing suites are often filterable by suite string):
+  - `swift test --filter SomeSuiteName`
+  - `swift test --filter AdaSpriteTests`
 
 ### Lint
 - SwiftLint is wired as a SwiftPM build tool plugin for macOS/Linux.
@@ -36,7 +41,7 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
     --transform-for-static-hosting \
     --hosting-base-path adaengine-docs \
     --enable-experimental-combined-documentation \
-    --target AdaEngine --target AdaECS --target AdaRender --target AdaUI \
+    --target AdaEngine --target AdaECS --target AdaScripting --target AdaRender --target AdaUI \
     --target AdaApp --target AdaPlatform --target AdaAssets --target AdaAudio \
     --target AdaTransform --target AdaText --target AdaInput --target AdaScene \
     --target AdaTilemap --target AdaPhysics --target AdaSprite --target AdaUtils \
@@ -44,7 +49,6 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
 
 ## Platform and Tooling Notes
 - Recommended editor: Xcode 26.2 or VSCode with Swift extension.
-- Bazel: present but marked as early development in README.
 
 ## Swift 6.2 + Concurrency Rules (Agent Requirements)
 
@@ -115,9 +119,9 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
 - Use `assertionFailure` for unreachable paths in debug-only code.
 
 ### Testing
-- Keep test classes focused: SwiftLint `single_test_class` opt-in rule
-  encourages one test class per file.
-- Use descriptive test method names; `yoda_condition` and
+- Prefer **Swift Testing** (`@Suite`, `@Test`, `#expect`) over XCTest for new
+  and migrated tests under `AdaEngine/Tests/`.
+- Use descriptive suite and test names; `yoda_condition` and
   `optional_enum_case_matching` are enabled.
 
 ### Types and Access Control
@@ -141,7 +145,6 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
 - Analyzer rules: `capture_variable`, `unused_declaration`, `unused_import`.
 
 ## Agent Workflow Expectations
-- Use SwiftPM for builds/tests unless explicitly asked to use Bazel.
 - Avoid editing vendored or third-party sources under `Sources/*` that are
   not part of AdaEngine (e.g., glslang, libpng) unless required.
 - Keep changes local to relevant targets; avoid sweeping refactors.

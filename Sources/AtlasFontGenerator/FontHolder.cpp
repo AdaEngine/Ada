@@ -24,4 +24,12 @@ bool FontHolder::loadFont(const char* fontPath) {
     return false;
 }
 
+bool FontHolder::setVariationAxis(const char* axis, double value) {
+    if (!ft || !font || !axis) {
+        return false;
+    }
+
+    return msdfgen::setFontVariationAxis(ft, font, axis, value);
+}
+
 }

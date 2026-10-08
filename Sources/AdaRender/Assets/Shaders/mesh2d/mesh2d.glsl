@@ -18,15 +18,23 @@ layout (location = 2) in vec2 a_UV;
 #endif
 
 #ifdef VERTEX_COLORS
-layout (location = 3) in vec2 a_VertexColor;
+layout (location = 3) in vec4 a_VertexColor;
 #endif
 
 struct VertexOut
 {
+#ifdef VERTEX_POSITIONS
     vec4 WorldPosition;
+#endif
+#ifdef VERTEX_NORMALS
     vec3 WorldNormal;
+#endif
+#ifdef VERTEX_UVS
     vec2 UV;
+#endif
+#ifdef VERTEX_COLORS
     vec4 VertexColor;
+#endif
 };
 
 layout (location = 0) out VertexOut Output;

@@ -12,12 +12,11 @@ import AdaECS
 /// Nodes are the fundamental part of the graph and used to extend its functionality, by
 /// generating draw calls and/or running subgraphs.
 public protocol RenderNode: Sendable {
-
     typealias Context = RenderGraphContext
-    
+
     /// Specifies the required input slots for this node.
     var inputResources: [RenderSlot] { get }
-    
+
     /// Specifies the produced output slots for this node.
     var outputResources: [RenderSlot] { get }
 
@@ -36,22 +35,22 @@ public protocol RenderNode: Sendable {
     ) async throws -> [RenderSlotValue]
 }
 
-public extension RenderNode {
-    static var name: RenderNodeLabel {
+extension RenderNode {
+    public static var name: RenderNodeLabel {
         RenderNodeLabel(rawValue: String(describing: self))
     }
 }
 
-public extension RenderNode {
-    var inputResources: [RenderSlot] { return [] }
+extension RenderNode {
+    public var inputResources: [RenderSlot] { return [] }
 
-    var outputResources: [RenderSlot] { return [] }
+    public var outputResources: [RenderSlot] { return [] }
 
-    func update(from world: World) { }
+    public func update(from _: World) {}
 }
 
 public struct EmptyRenderNode: RenderNode {
-    public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
+    public func execute(context _: inout Context, renderContext _: RenderContext) async throws -> [RenderSlotValue] {
         return []
     }
 }

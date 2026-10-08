@@ -20,6 +20,4 @@ android_test/include
 .DS_Store
 
 .swiftpm/
-bazel-*
-MODULE.bazel.lock
 Package.resolved

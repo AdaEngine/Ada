@@ -9,11 +9,11 @@ import AdaECS
 
 /// Draw pass is a render function that will render for specific item.
 ///
-/// For example, you can create render pass for rendering ``Transparent2DRenderItem`` and configure rendering whatever you want. 
+/// For example, you can create render pass for rendering ``Transparent2DRenderItem`` and configure rendering whatever you want.
 /// Pass additional render data as components to ``Entity`` and pass that entity to ``Transparent2DRenderItem/entity`` property.
 public protocol DrawPass<Item>: Resource {
     associatedtype Item: RenderItem
-    
+
     func render(
         with renderEncoder: RenderCommandEncoder,
         world: World,
@@ -26,7 +26,7 @@ public protocol DrawPass<Item>: Resource {
 public struct AnyDrawPass<T: RenderItem>: DrawPass {
     @usableFromInline
     let base: any DrawPass
-    
+
     public init<Value: DrawPass>(_ base: Value) {
         self.base = base
     }

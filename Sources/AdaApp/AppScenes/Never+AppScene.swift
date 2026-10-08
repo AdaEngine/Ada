@@ -10,7 +10,7 @@ extension Never: AppScene {
 
     @MainActor @preconcurrency
     public static func _makeView(
-        _ scene: _AppSceneNode<Never>,
+        _: _AppSceneNode<Never>,
         inputs: _SceneInputs
     ) -> _SceneOutputs {
         // For Never, just forward inputs as outputs as per default behavior.

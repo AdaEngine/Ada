@@ -1,0 +1,20 @@
+{
+  "sourceSHA256": "d4aba4f7c74a17bc690650fa8826b7c7396bb2cf09da5597ab56293f644696a5",
+  "tool": "meshoptimizer 1.2.0",
+  "variants": [
+    {
+      "level": 1,
+      "targetRatio": 0.65,
+      "maximumError": 0.025,
+      "baseTriangles": 3237,
+      "triangles": 2711
+    },
+    {
+      "level": 2,
+      "targetRatio": 0.35,
+      "maximumError": 0.06,
+      "baseTriangles": 3237,
+      "triangles": 1491
+    }
+  ]
+}

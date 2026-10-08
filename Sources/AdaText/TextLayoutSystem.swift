@@ -19,7 +19,6 @@ public struct TextLayoutComponent {
 /// System for layout text from ``Text2DComponent``.
 @PlainSystem
 public struct TextLayoutSystem {
-    
     @FilterQuery<
         Ref<TextComponent>,
         Ref<TextLayoutComponent>,
@@ -32,14 +31,14 @@ public struct TextLayoutSystem {
     >
     private var textComponents
 
-    public init(world: World) { }
-    
-    public func update(context: UpdateContext) {
+    public init(world _: World) {}
+
+    public func update(context _: UpdateContext) {
         self.textComponents.forEach { text, layout, visibility in
             if visibility == .hidden {
                 return
             }
-            
+
             let textContainer = TextContainer(
                 text: text.text,
                 textAlignment: text.textAlignment,

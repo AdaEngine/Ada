@@ -16,8 +16,19 @@
 *.ttf binary
 *.gif binary
 
+# Exclude C and C++ implementation details from GitHub language statistics.
+*.c -linguist-detectable
+*.cc -linguist-detectable
+*.cpp -linguist-detectable
+*.cxx -linguist-detectable
+*.h -linguist-detectable
+*.hh -linguist-detectable
+*.hpp -linguist-detectable
+
 # Vendored dependencies
 Sources/box2d/** linguist-vendored
+Sources/box3d/** linguist-vendored
+Sources/harfbuzz/** linguist-vendored
 Sources/libpng/** linguist-vendored
 Sources/miniaudio/** linguist-vendored
 Sources/msdf-atlas-gen/** linguist-vendored

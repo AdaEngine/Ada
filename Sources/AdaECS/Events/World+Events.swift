@@ -8,10 +8,15 @@
 import AdaUtils
 
 extension World {
+    /// Whether the event lifecycle resource has been installed (normally by EventsPlugin).
+    public var supportsEventDelivery: Bool {
+        getResource(HandledEvents.self) != nil
+    }
+
     /// Register new event if it is not registered yet.
     /// - Parameter type: The type of the event to register.
     /// - Note: This method is called automatically when you use `Events` or `EventsSender` property wrappers.
-    public func registerEventIfNeeded<T: Event>(_ type: T.Type) {
+    public func registerEventIfNeeded<T: Event>(_: T.Type) {
         guard self.getResource(EventsStorage<T>.self) == nil else {
             return
         }
@@ -42,7 +47,6 @@ extension World {
 /// Storage for events.
 /// Each event is stored in the world and can be received by the receiver and available for the next frame.
 public struct EventsStorage<T: Event>: Resource {
-
     @LocalIsolated
     /// Current events.
     private(set) var currentEvents: ContiguousArray<T>
@@ -94,11 +98,10 @@ package struct HandledEvents: Resource {
 /// This system is responsible for swapping and dropping old events and updating the handled events.
 @PlainSystem
 public struct EventsUpdateSystem {
-
     @Res<HandledEvents>
     private var handledEvents
 
-    public init(world: World) { }
+    public init(world _: World) {}
 
     public func update(context: UpdateContext) async {
         for handle in handledEvents.handledEvents {

@@ -1,8 +1,8 @@
-# Building AdaEngine
+# Building Ada
 
 This guide covers two scenarios:
-- Development build for working on AdaEngine itself.
-- Using AdaEngine as a dependency in your own app.
+- Development build for working on Ada itself.
+- Using Ada as a dependency in your own app.
 
 ## Requirements
 
@@ -45,7 +45,7 @@ swift test --parallel
 swiftlint --config .swiftlint.yml
 ```
 
-## Using AdaEngine in your app
+## Using Ada in your app
 
 ### Xcode
 
@@ -61,7 +61,7 @@ import AdaEngine
 
 ### Swift Package Manager
 
-Add AdaEngine to your `Package.swift`:
+Add Ada to your `Package.swift`:
 
 ```swift
 // Package.swift
@@ -81,10 +81,43 @@ let package = Package(
 
 Replace `X.Y.Z` with the latest release tag.
 
-If your app enables WebGPU, run the tint build plugin once in the AdaEngine package directory before the first build:
+If your app enables WebGPU, run the tint build plugin once in the Ada package directory before the first build:
 
 ```bash
 swift package plugin build-tint
 ```
 
 SwiftPM will ask to allow network access for the plugin. Confirm the prompt to let it download the Dawn/Tint sources.
+
+## Exporting a Web app
+
+Ada includes an experimental WebAssembly export command for browser-hosted games.
+
+Requirements:
+
+- Swift 6.3.2 release toolchain.
+- `swift-6.3.2-RELEASE_wasm` installed with `swift sdk install`.
+- A game executable product that depends on `AdaEngine`. Add `AdaWeb` if the app needs browser-specific helpers.
+
+Swift.org documents the current WebAssembly SDK installation flow at:
+<https://www.swift.org/documentation/articles/wasm-getting-started.html>
+
+Export a package product:
+
+```bash
+swift package --allow-writing-to-package-directory \
+  export-web \
+  --product MyGame \
+  --output dist/web
+```
+
+If several WASM SDKs are installed, pass the SDK id explicitly:
+
+```bash
+swift package --allow-writing-to-package-directory \
+  export-web \
+  --product MyGame \
+  --swift-sdk swift-6.3.2-RELEASE_wasm
+```
+
+The plugin emits `index.html`, `main.js`, `runtime.mjs`, the built `.wasm`, `package.json`, `ada-web-manifest.json`, `ada-resource-manifest.json`, copied SwiftPM resource bundles, and copies a package-level `Assets` directory when present. Use `npm install && npm run serve` in the output directory to serve the bundle locally.

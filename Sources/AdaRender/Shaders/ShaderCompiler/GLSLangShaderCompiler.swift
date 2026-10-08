@@ -2,10 +2,10 @@ import Foundation
 
 struct GLSLangShaderCompiler: ShaderDeviceCompilerEngine {
     func compile(
-        spirvData: Data, 
+        spirvData: Data,
         entryPoint: String,
-        stage: ShaderStage, 
-        defines: [ShaderDefine]
+        stage: ShaderStage,
+        defines _: [ShaderDefine]
     ) async throws -> DeviceCompiledShader {
         let spirvCompiler = try SpirvCompiler(spriv: spirvData, stage: stage, deviceLang: .deviceLang)
         spirvCompiler.renameEntryPoint(entryPoint)
@@ -16,9 +16,9 @@ struct GLSLangShaderCompiler: ShaderDeviceCompilerEngine {
 extension ShaderLanguage {
     static let deviceLang: ShaderLanguage = {
         #if canImport(Metal)
-        return .msl
+            return .msl
         #else
-        return .glsl
+            return .glsl
         #endif
     }()
 }

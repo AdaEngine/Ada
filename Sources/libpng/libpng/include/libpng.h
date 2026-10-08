@@ -1,3 +1,7 @@
+#if defined(__wasm__) && !defined(__wasm_exception_handling__)
+#define __wasm_exception_handling__
+#endif
+
 #include "png.h"
 
 png_uint_32 swift_png_image_row_stride(png_image image) {

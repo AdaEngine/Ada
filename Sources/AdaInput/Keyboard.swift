@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by v.prusakov on 5/1/24.
 //
@@ -9,7 +9,6 @@ import AdaUtils
 import Foundation
 
 open class Keyboard {
-
     public typealias KeyCodeHashMap = [UInt16: KeyCode]
     public typealias OSKeyCodeHashMap = [KeyCode: UInt16]
 
@@ -24,7 +23,7 @@ open class Keyboard {
         }
     }
 
-    open func initialize(keycodes: inout KeyCodeHashMap) {
+    open func initialize(keycodes _: inout KeyCodeHashMap) {
         fatalErrorMethodNotImplemented()
     }
 }

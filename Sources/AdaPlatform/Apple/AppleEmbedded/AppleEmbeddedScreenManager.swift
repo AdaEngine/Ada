@@ -6,46 +6,60 @@
 //
 
 #if canImport(UIKit)
-import UIKit
-@_spi(Internal) import AdaUI
-import Math
+    @_spi(Internal) import AdaUI
+    import Math
+    import UIKit
 
-final class AppleEmbeddedScreenManager: ScreenManager, @unchecked Sendable {
-    func getMainScreen() -> Screen? {
-        MainActor.assumeIsolated {
-            return makeScreen(from: UIScreen.main)
+    #if os(visionOS)
+    // visionOS has spatial windows, not a publicly accessible physical UIScreen.
+    final class AppleEmbeddedScreenManager: ScreenManager {
+        func getMainScreen() -> Screen? { nil }
+        func getScreens() -> [Screen] { [] }
+        func getSize(for screen: Screen) -> Size { .zero }
+        func getScreenScale(for screen: Screen) -> Float { 1 }
+        func getBrightness(for screen: Screen) -> Float { 1 }
+        func makeScreen(from systemScreen: SystemScreen) -> Screen {
+            Screen(systemScreen: systemScreen, screenManager: self)
         }
     }
-    
-    func getScreens() -> [Screen] {
-        MainActor.assumeIsolated {
-            UIScreen.screens.map(makeScreen(from:))
+    #else
+    final class AppleEmbeddedScreenManager: ScreenManager, @unchecked Sendable {
+        func getMainScreen() -> Screen? {
+            MainActor.assumeIsolated {
+                return makeScreen(from: UIScreen.main)
+            }
         }
-    }
-    
-    func getSize(for screen: Screen) -> Size {
-        MainActor.assumeIsolated {
-            return (screen.systemScreen as? UIScreen)?.bounds.toEngineRect.size ?? .zero
-        }
-    }
-    
-    func getScreenScale(for screen: Screen) -> Float {
-        MainActor.assumeIsolated {
-            let scale = Float((screen.systemScreen as? UIScreen)?.nativeScale ?? 0)
-            return max(1.0, scale)
-        }
-    }
-    
-    func makeScreen(from systemScreen: SystemScreen) -> Screen {
-        Screen(systemScreen: systemScreen as! UIKit.UIScreen, screenManager: self)
-    }
-    
-    func getBrightness(for screen: Screen) -> Float {
-        MainActor.assumeIsolated {
-            Float((screen.systemScreen as? UIScreen)?.brightness ?? 0)
-        }
-    }
-}
 
-extension UIKit.UIScreen: SystemScreen {}
+        func getScreens() -> [Screen] {
+            MainActor.assumeIsolated {
+                UIScreen.screens.map(makeScreen(from:))
+            }
+        }
+
+        func getSize(for screen: Screen) -> Size {
+            MainActor.assumeIsolated {
+                return (screen.systemScreen as? UIScreen)?.bounds.toEngineRect.size ?? .zero
+            }
+        }
+
+        func getScreenScale(for screen: Screen) -> Float {
+            MainActor.assumeIsolated {
+                let scale = Float((screen.systemScreen as? UIScreen)?.nativeScale ?? 0)
+                return max(1.0, scale)
+            }
+        }
+
+        func makeScreen(from systemScreen: SystemScreen) -> Screen {
+            Screen(systemScreen: systemScreen as! UIKit.UIScreen, screenManager: self)
+        }
+
+        func getBrightness(for screen: Screen) -> Float {
+            MainActor.assumeIsolated {
+                Float((screen.systemScreen as? UIScreen)?.brightness ?? 0)
+            }
+        }
+    }
+
+    extension UIKit.UIScreen: SystemScreen {}
+    #endif
 #endif

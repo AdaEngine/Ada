@@ -37,10 +37,10 @@ public struct BlitPassDescriptor: Sendable {
 public struct Origin3D: Sendable {
     /// The x-coordinate of the origin.
     public var x: Int
-    
+
     /// The y-coordinate of the origin.
     public var y: Int
-    
+
     /// The z-coordinate of the origin (for 3D textures or texture arrays).
     public var z: Int
 
@@ -63,10 +63,10 @@ public struct Origin3D: Sendable {
 public struct Size3D: Sendable {
     /// The width of the region in pixels or elements.
     public var width: Int
-    
+
     /// The height of the region in pixels or elements.
     public var height: Int
-    
+
     /// The depth of the region (for 3D textures or texture arrays).
     public var depth: Int
 
@@ -109,17 +109,46 @@ public protocol CommandBuffer: AnyObject {
     /// - Returns: A ``RenderCommandEncoder`` for encoding rendering commands.
     func beginRenderPass(_ desc: RenderPassDescriptor) -> RenderCommandEncoder
 
+    /// Renders into compressed geometry attachments and resolves them before screen-space effects.
+    /// Layered Metal shaders select ``GlobalBufferIndex/renderTargetLayer`` through their render-target-array output.
+    func beginFoveatedRenderPass(_ desc: RenderPassDescriptor, rateMap: any RasterizationRateMap) throws -> FoveatedRenderPass
+
     /// Begins a blit pass and returns an encoder for recording memory transfer commands.
     ///
     /// - Parameter desc: The descriptor that configures the blit pass.
     /// - Returns: A ``BlitCommandEncoder`` for encoding blit commands.
     func beginBlitPass(_ desc: BlitPassDescriptor) -> BlitCommandEncoder
-    
+
+    /// Encodes a backend-native spatial upscale when the source and destination are supported.
+    ///
+    /// - Returns: `true` when the upscale was encoded; otherwise `false` so the caller can use a fallback pass.
+    func encodeSpatialUpscale(source: Texture, destination: Texture) -> Bool
+
     /// Commits the command buffer for execution on the GPU.
     ///
     /// After calling this method, the command buffer is submitted to the GPU
     /// and cannot be modified further.
     func commit()
+
+    /// Reports GPU execution seconds after completion, or nil when timestamps are unavailable.
+    func addCompletedTimingHandler(_ handler: @escaping @Sendable (Double?) -> Void)
+
+    /// Registers a callback that runs after the command buffer has finished.
+    func addCompletedHandler(_ handler: @escaping @Sendable () -> Void)
+}
+
+extension CommandBuffer {
+    public func beginFoveatedRenderPass(_ desc: RenderPassDescriptor, rateMap: any RasterizationRateMap) throws -> FoveatedRenderPass {
+        throw FoveatedRenderingError.unsupportedBackend
+    }
+
+    public func addCompletedTimingHandler(_ handler: @escaping @Sendable (Double?) -> Void) {
+        addCompletedHandler { handler(nil) }
+    }
+
+    public func encodeSpatialUpscale(source _: Texture, destination _: Texture) -> Bool {
+        false
+    }
 }
 
 // MARK: - Blit Command Encoder
@@ -313,7 +342,6 @@ public struct RenderResourceSet {
 /// encoder.endRenderPass()
 /// ```
 public protocol RenderCommandEncoder: CommonCommandEncoder {
-
     /// Sets the render pipeline state for subsequent draw calls.
     ///
     /// The pipeline state defines the shaders, vertex layout, blending, and other
@@ -445,6 +473,11 @@ public protocol RenderCommandEncoder: CommonCommandEncoder {
     ///   - indexCount: The number of indices to draw.
     ///   - indexBufferOffset: The byte offset in the index buffer to start reading from.
     ///   - instanceCount: The number of instances to draw.
+    /// Encodes a GPU-generated indexed draw. Returns false when this encoder lacks support.
+    /// Unsupported backends should use the caller's CPU draw counts instead.
+    @discardableResult
+    func drawIndexedIndirect(arguments: any Buffer, offset: Int) -> Bool
+
     func drawIndexed(indexCount: Int, indexBufferOffset: Int, instanceCount: Int)
 
     /// Issues a non-indexed draw call.
@@ -468,7 +501,7 @@ public protocol RenderCommandEncoder: CommonCommandEncoder {
 
 // MARK: - RenderCommandEncoder Extension
 
-public extension RenderCommandEncoder {
+extension RenderCommandEncoder {
     /// Convenience method to set a value directly as vertex buffer data.
     ///
     /// This method copies the value's bytes directly to the GPU, making it
@@ -478,9 +511,16 @@ public extension RenderCommandEncoder {
     ///   - value: The value to send to the vertex shader.
     ///   - index: The binding index in the vertex shader.
     @inlinable
-    func setVertexBuffer<T>(_ value: T, slot: Int) {
+    public func setVertexBuffer<T>(_ value: T, slot: Int) {
         unsafe withUnsafeBytes(of: value) { ptr in
-            unsafe self.setVertexBytes(ptr.baseAddress!, length: MemoryLayout<T>.stride, slot: slot)
+            guard let baseAddress = ptr.baseAddress else {
+                return
+            }
+            unsafe self.setVertexBytes(baseAddress, length: MemoryLayout<T>.stride, slot: slot)
         }
     }
+}
+
+extension RenderCommandEncoder {
+    public func drawIndexedIndirect(arguments _: any Buffer, offset _: Int) -> Bool { false }
 }

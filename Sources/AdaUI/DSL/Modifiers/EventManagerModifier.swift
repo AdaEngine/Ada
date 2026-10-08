@@ -7,10 +7,10 @@
 
 import AdaUtils
 
-public extension View {
+extension View {
     /// Subscribe to EventManager events.
-    func onEvent<E: Event>(
-        _ event: E.Type,
+    public func onEvent<E: Event>(
+        _: E.Type,
         perform action: @escaping @Sendable (E) -> Void
     ) -> some View {
         self.modifier(
@@ -23,7 +23,6 @@ public extension View {
 }
 
 struct EventManagerModifier<Content: View, E: Event>: ViewModifier, ViewNodeBuilder {
-
     let content: Content
     let completion: @Sendable (E) -> Void
 
@@ -38,7 +37,6 @@ struct EventManagerModifier<Content: View, E: Event>: ViewModifier, ViewNodeBuil
 }
 
 private final class EventManagerNode<E: Event>: ViewModifierNode {
-
     let cancellable: any Cancellable
 
     init<Content: View>(
@@ -50,14 +48,18 @@ private final class EventManagerNode<E: Event>: ViewModifierNode {
         self.cancellable = manager.subscribe(to: E.self, completion: completion)
         super.init(contentNode: contentNode, content: content)
     }
+
+    deinit {
+        cancellable.cancel()
+    }
 }
 
 struct EventManagerEnvironmentKey: EnvironmentKey {
     static let defaultValue = EventManager.default
 }
 
-public extension EnvironmentValues {
-    var eventManager: EventManager {
+extension EnvironmentValues {
+    public var eventManager: EventManager {
         get { self[EventManagerEnvironmentKey.self] }
         set { self[EventManagerEnvironmentKey.self] = newValue }
     }

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "id": "example.gameplay",
+  "version": "1.0.0",
+  "api": 1,
+  "sources": ["Sources/Health.ada"],
+  "dependencies": []
+}

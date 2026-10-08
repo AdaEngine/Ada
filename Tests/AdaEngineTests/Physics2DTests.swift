@@ -12,6 +12,7 @@ import AdaECS
 import AdaTransform
 
 @MainActor
+@Suite(.serialized)
 struct Physics2DTests {
     
     let world: AppWorlds
@@ -25,6 +26,83 @@ struct Physics2DTests {
             .addPlugin(Physics2DPlugin())
             .addPlugin(TransformPlugin())
         try await world.build()
+    }
+
+    @Test
+    func dynamicBodyMoveEventWritesBackTransform() async throws {
+        let box = world.main.spawn {
+            PhysicsBody2DComponent(
+                shapes: [Shape2DResource.generateBox(width: 1, height: 1)],
+                mass: 1,
+                mode: .dynamic
+            )
+            Transform(position: [0, 4, 0])
+        }
+
+        await world.main.runScheduler(.physicsSync)
+
+        let startY = try #require(box.components[Transform.self]?.position.y)
+        let physicsWorld = try #require(world.main.physicsWorld2D)
+        physicsWorld.updateSimulation(1.0 / 60.0)
+        await world.main.runScheduler(.physicsWriteback)
+
+        let endY = try #require(box.components[Transform.self]?.position.y)
+        #expect(endY < startY)
+    }
+
+    @Test
+    func writebackLeavesTransformAloneWithoutMoveEvent() async throws {
+        let box = world.main.spawn {
+            PhysicsBody2DComponent(
+                shapes: [Shape2DResource.generateBox(width: 1, height: 1)],
+                mass: 1,
+                mode: .dynamic
+            )
+            Transform(position: [0, 4, 0])
+        }
+
+        await world.main.runScheduler(.physicsSync)
+        box.components[Transform.self]?.position.x = 123
+        await world.main.runScheduler(.physicsWriteback)
+
+        #expect(box.components[Transform.self]?.position.x == 123)
+    }
+
+    @Test
+    func workerCallbacksCanResolveOverlappingBodies() async throws {
+        var boxes: [Entity] = []
+        for x: Float in [0, 0.25] {
+            boxes.append(world.main.spawn {
+                PhysicsBody2DComponent(
+                    shapes: [Shape2DResource.generateBox(width: 1, height: 1)],
+                    mass: 1,
+                    mode: .dynamic
+                )
+                Transform(position: [x, 0, 0])
+            })
+        }
+
+        await world.main.runScheduler(.physicsSync)
+        let physicsWorld = try #require(world.main.physicsWorld2D)
+        physicsWorld.updateSimulation(1.0 / 60.0)
+
+        #expect(boxes.allSatisfy { $0.components[PhysicsBody2DComponent.self]?.runtimeBody != nil })
+    }
+
+    @Test
+    func nativePerformanceProfileReportsStepPhasesAndCounters() throws {
+        let metrics = PhysicsPerformanceMetrics()
+        let physicsWorld = try #require(world.main.physicsWorld2D)
+
+        physicsWorld.updateSimulation(1.0 / 60.0)
+        physicsWorld.recordPerformance(into: metrics)
+
+        let snapshot = try #require(metrics.snapshots.first { $0.dimension == .twoD })
+        #expect(snapshot.stepCount == 1)
+        #expect(snapshot.step != nil)
+        #expect(snapshot.phases.contains { $0.phase == .collide })
+        #expect(snapshot.phases.contains { $0.phase == .solve })
+        #expect(snapshot.counters.bodyCount >= 0)
     }
 //    
 //    @Test

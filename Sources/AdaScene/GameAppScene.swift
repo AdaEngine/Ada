@@ -6,23 +6,20 @@
 //
 
 import AdaApp
-import AdaAssets
 import AdaECS
 import AdaUI
-import Math
 
 /// GameAppScene will present game scene in the pre-configured window.
 /// You must use this type of scene if your application should launch a game scene.
 public struct GameAppScene: AppScene {
-
     public typealias SceneBlock = @MainActor @Sendable () throws -> Scene
 
     public var body: some AppScene {
         EmptyWindow()
             .transformAppWorlds { appWorlds in
                 do {
-                    try unsafe appWorlds.addPlugin(
-                        GameScenePlugin(gameScene: AssetHandle<Scene>(gameScene()))
+                    try appWorlds.addPlugin(
+                        GameScenePlugin(gameScene: gameScene(), make: gameScene)
                     )
                 } catch {
                     fatalError("\(error)")
@@ -44,12 +41,15 @@ public struct GameAppScene: AppScene {
 }
 
 struct GameScenePlugin: Plugin {
-
-    let gameScene: AssetHandle<Scene>
+    let gameScene: Scene
+    let make: GameAppScene.SceneBlock
 
     func setup(in app: AppWorlds) {
-        app.main.spawn {
-            DynamicScene(scene: gameScene)
+        let navigator = app.main.getResource(SceneNavigator.self) ?? SceneNavigator(world: app.main)
+        if app.main.getResource(SceneNavigator.self) == nil {
+            app.main.insertResource(navigator)
+            app.main.addSystem(SceneNavigationSystem.self, on: .postUpdate)
         }
+        navigator.installInitialScene(gameScene, make: make)
     }
 }

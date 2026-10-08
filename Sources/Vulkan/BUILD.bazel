@@ -1,6 +1,0 @@
-load("//utils/bazel:swift_ada_library.bzl", "swift_ada_library")
-
-swift_ada_library(
-    name = "Vulkan",
-    deps = ["//Modules/Vulkan:CVulkan"],
-)

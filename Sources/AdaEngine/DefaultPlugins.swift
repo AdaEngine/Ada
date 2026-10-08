@@ -18,6 +18,7 @@ import AdaText
 import AdaTilemap
 import AdaTransform
 import AdaUI
+import Foundation
 import OrderedCollections
 
 /// Contains base configuration for any scene in the game.
@@ -27,7 +28,7 @@ public struct DefaultPlugins: Plugin {
 
     /// Initialize a new instance of `DefaultPlugins` with the given file path.
     /// - Parameter filePath: The file path to use for the `AssetsPlugin`.
-    public init(filePath: StaticString = #filePath) {
+    public init(filePath: StaticString = #filePath, assetBundle: Bundle? = nil) {
         var plugins = OrderedDictionary<String, any Plugin>()
         insertPlugin(TransformPlugin(), into: &plugins)
         insertPlugin(AppPlatformPlugin(), into: &plugins)
@@ -35,7 +36,7 @@ public struct DefaultPlugins: Plugin {
         insertPlugin(RenderWorldPlugin(), into: &plugins)
         insertPlugin(EventsPlugin(), into: &plugins)
         insertPlugin(CameraPlugin(), into: &plugins)
-        insertPlugin(AssetsPlugin(filePath: filePath), into: &plugins)
+        insertPlugin(AssetsPlugin(filePath: filePath, assetBundle: assetBundle), into: &plugins)
         insertPlugin(VisibilityPlugin(), into: &plugins)
         insertPlugin(SpritePlugin(), into: &plugins)
         insertPlugin(Mesh2DPlugin(), into: &plugins)
@@ -45,8 +46,11 @@ public struct DefaultPlugins: Plugin {
         insertPlugin(AudioPlugin(), into: &plugins)
         insertPlugin(WindowPlugin(), into: &plugins)
         insertPlugin(Core2DPlugin(), into: &plugins)
+        insertPlugin(Core3DPlugin(), into: &plugins)
+        insertPlugin(Light2DPlugin(), into: &plugins)
         insertPlugin(UpscalePlugin(), into: &plugins)
         insertPlugin(UIPlugin(), into: &plugins)
+        insertPlugin(ContextMenuPlugin(), into: &plugins)
         insertPlugin(Physics2DPlugin(), into: &plugins)
         insertPlugin(TileMapPlugin(), into: &plugins)
         self.plugins = plugins
@@ -70,7 +74,7 @@ public struct DefaultPlugins: Plugin {
     /// Disable a plugin.
     /// - Parameter plugin: The plugin to disable.
     /// - Returns: A new instance of `DefaultPlugins` with the plugin disabled.
-    public func disable<T: Plugin>(_ plugin: T.Type) -> Self {
+    public func disable<T: Plugin>(_: T.Type) -> Self {
         var newValue = self
         newValue.plugins[String(reflecting: T.self)] = nil
         return newValue

@@ -37,11 +37,17 @@ public struct UIRenderNode: RenderNode {
     @Res<RenderItems<UITransparentRenderItem>>
     private var renderItems
 
+    @Res<PrimaryWindowId>
+    private var primaryWindowId
+
     @ResMut<UIViewUniform>
     private var uiViewUniform
 
     @Res<RenderDeviceHandler>
     private var renderDevice
+
+    @ResMut<GlassBackgroundTexture>
+    private var glassBackground
 
     public init() {}
 
@@ -52,8 +58,10 @@ public struct UIRenderNode: RenderNode {
     public func update(from world: World) {
         query.update(from: world)
         _renderItems.update(from: world)
+        _primaryWindowId.update(from: world)
         _uiViewUniform.update(from: world)
         _renderDevice.update(from: world)
+        _glassBackground.update(from: world)
     }
 
     public func execute(
@@ -64,25 +72,54 @@ public struct UIRenderNode: RenderNode {
             return []
         }
 
-        try query.forEach { entity, camera, target, cameraUniform in
+        try query.forEach { entity, camera, target, _ in
             if entity != view {
                 return
             }
 
-            let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
-
             guard let texture = target.mainTexture else {
                 return
             }
+            let targetWindowId = camera.targetWindowId(from: primaryWindowId)
+
+            let texWidth = texture.width
+            let texHeight = texture.height
+
+            // Snapshot main target for glass (must complete before glass fragments sample it).
+            if glassBackground.texture == nil
+                || glassBackground.texture?.width != texWidth
+                || glassBackground.texture?.height != texHeight {
+                glassBackground.texture = RenderTexture(
+                    size: SizeInt(width: texWidth, height: texHeight),
+                    scaleFactor: texture.scaleFactor,
+                    format: .bgra8,
+                    debugLabel: "GlassBackground",
+                    samplerDescription: SamplerDescriptor(
+                        minFilter: .linear,
+                        magFilter: .linear,
+                        mipFilter: .notMipmapped
+                    )
+                )
+            }
+
+            let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
+            commandBuffer.label = "UI Render + Glass Capture"
 
             // Get viewport size
             let viewportSize = camera.viewport.rect.size
+            let logicalViewportSize = camera.logicalViewport.rect.size
+            let effectiveScaleFactor: Float
+            if logicalViewportSize.width > 0 {
+                effectiveScaleFactor = viewportSize.width / logicalViewportSize.width
+            } else {
+                effectiveScaleFactor = texture.scaleFactor
+            }
 
             // Create UI-specific orthographic projection with origin at top-left
             let uiProjection = Transform3D.createUIProjection(
                 width: viewportSize.width,
                 height: viewportSize.height,
-                scaleFactor: texture.scaleFactor
+                scaleFactor: effectiveScaleFactor
             )
 
             // Update the UI view uniform buffer
@@ -90,30 +127,84 @@ public struct UIRenderNode: RenderNode {
                 projection: uiProjection
             )
 
-            let renderPass = commandBuffer.beginRenderPass(
-                RenderPassDescriptor(
-                    label: "UI Render Pass",
-                    colorAttachments: [
-                        .init(
-                            texture: texture,
-                            operation: OperationDescriptor(
-                                loadAction: .load,  // Load existing content (don't clear)
-                                storeAction: .store
-                            ),
-                            clearColor: .clear
-                        )
-                    ],
-                    depthStencilAttachment: nil
-                )
+            let uiRenderPassDescriptor = RenderPassDescriptor(
+                label: "UI Render Pass",
+                colorAttachments: [
+                    .init(
+                        texture: texture,
+                        operation: OperationDescriptor(
+                            loadAction: .load,  // Load existing content (don't clear)
+                            storeAction: .store
+                        ),
+                        clearColor: .clear
+                    )
+                ],
+                depthStencilAttachment: nil
             )
 
-            // Set the UI view uniform (not the camera's uniform)
-            renderPass.setVertexBuffer(uiViewUniform, slot: GlobalBufferIndex.viewUniform)
-            renderPass.setViewport(camera.viewport.rect)
+            let renderTargetScissor = Rect(
+                x: 0,
+                y: 0,
+                width: Float(texture.width),
+                height: Float(texture.height)
+            )
 
-            try renderItems.render(with: renderPass, world: context.world, view: view)
+            func blitMainTargetToGlassBackground() {
+                guard let glassTex = glassBackground.texture else {
+                    return
+                }
+                let blitEncoder = commandBuffer.beginBlitPass(
+                    BlitPassDescriptor(label: "Glass Background Blit")
+                )
+                blitEncoder.copyTextureToTexture(
+                    source: texture,
+                    sourceOrigin: Origin3D(),
+                    sourceSize: Size3D(width: texWidth, height: texHeight),
+                    sourceMipLevel: 0,
+                    sourceSlice: 0,
+                    destination: glassTex,
+                    destinationOrigin: Origin3D(),
+                    destinationMipLevel: 0,
+                    destinationSlice: 0
+                )
+                blitEncoder.endBlitPass()
+            }
 
-            renderPass.endRenderPass()
+            var renderPass: RenderCommandEncoder?
+
+            for item in renderItems.items where item.windowId == nil || item.windowId == targetWindowId {
+                let itemUsesGlass = !item.drawData.glassIndexBuffer.isEmpty
+
+                if itemUsesGlass {
+                    if let activePass = renderPass {
+                        activePass.endRenderPass()
+                        renderPass = nil
+                    }
+                    blitMainTargetToGlassBackground()
+                }
+
+                if renderPass == nil {
+                    let activePass = commandBuffer.beginRenderPass(uiRenderPassDescriptor)
+                    activePass.setVertexBuffer(uiViewUniform, slot: GlobalBufferIndex.viewUniform)
+                    activePass.setViewport(camera.viewport.rect)
+                    renderPass = activePass
+                }
+
+                if let activePass = renderPass {
+                    // Reset scissor for each item so clip state from previous draws
+                    // never leaks into non-clipped UI primitives.
+                    activePass.setScissorRect(renderTargetScissor)
+                    try AnyDrawPass(item.drawPass)
+                        .render(
+                            with: activePass,
+                            world: context.world,
+                            view: view,
+                            item: item
+                        )
+                }
+            }
+
+            renderPass?.endRenderPass()
             commandBuffer.commit()
         }
 
@@ -136,7 +227,7 @@ public struct UIRenderNode: RenderNode {
     }
 }
 
-public extension Transform3D {
+extension Transform3D {
     /// Creates an orthographic projection matrix for UI rendering.
     /// Origin is at top-left corner, Y increases downward.
     /// - Parameters:
@@ -144,7 +235,7 @@ public extension Transform3D {
     ///   - height: Viewport height in points.
     ///   - scaleFactor: Scale factor for HiDPI displays.
     /// - Returns: Orthographic projection matrix.
-    static func createUIProjection(
+    public static func createUIProjection(
         width: Float,
         height: Float,
         scaleFactor: Float = 1.0
@@ -152,7 +243,7 @@ public extension Transform3D {
         // UI orthographic projection with origin at top-left
         // X: 0 to width (left to right)
         // Y: 0 to -height (top to bottom, negated in Rect.toTransform3D)
-        return Transform3D.orthographic(
+        return Self.orthographic(
             left: 0,
             right: width / scaleFactor,
             top: 0,

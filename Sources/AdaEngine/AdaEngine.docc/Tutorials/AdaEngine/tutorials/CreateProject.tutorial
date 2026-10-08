@@ -1,6 +1,6 @@
 @Tutorial(time: 5) {
     @Intro(title: "Create your first game project") {
-        In this tutorial, you will learn how to create your first AdaEngine project.
+        In this tutorial, you will learn how to create your first Ada project.
         
         You should have some programming experience and knowledge of basic Swift language syntax.
         
@@ -40,7 +40,7 @@
             Let's configure our Xcode project file. 
             
             @Step {
-                First, we should add AdaEngine as a dependency to our project. Select your Xcode project file and move to `Package Dependencies`. 
+                First, we should add Ada as a dependency to our project. Select your Xcode project file and move to `Package Dependencies`.
                 
                 @Image(source: "CP-2-4.png", alt: "You can see package dependencies tab in Xcode")
             }
@@ -51,7 +51,7 @@
                 @Image(source: "CP-2-8.png", alt: "App Sandbox")
             }
             
-            Let's change the SwiftUI project to an AdaEngine project.
+            Let's change the SwiftUI project to an Ada project.
             
             @Step {
                 Open the `FirstPackageApp.swift` file, and you will see the Swift code.
@@ -66,7 +66,7 @@
             }
             
             @Step {
-                The ``App`` protocol requires us to implement a `body` property where we should pass our ``AppScene`` instance. ``AppScene`` tells AdaEngine how to configure the application and how to show app windows. 
+                The ``App`` protocol requires us to implement a `body` property where we should pass our ``AppScene`` instance. ``AppScene`` tells Ada how to configure the application and how to show app windows.
                 
                 @Code(name: "FirstPackageApp.swift", file: CP-2-3-app.swift)
             }
@@ -74,7 +74,7 @@
             @Step {
                 Now modify the ``AppScene``. 
 
-                AdaEngine supports modular app architecture. Each piece of logic can be connected to the app using the plugins. Core engine features implemented by plugins, like rendering, physics, audio, input, etc.
+                Ada supports modular app architecture. Each piece of logic can be connected to the app using the plugins. Core engine features implemented by plugins, like rendering, physics, audio, input, etc.
                 Let's add ``DefaultAppWindow`` object as our app scene. This object contains all core game engine plugins logic. But, you want full control which plugin is added, you can use ``EmptyWindow`` scene and add plugins manually.
                 
                 Also, add the `windowTitle` modifier to add a custom window title for your window. 

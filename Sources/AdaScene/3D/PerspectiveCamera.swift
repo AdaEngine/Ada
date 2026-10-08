@@ -5,11 +5,11 @@
 //  Created by v.prusakov on 2/10/23.
 //
 
-import AdaECS
 import AdaAudio
+import AdaCorePipelines
+import AdaECS
 import AdaRender
 import AdaTransform
-import AdaCorePipelines
 
 /// A virtual camera that establishes the rendering perspective.
 public typealias Camera3D = PerspectiveCameraBundle
@@ -22,6 +22,9 @@ public struct PerspectiveCameraBundle {
     public var globalViewUniform = GlobalViewUniform()
     public var audioReceiver = AudioReceiver()
     public var transform = Transform()
+    public var cameraRenderGraph: CameraRenderGraph
+    public var visibility: Visibility = .visible
+    public var environment: Environment3D
 
     /// Create a new perspective camera for rendering 2D and 3D items on screen.
     public init(
@@ -30,7 +33,8 @@ public struct PerspectiveCameraBundle {
         visibleEntities: VisibleEntities = VisibleEntities(),
         globalViewUniform: GlobalViewUniform = GlobalViewUniform(),
         audioReceiver: AudioReceiver = AudioReceiver(),
-        transform: Transform = Transform()
+        transform: Transform = Transform(),
+        environment: Environment3D = Environment3D()
     ) {
         self.camera = camera
         self.camera.projection = .perspective(perspectiveProjection)
@@ -38,5 +42,7 @@ public struct PerspectiveCameraBundle {
         self.globalViewUniform = globalViewUniform
         self.audioReceiver = audioReceiver
         self.transform = transform
+        self.environment = environment
+        self.cameraRenderGraph = CameraRenderGraph(subgraphLabel: .main3D, inputSlot: Core3DPlugin.InputNode.view)
     }
 }

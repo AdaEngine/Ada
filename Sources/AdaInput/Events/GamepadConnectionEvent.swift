@@ -11,7 +11,6 @@ import AdaUtils
 ///
 /// This event is dispatched when a gamepad is connected to or disconnected from the system.
 public struct GamepadConnectionEvent: InputEvent {
-
     public let id: RID = RID()
 
     public let window: RID
@@ -26,7 +25,7 @@ public struct GamepadConnectionEvent: InputEvent {
 
     /// A Boolean value indicating whether the gamepad was connected (`true`) or disconnected (`false`).
     public let isConnected: Bool
-    
+
     public init(
         gamepadId: Int,
         isConnected: Bool,

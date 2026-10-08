@@ -1,0 +1,63 @@
+{
+  "fill" : "automatic",
+  "groups" : [
+    {
+      "blur-material" : 0.5,
+      "layers" : [
+        {
+          "blend-mode" : "normal",
+          "fill" : "none",
+          "hidden" : false,
+          "image-name-specializations" : [
+            {
+              "value" : "Logo (1).svg"
+            },
+            {
+              "appearance" : "light",
+              "value" : "Logo.svg"
+            }
+          ],
+          "name" : "Logo",
+          "position-specializations" : [
+            {
+              "value" : {
+                "scale" : 1.5,
+                "translation-in-points" : [
+                  -0.0001178828251795494,
+                  -14.671885485228358
+                ]
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "scale" : 1.5,
+                "translation-in-points" : [
+                  -0.0001178828251795494,
+                  -14.671885485228358
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "lighting" : "individual",
+      "name" : "Group",
+      "shadow" : {
+        "kind" : "layer-color",
+        "opacity" : 0.5
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.55
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

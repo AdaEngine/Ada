@@ -6,7 +6,7 @@
 //
 
 /// An opaque value derived from an anchor source and a particular view.
-public struct AnchorPoint : Hashable, Sendable {
+public struct AnchorPoint: Hashable, Sendable {
     /// The x-coordinate of the anchor point.
     public var x: Float = 0
 
@@ -16,7 +16,7 @@ public struct AnchorPoint : Hashable, Sendable {
     /// Initialize a new anchor point.
     ///
     /// - Returns: The anchor point.
-    public init() { }
+    public init() {}
 
     /// Initialize a new anchor point.
     ///
@@ -28,31 +28,31 @@ public struct AnchorPoint : Hashable, Sendable {
     }
 
     /// The zero anchor point.
-    public static let zero = AnchorPoint(x: 0.0, y: 0.0)
+    public static let zero = Self(x: 0.0, y: 0.0)
 
     /// The center anchor point.
-    public static let center = AnchorPoint(x: 0.5, y: 0.5)
+    public static let center = Self(x: 0.5, y: 0.5)
 
     /// The leading anchor point.
-    public static let leading = AnchorPoint(x: 0.0, y: 0.5)
+    public static let leading = Self(x: 0.0, y: 0.5)
 
-    public static let trailing = AnchorPoint(x: 1.0, y: 0.5)
+    public static let trailing = Self(x: 1.0, y: 0.5)
 
     /// The top anchor point.
-    public static let top = AnchorPoint(x: 0.5, y: 0.0)
+    public static let top = Self(x: 0.5, y: 0.0)
 
     /// The bottom anchor point.
-    public static let bottom = AnchorPoint(x: 0.5, y: 1.0)
+    public static let bottom = Self(x: 0.5, y: 1.0)
 
     /// The top leading anchor point.
-    public static let topLeading = AnchorPoint(x: 0.0, y: 0.0)
+    public static let topLeading = Self(x: 0.0, y: 0.0)
 
     /// The top trailing anchor point.
-    public static let topTrailing = AnchorPoint(x: 1.0, y: 0.0)
+    public static let topTrailing = Self(x: 1.0, y: 0.0)
 
     /// The bottom leading anchor point.
-    public static let bottomLeading = AnchorPoint(x: 0.0, y: 1.0)
+    public static let bottomLeading = Self(x: 0.0, y: 1.0)
 
     /// The bottom trailing anchor point.
-    public static let bottomTrailing = AnchorPoint(x: 1.0, y: 1.0)
+    public static let bottomTrailing = Self(x: 1.0, y: 1.0)
 }

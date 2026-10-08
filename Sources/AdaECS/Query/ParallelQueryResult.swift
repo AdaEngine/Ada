@@ -27,19 +27,9 @@ private struct ChunkInfo: Sendable {
 /// ```
 public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
     public typealias Element = B.Components
-    public typealias Filter = QueryBuilderTargets<F>
 
     let state: QueryState
     let batchSize: Int
-
-    /// Create a new parallel query processor.
-    /// - Parameters:
-    ///   - state: The query state containing archetype indices and world reference
-    ///   - batchSize: Number of chunks to process per task (default: 4)
-    init(state: QueryState, batchSize: Int) {
-        self.state = state
-        self.batchSize = batchSize
-    }
 
     /// Process each element in parallel using a TaskGroup.
     /// - Parameter operation: The operation to perform on each element
@@ -57,7 +47,7 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
                 }
             }
 
-            for try await _ in group { }
+            for try await _ in group {}
         }
     }
 
@@ -103,18 +93,21 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
 
             let archetype = world.archetypes.archetypes[archetypeIndex]
             for chunkIndex in 0..<archetype.chunks.chunks.count {
-                allChunks.append(ChunkInfo(
-                    archetypeIndex: archetypeIndex,
-                    chunkIndex: chunkIndex
-                ))
+                allChunks.append(
+                    ChunkInfo(
+                        archetypeIndex: archetypeIndex,
+                        chunkIndex: chunkIndex
+                    )
+                )
             }
         }
 
         // Split chunks into batches
-        return stride(from: 0, to: allChunks.count, by: batchSize).map { startIndex in
-            let endIndex = min(startIndex + batchSize, allChunks.count)
-            return Array(allChunks[startIndex..<endIndex])
-        }
+        return stride(from: 0, to: allChunks.count, by: batchSize)
+            .map { startIndex in
+                let endIndex = min(startIndex + batchSize, allChunks.count)
+                return Array(allChunks[startIndex..<endIndex])
+            }
     }
 
     /// Process a batch of chunks with the given operation.
@@ -128,10 +121,16 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
             return
         }
 
+        let requiresRowEvaluation = F.requiresRowEvaluation
         let states = B.initState(world: world)
-        var fetches = B.initFetches(world: world, states: states, lastTick: world.lastTick)
-        let filterStates = Filter.initState(world: world)
-        var filterFetchs = Filter.initFetches(world: world, states: filterStates, lastTick: world.lastTick)
+        var fetches = B.initFetches(world: world, states: states, lastTick: state.lastTick)
+        let filterState = F._initState(world: world)
+        var filterFetch = F._initFetch(
+            world: world,
+            state: filterState,
+            lastTick: state.lastTick,
+            currentTick: world.currentTick
+        )
 
         for chunkInfo in batch {
             let archetypes = world.archetypes
@@ -151,21 +150,25 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
                 chunk: chunk,
                 archetype: archetype
             )
-            Filter.setChunk(
-                states: filterStates,
-                fetches: &filterFetchs,
+            filterFetch = F._setData(
+                state: filterState,
+                fetch: filterFetch,
                 chunk: chunk,
                 archetype: archetype
             )
 
             // Iterate over all entities in this chunk
             for row in 0..<chunk.count {
-                guard Filter.condition(
-                    states: filterStates,
-                    fetches: filterFetchs,
-                    at: row
-                ) else {
-                    continue
+                if requiresRowEvaluation {
+                    guard
+                        F.condition(
+                            state: filterState,
+                            fetch: filterFetch,
+                            at: row
+                        )
+                    else {
+                        continue
+                    }
                 }
 
                 let entityId = chunk.entities[row]
@@ -197,10 +200,16 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
             return []
         }
 
+        let requiresRowEvaluation = F.requiresRowEvaluation
         let states = B.initState(world: world)
-        var fetches = B.initFetches(world: world, states: states, lastTick: world.lastTick)
-        let filterStates = Filter.initState(world: world)
-        var filterFetchs = Filter.initFetches(world: world, states: filterStates, lastTick: world.lastTick)
+        var fetches = B.initFetches(world: world, states: states, lastTick: state.lastTick)
+        let filterState = F._initState(world: world)
+        var filterFetch = F._initFetch(
+            world: world,
+            state: filterState,
+            lastTick: state.lastTick,
+            currentTick: world.currentTick
+        )
 
         var results: [T] = []
 
@@ -222,9 +231,9 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
                 chunk: chunk,
                 archetype: archetype
             )
-            Filter.setChunk(
-                states: filterStates,
-                fetches: &filterFetchs,
+            filterFetch = F._setData(
+                state: filterState,
+                fetch: filterFetch,
                 chunk: chunk,
                 archetype: archetype
             )
@@ -238,12 +247,16 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
 
                 let entity = archetype.entities[location.archetypeRow]
 
-                guard Filter.condition(
-                    states: filterStates,
-                    fetches: filterFetchs,
-                    at: row
-                ) else {
-                    continue
+                if requiresRowEvaluation {
+                    guard
+                        F.condition(
+                            state: filterState,
+                            fetch: filterFetch,
+                            at: row
+                        )
+                    else {
+                        continue
+                    }
                 }
 
                 if let element = B.getQueryTargets(

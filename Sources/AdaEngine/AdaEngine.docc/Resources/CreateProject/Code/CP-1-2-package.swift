@@ -9,7 +9,8 @@ let package = Package(
         // Products define the executables and libraries a package produces, and make them visible to other packages.
         .executable(
             name: "CreateFirstProject",
-            targets: ["CreateFirstProject"]),
+            targets: ["CreateFirstProject"]
+        )
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -20,9 +21,11 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages this package depends on.
         .executableTarget(
             name: "CreateFirstProject",
-            dependencies: []),
+            dependencies: []
+        ),
         .testTarget(
             name: "CreateFirstProjectTests",
-            dependencies: ["CreateFirstProject"]),
+            dependencies: ["CreateFirstProject"]
+        ),
     ]
 )

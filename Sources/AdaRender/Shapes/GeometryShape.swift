@@ -10,9 +10,9 @@ public protocol GeometryShape {
     func meshDescriptors() -> [MeshDescriptor]
 }
 
-public extension Mesh {
+extension Mesh {
     /// Create a mesh resource from a shape.
-    static func generate(from shape: GeometryShape, renderDevice: RenderDevice) -> Mesh {
+    public static func generate(from shape: GeometryShape, renderDevice: RenderDevice) -> Mesh {
         return self.generate(from: shape.meshDescriptors(), renderDevice: renderDevice)
     }
 }

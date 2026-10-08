@@ -1,0 +1,5 @@
+module HarfBuzz [system] {
+    textual header "hb.h"
+    textual header "hb-ot.h"
+    export *
+}

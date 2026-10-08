@@ -10,9 +10,8 @@ import Math
 /// A flexible space that expands along the major axis of its containing stack layout,
 /// or on both axes if not contained in a stack.
 public struct Spacer: View, ViewNodeBuilder {
-
     public typealias Body = Never
-    public var body: Never { fatalError() }
+    public var body: Never { fatalError("Unreachable code") }
 
     /// The minimum length this spacer can be shrunk to, along the axis or axes of expansion.
     public var minLength: Float?
@@ -21,7 +20,7 @@ public struct Spacer: View, ViewNodeBuilder {
         self.minLength = minLength
     }
 
-    func buildViewNode(in context: BuildContext) -> ViewNode {
+    func buildViewNode(in _: BuildContext) -> ViewNode {
         SpacerViewNode(minLength: minLength, content: self)
     }
 }
@@ -35,23 +34,19 @@ final class SpacerViewNode: ViewNode {
     }
 
     override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
-        if proposal == .zero {
-            return .zero
-        }
+        let minLength = self.minLength ?? 8
 
-        var size = proposal.replacingUnspecifiedDimensions()
-        if let minLength {
-            size = proposal.replacingUnspecifiedDimensions(by: Size(width: minLength, height: minLength))
-            size.width = max(size.width, minLength)
-            size.height = max(size.height, minLength)
+        switch layoutProperties.stackOrientation {
+        case .horizontal:
+            let width = max(proposal.width ?? minLength, minLength)
+            return Size(width: width, height: 0)
+        case .vertical:
+            let height = max(proposal.height ?? minLength, minLength)
+            return Size(width: 0, height: height)
+        default:
+            let width = max(proposal.width ?? minLength, minLength)
+            let height = max(proposal.height ?? minLength, minLength)
+            return Size(width: width, height: height)
         }
-
-        if layoutProperties.stackOrientation == .horizontal {
-            size.height = 0
-        } else if layoutProperties.stackOrientation == .vertical {
-            size.width = 0
-        }
-
-        return size
     }
 }

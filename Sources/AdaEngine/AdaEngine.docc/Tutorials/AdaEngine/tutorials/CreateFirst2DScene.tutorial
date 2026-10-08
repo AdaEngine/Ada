@@ -1,7 +1,7 @@
 @Tutorial(time: 20) {
     @Intro(title: "Create your first 2D scene") {
         
-        In this tutorial, you will learn how to create your first 2D scene using AdaEngine.
+        In this tutorial, you will learn how to create your first 2D scene using Ada.
     }
     
     @XcodeRequirement(title: "Xcode 26.2 or later", destination: "https://developer.apple.com/download/")
@@ -43,7 +43,7 @@
         
     @Section(title: "Create a main camera.") {
         @ContentAndMedia {
-            AdaEngine uses the Entity Component System paradigm where all game objects are called ``Entity``.
+            Ada uses the Entity Component System paradigm where all game objects are called ``Entity``.
             Entities are objects that store user or engine data like position, scale, mesh instance, audio, etc. This data is called components, and they should conform to the ``Component`` protocol.
             By default, ``Entity`` is an empty object without any components.
             
@@ -52,7 +52,7 @@
             }
         }
         
-        ``Camera`` is a component that determines where all entities will be rendered. AdaEngine supports rendering to a texture or to the ``Window``. We recommend using engine component bundles like ``Camera2D`` or ``Camera3D``, because the engine provides additional components for rendering and audio capabilities.
+        ``Camera`` is a component that determines where all entities will be rendered. Ada supports rendering to a texture or to the ``Window``. We recommend using engine component bundles like ``Camera2D`` or ``Camera3D``, because the engine provides additional components for rendering and audio capabilities.
         
         @Steps {
             @Step {
@@ -84,7 +84,7 @@
             }
             
             @Step {
-                In the end, we should have this file structure in our project. AdaEngine doesn't use xcassets.
+                In the end, we should have this file structure in our project. Ada doesn't use xcassets.
                 
                 You can download this texture by right-clicking on the image and saving it to the downloads folder. 
                 
@@ -166,7 +166,7 @@
                 @Code(name: "FirstScene.swift", file: CF2G-4-5-player.swift)
             }
 
-            Now we can update our player position. AdaEngine can handle keyboard inputs for us. We should listen to keyboard inputs, and if a key is pressed, we should change the player transform.
+            Now we can update our player position. Ada can handle keyboard inputs for us. We should listen to keyboard inputs, and if a key is pressed, we should change the player transform.
             
             @Step {
                 Let's add a new function parameter named `deltaTime` with the `Res<DeltaTime>` type and `input` with `Res<Input>`. These are queries to resources in the world.

@@ -1,0 +1,36 @@
+name: Website demos on engine changes
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Package.swift'
+      - 'Plugins/AdaWebExportPlugin/**'
+      - '.github/workflows/website-demos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notify-website:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger website deployment
+        env:
+          GH_TOKEN: ${{ secrets.WEBSITE_ACCESS_TOKEN }}
+          ENGINE_REF: ${{ github.sha }}
+        run: |
+          if [[ -z "${GH_TOKEN}" ]]; then
+            echo "::notice::Skipping website deployment notification because WEBSITE_ACCESS_TOKEN is not configured."
+            exit 0
+          fi
+
+          curl --fail-with-body \
+            --request POST \
+            --url https://api.github.com/repos/AdaEngine/ada-website/dispatches \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --data "{\"event_type\":\"adaengine-demos-updated\",\"client_payload\":{\"engine_ref\":\"${ENGINE_REF}\",\"examples_ref\":\"main\"}}"

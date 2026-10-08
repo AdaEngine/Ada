@@ -5,8 +5,8 @@
 //  Created by v.prusakov on 3/9/23.
 //
 
-import Foundation
 import AdaUtils
+import Foundation
 
 // TODO: Mode for decoding/encoding files from/into binary format.
 
@@ -38,13 +38,13 @@ public enum AssetDecodingError: LocalizedError {
 
     /// The decoding problem error.
     case decodingProblem(String)
-    
+
     /// The error description.
     public var errorDescription: String? {
         switch self {
-        case .invalidAssetExtension(let string):
+        case let .invalidAssetExtension(string):
             return "[Asset Decoding Error] Invalid asset file extension \(string)"
-        case .decodingProblem(let string):
+        case let .decodingProblem(string):
             return "[Asset Decoding Error] Decoding finished with failure: \(string)"
         }
     }
@@ -54,16 +54,15 @@ public enum AssetDecodingError: LocalizedError {
 
 /// A type that can encode itself to an external asset representation.
 public protocol AssetEncoder: Sendable {
-
     /// - Returns: Meta information about asset.
     var assetMeta: AssetMeta { get }
-    
+
     var encoder: (any Encoder)? { get }
-    
+
     /// Use this method to encode content from asset.
     /// - Note: If you call this method more than once, than previous encode data will overwritten.
     func encode<T: Encodable>(_ value: T) throws
-    
+
     func encode<A: Asset>(_ asset: A, to encoder: any Encoder) async throws
 }
 
@@ -71,16 +70,15 @@ public protocol AssetEncoder: Sendable {
 
 /// A type that can decode itself from external asset representation.
 public protocol AssetDecoder: Sendable {
-
     /// - Returns: Meta information about asset.
     var assetMeta: AssetMeta { get }
-    
+
     /// - Returns: asset file data.
     var assetData: Data { get }
-    
+
     /// - Returns: decoder.
     var decoder: (any Decoder)? { get }
-    
+
     /// Get or load a resource.
     ///
     /// - Parameter resourceType: The type of the resource.
@@ -90,7 +88,7 @@ public protocol AssetDecoder: Sendable {
         _ resourceType: A.Type,
         at path: String
     ) throws -> AssetHandle<A>
-    
+
     /// Use this method to decode content from asset.
     ///
     /// - Parameter type: The type of the content.
@@ -107,58 +105,60 @@ public protocol AssetDecoder: Sendable {
 
 // MARK: Asset Decoding Context
 
-public extension CodingUserInfoKey {
+extension CodingUserInfoKey {
     /// Returns ``AssetDecodingContext`` object that contains information about resources
-    static let assetsDecodingContext: CodingUserInfoKey = CodingUserInfoKey(rawValue: "org.adaengine.assetdecoder.context")!
-    
+    public static let assetsDecodingContext = CodingUserInfoKey(rawValue: "org.adaengine.assetdecoder.context")
+        .unwrap(message: "Asset decoder coding key is invalid.")
+
     /// Returns ``AssetEncodingContext`` object that contains information about resources
-    static let assetsEncodingContext: CodingUserInfoKey = CodingUserInfoKey(rawValue: "org.adaengine.assetencoder.context")!
+    public static let assetsEncodingContext = CodingUserInfoKey(rawValue: "org.adaengine.assetencoder.context")
+        .unwrap(message: "Asset encoder coding key is invalid.")
 
     /// Returns ``AssetMeta`` object that contains information about resources
-    static let assetMetaInfo: CodingUserInfoKey = CodingUserInfoKey(rawValue: "org.adaengine.assetsMetaInfo")!
+    public static let assetMetaInfo = CodingUserInfoKey(rawValue: "org.adaengine.assetsMetaInfo")
+        .unwrap(message: "Asset metadata coding key is invalid.")
 }
 
-public extension Decoder {
+extension Decoder {
     /// Returns instance of asset decoding context if exists.
     /// - Warning: Only available if you save asset from AssetsManager
-    var assetsDecoder: AssetDecoder {
+    public var assetsDecoder: AssetDecoder {
         guard let context = self.userInfo[.assetsDecodingContext] as? AssetDecoder else {
             fatalError("AssetDecodingContext info available if you save resouce from AssetsManager object.")
         }
-        
+
         return context
     }
-    
+
     /// Returns instance of asset meta
     /// - Warning: Only available if you save asset from AssetsManager
-    var assetMeta: AssetMeta {
+    public var assetMeta: AssetMeta {
         guard let meta = self.userInfo[.assetMetaInfo] as? AssetMeta else {
             fatalError("AssetMeta info available if you save resouce from AssetsManager object.")
         }
-        
+
         return meta
     }
 }
 
-public extension Encoder {
-    
+extension Encoder {
     /// Returns instance of asset meta
     /// /// - Warning: Only available if you load asset from AssetsManager
-    var assetMeta: AssetMeta {
+    public var assetMeta: AssetMeta {
         guard let meta = self.userInfo[.assetMetaInfo] as? AssetMeta else {
             fatalError("AssetMeta info available if you load resouce from AssetsManager object.")
         }
-        
+
         return meta
     }
-    
+
     /// Returns instance of asset encoding context if exists.
     /// - Warning: Only available if you save asset from AssetsManager
-    var assetsEncoder: AssetEncoder {
+    public var assetsEncoder: AssetEncoder {
         guard let context = self.userInfo[.assetsEncodingContext] as? AssetEncoder else {
             fatalError("AssetEncodingContext info available if you save resouce from AssetsManager object.")
         }
-        
+
         return context
     }
 }

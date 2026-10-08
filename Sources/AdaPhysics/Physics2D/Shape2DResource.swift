@@ -9,70 +9,69 @@ import Math
 
 /// A representation of a shape.
 public final class Shape2DResource: Codable, Sendable {
-
     struct CircleShape: Codable, Hashable, Equatable, Sendable {
         let radius: Float
         var offset: Vector2 = .zero
     }
-    
+
     struct BoxShape: Codable, Hashable, Equatable, Sendable {
         let halfWidth: Float
         let halfHeight: Float
         var offset: Vector2 = .zero
     }
-    
+
     struct PolygonShape: Codable, Hashable, Equatable, Sendable {
         let verticies: [Vector2]
         var offset: Vector2 = .zero
     }
-    
+
     enum Fixture: Codable, Hashable, Equatable, Sendable {
         case circle(CircleShape)
         case box(BoxShape)
         case polygon(PolygonShape)
     }
-    
+
     let fixture: Fixture
-    
+
     init(fixture: Fixture) {
         self.fixture = fixture
     }
-    
+
     /// Creates a circle shape with the specified radius.
     public static func generateCircle(radius: Float = 1) -> Shape2DResource {
         return Shape2DResource(fixture: .circle(CircleShape(radius: radius / 2)))
     }
-    
+
     /// Creates a box shape with the specified size. By default size is equal entity transformation scale value.
     public static func generateBox(width: Float = 1, height: Float = 1) -> Shape2DResource {
         return Shape2DResource(fixture: .box(BoxShape(halfWidth: width / 2, halfHeight: height / 2)))
     }
-    
+
     /// Creates a box shape with the specified size and rotation.
     /// By default size is equal entity transformation scale value.
-    public static func generateBox(width: Float = 1, height: Float = 1, center: Vector2, angle: Float) -> Shape2DResource {
+    public static func generateBox(width: Float = 1, height: Float = 1, center: Vector2, angle _: Float) -> Shape2DResource {
         return Shape2DResource(fixture: .box(BoxShape(halfWidth: width / 2, halfHeight: height / 2, offset: center)))
     }
-    
+
     /// Create a custom polygon shape.
     public static func generatePolygon(vertices: [Vector2]) -> Shape2DResource {
         return Shape2DResource(fixture: .polygon(PolygonShape(verticies: vertices)))
     }
-    
+
     /// Creates a new shape resource by applying a rotation.
     public func offsetBy(x: Float, y: Float) -> Shape2DResource {
         switch self.fixture {
-        case .box(var shape):
+        case var .box(shape):
             shape.offset = [x, y]
-            
+
             return Shape2DResource(fixture: .box(shape))
-        case .circle(var shape):
+        case var .circle(shape):
             shape.offset = [x, y]
-            
+
             return Shape2DResource(fixture: .circle(shape))
-        case .polygon(var shape):
+        case var .polygon(shape):
             shape.offset = [x, y]
-            
+
             return Shape2DResource(fixture: .polygon(shape))
         }
     }

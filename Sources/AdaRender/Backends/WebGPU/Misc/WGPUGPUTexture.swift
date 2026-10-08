@@ -5,234 +5,329 @@
 //  Created by vladislav.prusakov on 13.03.2025.
 //
 
-#if canImport(WebGPU)
-import Math
-import WebGPU
-import Foundation
+#if WEBGPU_ENABLED && canImport(WebGPU)
+    import Foundation
+    import Math
+    import Synchronization
+    @unsafe @preconcurrency import WebGPU
 
-public final class WGPUGPUTexture: GPUTexture {
-
-    public var size: SizeInt {
-        SizeInt(width: Int(self.texture.width), height: Int(self.texture.height))
-    }
-
-    public var label: String? {
-        didSet {
-            self.texture.setLabel(label ?? "")
-            self.textureView.setLabel(label ?? "")
-        }
-    }
-
-    public let texture: WebGPU.Texture
-    public let textureView: WebGPU.TextureView
-
-    init(texture: WebGPU.Texture, textureView: WebGPU.TextureView) {
-        self.texture = texture
-        self.textureView = textureView
-    }
-
-    init(descriptor: TextureDescriptor, device: WebGPU.Device) {
-        var wgpuUsage: WebGPU.TextureUsage = []
-
-        if descriptor.textureUsage.contains(.read) {
-            wgpuUsage.insert(.copyDst)
-            wgpuUsage.insert(.textureBinding)
+    public final class WGPUGPUTexture: GPUTexture {
+        public var size: SizeInt {
+            SizeInt(width: Int(self.texture.width), height: Int(self.texture.height))
         }
 
-        if descriptor.textureUsage.contains(.write) {
-            wgpuUsage.insert(.copySrc)
+        public var label: String? {
+            didSet {
+                self.texture.setLabel(label: label ?? "")
+                self.textureView.setLabel(label: label ?? "")
+            }
         }
 
-        if descriptor.textureUsage.contains(.renderTarget) {
-            wgpuUsage.insert(.renderAttachment)
+        public let texture: WebGPU.GPUTexture
+        public let textureView: WebGPU.GPUTextureView
+        private let device: WebGPU.GPUDevice?
+
+        init(texture: WebGPU.GPUTexture, textureView: WebGPU.GPUTextureView, device: WebGPU.GPUDevice? = nil) {
+            self.texture = texture
+            self.textureView = textureView
+            self.device = device
         }
-        
-        // Always add textureBinding for textures that will be sampled in shaders
-        if !descriptor.textureUsage.contains(.renderTarget) {
-            wgpuUsage.insert(.textureBinding)
-        }
 
-        let textureDesc = WebGPU.TextureDescriptor(
-            label: descriptor.debugLabel,
-            usage: wgpuUsage,
-            dimension: descriptor.textureType.toWebGPUTextureDimension,
-            size: Extent3d(
-                width: UInt32(descriptor.width),
-                height: UInt32(descriptor.height),
-                depthOrArrayLayers: 1
-            ),
-            format: descriptor.pixelFormat.toWebGPU,
-            mipLevelCount: 1,
-            sampleCount: 1,
-            viewFormats: [
-                descriptor.pixelFormat.toWebGPU
-            ],
-            nextInChain: nil
-        )
+        public func replaceRegion(_ region: RectInt, mipmapLevel: Int, withBytes bytes: UnsafeRawPointer, bytesPerRow: Int) {
+            guard let device else {
+                fatalError("Cannot replace a region on a WebGPU texture without a device")
+            }
 
-        let texture = device.createTexture(descriptor: textureDesc)
-        if let image = descriptor.image {
-            let origin = WebGPU.Origin3d(x: 0, y: 0, z: 0)
-            let writeSize = WebGPU.Extent3d(
-                width: UInt32(image.width),
-                height: UInt32(image.height),
-                depthOrArrayLayers: 1
-            )
-
-            let bytesPerRow = descriptor.pixelFormat.bytesPerComponent * image.width
-
-            unsafe image.data.withUnsafeBytes { buffer in
-                unsafe precondition(buffer.baseAddress != nil, "Image should not contains empty address.")
-
-                unsafe device.queue.writeTexture(
-                    destination: TexelCopyTextureInfo(
+            #if WASM
+            let origin = WebGPU.GPUOrigin3D(x: region.origin.x, y: region.origin.y, z: 0)
+            #else
+            let origin = WebGPU.GPUOrigin3D(x: UInt32(region.origin.x), y: UInt32(region.origin.y), z: 0)
+            #endif
+            webGPUDeviceLock.withLock { _ in
+                device.queue.writeTexture(
+                    destination: WebGPU.GPUTexelCopyTextureInfo(
                         texture: texture,
-                        mipLevel: 0,
+                        mipLevel: UInt32(mipmapLevel),
                         origin: origin,
-                        aspect: TextureAspect.all
+                        aspect: WebGPU.GPUTextureAspect.all
                     ),
-                    data: buffer,
-                    dataLayout: TexelCopyBufferLayout(
+                    data: UnsafeRawBufferPointer(
+                        start: bytes,
+                        count: bytesPerRow * region.size.height
+                    ),
+                    dataLayout: WebGPU.GPUTexelCopyBufferLayout(
                         offset: 0,
                         bytesPerRow: UInt32(bytesPerRow),
-                        rowsPerImage: UInt32(image.height)
+                        rowsPerImage: UInt32(region.size.height)
                     ),
-                    writeSize: writeSize
+                    writeSize: WebGPU.GPUExtent3D(
+                        width: UInt32(region.size.width),
+                        height: UInt32(region.size.height),
+                        depthOrArrayLayers: 1
+                    )
                 )
             }
         }
 
-        self.texture = texture
-        self.textureView = texture.createView()
-    }
+        init(descriptor: TextureDescriptor, device: WebGPU.GPUDevice) {
+            var wgpuUsage: WebGPU.GPUTextureUsage = []
 
-    // TODO: (Vlad) think about it later
-    func getImage(device: WebGPU.Device) -> Image? {
-        let imageFormat: Image.Format
-        let bytesInPixel: UInt32
+            if descriptor.textureUsage.contains(.read) {
+                wgpuUsage.insert(.copyDst)
+                wgpuUsage.insert(.textureBinding)
+            }
 
-        switch self.texture.format {
-        case .bgra8Unorm:
-            imageFormat = .bgra8
-            bytesInPixel = 4
-        default:
-            imageFormat = .rgba8
-            bytesInPixel = 4
-        }
+            if descriptor.textureUsage.contains(.write) {
+                wgpuUsage.insert(.copySrc)
+            }
 
-        let bytesPerRow = self.texture.width * bytesInPixel
-        let pixelCount = UInt32(self.texture.width * self.texture.height)
-        let count = Int(pixelCount * bytesInPixel)
-        guard let buffer = device.createBuffer(descriptor: BufferDescriptor(usage: .copyDst, size: UInt64(count))) else {
-            return nil
-        }
-        let encoder = device.createCommandEncoder()
-        encoder.copyTextureToBuffer(
-            source: TexelCopyTextureInfo(
-                texture: texture, 
-                mipLevel: 0, 
-                origin: Origin3d(x: 0, y: 0, z: 0), 
-                aspect: TextureAspect.all
-            ), 
-            destination: TexelCopyBufferInfo(
-                layout: TexelCopyBufferLayout(offset: UInt64(0), bytesPerRow: UInt32(bytesPerRow), rowsPerImage: texture.height), 
-                buffer: buffer
-            ), 
-            copySize: Extent3d(
-                width: texture.width, 
-                height: texture.height, 
-                depthOrArrayLayers: 1
-            )
-        )
-        let commandBuffer = encoder.finish()
-        device.queue.submit(commands: [commandBuffer])
+            if descriptor.textureUsage.contains(.renderTarget) {
+                wgpuUsage.insert(.renderAttachment)
+                wgpuUsage.insert(.copySrc)
+            }
 
-        return unsafe Image(
-            width: Int(self.texture.width),
-            height: Int(self.texture.height),
-            data: Data(
-                bytesNoCopy: buffer.getMappedRange(), 
-                count: count, 
-                deallocator: .custom { [buffer] _, _ in
-                    buffer.unmap()
+            // Always add textureBinding for textures that will be sampled in shaders
+            if !descriptor.textureUsage.contains(.renderTarget) {
+                wgpuUsage.insert(.textureBinding)
+            }
+
+            #if WASM
+                let textureDesc = WebGPU.GPUTextureDescriptor(
+                    label: descriptor.debugLabel,
+                    usage: wgpuUsage,
+                    size: WebGPU.GPUExtent3D(
+                        width: UInt32(descriptor.width),
+                        height: UInt32(descriptor.height),
+                        depthOrArrayLayers: 1
+                    ),
+                    format: descriptor.pixelFormat.toWebGPU,
+                    mipLevelCount: UInt32(max(1, descriptor.mipmapLevel)),
+                    sampleCount: 1,
+                    dimension: descriptor.textureType.toWebGPUTextureDimension
+                )
+            #else
+                let textureDesc = WebGPU.GPUTextureDescriptor(
+                    label: descriptor.debugLabel,
+                    usage: wgpuUsage,
+                    dimension: descriptor.textureType.toWebGPUTextureDimension,
+                    size: WebGPU.GPUExtent3D(
+                        width: UInt32(descriptor.width),
+                        height: UInt32(descriptor.height),
+                        depthOrArrayLayers: 1
+                    ),
+                    format: descriptor.pixelFormat.toWebGPU,
+                    mipLevelCount: UInt32(max(1, descriptor.mipmapLevel)),
+                    sampleCount: 1,
+                    viewFormats: [
+                        descriptor.pixelFormat.toWebGPU
+                    ],
+                    nextInChain: nil
+                )
+            #endif
+
+            let texture = webGPUDeviceLock.withLock { _ in
+                device.createTexture(descriptor: textureDesc)
+            }
+            if let image = descriptor.image {
+                let origin = WebGPU.GPUOrigin3D(x: 0, y: 0, z: 0)
+                let writeSize = WebGPU.GPUExtent3D(
+                    width: UInt32(image.width),
+                    height: UInt32(image.height),
+                    depthOrArrayLayers: 1
+                )
+
+                let bytesPerRow = descriptor.pixelFormat.bytesPerComponent * image.width
+
+                unsafe image.data.withUnsafeBytes { buffer in
+                    unsafe precondition(buffer.baseAddress != nil, "Image should not contains empty address.")
+
+                    webGPUDeviceLock.withLock { _ in
+                        unsafe device.queue.writeTexture(
+                            destination: WebGPU.GPUTexelCopyTextureInfo(
+                                texture: texture,
+                                mipLevel: 0,
+                                origin: origin,
+                                aspect: WebGPU.GPUTextureAspect.all
+                            ),
+                            data: buffer,
+                            dataLayout: WebGPU.GPUTexelCopyBufferLayout(
+                                offset: 0,
+                                bytesPerRow: UInt32(bytesPerRow),
+                                rowsPerImage: UInt32(image.height)
+                            ),
+                            writeSize: writeSize
+                        )
+                    }
                 }
-            ),
-            format: imageFormat
-        )
-    }
-}
+            }
 
-extension PixelFormat {
-    var toWebGPU: WebGPU.TextureFormat {
-        switch self {
-        case .none:
-                .undefined
-        case .bgra8:
-                .bgra8Unorm
-        case .bgra8_srgb:
-                .bgra8UnormSrgb
-        case .rgba8:
-                .rgba8Unorm
-        case .rgba_16f:
-                .rgba16Float
-        case .rgba_32f:
-                .rgba32Float
-        case .depth_32f_stencil8:
-                .depth32FloatStencil8
-        case .depth_32f:
-                .depth32Float
-        case .depth24_stencil8:
-                .depth24PlusStencil8
+            self.texture = texture
+            self.textureView = texture.createView()
+            self.device = device
+        }
+
+        #if !WASM
+        /// Uses aligned texture-copy rows and the existing asynchronous owned buffer readback path.
+        func readImage(device: WebGPU.GPUDevice) async throws -> Image? {
+                guard texture.usage.contains(.copySrc) else {
+                    return nil
+                }
+                let imageFormat: Image.Format
+
+                switch self.texture.format {
+                case .BGRA8Unorm:
+                    imageFormat = .bgra8
+                case .BGRA8UnormSrgb:
+                    imageFormat = .bgra8_sRGB
+                case .RGBA8Unorm, .RGBA8UnormSrgb:
+                    imageFormat = .rgba8
+                default:
+                    return nil
+                }
+
+                let bytesPerRow = Int(self.texture.width) * 4
+                let paddedBytesPerRow = (bytesPerRow + 255) & ~255
+                let count = paddedBytesPerRow * Int(self.texture.height)
+                let readback: WGPUBuffer? = webGPUDeviceLock.withLock { _ in
+                    guard let buffer = device.createBuffer(descriptor: WebGPU.GPUBufferDescriptor(usage: [.copyDst, .copySrc], size: UInt64(count))) else {
+                        return nil
+                    }
+                    // The existing Sendable wrapper owns the handle; device operations remain serialized by the GPU lock.
+                    return WGPUBuffer(buffer: buffer, device: device)
+                }
+                guard let readback else {
+                    throw WGPUBuffer.MapError.failedToMap("Cannot allocate texture readback buffer")
+                }
+                let buffer = readback.buffer
+                defer { buffer.destroy() }
+                let encoder = webGPUDeviceLock.withLock { _ in
+                    device.createCommandEncoder(descriptor: nil as WebGPU.GPUCommandEncoderDescriptor?)
+                }
+                encoder.copyTextureToBuffer(
+                    source: WebGPU.GPUTexelCopyTextureInfo(
+                        texture: texture,
+                        mipLevel: 0,
+                        origin: WebGPU.GPUOrigin3D(x: 0, y: 0, z: 0),
+                        aspect: WebGPU.GPUTextureAspect.all
+                    ),
+                    destination: WebGPU.GPUTexelCopyBufferInfo(
+                        layout: WebGPU.GPUTexelCopyBufferLayout(offset: UInt64(0), bytesPerRow: UInt32(paddedBytesPerRow), rowsPerImage: texture.height),
+                        buffer: buffer
+                    ),
+                    copySize: WebGPU.GPUExtent3D(
+                        width: texture.width,
+                        height: texture.height,
+                        depthOrArrayLayers: 1
+                    )
+                )
+                let commandBuffer: WebGPU.GPUCommandBuffer = encoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
+                webGPUDeviceLock.withLock { _ in
+                    device.queue.submit(commands: [commandBuffer])
+                }
+
+                let padded = try await readback.readData()
+                var pixels = Data(capacity: bytesPerRow * Int(texture.height))
+                for row in 0..<Int(texture.height) {
+                    let offset = row * paddedBytesPerRow
+                    pixels.append(padded[offset..<(offset + bytesPerRow)])
+                }
+                return Image(
+                    width: Int(self.texture.width),
+                    height: Int(self.texture.height),
+                    data: pixels,
+                    format: imageFormat
+                )
+        }
+        #endif
+    }
+
+    extension PixelFormat {
+        var toWebGPU: WebGPU.GPUTextureFormat {
+            switch self {
+            case .none:
+                #if WASM
+                    .Undefined
+                #else
+                    .undefined
+                #endif
+            case .bgra8:
+                .BGRA8Unorm
+            case .bgra8_srgb:
+                .BGRA8UnormSrgb
+            case .rgba8:
+                .RGBA8Unorm
+            case .rgba_16f:
+                .RGBA16Float
+            case .rgba_32f:
+                .RGBA32Float
+            case .depth_32f_stencil8:
+                #if WASM
+                    .Depth24PlusStencil8
+                #else
+                    .depth32FloatStencil8
+                #endif
+            case .depth_32f:
+                #if WASM
+                    .Depth32Float
+                #else
+                    .depth32Float
+                #endif
+            case .depth24_stencil8:
+                #if WASM
+                    .Depth24PlusStencil8
+                #else
+                    .depth24PlusStencil8
+                #endif
+            }
         }
     }
-}
 
-extension Texture.TextureType {
-    var toWebGPUTextureDimension: WebGPU.TextureDimension {
-        switch self {
-        case .textureCube:
-                .typeUndefined
-        case .texture1D:
-                .type1d
-        case .texture1DArray:
-                .type1d
-        case .texture2D:
-                .type2d
-        case .texture2DArray:
-                .type2d
-        case .texture2DMultisample:
-                .type2d
-        case .texture2DMultisampleArray:
-                .type2d
-        case .texture3D:
-                .type3d
-        case .textureBuffer:
-                .typeUndefined
+    extension Texture.TextureType {
+        var toWebGPUTextureDimension: WebGPU.GPUTextureDimension {
+            switch self {
+            case .textureCube:
+                ._2D
+            case .texture1D:
+                ._1D
+            case .texture1DArray:
+                ._1D
+            case .texture2D:
+                ._2D
+            case .texture2DArray:
+                ._2D
+            case .texture2DMultisample:
+                ._2D
+            case .texture2DMultisampleArray:
+                ._2D
+            case .texture3D:
+                ._3D
+            case .textureBuffer:
+                ._2D
+            }
+        }
+
+        var toWebGPUTextureViewDimension: WebGPU.GPUTextureViewDimension {
+            switch self {
+            case .textureCube:
+                ._2D
+            case .texture1D:
+                ._1D
+            case .texture1DArray:
+                ._1D
+            case .texture2D:
+                ._2D
+            case .texture2DArray:
+                ._2D
+            case .texture2DMultisample:
+                ._2D
+            case .texture2DMultisampleArray:
+                ._2D
+            case .texture3D:
+                ._3D
+            case .textureBuffer:
+                ._2D
+            }
         }
     }
-
-    var toWebGPUTextureViewDimension: WebGPU.TextureViewDimension {
-        switch self {
-        case .textureCube:
-                .typeUndefined
-        case .texture1D:
-                .type1d
-        case .texture1DArray:
-                .type1d
-        case .texture2D:
-                .type2d
-        case .texture2DArray:
-                .type2d
-        case .texture2DMultisample:
-                .type2d
-        case .texture2DMultisampleArray:
-                .type2d
-        case .texture3D:
-                .type3d
-        case .textureBuffer:
-                .typeUndefined
-        }
-    }
-}
 
 #endif

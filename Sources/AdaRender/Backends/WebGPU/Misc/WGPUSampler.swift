@@ -5,37 +5,51 @@
 //  Created by v.prusakov on 1/22/23.
 //
 
-#if canImport(WebGPU)
-import WebGPU
+#if WEBGPU_ENABLED && canImport(WebGPU)
+    @unsafe @preconcurrency import WebGPU
 
-final class WGPUSampler: Sampler, Sendable {
-    
-    let descriptor: SamplerDescriptor
-    let wgpuSampler: WebGPU.Sampler
-    
-    init(descriptor: SamplerDescriptor, wgpuSampler: WebGPU.Sampler) {
-        self.descriptor = descriptor
-        self.wgpuSampler = wgpuSampler
-    }
-}
+    final class WGPUSampler: Sampler, @unchecked Sendable {
+        let descriptor: SamplerDescriptor
+        let wgpuSampler: WebGPU.GPUSampler
 
-extension SamplerMinMagFilter {
-    var toWebGPU: WebGPU.FilterMode {
-        switch self {
-        case .nearest: return .nearest
-        case .linear: return .linear
+        init(descriptor: SamplerDescriptor, wgpuSampler: WebGPU.GPUSampler) {
+            self.descriptor = descriptor
+            self.wgpuSampler = wgpuSampler
         }
     }
-}
 
-extension SamplerMipFilter {
-    var toWebGPU: WebGPU.MipmapFilterMode {
-        switch self {
-        case .nearest: return .nearest
-        case .linear: return .linear
-        case .notMipmapped: return .undefined
+    extension SamplerAddressMode {
+        var toWebGPU: WebGPU.GPUAddressMode {
+            switch self {
+            case .clampToEdge: return .clampToEdge
+            case .repeat:
+                #if WASM
+                    return .repeatMode
+                #else
+                    return .repeat
+                #endif
+            case .mirroredRepeat: return .mirrorRepeat
+            }
         }
     }
-}
+
+    extension SamplerMinMagFilter {
+        var toWebGPU: WebGPU.GPUFilterMode {
+            switch self {
+            case .nearest: return .nearest
+            case .linear: return .linear
+            }
+        }
+    }
+
+    extension SamplerMipFilter {
+        var toWebGPU: WebGPU.GPUMipmapFilterMode {
+            switch self {
+            case .nearest: return .nearest
+            case .linear: return .linear
+            case .notMipmapped: return .nearest
+            }
+        }
+    }
 
 #endif

@@ -22,10 +22,10 @@ extension Edge {
             self.rawValue = rawValue
         }
 
-        public static let top = Set(rawValue: 1 << 0)
-        public static let leading = Set(rawValue: 1 << 1)
-        public static let bottom = Set(rawValue: 1 << 2)
-        public static let trailing = Set(rawValue: 1 << 3)
+        public static let top = Self(rawValue: 1 << 0)
+        public static let leading = Self(rawValue: 1 << 1)
+        public static let bottom = Self(rawValue: 1 << 2)
+        public static let trailing = Self(rawValue: 1 << 3)
 
         public static let all: Set = [.top, .leading, .bottom, .trailing]
         public static let horizontal: Set = [.leading, .trailing]
@@ -33,7 +33,7 @@ extension Edge {
 
         public init(_ edge: Edge) {
             switch edge {
-            case .top: 
+            case .top:
                 self = .top
             case .leading:
                 self = .leading
@@ -76,15 +76,15 @@ public struct EdgeInsets: Equatable, Hashable, Sendable {
     }
 
     /// Returns new instance where all values is zero.
-    static let zero = EdgeInsets(0)
+    static let zero = Self(0)
 }
 
-public extension View {
+extension View {
     /// Adds an equal padding amount to specific edges of this view.
     /// - Parameter edges: The set of edges to pad for this view. The default is all.
     /// - Parameter length: An amount, given in points, to pad this view on the specified edges. The default value of this parameter is nil.
     /// - Returns: A view that’s padded by the specified amount on the specified edges.
-    func padding(_ edges: Edge.Set = .all, _ length: Float? = nil) -> some View {
+    public func padding(_ edges: Edge.Set = .all, _ length: Float? = nil) -> some View {
         self.modifier(
             PaddingViewModifier(
                 edges: edges,
@@ -97,14 +97,14 @@ public extension View {
     /// Adds an equal padding amount to specific edges of this view.
     /// - Parameter insets: An ``EdgeInsets`` instance that contains padding amounts for each edge.
     /// - Returns: A view that’s padded by the specified amount on the specified edges.
-    func padding(_ insets: EdgeInsets) -> some View {
+    public func padding(_ insets: EdgeInsets) -> some View {
         self.modifier(PaddingViewModifier(edges: .all, insets: insets, content: self))
     }
 
     /// Adds an equal padding amount to specific edges of this view.
     /// - Parameter length: The amount, given in points, to pad this view on all edges.
     /// - Returns: A view that’s padded by the specified amount on the specified edges.
-    func padding(_ length: Float) -> some View {
+    public func padding(_ length: Float) -> some View {
         self.modifier(
             PaddingViewModifier(
                 edges: .all,
@@ -117,7 +117,7 @@ public extension View {
 
 struct PaddingViewModifier<Content: View>: ViewModifier, ViewNodeBuilder {
     typealias Body = Never
-    
+
     let edges: Edge.Set
     let insets: EdgeInsets
     let content: Content
@@ -133,11 +133,10 @@ struct PaddingViewModifier<Content: View>: ViewModifier, ViewNodeBuilder {
 }
 
 final class PaddingModifierViewNode: ViewModifierNode {
-
     let edges: Edge.Set
     let insets: EdgeInsets
 
-    init<Content>(edges: Edge.Set, insets: EdgeInsets, content: Content, node: ViewNode) where Content : View {
+    init<Content>(edges: Edge.Set, insets: EdgeInsets, content: Content, node: ViewNode) where Content: View {
         self.edges = edges
         self.insets = insets
         super.init(contentNode: node, content: content)
@@ -178,16 +177,26 @@ final class PaddingModifierViewNode: ViewModifierNode {
     }
 
     override func performLayout() {
-        var minX = self.frame.minX
-        var maxX = self.frame.maxX
-        var minY = self.frame.minY
-        var maxY = self.frame.maxY
+        // Child layout must be in local coordinates of this modifier node.
+        var minX: Float = 0
+        var maxX: Float = self.frame.width
+        var minY: Float = 0
+        var maxY: Float = self.frame.height
 
-        if self.edges.contains(.leading) {
-            minX += insets.leading
-        }
-        if self.edges.contains(.trailing) {
-            maxX -= insets.trailing
+        if environment.layoutDirection == .leftToRight {
+            if self.edges.contains(.leading) {
+                minX += insets.leading
+            }
+            if self.edges.contains(.trailing) {
+                maxX -= insets.trailing
+            }
+        } else {
+            if self.edges.contains(.leading) {
+                maxX -= insets.leading
+            }
+            if self.edges.contains(.trailing) {
+                minX += insets.trailing
+            }
         }
         if self.edges.contains(.top) {
             minY += insets.top

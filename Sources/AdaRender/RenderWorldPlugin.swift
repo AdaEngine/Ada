@@ -14,7 +14,6 @@ import Math
 
 /// The plugin that sets up the render world.
 public struct RenderWorldPlugin: Plugin {
-
     public init() {}
 
     /// Setup the render world.
@@ -30,23 +29,27 @@ public struct RenderWorldPlugin: Plugin {
         renderWorld.updateScheduler = .renderRunner
         renderWorld
             .insertResource(RenderGraph(label: "RenderWorld_Root"))
-            .insertResource(DefaultSchedulerOrder(order: [
-                .preUpdate,
-                .prepare,
-                .batching,
-                .update,
-                .render,
-                .postUpdate
-            ]))
+            .insertResource(RenderGraphDiagnostics())
+            .insertResource(
+                DefaultSchedulerOrder(order: [
+                    .preUpdate,
+                    .prepare,
+                    .batching,
+                    .update,
+                    .render,
+                    .postUpdate,
+                ])
+            )
         renderWorld.setExctractor(RenderWorldExctractor())
         renderWorld.main.setSchedulers([
             .startup,
             .extract,
             .preUpdate,
             .prepare,
+            .batching,
             .update,
             .render,
-            .postUpdate
+            .postUpdate,
         ])
 
         do {
@@ -61,7 +64,13 @@ public struct RenderWorldPlugin: Plugin {
         unsafe renderWorld
             .insertResource(renderDevice)
             .insertResource(RenderEngineHandler(renderEngine: RenderEngine.shared))
-            .insertResource(WindowSurfaces(windows: [:]))
+            .insertResource(
+                WindowSurfaces(
+                    windows: [:],
+                    allowsWindowRendering: app.main.getResource(OffscreenRenderWorld.self) == nil,
+                    allowedWindowIDs: app.main.getResource(RenderWindowScope.self)?.windowIDs
+                )
+            )
             .addSystem(CreateWindowSurfacesSystem.self, on: .prepare)
             .addSystem(DefaultSchedulerRunner.self, on: .renderRunner)
             .addSystem(RenderSystem.self, on: .render)
@@ -89,7 +98,6 @@ public struct RenderEngineHandler: Resource {
 @PlainSystem
 @_spi(Internal)
 public struct RenderSystem {
-
     @Res<RenderGraph?>
     private var renderGraph
 
@@ -99,7 +107,10 @@ public struct RenderSystem {
     @Res<RenderDeviceHandler?>
     private var renderDevice
 
-    public init(world: World) { }
+    @Res<RenderGraphDiagnostics?>
+    private var renderGraphDiagnostics
+
+    public init(world _: World) {}
 
     public func update(context: UpdateContext) async {
         renderGraph?.update(from: context.world)
@@ -129,16 +140,23 @@ public struct RenderSystem {
             return
         }
         let renderGraphExecutor = RenderGraphExecutor()
-        try await renderGraphExecutor.execute(renderGraph, renderDevice: renderDevice, in: world)
+        try await renderGraphExecutor.execute(
+            renderGraph,
+            renderDevice: renderDevice,
+            in: world,
+            diagnostics: renderGraphDiagnostics
+        )
     }
 }
-
 
 /// The extractor that extracts the main world to the render world.
 struct RenderWorldExctractor: WorldExctractor {
     func exctract(from mainWorld: World, to renderWorld: World) async {
         renderWorld.clear()
         renderWorld.insertResource(MainWorld(world: mainWorld))
+        if let primaryWindow = mainWorld.getResource(PrimaryWindowId.self) {
+            renderWorld.insertResource(primaryWindow)
+        }
         await renderWorld.runScheduler(.extract)
     }
 }
@@ -153,8 +171,20 @@ public struct WindowSurface: Sendable {
     public var currentDrawable: (any Drawable)?
 }
 
-public struct WindowSurfaces: Resource {
+public final class WindowSurfaces: Resource, @unchecked Sendable {
     public var windows: SparseSet<WindowRef, WindowSurface>
+    let allowsWindowRendering: Bool
+    let allowedWindowIDs: Set<WindowID>?
+
+    public convenience init(windows: SparseSet<WindowRef, WindowSurface>) {
+        self.init(windows: windows, allowsWindowRendering: true)
+    }
+
+    init(windows: SparseSet<WindowRef, WindowSurface>, allowsWindowRendering: Bool, allowedWindowIDs: Set<WindowID>? = nil) {
+        self.windows = windows
+        self.allowsWindowRendering = allowsWindowRendering
+        self.allowedWindowIDs = allowedWindowIDs
+    }
 }
 
 @System
@@ -166,26 +196,52 @@ public func CreateWindowSurfaces(
     _ primaryWindow: Extract<Res<PrimaryWindowId>>
 ) async {
     surfaces.windows.removeAll()
+    // Keep this system in the camera dependency graph, but never acquire host drawables offscreen.
+    guard surfaces.wrappedValue.allowsWindowRendering else {
+        return
+    }
     let device = renderDevice.renderDevice
 
     do {
         let renderWindows = try await renderInstance.renderEngine.getRenderWindows()
         for (windowId, _) in renderWindows.windows.values {
-            let swapchain = await device.createSwapchain(from: windowId)
+            if let allowed = surfaces.wrappedValue.allowedWindowIDs, !allowed.contains(windowId) {
+                continue
+            }
+            guard let swapchain = await device.createSwapchain(from: windowId) else {
+                Logger(label: "org.adaengine.render")
+                    .debug("Swapchain not enable for \(windowId)")
+                continue
+            }
 
-            let ref: WindowRef = if primaryWindow.wrappedValue.windowId == windowId {
+            let ref: WindowRef =
+                if primaryWindow.wrappedValue.windowId == windowId {
                     .primary
                 } else {
                     .windowId(windowId)
                 }
+            let drawable = swapchain.getNextDrawable(device)
             surfaces.windows[ref] = WindowSurface(
                 swapchain: swapchain,
-                currentDrawable: swapchain.getNextDrawable(device)
+                currentDrawable: drawable
             )
         }
     } catch {
         Logger(label: "org.adaengine.AdaRender").error("\(error)")
     }
+}
+
+/// Limits a runtime's drawable acquisition to its own native windows.
+/// Insert before building render plugins; other embedded panels keep their own frame loop.
+public struct RenderWindowScope: Resource {
+    public let windowIDs: Set<WindowID>
+    public init(windowIDs: Set<WindowID>) { self.windowIDs = windowIDs }
+}
+
+/// Insert before building plugins to render only into textures, without presenting windows.
+@_spi(Internal)
+public struct OffscreenRenderWorld: Resource {
+    public init() {}
 }
 
 public struct PrimaryWindowId: Resource {
@@ -229,17 +285,17 @@ public struct RenderWindow: Sendable, Hashable {
     }
 }
 
-public extension SchedulerName {
+extension SchedulerName {
     /// The render scheduler.
-    static let renderRunner = SchedulerName(rawValue: "RenderWorld_RenderRunner")
+    public static let renderRunner = SchedulerName(rawValue: "RenderWorld_RenderRunner")
 
-    static let prepare = SchedulerName(rawValue: "RenderWorld_Prepare")
-    static let batching = SchedulerName(rawValue: "RenderWorld_Batching")
-    static let render = SchedulerName(rawValue: "RenderWorld_Render")
-    static let extract = SchedulerName(rawValue: "RenderWorld_Extract")
+    public static let prepare = SchedulerName(rawValue: "RenderWorld_Prepare")
+    public static let batching = SchedulerName(rawValue: "RenderWorld_Batching")
+    public static let render = SchedulerName(rawValue: "RenderWorld_Render")
+    public static let extract = SchedulerName(rawValue: "RenderWorld_Extract")
 }
 
-public extension AppWorldName {
+extension AppWorldName {
     /// The render world that will render the scene.
-    static let renderWorld = AppWorldName(rawValue: "RenderWorld")
+    public static let renderWorld = AppWorldName(rawValue: "RenderWorld")
 }

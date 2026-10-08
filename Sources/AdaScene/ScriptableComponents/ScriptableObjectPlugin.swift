@@ -10,7 +10,6 @@ import AdaECS
 
 /// Add support for ``ScriptableObject`` and ``ScriptableComponents`` objects for Unity-Like component system.
 public struct ScriptableObjectPlugin: Plugin {
-
     public init() {}
 
     public func setup(in app: borrowing AppWorlds) {
@@ -18,5 +17,6 @@ public struct ScriptableObjectPlugin: Plugin {
 
         app
             .addSystem(ScriptComponentUpdateSystem.self, on: .update)
+            .addSystem(ScriptUIBindingSystem.self, on: .update)
     }
 }
