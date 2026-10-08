@@ -23,9 +23,9 @@ public struct SparseSet<Key: Hashable, Value> {
 }
 
 extension SparseSet {
-    public init(_ dictionary: [Key: Value]) {
+    public init(_ dictionary: borrowing [Key: Value]) {
         var set = SparseSet<Key, Value>()
-        for (key, value) in dictionary {
+        dictionary.forEach { key, value in
             set.insert(value, for: key)
         }
         self = set

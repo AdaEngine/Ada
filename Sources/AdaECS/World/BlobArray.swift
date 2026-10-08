@@ -14,6 +14,9 @@ public struct BlobArray: Sendable {
     final class _Buffer: @unchecked Sendable {
         let count: Int
         let pointer: UnsafeMutableRawBufferPointer
+        // Flags have the same per-slot, externally synchronized access contract as the raw
+        // values. Structural operations are exclusive; query writes do not change these flags.
+        let initialized: UnsafeMutableBufferPointer<Bool>
         var deinitializer: ((UnsafeMutableRawBufferPointer, Int) -> Void)?
 
         init(
@@ -23,15 +26,35 @@ public struct BlobArray: Sendable {
         ) {
             unsafe self.count = count
             unsafe self.pointer = pointer
+            unsafe self.initialized = .allocate(capacity: count)
+            unsafe self.initialized.initialize(repeating: false)
             unsafe self.deinitializer = deinitializer
         }
 
         deinit {
+            unsafe initialized.deinitialize()
+            unsafe initialized.deallocate()
             unsafe pointer.deallocate()
         }
 
-        func clear(_ count: Int) {
-            unsafe deinitializer?(pointer, count)
+        func clear(_ count: Int, stride: Int) {
+            var index = 0
+            while index < count {
+                guard unsafe initialized[index] else {
+                    index += 1
+                    continue
+                }
+                let first = index
+                while unsafe index < count && initialized[index] {
+                    unsafe initialized[index] = false
+                    index += 1
+                }
+                let element = unsafe UnsafeMutableRawBufferPointer(
+                    start: pointer.baseAddress?.advanced(by: first * stride),
+                    count: (index - first) * stride
+                )
+                unsafe deinitializer?(element, index - first)
+            }
         }
     }
 
@@ -85,16 +108,58 @@ extension BlobArray {
             ),
             deinitializer: buffer.deinitializer
         )
-        unsafe newBuffer.pointer.copyMemory(from: UnsafeRawBufferPointer(self.buffer.pointer))
+        let transferredCount = min(count, self.count)
+        for index in transferredCount..<self.count {
+            remove(at: index)
+        }
+        unsafe newBuffer.pointer.copyMemory(from: UnsafeRawBufferPointer(
+            start: self.buffer.pointer.baseAddress,
+            count: transferredCount * self.layout.size
+        ))
+        for index in 0..<transferredCount {
+            unsafe newBuffer.initialized[index] = self.buffer.initialized[index]
+            // Reallocation transfers ownership; views of the previous allocation are invalidated.
+            forget(at: index)
+        }
         unsafe self.buffer = newBuffer
         self.count = count
     }
 
     public func clear(_ count: Int) {
-        unsafe self.buffer.clear(count)
+        unsafe self.buffer.clear(count, stride: self.layout.size)
     }
 
+    func isInitialized(at index: Int) -> Bool {
+        unsafe buffer.initialized[index]
+    }
+
+    /// Ends a slot's ownership after its value was transferred bitwise elsewhere.
+    func forget(at index: Int) {
+        unsafe buffer.initialized[index] = false
+    }
+
+    /// Initializes an empty slot or replaces an existing value, destroying it exactly once.
     public func insert<T: ~Copyable>(_ element: consuming T, at index: Int) {
+        #if DEBUG
+            precondition(
+                MemoryLayout<T>.stride == self.layout.size && MemoryLayout<T>.alignment == self.layout.alignment,
+                "Element has different layout"
+            )
+        #endif
+        if isInitialized(at: index) {
+            replace(consume element, at: index)
+        } else {
+            unsafe self.baseAddress()
+                .advanced(by: index * self.layout.size)
+                .assumingMemoryBound(to: T.self)
+                .initialize(to: element)
+            unsafe buffer.initialized[index] = true
+        }
+    }
+
+    /// Replaces an initialized element, destroying the previous value exactly once.
+    func replace<T: ~Copyable>(_ element: consuming T, at index: Int) {
+        assert(isInitialized(at: index), "Replacement requires an initialized element")
         #if DEBUG
             precondition(
                 MemoryLayout<T>.stride == self.layout.size && MemoryLayout<T>.alignment == self.layout.alignment,
@@ -104,7 +169,7 @@ extension BlobArray {
         unsafe self.baseAddress()
             .advanced(by: index * self.layout.size)
             .assumingMemoryBound(to: T.self)
-            .initialize(to: element)
+            .pointee = consume element
     }
 
     public func getMutablePointer<T: ~Copyable>(at index: Int, as type: T.Type) -> UnsafeMutablePointer<T> {
@@ -151,11 +216,12 @@ extension BlobArray {
         if fromIndex == toIndex || layout.size == 0 {
             return
         }
+        let sourceIsInitialized = isInitialized(at: fromIndex)
         let base = unsafe baseAddress()
         let fromPointer = unsafe base.advanced(by: fromIndex * layout.size)
         let toPointer = unsafe base.advanced(by: toIndex * layout.size)
 
-        if shouldDeinitialize {
+        if shouldDeinitialize && isInitialized(at: toIndex) {
             unsafe self.buffer.deinitializer?(UnsafeMutableRawBufferPointer(start: toPointer, count: layout.size), 1)
         }
         unsafe withUnsafeTemporaryAllocation(of: UInt8.self, capacity: layout.size) { tmp in
@@ -167,9 +233,15 @@ extension BlobArray {
             unsafe fromPointer.copyMemory(from: toPointer, byteCount: layout.size)
             unsafe toPointer.copyMemory(from: tempPointer, byteCount: layout.size)
         }
+        unsafe buffer.initialized[toIndex] = sourceIsInitialized
+        forget(at: fromIndex)
     }
 
     public func remove(at index: Int) {
+        guard isInitialized(at: index) else {
+            return
+        }
+        forget(at: index)
         // Create a buffer pointer starting at the element to remove
         let basePointer = unsafe self.baseAddress()
         let elementPointer = unsafe basePointer.advanced(by: index * self.layout.size)
@@ -186,6 +258,9 @@ extension BlobArray {
         from fromIndex: Int,
         to toIndex: Int
     ) {
+        guard isInitialized(at: fromIndex) else {
+            return
+        }
         #if DEBUG
             precondition(
                 self.layout.size == blobArray.layout.size && self.layout.alignment == blobArray.layout.alignment,
@@ -195,6 +270,7 @@ extension BlobArray {
         let sourcePointer = unsafe self.baseAddress().advanced(by: fromIndex * self.layout.size)
         let destinationPointer = unsafe blobArray.baseAddress().advanced(by: toIndex * self.layout.size)
         unsafe destinationPointer.copyMemory(from: sourcePointer, byteCount: self.layout.size)
+        unsafe blobArray.buffer.initialized[toIndex] = true
     }
 
     @inline(__always)

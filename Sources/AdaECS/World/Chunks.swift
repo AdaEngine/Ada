@@ -63,7 +63,7 @@ extension Chunks {
     }
 
     public func insert<T: Component>(
-        _ component: T,
+        _ component: consuming T,
         for entity: Entity.ID,
         lastTick: Tick
     ) {
@@ -73,10 +73,19 @@ extension Chunks {
         }
         self.chunks[location.chunkIndex]
             .insert(
-                component,
+                consume component,
                 at: location.entityRow,
                 lastTick: lastTick
             )
+    }
+
+    /// Initializes a newly added component column after an archetype transition.
+    func initialize<T: Component>(_ component: consuming T, for entity: Entity.ID, lastTick: Tick) {
+        guard let location = self.entities[entity] else {
+            assertionFailure("Entity not found in chunks")
+            return
+        }
+        self.chunks[location.chunkIndex].initialize(consume component, at: location.entityRow, lastTick: lastTick)
     }
 
     public subscript(_ index: Int) -> Chunk {
@@ -91,17 +100,15 @@ extension Chunks {
         tick: Tick
     ) -> ChunkLocation {
         let location = self.getFreeChunkIndex()
-        var chunk = self.chunks[location]
-        guard let entityLocation = chunk.addEntity(entity) else {
+        guard let entityLocation = self.chunks[location].addEntity(entity) else {
             fatalError("Failed to add entity \(entity) to chunk \(location)")
         }
-        chunk.insert(at: entityLocation, components: components, tick: tick)
+        self.chunks[location].insert(at: entityLocation, components: components, tick: tick)
         let chunkLocation = ChunkLocation(
             chunkIndex: location,
             entityRow: entityLocation
         )
         self.entities[entity] = chunkLocation
-        self.chunks[location] = chunk
         return chunkLocation
     }
 
@@ -110,9 +117,7 @@ extension Chunks {
         guard let location = self.entities[entity] else {
             return nil
         }
-        var chunk = self.chunks[location.chunkIndex]
-        let swappedEntity = chunk.swapRemoveEntity(at: entity)
-        self.chunks[location.chunkIndex] = chunk
+        let swappedEntity = self.chunks[location.chunkIndex].swapRemoveEntity(at: entity)
         self.friedLocation.append(location)
         return MoveEntityResult(newLocation: location, swappedEntity: swappedEntity)
     }
@@ -121,10 +126,8 @@ extension Chunks {
         guard let location = self.entities[entity] else {
             fatalError("Entity \(entity) not found in chunks")
         }
-        let oldChunk = self.chunks[location.chunkIndex]
         let newLocation = chunks.getFreeChunkIndex()
-        var chunk = chunks.chunks[newLocation]
-        let entityLocation = chunk.addEntity(entity)
+        let entityLocation = chunks.chunks[newLocation].addEntity(entity)
             .unwrap(message: "Can't add entity to chunk")
         let chunkLocation = ChunkLocation(
             chunkIndex: newLocation,
@@ -133,8 +136,8 @@ extension Chunks {
         chunks.entities[entity] = chunkLocation
         for component in chunks.componentLayout.components {
             guard
-                let oldChunkComponent = oldChunk.componentsData[component.identifier],
-                var newChunkComponent = chunk.componentsData[component.identifier]
+                let oldChunkComponent = self.chunks[location.chunkIndex].componentsData[component.identifier],
+                var newChunkComponent = chunks.chunks[newLocation].componentsData[component.identifier]
             else {
                 continue
             }
@@ -157,10 +160,13 @@ extension Chunks {
                     from: location.entityRow,
                     to: chunkLocation.entityRow
                 )
-            chunk.componentsData[component.identifier] = newChunkComponent
+            chunks.chunks[newLocation].componentsData[component.identifier] = newChunkComponent
         }
-        chunks.chunks[newLocation] = chunk
-        // Don't deinitialize - data was copied to the new chunk (bitwise copy preserves references)
+        // Common columns transferred ownership bitwise. Columns absent from the destination
+        // must be destroyed before the source row is reused by swap-remove.
+        for component in self.componentLayout.components where !chunks.componentLayout.maskSet.contains(component.identifier) {
+            self.chunks[location.chunkIndex].componentsData[component.identifier]?.data.remove(at: location.entityRow)
+        }
         let swappedEntity = self.swapRemoveEntity(entity, deinitialize: false)
         return MoveEntityResult(newLocation: chunkLocation, swappedEntity: swappedEntity)
     }
@@ -171,14 +177,12 @@ extension Chunks {
             return nil
         }
 
-        var chunk = self.chunks[location.chunkIndex]
-        let swappedEntityId = chunk.swapRemoveEntity(at: entity, deinitialize: deinitialize)
+        let swappedEntityId = self.chunks[location.chunkIndex].swapRemoveEntity(at: entity, deinitialize: deinitialize)
         self.entities.remove(for: entity)
 
         if let swappedEntityId {
             self.entities[swappedEntityId] = location
         }
-        self.chunks[location.chunkIndex] = chunk
 
         return swappedEntityId
     }
@@ -363,6 +367,14 @@ public struct Chunk: Sendable {
         count -= 1
         let lastIndex = count
 
+        if !deinitialize {
+            for componentData in self.componentsData {
+                componentData.data.forget(at: removedIndex)
+                componentData.addedTicks.forget(at: removedIndex)
+                componentData.changeTicks.forget(at: removedIndex)
+            }
+        }
+
         if removedIndex < lastIndex {
             // Move component data from the last element to the removed element's slot
             for componentData in self.componentsData {
@@ -477,8 +489,22 @@ public struct Chunk: Sendable {
             assertionFailure("Component \(T.self) not found in chunk")
             return
         }
+        if !componentData.data.isInitialized(at: entityIndex) {
+            initialize(consume component, at: entityIndex, lastTick: lastTick)
+            return
+        }
+        componentData.changeTicks.replace(lastTick, at: entityIndex)
+        componentData.data.replace(consume component, at: entityIndex)
+    }
+
+    func initialize<T: Component>(_ component: consuming T, at entityIndex: RowIndex, lastTick: Tick) {
+        guard let componentData = self.componentsData[T.identifier] else {
+            assertionFailure("Component not found in chunk")
+            return
+        }
+        componentData.addedTicks.insert(lastTick, at: entityIndex)
         componentData.changeTicks.insert(lastTick, at: entityIndex)
-        componentData.data.insert(component, at: entityIndex)
+        componentData.data.insert(consume component, at: entityIndex)
     }
 
     /// Get all component data arrays for efficient iteration
@@ -512,8 +538,22 @@ public struct Chunk: Sendable {
             assertionFailure("Runtime component \(component.stableID) not found in chunk")
             return
         }
+        if !componentData.data.isInitialized(at: entityIndex) {
+            initializeRuntimeComponent(consume component, at: entityIndex, lastTick: lastTick)
+            return
+        }
+        componentData.changeTicks.replace(lastTick, at: entityIndex)
+        componentData.data.replace(consume component, at: entityIndex)
+    }
+
+    func initializeRuntimeComponent(_ component: consuming RuntimeComponentPayload, at entityIndex: RowIndex, lastTick: Tick) {
+        guard let componentData = componentsData[component.componentID] else {
+            assertionFailure("Runtime component not found in chunk")
+            return
+        }
+        componentData.addedTicks.insert(lastTick, at: entityIndex)
         componentData.changeTicks.insert(lastTick, at: entityIndex)
-        componentData.data.insert(component, at: entityIndex)
+        componentData.data.insert(consume component, at: entityIndex)
     }
 
     public func getComponentSlice<T: Component>(for _: T.Type) -> UnsafeBufferPointer<T>? {

@@ -156,7 +156,7 @@ final class AnnotatedGravityComponentFactory: @unchecked Sendable {
 
     private init(
         constructors: [RegisteredRuntimeComponentConstructor],
-        runtimeDescriptors: [RuntimeComponentDescriptor],
+        runtimeDescriptors: borrowing [RuntimeComponentDescriptor],
         reportDiagnostic: @escaping @Sendable (String) -> Void
     ) {
         self.constructors = constructors

@@ -546,9 +546,12 @@ extension World {
         return self.get(from: entity)
     }
 
-    public func insert<T: Component>(_ component: T, for entityId: Entity.ID) {
-        if let runtimeComponent = component as? RuntimeComponentPayload {
-            insertRuntimeComponent(runtimeComponent, for: entityId)
+    public func insert<T: Component>(_ component: consuming T, for entityId: Entity.ID) {
+        // Runtime payloads are a concrete struct. Check the type before consuming the value
+        // so native components can be forwarded without copying for a conditional cast.
+        if T.self == RuntimeComponentPayload.self {
+            let runtimeComponent = (consume component) as! RuntimeComponentPayload
+            insertRuntimeComponent(consume runtimeComponent, for: entityId)
             return
         }
         guard let location = self.entities.entities[entityId] else {
@@ -556,18 +559,17 @@ extension World {
         }
 
         // We have component in archetype, just update
-        var archetype = self.archetypes.archetypes[location.archetypeId]
-        if archetype.componentLayout.maskSet.contains(T.identifier) {
+        if self.archetypes.archetypes[location.archetypeId].componentLayout.maskSet.contains(T.identifier) {
             self.archetypes
                 .archetypes[location.archetypeId]
                 .chunks
                 .chunks[location.chunkIndex]
-                .insert(component, at: location.chunkRow, lastTick: currentTick)
+                .insert(consume component, at: location.chunkRow, lastTick: currentTick)
             return
         }
 
         // Prepare new layout
-        var newLayout = archetype.componentLayout
+        var newLayout = self.archetypes.archetypes[location.archetypeId].componentLayout
         newLayout.insert(T.self)
 
         var components: [any Component] = []
@@ -589,7 +591,7 @@ extension World {
         }
 
         // Move entity to new archetype
-        if let newArchetype = archetype.edges.getArchetypeAfterInsertion(for: newLayout) {
+        if let newArchetype = self.archetypes.archetypes[location.archetypeId].edges.getArchetypeAfterInsertion(for: newLayout) {
             self.moveEntityToArchetype(
                 entityId,
                 oldLocation: location,
@@ -597,8 +599,7 @@ extension World {
             )
         } else {
             let newArchetype = self.archetypes.getOrCreate(for: newLayout)
-            archetype.edges.addArchetypeAfterInsertion(newArchetype, for: newLayout)
-            self.archetypes.archetypes[location.archetypeId] = archetype
+            self.archetypes.archetypes[location.archetypeId].edges.addArchetypeAfterInsertion(newArchetype, for: newLayout)
             self.moveEntityToArchetype(
                 entityId,
                 oldLocation: location,
@@ -616,32 +617,31 @@ extension World {
             self.archetypes
                 .archetypes[newLocation.archetypeId]
                 .chunks
-                .insert(component, for: entityId, lastTick: currentTick)
+                .initialize(component, for: entityId, lastTick: currentTick)
         }
 
         self.archetypes
             .archetypes[newLocation.archetypeId]
             .chunks
-            .insert(component, for: entityId, lastTick: currentTick)
+            .initialize(consume component, for: entityId, lastTick: currentTick)
     }
 
     /// Inserts or replaces a logical runtime component on an entity.
     public func insertRuntimeComponent(
-        _ component: RuntimeComponentPayload,
+        _ component: consuming RuntimeComponentPayload,
         for entityId: Entity.ID
     ) {
         guard let location = entities.entities[entityId] else {
             return
         }
-        var archetype = archetypes.archetypes[location.archetypeId]
-        if archetype.componentLayout.maskSet.contains(component.componentID) {
+        if archetypes.archetypes[location.archetypeId].componentLayout.maskSet.contains(component.componentID) {
             archetypes.archetypes[location.archetypeId]
                 .chunks.chunks[location.chunkIndex]
-                .insertRuntimeComponent(component, at: location.chunkRow, lastTick: currentTick)
+                .insertRuntimeComponent(consume component, at: location.chunkRow, lastTick: currentTick)
             return
         }
 
-        var newLayout = archetype.componentLayout
+        var newLayout = archetypes.archetypes[location.archetypeId].componentLayout
         newLayout.insert(runtime: component.componentID)
         var requiredComponents: [any Component] = []
         for required in componentsStorage.getRequiredComponents(for: component.componentID) {
@@ -654,12 +654,11 @@ extension World {
         }
 
         let newArchetype: Archetype.ID
-        if let cached = archetype.edges.getArchetypeAfterInsertion(for: newLayout) {
+        if let cached = archetypes.archetypes[location.archetypeId].edges.getArchetypeAfterInsertion(for: newLayout) {
             newArchetype = cached
         } else {
             newArchetype = archetypes.getOrCreate(for: newLayout)
-            archetype.edges.addArchetypeAfterInsertion(newArchetype, for: newLayout)
-            archetypes.archetypes[location.archetypeId] = archetype
+            archetypes.archetypes[location.archetypeId].edges.addArchetypeAfterInsertion(newArchetype, for: newLayout)
         }
         moveEntityToArchetype(entityId, oldLocation: location, newArchetype: newArchetype)
         guard let newLocation = entities.entities[entityId] else {
@@ -668,11 +667,11 @@ extension World {
         }
         for required in requiredComponents {
             archetypes.archetypes[newLocation.archetypeId]
-                .chunks.insert(required, for: entityId, lastTick: currentTick)
+                .chunks.initialize(required, for: entityId, lastTick: currentTick)
         }
         archetypes.archetypes[newLocation.archetypeId]
             .chunks.chunks[newLocation.chunkIndex]
-            .insertRuntimeComponent(component, at: newLocation.chunkRow, lastTick: currentTick)
+            .initializeRuntimeComponent(consume component, at: newLocation.chunkRow, lastTick: currentTick)
     }
 
     /// Makes a native component an invariant of one logical runtime component.
@@ -715,10 +714,12 @@ extension World {
         }
 
         // Get the entity from the archetype
-        var archetype = self.archetypes.archetypes[location.archetypeId]
-        var newLayout = archetype.chunks.componentLayout
+        guard self.archetypes.archetypes[location.archetypeId].componentLayout.maskSet.contains(componentId) else {
+            return
+        }
+        var newLayout = self.archetypes.archetypes[location.archetypeId].chunks.componentLayout
         newLayout.remove(componentId)
-        if let newArchetype = archetype.edges.getArchetypeAfterRemoval(for: newLayout) {
+        if let newArchetype = self.archetypes.archetypes[location.archetypeId].edges.getArchetypeAfterRemoval(for: newLayout) {
             self.moveEntityToArchetype(
                 entityId,
                 oldLocation: location,
@@ -726,8 +727,7 @@ extension World {
             )
         } else {
             let newArchetype = self.archetypes.getOrCreate(for: newLayout)
-            archetype.edges.addArchetypeAfterRemoval(newArchetype, for: newLayout)
-            self.archetypes.archetypes[location.archetypeId] = archetype
+            self.archetypes.archetypes[location.archetypeId].edges.addArchetypeAfterRemoval(newArchetype, for: newLayout)
             self.moveEntityToArchetype(
                 entityId,
                 oldLocation: location,
@@ -841,17 +841,15 @@ extension World {
             for: componentsLayout
         )
 
-        var archetype = self.archetypes.archetypes[archetypeIndex]
-        let row = archetype.append(entity)
-        let chunkLocation = archetype.chunks.insertEntity(
+        let row = self.archetypes.archetypes[archetypeIndex].append(entity)
+        let chunkLocation = self.archetypes.archetypes[archetypeIndex].chunks.insertEntity(
             entity.id,
             components: components,
             tick: self.currentTick
         )
-        self.archetypes.archetypes[archetypeIndex] = archetype
         self.entities.insert(
             EntityLocation(
-                archetypeId: archetype.id,
+                archetypeId: self.archetypes.archetypes[archetypeIndex].id,
                 archetypeRow: row,
                 chunkIndex: chunkLocation.chunkIndex,
                 chunkRow: chunkLocation.entityRow
@@ -869,12 +867,16 @@ extension World {
         oldLocation location: EntityLocation,
         newArchetype: Archetype.ID
     ) {
-        var archetype = self.archetypes.archetypes[location.archetypeId]
-        let entity = archetype.entities[location.archetypeRow]
-        var toArchetype = self.archetypes.archetypes[newArchetype]
-        let row = toArchetype.append(entity)
-        let result = archetype.swapRemove(at: location.archetypeRow)
-        let moveResult = archetype.chunks.moveEntity(entityId, to: &toArchetype.chunks)
+        let (row, result, moveResult) = self.archetypes.withMutablePair(
+            at: location.archetypeId,
+            and: newArchetype
+        ) { source, destination in
+            let entity = source.entities[location.archetypeRow]
+            let row = destination.append(entity)
+            let result = source.swapRemove(at: location.archetypeRow)
+            let moveResult = source.chunks.moveEntity(entityId, to: &destination.chunks)
+            return (row, result, moveResult)
+        }
         let newLocation = moveResult.newLocation
 
         var updatedLocations: [Entity.ID: EntityLocation] = [:]
@@ -915,8 +917,6 @@ extension World {
             entities.insert(location, for: entity)
         }
 
-        self.archetypes.archetypes[location.archetypeId] = archetype
-        self.archetypes.archetypes[newArchetype] = toArchetype
         self.entities.insert(
             EntityLocation(
                 archetypeId: newArchetype,
@@ -936,8 +936,7 @@ extension World {
         }
         self.entities.remove(entity)
 
-        var currentArchetype = self.archetypes.archetypes[record.archetypeId]
-        let removeResult = currentArchetype.swapRemove(at: record.archetypeRow)
+        let removeResult = self.archetypes.archetypes[record.archetypeId].swapRemove(at: record.archetypeRow)
 
         if let swappedEntity = removeResult.swappedEntity,
             let swappedLocation = entities.entities[swappedEntity] {
@@ -952,7 +951,7 @@ extension World {
             )
         }
 
-        let removeChunkResult = currentArchetype.chunks.removeEntity(entity)
+        let removeChunkResult = self.archetypes.archetypes[record.archetypeId].chunks.removeEntity(entity)
         if let removeChunkResult, let swappedEntity = removeChunkResult.swappedEntity {
             if let swappedLocation = entities.entities[swappedEntity] {
                 entities.insert(
@@ -967,7 +966,6 @@ extension World {
             }
         }
 
-        self.archetypes.archetypes[record.archetypeId] = currentArchetype
     }
 }
 

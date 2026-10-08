@@ -98,6 +98,29 @@ public final class Archetypes: @unchecked Sendable {
             self.archetypes[index].clear()
         }
     }
+
+    /// Borrows two distinct elements without making intermediate archetype copies.
+    /// The closure must not resize or reenter this collection. Pointers stay within this scope.
+    @inline(__always)
+    @safe
+    func withMutablePair<Result>(
+        at firstIndex: Int,
+        and secondIndex: Int,
+        _ body: (inout Archetype, inout Archetype) -> Result
+    ) -> Result {
+        precondition(firstIndex != secondIndex, "Archetype mutation requires distinct indices")
+        precondition(archetypes.indices.contains(firstIndex) && archetypes.indices.contains(secondIndex))
+        // Swift cannot borrow two array subscripts simultaneously. Buffer access makes the
+        // storage unique; checked, distinct indices give disjoint access for this nonescaping closure.
+        return unsafe archetypes.withUnsafeMutableBufferPointer { buffer in
+            guard let baseAddress = unsafe buffer.baseAddress else {
+                preconditionFailure("Validated archetype indices require nonempty storage")
+            }
+            let first = unsafe baseAddress.advanced(by: firstIndex)
+            let second = unsafe baseAddress.advanced(by: secondIndex)
+            return unsafe body(&first.pointee, &second.pointee)
+        }
+    }
 }
 
 public struct ComponentLayout: Hashable, Sendable {
@@ -119,10 +142,10 @@ public struct ComponentLayout: Hashable, Sendable {
         }
     }
 
-    public init(components: [any Component]) {
+    public init(components: borrowing [any Component]) {
         var componentTypes: [Entry] = []
         var maskSet = ComponentMaskSet(reservingCapacity: components.count)
-        for component in components {
+        components.forEach { component in
             let componentType = type(of: component)
             let identifier = componentIdentifier(of: component)
             componentTypes.append(Entry(componentType: componentType, identifier: identifier))
@@ -132,9 +155,9 @@ public struct ComponentLayout: Hashable, Sendable {
         self.components = componentTypes
     }
 
-    public init(componentTypes: [any Component.Type]) {
+    public init(componentTypes: borrowing [any Component.Type]) {
         var set = ComponentMaskSet(reservingCapacity: componentTypes.count)
-        for component in componentTypes {
+        componentTypes.forEach { component in
             set.insert(component.identifier)
         }
         self.maskSet = set
@@ -323,14 +346,14 @@ extension Archetype {
         }
 
         @inline(__always)
-        mutating func getArchetypeAfterInsertion(
+        func getArchetypeAfterInsertion(
             for layout: ComponentLayout
         ) -> Archetype.ID? {
             self.add[layout]
         }
 
         @inline(__always)
-        mutating func getArchetypeAfterRemoval(
+        func getArchetypeAfterRemoval(
             for layout: ComponentLayout
         ) -> Archetype.ID? {
             self.remove[layout]
