@@ -453,10 +453,12 @@ extension World {
         return resource
     }
 
-    /// Get a or create resource from the world and returns ref.
+    /// Get or create a resource and return a reference to its storage.
+    /// The reference retains this resource allocation. Replacement, removal or
+    /// World teardown does not retarget existing references to a new resource.
     /// - Parameter resource: The resource to get.
     /// - Complexity: O(1)
-    /// - Returns: The resource if it exists, otherwise nil.
+    /// - Returns: A reference to the existing or newly initialized resource.
     public func getOrInitRefResource<T: Resource>(_: T.Type, constructor: () -> T) -> Ref<T> {
         if !self.resources.contains(T.self) {
             self.insertResource(constructor())
@@ -473,10 +475,13 @@ extension World {
         )
     }
 
-    /// Get a resource from the world.
+    /// Get a reference to a resource's storage.
+    /// The reference retains this resource allocation until its last copy is
+    /// released, including after replacement, removal or World teardown.
     /// - Parameter resource: The resource to get.
     /// - Complexity: O(1)
-    /// - Returns: The resource if it exists, otherwise nil.
+    /// - Returns: A reference to the resource. Accessing its wrapped value traps
+    ///   if the resource was absent when this method was called.
     public func getRefResource<T: Resource>(_: T.Type) -> Ref<T> {
         let resource = unsafe self.resources.getResourceData(T.self)?.getWithTick(T.self)
         return unsafe Ref(
@@ -497,7 +502,8 @@ extension World {
     }
 
     /// Clear all resources from the world.
-    /// - Complexity: O(1)
+    /// Existing resource references keep their allocations alive until released.
+    /// - Complexity: O(n), where n is the number of registered resources.
     public func clearResources() {
         self.resources.clear()
     }
@@ -847,7 +853,7 @@ extension World {
         eventManager.send(WorldEvents.DidAddEntity(entity: entity), source: self)
     }
 
-    private func prepareSpawnComponents(_ inputs: [any Component]) -> ([any Component], Archetype.ID) {
+    func prepareSpawnComponents(_ inputs: [any Component]) -> ([any Component], Archetype.ID) {
         let revision = spawnPlans.revision
         let plan = spawnPlans.lookup(inputs)
         // Reuse the input array when no requirements are produced. Start an
@@ -931,6 +937,15 @@ extension World {
             ))
         }
         return (components, archetypeIndex)
+    }
+
+    func registerSpawnBatch(_ batch: [Entity], locations: [EntityLocation]) {
+        entities.insertBatch(batch, locations: locations)
+        addedEntities.reserveCapacity(addedEntities.count + batch.count)
+        for entity in batch {
+            entity.world = self
+            addedEntities.insert(entity.id)
+        }
     }
 
     /// Move entity to new archetype.

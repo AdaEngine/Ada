@@ -8,11 +8,15 @@
 import AdaUtils
 import Foundation
 
+/// Type-erased storage whose copies share an allocation. The final allocation
+/// owner destroys initialized slots with the supplied deinitializer before
+/// freeing memory; clear and transfer operations update that ownership per slot.
 @safe
 public struct BlobArray: Sendable {
     @unsafe
     final class _Buffer: @unchecked Sendable {
         let count: Int
+        let stride: Int
         let pointer: UnsafeMutableRawBufferPointer
         // Flags have the same per-slot, externally synchronized access contract as the raw
         // values. Structural operations are exclusive; query writes do not change these flags.
@@ -21,10 +25,12 @@ public struct BlobArray: Sendable {
 
         init(
             count: Int,
+            stride: Int,
             pointer: UnsafeMutableRawBufferPointer,
             deinitializer: ((UnsafeMutableRawBufferPointer, Int) -> Void)? = nil
         ) {
             unsafe self.count = count
+            unsafe self.stride = stride
             unsafe self.pointer = pointer
             unsafe self.initialized = .allocate(capacity: count)
             unsafe self.initialized.initialize(repeating: false)
@@ -32,6 +38,10 @@ public struct BlobArray: Sendable {
         }
 
         deinit {
+            // Final allocation ownership includes every remaining initialized
+            // value. Explicit clear/moves already unset flags, so they cannot
+            // be destroyed again when the final shared buffer owner disappears.
+            unsafe clear(count, stride: stride)
             unsafe initialized.deinitialize()
             unsafe initialized.deallocate()
             unsafe pointer.deallocate()
@@ -82,6 +92,7 @@ public struct BlobArray: Sendable {
         self.layout = ElementLayout(size: MemoryLayout<T>.stride, alignment: MemoryLayout<T>.alignment)
         unsafe self.buffer = _Buffer(
             count: count,
+            stride: MemoryLayout<T>.stride,
             pointer: .allocate(
                 byteCount: count * MemoryLayout<T>.stride,
                 alignment: MemoryLayout<T>.alignment
@@ -102,6 +113,7 @@ extension BlobArray {
     public mutating func realloc(_ count: Int) {
         let newBuffer = unsafe _Buffer(
             count: count,
+            stride: self.layout.size,
             pointer: .allocate(
                 byteCount: count * self.layout.size,
                 alignment: self.layout.alignment
@@ -172,6 +184,8 @@ extension BlobArray {
             .pointee = consume element
     }
 
+    /// Returns a borrowed pointer. Keep the allocation owner alive through every
+    /// access; clear, removal and reallocation can invalidate the pointed-to value.
     public func getMutablePointer<T: ~Copyable>(at index: Int, as type: T.Type) -> UnsafeMutablePointer<T> {
         #if DEBUG
             precondition(

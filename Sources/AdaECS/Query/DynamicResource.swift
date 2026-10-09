@@ -65,19 +65,27 @@ public final class DynamicResource: @unchecked Sendable {
         guard let pointer = unsafe pointer, let readPointer = unsafe field.readPointer else {
             return nil
         }
-        return unsafe readPointer(UnsafeRawPointer(pointer))
+        // A reflected callback may finish or refresh this parameter. Keep the
+        // allocation from the start of this access alive through the callback.
+        return withExtendedLifetime(changedTick) { unsafe readPointer(UnsafeRawPointer(pointer)) }
     }
 
     @discardableResult
     public func write(field: ReflectedComponentField, value: ReflectedFieldValue) -> Bool {
         guard
-            field.accepts(value), let pointer = unsafe pointer, let writePointer = unsafe field.writePointer,
-            unsafe writePointer(pointer, value)
+            field.accepts(value), let pointer = unsafe pointer, let writePointer = unsafe field.writePointer
         else {
             return false
         }
-        changedTick?.wrappedValue = currentTick
-        return true
+        var tick = changedTick
+        let currentTick = self.currentTick
+        return withExtendedLifetime(tick) {
+            guard unsafe writePointer(pointer, value) else {
+                return false
+            }
+            tick?.wrappedValue = currentTick
+            return true
+        }
     }
 }
 

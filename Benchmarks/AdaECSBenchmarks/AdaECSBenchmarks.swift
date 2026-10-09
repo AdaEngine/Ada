@@ -189,6 +189,20 @@ let benchmarks: @Sendable () -> Void = {
         world.clear()
     }
 
+    Benchmark("AdaECS.SpawnBatch") { benchmark in
+        let world = World()
+        benchmark.startMeasurement()
+        let entities = world.spawnBatch(count: BenchConstants.spawnEntities) { _ in }
+        benchmark.stopMeasurement()
+        blackHole(world)
+        blackHole(entities)
+        if BenchConstants.smoke {
+            precondition(entities.count == BenchConstants.spawnEntities)
+            precondition(world.getEntities().count == BenchConstants.spawnEntities)
+        }
+        world.clear()
+    }
+
     Benchmark(
         "AdaECS.SimpleIter",
         closure: { benchmark, state in

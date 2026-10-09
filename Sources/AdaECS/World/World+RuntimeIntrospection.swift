@@ -73,7 +73,7 @@ extension World {
         else {
             return nil
         }
-        return unsafe readPointer(UnsafeRawPointer(pointer))
+        return withExtendedLifetime(data) { unsafe readPointer(UnsafeRawPointer(pointer)) }
     }
 
     /// Reads one reflected component field within the caller's declared ECS access scope.
@@ -134,14 +134,18 @@ extension World {
             field.accepts(value),
             let data = resources.getResourceData(for: type),
             let pointer = unsafe data.pointer.buffer.pointer.baseAddress,
-            let writePointer = unsafe field.writePointer,
-            unsafe writePointer(pointer, value)
+            let writePointer = unsafe field.writePointer
         else {
             return false
         }
-        var changedTick = data.changedTick
-        changedTick.wrappedValue = currentTick
-        return true
+        return withExtendedLifetime(data) {
+            guard unsafe writePointer(pointer, value) else {
+                return false
+            }
+            var changedTick = data.changedTick
+            changedTick.wrappedValue = currentTick
+            return true
+        }
     }
 
     private func insertTypeErasedComponent(_ component: any Component, into entity: Entity.ID) {

@@ -37,6 +37,12 @@ public struct UnsafeBox<T> {
         unsafe self.box = _UnsafeBox(wrappedValue)
     }
 
+    /// Keeps an allocation owner alive with this managed box. Used by ECS
+    /// resource ticks so existing Ref views retain their resource allocation.
+    package init(_ wrappedValue: consuming T, retaining owner: any AnyObject & Sendable) {
+        unsafe self.box = _UnsafeBox(wrappedValue, retaining: owner)
+    }
+
     @inlinable
     public init(_ pointer: UnsafeMutablePointer<T>) {
         unsafe self.box = _UnsafeBox(pointer)
@@ -118,6 +124,19 @@ final class _UnsafeBox: @unchecked Sendable {
         unsafe deallocator = {
             unsafe $0.assumingMemoryBound(to: T.self)
                 .deinitialize(count: 1)
+        }
+        unsafe automanaged = true
+    }
+
+    init<T>(_ instance: consuming T, retaining owner: any AnyObject & Sendable) {
+        unsafe pointer = .allocate(byteCount: MemoryLayout<T>.stride, alignment: MemoryLayout<T>.alignment)
+        unsafe pointer.initializeMemory(as: T.self, to: instance)
+        // Capture the lease in the existing cleanup closure instead of growing
+        // every box (including component-query borrowed tick boxes).
+        unsafe deallocator = { pointer in
+            withExtendedLifetime(owner) {
+                _ = unsafe pointer.assumingMemoryBound(to: T.self).deinitialize(count: 1)
+            }
         }
         unsafe automanaged = true
     }

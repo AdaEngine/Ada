@@ -27,6 +27,7 @@ count, retain count, and release count where supported by the host.
 | Scenario | Default workload | Measured operation |
 | --- | --- | --- |
 | Spawn | 100,000 entities | Spawn empty entities; world creation and cleanup are excluded. |
+| SpawnBatch | 100,000 entities | Spawn empty entities through the batch API, including its returned entity array; world creation and cleanup are excluded. |
 | SimpleIter | 100,000 entities | Update position from velocity through a typed mutable query. |
 | FragmentedIter | 100,002 entities in three archetypes | Update one shared component across all archetypes. |
 | HeavyCompute | 1,000 entities, 100 rotations each | Rotate matrix columns and write the result through a mutable query. |
@@ -47,7 +48,7 @@ Smoke mode reduces workloads to approximately 1,000 entities (100 for heavy
 compute), one warmup, and at most three measured samples. It validates fixture
 sizes and resulting mutations outside measurement. Use this for build/runtime
 checks, not performance conclusions. The `ECS Benchmark Smoke` workflow runs
-all six scenarios and uploads its output.
+all seven scenarios and uploads its output.
 
 ## Compare revisions
 

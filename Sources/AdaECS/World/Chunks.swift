@@ -53,6 +53,39 @@ public struct Chunks: Sendable {
 }
 
 extension Chunks {
+    mutating func reserveBatchCapacity(_ additionalCount: Int) {
+        entities.reserveCapacity(entities.count + additionalCount)
+        let additionalChunks = additionalCount / entitiesPerChunk + (additionalCount % entitiesPerChunk == 0 ? 0 : 1)
+        chunks.reserveCapacity(chunks.count + additionalChunks)
+    }
+
+    /// Fills each available chunk before looking up the next one. No user
+    /// callbacks run while mutable storage is borrowed by this operation.
+    mutating func insertBatch(
+        _ batch: [Entity],
+        components: [[any Component]],
+        indices: [Int],
+        tick: Tick
+    ) -> [ChunkLocation] {
+        var locations: [ChunkLocation] = []
+        locations.reserveCapacity(indices.count)
+        var offset = 0
+        while offset < indices.count {
+            let chunkIndex = getFreeChunkIndex()
+            let row = chunks[chunkIndex].count
+            let length = min(entitiesPerChunk - row, indices.count - offset)
+            let end = offset + length
+            chunks[chunkIndex].insertBatch(batch, components: components, indices: indices[offset..<end], tick: tick)
+            for index in offset..<end {
+                let location = ChunkLocation(chunkIndex: chunkIndex, entityRow: row + index - offset)
+                entities[batch[indices[index]].id] = location
+                locations.append(location)
+            }
+            offset = end
+        }
+        return locations
+    }
+
     public mutating func getFreeChunkIndex() -> Int {
         while let index = nonFullChunkIndices.last {
             if !chunks[index].isFull {
@@ -346,6 +379,56 @@ public struct Chunk: Sendable {
         return index
     }
 
+    mutating func insertBatch(
+        _ batch: [Entity],
+        components: [[any Component]],
+        indices: ArraySlice<Int>,
+        tick: Tick
+    ) {
+        let firstRow = count
+        entities.reserveCapacity(count + indices.count)
+        for index in indices {
+            _ = addEntity(batch[index].id)
+        }
+        guard let firstIndex = indices.first else {
+            return
+        }
+        let firstComponents = components[firstIndex]
+        // Resolve column owners once per chunk. A shared archetype mask does not
+        // imply identical component order or duplicate counts in every row.
+        let ids = firstComponents.map { componentIdentifier(of: $0) }
+        let columns = ids.map { id -> ComponentsData in
+            guard let column = componentsData[id] else {
+                preconditionFailure("Batch component is absent from chunk layout")
+            }
+            return column
+        }
+        for (offset, index) in indices.enumerated() {
+            let row = firstRow + offset
+            let values = components[index]
+            var matches = values.count == ids.count
+            if matches {
+                for columnIndex in values.indices where componentIdentifier(of: values[columnIndex]) != ids[columnIndex] {
+                    matches = false
+                    break
+                }
+            }
+            if matches {
+                for columnIndex in values.indices {
+                    let column = columns[columnIndex]
+                    // Bind the existential before generic insertion so Swift
+                    // opens its concrete type, as in the ordinary row path.
+                    let component = values[columnIndex]
+                    column.data.insert(component, at: row)
+                    column.addedTicks.insert(tick, at: row)
+                    column.changeTicks.insert(tick, at: row)
+                }
+            } else {
+                insert(at: row, components: values, tick: tick)
+            }
+        }
+    }
+
     /// Remove an entity from this chunk
     /// - Parameter index: The index of the entity to remove
     mutating func removeEntity(at entityId: Entity.ID) {
@@ -474,6 +557,8 @@ public struct Chunk: Sendable {
             .get(at: index, as: T.self)
     }
 
+    /// Returns a borrowed pointer. Keep this chunk's storage alive through every
+    /// access and do not retain the pointer across structural mutations.
     @inline(__always)
     public func getMutablePointer<T: Component>(
         _: T.Type,
@@ -487,6 +572,8 @@ public struct Chunk: Sendable {
             .getMutablePointer(at: index, as: T.self)
     }
 
+    /// Returns a borrowed tick pointer with the same lifetime and structural
+    /// mutation restrictions as ``getMutablePointer(_:for:)``.
     public func getMutableTick<T: Component>(
         _: T.Type,
         for entity: Entity.ID

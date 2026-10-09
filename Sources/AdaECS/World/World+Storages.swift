@@ -196,8 +196,8 @@ extension World {
             return resourceData[id]
         }
 
-        func getPointer(for resourceId: ComponentId) -> UnsafeMutableRawPointer? {
-            unsafe self.resourceData[resourceId]?.pointer.buffer.pointer.baseAddress
+        func getResourceData(for resourceId: ComponentId) -> ResourceData? {
+            resourceData[resourceId]
         }
 
         mutating func registerResource<T: Resource>(
@@ -256,8 +256,11 @@ extension World {
             return ResourceData(
                 pointer: array,
                 resourceType: T.self,
-                addedTick: UnsafeBox(tick),
-                changedTick: UnsafeBox(tick)
+                // Tick boxes already travel with typed/dynamic resource views.
+                // Their leases keep this allocation valid until the last view
+                // releases it, without changing Ref's public layout.
+                addedTick: unsafe UnsafeBox(tick, retaining: array.buffer),
+                changedTick: unsafe UnsafeBox(tick, retaining: array.buffer)
             )
         }
     }

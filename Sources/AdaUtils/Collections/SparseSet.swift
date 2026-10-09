@@ -33,6 +33,12 @@ extension SparseSet {
 }
 
 extension SparseSet {
+    /// Reserves storage for at least this many key/value pairs without changing contents.
+    package mutating func reserveCapacity(_ minimumCapacity: Int) {
+        dense.reserveCapacity(minimumCapacity)
+        sparse.reserveCapacity(minimumCapacity)
+    }
+
     @inlinable
     public var values: ContiguousArray<DenseValue> {
         _read {

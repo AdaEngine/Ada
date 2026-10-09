@@ -523,6 +523,10 @@ extension ChunkTests {
         chunk.insert(newA, at: row, lastTick: Tick(value: 2))
 
         #expect(chunk.getMutableTick(A.self, for: 1)?.pointee == Tick(value: 2))
-        #expect(chunk.getMutablePointer(A.self, for: 1)?.pointee == newA)
+        // The returned raw pointer borrows this chunk's allocation; its owner
+        // must survive the pointee read even when this is its final use.
+        withExtendedLifetime(chunk) {
+            #expect(chunk.getMutablePointer(A.self, for: 1)?.pointee == newA)
+        }
     }
 }

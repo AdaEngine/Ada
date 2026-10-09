@@ -39,6 +39,25 @@ public final class Entities: @unchecked Sendable {
         return Entity(name: name, id: newId)
     }
 
+    func allocateBatch(count: Int, name: String) -> [Entity] {
+        let firstID = currentId.loadThenWrappingIncrement(by: count, ordering: .relaxed)
+        var result: [Entity] = []
+        result.reserveCapacity(count)
+        for offset in 0..<count {
+            result.append(Entity(name: name, id: firstID &+ offset))
+        }
+        return result
+    }
+
+    func insertBatch(_ batch: [Entity], locations: [EntityLocation]) {
+        lock.sync {
+            entities.reserveCapacity(entities.count + batch.count)
+            for index in batch.indices {
+                entities[batch[index].id] = locations[index]
+            }
+        }
+    }
+
     func addNotAllocatedEntity(_ entity: Entity) {
         guard entity.id == Entity.notAllocatedId else {
             return
@@ -241,6 +260,11 @@ public struct Archetype: Identifiable, Sendable {
 }
 
 extension Archetype {
+    mutating func reserveBatchCapacity(_ additionalCount: Int) {
+        entities.reserveCapacity(entities.count + additionalCount)
+        chunks.reserveBatchCapacity(additionalCount)
+    }
+
     /// Checks if the archetype has any entities.
     public var isEmpty: Bool {
         self.entities.isEmpty

@@ -105,10 +105,13 @@ public struct EventsUpdateSystem {
 
     public func update(context: UpdateContext) async {
         for handle in handledEvents.handledEvents {
-            guard let pointer = unsafe context.world.resources.getPointer(for: handle.resourceId) else {
+            guard
+                let data = context.world.resources.getResourceData(for: handle.resourceId),
+                let pointer = unsafe data.pointer.buffer.pointer.baseAddress
+            else {
                 continue
             }
-            unsafe handle.update(pointer)
+            withExtendedLifetime(data) { unsafe handle.update(pointer) }
         }
     }
 }
