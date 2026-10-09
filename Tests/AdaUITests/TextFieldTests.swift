@@ -9,6 +9,8 @@ import Testing
 @testable import AdaUI
 @testable import AdaPlatform
 import AdaInput
+import AdaText
+import AdaUtils
 import Math
 #if canImport(AppKit)
 import AppKit
@@ -124,6 +126,53 @@ struct TextFieldTests {
     @Test
     func textFieldCaretUsesReadableWideLineWidth() {
         #expect(TextFieldViewNode.Constants.caretLineWidth >= 2.5)
+    }
+
+    @Test(arguments: ["", "   ", "hello"], [false, true])
+    func focusedFieldDrawsFiniteCaretAndBlinks(initialText: String, touch: Bool) throws {
+        var text = initialText
+        let tester = ViewTester {
+            TextField("Search worlds and tags", text: Binding(get: { text }, set: { text = $0 }))
+                .textFieldStyle(PlainTextFieldStyle())
+                .font(.system(size: 15))
+                .frame(width: 240, height: 48)
+        }
+        .setSize(Size(width: 260, height: 80))
+        .performLayout()
+        let point = Point(25, 40)
+        let node = try #require(tester.click(at: point) as? TextFieldViewNode)
+        if touch {
+            let contact = RID()
+            tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: point, phase: .began, time: 0, contactID: contact)])
+            tester.containerView.onTouchesEvent([TouchEvent(window: .empty, location: point, phase: .ended, time: 0.03, contactID: contact)])
+        } else {
+            tester.sendMouseEvent(at: point, phase: .began)
+            tester.sendMouseEvent(at: point, phase: .ended)
+        }
+
+        func caretTransforms() -> [Transform3D] {
+            let context = UIGraphicsContext()
+            node.draw(with: context)
+            return context.getDrawCommands().compactMap {
+                if case let .drawPath(_, transform, _) = $0 { return transform }
+                return nil
+            }
+        }
+
+        let focused = try #require(caretTransforms().first)
+        #expect(focused.w.x.isFinite)
+        #expect(focused.w.y.isFinite)
+        node.update(TextFieldViewNode.Constants.caretBlinkInterval)
+        #expect(caretTransforms().isEmpty)
+        node.update(TextFieldViewNode.Constants.caretBlinkInterval)
+        let blinked = try #require(caretTransforms().first)
+        #expect(blinked.w.y.isFinite)
+
+        node.update(TextFieldViewNode.Constants.caretBlinkInterval)
+        tester.sendTextInput("x")
+        let typed = try #require(caretTransforms().first)
+        #expect(typed.w.y.isFinite)
+        #expect(text.contains("x"))
     }
 
     @Test

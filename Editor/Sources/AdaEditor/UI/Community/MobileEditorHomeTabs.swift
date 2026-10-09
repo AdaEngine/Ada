@@ -54,7 +54,8 @@ struct MobileEditorHomeTabs<Studio: View>: View {
                 unselectedColor: theme.editorColors.muted,
                 symbols: ["Studio": "\u{E86F}", "Community": "\u{E80B}"],
                 symbolFont: AdaEditorMaterialSymbolFont.font(size: 22),
-                labelFont: .system(size: 11)
+                labelFont: .system(size: 11),
+                bottomPadding: 6
             )
         ))
         .background(theme.editorColors.background.ignoresSafeArea())

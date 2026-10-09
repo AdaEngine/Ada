@@ -13,6 +13,7 @@ import Logging
 public struct AssetsPlugin: Plugin {
     private let filePath: StaticString
     private let assetBundleResourceURL: URL?
+    private var directories: ProjectDirectories?
 
     public init(filePath: StaticString = #filePath, assetBundle: Bundle? = nil) {
         self.filePath = filePath
@@ -28,7 +29,18 @@ public struct AssetsPlugin: Plugin {
         self.assetBundleResourceURL = assetDirectory.standardizedFileURL
     }
 
+    public init(directories: ProjectDirectories) {
+        self.filePath = #filePath
+        self.assetBundleResourceURL = directories.assetsDirectory
+        self.directories = directories
+    }
+
     public func setup(in app: AppWorlds) {
+        if let directories {
+            AssetsManager.initialize(directories: directories, scopeID: app.executionID)
+            app.addSystem(AssetsProcessSystem.self, on: .preUpdate)
+            return
+        }
         do {
             try AssetsManager.initialize(
                 filePath: filePath,

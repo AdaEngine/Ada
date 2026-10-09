@@ -75,6 +75,13 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSenda
 
 @GSExportable("AdaCommands")
 final class AnnotatedGravityCommandsBridge: @unchecked Sendable, AdaScriptNonSendableBridge {
+    @GSExportableIgnore
+    private var permitCommunitySpawn: (@Sendable () -> Bool)?
+
+    @GSExportableIgnore
+    func restrictCommunitySpawns(_ permit: @escaping @Sendable () -> Bool) {
+        permitCommunitySpawn = permit
+    }
     private var commands: Commands?
     private let navigator: SceneNavigator?
     private let reportDiagnostic: @Sendable (String) -> Void
@@ -113,6 +120,10 @@ final class AnnotatedGravityCommandsBridge: @unchecked Sendable, AdaScriptNonSen
 
     func spawn(_ componentValues: GSValue) -> Int {
         guard validateAccess() else {
+            return -1
+        }
+        if let permitCommunitySpawn, !permitCommunitySpawn() {
+            reportDiagnostic("Community entity creation limit exceeded")
             return -1
         }
         guard componentValues.isList else {

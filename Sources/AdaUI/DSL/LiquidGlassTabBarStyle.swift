@@ -17,6 +17,8 @@ public struct LiquidGlassTabBarStyle: TabViewStyle {
     public var symbols: [String: String]
     public var symbolFont: Font
     public var labelFont: Font
+    /// Space below bottom-aligned controls, in addition to the container's safe area.
+    public var bottomPadding: Float
 
     public init(
         backgroundColor: Color = Color(red: 0.12, green: 0.12, blue: 0.12),
@@ -25,7 +27,8 @@ public struct LiquidGlassTabBarStyle: TabViewStyle {
         unselectedColor: Color = Color.white.opacity(0.58),
         symbols: [String: String] = [:],
         symbolFont: Font = .system(size: 22),
-        labelFont: Font = .system(size: 11)
+        labelFont: Font = .system(size: 11),
+        bottomPadding: Float = 20
     ) {
         self.backgroundColor = backgroundColor
         self.borderColor = borderColor
@@ -34,6 +37,7 @@ public struct LiquidGlassTabBarStyle: TabViewStyle {
         self.symbols = symbols
         self.symbolFont = symbolFont
         self.labelFont = labelFont
+        self.bottomPadding = bottomPadding
     }
 
     public func makeBody(configuration: Configuration) -> some View {
@@ -58,7 +62,7 @@ private struct LiquidGlassTabBar: View {
         case .bottom, .left, .right:
             ZStack(anchor: .bottom) {
                 configuration.content
-                LiquidGlassTabBarControls(configuration: configuration, style: style).padding(.bottom, 20)
+                LiquidGlassTabBarControls(configuration: configuration, style: style).padding(.bottom, style.bottomPadding)
                     .offset(y: keyboardSafeAreaInset)
             }
         }

@@ -39,6 +39,7 @@ enum AdaApplicationEntry {
             try await AppRuntime.run(AdaPlayerApp())
             return
         }
+        _ = EditorProjectOpenURLRouter.shared
         #if os(iOS)
             if UIDevice.current.userInterfaceIdiom == .phone {
                 try await AppRuntime.run(AdaEditorPhoneApp())

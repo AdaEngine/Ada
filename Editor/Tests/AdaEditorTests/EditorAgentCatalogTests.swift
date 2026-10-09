@@ -128,7 +128,7 @@ struct EditorAgentCatalogTests {
     func decodeRegistry() throws {
         let data = Data(
             """
-            {"version":"1.0.0","agents":[{"id":"sample","name":"Sample","version":"1.0","description":"Agent",
+            {"version":"1.0.0","agents":[{"id":"sample","name":"Sample","version":"1.0","description":"Agent","icon":"https://example.com/sample.svg",
             "distribution":{"npx":{"package":"@scope/agent@1.0","args":["--acp"],"env":{"A":"B"}},
             "binary":{"darwin-aarch64":{"archive":"https://example.com/a.zip","cmd":"./agent","sha256":"abc"}}}}]}
             """
@@ -136,6 +136,7 @@ struct EditorAgentCatalogTests {
         )
         let registry = try EditorAgentCatalogService.decodeRegistry(data)
         #expect(registry.agents.first?.distribution.npx?.env == ["A": "B"])
+        #expect(registry.agents.first?.icon == "https://example.com/sample.svg")
         var duplicate = registry
         duplicate.agents += registry.agents
         #expect(throws: EditorAgentCatalogError.self) {
@@ -295,6 +296,13 @@ struct EditorAgentCatalogTests {
                 #expect(button.absoluteFrame.height <= 32)
                 #expect(button.absoluteFrame.width < 180)
                 #expect(buttonContainsGlass(button))
+            }
+            for id in ["sample", "local", "registry"] {
+                let icon = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agents.Icon.\(id)"))
+                let name = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agents.Name.\(id)"))
+                #expect(icon.absoluteFrame.width == 20)
+                #expect(icon.absoluteFrame.height == 20)
+                #expect(icon.absoluteFrame.maxX <= name.absoluteFrame.minX)
             }
             _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agents.Use.sample"))
             for _ in 0..<100 where !agent.settingsStatusMessage.contains("connected.") {

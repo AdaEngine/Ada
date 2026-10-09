@@ -842,7 +842,20 @@ final class TabViewNode<Selection: Hashable, Content: View>: ViewNode, Presentat
                 contentProxy: contentProxy,
                 onSelect: { value in weakSelf.value?.selectTab(value) }
             )
-            tabBarNode.update(from: newTabBarNode)
+            if tabBarNode === newTabBarNode {
+                tabBarNode.parent = self
+            } else if newTabBarNode.canUpdate(tabBarNode) {
+                tabBarNode.update(from: newTabBarNode)
+            } else {
+                // A style can change its root when hiding its controls. Reconcile
+                // that root instead of updating an incompatible node in place.
+                tabBarNode.parent = nil
+                tabBarNode = newTabBarNode
+                tabBarNode.parent = self
+                if let owner {
+                    tabBarNode.updateViewOwner(owner)
+                }
+            }
         }
 
         // Swap content node only if selection actually changed

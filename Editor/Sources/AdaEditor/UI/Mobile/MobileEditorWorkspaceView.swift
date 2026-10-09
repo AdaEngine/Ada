@@ -100,7 +100,8 @@ struct MobileEditorWorkspaceView: View {
                 "Play": "\u{E037}"
             ],
             symbolFont: AdaEditorMaterialSymbolFont.font(size: 22),
-            labelFont: MobileEditorFont.font(size: 11)
+            labelFont: MobileEditorFont.font(size: 11),
+            bottomPadding: 6
         ))
     }
 }

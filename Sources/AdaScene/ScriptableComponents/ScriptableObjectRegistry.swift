@@ -1,3 +1,4 @@
+@_spi(Internal) import AdaApp
 import AdaECS
 import Foundation
 
@@ -65,6 +66,7 @@ public struct ScriptableObjectDescriptor: Sendable {
 public enum ScriptableObjectRegistry {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var descriptorsByName: [String: ScriptableObjectDescriptor] = [:]
+    nonisolated(unsafe) private static var descriptorsByScope: [UUID: [String: ScriptableObjectDescriptor]] = [:]
     nonisolated(unsafe) private static var identifiersByType: [ObjectIdentifier: String] = [:]
 
     @MainActor
@@ -144,20 +146,43 @@ public enum ScriptableObjectRegistry {
         }
     }
 
+    /// Installs a catalog isolated from other games and native editor script factories.
+    @MainActor
+    public static func install(_ descriptors: [ScriptableObjectDescriptor], in scope: UUID) throws {
+        var names: [String: ScriptableObjectDescriptor] = [:]
+        for descriptor in descriptors {
+            guard descriptor.version > 0 else { throw ScriptableObjectCodingError.invalidVersion(descriptor.version, type: descriptor.identifier) }
+            for name in [descriptor.identifier] + descriptor.aliases {
+                guard names[name] == nil else { throw ScriptableObjectCodingError.duplicateIdentifier(name) }
+                names[name] = descriptor
+            }
+        }
+        lock.withLock { unsafe descriptorsByScope[scope] = names }
+    }
+
+    public static func removeScope(_ scope: UUID) {
+        lock.withLock { _ = unsafe descriptorsByScope.removeValue(forKey: scope) }
+    }
+
+    private static func currentDescriptors() -> [String: ScriptableObjectDescriptor] {
+        if let id = AppWorldsExecutionContext.currentID, let catalog = unsafe descriptorsByScope[id] { return catalog }
+        return unsafe descriptorsByName
+    }
+
     public static func descriptor(named name: String) -> ScriptableObjectDescriptor? {
-        lock.withLock { unsafe descriptorsByName[name] }
+        lock.withLock { currentDescriptors()[name] }
     }
 
     public static func descriptor(for object: ScriptableObject) -> ScriptableObjectDescriptor? {
         lock.withLock {
             if let explicitIdentifier = object.explicitTypeIdentifier,
-                let descriptor = unsafe descriptorsByName[explicitIdentifier] {
+                let descriptor = currentDescriptors()[explicitIdentifier] {
                 return descriptor
             }
             guard let identifier = unsafe identifiersByType[ObjectIdentifier(type(of: object))] else {
                 return nil
             }
-            return unsafe descriptorsByName[identifier]
+            return currentDescriptors()[identifier]
         }
     }
 
@@ -172,7 +197,7 @@ public enum ScriptableObjectRegistry {
         lock.withLock {
             var access = SystemAccessSet()
             var identifiers = Set<String>()
-            for descriptor in unsafe descriptorsByName.values where identifiers.insert(descriptor.identifier).inserted {
+            for descriptor in currentDescriptors().values where identifiers.insert(descriptor.identifier).inserted {
                 access.formUnion(descriptor.declaredAccess)
             }
             return access

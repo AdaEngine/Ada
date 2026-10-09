@@ -109,7 +109,7 @@ actor EditorAgentCatalogService {
                 } else {
                     throw EditorAgentCatalogError(message: "This agent has no distribution for this Mac.")
                 }
-                let entry = EditorInstalledAgent(id: agent.id, name: agent.name, version: installedVersion, target: target, managedDirectory: directory.path)
+                let entry = EditorInstalledAgent(id: agent.id, name: agent.name, version: installedVersion, target: target, managedDirectory: directory.path, icon: agent.icon)
                 try save(entry)
                 return entry
             } catch {

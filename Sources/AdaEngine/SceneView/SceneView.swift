@@ -17,6 +17,9 @@ import Math
 ///
 /// The `make` closure is called exactly once per `SceneView` instance before the runtime
 /// is built. Use it to configure plugins, resources, and initial scene content.
+/// Set `useSceneCameras` to render with the game's active cameras (including 3D)
+/// instead of creating a default 2D viewport camera. Their projections and transforms
+/// are preserved; render targets and viewport sizes are owned by this view.
 /// `onFrameRendered` receives the scene texture on the main actor after GPU completion.
 /// Read pixels during the callback; the texture is reused for subsequent frames.
 ///
@@ -31,6 +34,7 @@ import Math
 /// })
 /// ```
 public struct SceneView<Placeholder: View>: View {
+    let useSceneCameras: Bool
     let isInteractive: Bool
     let make: @MainActor (inout AppWorlds) -> Void
     let updateContent: @MainActor (World, AdaUtils.TimeInterval) -> Void
@@ -39,10 +43,12 @@ public struct SceneView<Placeholder: View>: View {
 
     public init(
         isInteractive: Bool = true,
+        useSceneCameras: Bool = false,
         make: @escaping @MainActor (inout AppWorlds) -> Void,
         updateContent: @escaping @MainActor (World, AdaUtils.TimeInterval) -> Void,
         onFrameRendered: (@MainActor (Texture2D) -> Void)? = nil
     ) where Placeholder == EmptyView {
+        self.useSceneCameras = useSceneCameras
         self.isInteractive = isInteractive
         self.make = make
         self.updateContent = updateContent
@@ -52,11 +58,13 @@ public struct SceneView<Placeholder: View>: View {
 
     public init(
         isInteractive: Bool = true,
+        useSceneCameras: Bool = false,
         make: @escaping @MainActor (inout AppWorlds) -> Void,
         updateContent: @escaping @MainActor (World, AdaUtils.TimeInterval) -> Void,
         onFrameRendered: (@MainActor (Texture2D) -> Void)? = nil,
         @ViewBuilder placeholder: @escaping @MainActor () -> Placeholder
     ) {
+        self.useSceneCameras = useSceneCameras
         self.isInteractive = isInteractive
         self.make = make
         self.updateContent = updateContent
@@ -66,8 +74,9 @@ public struct SceneView<Placeholder: View>: View {
 
     public var body: some View {
         OffscreenViewportContainer(
-            delegateFactory: { [make, updateContent, onFrameRendered] in
+            delegateFactory: { [make, updateContent, onFrameRendered, useSceneCameras] in
                 SceneViewCoordinator(
+                    useSceneCameras: useSceneCameras,
                     make: make,
                     updateContent: updateContent,
                     onFrameRendered: onFrameRendered

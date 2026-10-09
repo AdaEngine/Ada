@@ -260,26 +260,27 @@ public struct FilterQueryIterator<
     @inlinable
     public mutating func next() -> Element? {
         // swiftlint:disable:next empty_count
-        guard count > 0 && !archetypes.archetypes.isEmpty else {
+        guard count > 0 else {
+            return nil
+        }
+        let archetypes = self.archetypes
+        guard !archetypes.archetypes.isEmpty else {
             return nil
         }
 
-        while true {
-            guard cursor.currentArchetypeIndex < self.count else {
-                return nil
-            }
-
+        while cursor.currentArchetypeIndex < self.count {
             let archetypeIndex = state.archetypeIndecies[cursor.currentArchetypeIndex]
-            let archetype = self.archetypes.archetypes[archetypeIndex]
-
-            if archetype.isEmpty {
+            // Project only the fields needed for row iteration. Keeping a whole
+            // Archetype value here retains all of its nested CoW metadata per row.
+            if archetypes.archetypes[archetypeIndex].entities.isEmpty {
                 cursor.currentArchetypeIndex += 1
                 cursor.currentChunkIndex = 0
                 needsUpdateData = true
                 continue
             }
 
-            if cursor.currentChunkIndex >= archetype.chunks.chunks.count {
+            let chunks = archetypes.archetypes[archetypeIndex].chunks.chunks
+            if cursor.currentChunkIndex >= chunks.count {
                 cursor.currentArchetypeIndex += 1
                 cursor.currentChunkIndex = 0
                 cursor.currentRow = 0
@@ -288,7 +289,8 @@ public struct FilterQueryIterator<
                 continue
             }
 
-            if cursor.currentRow >= archetype.chunks.chunks[cursor.currentChunkIndex].count {
+            let chunkIndex = cursor.currentChunkIndex
+            if cursor.currentRow >= chunks[chunkIndex].count {
                 cursor.currentChunkIndex += 1
                 cursor.currentRow = 0
                 needsUpdateData = true
@@ -296,37 +298,20 @@ public struct FilterQueryIterator<
                 continue
             }
 
-            let currentChunk = archetype.chunks.chunks[cursor.currentChunkIndex]
             if needsUpdateData {
-                B.setChunk(
-                    states: states,
-                    fetches: &fetches,
-                    chunk: currentChunk,
-                    archetype: archetype
+                setChunkData(
+                    chunk: chunks[chunkIndex],
+                    archetype: archetypes.archetypes[archetypeIndex]
                 )
-                filterFetch = F._setData(
-                    state: filterState,
-                    fetch: filterFetch,
-                    chunk: currentChunk,
-                    archetype: archetype
-                )
-                needsUpdateData = false
             }
 
-            let entityId = currentChunk.entities[cursor.currentRow]
-
+            let entityId = chunks[chunkIndex].entities[cursor.currentRow]
             defer {
                 cursor.currentRow += 1
             }
 
             if requiresRowEvaluation {
-                guard
-                    F.condition(
-                        state: filterState,
-                        fetch: filterFetch,
-                        at: cursor.currentRow
-                    )
-                else {
+                guard F.condition(state: filterState, fetch: filterFetch, at: cursor.currentRow) else {
                     continue
                 }
             }
@@ -334,8 +319,7 @@ public struct FilterQueryIterator<
             guard let location = state.entities.entities[entityId] else {
                 continue
             }
-            let entity = archetype.entities[location.archetypeRow]
-
+            let entity = archetypes.archetypes[archetypeIndex].entities[location.archetypeRow]
             if let value = B.getQueryTargets(
                 for: entity,
                 states: states,
@@ -345,6 +329,27 @@ public struct FilterQueryIterator<
                 return value
             }
         }
+        return nil
+    }
+
+    // Whole metadata values are needed only when binding a new chunk. Borrows
+    // end before next() returns; no metadata snapshot is held between calls.
+    @inlinable
+    @inline(__always)
+    mutating func setChunkData(chunk: borrowing Chunk, archetype: borrowing Archetype) {
+        B.setChunk(
+            states: states,
+            fetches: &fetches,
+            chunk: chunk,
+            archetype: archetype
+        )
+        filterFetch = F._setData(
+            state: filterState,
+            fetch: filterFetch,
+            chunk: chunk,
+            archetype: archetype
+        )
+        needsUpdateData = false
     }
 
     @usableFromInline

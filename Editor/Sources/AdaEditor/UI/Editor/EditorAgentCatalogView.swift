@@ -1,4 +1,5 @@
 @_spi(AdaEngine) import AdaEngine
+import Foundation
 
 #if os(macOS)
     import AppKit
@@ -76,7 +77,9 @@ struct EditorAgentCatalogView: View {
     private var installedAgents: some View {
         ForEach(catalog.installed.filter { catalog.query.isEmpty || $0.name.localizedCaseInsensitiveContains(catalog.query) }) { entry in
             HStack {
+                agentIcon(id: entry.id, url: entry.icon ?? catalog.agents.first { $0.id == entry.id }?.icon)
                 Text("\(entry.name) · \(entry.version)").font(.system(size: 12))
+                    .accessibilityIdentifier("AdaEditor.Agents.Name.\(entry.id)")
                 Spacer()
                 if agent.isCatalogAgentSelected(entry) {
                     Text("Selected for all projects")
@@ -103,7 +106,9 @@ struct EditorAgentCatalogView: View {
         ) { local in
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
+                    agentIcon(id: local.id, url: catalog.adapter(for: local)?.icon)
                     Text("Found \(local.name)").font(.system(size: 12, weight: .semibold))
+                        .accessibilityIdentifier("AdaEditor.Agents.Name.\(local.id)")
                     Spacer()
                     if local.target != nil {
                         Button(agent.projectURL == nil ? "Add & Use" : "Add & Connect") { Task { await agent.connectCatalogAgent(local: local) } }
@@ -137,7 +142,9 @@ struct EditorAgentCatalogView: View {
     private func registryRow(_ item: EditorRegistryAgent) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
+                agentIcon(id: item.id, url: item.icon)
                 Text(item.name).font(.system(size: 13, weight: .semibold))
+                    .accessibilityIdentifier("AdaEditor.Agents.Name.\(item.id)")
                 Text(item.version).font(.system(size: 10)).foregroundColor(theme.editorColors.muted)
                 Spacer()
                 Button(agent.projectURL == nil ? "Install & Use" : "Install & Connect") { Task { await agent.connectCatalogAgent(registry: item) } }
@@ -154,6 +161,12 @@ struct EditorAgentCatalogView: View {
 
     private var actionButtonStyle: EditorAgentCatalogActionButtonStyle {
         EditorAgentCatalogActionButtonStyle(theme: theme)
+    }
+
+    private func agentIcon(id: String, url: String?) -> some View {
+        EditorAgentIcon(id: id, iconURL: url.flatMap(URL.init(string:)))
+            .id("\(id)|\(url ?? "")")
+            .accessibilityIdentifier("AdaEditor.Agents.Icon.\(id)")
     }
 }
 

@@ -100,7 +100,8 @@ public struct SwitchToggleStyle: ToggleStyle {
                 if configuration.showsLabel {
                     configuration.label
                         .font(.system(size: 13))
-                    Spacer(minLength: minimumLabelControlSpacing)
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                        .padding(.trailing, minimumLabelControlSpacing)
                 }
                 if showsStateText {
                     Text(configuration.isOn.wrappedValue ? onText : offText)
@@ -109,13 +110,18 @@ public struct SwitchToggleStyle: ToggleStyle {
                 }
                 ZStack(anchor: .leading) {
                     RoundedRectangleShape(cornerRadius: 10)
-                        .fill(configuration.isOn.wrappedValue ? tint : offTint)
+                        .fill(offTint)
                         .frame(width: 36, height: 20)
+                    RoundedRectangleShape(cornerRadius: 10)
+                        .fill(tint)
+                        .frame(width: 36, height: 20)
+                        .opacity(configuration.isOn.wrappedValue ? 1 : 0)
                     CircleShape().fill(thumbColor)
                         .frame(width: 16, height: 16)
                         .offset(x: configuration.isOn.wrappedValue ? 18 : 2)
                 }
                 .frame(width: 36, height: 20)
+                .animation(.easeInOut(duration: 0.18), value: configuration.isOn.wrappedValue)
             }
             .foregroundColor(labelColor ?? .white)
             .padding(.horizontal, horizontalPadding)

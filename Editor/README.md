@@ -70,5 +70,8 @@ The snapshot lives in `Sources/AdaEditor/Assets/Documentation/catalog.json` and 
 
 Standalone macOS Studio supports **Build → Export to Android…** and Android
 Run Destinations with connected devices and AVDs. Swift and AdaScript projects
-use the native Swift/WebGPU Android host. Configure **Settings → Android** and
+use the native Swift/WebGPU Android host. Configure **Settings → Build & Export → Android** and
 see [Android export and run](Documentation/Android.md).
+
+Build & Export also groups iOS, Web, Windows, Linux, macOS and VR / XR tool paths.
+See [build tool settings and platform availability](Documentation/BuildExport.md).

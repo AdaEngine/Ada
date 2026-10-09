@@ -56,8 +56,12 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     public init(
         sources: [AdaScriptSource],
         name: String,
-        startupSystemIdentifier: String? = nil
+        startupSystemIdentifier: String? = nil,
+        communityPolicy: AdaScriptCommunityPolicy? = nil
     ) throws {
+        if communityPolicy != nil {
+            for source in sources { try AdaScriptCommunityLowerer.validate(source: source.source) }
+        }
         let componentConstructors = AdaScriptComponentRuntime.linkedConstructors()
         let dataSchemas = try AdaScriptSchemaParser.parse(sources: sources)
         let runtimeComponents = AdaScriptComponentRuntime.runtimeDescriptors(schemas: dataSchemas)
@@ -67,7 +71,8 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             module: module,
             componentConstructors: componentConstructors,
             runtimeComponents: runtimeComponents,
-            networkCommands: networkCommands
+            networkCommands: networkCommands,
+            communityPolicy: communityPolicy
         )
         let resourceBindings = try AdaScriptSchemaParser.parseResourceBindings(sources: sources)
         let remoteCommandBindings = try AdaScriptSchemaParser.parseRemoteCommandBindings(sources: sources)
@@ -694,6 +699,7 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
     private let virtualMachine: GravityVirtualMachine
     private let taskRuntime: AdaScriptTaskRuntime
     private let asyncHost: AdaScriptAsyncHost
+    private let communityBudget: AdaScriptCommunityBudget?
     private var instances: [String: GSValue] = [:]
 
     deinit {
@@ -707,9 +713,16 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         module: ResolvedGravityScriptModule,
         componentConstructors: [AdaScriptLinkedComponentConstructor],
         runtimeComponents: [RuntimeComponentDescriptor],
-        networkCommands: [AdaScriptNetworkCommandSchema]
+        networkCommands: [AdaScriptNetworkCommandSchema],
+        communityPolicy: AdaScriptCommunityPolicy?
     ) throws {
-        let delegate = AnnotatedGravityRuntimeDelegate(module: module)
+        let guardedSources = try module.sourcesByPath.mapValues { source in
+            ResolvedGravityScriptModule.Source(
+                fileID: source.fileID,
+                source: communityPolicy == nil ? source.source : try AdaScriptCommunityLowerer.instrument(source: source.source)
+            )
+        }
+        let delegate = AnnotatedGravityRuntimeDelegate(module: module, sourcesByPath: guardedSources)
         self.delegate = delegate
         self.runtimeComponents = runtimeComponents
 
@@ -718,6 +731,7 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
 
         let virtualMachine = GravityVirtualMachine(settings: .init(), delegate: delegate)
         self.virtualMachine = virtualMachine
+        self.communityBudget = try communityPolicy.map { try AdaScriptCommunityBudget.install(in: virtualMachine, policy: $0) }
         let suspensionPolicy = AdaScriptSuspensionPolicy(scriptNonSendableTypes: module.nonSendableTypeNames)
         let taskRuntime = AdaScriptTaskRuntime.make(
             virtualMachine: virtualMachine,
@@ -768,17 +782,19 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         virtualMachine.setValue(taskRuntime, forKey: "__adaTasks")
         virtualMachine.setValue(asyncHost, forKey: "__adaAsync")
 
-        let binary = virtualMachine.loadGravityFile(
-            from: AdaScriptStandardLibrary.source + "\n"
+        let authoredSource = module.entrySource
+        let standardLibrary = communityPolicy == nil ? AdaScriptStandardLibrary.source : AdaScriptStandardLibrary.communitySource
+        let runtimeSource = (communityPolicy == nil ? "" : "extern var __adaUGCBudget;\n") + standardLibrary + "\n"
                 + AdaScriptTaskPrelude.source + "\n"
                 + AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
                 + AdaScriptNetworkBridge.prelude(commands: networkCommands)
-                + module.entrySource
-        )
+                + authoredSource
+        let binary = virtualMachine.loadGravityFile(from: communityPolicy == nil ? runtimeSource : try AdaScriptCommunityLowerer.instrument(source: runtimeSource))
         guard delegate.errors.isEmpty else {
             throw AdaScriptError.compilation(delegate.errors)
         }
         self.annotations = binary.annotations
+        communityBudget?.reset()
         virtualMachine.load(binary)
         guard delegate.errors.isEmpty else {
             throw AdaScriptError.compilation(delegate.errors)
@@ -791,6 +807,7 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
     func instantiateSystems(_ plans: [AnnotatedSystemPlan]) throws {
         AdaScriptRuntimeCoordinator.lock.lock()
         defer { AdaScriptRuntimeCoordinator.lock.unlock() }
+        communityBudget?.reset()
         for plan in plans {
             let systemClass = virtualMachine.getValue(forKey: plan.className)
             guard systemClass.isClass, let instance = systemClass.callAsFunction(), instance.isInstance else {
@@ -823,7 +840,11 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
     ) {
         AdaScriptRuntimeCoordinator.lock.lock()
         defer { AdaScriptRuntimeCoordinator.lock.unlock() }
+        communityBudget?.reset()
         let previousOwner = taskRuntime.currentOwnerID
+        if let communityBudget {
+            world.commands.restrictCommunitySpawns { communityBudget.permitSpawn() }
+        }
         taskRuntime.currentOwnerID = ownerID
         defer { taskRuntime.currentOwnerID = previousOwner }
         defer {
@@ -877,6 +898,7 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
 
     func pumpTasks(deltaTime: Double, worldID: String) {
         AdaScriptRuntimeCoordinator.lock.withLock {
+            communityBudget?.reset()
             asyncHost.advanceGameTime(by: deltaTime, forWorld: worldID)
             taskRuntime.pump(onlyWorld: worldID)
         }

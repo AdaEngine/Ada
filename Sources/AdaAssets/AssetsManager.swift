@@ -334,6 +334,9 @@ public struct AssetsManager: Resource {
         at path: String
     ) async throws {
         try validateVirtualPath(path)
+        if currentProjectDirectories?.restrictToVirtualRoots == true, path.hasPrefix(resourcePathPrefix) {
+            throw AssetError.message("Community package resources are read-only")
+        }
         try await AdaTrace.span("Assets.save.\(String(reflecting: R.self))") {
             let fileSystem = FileSystem.current
             var processedPath = self.processPath(path)
@@ -603,6 +606,9 @@ public struct AssetsManager: Resource {
             state.fileWatcher?.stop()
         }
         scopeConfigurations.withLock { configurations in
+            if configurations.directoriesByScope[scopeID]?.restrictToVirtualRoots == true {
+                configurations.retiredRestrictedScopes.insert(scopeID)
+            }
             configurations.directoriesByScope[scopeID] = nil
         }
     }
@@ -780,6 +786,12 @@ public struct AssetsManager: Resource {
         }
     }
 
+    /// Resource boundary for decoders with model-relative dependencies.
+    static var restrictedResourceRoot: URL? {
+        guard let directories = currentProjectDirectories, directories.restrictToVirtualRoots else { return nil }
+        return directories.assetsDirectory
+    }
+
     /// Configures virtual asset roots for an application execution scope.
     @AssetActor
     public static func setProjectDirectories(_ projectDirectories: ProjectDirectories) {
@@ -789,9 +801,16 @@ public struct AssetsManager: Resource {
         updateFileWatcher()
     }
 
+    /// Configures roots before an embedded world's plugins start.
+    @_spi(AdaEngine)
+    public static func initialize(directories: ProjectDirectories, scopeID: UUID) {
+        setProjectDirectories(directories, scopeID: scopeID)
+    }
+
     private static func setProjectDirectories(_ projectDirectories: ProjectDirectories, scopeID: UUID?) {
         scopeConfigurations.withLock { configurations in
             if let scopeID {
+                configurations.retiredRestrictedScopes.remove(scopeID)
                 configurations.directoriesByScope[scopeID] = projectDirectories
             } else {
                 configurations.defaultDirectories = projectDirectories
@@ -857,6 +876,13 @@ extension AssetsManager {
     private static func processPath(_ path: String) -> Path {
         var path = path
         var url: URL
+        if isRetiredRestrictedScope {
+            return Path(url: FileManager.default.temporaryDirectory.appendingPathComponent(".denied"), query: [])
+        }
+        if let directories = currentProjectDirectories, directories.restrictToVirtualRoots,
+           !isContainedVirtualPath(path) {
+            return Path(url: directories.cacheDirectory.appendingPathComponent(".denied"), query: [])
+        }
 
         if let root = virtualRoot(for: path) {
             path.removeFirst(root.prefix.count)
@@ -903,7 +929,35 @@ extension AssetsManager {
         return nil
     }
 
+    private static var isRetiredRestrictedScope: Bool {
+        guard let scopeID = AppWorldsExecutionContext.currentID else { return false }
+        return scopeConfigurations.withLock { $0.retiredRestrictedScopes.contains(scopeID) }
+    }
+
+    private static func isContainedVirtualPath(_ path: String) -> Bool {
+        guard !isRetiredRestrictedScope else { return false }
+        guard let root = virtualRoot(for: path) else { return false }
+        let relative = String(path.dropFirst(root.prefix.count).split(separator: "#", maxSplits: 1).first ?? "")
+        guard !relative.hasPrefix("/"), !relative.contains("\\"), !relative.contains(":"),
+              !relative.split(separator: "/", omittingEmptySubsequences: false).contains("..") else { return false }
+        // URL canonicalization can leave a nonexistent leaf unresolved. Reject links
+        // component by component, including broken links, before reads or writes.
+        var cursor = root.url
+        if (try? FileManager.default.destinationOfSymbolicLink(atPath: cursor.path)) != nil { return false }
+        for component in relative.split(separator: "/") {
+            cursor.appendPathComponent(String(component))
+            if (try? FileManager.default.destinationOfSymbolicLink(atPath: cursor.path)) != nil { return false }
+        }
+        let base = root.url.resolvingSymlinksInPath().standardizedFileURL.path
+        let target = root.url.appendingPathComponent(relative).resolvingSymlinksInPath().standardizedFileURL.path
+        return target == base || target.hasPrefix(base + "/")
+    }
+
     private static func validateVirtualPath(_ path: String) throws {
+        guard !isRetiredRestrictedScope else { throw AssetError.message("Community asset scope has ended") }
+        if currentProjectDirectories?.restrictToVirtualRoots == true, !isContainedVirtualPath(path) {
+            throw AssetError.message("Community asset path is outside its virtual roots")
+        }
         let prefixes = [resourcePathPrefix, userPathPrefix, cachePathPrefix]
         guard let prefix = prefixes.first(where: { path.hasPrefix($0) }) else {
             return
@@ -1047,6 +1101,8 @@ extension AssetsManager {
 private struct AssetsScopeConfigurations: Sendable {
     var defaultDirectories: ProjectDirectories?
     var directoriesByScope: [UUID: ProjectDirectories] = [:]
+    // Keep revoked IDs so inherited asynchronous tasks cannot fall back to native paths.
+    var retiredRestrictedScopes: Set<UUID> = []
 }
 
 private final class AssetsScopeState {
@@ -1114,13 +1170,18 @@ public struct ProjectDirectories: Sendable {
     /// Replaceable writable data that may be removed by the operating system.
     public let cacheDirectory: URL
 
+    /// Restricts embedded community games to their three scoped virtual roots.
+    public let restrictToVirtualRoots: Bool
+
     public init(
         source: URL,
         assetsDirectory: URL,
         userDataDirectory: URL? = nil,
-        cacheDirectory: URL? = nil
+        cacheDirectory: URL? = nil,
+        restrictToVirtualRoots: Bool = false
     ) {
         self.source = source
+        self.restrictToVirtualRoots = restrictToVirtualRoots
         self.assetsDirectory = assetsDirectory
 
         let namespace = source.lastPathComponent.isEmpty ? "AdaEngine" : source.lastPathComponent

@@ -55,6 +55,7 @@ final class EditorProjectOpenURLRouter {
     }
 
     func receive(_ url: URL) {
+        if EditorCommunityLinkRouter.receive(url) { return }
         #if os(macOS)
         if EditorAssetStoreRouter.shared.receive(url) { return }
         #endif

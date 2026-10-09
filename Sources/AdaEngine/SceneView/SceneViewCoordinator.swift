@@ -21,6 +21,7 @@ import Math
 final class SceneViewCoordinator: OffscreenViewportDelegate {
     private(set) var appWorlds: AppWorlds?
     private var cameraEntity: Entity?
+    private let useSceneCameras: Bool
     private var targetRenderTexture: RenderTexture?
     private var renderTexturePool: [RenderTexture] = []
     private var pendingDisplayTargets: [PendingDisplayTarget] = []
@@ -63,10 +64,12 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     init(
+        useSceneCameras: Bool = false,
         make: @escaping @MainActor (inout AppWorlds) -> Void,
         updateContent: @escaping @MainActor (World, AdaUtils.TimeInterval) -> Void,
         onFrameRendered: (@MainActor (Texture2D) -> Void)? = nil
     ) {
+        self.useSceneCameras = useSceneCameras
         self.makeClosure = make
         self.updateContentClosure = updateContent
         self.onFrameRendered = onFrameRendered
@@ -293,6 +296,10 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     private func spawnCamera(in app: AppWorlds) {
+        if useSceneCameras {
+            if let texture = targetRenderTexture { makeCameraRenderTargetReady(texture) }
+            return
+        }
         guard let texture = targetRenderTexture else {
             return
         }
@@ -334,7 +341,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         )
 
         if var camera: Camera = entity.components[Camera.self] {
-            camera.isActive = true
+            if !useSceneCameras { camera.isActive = true }
             camera.renderTarget = .texture(AssetHandle(texture))
             camera.viewport.rect = Rect(origin: .zero, size: physicalSize)
             camera.logicalViewport.rect = Rect(origin: .zero, size: logicalSize)
@@ -343,6 +350,12 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     private func makeCameraRenderTargetReady(_ texture: RenderTexture) {
+        if useSceneCameras, let app = appWorlds {
+            for entity in app.main.getEntities() where entity.components[Camera.self]?.isActive == true {
+                updateCameraTarget(app: app, entity: entity, texture: texture)
+            }
+            return
+        }
         if let entity = cameraEntity, let app = appWorlds {
             updateCameraTarget(app: app, entity: entity, texture: texture)
         }
@@ -449,6 +462,17 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     private func suspendCameraRendering() {
+        if useSceneCameras, let app = appWorlds {
+            // The embedded world's primary window has no surface. Preserve authored
+            // activation while skipping frames until an offscreen target is available.
+            for entity in app.main.getEntities() {
+                if var camera: Camera = entity.components[Camera.self] {
+                    camera.renderTarget = .window(.primary)
+                    entity.components += camera
+                }
+            }
+            return
+        }
         guard let cameraEntity, var camera: Camera = cameraEntity.components[Camera.self] else {
             return
         }

@@ -31,7 +31,10 @@ public struct Chunks: Sendable {
     /// Configuration for chunk storage
     public let entitiesPerChunk: Int
 
-    private var friedLocation: [ChunkLocation] = []
+    // Full entries are discarded lazily on lookup. Membership prevents duplicate
+    // entries when several rows are freed before the next insertion.
+    private var nonFullChunkIndices: [Int] = [0]
+    private var isListedAsNonFull: [Bool] = [true]
 
     /// Location entity in chunk
     public private(set) var entities: SparseSet<Entity.ID, ChunkLocation> = [:]
@@ -51,15 +54,27 @@ public struct Chunks: Sendable {
 
 extension Chunks {
     public mutating func getFreeChunkIndex() -> Int {
-        if let firstLocation = friedLocation.popLast() {
-            return firstLocation.chunkIndex
-        } else if let possibleIndex = chunks.firstIndex(where: { !$0.isFull }) {
-            return possibleIndex
-        } else {
-            let chunk = Chunk(entitiesPerChunk: entitiesPerChunk, layout: componentLayout)
-            self.chunks.append(chunk)
-            return self.chunks.endIndex - 1
+        while let index = nonFullChunkIndices.last {
+            if !chunks[index].isFull {
+                return index
+            }
+            nonFullChunkIndices.removeLast()
+            isListedAsNonFull[index] = false
         }
+
+        let index = chunks.count
+        chunks.append(Chunk(entitiesPerChunk: entitiesPerChunk, layout: componentLayout))
+        nonFullChunkIndices.append(index)
+        isListedAsNonFull.append(true)
+        return index
+    }
+
+    private mutating func markNonFullChunk(_ index: Int) {
+        guard !chunks[index].isFull, !isListedAsNonFull[index] else {
+            return
+        }
+        nonFullChunkIndices.append(index)
+        isListedAsNonFull[index] = true
     }
 
     public func insert<T: Component>(
@@ -90,7 +105,10 @@ extension Chunks {
 
     public subscript(_ index: Int) -> Chunk {
         _read { yield chunks[index] }
-        _modify { yield &chunks[index] }
+        _modify {
+            defer { markNonFullChunk(index) }
+            yield &chunks[index]
+        }
     }
 
     @discardableResult
@@ -117,8 +135,7 @@ extension Chunks {
         guard let location = self.entities[entity] else {
             return nil
         }
-        let swappedEntity = self.chunks[location.chunkIndex].swapRemoveEntity(at: entity)
-        self.friedLocation.append(location)
+        let swappedEntity = self.swapRemoveEntity(entity)
         return MoveEntityResult(newLocation: location, swappedEntity: swappedEntity)
     }
 
@@ -183,6 +200,7 @@ extension Chunks {
         if let swappedEntityId {
             self.entities[swappedEntityId] = location
         }
+        markNonFullChunk(location.chunkIndex)
 
         return swappedEntityId
     }
@@ -192,7 +210,8 @@ extension Chunks {
             self.chunks[index].clear()
         }
         self.entities.removeAll()
-        self.friedLocation.removeAll()
+        self.nonFullChunkIndices = Array(chunks.indices.reversed())
+        self.isListedAsNonFull = Array(repeating: true, count: chunks.count)
     }
 
     public func getComponentSlices<T: Component>(for type: T.Type) -> [UnsafeBufferPointer<T>] {
@@ -299,7 +318,7 @@ public struct Chunk: Sendable {
         self.componentsData = [:]
         for component in layout.components {
             self.componentsData[component.identifier] = ComponentsData(
-                capacity: entitiesPerChunk * MemoryLayout.stride(ofValue: component.componentType),
+                capacity: entitiesPerChunk,
                 component: component.componentType
             )
         }

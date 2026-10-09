@@ -23,9 +23,9 @@ final class AnnotatedGravityRuntimeDelegate: GravityVirtualMachineDelegate, @unc
     private let pathsByFileID: [UInt32: String]
     private let sourcesByPath: [String: ResolvedGravityScriptModule.Source]
 
-    init(module: ResolvedGravityScriptModule) {
+    init(module: ResolvedGravityScriptModule, sourcesByPath: [String: ResolvedGravityScriptModule.Source]? = nil) {
         self.pathsByFileID = module.pathsByFileID
-        self.sourcesByPath = module.sourcesByPath
+        self.sourcesByPath = sourcesByPath ?? module.sourcesByPath
     }
 
     func append(_ message: String) {

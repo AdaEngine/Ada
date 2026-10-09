@@ -1,7 +1,8 @@
 @_spi(AdaEngine) import AdaEngine
 import Foundation
+import Math
 
-/// Shared AdaUI discovery and navigation. Browser launching is an injected platform action.
+/// Shared discovery and native AdaScript play. Web builds use an injected platform action.
 struct EditorCommunityView: View {
     @Environment(\.theme) private var theme
     @State private var model: EditorCommunityModel
@@ -25,7 +26,7 @@ struct EditorCommunityView: View {
         NavigationStack(path: $path) {
             GeometryReader { geometry in
                 let width = min(1000, geometry.size.width)
-                catalog(width: width, columns: width >= 700 ? 2 : 1)
+                catalog(width: width, columns: 2)
             }
             .navigationTitle("Community")
             .navigationTitleFont(AdaEditorTitleFont.font(size: 24))
@@ -52,12 +53,12 @@ struct EditorCommunityView: View {
 
     private func catalog(width: Float, columns: Int) -> some View {
         let rows = rows(columns: columns)
-        let cardWidth = max(0, (width - 44 - Float(columns - 1) * 18) / Float(columns))
+        let cardWidth = max(0, (width - 44 - Float(columns - 1) * 14) / Float(columns))
         return MobileEditorPageScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 9) {
                     Text("Discover worlds")
-                        .font(AdaEditorTitleFont.font(size: 32))
+                        .font(AdaEditorTitleFont.font(size: 28))
                         .foregroundColor(theme.editorColors.text)
                     Text("Games created by the community.")
                         .font(.system(size: 15))
@@ -91,17 +92,17 @@ struct EditorCommunityView: View {
                         detail: model.games.isEmpty ? "Published games from the community will appear here." : "Try another name or tag."
                     )
                 }
-                LazyVStack(rows.indices, id: \.self, alignment: .leading, spacing: 22, estimatedRowHeight: 320) { row in
-                    HStack(alignment: .top, spacing: 18) {
+                LazyVStack(rows.indices, id: \.self, alignment: .leading, spacing: 14, estimatedRowHeight: 220) { row in
+                    HStack(alignment: .top, spacing: 14) {
                         ForEach(rows[row]) { game in
-                            gameCard(game).frame(width: cardWidth)
+                            gameCard(game, width: cardWidth).frame(width: cardWidth)
                         }
                         if rows[row].count < columns { Spacer() }
                     }
                 }
             }
             .padding(.horizontal, 22)
-            .padding(.top, 24)
+            .padding(.top, 20)
             .padding(.bottom, 120)
             .frame(width: width)
             .frame(maxWidth: .infinity)
@@ -139,27 +140,25 @@ struct EditorCommunityView: View {
         .accessibilityIdentifier("AdaEditor.Community.Status")
     }
 
-    private func gameCard(_ game: EditorCommunityGame) -> some View {
+    private func gameCard(_ game: EditorCommunityGame, width: Float) -> some View {
         Button { path.append(game) } label: {
-            VStack(alignment: .leading, spacing: 14) {
-                EditorCommunityArtwork(url: game.coverURL, height: 180)
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(game.title).font(.system(size: 20)).foregroundColor(theme.editorColors.text).lineLimit(2)
-                        Text(game.description).font(.system(size: 13)).foregroundColor(theme.editorColors.muted).lineLimit(2)
-                    }
-                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                    Text("\u{E5CC}").font(AdaEditorMaterialSymbolFont.font(size: 20)).foregroundColor(theme.editorColors.purple)
-                }
-                HStack {
-                    Text(game.tags.prefix(3).joined(separator: " · ")).lineLimit(1)
-                    Spacer()
-                    Text("\(game.likes) likes")
+            VStack(alignment: .leading, spacing: 8) {
+                EditorCommunityArtwork(url: game.coverURL, height: min(140, max(72, (width - 24) * 0.62)))
+                Text(game.title)
+                    .font(.system(size: 16))
+                    .foregroundColor(theme.editorColors.text)
+                    .lineLimit(2)
+                    .frame(height: 32, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 6) {
+                    Text(game.tags.prefix(1).joined()).lineLimit(1)
+                    Spacer(minLength: 0)
+                    EditorCommunityLikes(count: game.likes)
                 }
                 .font(.system(size: 12))
                 .foregroundColor(theme.editorColors.muted)
             }
-            .padding(16)
+            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangleShape(cornerRadius: 18).fill(theme.editorColors.surface))
         }
@@ -182,9 +181,14 @@ struct EditorCommunityDetailView: View {
             VStack(alignment: .leading, spacing: 22) {
                 EditorCommunityArtwork(url: game.coverURL, height: 240)
                 Text(game.title).font(AdaEditorTitleFont.font(size: 32)).foregroundColor(theme.editorColors.text).lineLimit(3)
-                Text("Community creation · \(game.likes) likes").font(.system(size: 14)).foregroundColor(theme.editorColors.muted)
+                HStack {
+                    Text("Community creation").font(.system(size: 14))
+                    Spacer()
+                    EditorCommunityLikes(count: game.likes)
+                }
+                .foregroundColor(theme.editorColors.muted)
                 Button(action: play) {
-                    Text(checking ? "Checking availability…" : "Play in browser")
+                    Text(checking ? "Checking availability…" : (game.runtime == .web ? "Play in browser" : "Play"))
                         .font(.system(size: 17))
                         .foregroundColor(.white)
                         .frame(height: 52)
@@ -233,11 +237,47 @@ struct EditorCommunityDetailView: View {
             do {
                 let current = try await client.game(id: game.id)
                 try Task.checkCancellation()
-                error = openGame(current.playURL) ? nil : "Could not open this world in your browser."
+                switch current.runtime {
+                case .web: error = openGame(current.playURL) ? nil : "Could not open this world in your browser."
+                case .adaScript: error = nil; EditorCommunityLinkRouter.open(game: current, client: client)
+                }
             } catch {
                 guard !Task.isCancelled else { return }
                 self.error = error.localizedDescription
             }
         }
+    }
+}
+
+private struct EditorCommunityLikes: View {
+    @Environment(\.theme) private var theme
+    let count: Int64
+
+    var body: some View {
+        HStack(spacing: 5) {
+            EditorCommunityHeart()
+                .fill(theme.editorColors.purple)
+                .frame(width: 16, height: 16)
+            Text("\(count)").font(.system(size: 12)).lineLimit(1)
+        }
+        .accessibilityIdentifier("AdaEditor.Community.Likes.\(count)")
+    }
+}
+
+private struct EditorCommunityHeart: Shape {
+    typealias AnimatableData = EmptyAnimatableData
+
+    func path(in rect: Rect) -> Path {
+        func point(_ x: Float, _ y: Float) -> Point {
+            Point(rect.minX + x * rect.width, rect.minY + y * rect.height)
+        }
+        var path = Path()
+        path.move(to: point(0.5, 0.92))
+        path.addCurve(to: point(0.07, 0.39), control1: point(0.37, 0.8), control2: point(0.07, 0.61))
+        path.addCurve(to: point(0.5, 0.24), control1: point(0.07, 0.08), control2: point(0.37, 0.02))
+        path.addCurve(to: point(0.93, 0.39), control1: point(0.63, 0.02), control2: point(0.93, 0.08))
+        path.addCurve(to: point(0.5, 0.92), control1: point(0.93, 0.61), control2: point(0.63, 0.8))
+        path.closeSubpath()
+        return path
     }
 }

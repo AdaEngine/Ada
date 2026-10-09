@@ -4,17 +4,20 @@ import Foundation
 enum EditorSettingsPage {
     static let runtimeEntry = "RUNTIME ENTRY"
     static let editorDisplay = "EDITOR DISPLAY"
+
+    static func title(_ page: String) -> String {
+        EditorBuildPlatform(rawValue: page)?.title ?? page.localizedCapitalized
+    }
 }
 
 extension EditorSettingsWindowViewModel {
     func pages(in section: EditorSettingsSection) -> [String] {
         switch section {
         case .general:
-            var globalPages = ["ADA CLOUD", "APPEARANCE", EditorSettingsPage.editorDisplay]
-            #if os(macOS)
-            if EditorDistribution.current.supportsSwiftProjects { globalPages.append("ANDROID") }
-            #endif
+            let globalPages = ["ADA CLOUD", "APPEARANCE", EditorSettingsPage.editorDisplay]
             return editorViewModel == nil ? globalPages : globalPages + ["EDITOR FONT", "SYNTAX APPEARANCE"]
+        case .buildExport:
+            return EditorBuildPlatform.allCases.map(\.rawValue)
         case .project:
             guard editorViewModel != nil else {
                 return []
@@ -49,7 +52,11 @@ extension EditorSettingsWindowViewModel {
         if query.isEmpty || section.title.localizedCaseInsensitiveContains(query) {
             return pages(in: section)
         }
-        return pages(in: section).filter { $0.localizedCaseInsensitiveContains(query) }
+        return pages(in: section).filter { page in
+            if page.localizedCaseInsensitiveContains(query) { return true }
+            guard section == .buildExport, let platform = EditorBuildPlatform(rawValue: page) else { return false }
+            return platform.fields.contains { $0.title.localizedCaseInsensitiveContains(query) || $0.id.localizedCaseInsensitiveContains(query) }
+        }
     }
 
     func activateSection(_ section: EditorSettingsSection) {
@@ -113,7 +120,7 @@ struct EditorSettingsTree: View {
                     } label: {
                         HStack(spacing: 8) {
                             theme.editorColors.border.frame(width: 1, height: 28)
-                            Text(page.localizedCapitalized).font(.system(size: 12))
+                            Text(EditorSettingsPage.title(page)).font(.system(size: 12))
                             Spacer()
                         }
                         .padding(.leading, 15)

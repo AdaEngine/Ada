@@ -209,7 +209,7 @@ struct EditorView: View {
                     androidStatus: viewModel.androidStatus,
                     onSelectAndroid: viewModel.selectAndroidTarget,
                     onRefreshAndroid: viewModel.refreshAndroidTargets,
-                    onAndroidSettings: { viewModel.presentSettings(.general, page: "ANDROID") }
+                    onAndroidSettings: { viewModel.presentSettings(.buildExport, page: "ANDROID") }
                 )
             }
         }

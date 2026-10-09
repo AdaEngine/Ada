@@ -171,6 +171,11 @@ Android export/run also supports Swift AdaEngine App projects, ADB device discov
 AVD boot, per-project debug signing and toolbar Run/Stop. Physical devices require
 authorized USB debugging; host-side export remains standalone macOS only. See
 [Android.md](Documentation/Android.md) for setup and verification scope.
+Build & Export settings group Android, iOS, Web, Windows, Linux, macOS and VR / XR
+tool paths, with file browsing, path checks and host-local persistence. Android JDK,
+SDK/NDK and optional Gradle settings retain the existing preference key. SwiftPM,
+Web and macOS AdaScript exports consume the selected tools; iOS/XR game export and
+cross-platform Windows/Linux packaging from macOS remain unavailable.
 Android startup is generated from a top-level, nongeneric `@main App` in the
 export copy; private types and explicit target source lists are supported.
 
@@ -238,7 +243,10 @@ Entry points: [EditorAgentA2UIController.swift](Sources/AdaEditor/Agent/EditorAg
 Coverage: [EditorAgentA2UITests.swift](Tests/AdaEditorTests/EditorAgentA2UITests.swift),
 [EditorAgentA2UITransportTests.swift](Tests/AdaEditorTests/EditorAgentA2UITransportTests.swift).
 macOS ACP catalog discovers/installs/connects agents; mobile uses an in-process
-SloppyRuntime path when available. Editor MCP/host tools expose project/docs/API
+SloppyRuntime path when available. The macOS catalog shows bundled ACP Registry logos
+and Sloppy branding for installed, discovered and registry agents. New registry logos
+load from HTTPS metadata with a shared cache and a generic fallback; icon URLs persist
+with managed installations. Editor MCP/host tools expose project/docs/API
 context, scene edits, diagnostics, build, simulation, visible Play, frame capture,
 web access and asset/image operations. Model texture assignment tools also exist;
 they do not constitute a visual 3D asset editor.
@@ -279,12 +287,25 @@ mobile flow have separate implementations and tests.
 The iPhone project home and iPad launcher use Studio/Community tabs. Catalog,
 search, sorting, details, screenshots and navigation are shared AdaUI views under
 `UI/Community`, with no SwiftUI/UIKit dependency. The public client requests PNG
-media for the engine's portable decoder. Play rechecks the selected publication
-and delegates browser opening to `Application.openURL`; Android uses ACTION_VIEW.
+media for the engine's portable decoder. Play rechecks the selected publication. AdaScript API-v1/v2 packages download with
+release pinning and SHA-256 verification and run in a separate embedded world/VM;
+web builds delegate opening to `Application.openURL` (Android ACTION_VIEW).
+The 3D player uses `SceneView(useSceneCameras: true)` to route active authored
+cameras into the offscreen viewport while preserving projection and transforms.
+API v2 adds 3D rendering/models/physics, scoped `@scriptable` objects and native
+Cloud multiplayer. Players choose Solo, Host or Join by code; hosting requires
+Cloud sign-in. Room compatibility is bound to the immutable published release,
+not authored network settings. The community player rejects native libraries,
+external projects/plugins and script UI. It restricts
+virtual asset roots from preparation through world teardown, keeps scriptable
+registrations local to the game world, and instruments loops/functions with limits;
+this is not a separate process or a total native/GPU memory sandbox.
 Browsing needs no Cloud sign-in. Studio and Community retain separate navigation;
 the last tab restores on launch, and workspace navigation focuses Studio while
-preserving its Build/Files/Play tabs. The public catalog currently returns up to
-100 entries. An Android Studio application shell is not provided by this change.
+preserving its Build/Files/Play tabs.
+The home tab bar hides during Studio navigation so it does not overlap workspace controls;
+both mobile tab bars use a 6-point bottom padding above the safe area.
+The public catalog currently returns up to 100 entries. An Android Studio application shell is not provided by this change.
 Entry points: [EditorCommunityView.swift](Sources/AdaEditor/UI/Community/EditorCommunityView.swift),
 [MobileEditorHomeTabs.swift](Sources/AdaEditor/UI/Community/MobileEditorHomeTabs.swift),
 [EditorCommunityClient.swift](Sources/AdaEditor/Cloud/EditorCommunityClient.swift).
@@ -292,6 +313,8 @@ Coverage: [EditorCommunityTests.swift](Tests/AdaEditorTests/EditorCommunityTests
 Bundled offline documentation provides search, sections, history and copyable
 examples. Appearance/input settings, notifications/background activities,
 achievements/Game Center, cloud account/settings and standalone update UI exist.
+Shared AdaUI settings switches place labels and controls at opposite row edges,
+with animated thumb movement and track tint; settings rows omit On/Off text.
 
 Ada Cloud AI wallet integration uses the existing account session for catalog,
 balance, cursor-paginated usage, quotes, reservations, lookup and cancellation.

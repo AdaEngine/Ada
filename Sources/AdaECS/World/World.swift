@@ -49,6 +49,7 @@ public final class World: @unchecked Sendable, Codable {
     private var removedComponents: [Entity.ID: Set<ComponentId>] = [:]
 
     private var componentsStorage = ComponentsStorage()
+    private var spawnPlans = SpawnPlanCache()
     var runtimeComponents = RuntimeComponentsStorage()
     public var commandQueue: WorldCommandQueue = WorldCommandQueue()
 
@@ -366,6 +367,7 @@ extension World {
     public func clear() {
         self.entities.clear()
         self.archetypes.clear()
+        self.spawnPlans.invalidate()
         self.removedEntities.removeAll(keepingCapacity: true)
         self.addedEntities.removeAll(keepingCapacity: true)
         self.commandQueue = WorldCommandQueue()
@@ -686,6 +688,7 @@ extension World {
             requiredComponentId: requiredComponent.identifier,
             constructor: constructor
         )
+        spawnPlans.invalidate()
         return self
     }
 
@@ -761,6 +764,7 @@ extension World {
             requiredComponentId: requiredComponentId,
             constructor: constructor
         )
+        self.spawnPlans.invalidate()
 
         return self
     }
@@ -821,25 +825,7 @@ extension World: EventSource {
 extension World {
     /// Insert entity to the world. Expect, that entity is already stored in `Entities`.
     func insertNewEntity(_ entity: Entity, components: [any Component]) {
-        let components: [any Component] = components.reduce(into: []) { partialResult, component in
-            let registeredRequirements: [ComponentsStorage.RequiredComponentInfo]
-            if let runtimeComponent = component as? RuntimeComponentPayload {
-                registeredRequirements = componentsStorage.getRequiredComponents(for: runtimeComponent.componentID)
-            } else {
-                registeredRequirements = componentsStorage.getRequiredComponents(for: component)
-            }
-            for requiredComponent in registeredRequirements {
-                partialResult.append(requiredComponent.constructor())
-            }
-            for requiredComponent in type(of: component).requiredComponents.components {
-                partialResult.append(requiredComponent.defaultValue)
-            }
-            partialResult.append(component)
-        }
-        let componentsLayout = ComponentLayout(components: components)
-        let archetypeIndex = self.archetypes.getOrCreate(
-            for: componentsLayout
-        )
+        let (components, archetypeIndex) = prepareSpawnComponents(components)
 
         let row = self.archetypes.archetypes[archetypeIndex].append(entity)
         let chunkLocation = self.archetypes.archetypes[archetypeIndex].chunks.insertEntity(
@@ -859,6 +845,92 @@ extension World {
         entity.world = self
         addedEntities.insert(entity.id)
         eventManager.send(WorldEvents.DidAddEntity(entity: entity), source: self)
+    }
+
+    private func prepareSpawnComponents(_ inputs: [any Component]) -> ([any Component], Archetype.ID) {
+        let revision = spawnPlans.revision
+        let plan = spawnPlans.lookup(inputs)
+        // Reuse the input array when no requirements are produced. Start an
+        // expanded array lazily at the first generated component.
+        var expanded: [any Component]?
+        var outputCount = 0
+        var requirements: [[ComponentsStorage.RequiredComponentInfo]] = []
+        var matchesPlan = plan != nil
+
+        func expand(beforeInput index: Int) {
+            guard expanded == nil else {
+                return
+            }
+            var components: [any Component] = []
+            components.reserveCapacity(plan?.outputIDs.count ?? inputs.count)
+            components.append(contentsOf: inputs.prefix(index))
+            expanded = components
+        }
+
+        func append(_ component: any Component, knownID: ComponentId? = nil) {
+            if matchesPlan, let plan {
+                if outputCount >= plan.outputIDs.count || (knownID ?? componentIdentifier(of: component)) != plan.outputIDs[outputCount] {
+                    matchesPlan = false
+                }
+            }
+            outputCount += 1
+            expanded?.append(component)
+        }
+
+        for (index, component) in inputs.enumerated() {
+            let registeredRequirements: [ComponentsStorage.RequiredComponentInfo]
+            // Factories may reenter the world and change requirements for later inputs.
+            // Keep a value snapshot for this input, just as the uncached path does.
+            if let plan, revision == spawnPlans.revision {
+                registeredRequirements = plan.registeredRequirements[index]
+            } else if let runtimeComponent = component as? RuntimeComponentPayload {
+                registeredRequirements = componentsStorage.getRequiredComponents(for: runtimeComponent.componentID)
+            } else {
+                registeredRequirements = componentsStorage.getRequiredComponents(for: component)
+            }
+            if plan == nil {
+                requirements.append(registeredRequirements)
+            }
+            if !registeredRequirements.isEmpty {
+                expand(beforeInput: index)
+            }
+            for requiredComponent in registeredRequirements {
+                append(requiredComponent.constructor())
+            }
+            // A computed getter may change its types or have side effects. Evaluate
+            // it and every default factory at the same point on every spawn.
+            let typeRequirements = type(of: component).requiredComponents.components
+            if !typeRequirements.isEmpty {
+                expand(beforeInput: index)
+            }
+            for requiredComponent in typeRequirements {
+                append(requiredComponent.defaultValue)
+            }
+            append(component, knownID: plan?.inputIDs[index])
+        }
+
+        let components = expanded ?? inputs
+        if matchesPlan, let plan,
+           components.count == plan.outputIDs.count,
+           archetypes.archetypes.indices.contains(plan.archetypeIndex),
+           archetypes.archetypes[plan.archetypeIndex].componentLayout.maskSet == plan.layout.maskSet {
+            return (components, plan.archetypeIndex)
+        }
+
+        let componentsLayout = ComponentLayout(components: components)
+        let archetypeIndex = archetypes.getOrCreate(for: componentsLayout)
+        // Do not publish snapshots from a spawn that changed the registry while
+        // running factories. The next spawn must resolve the current requirements.
+        if revision == spawnPlans.revision {
+            spawnPlans.store(SpawnPlan(
+                inputIDs: plan?.inputIDs ?? inputs.map { componentIdentifier(of: $0) },
+                registeredRequirements: plan?.registeredRequirements ?? requirements,
+                outputIDs: componentsLayout.components.map(\.identifier),
+                layout: componentsLayout,
+                archetypeIndex: archetypeIndex
+            ))
+        }
+        return (components, archetypeIndex)
     }
 
     /// Move entity to new archetype.
@@ -965,7 +1037,6 @@ extension World {
                 )
             }
         }
-
     }
 }
 

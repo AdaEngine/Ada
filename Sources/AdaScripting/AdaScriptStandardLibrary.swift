@@ -1,5 +1,15 @@
+import Foundation
+
 /// AdaScript conveniences installed in every runtime before authored sources.
 enum AdaScriptStandardLibrary {
+    static var communitySource: String {
+        // These conveniences must not expose process control or block on stdin.
+        source.replacingOccurrences(of: "System.put(value);", with: "")
+            .replacingOccurrences(of: "System.print();", with: "")
+            .replacingOccurrences(of: "return System.input(removeTrailingNewline);", with: "return \"\";")
+            .replacingOccurrences(of: "return System.nanotime();", with: "return 0;")
+            .replacingOccurrences(of: "return System.exit(code);", with: "Fiber.abort(\"Process control is unavailable\");")
+    }
     static let source = """
     // The VM's native print closure does not forward all arguments through apply().
     func print() {

@@ -275,7 +275,7 @@ def parser():
     parser.add_argument("--swift-sdks",default=os.environ.get("SWIFT_ANDROID_SDKS_PATH"))
     parser.add_argument("--ndk")
     parser.add_argument("--android-sdk")
-    parser.add_argument("--build-tools",default="36.0.0")
+    parser.add_argument("--build-tools",default=os.environ.get("ANDROID_BUILD_TOOLS_VERSION","36.0.0"))
     parser.add_argument("--min-sdk",type=int,default=29)
     parser.add_argument("--target-sdk",type=int,default=36)
     parser.add_argument("--abi",choices=[*ABIS,"all"],default="arm64-v8a")

@@ -1,0 +1,212 @@
+{
+  "registry": "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json",
+  "retrieved": "2026-10-09",
+  "rasterSize": 64,
+  "icons": [
+    {
+      "id": "agoragentic-acp",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/agoragentic-acp.svg",
+      "svgSHA256": "a185cdd875bc41d6b288a639e019391b65f50df75e4d5a8ca07640786704d98b"
+    },
+    {
+      "id": "amp-acp",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/amp-acp.svg",
+      "svgSHA256": "8d89c414bec3aa422ea481996bbc7699b7dc2930a49bbd619643f2c4ad26aeb2"
+    },
+    {
+      "id": "antigravity-acp",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/antigravity-acp.svg",
+      "svgSHA256": "ef068db27db956dbf947b59a3e6d21e8aa170656c55ff04d0b66fa673ea852c1"
+    },
+    {
+      "id": "auggie",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/auggie.svg",
+      "svgSHA256": "66f6c787deecab872b78e68a413227db20a2be770732682bbd73e14fd2602345"
+    },
+    {
+      "id": "autohand",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/autohand.svg",
+      "svgSHA256": "6324e552f6c85025642ca9aabf4adddb4bba318a6f9422c7053fd4c610914120"
+    },
+    {
+      "id": "claude-acp",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/claude-acp.svg",
+      "svgSHA256": "30c1a5c5e597b030d17bd7ff55ad62fd38975a7ba560d32589bd96de99b5fe8d"
+    },
+    {
+      "id": "cline",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/cline.svg",
+      "svgSHA256": "e2de9b03c11aa6887796916aa636c910674615639983a20bc47441728412847e"
+    },
+    {
+      "id": "codebuddy-code",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/codebuddy-code.svg",
+      "svgSHA256": "28b73467b7c439956a1fcafaf5b0f997a552bb2428a0e9ed93b44c1e53565368"
+    },
+    {
+      "id": "codex-acp",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/codex-acp.svg",
+      "svgSHA256": "3304f6c5797ebce8f5c3d0e0af28e1eb970e81697deaae986466970523e46b96"
+    },
+    {
+      "id": "cortex-code",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/cortex-code.svg",
+      "svgSHA256": "70128bcb28473e73b53f93f9fea286004633acca8d378b9d97846463bdbefee1"
+    },
+    {
+      "id": "corust-agent",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/corust-agent.svg",
+      "svgSHA256": "41a66ffc695728671a7bed4ebdf0c1c27e4c22f75e1e06f98e39459190e13157"
+    },
+    {
+      "id": "crow-cli",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/crow-cli.svg",
+      "svgSHA256": "e5bf3c1707a3804f57e4ee12dbefd6ac91d03ec461d951b4ae22cc766bb0a411"
+    },
+    {
+      "id": "cursor",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/cursor.svg",
+      "svgSHA256": "a77e8aafedef55dd0b4b9ad17b921f31bdf46996f109ec67e8d93a21ab52437f"
+    },
+    {
+      "id": "deepagents",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/deepagents.svg",
+      "svgSHA256": "bb0fed2e9587992e5814c64df443109dd82520559f3527b1a3270477083712e6"
+    },
+    {
+      "id": "devin",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/devin.svg",
+      "svgSHA256": "ab2f979144f0ad4613c8ded9e0562726d6e29e2f5ad95bab64acd0cd526e13d3"
+    },
+    {
+      "id": "dimcode",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/dimcode.svg",
+      "svgSHA256": "0c8a5019f004e420871e9550e55420edaa5ecbf3e5559176338ef0053f966082"
+    },
+    {
+      "id": "dirac",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/dirac.svg",
+      "svgSHA256": "cb901f52cad80851dc7ea745b0793b051dabd442f8256a475325388a0dda9381"
+    },
+    {
+      "id": "factory-droid",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/factory-droid.svg",
+      "svgSHA256": "931960821fbafd095221a922ca017676d41fbc67f61b708d325413ad6e0bbec7"
+    },
+    {
+      "id": "fast-agent",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/fast-agent.svg",
+      "svgSHA256": "f70197d4bfb23053ad3d25db4f1651211776043deaca1f94565e4683ee40216a"
+    },
+    {
+      "id": "gemini",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/gemini.svg",
+      "svgSHA256": "f2126f3c449668167d12fea59ea6b796aad39118fdeaecb5e11e152d68fef853"
+    },
+    {
+      "id": "github-copilot-cli",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/github-copilot-cli.svg",
+      "svgSHA256": "730116f6a71597622cf7efa027fe82f1dd597016f8d12c2394577757a1ab73b0"
+    },
+    {
+      "id": "glm-acp-agent",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/glm-acp-agent.svg",
+      "svgSHA256": "92d58de607569cad5df45504b45e31602d35eee953c48002623d1fdc6023c56c"
+    },
+    {
+      "id": "goose",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/goose.svg",
+      "svgSHA256": "9dacb0a0324f958fa6fbc270026526b2ad66ea5d2e01bded474546811218a316"
+    },
+    {
+      "id": "grok-build",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/grok-build.svg",
+      "svgSHA256": "b8fe2866adbbfb6352af9a3138916e79c90086566cede68e724c3e19e663b51e"
+    },
+    {
+      "id": "harn",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/harn.svg",
+      "svgSHA256": "c87bdd7da801e86406f62518071cffc00c37fea99bde41c0dc68b8eba7257356"
+    },
+    {
+      "id": "junie",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/junie.svg",
+      "svgSHA256": "4019de035c99dbeae4f659b43969c7df4f8032ff5c37fb6861fd42609159dc75"
+    },
+    {
+      "id": "kilo",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/kilo.svg",
+      "svgSHA256": "41509610850a56ee132a764b335806b8c06fc4f9857ec3fe9f9e54a55f51f417"
+    },
+    {
+      "id": "kimchi",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/kimchi.svg",
+      "svgSHA256": "d246ec242fb714ae57c66ce7cfd4d24a05ec092c50b7320c340cc10bf79c7aa4"
+    },
+    {
+      "id": "kimi",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/kimi.svg",
+      "svgSHA256": "e3354675d761f2b27651dce3afda0fcf7351c174bc19ecffe6c907b7121165d5"
+    },
+    {
+      "id": "minimax-code",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/minimax-code.svg",
+      "svgSHA256": "ea4d671eb04a1e87a51fbc0b9e708c5d5a6e0440fa8a7f3ffcd9034ccdcbebd2"
+    },
+    {
+      "id": "minion-code",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/minion-code.svg",
+      "svgSHA256": "a786bb89317134be8211f10826585e14c041016708cbe8d89b18fd7a0f64057c"
+    },
+    {
+      "id": "mistral-vibe",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/mistral-vibe.svg",
+      "svgSHA256": "6b854c405424eb3a4020b6d15ff2d0354bc286d10f56a12f43681c0fc401fcd4"
+    },
+    {
+      "id": "nova",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/nova.svg",
+      "svgSHA256": "6fae2c9dd17034305ae0c07410564f3ad15f7c38ce383084fa60df1295e149aa"
+    },
+    {
+      "id": "opencode",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/opencode.svg",
+      "svgSHA256": "b60bce4476ce81c772f78313e497b98f9489a67580fd89f39354b527241edbc6"
+    },
+    {
+      "id": "pi-acp",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/pi-acp.svg",
+      "svgSHA256": "a902d73df746feba793514b9da3a4b8334caf16f6ae2ef36b1a25c70808b7f91"
+    },
+    {
+      "id": "poolside",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/poolside.svg",
+      "svgSHA256": "72d26ef8da930b510e4de0042111e9f82d3400b732991e0828fbf1eb3885afa2"
+    },
+    {
+      "id": "qoder",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/qoder.svg",
+      "svgSHA256": "635db5d8afd3d75cbb8524ade950435549dd52ad9705871b1407b37ea77e7f24"
+    },
+    {
+      "id": "qwen-code",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/qwen-code.svg",
+      "svgSHA256": "3d8111d0b871cd80bad55c4bb3011da3c411dd806ba03e0f8fb9c0c9d7daaee5"
+    },
+    {
+      "id": "sigit",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/sigit.svg",
+      "svgSHA256": "db67e17540399da6db400cf07c6d0d23161f67a1bf11186ae7fa72c5de8943ee"
+    },
+    {
+      "id": "stakpak",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/stakpak.svg",
+      "svgSHA256": "37668a944f30f03a3af74d98e7fe1b68dcbacdebad9f5b46c4e241a12be244c1"
+    },
+    {
+      "id": "vtcode",
+      "url": "https://cdn.agentclientprotocol.com/registry/v1/latest/vtcode.svg",
+      "svgSHA256": "6f116d7447056cfe38e3512e4957a1360e3be21a72da9589ac702e073513ff5d"
+    }
+  ]
+}

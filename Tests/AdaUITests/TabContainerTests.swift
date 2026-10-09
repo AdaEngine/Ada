@@ -44,6 +44,36 @@ private struct TabContainerTestStyle: TabViewStyle {
     }
 }
 
+private struct CollapsibleTabContainerTestStyle: TabViewStyle {
+    let showsTabBar: Bool
+
+    @ViewBuilder func makeBody(configuration: Configuration) -> some View {
+        if showsTabBar {
+            TabContainerTestStyle().makeBody(configuration: configuration)
+                .accessibilityIdentifier("home-tab-bar")
+        } else {
+            configuration.content
+        }
+    }
+}
+
+private struct CollapsibleTabContainerRoot: View {
+    @State var showsTabBar = true
+    @State var selected = 0
+
+    var body: some View {
+        TabView(selection: $selected) {
+            Tab("Studio", value: 0) {
+                Text("Workspace").accessibilityIdentifier("retained-workspace")
+            }
+            Tab("Community", value: 1) {
+                Text("Community").accessibilityIdentifier("retained-community")
+            }
+        }
+        .tabViewStyle(CollapsibleTabContainerTestStyle(showsTabBar: showsTabBar))
+    }
+}
+
 private struct StatefulTabContainerTestStyle: TabViewStyle {
     func makeBody(configuration: Configuration) -> some View {
         StatefulTabContainerTestBody(configuration: configuration)
@@ -114,6 +144,33 @@ struct TabContainerTests {
     }
 
     // MARK: - TabView switching
+
+    @Test
+    func customStyleCanHideAndRestoreTabBarWithoutLosingContent() async throws {
+        let root = CollapsibleTabContainerRoot()
+        let tester = ViewTester(rootView: root)
+            .setSize(Size(width: 320, height: 480))
+            .performLayout()
+        let workspace = try #require(tester.findNodeByAccessibilityIdentifier("retained-workspace"))
+
+        for showsTabBar in [false, true, false, true] {
+            root.showsTabBar = showsTabBar
+            await Task.yield()
+            tester.advanceFrame(deltaTime: 0.4).performLayout()
+            #expect((tester.findNodeByAccessibilityIdentifier("home-tab-bar") != nil) == showsTabBar)
+            #expect(tester.findNodeByAccessibilityIdentifier("retained-workspace") === workspace)
+            #expect(workspace.owner === tester.containerView)
+            #expect(workspace.parent != nil)
+            var ancestor = workspace
+            while let parent = ancestor.parent { ancestor = parent }
+            #expect(ancestor === tester.containerView.viewTree.rootNode)
+        }
+
+        root.selected = 1
+        await Task.yield()
+        tester.advanceFrame(deltaTime: 0.4).performLayout()
+        #expect(tester.findNodeByAccessibilityIdentifier("retained-community") != nil)
+    }
 
     @Test
     func tabView_switchesContentOnSelectionChange() {

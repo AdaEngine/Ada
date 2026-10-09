@@ -179,7 +179,9 @@ enum EditorCLI {
                     gravityRoot: sdk.compilerRoot,
                     engineRoot: sdk.engineRoot,
                     swiftExecutable: swift,
-                    swiftSDK: invocation.options["swift-sdk"] ?? ProcessInfo.processInfo.environment["ADA_WEB_SWIFT_SDK"] ?? "swift-6.3.2-RELEASE_wasm",
+                    buildEnvironment: EditorBuildExportConfiguration.load().environment(for: web ? .web : .macOS),
+                    swiftSDK: invocation.options["swift-sdk"] ?? ProcessInfo.processInfo.environment["ADA_WEB_SWIFT_SDK"]
+                        ?? EditorBuildExportConfiguration.load().values[EditorBuildPlatform.web.rawValue]?["ADA_WEB_SWIFT_SDK"] ?? "swift-6.3.2-RELEASE_wasm",
                     configuration: invocation.options["configuration"] == "debug" ? .debug : .release,
                     scratchDirectory: scratch,
                     hostScratchDirectory: web ? scratch.appendingPathComponent("host") : nil
@@ -243,6 +245,9 @@ enum EditorCLI {
             return explicit
         }
         if invocation.options["target"] == "web", let web = ProcessInfo.processInfo.environment["ADA_WEB_SWIFT_EXECUTABLE"] {
+            return web
+        }
+        if invocation.options["target"] == "web", let web = EditorBuildExportConfiguration.load().swiftExecutable(for: .web) {
             return web
         }
         return await SwiftToolchainLocator.locate().swiftExecutablePath

@@ -13,6 +13,7 @@ struct EditorAdaScriptNativeExportOptions: Sendable {
     let gravityRoot: URL
     let engineRoot: URL
     let swiftExecutable: String
+    var buildEnvironment: [String: String] = [:]
     var swiftSDK = "swift-6.3.2-RELEASE_wasm"
     var buildsPlayer = true
     var configuration: Configuration = .release
@@ -73,13 +74,19 @@ actor EditorAdaScriptNativeExporter {
         let native = stage.appendingPathComponent("Sources/GameplayNative", isDirectory: true)
         let archive = native.appendingPathComponent("libada_game.a")
         if !FileManager.default.isExecutableFile(atPath: options.gravityRoot.appendingPathComponent("gravity").path) {
-            try await run("/usr/bin/make", ["-j4"], at: options.gravityRoot, log: log)
+            try await run("/usr/bin/make", ["-j4"], at: options.gravityRoot, environment: options.buildEnvironment, log: log)
         }
         let tool = options.gravityRoot.appendingPathComponent("tools/aot_build.py")
         guard FileManager.default.fileExists(atPath: tool.path) else { throw EditorPreviewBuildFailure(message: "The Gravity checkout does not contain tools/aot_build.py.") }
-        try await run("/usr/bin/python3", [tool.path] + inputPaths + ["--module", "ada_game", "--output", archive.path], at: stage, log: log)
+        try await run(
+            "/usr/bin/python3", [tool.path] + inputPaths + ["--module", "ada_game", "--output", archive.path],
+            at: stage, environment: options.buildEnvironment, log: log
+        )
         let inspection = stage.appendingPathComponent("libada_game-inspection.dylib")
-        try await run("/usr/bin/clang", ["-std=c11", "-dynamiclib", native.appendingPathComponent("ada_game.c").path, "-I", native.path, "-o", inspection.path], at: stage, log: log)
+        try await run(
+            "/usr/bin/clang", ["-std=c11", "-dynamiclib", native.appendingPathComponent("ada_game.c").path, "-I", native.path, "-o", inspection.path],
+            at: stage, environment: options.buildEnvironment, log: log
+        )
         try await Self.validateMetadata(at: inspection, project: project, sources: sources)
         try FileManager.default.removeItem(at: inspection)
         let include = native.appendingPathComponent("include", isDirectory: true)
@@ -122,7 +129,7 @@ actor EditorAdaScriptNativeExporter {
         icon = "run"
         command = "./script/build_and_run.sh"
         """.write(to: codexDirectory.appendingPathComponent("environment.toml"), atomically: true, encoding: .utf8)
-        let env = ["ADAENGINE_GRAVITY_PACKAGE_PATH": options.gravityRoot.path, "ADAENGINE_DISABLE_SWAN": "1"]
+        let env = options.buildEnvironment.merging(["ADAENGINE_GRAVITY_PACKAGE_PATH": options.gravityRoot.path, "ADAENGINE_DISABLE_SWAN": "1"]) { _, value in value }
         if !options.buildsPlayer {
             // Package-only mode is used for reusable library exports and compiler QA.
         } else if options.destination == .android {

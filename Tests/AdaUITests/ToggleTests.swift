@@ -72,6 +72,55 @@ struct ToggleTests {
         #expect(model.isOn)
     }
 
+    @Test("padded switch keeps label and control at opposite row edges", arguments: [Float(300), Float(720)])
+    func paddedSwitchLayout(width: Float) throws {
+        let tester = ViewTester {
+            Toggle("Setting", isOn: .constant(false))
+                .toggleStyle(SwitchToggleStyle(rowHeight: 44, horizontalPadding: 12))
+        }
+        .setSize(Size(width: width, height: 44))
+        .performLayout()
+
+        let root = tester.containerView.viewTree.rootNode
+        let label = try #require(descendants(of: TextViewNode.self, in: root).first)
+        let thumb = try #require(descendants(of: ShapeViewNode<CircleShape>.self, in: root).first)
+        #expect(abs(label.absoluteFrame().minX - 12) < 0.01)
+        #expect(abs(thumb.absoluteFrame().minX - (width - 46)) < 0.01)
+    }
+
+    @Test("switch thumb and track animate together in both directions")
+    func switchAnimation() throws {
+        let model = ToggleModel()
+        let tester = ViewTester {
+            Toggle("Setting", isOn: Binding(get: { model.isOn }, set: { model.isOn = $0 }))
+        }
+        .setSize(Size(width: 300, height: 44))
+        .performLayout()
+        let root = tester.containerView.viewTree.rootNode
+        let thumb = try #require(descendants(of: ShapeViewNode<CircleShape>.self, in: root).first)
+        let track = try #require(descendants(of: OpacityViewNodeModifier.self, in: root).first)
+        let offX = thumb.absoluteFrame().minX
+        #expect(track.opacity == 0)
+
+        for isOn in [true, false] {
+            tap(tester, at: Point(280, 22))
+            #expect(model.isOn == isOn)
+            tester.invalidateContent().advanceFrame(deltaTime: 0)
+            tester.advanceFrame(deltaTime: 0.09)
+            #expect(thumb.absoluteFrame().minX > offX)
+            #expect(thumb.absoluteFrame().minX < offX + 16)
+            #expect(track.opacity > 0 && track.opacity < 1)
+            tester.advanceFrame(deltaTime: 0.2)
+            #expect(abs(thumb.absoluteFrame().minX - (offX + (isOn ? 16 : 0))) < 0.01)
+            #expect(abs(track.opacity - (isOn ? 1 : 0)) < 0.01)
+        }
+    }
+
+    private func descendants<Node: ViewNode>(of type: Node.Type, in root: ViewNode) -> [Node] {
+        let matches = (root as? Node).map { [$0] } ?? []
+        return matches + root.transientEnvironmentChildren.flatMap { descendants(of: type, in: $0) }
+    }
+
     private func tap<Content: View>(_ tester: ViewTester<Content>, at point: Point) {
         tester.sendMouseEvent(at: point, phase: .began)
         tester.sendMouseEvent(at: point, phase: .ended)

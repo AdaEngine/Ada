@@ -6,12 +6,19 @@ NativeActivity and Swift Concurrency. Android API 29 or newer is required.
 
 ## Setup
 
-Open **Settings → General → Android** and configure:
+Open **Settings → Build & Export → Android** and configure:
 
 - Android SDK (including `platform-tools`, platform 36, build-tools 36.0.0 and `emulator`).
 - Android NDK 27 or newer; the validated development setup uses r28c.
+- JDK home (Android Studio's bundled JDK is detected automatically), and optionally a Gradle executable for external tooling.
+- Android build-tools version, if different from the default 36.0.0.
 - Swift 6.4 executable and the matching official Swift SDK for Android.
 - Swan package and its Android Dawn artifact path, relative to Swan.
+
+Use **Browse…** to choose paths, then **Save Build Settings**. Settings apply to this
+computer across all projects. The built-in APK exporter uses Android tools directly
+and does not require Gradle. The neighboring platform pages configure Web and native
+host tools and identify export paths that Studio does not yet provide.
 
 Standalone builds can bundle Swan and its artifact in the Studio build SDK using
 `stage-build-sdk.py --swan-root /path/to/swan`. Swift and the Android SDK/NDK stay

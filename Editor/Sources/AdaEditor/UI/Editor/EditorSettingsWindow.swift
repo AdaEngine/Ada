@@ -10,6 +10,7 @@ import Observation
 
 enum EditorSettingsSection: String, CaseIterable, Hashable, Sendable {
     case general
+    case buildExport
     case achievements
     case notifications
     case project
@@ -23,6 +24,8 @@ enum EditorSettingsSection: String, CaseIterable, Hashable, Sendable {
             "Notifications"
         case .general:
             "General"
+        case .buildExport:
+            "Build & Export"
         case .project:
             "Project"
         case .agent:
@@ -38,6 +41,8 @@ enum EditorSettingsSection: String, CaseIterable, Hashable, Sendable {
             "\u{E7F4}"
         case .general:
             "\u{E8B8}"
+        case .buildExport:
+            "\u{E869}"
         case .project:
             "\u{E2C7}"
         case .agent:
@@ -75,6 +80,9 @@ final class EditorSettingsWindowViewModel {
     var keywordFontWeight: EditorCodeFontWeight
     var codePalettePreset: EditorCodePalettePreset
     var generalSettingsStatusMessage = ""
+    var buildExportConfiguration: EditorBuildExportConfiguration
+    let buildExportDefaults: UserDefaults
+    var buildExportSettingsStatusMessage = ""
     var inputBindingsDraft: EditorInputBindingsDraft
     var adaScriptTypeChecking: AdaScriptTypeCheckingMode
     var runtimeDraft: EditorRuntimeSettingsDraft
@@ -84,10 +92,13 @@ final class EditorSettingsWindowViewModel {
     init(
         editorViewModel: EditorViewModel?,
         selectedSection: EditorSettingsSection,
-        selectedPage: String? = nil
+        selectedPage: String? = nil,
+        buildExportDefaults: UserDefaults = .standard
     ) {
         let runtimeSettings = Self.loadRuntimeSettings(from: editorViewModel)
         self.editorViewModel = editorViewModel
+        self.buildExportDefaults = buildExportDefaults
+        self.buildExportConfiguration = .load(defaults: buildExportDefaults)
         self.selectedSection = selectedSection
         self.codeFontSize = editorViewModel?.workbench.codeFontSize ?? 14
         self.codeFontFamily = editorViewModel?.workbench.codeFontFamily ?? .firaCode
@@ -112,7 +123,7 @@ final class EditorSettingsWindowViewModel {
         guard !query.isEmpty else {
             return EditorSettingsSection.allCases
         }
-        return EditorSettingsSection.allCases.filter { $0.title.localizedCaseInsensitiveContains(query) || pages(in: $0).contains { $0.localizedCaseInsensitiveContains(query) } }
+        return EditorSettingsSection.allCases.filter { $0.title.localizedCaseInsensitiveContains(query) || !visiblePages(in: $0).isEmpty }
     }
 
     var projectName: String {
@@ -462,10 +473,10 @@ struct EditorSettingsWindowView: View {
             .frame(minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(viewModel.selectedSection == .agent ? "APPLIES TO" : "CURRENT PROJECT")
+                Text(viewModel.selectedSection == .agent || viewModel.selectedSection == .buildExport ? "APPLIES TO" : "CURRENT PROJECT")
                     .font(.system(size: 9))
                     .foregroundColor(theme.editorColors.muted)
-                Text(viewModel.selectedSection == .agent ? "All Projects" : viewModel.projectName)
+                Text(viewModel.selectedSection == .buildExport ? "This Computer" : viewModel.selectedSection == .agent ? "All Projects" : viewModel.projectName)
                     .font(.system(size: 11))
                     .foregroundColor(theme.editorColors.text)
                     .lineLimit(1)
@@ -489,13 +500,13 @@ struct EditorSettingsWindowView: View {
                 }
                 .id("\(viewModel.selectedSection.rawValue).\(viewModel.selectedPage ?? "overview")")
 
-                if viewModel.editorViewModel != nil, viewModel.selectedSection != .achievements {
+                if (viewModel.editorViewModel != nil || viewModel.selectedSection == .buildExport), viewModel.selectedSection != .achievements {
                     settingsFooter
                 }
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             .background(theme.editorColors.background)
-            .navigationTitle(viewModel.selectedPage?.localizedCapitalized ?? viewModel.selectedSection.title)
+            .navigationTitle(viewModel.selectedPage.map(EditorSettingsPage.title) ?? viewModel.selectedSection.title)
             .navigationTitleFont(AdaEditorTitleFont.font(size: 22))
             .navigationTitlePosition(.leading)
             .navigationBarColor(theme.editorColors.background)
@@ -514,7 +525,7 @@ struct EditorSettingsWindowView: View {
                     EditorAgentCatalogToolbar(agent: viewModel.agent)
                 }
             #endif
-            Text(viewModel.selectedSection == .agent ? "All Projects" : viewModel.projectName)
+            Text(viewModel.selectedSection == .buildExport ? "This Computer" : viewModel.selectedSection == .agent ? "All Projects" : viewModel.projectName)
                 .font(.system(size: 10))
                 .foregroundColor(theme.editorColors.muted)
                 .lineLimit(1)
@@ -536,7 +547,11 @@ struct EditorSettingsWindowView: View {
 
     @ViewBuilder
     private var selectedSectionContent: some View {
-        if viewModel.selectedSection == .achievements {
+        if viewModel.selectedSection == .buildExport {
+            if let platform = viewModel.selectedPage.flatMap(EditorBuildPlatform.init(rawValue:)) {
+                EditorBuildExportSettingsView(model: viewModel, platform: platform)
+            }
+        } else if viewModel.selectedSection == .achievements {
             EditorAchievementSettings()
         } else if viewModel.selectedSection == .notifications {
             EditorNotificationSettings()
@@ -544,10 +559,7 @@ struct EditorSettingsWindowView: View {
             agentSettings(viewModel.agent)
         } else if viewModel.selectedSection == .general, viewModel.editorViewModel == nil {
             VStack(alignment: .leading, spacing: 0) {
-                #if os(macOS)
-            settingsGroup("ANDROID") { EditorAndroidSettingsView(editor: viewModel.editorViewModel) }
-            #endif
-            settingsGroup("ADA CLOUD") { EditorCloudSettingsView() }
+                settingsGroup("ADA CLOUD") { EditorCloudSettingsView() }
                 settingsGroup("APPEARANCE") { EditorAgentGlowSettings() }
                 settingsGroup(EditorSettingsPage.editorDisplay) { EditorCodeDisplaySettings() }
             }
@@ -559,6 +571,8 @@ struct EditorSettingsWindowView: View {
                 EditorNotificationSettings()
             case .general:
                 generalSettings
+            case .buildExport:
+                EmptyView()
             case .project:
                 projectSettings(editorViewModel)
             case .agent:
@@ -955,6 +969,9 @@ struct EditorSettingsWindowView: View {
     }
 
     private var footerConfiguration: (title: String, status: String, action: () -> Void) {
+        if viewModel.selectedSection == .buildExport {
+            return ("Save Build Settings", viewModel.buildExportSettingsStatusMessage, viewModel.applyBuildExportSettings)
+        }
         if viewModel.selectedSection == .agent {
             return ("Save Agent Settings", viewModel.agent.settingsStatusMessage, viewModel.agent.saveAgentSettings)
         }
@@ -971,6 +988,8 @@ struct EditorSettingsWindowView: View {
             return ("Done", "Settings are saved automatically.", {})
         case .general:
             return ("Apply", viewModel.generalSettingsStatusMessage, viewModel.applyGeneralSettings)
+        case .buildExport:
+            return ("Save Build Settings", viewModel.buildExportSettingsStatusMessage, viewModel.applyBuildExportSettings)
         case .project:
             let status =
                 viewModel.runtimeSettingsStatusMessage.isEmpty

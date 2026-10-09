@@ -12,8 +12,21 @@ struct SwiftToolchain: Equatable, Sendable {
 
 enum SwiftToolchainLocator {
     static func locate(fileManager: FileManager = .default) async -> SwiftToolchain {
-        let swiftPath = await findExecutable(["/usr/bin/swift", "/usr/local/bin/swift"], fallbackName: "swift", fileManager: fileManager) ?? "swift"
-        let sourceKitPath = await findSourceKitLSP(fileManager: fileManager)
+        let configured = EditorBuildExportConfiguration.load().swiftExecutable(for: .host)
+        let swiftPath = if let configured { configured } else {
+            await findExecutable(["/usr/bin/swift", "/usr/local/bin/swift"], fallbackName: "swift", fileManager: fileManager) ?? "swift"
+        }
+        #if os(Windows)
+        let sourceKitName = "sourcekit-lsp.exe"
+        #else
+        let sourceKitName = "sourcekit-lsp"
+        #endif
+        let siblingSourceKit = URL(fileURLWithPath: swiftPath).deletingLastPathComponent().appendingPathComponent(sourceKitName).path
+        let sourceKitPath = if configured != nil, fileManager.isExecutableFile(atPath: siblingSourceKit) {
+            siblingSourceKit
+        } else {
+            await findSourceKitLSP(fileManager: fileManager)
+        }
 
         return SwiftToolchain(
             swiftExecutablePath: swiftPath,
@@ -623,7 +636,14 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
     }
 
     nonisolated func makeCommand(_ kind: SwiftPMCommandKind, projectURL: URL, toolchain: SwiftToolchain) -> EditorProcessCommand {
-        let arguments: [String] =
+        makeCommand(kind, projectURL: projectURL, toolchain: toolchain, buildSettings: .load())
+    }
+
+    nonisolated func makeCommand(
+        _ kind: SwiftPMCommandKind, projectURL: URL, toolchain: SwiftToolchain,
+        buildSettings: EditorBuildExportConfiguration
+    ) -> EditorProcessCommand {
+        var arguments: [String] =
             switch kind {
             case .resolve:
                 ["package", "resolve"]
@@ -645,14 +665,17 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
                 ["package", "reset"]
             }
 
-        let environment: [String: String] =
-            if case .runWeb = kind {
-                ["ADAENGINE_WEB_EXPORT": "1", "BUILD_WASM": "1"]
-            } else {
-                [:]
-            }
+        let platform: EditorBuildPlatform
+        if case .runWeb = kind { platform = .web } else { platform = .host }
+        var environment = buildSettings.environment(for: platform)
+        if case .runWeb = kind {
+            environment["ADAENGINE_WEB_EXPORT"] = "1"
+            environment["BUILD_WASM"] = "1"
+            let sdk = buildSettings.value("ADA_WEB_SWIFT_SDK", for: .web).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !sdk.isEmpty { arguments += ["--swift-sdk", sdk] }
+        }
         return EditorProcessCommand(
-            executablePath: toolchain.swiftExecutablePath,
+            executablePath: buildSettings.swiftExecutable(for: platform) ?? toolchain.swiftExecutablePath,
             arguments: arguments,
             workingDirectory: projectURL,
             environment: environment

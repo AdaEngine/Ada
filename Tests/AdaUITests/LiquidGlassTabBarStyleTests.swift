@@ -49,8 +49,8 @@ struct LiquidGlassTabBarStyleTests {
         try Application.prepareForTest()
     }
 
-    @Test
-    func bottomTabBarStaysAtScreenBottomWhenKeyboardAppears() throws {
+    @Test(arguments: [Float(20), Float(6)])
+    func bottomTabBarStaysAtScreenBottomWhenKeyboardAppears(bottomPadding: Float) throws {
         let tester = ViewTester {
             TabView(selection: Binding<Int>(get: { 0 }, set: { _ in })) {
                 Tab("Build", value: 0) {
@@ -61,7 +61,7 @@ struct LiquidGlassTabBarStyleTests {
                 }
             }
             .tabViewPosition(.bottom)
-            .tabViewStyle(LiquidGlassTabBarStyle())
+            .tabViewStyle(LiquidGlassTabBarStyle(bottomPadding: bottomPadding))
         }
         .setSize(Size(width: 390, height: 844))
         tester.containerView.safeAreaInsets = EdgeInsets(top: 59, leading: 0, bottom: 34, trailing: 0)

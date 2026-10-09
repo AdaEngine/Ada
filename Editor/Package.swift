@@ -47,6 +47,7 @@ let package = Package(
         ),
     ],
     dependencies: [
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0"),
         .package(name: "AdaEngine", path: adaEngineLocalPath),
         .package(name: "AdaDebugging", path: "Debugging"),
         .package(name: "AdaPlayerConnect", path: "PlayerConnect"),
@@ -108,6 +109,7 @@ let package = Package(
                 .product(name: "SwiftTreeSitter", package: "swift-tree-sitter"),
                 .product(name: "TreeSitterSwift", package: "tree-sitter-swift"),
                 "Yams",
+                .product(name: "Crypto", package: "swift-crypto"),
                 "AdaPackageManifestTool",
                 "GravityLanguageCore",
             ] + sloppyRuntimeTarget + gravityAOTTarget,

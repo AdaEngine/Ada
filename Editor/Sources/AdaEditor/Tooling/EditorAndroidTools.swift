@@ -16,6 +16,9 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
   static let preferenceKey = "AdaStudio.Android.Tools"
   static let fields: [(String, String)] = [
     ("ANDROID_HOME", "Android SDK"), ("ANDROID_NDK_HOME", "Android NDK"),
+    ("JAVA_HOME", "JDK home"), ("GRADLE_EXECUTABLE", "Gradle executable (optional)"),
+    ("ANDROID_BUILD_TOOLS_VERSION", "Android build-tools version"),
+    ("ANDROID_AVD_HOME", "Emulator data directory"),
     ("SWIFT_ANDROID_SWIFT", "Swift 6.4 executable"),
     ("SWIFT_ANDROID_SDKS_PATH", "Swift Android SDKs"),
     ("SWIFT_ANDROID_SDK", "Swift Android SDK identifier"),
@@ -75,6 +78,19 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
           atPath: swan.appendingPathComponent("Package.swift").path) ? swan.path : development.path)
     }
     values["SWAN_LOCAL_DAWN"] = values["SWAN_LOCAL_DAWN"] ?? "Dawn/dist/android.artifactbundle"
+    if values["JAVA_HOME"] == nil {
+      let jdk = "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+      if FileManager.default.isExecutableFile(atPath: jdk + "/bin/java") { values["JAVA_HOME"] = jdk }
+    }
+    var toolPaths: [String] = []
+    if let jdk = values["JAVA_HOME"] { toolPaths.append(URL(fileURLWithPath: jdk).appendingPathComponent("bin").path) }
+    if let gradle = values["GRADLE_EXECUTABLE"] { toolPaths.append(URL(fileURLWithPath: gradle).deletingLastPathComponent().path) }
+    #if os(Windows)
+    let separator = ";"
+    #else
+    let separator = ":"
+    #endif
+    if !toolPaths.isEmpty { values["PATH"] = (toolPaths + [environment["PATH"] ?? ""]).joined(separator: separator) }
     if values["ANDROID_NDK_HOME"] == nil, let sdk = values["ANDROID_HOME"] {
       let ndks =
         (try? FileManager.default.contentsOfDirectory(
@@ -111,7 +127,7 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
     ] {
       guard let path = environment[key], FileManager.default.fileExists(atPath: path) else {
         throw EditorPreviewBuildFailure(
-          message: "Configure \(key) in Settings → Android. The path is missing or unavailable.")
+          message: "Configure \(key) in Settings → Build & Export → Android. The path is missing or unavailable.")
       }
     }
     guard

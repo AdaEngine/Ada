@@ -30,6 +30,7 @@ struct EditorRegistryAgent: Codable, Identifiable, Equatable, Sendable {
     var repository: String?
     var website: String?
     var distribution: Distribution
+    var icon: String?
 
     static var platform: String {
         #if os(macOS) && arch(arm64)
@@ -48,6 +49,7 @@ struct EditorInstalledAgent: Codable, Identifiable, Equatable, Sendable {
     var version: String
     var target: AdaProjectAgentTarget
     var managedDirectory: String?
+    var icon: String?
 }
 
 struct EditorDiscoveredAgent: Identifiable, Equatable, Sendable {

@@ -104,7 +104,7 @@ public struct NativeGLTFLoader: GLTFLoader {
             if uri.starts(with: "data:") {
                 try buffers.append(decodeDataURI(uri))
             } else {
-                let bufferURL = baseURL.appendingPathComponent(uri.removingPercentEncoding ?? uri)
+                let bufferURL = try resourceURL(uri, relativeTo: baseURL)
                 let data = try Data(contentsOf: bufferURL)
                 buffers.append(data)
             }
@@ -124,7 +124,7 @@ public struct NativeGLTFLoader: GLTFLoader {
                     if uri.starts(with: "data:") {
                         return try GLTFImportResult.Image(uri: nil, data: decodeDataURI(uri), mimeType: image.mimeType)
                     }
-                    let imageURL = baseURL.appendingPathComponent(uri.removingPercentEncoding ?? uri)
+                    let imageURL = try resourceURL(uri, relativeTo: baseURL)
                     return try GLTFImportResult.Image(uri: imageURL, data: Data(contentsOf: imageURL), mimeType: image.mimeType)
                 } else if let bufferViewIndex = image.bufferView {
                     let data = try getBufferViewData(bufferViewIndex, gltf: gltf, buffers: buffers)
@@ -247,6 +247,20 @@ public struct NativeGLTFLoader: GLTFLoader {
             throw GLTFError.bufferOutOfBounds
         }
         return buffer.subdata(in: offset ..< offset + bufferView.byteLength)
+    }
+
+    private func resourceURL(_ uri: String, relativeTo base: URL) throws -> URL {
+        let decoded = uri.removingPercentEncoding ?? uri
+        let target = base.appendingPathComponent(decoded).standardizedFileURL
+        if let root = AssetsManager.restrictedResourceRoot {
+            let canonicalRoot = root.resolvingSymlinksInPath().standardizedFileURL.path
+            let canonicalTarget = target.resolvingSymlinksInPath().standardizedFileURL.path
+            guard !decoded.hasPrefix("/"), !decoded.contains(":"), !decoded.contains("\\"),
+                  !decoded.contains("?"), !decoded.contains("#"), canonicalTarget.hasPrefix(canonicalRoot + "/") else {
+                throw GLTFError.invalidDataURI
+            }
+        }
+        return target
     }
 
     private func decodeDataURI(_ uri: String) throws -> Data {

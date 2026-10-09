@@ -1145,6 +1145,12 @@ extension TextFieldViewNode {
             }
         }
 
+        // Empty layouts can contain a line without glyphs. Keep the caret's
+        // transform finite while there are no glyph bounds to center.
+        guard maxTopY.isFinite, minBottomY.isFinite else {
+            return 0
+        }
+
         let textCenterY = (maxTopY + minBottomY) / 2
         let frameCenterY = -height / 2
         return frameCenterY - textCenterY

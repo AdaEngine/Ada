@@ -1,6 +1,7 @@
 @_spi(Scripting) import AdaECS
 import AdaInput
 @_spi(Scripting) import AdaScene
+import AdaScriptCompilerCore
 import Foundation
 import Gravity
 import Logging
@@ -44,6 +45,32 @@ public struct AdaScriptObjectBinding: Equatable, Sendable {
         self.kind = kind
         self.propertyName = propertyName
         self.typeName = typeName
+    }
+}
+
+/// Prepared per-game factories and diagnostics; compilation does not register global aliases.
+@MainActor
+public final class AdaScriptObjectCatalog {
+    public let descriptors: [ScriptableObjectDescriptor]
+    private let runtime: GravityScriptableModuleRuntime?
+
+    public var diagnostics: [String] { AdaScriptRuntimeCoordinator.lock.withLock { runtime?.diagnostics ?? [] } }
+
+    public init(schemas: [AdaScriptObjectSchema], sources: [AdaScriptSource], communityPolicy: AdaScriptCommunityPolicy? = nil) throws {
+        guard !schemas.isEmpty else { runtime = nil; descriptors = []; return }
+        let runtime = try GravityScriptableModuleRuntime(sources: sources, schemas: schemas, communityPolicy: communityPolicy)
+        self.runtime = runtime
+        descriptors = try schemas.map { schema in
+            let definition = try GravityScriptableDefinition(schema: schema, runtime: runtime)
+            return ScriptableObjectDescriptor(identifier: schema.identifier, version: schema.version, aliases: schema.aliases,
+                declaredAccess: definition.declaredAccess, exportedFields: schema.fields, requiredComponents: definition.requiredComponents,
+                make: { GravityScriptableObject(definition: definition) },
+                decode: { decoder, version in
+                    let object = try GravityScriptableObject(definition: definition, payload: GravityScriptablePayload.decode(from: decoder))
+                    object.encodedSchemaVersion = version
+                    return object
+                })
+        }
     }
 }
 
@@ -481,7 +508,13 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
     private var classNamesByInstance: [Foundation.UUID: String] = [:]
     private var instances: [Foundation.UUID: GSValue] = [:]
 
-    init(sources: [AdaScriptSource], schemas: [AdaScriptObjectSchema]) throws {
+    private let communityBudget: AdaScriptCommunityBudget?
+    var diagnostics: [String] { delegate.errors }
+
+    init(sources: [AdaScriptSource], schemas: [AdaScriptObjectSchema], communityPolicy: AdaScriptCommunityPolicy? = nil) throws {
+        AdaScriptRuntimeCoordinator.lock.lock()
+        defer { AdaScriptRuntimeCoordinator.lock.unlock() }
+        if communityPolicy != nil { for source in sources { try AdaScriptCommunityLowerer.validate(source: source.source) } }
         let componentConstructors = AdaScriptComponentRuntime.linkedConstructors()
         let module = try GravityScriptModuleResolver.resolve(sources)
         for schema in schemas {
@@ -513,10 +546,14 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
                 }
         )
         self.getterNamesByClass = getterNamesByClass
-        let delegate = AnnotatedGravityRuntimeDelegate(module: module)
+        let guarded = try module.sourcesByPath.mapValues { source in
+            ResolvedGravityScriptModule.Source(fileID: source.fileID, source: communityPolicy == nil ? source.source : try AdaScriptCommunityLowerer.instrument(source: source.source))
+        }
+        let delegate = AnnotatedGravityRuntimeDelegate(module: module, sourcesByPath: guarded)
         self.delegate = delegate
         let virtualMachine = GravityVirtualMachine(settings: .init(), delegate: delegate)
         self.virtualMachine = virtualMachine
+        self.communityBudget = try communityPolicy.map { try AdaScriptCommunityBudget.install(in: virtualMachine, policy: $0) }
 
         try virtualMachine.bindClass(with: GravityScriptableLifecycleContext.self)
         try virtualMachine.bindClass(with: AnnotatedGravitySystemContext.self)
@@ -535,6 +572,13 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
             reportDiagnostic: delegate.append
         )
         try AdaScriptAssetRuntime.bind(to: virtualMachine, reportDiagnostic: delegate.append)
+        let networkCommands = try AdaScriptSchemaParser.parseNetworkCommands(sources: sources)
+        try virtualMachine.bindClass(with: AdaScriptMultiplayerAPI.self)
+        try virtualMachine.bindClass(with: AdaScriptNetworkCommandFactory.self)
+        try virtualMachine.bindClass(with: AdaScriptNetworkCommandValue.self)
+        try virtualMachine.bindClass(with: AdaScriptNetworkValueBridge.self)
+        try virtualMachine.bindClass(with: AdaScriptRemoteCommandBridge.self)
+        virtualMachine.setValue(AdaScriptNetworkCommandFactory.make(schemas: networkCommands, reportDiagnostic: delegate.append), forKey: "__adaNetworkFactory")
         let factories =
             factoryNamesByClass
             .map { className, factoryName in
@@ -551,16 +595,17 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
             }
             .sorted()
         let generatedSource = (factories + getters).joined(separator: "\n")
-        let binary = virtualMachine.loadGravityFile(
-            from: AdaScriptStandardLibrary.source + "\n"
+        let runtimeSource = (communityPolicy == nil ? "" : "extern var __adaUGCBudget;\n") + (communityPolicy == nil ? AdaScriptStandardLibrary.source : AdaScriptStandardLibrary.communitySource) + "\n"
                 + AdaScriptComponentRuntime.prelude(constructors: componentConstructors)
+                + AdaScriptNetworkBridge.prelude(commands: networkCommands)
                 + module.entrySource
                 + "\n"
                 + generatedSource
-        )
+        let binary = virtualMachine.loadGravityFile(from: communityPolicy == nil ? runtimeSource : try AdaScriptCommunityLowerer.instrument(source: runtimeSource))
         guard delegate.errors.isEmpty else {
             throw AdaScriptError.compilation(delegate.errors)
         }
+        communityBudget?.reset()
         virtualMachine.load(binary)
         guard delegate.errors.isEmpty else {
             throw AdaScriptError.compilation(delegate.errors)
@@ -574,6 +619,8 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
 
     func instantiate(className: String, payload: [String: ReflectedFieldValue]) throws -> Foundation.UUID {
         try AdaScriptRuntimeCoordinator.lock.withLock {
+            if communityBudget != nil, !delegate.errors.isEmpty { throw AdaScriptError.compilation(delegate.errors) }
+            communityBudget?.reset()
             guard let factoryName = factoryNamesByClass[className] else {
                 throw AdaScriptError.invalidManifest("Missing @scriptable factory for '\(className)'")
             }
@@ -611,6 +658,8 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         bindings: [ResolvedGravityScriptableBinding]
     ) {
         AdaScriptRuntimeCoordinator.lock.withLock {
+            if communityBudget != nil, !delegate.errors.isEmpty { return }
+            communityBudget?.reset()
             guard let instance = instances[instanceID], instance.hasMethod(named: method) else {
                 return
             }
@@ -620,6 +669,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
                 context,
                 reportDiagnostic: delegate.append
             )
+            if let communityBudget { lifecycleContext.world.commands.restrictCommunitySpawns { communityBudget.permitSpawn() } }
             defer { lifecycleContext.world.invalidate() }
             _ = instance.callMethod(
                 named: method,
@@ -635,6 +685,8 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         bindings: [ResolvedGravityScriptableBinding]
     ) {
         AdaScriptRuntimeCoordinator.lock.withLock {
+            if communityBudget != nil, !delegate.errors.isEmpty { return }
+            communityBudget?.reset()
             guard let instance = instances[instanceID], instance.hasMethod(named: "event") else {
                 return
             }
@@ -644,6 +696,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
                 context,
                 reportDiagnostic: delegate.append
             )
+            if let communityBudget { lifecycleContext.world.commands.restrictCommunitySpawns { communityBudget.permitSpawn() } }
             defer { lifecycleContext.world.invalidate() }
             _ = instance.callMethod(
                 named: "event",
@@ -657,6 +710,8 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         fields: [String: ReflectedFieldValue].Keys
     ) -> [String: ReflectedFieldValue] {
         AdaScriptRuntimeCoordinator.lock.withLock {
+            if communityBudget != nil, !delegate.errors.isEmpty { return [:] }
+            communityBudget?.reset()
             guard let instance = instances[instanceID] else {
                 return [:]
             }

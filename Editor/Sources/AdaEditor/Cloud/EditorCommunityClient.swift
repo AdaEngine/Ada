@@ -12,6 +12,13 @@ struct EditorCommunityGame: Identifiable, Hashable, Sendable {
     let coverURL: URL?
     let screenshotURLs: [URL]
     let playURL: URL
+    var runtime: Runtime = .web
+    var isPreview = false
+    var apiVersion = 1
+    enum Runtime: Hashable, Sendable {
+        case web
+        case adaScript(releaseID: String)
+    }
 
     func matches(_ query: String) -> Bool {
         let terms = query.split(whereSeparator: \.isWhitespace)
@@ -25,9 +32,7 @@ struct EditorCommunityClient: Sendable {
     typealias Transport = @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
     let server: URL
     var transport: Transport = { request in
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let response = response as? HTTPURLResponse else { throw CommunityError.invalidResponse }
-        return (data, response)
+        try await EditorCommunityHTTP.fetch(request)
     }
 
     func games(now: Date = Date()) async throws -> [EditorCommunityGame] {
@@ -79,6 +84,17 @@ struct EditorCommunityClient: Sendable {
                 return nil
             }
         }
+        let runtime: EditorCommunityGame.Runtime
+        switch publication["runtime"]["kind"].string {
+        case nil, "web": runtime = .web
+        case "adascript":
+            guard [1, 2].contains(publication["runtime"]["apiVersion"].int ?? 0),
+                  publication["runtime"]["manifestPath"].string == "ada-manifest.json",
+                  let release = publication["uploadId"].string ?? publication["releaseId"].string,
+                  UUID(uuidString: release) != nil else { return nil }
+            runtime = .adaScript(releaseID: release)
+        default: return nil
+        }
         return EditorCommunityGame(
             id: id,
             title: title,
@@ -87,7 +103,9 @@ struct EditorCommunityClient: Sendable {
             likes: max(0, page["likes"].int ?? 0),
             coverURL: mediaURL(page["cover"].string),
             screenshotURLs: page["screenshots"].array.compactMap { mediaURL($0.string) },
-            playURL: playURL
+            playURL: playURL,
+            runtime: runtime,
+            apiVersion: Int(publication["runtime"]["apiVersion"].int ?? 1)
         )
     }
 
@@ -101,7 +119,8 @@ struct EditorCommunityClient: Sendable {
     }
 
     private func webURL(_ value: String) -> URL? {
-        guard let url = URL(string: value), url.scheme == "https", url.host != nil,
+        guard let url = URL(string: value), url.host != nil,
+              url.scheme == "https" || (url.scheme == "http" && server.scheme == "http" && url.host == server.host && ["127.0.0.1", "localhost", "::1"].contains(url.host ?? "")),
               url.user == nil, url.password == nil else {
             return nil
         }
