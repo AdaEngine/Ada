@@ -9,6 +9,9 @@ public extension AdaScriptTypeEnvironment {
                 "Assets": .named("Assets"),
                 "Math": .named("Math"),
                 "Saves": .named("Saves"),
+                "SpriteAnchor": .named("SpriteAnchorFactory"),
+                "SpriteImageMode": .named("SpriteImageMode"),
+                "TileOrientation": .named("TileOrientation"),
                 "System": .named("System"),
                 "Tasks": .named("Tasks"),
                 "Time": .named("Time"),
@@ -17,6 +20,8 @@ public extension AdaScriptTypeEnvironment {
     }
 
     private static let globalFunctions: [String: AdaScriptCallableType] = [
+        "SpriteAnchor": .init(parameters: [.float, .float], returnType: .list(.float)),
+        "SpriteSliceBorder": .init(parameters: [.float, .float, .float, .float], returnType: .list(.float)),
         "assert": .init(parameters: [.bool, .string], returnType: .void),
         "exit": .init(parameters: [.int], returnType: .void),
         "input": .init(parameters: [.bool], returnType: .string),
@@ -27,6 +32,12 @@ public extension AdaScriptTypeEnvironment {
 
     private static let standardMembers: [String: [String: AdaScriptMemberType]] = [
         "$AdaCommands": members([
+            method(
+                "setTileOrientation",
+                parameters: [.int, .int, .list(.int), .int],
+                returning: .bool,
+                detail: "setTileOrientation(entityID, layer, coordinates, orientation) — enqueue a tile orientation edit"
+            ),
             method(
                 "despawn",
                 parameters: [.int],
@@ -57,6 +68,11 @@ public extension AdaScriptTypeEnvironment {
             ),
         ]),
         "$AdaEditorToolContext": members([
+            property("entityCount", type: .int, detail: "Entity count in the action's scene snapshot; requires editor.documents.read"),
+            property("scenePath", type: .string, detail: "Path of the active scene; requires editor.documents.read"),
+            property("sceneRevision", type: .string, detail: "Revision of the active scene; requires editor.documents.read"),
+            method("createEntity", parameters: [.string, .float, .float], returning: .bool,
+                   detail: "createEntity(name, x, y) — stage an entity in the action's undoable batch; requires editor.documents.write"),
             method(
                 "addCommand",
                 parameters: [.string, .string, .string, .string],
@@ -84,8 +100,9 @@ public extension AdaScriptTypeEnvironment {
             method(
                 "addPanel",
                 parameters: [.string, .string, .string, .string],
-                detail: "addPanel(id, title, location, view) — register an AdaUI editor panel",
-                insertText: "addPanel(id: \"\", title: \"\", location: \"right\", view: \"\")"
+                returning: .bool,
+                detail: "addPanel(id, title, location, ui) — register a project-local .ui panel; API 1 supports right",
+                insertText: "addPanel(id: \"\", title: \"\", location: \"right\", ui: \"Panel.ui\")"
             ),
             method(
                 "addSetting",
@@ -112,6 +129,12 @@ public extension AdaScriptTypeEnvironment {
             property("world", type: .named("$AdaWorldContext"), detail: "Scoped AdaECS world access"),
         ]),
         "$AdaWorldContext": members([
+            method(
+                "setTileOrientation",
+                parameters: [.int, .int, .list(.int), .int],
+                returning: .bool,
+                detail: "setTileOrientation(entityID, layer, coordinates, orientation) — enqueue a tile orientation edit"
+            ),
             property("commands", type: .named("$AdaCommands"), detail: "Scoped deferred world commands"),
             method(
                 "changeScene",
@@ -182,6 +205,34 @@ public extension AdaScriptTypeEnvironment {
         "Time": members([
             method("sleep", parameters: [.float], returning: .any, detail: "sleep(seconds) — suspend using game time"),
             method("sleepRealTime", parameters: [.float], returning: .any, detail: "sleepRealTime(seconds) — suspend using monotonic time"),
+        ]),
+        "SpriteAnchorFactory": members([
+            property("center", type: .list(.float), detail: "Normalized sprite anchor, positive Y up"),
+            property("bottomLeft", type: .list(.float), detail: "Normalized sprite anchor, positive Y up"),
+            property("bottomCenter", type: .list(.float), detail: "Normalized sprite anchor, positive Y up"),
+            property("bottomRight", type: .list(.float), detail: "Normalized sprite anchor, positive Y up"),
+            property("centerLeft", type: .list(.float), detail: "Normalized sprite anchor, positive Y up"),
+            property("centerRight", type: .list(.float), detail: "Normalized sprite anchor, positive Y up"),
+            property("topLeft", type: .list(.float), detail: "Normalized sprite anchor, positive Y up"),
+            property("topCenter", type: .list(.float), detail: "Normalized sprite anchor, positive Y up"),
+            property("topRight", type: .list(.float), detail: "Normalized sprite anchor, positive Y up"),
+        ]),
+        "SpriteImageMode": members([
+            property("stretch", type: .any, detail: "Stretch the image"),
+            property("fit", type: .any, detail: "Centered aspect fit"),
+            property("fill", type: .any, detail: "Centered aspect fill"),
+            method("sliced", parameters: [.list(.float)], returning: .any, detail: "sliced(border) — source-pixel nine-slice borders", insertText: "sliced(SpriteSliceBorder(8, 8, 8, 8))"),
+            method("tiled", parameters: [.bool, .bool, .float], returning: .any, detail: "tiled(tileX, tileY, scale) — repeat selected axes", insertText: "tiled(true, true, 1)"),
+        ]),
+        "TileOrientation": members([
+            property("identity", type: .int, detail: "Tile orientation ID 0"),
+            property("rotate90", type: .int, detail: "Tile orientation ID 1"),
+            property("rotate180", type: .int, detail: "Tile orientation ID 2"),
+            property("rotate270", type: .int, detail: "Tile orientation ID 3"),
+            property("mirrorX", type: .int, detail: "Tile orientation ID 4"),
+            property("mirrorXRotate90", type: .int, detail: "Tile orientation ID 5"),
+            property("mirrorXRotate180", type: .int, detail: "Tile orientation ID 6"),
+            property("mirrorXRotate270", type: .int, detail: "Tile orientation ID 7"),
         ]),
         "Vector3": members([
             property("ZERO", type: .named("Vector3"), detail: "Zero three-dimensional vector"),

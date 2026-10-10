@@ -8,12 +8,11 @@ import PackagePlugin
 
 @main
 struct TextureAtlasBuildPlugin: BuildToolPlugin {
-
     private let fileManager = FileManager.default
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         let tool = try context.tool(named: "TextureAtlasBuilderTool")
-        let root = URL(fileURLWithPath: target.directory.string, isDirectory: true)
+        let root = target.directoryURL
 
         guard let enumerator = fileManager.enumerator(
             at: root,
@@ -40,7 +39,7 @@ struct TextureAtlasBuildPlugin: BuildToolPlugin {
             let inputDir = baseDir.appendingPathComponent(lite.inputDirectory, isDirectory: true)
             let isFontsConfig = configURL.lastPathComponent.hasSuffix(".fonts.json")
 
-            var inputs: [Path] = [Path(configURL.path)]
+            var inputs: [URL] = [configURL]
             if fileManager.fileExists(atPath: inputDir.path) {
                 let resourceExtensions = isFontsConfig ? AssetConstantsConfigLite.fontExtensions : AssetConstantsConfigLite.pngExtensions
                 let resources = try fileManager.contentsOfDirectory(
@@ -48,24 +47,24 @@ struct TextureAtlasBuildPlugin: BuildToolPlugin {
                     includingPropertiesForKeys: nil,
                     options: [.skipsHiddenFiles]
                 ).filter { resourceExtensions.contains($0.pathExtension.lowercased()) }.sorted { $0.path < $1.path }
-                inputs.append(contentsOf: resources.map { Path($0.path) })
+                inputs.append(contentsOf: resources)
             }
 
             let safeName = lite.outputName.replacingOccurrences(of: " ", with: "_")
             let outName = isFontsConfig ? "\(safeName)Fonts+Generated.swift" : "\(safeName)Atlas+Generated.swift"
-            let outPath = context.pluginWorkDirectory.appending(outName)
+            let outputURL = context.pluginWorkDirectoryURL.appendingPathComponent(outName)
 
             commands.append(
                 .buildCommand(
                     displayName: isFontsConfig ? "Generate font constants \(lite.outputName)" : "Pack texture atlas \(lite.outputName)",
-                    executable: tool.path,
+                    executable: tool.url,
                     arguments: [
                         "--config", configURL.path,
-                        "--output-swift", outPath.string
+                        "--output-swift", outputURL.path
                     ],
                     environment: [:],
                     inputFiles: inputs,
-                    outputFiles: [outPath]
+                    outputFiles: [outputURL]
                 )
             )
         }

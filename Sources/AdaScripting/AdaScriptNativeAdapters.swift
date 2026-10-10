@@ -6,6 +6,7 @@ import AdaMultiplayer
 import AdaScene
 import AdaScriptCompilerCore
 import AdaTilemap
+import AdaUtils
 import Foundation
 import GravityAOT
 
@@ -55,6 +56,29 @@ final class NativeWorldHost: NativeHostObject {
     func call(_ method: String, arguments: [NativeValue]) throws -> NativeValue? {
         try scope.check()
         switch method {
+        case "setTileOrientation":
+            guard arguments.count == 4, case let .list(coordinates) = arguments[2], coordinates.count == 2 else {
+                return nil
+            }
+            let rawValues = [arguments[0], arguments[1]] + coordinates + [arguments[3]]
+            let integers = rawValues.compactMap { value -> Int? in
+                guard case let .integer(raw) = value else {
+                return nil
+            }
+                return Int(exactly: raw)
+            }
+            guard integers.count == 5 else {
+                return nil
+            }
+            return .boolean(AdaScriptTileOrientationCommand.enqueue(
+                commands: commands,
+                entity: integers[0],
+                layer: integers[1],
+                x: integers[2],
+                y: integers[3],
+                orientation: integers[4],
+                reportDiagnostic: { RuntimeLogStore.shared.append(level: "error", label: "AdaScript", message: $0) }
+            ))
         case "spawn":
             guard arguments.count == 1, case .list(let values) = arguments[0] else {
                 return nil

@@ -20,6 +20,10 @@ struct SpriteMetalRenderingTests {
         let chunks = try await renderReferenceScene(backend: .metal)
         let sprites = try await renderReferenceScene(backend: .metal, tileMapMode: .sprites)
         #expect(chunks.data == sprites.data, "Chunk geometry must preserve the reference renderer's visible pixels.")
+        let reference = try await renderReferenceScene(backend: .metal, spriteMode: .batched)
+        let referenceSprites = try await renderReferenceScene(backend: .metal, tileMapMode: .sprites, spriteMode: .batched)
+        #expect(chunks.data == reference.data, "Instancing must preserve layout, alpha, tile and painter-order pixels.")
+        #expect(sprites.data == referenceSprites.data)
     }
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_WGPU_SMOKE"] == "1"))
@@ -27,6 +31,10 @@ struct SpriteMetalRenderingTests {
         let chunks = try await renderReferenceScene(backend: .webgpu)
         let sprites = try await renderReferenceScene(backend: .webgpu, tileMapMode: .sprites)
         #expect(chunks.data == sprites.data, "Chunk geometry must preserve the reference renderer's visible pixels.")
+        let reference = try await renderReferenceScene(backend: .webgpu, spriteMode: .batched)
+        let referenceSprites = try await renderReferenceScene(backend: .webgpu, tileMapMode: .sprites, spriteMode: .batched)
+        #expect(chunks.data == reference.data, "WebGPU instancing must match the expanded reference path.")
+        #expect(sprites.data == referenceSprites.data)
         // Three RGBA pixels require 12 bytes, whereas WebGPU copy rows require 256-byte alignment.
         let device = unsafe RenderEngine.shared.renderDevice
         let target = RenderTexture(size: SizeInt(width: 3, height: 2), scaleFactor: 1, format: .bgra8)
@@ -120,7 +128,9 @@ struct SpriteMetalRenderingTests {
         if let path = ProcessInfo.processInfo.environment[captureVariable] { try result.writePNG(to: URL(fileURLWithPath: path)) }
     }
 
-    private func renderReferenceScene(backend: RenderBackendType, tileMapMode: TileMapRenderMode = .chunks) async throws -> Image {
+    private func renderReferenceScene(
+        backend: RenderBackendType, tileMapMode: TileMapRenderMode = .chunks, spriteMode: SpriteRenderingMode = .automatic
+    ) async throws -> Image {
         unsafe RenderEngine.configurations.preferredBackend = backend
         try RenderEngine.setupRenderEngine()
         try #require(unsafe RenderEngine.shared.type == backend, "Requested GPU backend must be active; fallback is not validation.")
@@ -219,7 +229,9 @@ struct SpriteMetalRenderingTests {
         world.insertResource(SortedRenderItems<Transparent2DRenderItem>())
         world.insertResource(SpriteDrawPass())
         world.insertResource(SpriteBatches())
-        world.insertResource(SpriteDrawData.defaultValue)
+        var spriteData = SpriteDrawData.defaultValue
+        spriteData.renderingMode = spriteMode
+        world.insertResource(spriteData)
         world.insertResource(RenderPipelines(configurator: SpriteRenderPipeline()))
         world.insertResource(RenderDeviceHandler(renderDevice: device))
         world.addSystem(ExtractSpriteSystem.self, on: .extract)
@@ -236,6 +248,14 @@ struct SpriteMetalRenderingTests {
         await world.runScheduler(.preUpdate)
         await world.runScheduler(.batching)
         await world.runScheduler(.update)
+
+        let prepared = try #require(world.getResource(SpriteDrawData.self))
+        #expect(prepared.usesInstancing == (spriteMode == .automatic))
+        if prepared.usesInstancing {
+            #expect(prepared.vertexBuffer.isEmpty && prepared.indexBuffer.isEmpty)
+            #expect(prepared.instancing.quad.count == 4 && prepared.instancing.indices.count == 6)
+            #expect(!prepared.instancing.instances.isEmpty)
+        }
 
         let target = RenderTexture(size: SizeInt(width: 512, height: 256), scaleFactor: 1, format: .bgra8)
         let commandBuffer = device.createCommandQueue().makeCommandBuffer()

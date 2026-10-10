@@ -4,12 +4,14 @@ import Foundation
 struct EditorImageAssetPreview: View {
     let document: EditorAssetDocument
     private let previewImage: Image?
+    private let model: EditorTextureSettingsModel?
 
     @Environment(\.theme) private var theme
 
-    init(document: EditorAssetDocument, previewImage: Image? = nil) {
+    init(document: EditorAssetDocument, previewImage: Image? = nil, model: EditorTextureSettingsModel? = nil) {
         self.document = document
         self.previewImage = previewImage
+        self.model = model
     }
 
     var body: some View {
@@ -21,16 +23,18 @@ struct EditorImageAssetPreview: View {
             } else {
                 unavailableCanvas
             }
-            informationPanel(loadedImage)
+            informationPanel(model?.sourceImage ?? loadedImage)
         }
         .padding(16)
         .background(theme.editorColors.background)
+        .task { await model?.loadPreviewIfNeeded() }
     }
 
     private var image: Image? {
         if let previewImage {
             return previewImage
         }
+        if let model { return model.previewImage }
         guard let path = document.absolutePath else {
             return nil
         }

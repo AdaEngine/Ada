@@ -30,6 +30,8 @@ open class Texture2D: Texture, @unchecked Sendable {
     public private(set) var width: Int
     /// The height of the texture.
     public private(set) var height: Int
+    /// Number of allocated and initialized mip levels for imported textures, including level zero.
+    public private(set) var mipmapLevelCount: Int = 1
 
     /// The size of the texture.
     public var size: SizeInt {
@@ -47,7 +49,7 @@ open class Texture2D: Texture, @unchecked Sendable {
     ///   - image: The image to initialize the texture from.
     ///   - samplerDescription: The sampler description of the texture.
     public init(image: Image, samplerDescription: SamplerDescriptor? = nil) {
-        let descriptor = TextureDescriptor(
+        var descriptor = TextureDescriptor(
             width: image.width,
             height: image.height,
             pixelFormat: image.format.toPixelFormat,
@@ -57,12 +59,18 @@ open class Texture2D: Texture, @unchecked Sendable {
             samplerDescription: samplerDescription ?? image.samplerDescription
         )
 
+        if let imported = image.importedTextureData, imported.settings.dimension == .texture2D {
+            descriptor = imported.descriptor
+            descriptor.samplerDescription = samplerDescription ?? imported.settings.sampler
+        }
+
         let device = unsafe RenderEngine.shared.createLocalRenderDevice()
         let gpuTexture = device.createTexture(from: descriptor)
         let sampler = device.createSampler(from: descriptor.samplerDescription)
 
         self.width = descriptor.width
         self.height = descriptor.height
+        self.mipmapLevelCount = max(1, descriptor.mipmapLevel)
 
         super.init(gpuTexture: gpuTexture, sampler: sampler, textureType: descriptor.textureType)
         self.assetMetaInfo = image.assetMetaInfo
@@ -79,6 +87,7 @@ open class Texture2D: Texture, @unchecked Sendable {
 
         self.width = descriptor.width
         self.height = descriptor.height
+        self.mipmapLevelCount = max(1, descriptor.mipmapLevel)
 
         super.init(gpuTexture: gpuTexture, sampler: sampler, textureType: descriptor.textureType)
         if let image = descriptor.image, descriptor.pixelFormat == image.format.toPixelFormat,
@@ -129,9 +138,15 @@ open class Texture2D: Texture, @unchecked Sendable {
                 Image.self,
                 at: filePath
             )
+            if image.asset.importedTextureData?.settings.dimension == .cube {
+                throw TextureImportSettings.ImportError.requiresCubeLoader
+            }
             self.init(image: image.asset, samplerDescription: samplerDesc)
         } else {
             let image = try await Image(from: decoder)
+            if image.importedTextureData?.settings.dimension == .cube {
+                throw TextureImportSettings.ImportError.requiresCubeLoader
+            }
             self.init(image: image, samplerDescription: image.samplerDescription)
         }
     }

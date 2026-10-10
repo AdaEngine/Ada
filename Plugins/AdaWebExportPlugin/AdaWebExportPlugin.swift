@@ -605,10 +605,11 @@ struct AdaWebExportPlugin: CommandPlugin {
                 Diagnostics.remark("Using Tint compiler from TINT_EXECUTABLE: \(executable.path())")
                 return executable
             }
+            throw ExportError.tintNotFound(override)
         }
 
         if let executable = builtTintExecutable(packageDirectory: packageDirectory) {
-            Diagnostics.remark("Using Tint compiler from WebGPUTintPlugin output: \(executable.path())")
+            Diagnostics.remark("Using Tint compiler from project tool cache: \(executable.path())")
             return executable
         }
 
@@ -638,6 +639,12 @@ struct AdaWebExportPlugin: CommandPlugin {
     }
 
     private func builtTintExecutable(packageDirectory: URL) -> URL? {
+        let cache = ProcessInfo.processInfo.environment["ADAENGINE_TINT_CACHE"].map { URL(fileURLWithPath: $0) }
+            ?? packageDirectory.appendingPathComponent(".build-tools/tint")
+        let verifiedTool = cache.appendingPathComponent("bin/\(String.tintBinaryPlatform)/\(String.tintBinaryName)")
+        if FileManager.default.isExecutableFile(atPath: verifiedTool.path) {
+            return verifiedTool
+        }
         let executable = packageDirectory.appending(
             components: ".build", "plugins", "WebGPUTintPlugin", "outputs", "bin", .tintBinaryPlatform, .tintBinaryName,
             directoryHint: .notDirectory
@@ -669,6 +676,7 @@ struct AdaWebExportPlugin: CommandPlugin {
                 "plugin",
                 "--allow-network-connections",
                 "all",
+                "--allow-writing-to-package-directory",
                 "build-tint"
             ],
             workingDirectory: packageDirectory
@@ -840,6 +848,9 @@ struct AdaWebExportPlugin: CommandPlugin {
         let cached = cacheRoot.appending(component: "bridge-js.js", directoryHint: .notDirectory)
         guard FileManager.default.fileExists(atPath: cached.path()) else { return false }
         try replaceItem(at: output, with: cached)
+        // A copied cache can predate the previous export. Fresh mtime prevents HTTP
+        // conditional requests from retaining an older bridge at this same URL.
+        try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: output.path())
         return true
     }
 
@@ -859,7 +870,11 @@ struct AdaWebExportPlugin: CommandPlugin {
     }
 
     private func bridgeJSSkeleton(checkouts: URL) -> URL? {
-        let candidates = [
+        var candidates: [URL] = []
+        if let localSwan = ProcessInfo.processInfo.environment["ADAENGINE_SWAN_PACKAGE_PATH"], !localSwan.isEmpty {
+            candidates.append(URL(fileURLWithPath: localSwan).appendingPathComponent("Sources/WebGPU/Wasm/Generated/JavaScript/BridgeJS.json"))
+        }
+        candidates += [
             checkouts.appending(
                 components: "swan", "Sources", "WebGPU", "Wasm", "Generated", "JavaScript", "BridgeJS.json",
                 directoryHint: .notDirectory
@@ -1172,6 +1187,8 @@ private extension String {
         return "arm64-macos"
         #elseif os(Linux)
         return "arm64-linux"
+        #elseif os(Windows)
+        return "arm64-windows"
         #else
         return ""
         #endif
@@ -1181,7 +1198,7 @@ private extension String {
         #elseif os(Linux)
         return "x86_64-linux"
         #elseif os(Windows)
-        return "x86_64-win32"
+        return "x86_64-windows"
         #else
         return ""
         #endif
@@ -1243,7 +1260,7 @@ private enum ExportError: LocalizedError, CustomStringConvertible {
         case .bridgeJSToolNotFound:
             return "Could not find built BridgeJSToolInternal executable."
         case .tintNotFound(let path):
-            return "Tint binary not found at \(path). Install `tint`, set TINT_EXECUTABLE, or run `swift package plugin --allow-network-connections all build-tint` before exporting web builds."
+            return "Tint binary not found at \(path). Install `tint`, set TINT_EXECUTABLE, or run `python3 script/ensure_tint.py` before exporting web builds."
         }
     }
 }
@@ -1646,6 +1663,7 @@ private func mainJS(product: String) -> String {
       const i64Stack = [];
       const typedArrayStack = [];
       const typedArrayConstructors = [Int8Array, Uint8Array, Int16Array, Uint16Array, Int32Array, Uint32Array, Float32Array, Float64Array];
+      importObject.bjs ??= {};
       importObject.bjs.swift_js_push_i64 ??= (value) => {
         i64Stack.push(value);
       };

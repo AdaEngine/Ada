@@ -1,0 +1,5 @@
+{
+  "repository": "https://github.com/google/dawn.git",
+  "revision": "e75b7342117dbf775a80a6220f3876a3e4f180a3",
+  "capabilities": ["spirv-reader", "wgsl-writer"]
+}

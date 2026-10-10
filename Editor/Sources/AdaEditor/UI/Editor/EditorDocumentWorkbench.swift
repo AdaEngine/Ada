@@ -14,7 +14,7 @@ struct EditorDocumentWorkbench: View {
                 sceneResourceRootURL: viewModel.projectAssetsURL,
                 onPlayScene: viewModel.runActiveSceneInEditor,
                 onStopScene: viewModel.stopPlayMode,
-                onSceneEntitySelected: viewModel.presentSceneInspector,
+                onSceneEntitySelected: viewModel.presentSceneInspectorForSelection,
                 onSourceHover: { document, position in
                     viewModel.handleSourceHover(document: document, position: position)
                 },

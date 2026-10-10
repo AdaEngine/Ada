@@ -19,7 +19,7 @@ import Math
 public struct SpriteBatch: Sendable {
     /// The texture for this batch.
     public var texture: Texture2D
-    /// The range of indices in the index buffer for this batch.
+    /// The range of prepared quads; instancing uses it directly, batching expands each quad to six indices.
     public var range: Range<Int32>
 }
 
@@ -116,6 +116,10 @@ public struct ExtractedSprite: Sendable {
 public struct SpriteDrawData: Resource, DefaultValue {
     public var vertexBuffer: BufferData<SpriteVertexData>
     public var indexBuffer: BufferData<UInt32>
+    /// Automatic instancing on capable devices, or the expanded-vertex reference path.
+    public var renderingMode: SpriteRenderingMode = .automatic
+    var instancing = SpriteInstancingData()
+    var usesInstancing = false
 
     public static let defaultValue: SpriteDrawData = {
         Self(
@@ -285,6 +289,15 @@ public struct SpriteRenderSystem {
     public func update(context _: UpdateContext) {
         spriteBatches.batches.removeAll(keepingCapacity: true)
         let device = renderDevice.renderDevice
+        let usesInstancing = spriteData.renderingMode == .automatic && device.supportsInstancedVertexInputs
+        spriteData.usesInstancing = usesInstancing
+        spriteData.instancing.instances.elements.removeAll(keepingCapacity: true)
+        let pipeline: RenderPipeline
+        if usesInstancing {
+            pipeline = spriteData.instancing.pipeline(device: device)
+        } else {
+            pipeline = spriteRenderPipeline.pipeline(device: device)
+        }
 
         // Clear previous frame data
         spriteData.vertexBuffer.elements.removeAll(keepingCapacity: true)
@@ -294,6 +307,7 @@ public struct SpriteRenderSystem {
         var batchStartIndex: Int32 = 0
         var instanceCount: Int32 = 0
         var batchEntityId: Entity.ID?
+        var batchItemIndex: Int?
 
         func finishCurrentBatch() {
             if let batchEntity = batchEntityId,
@@ -303,18 +317,26 @@ public struct SpriteRenderSystem {
                     texture: texture,
                     range: batchStartIndex..<instanceCount
                 )
+                if let batchItemIndex {
+                    renderItems.items.items[batchItemIndex].batchRange = batchStartIndex..<instanceCount
+                    renderItems.items.items[batchItemIndex].renderPipeline = pipeline
+                }
             }
         }
 
         for index in renderItems.items.items.indices {
             let renderEntityID = renderItems.items.items[index].entity
-            guard let sprite = extractedSprites.sprites[renderEntityID] ?? additionalSprites.sprites[renderEntityID] else {
+            guard renderItems.items.items[index].drawPass is SpriteDrawPass,
+                let sprite = extractedSprites.sprites[renderEntityID] ?? additionalSprites.sprites[renderEntityID] else {
                 finishCurrentBatch()
                 currentTexture = nil
                 batchEntityId = nil
+                batchItemIndex = nil
                 batchStartIndex = instanceCount
                 continue
             }
+            // Only the leading item encodes a draw. Repeated entity IDs may belong to separate batches.
+            renderItems.items.items[index].batchRange = 0..<0
 
             let texture = sprite.texture ?? .whiteTexture
 
@@ -328,6 +350,7 @@ public struct SpriteRenderSystem {
                 currentTexture = texture
                 batchStartIndex = instanceCount
                 batchEntityId = renderItems.items.items[index].entity
+                batchItemIndex = index
             }
 
             // Get texture coordinates with flip support
@@ -346,12 +369,28 @@ public struct SpriteRenderSystem {
                 flipY: sprite.flipY
             )
             geometry.forEachQuad { destination, source in
-                appendQuad(destination: destination, source: source, textureCoords: textureCoords, sprite: sprite)
+                if usesInstancing {
+                    spriteData.instancing.instances.append(SpriteInstanceData(
+                        destination: destination,
+                        source: source,
+                        textureCoordinates: textureCoords,
+                        transform: sprite.worldTransform,
+                        color: sprite.tintColor
+                    ))
+                } else {
+                    appendQuad(destination: destination, source: source, textureCoords: textureCoords, sprite: sprite)
+                }
                 instanceCount += 1
             }
         }
 
         finishCurrentBatch()
+        if usesInstancing {
+            if !spriteData.instancing.instances.isEmpty {
+                spriteData.instancing.upload(to: device)
+            }
+            return
+        }
 
         // Early exit if no sprites to render
         if spriteData.vertexBuffer.isEmpty {

@@ -111,6 +111,8 @@ var products: [Product] = [
         name: "AdaScene",
         targets: ["AdaScene"]
     ),
+    .library(name: "AdaCorePipelines", targets: ["AdaCorePipelines"]),
+    .library(name: "AdaTilemap", targets: ["AdaTilemap"]),
     .library(
         name: "AdaSprite",
         targets: ["AdaSprite"]
@@ -564,7 +566,10 @@ var targets: [Target] = [
         name: "A2UIFormDemo",
         dependencies: ["AdaA2UI", "AdaEngine", "AdaPlatform"],
         path: "Demos/A2UIForm",
-        exclude: ["README.md", "script", "dist"],
+        exclude: ["README.md", "script"] + (
+            FileManager.default.fileExists(atPath: URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Demos/A2UIForm/dist").path)
+                ? ["dist"] : []
+        ),
         resources: [.copy("Fixtures")],
         swiftSettings: swiftSettings
     ),
@@ -823,7 +828,8 @@ if isWGPUEnabled {
             capability: .command(
                 intent: .custom(verb: "build-tint", description: "Build Tint compiler from Dawn repository"),
                 permissions: [
-                    .allowNetworkConnections(scope: .all(), reason: "Download dawn from github")
+                    .allowNetworkConnections(scope: .all(), reason: "Download pinned Dawn/Tint dependencies"),
+                    .writeToPackageDirectory(reason: "Store verified Tint in the project tool cache")
                 ]
             ),
             dependencies: []
@@ -1400,6 +1406,17 @@ if isAndroidBuildEnabled {
 }
 
 targets.append(.testTarget(name: "SkeletalGardenTests", dependencies: ["SkeletalGarden", "AdaEngine"], path: "Demos/SkeletalGarden/Tests"))
+
+// Portable GPU readback QA app; kept outside the engine and Studio runtime.
+products.append(.executable(name: "SpriteInstancingValidation", targets: ["SpriteInstancingValidation"]))
+targets.append(.executableTarget(
+    name: "SpriteInstancingValidation",
+    dependencies: ["AdaApp", "AdaAssets", "AdaCorePipelines", "AdaECS", "AdaInput", "AdaPlatform", "AdaRender", "AdaSprite", "AdaText", "AdaTransform", "AdaUI", "AdaUtils", "Math"],
+    path: "Demos/SpriteInstancingValidation",
+    exclude: ["project.yml", "README.md", "SpriteInstancingValidation.xcodeproj"],
+    swiftSettings: swiftSettings,
+    linkerSettings: wasmExecutableLinkerSettings
+))
 
 // MARK: - Package -
 

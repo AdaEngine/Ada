@@ -8,10 +8,13 @@ public enum AdaScriptNativeSourceBuilder {
         for schema in schemas where schema.kind == .component { calls[schema.name] = ("__adaComponentFactory", schema.fields.map(\.name)) }
         for command in commands { calls[command.name] = ("__adaNetworkFactory", command.fields.map(\.name)) }
         let prepared = try sources.map { source in
-            AdaScriptCompilerSource(
+            let layoutSource = AdaScriptSpriteLayoutLibrary.lowerForNative(source.source)
+            let assetSource = AdaScriptAssetsLowerer.lower(source: layoutSource)
+            let typedSource = AdaScriptTypeAnnotationLowerer.lower(source: assetSource)
+            return AdaScriptCompilerSource(
                 path: source.path,
                 source: try lowerConstructors(
-                    lowerRPCParameters(AdaScriptTypeAnnotationLowerer.lower(source: AdaScriptAssetsLowerer.lower(source: source.source)), commands: commands),
+                    lowerRPCParameters(typedSource, commands: commands),
                     calls: calls
                 )
             )
@@ -26,7 +29,7 @@ public enum AdaScriptNativeSourceBuilder {
             }
         }
         let prelude = globals.filter { !declared.contains($0) }.map { "extern var \($0);" }.joined(separator: "\n")
-        return [AdaScriptCompilerSource(path: "NativeHost.ada", source: prelude)] + prepared
+        return [AdaScriptCompilerSource(path: "NativeHost.ada", source: prelude + "\n" + AdaScriptSpriteLayoutLibrary.nativeSource)] + prepared
     }
 
     private static func lowerRPCParameters(_ source: String, commands: [AdaScriptNetworkCommandSchema]) -> String {

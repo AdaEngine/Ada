@@ -60,6 +60,7 @@
             glTexParameteri(glType, GLenum(GL_TEXTURE_WRAP_S), GL_REPEAT)
             glTexParameteri(glType, GLenum(GL_TEXTURE_WRAP_T), GL_REPEAT)
             glTexParameteri(glType, GLenum(GL_TEXTURE_WRAP_R), GL_REPEAT)
+            glTexParameteri(glType, GLenum(GL_TEXTURE_MAX_LEVEL), GLint(max(1, descriptor.mipmapLevel) - 1))
 
             try checkOpenGLError()
 
@@ -124,8 +125,31 @@
                     GLsizei(descriptor.height),
                     GLboolean(GL_TRUE)
                 )
+            case .textureCube:
+                for face in 0..<6 {
+                    for level in 0..<max(1, descriptor.mipmapLevel) {
+                        glTexImage2D(
+                            GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X) + GLenum(face),
+                            GLint(level), internalFormat,
+                            GLsizei(max(1, descriptor.width >> level)),
+                            GLsizei(max(1, descriptor.height >> level)),
+                            0, GLenum(format), GLenum(GL_UNSIGNED_BYTE),
+                            face == 0 && level == 0 ? pointer?.baseAddress : nil
+                        )
+                    }
+                }
             default:
                 fatalErrorMethodNotImplemented()
+            }
+
+            for subresource in descriptor.subresources {
+                let image = subresource.image
+                let uploadTarget = descriptor.textureType == .textureCube
+                    ? GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X) + GLenum(subresource.slice) : glType
+                image.data.withUnsafeBytes { bytes in
+                    glTexSubImage2D(uploadTarget, GLint(subresource.mipLevel), 0, 0,
+                                    GLsizei(image.width), GLsizei(image.height), GLenum(format), GLenum(GL_UNSIGNED_BYTE), bytes.baseAddress)
+                }
             }
 
             // Check for errors after texture creation

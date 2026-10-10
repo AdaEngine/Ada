@@ -353,7 +353,8 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         try await refreshPlan()
         status = "Purchases restored."
     }
-    func publish(zip: URL, mode: String = "invite", pageID: String? = nil) async throws {
+    @discardableResult
+    func publish(zip: URL, mode: String = "invite", pageID: String? = nil) async throws -> EditorCloudValue {
         guard let owner = accountID else {
             throw CloudError.message("Sign in first.")
         }
@@ -361,6 +362,7 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         guard cloudServicesAvailable else {
             throw CloudError.message("Cloud Services will open soon.")
         }
+        guard accountID == owner else { throw EditorAIError.sessionChanged }
         let scoped = zip.startAccessingSecurityScopedResource()
         defer {
             if scoped {
@@ -371,7 +373,8 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         guard let bytes = attributes[.size] as? Int64, bytes > 0, bytes <= 300_000_000 else {
             throw CloudError.message("Choose a ZIP up to 300 MB.")
         }
-        let fingerprint = owner + zip.lastPathComponent + String(bytes) + String((attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0) + mode + (pageID ?? "")
+        let origin = server
+        let fingerprint = origin + owner + EditorCommunityPackageManifest.digest(try Data(contentsOf: zip)) + mode + (pageID ?? "")
         let operationKey = "AdaEditor.cloud.upload." + Self.base64URL(Data(SHA256.hash(data: Data(fingerprint.utf8))))
         let operation = UserDefaults.standard.string(forKey: operationKey) ?? UUID().uuidString
         UserDefaults.standard.set(operation, forKey: operationKey)
@@ -390,27 +393,36 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
             var put = URLRequest(url: url)
             put.httpMethod = "PUT"
             put.timeoutInterval = 600
-            status = "Uploading web build…"
+            status = mode == "ugc" ? "Uploading app…" : "Uploading web build…"
             let (_, response) = try await URLSession.shared.upload(for: put, fromFile: zip)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 throw CloudError.message("Upload interrupted. Retry to resume the same upload.")
             }
+            guard accountID == owner, server == origin else { throw EditorAIError.sessionChanged }
             upload = try await request("/uploads/" + id + "/complete", method: "POST", body: [:])
         }
         let deadline = Date().addingTimeInterval(1800)
         while ["queued", "processing"].contains(upload["status"].string ?? ""), Date() < deadline {
-            status = "Checking web build…"
+            guard accountID == owner, server == origin else { throw EditorAIError.sessionChanged }
+            status = mode == "ugc" ? "Checking app package…" : "Checking web build…"
             try await Task.sleep(for: .seconds(2))
             upload = try await request("/uploads/" + id)
         }
-        guard ["ready", "published"].contains(upload["status"].string ?? "") else {
+        guard ["ready", "published", "submitted"].contains(upload["status"].string ?? "") else {
             throw CloudError.message(upload["error"].string ?? "Build is not ready; retry later.")
         }
+        guard accountID == owner, server == origin else { throw EditorAIError.sessionChanged }
         let published = try await request("/uploads/" + id + "/publish", method: "POST", body: [:])
         publicationURL = published["url"].string
         UserDefaults.standard.removeObject(forKey: operationKey)
-        status = "Published until " + Date(timeIntervalSince1970: published["expiresAt"].seconds).formatted()
+        status = mode == "ugc" ? "Submitted for review." : "Published until " + Date(timeIntervalSince1970: published["expiresAt"].seconds).formatted()
+        return published
     }
+    func uploadPublicationImage(_ data: Data) async throws -> EditorCloudValue {
+        guard data.count > 0, data.count <= 5_000_000 else { throw CloudError.message("Choose an image up to 5 MB.") }
+        return try await request("/media", method: "POST", rawBody: data)
+    }
+
     func createMultiplayerRoom() async throws -> EditorCloudValue {
         guard accountID != nil else {
             throw CloudError.message("Sign in to AdaEngine Cloud before hosting a Web multiplayer room.")
@@ -418,7 +430,7 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         return try await request("/multiplayer/sessions", method: "POST", body: [:])
     }
 
-    func request(_ path: String, method: String = "GET", body: EditorCloudValue? = nil, authenticated: Bool = true, retry: Bool = true) async throws -> EditorCloudValue {
+    func request(_ path: String, method: String = "GET", body: EditorCloudValue? = nil, authenticated: Bool = true, retry: Bool = true, rawBody: Data? = nil) async throws -> EditorCloudValue {
         let revision = sessionRevision
         let origin = server
         guard let base = URL(string: server), Self.isAllowedCloudURL(base), let url = URL(string: server.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/v1" + path) else {
@@ -430,11 +442,11 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = 30
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(rawBody == nil ? "application/json" : "application/octet-stream", forHTTPHeaderField: "Content-Type")
         if authenticated, let token = credentials["accessToken"].string {
             request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
         }
-        if let body {
+        if let rawBody { request.httpBody = rawBody } else if let body {
             request.httpBody = try JSONEncoder().encode(body)
         }
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -456,7 +468,7 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
             credentials["accessToken"] = refreshed["accessToken"]
             credentials["refreshToken"] = refreshed["refreshToken"]
             try Self.keychainWrite(JSONEncoder().encode(credentials))
-            return try await self.request(path, method: method, body: body, authenticated: authenticated, retry: false)
+            return try await self.request(path, method: method, body: body, authenticated: authenticated, retry: false, rawBody: rawBody)
         }
         guard (200..<300).contains(http.statusCode) else {
             throw CloudError.http(http.statusCode, result["error"]["message"].string ?? "Cloud request failed (\(http.statusCode))")

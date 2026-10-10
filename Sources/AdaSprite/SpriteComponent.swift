@@ -40,7 +40,7 @@ public struct Sprite: Codable {
     /// - Parameter size: The custom size of the sprite.
     /// - Parameter anchor: The normalized point fixed to the entity origin.
     /// - Parameter imageMode: How the texture fills the custom size.
-    @AdaScriptInit
+    @AdaScriptInit(exposing: ["size", "anchor", "imageMode"])
     public init(
         texture: AssetHandle<Texture2D>? = nil,
         tintColor: Color = .white,

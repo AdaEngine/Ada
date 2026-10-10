@@ -76,6 +76,7 @@ struct MobileEditorRootView: View {
     @State private var presentedFile: MobileEditorFilePresentation?
     @State private var isPromptPresented = false
     @State private var isVoicePresented = false
+    @State private var publicationProject: MobileEditorProject?
 
     private let logo = ProjectOpeningAssets.loadAdaEngineLogo()
 
@@ -175,6 +176,11 @@ struct MobileEditorRootView: View {
         .fullScreenCover(isPresented: $isModelPickerPresented) {
             MobileEditorModelPickerScreen(modelStore: providerModels)
         }
+        .fullScreenCover(item: $publicationProject) { project in
+            if let root = try? MobileAdaScriptProjectService.projectURL(for: project.id) {
+                MobileEditorPublishScreen(projectURL: root, title: project.title, close: { publicationProject = nil })
+            }
+        }
         .fullScreenCover(item: $presentedFile) { request in
             MobileEditorFileCover(project: request.project, relativePath: request.relativePath)
         }
@@ -198,6 +204,12 @@ struct MobileEditorRootView: View {
                 }
                 .navigationBarTrailingItems {
                     HStack(spacing: 8) {
+                        Button("Publish") { publicationProject = project }
+                            .font(MobileEditorFont.font(size: 13))
+                            .foregroundColor(theme.editorColors.blue)
+                            .frame(minHeight: 40)
+                            .disabled(isAgentRunning)
+                            .accessibilityIdentifier("AdaEditor.Mobile.Publish")
                         EditorAICreditsBadge(compact: true, onOpen: {
                             navigationPath.append(MobileEditorDestination.settings)
                         })
@@ -256,6 +268,12 @@ struct MobileEditorRootView: View {
                 .navigationBarColor(theme.editorColors.background)
                 .navigationBarTrailingItems {
                     HStack(spacing: 8) {
+                        Button("Publish") { publicationProject = project }
+                            .font(MobileEditorFont.font(size: 13))
+                            .foregroundColor(theme.editorColors.blue)
+                            .frame(minHeight: 40)
+                            .disabled(isAgentRunning)
+                            .accessibilityIdentifier("AdaEditor.Mobile.Publish")
                         EditorAICreditsBadge(compact: true, onOpen: {
                             navigationPath.append(MobileEditorDestination.settings)
                         })

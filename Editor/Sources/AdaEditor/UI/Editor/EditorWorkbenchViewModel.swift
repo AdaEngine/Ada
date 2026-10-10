@@ -44,6 +44,7 @@ final class EditorWorkbenchViewModel {
     @ObservationIgnored var uiSceneModels: [String: EditorUISceneModel] = [:]
     @ObservationIgnored var tileSourceModels: [String: EditorTileSourceEditorModel] = [:]
     @ObservationIgnored var tileMapModels: [String: EditorTileMapEditorModel] = [:]
+    @ObservationIgnored var textureSettingsModels: [String: EditorTextureSettingsModel] = [:]
     @ObservationIgnored var sceneUndoHistory: [String: [EditorSceneDocument]] = [:]
     @ObservationIgnored var sceneRedoHistory: [String: [EditorSceneDocument]] = [:]
     var selectedPreviewID: String?
@@ -243,6 +244,7 @@ final class EditorWorkbenchViewModel {
         uiSceneModels.removeValue(forKey: documentID)
         tileSourceModels.removeValue(forKey: documentID)
         tileMapModels.removeValue(forKey: documentID)
+        textureSettingsModels.removeValue(forKey: documentID)
         sceneUndoHistory.removeValue(forKey: documentID)
         sceneRedoHistory.removeValue(forKey: documentID)
         reconcilePanes()
@@ -276,6 +278,7 @@ final class EditorWorkbenchViewModel {
         uiSceneModels = uiSceneModels.filter { !discardedIDSet.contains($0.key) }
         tileSourceModels = tileSourceModels.filter { !discardedIDSet.contains($0.key) }
         tileMapModels = tileMapModels.filter { !discardedIDSet.contains($0.key) }
+        textureSettingsModels = textureSettingsModels.filter { !discardedIDSet.contains($0.key) }
         sceneUndoHistory = sceneUndoHistory.filter { !discardedIDSet.contains($0.key) }
         sceneRedoHistory = sceneRedoHistory.filter { !discardedIDSet.contains($0.key) }
         navigationHistory.removeAll { discardedIDSet.contains($0) }

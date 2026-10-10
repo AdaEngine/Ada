@@ -51,6 +51,9 @@ protocol RenderBackend: AnyObject, Sendable {
 
 /// The GPU device instance resposible for rendering and computing.
 public protocol RenderDevice: AnyObject, Sendable {
+    /// Whether vertex layouts can advance a buffer once per instance.
+    /// Devices without this capability retain expanded vertex geometry.
+    var supportsInstancedVertexInputs: Bool { get }
     /// Returns whether this device can encode a backend-native spatial upscale.
     var supportsSpatialUpscaling: Bool { get }
 
@@ -123,6 +126,7 @@ public protocol Drawable: AnyObject, Sendable {
 }
 
 extension RenderDevice {
+    public var supportsInstancedVertexInputs: Bool { false }
     public func readImage(from texture: Texture) async throws -> Image? {
         getImage(from: texture)
     }

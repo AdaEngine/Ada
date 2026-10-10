@@ -30,6 +30,9 @@ public struct TextureDescriptor {
     /// The data from we can create a texture.
     public var image: Image?
 
+    /// Additional initialized mip levels or cube faces. Level zero of slice zero may use `image`.
+    public var subresources: [TextureSubresource] = []
+
     /// Requests GPU-only storage when a backend-native effect requires private textures.
     public var usesPrivateStorage: Bool = false
 
@@ -70,6 +73,19 @@ public struct TextureDescriptor {
         self.debugLabel = debugLabel
         self.image = image
         self.samplerDescription = samplerDescription
+    }
+}
+
+/// Initial pixels for one mip level of a texture slice. Cube slices use +X, -X, +Y, -Y, +Z, -Z order.
+public struct TextureSubresource: Sendable {
+    public let image: Image
+    public let mipLevel: Int
+    public let slice: Int
+
+    public init(image: Image, mipLevel: Int, slice: Int = 0) {
+        self.image = image
+        self.mipLevel = mipLevel
+        self.slice = slice
     }
 }
 

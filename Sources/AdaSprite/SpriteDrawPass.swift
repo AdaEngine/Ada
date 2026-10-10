@@ -26,15 +26,16 @@ public struct SpriteVertexData: Sendable {
 /// Render draw pass for rendering sprites. Support batching.
 ///
 /// Batching works by grouping sprites with the same texture together
-/// and drawing them with a single draw call. Each sprite has pre-transformed
-/// vertices in the vertex buffer, allowing efficient rendering without
-/// per-instance data.
+/// and drawing contiguous quads with one draw. Capable devices use a shared quad
+/// and per-instance data; other devices retain pre-transformed vertices.
 public struct SpriteDrawPass: DrawPass {
     enum ShaderSlots {
         static let texture = 0
         static let sampler = 1
         static let vertexBuffer = 0
     }
+
+    public init() {}
 
     public func render(
         with renderEncoder: RenderCommandEncoder,
@@ -44,7 +45,8 @@ public struct SpriteDrawPass: DrawPass {
     ) throws {
         guard
             let spritesData = world.getResource(SpriteDrawData.self),
-            let spriteBatches = world.getResource(SpriteBatches.self)
+            let spriteBatches = world.getResource(SpriteBatches.self),
+            let range = item.batchRange, !range.isEmpty
         else {
             return
         }
@@ -73,12 +75,23 @@ public struct SpriteDrawPass: DrawPass {
             ]
         )
         renderEncoder.setResourceSet(resourceSet, index: 0)
+        renderEncoder.setRenderPipelineState(item.renderPipeline)
+        if spritesData.usesInstancing {
+            renderEncoder.setVertexBuffer(spritesData.instancing.quad, offset: 0, slot: ShaderSlots.vertexBuffer)
+            renderEncoder.setVertexBuffer(
+                spritesData.instancing.instances,
+                offset: Int(range.lowerBound) * MemoryLayout<SpriteInstanceData>.stride,
+                slot: 1
+            )
+            renderEncoder.setIndexBuffer(spritesData.instancing.indices, indexFormat: .uInt32)
+            renderEncoder.drawIndexed(indexCount: 6, indexBufferOffset: 0, instanceCount: range.count)
+            return
+        }
         renderEncoder.setVertexBuffer(spritesData.vertexBuffer, offset: 0, slot: ShaderSlots.vertexBuffer)
         renderEncoder.setIndexBuffer(spritesData.indexBuffer, indexFormat: .uInt32)
-        renderEncoder.setRenderPipelineState(item.renderPipeline)
 
-        let instanceCount = Int(batch.range.upperBound - batch.range.lowerBound)
-        let indexBufferOffset = Int(batch.range.lowerBound) * MemoryLayout<UInt32>.stride
+        let instanceCount = range.count
+        let indexBufferOffset = Int(range.lowerBound) * MemoryLayout<UInt32>.stride
         renderEncoder.drawIndexed(
             indexCount: 6 * instanceCount,
             indexBufferOffset: 6 * indexBufferOffset,

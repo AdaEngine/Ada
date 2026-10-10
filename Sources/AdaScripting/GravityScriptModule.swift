@@ -202,6 +202,7 @@ enum GravityScriptModuleResolver {
         "resource",
         "scriptable",
         "system",
+        "tool",
         "view",
     ]
 

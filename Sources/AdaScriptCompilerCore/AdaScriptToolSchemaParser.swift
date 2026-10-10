@@ -2,7 +2,8 @@ extension Parser {
     mutating func parseTool(
         name: String,
         annotation: Annotation,
-        line: Int
+        line: Int,
+        fields: [AdaScriptSchemaField] = []
     ) throws -> AdaScriptToolSchema {
         let supportedArguments: Set<String> = ["api", "id", "name", "permissions", "platforms", "version"]
         guard
@@ -46,6 +47,7 @@ extension Parser {
         return AdaScriptToolSchema(
             apiVersion: apiVersion,
             className: name,
+            fields: fields,
             id: id,
             line: line,
             name: displayName,

@@ -275,6 +275,19 @@ extension ComponentMacro {
         var initializerArguments: [String] = []
         var argumentIndex = 0
 
+        let exposedNames = initializer.attributes.compactMap { element -> AttributeSyntax? in
+            guard let attribute = element.as(AttributeSyntax.self),
+                attribute.attributeName.trimmedDescription.hasSuffix("AdaScriptInit") else { return nil }
+            return attribute
+        }.flatMap { attribute -> [String] in
+            guard let arguments = attribute.arguments?.as(LabeledExprListSyntax.self),
+                let names = arguments.first(where: { $0.label?.text == "exposing" })?.expression.as(ArrayExprSyntax.self) else { return [] }
+            return names.elements.compactMap { $0.expression.as(StringLiteralExprSyntax.self)?.representedLiteralValue }
+        }
+        guard exposedNames.allSatisfy({ name in parameters.contains { $0.externalName == name || $0.localName == name } }) else {
+            throw MacroError.macroUsage("@AdaScriptInit exposing names must match initializer parameters.")
+        }
+
         for parameter in parameters {
             let callArgument = parameter.externalName == "_"
                 ? parameter.localName
@@ -315,7 +328,7 @@ extension ComponentMacro {
                 continue
             }
 
-            guard isSupportedRuntimeConstructorType(parameter.typeName) else {
+            guard isSupportedRuntimeConstructorType(parameter.typeName) || exposedNames.contains(parameter.externalName) || exposedNames.contains(parameter.localName) else {
                 guard let defaultExpression = parameter.defaultExpression else {
                     throw MacroError.macroUsage(
                         "@AdaScriptInit parameter '\(parameter.externalName)' has unsupported type "
@@ -482,7 +495,7 @@ extension ComponentMacro {
                         typeName: String(reflecting: Self.self),
                         parameters: [
                             \(raw: runtimeConstructorParameters.joined(separator: ",\n"))
-                        ].filter { $0.kind != .readOnly },
+                        ]\(raw: runtimeConstructorBody == nil ? ".filter { $0.kind != .readOnly }" : ""),
                         \(raw: runtimeConstructorImplementation)
                     )
                 }

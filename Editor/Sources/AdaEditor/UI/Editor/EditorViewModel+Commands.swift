@@ -11,6 +11,7 @@ extension EditorViewModel {
 
         RuntimeLogStore.shared.setEnabled(true)
         didStartEditorSession = true
+        startStudioTools()
         if selectedRunDestination == .android { refreshAndroidTargets() }
         bootstrapWorkspaceIfNeeded()
         refreshSourceControl()

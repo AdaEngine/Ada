@@ -93,10 +93,11 @@ Bevy examples or ecosystem plugins are not evidence of built-in engines.
 - [x] Stretch/fit/fill/sliced/tiled modes through the production batching path.
 - [x] Tile orientation, invalidation, serialization and occluder consistency.
 - [x] Visible sprite/tile reference scene and recorded backend validation (offscreen Metal).
-- [ ] Editor controls, resource round trips and AdaScript authoring exposure.
+- [x] Editor controls, resource round trips and AdaScript authoring exposure (macOS validation; mobile UI remains unverified).
 - [x] Runtime picking and editor integration (native Swift and viewport event path).
 - [x] Chunked tile-map rendering with realistic performance evidence (debug/headless CPU preparation; Metal/native WGPU pixels).
-- [ ] Sprite instancing with ordering and backend coverage.
+- [x] Sprite instancing with ordering and fallback (Metal/native WebGPU/browser pixels; native timings).
+- [x] Instanced WebGPU/browser and physical iPad rendering proof (iOS Simulator launched separately).
 - [ ] Alpha phases, sprite material convenience and UV transforms.
 - [ ] Pixel-perfect presentation preset.
 - [ ] HDR 2D, bloom, tone mapping and UI composition.
@@ -424,6 +425,75 @@ shadow-mask pass, not a browser export or physical-device editor session.
 Editor UI proof uses production AdaUI containers and pointer events; no native
 Studio window was manually exercised. Browser/WASM and physical mobile authoring
 remain outside this validation.
+
+## Authoring follow-up — 2026-10-09
+
+The Sprite Inspector now authors anchor presets/custom coordinates, stretch,
+fit/fill, sliced borders and tiled axes/scale. Fields retain the runtime Codable
+layout, normal scene history and Save/reopen behavior. Native `Size` objects and
+legacy array dimensions both display and decode. Invalid anchors, borders and
+scales do not overwrite valid Inspector values.
+
+The tile-map Inspector authors all eight brush/selected-cell orientations.
+The canvas previews transformed textures inside rectangular cells. Painting,
+same-tile repaint, layers, palette reindexing, saves and runtime loading preserve
+the optional orientation ID. Existing resources default to identity.
+
+AdaScript exposes layout factories, Sprite constructor inputs and query writes.
+The VM and native host share detached value conversion; AOT factory-member
+lowering uses ordinary functions/literals supported by the native compiler.
+`world.setTileOrientation(entityID, layer, [x, y], orientation)` and its Commands
+equivalent execute through the deferred world queue. This edits a shared runtime
+asset; it does not write the authored resource to disk. See the editor's
+[SpriteLayout.md](../../Editor/Documentation/SpriteLayout.md) for examples.
+
+Validation: 186 engine/scripting/sprite/tile-map tests in 36 suites passed.
+60 Editor tests in eight suites passed, including actual AdaUI menu, text and
+pointer input, fractional values, scene Save/reopen/undo/redo, resource round
+trips and canvas commands. Editor validation and native Studio launch used a
+temporary source snapshot containing the task's Editor changes and the current
+engine, because unrelated Community publishing edits blocked the shared checkout.
+The AOT compiler generated standalone C for layout factories; compiled C assertions
+verified their returned values. This is not a full exported-game or mobile-device
+run. The QA Studio process launched with a real temporary project and remained
+running; native visual layout was not inspected. New files pass strict SwiftLint
+and the task diff passes whitespace checks. Existing files retain baseline lint
+warnings. Sprite instancing and later rendering stages remain open.
+
+## Sprite instancing follow-up — 2026-10-10
+
+Capable devices now prepare 96-byte quad instances with shared quad/index
+geometry. The shader reconstructs the transformed plane and cropped/flipped
+atlas UVs. Contiguous texture/sampler batches retain painter order and are split
+by other draw passes, including those using the same entity ID. Leading items
+carry distinct draw ranges; GPU instance storage rotates with the in-flight
+frame budget. `SpriteDrawData.renderingMode = .batched` selects the production
+expanded reference, and unsupported devices use that path automatically.
+
+196 focused engine tests passed. Metal instancing and reference/chunk/sprite
+controls produced identical GPU pixels. The 20,000-sprite Release workload reduced
+preparation from 27.69 to 12.01 ms and upload from 3.68 to 1.92 MB, with one draw in
+both paths. GPU command timestamps were 1.161 vs 1.235 ms; this does not establish
+faster GPU execution or display FPS. Root Release tests hit an unrelated Swift
+6.3.2 AdaUI compiler crash; a temporary package importing the production rendering
+modules ran the Release workload instead, with independently resolved dependencies.
+
+Native WebGPU AdaSprite compilation passed with a task-owned source snapshot of
+compatible Swan (checkout metadata `1eb45a22c79439b50e9cde774454450e50147149`) and
+cached Dawn 147. The follow-up now passes native WebGPU layout/tile A/B and shadow
+checks plus actual WASM WebGPU, iPhone Simulator and physical iPad pixel checks.
+The portable fixture renders ten frames / 1242 quads / eight draws, requires active
+instancing, pixel equality and known control colors. A device report was retrieved
+from the physical iPad's own application container. Android and fallback GPU paths
+remain outside the proof; this does not establish mobile performance gains.
+
+Tint now has a pinned, hash-checked project tool cache and shared bootstrap used by
+runtime discovery and export. `script/validate_webgpu.sh` always exercises fresh
+GLSL → SPIR-V → WGSL compilation, actual GPU pixels and binding reflection. Browser
+smoke found unsigned Tint binding constants were omitted by the reflection parser;
+this is fixed and covered by regression tests and real Tint output. Local Swan
+BridgeJS discovery and stale HTTP cache timestamps were also corrected. Full
+methods and commands are in [SpriteInstancing.md](../SpriteInstancing.md).
 
 ## References
 

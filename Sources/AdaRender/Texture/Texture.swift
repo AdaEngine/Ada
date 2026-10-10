@@ -147,6 +147,7 @@ extension Texture: RuntimeRegistrable {
     @MainActor
     public static func registerTypes() {
         AssetsManager.registerAssetType(Texture2D.self)
+        AssetsManager.registerAssetType(TextureCube.self)
         AssetsManager.registerAssetType(TextureAtlas.self)
         AssetsManager.registerAssetType(TextureAtlas.Slice.self)
         AssetsManager.registerAssetType(AnimatedTexture.self)
@@ -154,6 +155,7 @@ extension Texture: RuntimeRegistrable {
         AssetsManager.registerAssetType(NamedTextureAtlas.Slice.self)
 
         Texture2D.registerTextureType()
+        TextureCube.registerTextureType()
         TextureAtlas.registerTextureType()
         AnimatedTexture.registerTextureType()
     }

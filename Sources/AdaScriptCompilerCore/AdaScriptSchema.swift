@@ -61,8 +61,11 @@ extension Parser {
         }
 
         if let toolAnnotation = toolAnnotations.first {
-            output.tools.append(try parseTool(name: name, annotation: toolAnnotation, line: declarationLine))
-            try skipDeclarationBody()
+            let body = try parseScriptableBody(name: name)
+            guard body.bindings.isEmpty else {
+                throw error("@tool fields cannot bind gameplay components or resources")
+            }
+            output.tools.append(try parseTool(name: name, annotation: toolAnnotation, line: declarationLine, fields: body.fields))
         } else if annotations.contains(where: { $0.name == "system" }) {
             let system = try parseSystemBody(systemName: name)
             output.resourceBindings += system.resourceBindings
@@ -290,6 +293,7 @@ extension Parser {
                 usesDeferredCommands
                 || checkSequence(["context", ".", "world", ".", "commands"])
                 || checkSequence(["context", ".", "world", ".", "spawn"])
+                || checkSequence(["context", ".", "world", ".", "setTileOrientation"])
             if depth == 1 {
                 let annotations = try parseAnnotations()
                 if let rpc = annotations.first(where: { $0.name == "rpc" }) {

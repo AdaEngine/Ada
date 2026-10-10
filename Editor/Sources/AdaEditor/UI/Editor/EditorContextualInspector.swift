@@ -46,6 +46,9 @@ struct EditorContextualInspector: View {
         case let .text(document):
             return AnyView(EditorFileInspector(document: .text(document)))
         case let .asset(document):
+            if document.kind == .image {
+                return AnyView(EditorTextureSettingsInspector(model: workbench.textureSettingsModel(for: document)))
+            }
             if document.kind == .tileMap {
                 return AnyView(
                     EditorTileMapInspector(document: document, model: workbench.tileMapModel(for: document))

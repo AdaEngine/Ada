@@ -122,7 +122,9 @@
                     throw ContextError.windowNotFound
                 }
                 window.surfaceLock.withLock { _ in
-                    guard window.size != newSize || (scaleFactor ?? window.scaleFactor) != window.scaleFactor else { return }
+                    guard window.size != newSize || (scaleFactor ?? window.scaleFactor) != window.scaleFactor else {
+                        return
+                    }
                     webGPUDeviceLock.withLock { _ in
                         configureSurface(
                             surface: window.surface,

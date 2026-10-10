@@ -54,6 +54,7 @@ enum AdaScriptComponentRuntime {
         }
         return ([
             "extern var __adaComponentFactory;",
+            AdaScriptSpriteLayoutLibrary.source,
             """
             class __AdaVector3Factory {
                 var ZERO {

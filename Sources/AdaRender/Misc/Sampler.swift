@@ -34,7 +34,7 @@ public enum SamplerAddressMode: String, Codable, Sendable {
 }
 
 /// An object that you use to configure a texture sampler.
-public struct SamplerDescriptor: Codable, Sendable {
+public struct SamplerDescriptor: Codable, Equatable, Sendable {
     /// The filtering option for combining pixels within one mipmap level when the sample footprint is larger than a pixel (minification).
     public var minFilter: SamplerMinMagFilter
 

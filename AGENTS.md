@@ -20,6 +20,14 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
 - Do not delete or rewrite the user's shared `.build` directory. Immediately retry with an isolated scratch directory, for example: `swift test --scratch-path /tmp/adaengine-swift-build --filter SomeSuiteName` or `swift build --scratch-path /tmp/adaengine-swift-build`.
 - Reuse the same scratch path for subsequent commands in the task so the clean build remains incremental.
 
+### WebGPU shader validation
+- For shader, sprite-renderer or WebGPU changes, run `script/validate_webgpu.sh`
+  from the engine root with compatible Swan/Dawn and Swift 6.3.2. It bootstraps
+  pinned Tint and tests a fresh SPIR-V → WGSL conversion plus actual GPU pixels.
+- `python3 script/ensure_tint.py --check` verifies the installed tool hash and
+  reader/writer smoke. Do not treat cached WGSL as proof of current Tint behavior.
+- Tool setup and overrides are documented in [Tools/Tint/README.md](Tools/Tint/README.md).
+
 ### Test
 - **Use Swift Testing** for AdaEngine package tests: `import Testing`, `@Suite`, `@Test`, and `#expect` / `#require`. Do not add new **XCTest**-based tests in `AdaEngine/Tests/`.
 - Run all tests: `swift test --parallel`

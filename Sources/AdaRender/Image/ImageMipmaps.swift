@@ -5,7 +5,13 @@ public enum ImageMipmaps {
     public enum Error: Swift.Error, Sendable { case invalidSource }
     public enum ColorSpace: Sendable, Equatable { case linear, sRGB }
 
-    public static func make(from image: Image, colorSpace: ColorSpace, includeMipmaps: Bool = true) throws -> [Image] {
+    public static func make(
+        from image: Image,
+        colorSpace: ColorSpace,
+        includeMipmaps: Bool = true,
+        maximumLevelCount: Int? = nil,
+        normalMap: Bool = false
+    ) throws -> [Image] {
         guard image.width > 0, image.height > 0, image.data.count.isMultiple(of: image.height) else {
             throw Error.invalidSource
         }
@@ -35,7 +41,7 @@ public enum ImageMipmaps {
         guard includeMipmaps else {
             return result
         }
-        while width > 1 || height > 1 {
+        while (width > 1 || height > 1) && result.count < (maximumLevelCount ?? Int.max) {
             let nextWidth = max(1, width / 2)
             let nextHeight = max(1, height / 2)
             var next = [UInt8](repeating: 0, count: nextWidth * nextHeight * 4)
@@ -58,6 +64,17 @@ public enum ImageMipmaps {
                         let average = sum / count
                         let value = channel < 3 && colorSpace == .sRGB ? encodeSRGB(average) : average
                         next[(y * nextWidth + x) * 4 + channel] = UInt8(min(max((value * 255).rounded(), 0), 255))
+                    }
+                    if normalMap {
+                        let offset = (y * nextWidth + x) * 4
+                        let nx = Float(next[offset]) / 127.5 - 1
+                        let ny = Float(next[offset + 1]) / 127.5 - 1
+                        let nz = Float(next[offset + 2]) / 127.5 - 1
+                        let length = (nx * nx + ny * ny + nz * nz).squareRoot()
+                        let normal = length > 0.01 ? [nx / length, ny / length, nz / length] : [0, 0, 1]
+                        for channel in 0..<3 {
+                            next[offset + channel] = UInt8(min(max(((normal[channel] * 0.5 + 0.5) * 255).rounded(), 0), 255))
+                        }
                     }
                 }
             }

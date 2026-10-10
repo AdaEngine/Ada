@@ -4,6 +4,7 @@ import Foundation
 enum EditorSettingsPage {
     static let runtimeEntry = "RUNTIME ENTRY"
     static let editorDisplay = "EDITOR DISPLAY"
+    static let studioTools = "STUDIO TOOLS"
 
     static func title(_ page: String) -> String {
         EditorBuildPlatform(rawValue: page)?.title ?? page.localizedCapitalized
@@ -23,6 +24,9 @@ extension EditorSettingsWindowViewModel {
                 return []
             }
             var pages = ["PROJECT"]
+            #if os(macOS)
+            pages.append(EditorSettingsPage.studioTools)
+            #endif
             if isAdaScriptProject {
                 pages += [EditorSettingsPage.runtimeEntry, "RUNTIME PROFILE", "FEATURE PLUGINS"]
                 if isRuntimePluginEnabled(.physics2D) {

@@ -11,6 +11,8 @@ struct EditorTileMapSidebar: View {
             layers
                 .padding(12)
             RectangleShape().fill(theme.editorColors.border).frame(height: 1)
+            orientationControls
+                .padding(12)
             cellOcclusion
                 .padding(.horizontal, 12)
             palette
@@ -41,6 +43,35 @@ struct EditorTileMapSidebar: View {
                 }
             }
             .padding(.vertical, 8)
+        }
+    }
+
+    private var orientationControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionTitle("Orientation", detail: model.selectedCell == nil ? "Brush" : "Brush / cell")
+            Text("Brush").font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+            EditorEnumField(cases: TileOrientation.allCases.map(\.editorLabel), selection: Binding(
+                get: { model.brushOrientation.editorLabel },
+                set: { label in
+                    guard let orientation = TileOrientation.allCases.first(where: { $0.editorLabel == label }) else {
+                        return
+                    }
+                    model.endStroke()
+                    model.brushOrientation = orientation
+                }
+            )).accessibilityIdentifier("AdaEditor.TileMapEditor.BrushOrientation")
+            if model.selectedCell != nil {
+                Text("Selected cell").font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+                EditorEnumField(cases: TileOrientation.allCases.map(\.editorLabel), selection: Binding(
+                    get: { model.selectedCellOrientation.editorLabel },
+                    set: { label in
+                        guard let orientation = TileOrientation.allCases.first(where: { $0.editorLabel == label }) else {
+                        return
+                    }
+                        model.setSelectedCellOrientation(orientation)
+                    }
+                )).accessibilityIdentifier("AdaEditor.TileMapEditor.CellOrientation")
+            }
         }
     }
 

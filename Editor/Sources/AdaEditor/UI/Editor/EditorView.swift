@@ -226,6 +226,7 @@ struct EditorView: View {
     var body: some View {
         // Keep the window presentation value small as editor overlays grow.
         AnyView(editorContent)
+            .modifier(EditorStudioToolPermissionPresentation(host: viewModel.studioTools, presentation: .workspace))
             .modifier(EditorTextSearchPresentation(viewModel: viewModel))
             .fullScreenCover(isPresented: viewModel.isNewFileDialogPresentedBinding) {
                 EditorNewFileDialog(viewModel: viewModel)
@@ -306,6 +307,7 @@ struct EditorView: View {
             }
             .onAppear {
                 EditorAgentMCPTools.shared.activate(viewModel)
+                viewModel.startStudioTools()
                 viewModel.startProjectFileWatching()
                 EditorNotificationRouter.shared.attach(viewModel)
                 EditorMenuCommandRouter.shared.install(owner: viewModel) { [weak viewModel] command in
@@ -323,6 +325,7 @@ struct EditorView: View {
                 viewModel.playerPairingWindow?.close()
                 viewModel.playerPairingWindow = nil
                 viewModel.stopProjectFileWatching()
+                viewModel.studioTools.close()
                 EditorNotificationRouter.shared.detach(viewModel)
                 viewModel.debugger.stop()
                 EditorMenuCommandRouter.shared.uninstall(owner: viewModel)
@@ -497,6 +500,10 @@ private struct EditorRightSidebarContent: View {
     var body: some View {
         if viewModel.toolStrip.activeRightTool == "agentChat" {
             EditorAgentSidebar(viewModel: viewModel.agent, onOpenCatalog: { viewModel.presentSettings(.agent) })
+        } else if viewModel.toolStrip.activeRightTool == "studioTools" {
+            EditorStudioToolsSidebar(host: viewModel.studioTools, onOpenSettings: {
+                viewModel.presentSettings(.project, page: EditorSettingsPage.studioTools)
+            })
         } else if viewModel.toolStrip.activeRightTool == "inspector" {
             EditorContextualInspector(
                 document: viewModel.workbench.activeDocument,

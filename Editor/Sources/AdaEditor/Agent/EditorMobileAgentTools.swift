@@ -75,7 +75,7 @@ enum EditorMobileAgentTools {
                 "Read bounded build/debug output by cursor, plus current errors from the visible Play runtime.",
                 ["after": .object(["type": "integer", "minimum": 0])]
             ),
-        ] + EditorAgentKnowledgeTools.tools() + EditorAgentAssetTools.tools() + EditorAgentWebTools.tools()
+        ] + EditorAgentPublicationTools.tools() + EditorAgentKnowledgeTools.tools() + EditorAgentAssetTools.tools() + EditorAgentWebTools.tools()
     }
 
     static func tool(
@@ -83,7 +83,8 @@ enum EditorMobileAgentTools {
         _ description: String,
         _ properties: [String: Value] = [:],
         _ required: [String] = [],
-        readOnly: Bool = true
+        readOnly: Bool = true,
+        openWorld: Bool = false
     ) -> Tool {
         Tool(
             name: name,
@@ -92,7 +93,7 @@ enum EditorMobileAgentTools {
                 "type": "object", "properties": .object(properties),
                 "required": .array(required.map(Value.string)), "additionalProperties": false,
             ]),
-            annotations: .init(readOnlyHint: readOnly, destructiveHint: false, openWorldHint: false)
+            annotations: .init(readOnlyHint: readOnly, destructiveHint: false, openWorldHint: openWorld)
         )
     }
 }

@@ -5,7 +5,7 @@ import MCP
 @MainActor
 enum EditorAgentAuthoringMCPTools {
     static func tools() -> [Tool] {
-        EditorAgentKnowledgeTools.tools() + EditorAgentAssetTools.tools().filter {
+        EditorAgentPublicationTools.tools() + EditorAgentKnowledgeTools.tools() + EditorAgentAssetTools.tools().filter {
             // Desktop scene edits must enter the open document's revision/undo path.
             // Image analysis requires a provider callback installed by the mobile host.
             !["editor.scene.asset.assign", "editor.image.read"].contains($0.name)
@@ -19,6 +19,9 @@ enum EditorAgentAuthoringMCPTools {
         do {
             guard let viewModel = EditorAgentMCPTools.shared.activeViewModel, let projectURL = viewModel.projectURL else {
                 throw AuthoringError("Open an Ada project in Ada Studio first.")
+            }
+            if name == "editor.community.submit", viewModel.workbench.openDocuments.contains(where: \.isDirty) {
+                throw AuthoringError("Save open documents before submitting the app for review.")
             }
             if tool.annotations?.readOnlyHint != true {
                 let paths = [arguments["path"]?.stringValue, arguments["destination"]?.stringValue, arguments["previewPath"]?.stringValue].compactMap { $0 }
@@ -39,7 +42,9 @@ enum EditorAgentAuthoringMCPTools {
 
     static func execute(name: String, arguments: [String: Value], projectURL: URL) async throws -> CallTool.Result {
         let payload: [String: Any]
-        if EditorAgentKnowledgeTools.tools().contains(where: { $0.name == name }) {
+        if name == "editor.community.submit" {
+            payload = try await EditorAgentPublicationTools.submit(projectURL: projectURL, arguments: arguments)
+        } else if EditorAgentKnowledgeTools.tools().contains(where: { $0.name == name }) {
             payload = try EditorAgentKnowledge.query(name: name, arguments: arguments)
         } else {
             payload = try await EditorAgentAssetToolService(projectURL: projectURL).execute(name: name, arguments: arguments)

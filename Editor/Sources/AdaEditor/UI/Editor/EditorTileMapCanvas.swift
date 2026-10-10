@@ -33,10 +33,15 @@ struct EditorTileMapCanvas: View {
             let width = model.displayTileSize.width * zoom
             let height = model.displayTileSize.height * zoom
             let origin = model.canvasOrigin(in: size)
-            model.visitVisibleTiles(in: size) { x, y, index in
+            model.visitVisibleOrientedTiles(in: size) { _, x, y, index, orientation in
                 let rect = model.tileRect(atX: x, y: y, in: size)
                 if let texture = model.texture(at: index) {
-                    context.drawRect(rect, texture: texture, color: .white)
+                    var tileContext = context
+                    tileContext.translateBy(x: rect.midX, y: -rect.midY)
+                    tileContext.scaleBy(x: rect.width, y: rect.height)
+                    tileContext.rotate(by: .radians(Float(orientation.rawValue % 4) * .pi / 2))
+                    tileContext.scaleBy(x: orientation.rawValue >= 4 ? -1 : 1, y: 1)
+                    tileContext.drawRect(Rect(x: -0.5, y: -0.5, width: 1, height: 1), texture: texture, color: .white)
                 } else {
                     context.drawRect(rect, color: model.paletteColor(at: index))
                 }

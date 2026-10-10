@@ -13,6 +13,7 @@ enum EditorAdaScriptProjectBuildOutcome: Sendable {
 @Observable
 @MainActor
 final class EditorViewModel {
+    let studioTools = EditorStudioToolHost()
     let performance = EditorPerformanceModel()
     let playerSession = EditorPlayerSession()
     var playerPairingWindow: UIWindow?
@@ -306,6 +307,7 @@ final class EditorViewModel {
             self?.rememberActiveProjectDocument()
         }
         self.workbench.setDocumentEditedHandler { [weak self] documentID in
+            self?.scheduleStudioToolReload(documentID: documentID)
             self?.updateDebugSource(documentID: documentID)
             self?.scheduleAutosave(documentID: documentID)
             self?.scheduleSourceAnalysis(documentID: documentID)

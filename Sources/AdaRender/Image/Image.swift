@@ -27,6 +27,9 @@ public struct Image: Sendable {
     public var assetMetaInfo: AssetMetaInfo?
     public var samplerDescription: SamplerDescriptor = SamplerDescriptor()
 
+    /// Validated import pixels loaded from the adjacent texture settings file, when present.
+    public private(set) var importedTextureData: ImportedTextureData?
+
     /// Create an empty image.
     public init() {
         self.data = Data()
@@ -143,6 +146,7 @@ extension Image {
         }
 
         self = try Self.decode(from: data, fileExtension: file.pathExtension)
+        try applyTextureSettings(at: file)
     }
 
     /// Decodes an image by recognizing its encoded bytes.
@@ -210,6 +214,14 @@ extension Image: Asset {
             self.samplerDescription = rep.sampler
         } else {
             self = try Self.decode(from: assetDecoder.assetData, fileExtension: pathExt)
+        }
+        try applyTextureSettings(at: assetDecoder.assetMeta.filePath)
+    }
+
+    private mutating func applyTextureSettings(at file: URL) throws {
+        if let settings = try TextureImportSettings.load(for: file) {
+            importedTextureData = try settings.prepare(self)
+            samplerDescription = settings.sampler
         }
     }
 

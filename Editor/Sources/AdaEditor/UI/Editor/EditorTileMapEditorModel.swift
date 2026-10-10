@@ -33,6 +33,7 @@ final class EditorTileMapEditorModel {
     private(set) var map = EditorTileMapResource(atlasColors: [], cells: [])
     private(set) var status = ""
     var selectedColor = 0
+    var brushOrientation: TileOrientation = .identity
     private(set) var selectedLayer = 0
     var tool: Tool = .paint
     var newColorHex = "FFFFFF"
@@ -56,6 +57,7 @@ final class EditorTileMapEditorModel {
     @ObservationIgnored private let onSave: (() -> Void)?
     @ObservationIgnored private var savedData: Data?
     @ObservationIgnored private var paintedCells: [[TileMapCoordinate: Int]] = []
+    @ObservationIgnored private var orientedCells: [[TileMapCoordinate: TileOrientation]] = []
     @ObservationIgnored private var tileImages: [Image?] = []
     @ObservationIgnored private var tileTextures: [Texture2D?] = []
     @ObservationIgnored private var linkedImages: [Image?] = []
@@ -94,6 +96,16 @@ final class EditorTileMapEditorModel {
                     cells[TileMapCoordinate(x: cell[0], y: cell[1])] = cell[2]
                 }
                 return cells
+            }
+            orientedCells = try map.effectiveLayers.map { layer in
+                var orientations: [TileMapCoordinate: TileOrientation] = [:]
+                for cell in layer.cells where cell.count > 3 {
+                    guard let orientation = TileOrientation(rawValue: cell[3]) else {
+                        throw EditorTileMapReferenceError.invalid("Tile orientation must be between 0 and 7.")
+                    }
+                    orientations[TileMapCoordinate(x: cell[0], y: cell[1])] = orientation
+                }
+                return orientations
             }
             selectedLayer = min(selectedLayer, paintedCells.count - 1)
             tileImages = (map.atlasTextures ?? []).map { path in
@@ -145,6 +157,11 @@ final class EditorTileMapEditorModel {
     /// dense maps examine only the viewport, whichever has fewer candidates.
     @discardableResult
     func visitVisibleTiles(in viewport: Size, _ visit: (Int, Int, Int) -> Void) -> Int {
+        visitVisibleOrientedTiles(in: viewport) { _, x, y, index, _ in visit(x, y, index) }
+    }
+
+    @discardableResult
+    func visitVisibleOrientedTiles(in viewport: Size, _ visit: (Int, Int, Int, Int, TileOrientation) -> Void) -> Int {
         guard viewport.width > 0, viewport.height > 0, cellWidth > 0, cellHeight > 0 else { return 0 }
         let origin = canvasOrigin(in: viewport)
         let minX = Int(floor(-origin.x / cellWidth - 0.5))
@@ -162,7 +179,7 @@ final class EditorTileMapEditorModel {
                     candidates += 1
                     guard cell.x >= minX, cell.x <= maxX, cell.y >= minY, cell.y <= maxY,
                         index >= 0, index < paletteCount else { continue }
-                    visit(cell.x, cell.y, index)
+                    visit(layerIndex, cell.x, cell.y, index, orientation(at: cell, layer: layerIndex))
                 }
             } else {
                 for y in minY...maxY {
@@ -170,7 +187,7 @@ final class EditorTileMapEditorModel {
                         candidates += 1
                         guard let index = paintedCells[layerIndex][TileMapCoordinate(x: x, y: y)],
                             index >= 0, index < paletteCount else { continue }
-                        visit(x, y, index)
+                        visit(layerIndex, x, y, index, orientation(at: TileMapCoordinate(x: x, y: y), layer: layerIndex))
                     }
                 }
             }
@@ -264,6 +281,29 @@ final class EditorTileMapEditorModel {
         reload()
     }
 
+    func orientation(at cell: TileMapCoordinate, layer: Int) -> TileOrientation {
+        guard orientedCells.indices.contains(layer) else {
+            return .identity
+        }
+        return orientedCells[layer][cell] ?? .identity
+    }
+
+    var selectedCellOrientation: TileOrientation {
+        selectedCell.map { orientation(at: $0, layer: selectedLayer) } ?? .identity
+    }
+
+    func setSelectedCellOrientation(_ orientation: TileOrientation) {
+        endStroke()
+        guard let cell = selectedCell, paintedCells[selectedLayer][cell] != nil,
+            selectedCellOrientation != orientation else {
+            return
+        }
+        orientedCells[selectedLayer][cell] = orientation == .identity ? nil : orientation
+        strokeChanged = true
+        revision += 1
+        endStroke()
+    }
+
     func texture(at index: Int) -> Texture2D? {
         if index < legacyPaletteCount { return tileTextures.indices.contains(index) ? tileTextures[index] : nil }
         let linkedIndex = index - legacyPaletteCount
@@ -345,7 +385,11 @@ final class EditorTileMapEditorModel {
             $0.key.y == $1.key.y ? $0.key.x < $1.key.x : $0.key.y < $1.key.y
         }.map { cell -> [Int] in
             let old = previousCells[cell.key]
-            return old?.dropFirst(2).first == cell.value ? (old ?? []) : [cell.key.x, cell.key.y, cell.value]
+            var record = old ?? [cell.key.x, cell.key.y, cell.value]
+            record[2] = cell.value
+            let orientation = orientation(at: cell.key, layer: selectedLayer).rawValue
+            if record.count > 3 { record[3] = orientation } else if orientation != 0 { record.append(orientation) }
+            return record
         }
         let records = layers[selectedLayer].cellOcclusion?.filter { paintedCells[selectedLayer][TileMapCoordinate(x: $0.position.x, y: $0.position.y)] != nil }
         if updated.paletteLayers == nil {
@@ -360,6 +404,7 @@ final class EditorTileMapEditorModel {
     }
 
     func selectCell(at location: Point, in viewport: Size) {
+        endStroke()
         let coordinate = cell(at: location, in: viewport)
         let selected = TileMapCoordinate(x: coordinate.x, y: coordinate.y)
         guard paintedCells.indices.contains(selectedLayer), let palette = paintedCells[selectedLayer][selected] else {
@@ -714,11 +759,13 @@ final class EditorTileMapEditorModel {
         guard paintedCells.indices.contains(selectedLayer) else { return }
         if erasing {
             guard paintedCells[selectedLayer].removeValue(forKey: cell) != nil else { return }
+            orientedCells[selectedLayer][cell] = nil
         } else {
             guard (0..<paletteCount).contains(selectedColor),
                 selectedColor < legacyPaletteCount || image(at: selectedColor) != nil,
-                paintedCells[selectedLayer][cell] != selectedColor else { return }
+                paintedCells[selectedLayer][cell] != selectedColor || orientation(at: cell, layer: selectedLayer) != brushOrientation else { return }
             paintedCells[selectedLayer][cell] = selectedColor
+            orientedCells[selectedLayer][cell] = brushOrientation == .identity ? nil : brushOrientation
         }
         strokeChanged = true
         revision += 1

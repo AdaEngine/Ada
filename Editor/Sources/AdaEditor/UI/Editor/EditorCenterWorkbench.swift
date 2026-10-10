@@ -454,7 +454,8 @@ extension EditorCenterWorkbench {
         case .atlas:
             EditorTextureAtlasAssetEditor(document: document)
         case .image:
-            EditorImageAssetPreview(document: document)
+            EditorImageAssetPreview(document: document, model: viewModel.textureSettingsModel(for: document))
+                .id(document.id)
         case .audio,
             .generic:
             assetMetadataPreview(document: document)

@@ -237,6 +237,7 @@ struct EditorInspectorSidebar: View {
             sceneReferenceField(fieldID: fieldID, value: value)
         } else if isEditable {
             editorTextField(text: scalarBinding)
+                .accessibilityIdentifier("AdaEditor.Inspector.Value.\(fieldID)")
         } else {
             readonlyField(value)
         }

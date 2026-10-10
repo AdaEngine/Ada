@@ -36,6 +36,10 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSenda
         commands.spawn(components)
     }
 
+    func setTileOrientation(_ entity: Int, _ layer: Int, _ coordinates: GSValue, _ orientation: Int) -> Bool {
+        commands.setTileOrientation(entity, layer, coordinates, orientation)
+    }
+
     @discardableResult
     func changeScene(_ path: String) -> Bool {
         guard isActive else {
@@ -75,6 +79,21 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSenda
 
 @GSExportable("AdaCommands")
 final class AnnotatedGravityCommandsBridge: @unchecked Sendable, AdaScriptNonSendableBridge {
+    func setTileOrientation(_ entity: Int, _ layer: Int, _ coordinates: GSValue, _ orientation: Int) -> Bool {
+        guard validateAccess(), let commands, coordinates.isList else {
+            return false
+        }
+        let values = coordinates.toList
+        guard values.count == 2, values.allSatisfy(\.isInteger),
+            let x = Int(exactly: values[0].toInteger), let y = Int(exactly: values[1].toInteger) else {
+            reportDiagnostic("Tile coordinates must be a pair of integers")
+            return false
+        }
+        return AdaScriptTileOrientationCommand.enqueue(
+            commands: commands, entity: entity, layer: layer, x: x, y: y, orientation: orientation, reportDiagnostic: reportDiagnostic
+        )
+    }
+
     @GSExportableIgnore
     private var permitCommunitySpawn: (@Sendable () -> Bool)?
 

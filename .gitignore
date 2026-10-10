@@ -6,6 +6,7 @@
 **/.build/
 .build-codex/
 .build-web-*/
+.build-tools/
 .zed/
 
 

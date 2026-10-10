@@ -418,7 +418,8 @@ private extension ModuleAnalyzer {
         if annotations.contains("system"), function.name == "update", offset == 0 {
             return .named("$AdaSystemContext")
         }
-        if annotations.contains("tool"), function.name == "activate", offset == 0 {
+        if annotations.contains("tool"), offset == 0,
+           function.name == "activate" || function.parameters.first?.name == "editor" {
             return .named("$AdaEditorToolContext")
         }
         if annotations.contains("scriptable"), ["destroy", "fixedUpdate", "ready", "update"].contains(function.name), offset == 0 {

@@ -88,7 +88,7 @@ struct EditorAdaScriptProjectBuilder {
 
         let sourceRoot = project.paths.sources ?? "Sources"
         let sources =
-            try loadSources(at: projectURL.appendingPathComponent(sourceRoot, isDirectory: true))
+            try loadSources(at: projectURL.appendingPathComponent(sourceRoot, isDirectory: true), toolsRoot: projectURL.appendingPathComponent("Tools"))
                 .map { source in
                     let projectPath = sourceRoot + "/" + source.path
                     return AdaScriptSource(path: source.path, source: sourceOverrides[projectPath] ?? source.source)
@@ -215,7 +215,7 @@ struct EditorAdaScriptProjectBuilder {
         }
     }
 
-    private func loadSources(at sourceRoot: URL) throws -> [AdaScriptSource] {
+    private func loadSources(at sourceRoot: URL, toolsRoot: URL) throws -> [AdaScriptSource] {
         guard
             let enumerator = fileManager.enumerator(
                 at: sourceRoot,
@@ -228,6 +228,9 @@ struct EditorAdaScriptProjectBuilder {
 
         var sources: [AdaScriptSource] = []
         for case let fileURL as URL in enumerator where fileURL.pathExtension.lowercased() == "ada" {
+            let resolved = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
+            let toolsPath = toolsRoot.resolvingSymlinksInPath().standardizedFileURL.path
+            guard !resolved.hasPrefix(toolsPath + "/") else { continue }
             let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             guard values.isRegularFile == true, values.isSymbolicLink != true else {
                 continue

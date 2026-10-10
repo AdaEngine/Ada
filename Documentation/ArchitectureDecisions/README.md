@@ -38,6 +38,7 @@ describes the intended design even when its implementation is still planned.
 | [ADR-0010](0010-adascript-native-adaui-extension-registry.md) | Accepted | Planned | Versioned descriptors and host factories for native AdaUI views and modifiers used by AdaScript |
 | [ADR-0015](0015-adascript-async-tasks-and-coroutines.md) | Accepted | Partial (worktree foundation; not released) | Structured AdaScript async functions, awaitables, task ownership, timers, background I/O, and safe coroutine resumption |
 | [ADR-0016](0016-temporarily-disable-adascript-adaui.md) | Accepted | Partial (disablement shipped; redesign planned) | Temporarily disable AdaUI views in AdaScript and define the compiler/catalog/runtime redesign |
+| [ADR-0023](0023-studio-tools-ui-panels.md) | Accepted | Partial (local foundation; not released) | Project-local Studio tools with .ui panels, detached bindings/actions and document history |
 
 ## Multiplayer decisions
 

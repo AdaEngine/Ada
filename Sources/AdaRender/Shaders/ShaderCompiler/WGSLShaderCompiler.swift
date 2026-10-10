@@ -1,4 +1,5 @@
 #if canImport(WebGPU) && !WASM && !os(Android)
+    import AdaUtils
     import Foundation
     import Subprocess
     import WebGPU
@@ -21,6 +22,7 @@
 
             let tempFileURL = try getTempFileURL(from: spirvData)
 
+            defer { try? FileManager.default.removeItem(at: tempFileURL) }
             let process = try await run(
                 .path(FilePath(toolExecutable.path())),
                 arguments: [
@@ -33,14 +35,12 @@
                 output: .string(limit: .max),
                 error: .string(limit: 1024)
             )
-            try FileManager.default.removeItem(at: tempFileURL)
-
             if let error = process.standardError, !error.isEmpty {
                 throw ShaderCompilerError.failed(error)
             }
 
-            if case let .unhandledException(status) = process.terminationStatus, status != 0 {
-                throw ShaderCompilerError.failed("Process terminated with status \(status)")
+            guard process.terminationStatus.isSuccess else {
+                throw ShaderCompilerError.failed("Tint terminated with status \(process.terminationStatus)")
             }
 
             guard let source = process.standardOutput else {
@@ -78,7 +78,7 @@
             var errorDescription: String? {
                 switch self {
                 case .tintNotFound:
-                    return "Tint tool not found"
+                    return "Tint tool not found. Run python3 script/ensure_tint.py, or set TINT_EXECUTABLE to a verified SPIR-V reader / WGSL writer."
                 case let .failed(message):
                     return "Failed to compile shader: \(message)"
                 }
@@ -88,14 +88,7 @@
 
     extension Bundle {
         var tintExecutable: URL? {
-            if let path = ProcessInfo.processInfo.environment["TINT_EXECUTABLE"], FileManager.default.isExecutableFile(atPath: path) {
-                return URL(fileURLWithPath: path)
-            }
-            #if os(Windows)
-                return url(forResource: "tint", withExtension: "exe")
-            #else
-                return url(forResource: "tint", withExtension: "")
-            #endif
+            TintToolchain.executable(bundle: self)
         }
     }
 #endif

@@ -366,6 +366,26 @@ struct SpriteRenderSystemTests {
         #expect(Array(indices.suffix(6)) == [12, 13, 14, 14, 15, 12])
     }
 
+    @Test("Repeated sprite IDs and other draw passes retain separate ordered draw ranges")
+    func repeatedIDsRetainDrawRanges() async throws {
+        try Self.setupHeadlessRenderEngineIfNeeded()
+        let pipeline = try Self.makePipeline()
+        let sprite = Self.extractedSprite(id: 1, texture: .whiteTexture)
+        let world = try Self.makeRenderWorld(extractedSprites: [1: sprite], items: [
+            Self.item(entity: 1, drawPass: SpriteDrawPass(), renderPipeline: pipeline, sortKey: 0, batchRange: 0..<0),
+            Self.item(entity: 1, drawPass: TextDrawPass(), renderPipeline: pipeline, sortKey: 1, batchRange: 0..<0),
+            Self.item(entity: 1, drawPass: SpriteDrawPass(), renderPipeline: pipeline, sortKey: 2, batchRange: 0..<0),
+        ])
+        await world.runScheduler(.update)
+        let prepared = try #require(world.getResource(SortedRenderItems<Transparent2DRenderItem>.self))
+        #expect(prepared.items.items[0].batchRange == 0..<1)
+        #expect(prepared.items.items[1].batchRange == 0..<0)
+        #expect(prepared.items.items[2].batchRange == 1..<2)
+        let data = try #require(world.getResource(SpriteDrawData.self))
+        #expect(!data.usesInstancing, "Headless capability fallback must keep the production CPU path.")
+        #expect(data.vertexBuffer.count == 8)
+    }
+
     private static func render(_ sprite: ExtractedSprite) async throws -> ([SpriteVertexData], SpriteBatches) {
         let pipeline = try makePipeline()
         let world = try makeRenderWorld(extractedSprites: [sprite.entityId: sprite], items: [

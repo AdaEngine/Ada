@@ -13,6 +13,7 @@
 
     @_spi(Internal)
     public final class WebGPURenderDevice: RenderDevice, @unchecked Sendable {
+        public var supportsInstancedVertexInputs: Bool { true }
         public let context: WGPUContext
 
         init(context: WGPUContext) {
@@ -148,11 +149,7 @@
         }
 
         public func readImage(from texture: Texture) async throws -> Image? {
-            #if WASM
-                return nil
-            #else
-                return try await (texture.gpuTexture as? WGPUGPUTexture)?.readImage(device: context.device)
-            #endif
+            return try await (texture.gpuTexture as? WGPUGPUTexture)?.readImage(device: context.device)
         }
 
         public func createCommandQueue() -> any CommandQueue {

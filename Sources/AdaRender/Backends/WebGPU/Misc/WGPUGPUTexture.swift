@@ -26,11 +26,17 @@
         public let texture: WebGPU.GPUTexture
         public let textureView: WebGPU.GPUTextureView
         private let device: WebGPU.GPUDevice?
+        private let allowsReadback: Bool
 
         init(texture: WebGPU.GPUTexture, textureView: WebGPU.GPUTextureView, device: WebGPU.GPUDevice? = nil) {
             self.texture = texture
             self.textureView = textureView
             self.device = device
+            #if WASM
+            self.allowsReadback = false
+            #else
+            self.allowsReadback = texture.usage.contains(.copySrc)
+            #endif
         }
 
         public func replaceRegion(_ region: RectInt, mipmapLevel: Int, withBytes bytes: UnsafeRawPointer, bytesPerRow: Int) {
@@ -98,7 +104,7 @@
                     size: WebGPU.GPUExtent3D(
                         width: UInt32(descriptor.width),
                         height: UInt32(descriptor.height),
-                        depthOrArrayLayers: 1
+                        depthOrArrayLayers: descriptor.textureType == .textureCube ? 6 : 1
                     ),
                     format: descriptor.pixelFormat.toWebGPU,
                     mipLevelCount: UInt32(max(1, descriptor.mipmapLevel)),
@@ -113,7 +119,7 @@
                     size: WebGPU.GPUExtent3D(
                         width: UInt32(descriptor.width),
                         height: UInt32(descriptor.height),
-                        depthOrArrayLayers: 1
+                        depthOrArrayLayers: descriptor.textureType == .textureCube ? 6 : 1
                     ),
                     format: descriptor.pixelFormat.toWebGPU,
                     mipLevelCount: UInt32(max(1, descriptor.mipmapLevel)),
@@ -128,8 +134,14 @@
             let texture = webGPUDeviceLock.withLock { _ in
                 device.createTexture(descriptor: textureDesc)
             }
-            if let image = descriptor.image {
-                let origin = WebGPU.GPUOrigin3D(x: 0, y: 0, z: 0)
+            let initialImages = descriptor.image.map { [TextureSubresource(image: $0, mipLevel: 0)] } ?? []
+            for subresource in initialImages + descriptor.subresources {
+                let image = subresource.image
+                #if WASM
+                let origin = WebGPU.GPUOrigin3D(x: 0, y: 0, z: subresource.slice)
+                #else
+                let origin = WebGPU.GPUOrigin3D(x: 0, y: 0, z: UInt32(subresource.slice))
+                #endif
                 let writeSize = WebGPU.GPUExtent3D(
                     width: UInt32(image.width),
                     height: UInt32(image.height),
@@ -145,7 +157,7 @@
                         unsafe device.queue.writeTexture(
                             destination: WebGPU.GPUTexelCopyTextureInfo(
                                 texture: texture,
-                                mipLevel: 0,
+                                mipLevel: UInt32(subresource.mipLevel),
                                 origin: origin,
                                 aspect: WebGPU.GPUTextureAspect.all
                             ),
@@ -162,14 +174,18 @@
             }
 
             self.texture = texture
-            self.textureView = texture.createView()
+            if descriptor.textureType == .textureCube {
+                self.textureView = texture.createView(descriptor: WebGPU.GPUTextureViewDescriptor(dimension: .cube))
+            } else {
+                self.textureView = texture.createView()
+            }
             self.device = device
+            self.allowsReadback = wgpuUsage.contains(.copySrc)
         }
 
-        #if !WASM
         /// Uses aligned texture-copy rows and the existing asynchronous owned buffer readback path.
         func readImage(device: WebGPU.GPUDevice) async throws -> Image? {
-                guard texture.usage.contains(.copySrc) else {
+                guard allowsReadback else {
                     return nil
                 }
                 let imageFormat: Image.Format
@@ -189,7 +205,8 @@
                 let paddedBytesPerRow = (bytesPerRow + 255) & ~255
                 let count = paddedBytesPerRow * Int(self.texture.height)
                 let readback: WGPUBuffer? = webGPUDeviceLock.withLock { _ in
-                    guard let buffer = device.createBuffer(descriptor: WebGPU.GPUBufferDescriptor(usage: [.copyDst, .copySrc], size: UInt64(count))) else {
+                    let created: WebGPU.GPUBuffer? = device.createBuffer(descriptor: WebGPU.GPUBufferDescriptor(usage: [.copyDst, .copySrc], size: UInt64(count)))
+                    guard let buffer = created else {
                         return nil
                     }
                     // The existing Sendable wrapper owns the handle; device operations remain serialized by the GPU lock.
@@ -211,12 +228,12 @@
                         aspect: WebGPU.GPUTextureAspect.all
                     ),
                     destination: WebGPU.GPUTexelCopyBufferInfo(
-                        layout: WebGPU.GPUTexelCopyBufferLayout(offset: UInt64(0), bytesPerRow: UInt32(paddedBytesPerRow), rowsPerImage: texture.height),
+                        layout: WebGPU.GPUTexelCopyBufferLayout(offset: UInt64(0), bytesPerRow: UInt32(paddedBytesPerRow), rowsPerImage: UInt32(texture.height)),
                         buffer: buffer
                     ),
                     copySize: WebGPU.GPUExtent3D(
-                        width: texture.width,
-                        height: texture.height,
+                        width: UInt32(texture.width),
+                        height: UInt32(texture.height),
                         depthOrArrayLayers: 1
                     )
                 )
@@ -238,7 +255,6 @@
                     format: imageFormat
                 )
         }
-        #endif
     }
 
     extension PixelFormat {
@@ -309,7 +325,7 @@
         var toWebGPUTextureViewDimension: WebGPU.GPUTextureViewDimension {
             switch self {
             case .textureCube:
-                ._2D
+                .cube
             case .texture1D:
                 ._1D
             case .texture1DArray:

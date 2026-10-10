@@ -131,6 +131,8 @@ final class EditorMobileAgentToolService {
         case "editor.docs.search", "editor.docs.read", "editor.api.describe", "editor.components.describe",
              "editor.examples.list", "editor.examples.read", "editor.skills.list", "editor.skills.read":
             return try EditorAgentKnowledge.query(name: name, arguments: arguments)
+        case "editor.community.submit":
+            return try await EditorAgentPublicationTools.submit(projectURL: projectURL, arguments: arguments)
         case "editor.project.configure":
             return try configure(settings: requiredString("settingsJSON", arguments))
         case "editor.scene.validate":

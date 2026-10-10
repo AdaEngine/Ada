@@ -20,7 +20,9 @@
 
         func getNextDrawable(_: RenderDevice) -> (any Drawable)? {
             renderWindow.surfaceLock.withLock { _ in
-                guard renderWindow.isActive else { return nil }
+                guard renderWindow.isActive else {
+                    return nil
+                }
                 if renderWindow.pendingDrawableSkips > 0 {
                     renderWindow.pendingDrawableSkips -= 1
                     return nil
@@ -81,7 +83,9 @@
                 self.isPresented = true
             #else
                 let value = renderWindow.surfaceLock.withLock { _ in
-                    guard renderWindow.isActive else { return WebGPU.GPUStatus.success }
+                    guard renderWindow.isActive else {
+                        return WebGPU.GPUStatus.success
+                    }
                     return webGPUDeviceLock.withLock { _ in renderWindow.surface.present() }
                 }
                 self.isPresented = true

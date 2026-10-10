@@ -39,8 +39,10 @@ public macro Component(
 
 /// Selects the Swift initializer used by AdaScript host construction.
 /// ``Component()`` consumes this marker and generates the direct bridge.
+/// `exposing` opts additional parameters into conversion through
+/// `ComponentReflection.value(_:as:)` overloads provided by their owning module.
 @attached(peer)
-public macro AdaScriptInit() = #externalMacro(
+public macro AdaScriptInit(exposing: [String] = []) = #externalMacro(
     module: "AdaEngineMacros",
     type: "AdaScriptInitMacro"
 )

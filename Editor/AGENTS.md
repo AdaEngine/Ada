@@ -69,6 +69,16 @@ and Move/Scale/Rotate tools. Scene edits have undo/redo.
 2D sprite picking shares the runtime hit test: CPU alpha masks, atlas regions,
 anchors, image modes and composed parent transforms before ECS propagation.
 Coverage: [EditorSpritePickingTests.swift](Tests/AdaEditorTests/EditorSpritePickingTests.swift).
+The Sprite Inspector authors anchor presets/custom coordinates, stretch/fit/fill,
+nine-slice borders and tiled axes/scale through normal scene history and Save.
+AdaScript constructors and query writes share these layout values; native AOT
+uses equivalent factory lowering. Guide: [SpriteLayout.md](Documentation/SpriteLayout.md).
+Coverage: [EditorSpriteLayoutTests.swift](Tests/AdaEditorTests/EditorSpriteLayoutTests.swift).
+The runtime automatically instances Sprite quads on capable Metal/WebGPU devices,
+with an expanded-vertex fallback and render-world reference-mode override.
+Metal pixels and CPU/upload/GPU timings are validated; WebGPU compilation is
+validated while WebGPU/mobile runtime execution remains unverified for this path.
+Guide: [SpriteInstancing.md](../Documentation/SpriteInstancing.md).
 
 Entry points: [EditorSceneDocumentEditor.swift](Sources/AdaEditor/UI/Editor/EditorSceneDocumentEditor.swift),
 [EditorSceneModel+Hierarchy.swift](Sources/AdaEditor/EditorSceneModel+Hierarchy.swift),
@@ -111,7 +121,13 @@ Coverage: [EditorUISceneTests.swift](Tests/AdaEditorTests/EditorUISceneTests.swi
 
 ### Assets and animation
 
-Image preview, texture-atlas editing, tile-source (`.tileset`) editing, and
+Image preview includes a shared texture Inspector with sampler filters/wrap/LOD,
+CPU-generated mip levels, Color/Normal/Data purpose, sRGB/Linear settings, and
+2D/Cube import from a six-face horizontal strip. Apply persists an adjacent
+`.texture.json`; preview selects applied levels/faces. Existing Play resources
+require reloading. Guide: [TextureSettings.md](Documentation/TextureSettings.md).
+Coverage: [EditorTextureSettingsTests.swift](Tests/AdaEditorTests/EditorTextureSettingsTests.swift).
+Texture-atlas editing, tile-source (`.tileset`) editing, and
 tile-map (`.tilemap`) painting/erasing, layers, pan and zoom.
 Tile sources author light-occlusion polygons visually; tile maps select cells to
 inherit, disable or replace their shadow shape. Shapes and sparse overrides
@@ -121,6 +137,10 @@ Tile-source bulk creation skips fully transparent cells, respecting margins and
 spacing; individually authored tiles remain available.
 Tile-map layer controls and the tile palette live in the contextual Inspector,
 sharing the active document's model with the full-width canvas.
+The Inspector also authors all eight brush/selected-cell tile orientations.
+Canvas previews retain rectangular cell dimensions; layered resources preserve
+orientation IDs. AdaScript can enqueue orientation changes to existing tiles.
+Coverage: [EditorTileOrientationTests.swift](Tests/AdaEditorTests/EditorTileOrientationTests.swift).
 The tile palette adapts its column count to the Inspector width and builds only
 rows near the visible scroll viewport.
 GLSL source editing and shader highlighting. Audio/generic assets currently use metadata previews.
@@ -212,6 +232,17 @@ Coverage: [EditorDebuggerLaunchTests.swift](Tests/AdaEditorTests/EditorDebuggerL
 
 ### Git and agents
 
+Project-local AdaScript `@tool` extensions can mount right-sidebar `.ui` panels
+in the macOS workspace's Studio Tools section. An explicit access dialog grants the
+declared document read/write permissions before activation. Project Settings →
+Studio Tools owns enablement and immediate access revocation. Exported scalar inputs and synchronous
+named actions use detached UI data; successful entity batches enter scene Undo/Redo.
+Disable/close removes contributions, and invalid reloads retain the previous
+working version. iPadOS activation and command/menu/formatter/settings/event
+registrations remain unavailable in this initial host.
+Guide: [StudioTools.md](Documentation/StudioTools.md).
+Coverage: [EditorStudioToolsTests.swift](Tests/AdaEditorTests/EditorStudioToolsTests.swift).
+
 Desktop Studio also offers an **Editor / Agent** interface switch in the top
 bar. Agent Interface uses a project session tree, conversation tabs, the existing
 agent transcript/composer and a document workspace opened on demand. Conversation
@@ -280,6 +311,17 @@ Coverage: [GitReviewTests.swift](Tests/AdaEditorTests/GitReviewTests.swift),
 [EditorMobileAgentToolTests.swift](Tests/AdaEditorTests/EditorMobileAgentToolTests.swift).
 
 ### Mobile and supporting features
+
+Mobile Studio's project toolbar includes Publish, opening title/description, cover and
+up to five screenshot fields. Cloud sign-in and Pro are required. Saved AdaScript
+projects are packaged on-device and submitted as permanent Community releases in
+`pending` review; approval updates the same app card. Identical retries reuse the
+submission and uploaded media. Native libraries, external/custom resource roots,
+custom plugins and script UI are unavailable in the public player.
+The bundled `ada-community-publish` skill and `editor.community.submit` tool share
+this path on mobile and desktop; desktop requires saving dirty documents first.
+Coverage: [EditorPublicationTests.swift](Tests/AdaEditorTests/EditorPublicationTests.swift).
+Guide: [CommunityPublishing.md](Documentation/CommunityPublishing.md).
 
 iPhone has dedicated project/files/code/scene/Play/chat/activity/settings screens,
 image attachments, screenshot markup and voice input. The shared workspace and

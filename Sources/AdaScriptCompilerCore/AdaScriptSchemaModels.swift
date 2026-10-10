@@ -238,6 +238,7 @@ public enum AdaScriptToolPermission: String, CaseIterable, Equatable, Sendable {
 public struct AdaScriptToolSchema: Equatable, Sendable {
     public let apiVersion: Int
     public let className: String
+    public let fields: [AdaScriptSchemaField]
     public let id: String
     public let line: Int
     public let name: String
@@ -249,6 +250,7 @@ public struct AdaScriptToolSchema: Equatable, Sendable {
     public init(
         apiVersion: Int,
         className: String,
+        fields: [AdaScriptSchemaField] = [],
         id: String,
         line: Int,
         name: String,
@@ -259,6 +261,7 @@ public struct AdaScriptToolSchema: Equatable, Sendable {
     ) {
         self.apiVersion = apiVersion
         self.className = className
+        self.fields = fields
         self.id = id
         self.line = line
         self.name = name

@@ -428,6 +428,7 @@ struct EditorSettingsWindowView: View {
         .background(theme.editorColors.background)
         .foregroundColor(theme.editorColors.text)
         .accessibilityIdentifier(Self.accessibilityIdentifier)
+        .modifier(EditorStudioToolPermissionPresentation(host: viewModel.editorViewModel?.studioTools, presentation: .settings))
     }
 
     private var sidebar: some View {
@@ -500,7 +501,8 @@ struct EditorSettingsWindowView: View {
                 }
                 .id("\(viewModel.selectedSection.rawValue).\(viewModel.selectedPage ?? "overview")")
 
-                if (viewModel.editorViewModel != nil || viewModel.selectedSection == .buildExport), viewModel.selectedSection != .achievements {
+                if (viewModel.editorViewModel != nil || viewModel.selectedSection == .buildExport), viewModel.selectedSection != .achievements,
+                   !viewModel.showsPage(EditorSettingsPage.studioTools) {
                     settingsFooter
                 }
             }
@@ -662,6 +664,9 @@ struct EditorSettingsWindowView: View {
 
     private func projectSettings(_ editorViewModel: EditorViewModel) -> some View {
         VStack(alignment: .leading, spacing: 0) {
+            settingsGroup(EditorSettingsPage.studioTools) {
+                EditorStudioToolsSettings(host: editorViewModel.studioTools)
+            }
             settingsGroup("PROJECT") {
                 settingsField(
                     editorViewModel.project?.name ?? "Game",

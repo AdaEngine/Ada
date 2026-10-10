@@ -52,6 +52,7 @@ extension EditorViewModel {
     }
 
     func refreshProjectFiles(logsRefresh: Bool = true) {
+        studioTools.scheduleReload()
         let selectedID = projectSidebar.selectedItem?.id
         let collapsedIDs = projectSidebar.collapsedFolderIDs
         let items = Self.projectTreeItems(for: project, fileManager: fileManager)

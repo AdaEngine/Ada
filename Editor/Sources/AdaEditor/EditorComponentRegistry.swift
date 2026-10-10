@@ -90,8 +90,14 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
     }
 
     func displayValue(in payload: EditorComponentPayload) -> String {
+        if coding == .spriteAnchorPreset {
+            return EditorSpriteLayoutFields.anchorPreset(in: payload)
+        }
         let value = storedValue(in: payload) ?? defaultValue
-        if coding == .enumCase, case let .object(cases) = value {
+        if coding == .spriteSize, case let .object(dimensions) = value {
+            return ["width", "height"].map { dimensions[$0]?.stringValue ?? "0" }.joined(separator: ", ")
+        }
+        if coding == .enumCase || coding == .spriteImageMode, case let .object(cases) = value {
             return cases.keys.min() ?? ""
         }
         if coding == .json {
@@ -117,8 +123,22 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
         guard isEditable else {
             return
         }
+        if coding == .spriteAnchorPreset {
+            EditorSpriteLayoutFields.writeAnchorPreset(rawValue, to: &payload)
+            return
+        }
+        if coding == .spriteImageMode {
+            EditorSpriteLayoutFields.writeImageMode(rawValue, to: &payload)
+            return
+        }
+        if key == "anchor" {
+            let values = rawValue.split { $0 == "," || $0.isWhitespace }.compactMap { Float($0) }
+            guard values.count == 2, values.allSatisfy(\.isFinite) else {
+                return
+            }
+        }
         if let minimumValue {
-            guard let number = Double(rawValue), number.isFinite, number >= minimumValue else {
+            guard let number = Double(rawValue), Float(number).isFinite, number >= minimumValue else {
                 return
             }
         }
@@ -128,7 +148,8 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
             return
         }
         switch coding {
-        case .standard: break
+        case .standard, .spriteSize: break
+        case .spriteImageMode, .spriteAnchorPreset: return
         case .enumCase: value = .object([value.stringValue: .object([:])])
         case .json:
             guard let decoded = try? JSONDecoder().decode(EditorSceneValue.self, from: Data(rawValue.utf8)) else {
@@ -452,15 +473,15 @@ extension EditorComponentRegistry {
         typeName: EditorBuiltInComponentType.sprite,
         displayName: "Sprite",
         category: "2D",
-        description: "Draws a 2D texture with tint, flip, and size controls.",
+        description: "Draws a 2D texture with anchor, image layout, tint, flip, and size controls.",
         requiredComponentTypeNames: [EditorBuiltInComponentType.visibility],
         fields: [
             EditorComponentField(key: "tintColor", label: "Tint", kind: .color),
             EditorComponentField(key: "flipX", label: "Flip X", kind: .bool),
             EditorComponentField(key: "flipY", label: "Flip Y", kind: .bool),
             EditorComponentField(key: "texture", label: "Texture", kind: .assetReference),
-            EditorComponentField(key: "size", label: "Size", kind: .vector2),
-        ],
+            EditorSpriteLayoutFields.sizeField,
+        ] + EditorSpriteLayoutFields.fields,
         makeDefaultPayload: {
             [
                 "texture": .null,
@@ -468,6 +489,8 @@ extension EditorComponentRegistry {
                 "flipX": .bool(false),
                 "flipY": .bool(false),
                 "size": .null,
+                "anchor": .object(["x": .double(0), "y": .double(0)]),
+                "imageMode": .object(["stretch": .object([:])]),
             ]
         },
         decode: { payload in
@@ -477,7 +500,13 @@ extension EditorComponentRegistry {
             } else {
                 texture = nil
             }
-            let size = payload["size"]?.vector2Value.map { Size(width: $0.x, height: $0.y) }
+            let size: Size?
+            if case let .object(dimensions)? = payload["size"],
+                let width = dimensions["width"]?.doubleValue, let height = dimensions["height"]?.doubleValue {
+                size = Size(width: Float(width), height: Float(height))
+            } else {
+                size = payload["size"]?.vector2Value.map { Size(width: $0.x, height: $0.y) }
+            }
             let anchor = try payload["anchor"].map { try JSONDecoder().decode(SpriteAnchor.self, from: JSONEncoder().encode($0)) } ?? .center
             let imageMode = try payload["imageMode"].map { try JSONDecoder().decode(SpriteImageMode.self, from: JSONEncoder().encode($0)) } ?? .stretch
             return Sprite(

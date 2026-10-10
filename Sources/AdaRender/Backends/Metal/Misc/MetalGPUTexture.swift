@@ -75,7 +75,9 @@
 
             texture.label = descriptor.debugLabel
 
-            if let image = descriptor.image {
+            let initialImages = descriptor.image.map { [TextureSubresource(image: $0, mipLevel: 0)] } ?? []
+            for subresource in initialImages + descriptor.subresources {
+                let image = subresource.image
                 let region = MTLRegion(
                     origin: MTLOrigin(x: 0, y: 0, z: 0),
                     size: MTLSize(width: image.width, height: image.height, depth: 1)
@@ -100,9 +102,11 @@
                         }
                         unsafe texture.replace(
                             region: region,
-                            mipmapLevel: 0,
+                            mipmapLevel: subresource.mipLevel,
+                            slice: subresource.slice,
                             withBytes: baseAddress,
-                            bytesPerRow: rgbaBytesPerRow
+                            bytesPerRow: rgbaBytesPerRow,
+                            bytesPerImage: rgbaData.count
                         )
                     }
                 } else {
@@ -121,9 +125,11 @@
                         }
                         unsafe texture.replace(
                             region: region,
-                            mipmapLevel: 0,
+                            mipmapLevel: subresource.mipLevel,
+                            slice: subresource.slice,
                             withBytes: baseAddress,
-                            bytesPerRow: sourceBytesPerRow
+                            bytesPerRow: sourceBytesPerRow,
+                            bytesPerImage: image.data.count
                         )
                     }
                 }

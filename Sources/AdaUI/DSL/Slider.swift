@@ -23,6 +23,7 @@ private struct SliderSurface: UIViewRepresentable {
     let step: Double
     func makeUIView(in _: Context) -> SliderHost { SliderHost() }
     func updateUIView(_ view: SliderHost, in context: Context) {
+        view.backgroundColor = .clear
         view.value = value
         view.range = bounds
         view.step = step

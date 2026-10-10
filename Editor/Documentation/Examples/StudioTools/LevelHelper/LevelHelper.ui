@@ -1,0 +1,43 @@
+format: ada.ui
+schemaVersion: 1
+inputs:
+  - name: count
+    type: number
+    defaultValue: 3
+  - name: status
+    type: string
+    defaultValue: Ready
+actions:
+  - name: generate
+root:
+  id: level-helper
+  type: VStack
+  arguments:
+    spacing: {value: 12}
+  children:
+    - id: description
+      type: Text
+      arguments:
+        text: {value: Create a row of entities in the active scene.}
+    - id: count
+      type: Slider
+      arguments:
+        value: {binding: count}
+        min: {value: 1}
+        max: {value: 32}
+        step: {value: 1}
+    - id: generate
+      type: Button
+      arguments:
+        title: {value: Generate}
+      actions:
+        action: generate
+      modifiers:
+        - id: generate-accessibility
+          type: accessibilityIdentifier
+          arguments:
+            value: {value: studio.level-helper.generate}
+    - id: status
+      type: Text
+      arguments:
+        text: {binding: status}

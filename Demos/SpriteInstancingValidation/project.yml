@@ -1,0 +1,44 @@
+name: SpriteInstancingValidation
+options:
+  deploymentTarget:
+    iOS: '18.0'
+packages:
+  AdaEngine:
+    path: ../..
+settings:
+  base:
+    SWIFT_VERSION: '6.2'
+    DEVELOPMENT_TEAM: 8PYCRS3EA3
+    CODE_SIGN_STYLE: Automatic
+targets:
+  SpriteInstancingValidation:
+    type: application
+    platform: iOS
+    sources:
+      - SpriteValidationApp.swift
+      - SpriteValidationFixture.swift
+    dependencies:
+      - package: AdaEngine
+        product: AdaApp
+      - package: AdaEngine
+        product: AdaCorePipelines
+      - package: AdaEngine
+        product: AdaECS
+      - package: AdaEngine
+        product: AdaRender
+      - package: AdaEngine
+        product: AdaSprite
+      - package: AdaEngine
+        product: AdaTransform
+      - package: AdaEngine
+        product: AdaUtils
+      - package: AdaEngine
+        product: Math
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.adaengine.SpriteInstancingValidation
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: '1,2'
+    scheme:
+      testTargets: []
