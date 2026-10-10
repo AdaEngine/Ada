@@ -64,7 +64,8 @@ struct EditorPublicationTests {
                 },
                 submitArchive: { zip, page in
                     #expect(page == pageID)
-                    #expect((try Data(contentsOf: zip)).count > 100)
+                    let archiveBytes = try Data(contentsOf: zip)
+                    #expect(archiveBytes.count > 100)
                     submissions += 1
                     lastRelease = ["id": .string(UUID().uuidString), "pageId": .string(pageID), "status": "pending", "number": .integer(Int64(submissions))]
                     return lastRelease
@@ -84,6 +85,42 @@ struct EditorPublicationTests {
         let updated = try await publisher().submit(projectURL: root, draft: draft, owner: "owner", server: "https://cloud.example")
         #expect(updated["number"].int == 3)
         #expect(creates == 1 && patches == 3 && images == 1 && submissions == 3)
+    }
+
+    @Test("Projects without metadata IDs keep independent publication pages")
+    func missingProjectIDs() async throws {
+        let roots = [try fixture(), try fixture()]
+        defer { for root in roots { try? FileManager.default.removeItem(at: root) } }
+        let suite = "PublicationTests-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var createdPages: [String] = []
+        let publisher = EditorProjectPublisher(
+            defaults: defaults,
+            request: { path, method, _ in
+                #expect(path == "/pages")
+                #expect(method == "POST")
+                let pageID = UUID().uuidString
+                createdPages.append(pageID)
+                return ["id": .string(pageID)]
+            },
+            uploadImage: { _ in ["id": .string(UUID().uuidString)] },
+            submitArchive: { _, pageID in
+                ["id": .string(UUID().uuidString), "pageId": .string(pageID), "status": "pending"]
+            }
+        )
+        for root in roots {
+            var project = try ProjectSystem.loadProject(at: root)
+            project.project.id = nil
+            try ProjectSystem.saveProject(project, at: root)
+            #expect(try ProjectSystem.loadProject(at: root).project.id == nil)
+            let image = root.appendingPathComponent("cover.png")
+            try Data([1, 2, 3]).write(to: image)
+            let draft = EditorPublicationDraft(title: "Test game", description: "A test app", cover: image)
+            _ = try await publisher.submit(projectURL: root, draft: draft, owner: "owner", server: "https://cloud.example")
+        }
+        #expect(createdPages.count == 2)
+        #expect(Set(createdPages).count == 2)
     }
 
     @Test("Local failures do not create Cloud resources; agent rejects escaped image paths")

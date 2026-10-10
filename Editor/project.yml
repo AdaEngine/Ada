@@ -7,6 +7,7 @@ options:
   deploymentTarget:
     iOS: "18.0"
     macOS: "15.0"
+    visionOS: "2.0"
 packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
@@ -65,8 +66,8 @@ targets:
         ADA_CLOUD_API_URL: ""
         ADA_CLOUD_PRO_PRODUCT_ID: ""
         INFOPLIST_FILE: Sources/AdaEditor/Platforms/macOS/Info.plist
-        MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "20261010"
         ENABLE_APP_SANDBOX: true
         ADAEDITOR_DISTRIBUTION: appStore
         DEVELOPMENT_TEAM: 8PYCRS3EA3
@@ -138,8 +139,8 @@ targets:
         INFOPLIST_FILE: Platforms/StandaloneUpdater/App-Info.plist
         ADAEDITOR_UPDATE_FEED_URL: "https://adaengine.org/updates/appcast.xml"
         ADAEDITOR_UPDATE_PUBLIC_KEY: "781F/fu+H9L/exraMYgHhHh2/+tm1NfJLXMG+JQWOcc="
-        MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "20261010"
         ENABLE_APP_SANDBOX: false
         ENABLE_HARDENED_RUNTIME: true
         ADAEDITOR_DISTRIBUTION: standalone
@@ -211,9 +212,9 @@ targets:
             --output "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/BuildSDK"
           if [[ "${CODE_SIGNING_ALLOWED:-YES}" != "NO" ]]; then
             identity="${EXPANDED_CODE_SIGN_IDENTITY:--}"
-            /usr/bin/codesign --force --options runtime --sign "${identity}" \
+            /usr/bin/codesign --force --timestamp --options runtime --sign "${identity}" \
               --entitlements "${SRCROOT}/Platforms/AdaEditor-Standalone.entitlements" "${cli_binary}"
-            /usr/bin/codesign --force --options runtime --sign "${identity}" \
+            /usr/bin/codesign --force --timestamp --options runtime --sign "${identity}" \
               "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/BuildSDK/AdaScript/gravity"
           fi
   AdaEditor-iPadOS:
@@ -241,12 +242,89 @@ targets:
         ADA_CLOUD_API_URL: ""
         ADA_CLOUD_PRO_PRODUCT_ID: ""
         INFOPLIST_FILE: Sources/AdaEditor/Platforms/iOS/Info.plist
-        MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "20261010"
         DEVELOPMENT_TEAM: 8PYCRS3EA3
         CODE_SIGN_STYLE: Automatic
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: false
+    dependencies:
+      - package: AdaEditor
+        product: AdaEditor
+    postBuildScripts:
+      - name: Stage SwiftPM executable
+        shell: /bin/zsh
+        showEnvVars: false
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(BUILT_PRODUCTS_DIR)/AdaEditor
+          - $(BUILT_PRODUCTS_DIR)/AdaEditor_AdaEditor.bundle
+          - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaUI.bundle
+          - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaA2UI.bundle
+        # CodeSign must run after staging replaces the executable and resources.
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)
+        script: |
+          set -euo pipefail
+
+          source_binary="${BUILT_PRODUCTS_DIR}/AdaEditor"
+          destination_binary="${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}"
+          source_resources="${BUILT_PRODUCTS_DIR}/AdaEditor_AdaEditor.bundle"
+          destination_resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AdaEditor_AdaEditor.bundle"
+          source_ui_resources="${BUILT_PRODUCTS_DIR}/AdaEngine_AdaUI.bundle"
+          destination_ui_resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AdaEngine_AdaUI.bundle"
+          source_a2ui_resources="${BUILT_PRODUCTS_DIR}/AdaEngine_AdaA2UI.bundle"
+          destination_a2ui_resources="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AdaEngine_AdaA2UI.bundle"
+
+          if [[ ! -x "${source_binary}" ]]; then
+            echo "error: SwiftPM executable not found at ${source_binary}" >&2
+            exit 1
+          fi
+          if [[ ! -d "${source_resources}" ]]; then
+            echo "error: SwiftPM resource bundle not found at ${source_resources}" >&2
+            exit 1
+          fi
+
+          if [[ ! -d "${source_ui_resources}" ]]; then
+            echo "error: AdaUI resource bundle not found at ${source_ui_resources}" >&2
+            exit 1
+          fi
+
+          mkdir -p "${destination_binary:h}"
+          /usr/bin/ditto "${source_binary}" "${destination_binary}"
+          /bin/chmod +x "${destination_binary}"
+          mkdir -p "${destination_resources:h}"
+          /usr/bin/ditto "${source_resources}" "${destination_resources}"
+          /usr/bin/ditto "${source_ui_resources}" "${destination_ui_resources}"
+          /usr/bin/ditto "${source_a2ui_resources}" "${destination_a2ui_resources}"
+  AdaEditor-visionOS:
+    attributes:
+      SystemCapabilities:
+        com.apple.GameCenter:
+          enabled: 1
+    entitlements:
+      path: Platforms/AdaEditor.entitlements
+      properties:
+        com.apple.developer.game-center: true
+    type: application
+    platform: visionOS
+    sources:
+      - path: Platforms/VisionAssets.xcassets
+        buildPhase: resources
+        group: Assets
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AdaEngine
+        PRODUCT_NAME: "Ada Studio"
+        PRODUCT_BUNDLE_IDENTIFIER: org.adaengine.editor
+        ADA_CLOUD_API_URL: ""
+        ADA_CLOUD_PRO_PRODUCT_ID: ""
+        INFOPLIST_FILE: Platforms/AdaEditor-visionOS-Info.plist
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "20261010"
+        DEVELOPMENT_TEAM: 8PYCRS3EA3
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "7"
     dependencies:
       - package: AdaEditor
         product: AdaEditor
@@ -311,8 +389,8 @@ targets:
         ADA_CLOUD_API_URL: ""
         ADA_CLOUD_PRO_PRODUCT_ID: ""
         INFOPLIST_FILE: Platforms/AdaPlayer-Info.plist
-        MARKETING_VERSION: "0.1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "20261010"
         DEVELOPMENT_TEAM: 8PYCRS3EA3
         CODE_SIGN_STYLE: Automatic
         TARGETED_DEVICE_FAMILY: "1,2"
@@ -419,5 +497,14 @@ schemes:
     run:
       config: Debug
       executable: AdaPlayer-iOS
+    archive:
+      config: Release
+  AdaEditor-visionOS:
+    build:
+      targets:
+        AdaEditor-visionOS: all
+    run:
+      config: Debug
+      executable: AdaEditor-visionOS
     archive:
       config: Release

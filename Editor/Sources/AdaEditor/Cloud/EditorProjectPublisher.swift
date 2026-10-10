@@ -77,8 +77,10 @@ final class EditorProjectPublisher {
             guard size > 0, size <= 5_000_000 else { throw EditorPublicationError("Each image must be at most 5 MB.") }
             return try Data(contentsOf: url)
         }
-        let key = "AdaEditor.cloud.projectPublication." + EditorCommunityPackageManifest.digest(Data((server + "|" + owner + "|" + project.project.id).utf8))
-        var state = defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(EditorCloudValue.self, from: $0) } ?? [:]
+        let projectID = project.project.id ?? projectURL.standardizedFileURL.path
+        let identity = [server, owner, projectID].joined(separator: "|")
+        let key = "AdaEditor.cloud.projectPublication." + EditorCommunityPackageManifest.digest(Data(identity.utf8))
+        var state: EditorCloudValue = defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(EditorCloudValue.self, from: $0) } ?? [:]
         func save() throws { defaults.set(try JSONEncoder().encode(state), forKey: key) }
         var mediaIDs: [EditorCloudValue] = []
         for data in images {

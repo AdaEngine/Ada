@@ -8,6 +8,11 @@ and assess gaps before proposing new features.
 
 - `Editor/` is a separate Swift 6.2 SwiftPM package, depending on AdaEngine by
   local path. Run editor builds/tests from this directory.
+- Release wrappers include Studio for iOS/iPadOS, macOS App Store, native visionOS
+  and standalone macOS, plus the separate iOS AdaPlayer. `fastlane/SETUP.md`
+  documents the `upload_xcode` targets `ios`, `macos`, `visionos` and `player`.
+  The visionOS wrapper uses the shared workbench and a dedicated layered icon;
+  archive/upload validation does not establish visionOS interaction parity.
 - Shared editor UI uses AdaUI. Native app wrappers and mobile-specific screens
   have separate platform boundaries; do not assume desktop/mobile feature parity.
 - [Package.swift](Package.swift) owns package dependencies and resources;

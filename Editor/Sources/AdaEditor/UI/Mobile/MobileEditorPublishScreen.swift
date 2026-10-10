@@ -29,13 +29,13 @@ struct MobileEditorPublishScreen: View {
                 }
                 detail("Submit your app to Community review. The current public app is updated after approval.")
                 Text("Title").font(MobileEditorFont.font(size: 14))
-                TextField("App title", text: $draft.title)
+                TextField("App title", text: Binding(get: { draft.title }, set: { draft.title = $0 }))
                     .textFieldStyle(PlainTextFieldStyle())
                     .font(MobileEditorFont.font(size: 17))
                     .frame(height: 44)
                     .accessibilityIdentifier("AdaEditor.Mobile.Publish.Title")
                 Text("Description").font(MobileEditorFont.font(size: 14))
-                TextEditor(text: $draft.description, showsLineNumbers: false, showsScrollIndicators: true, wrapsLines: true)
+                TextEditor(text: Binding(get: { draft.description }, set: { draft.description = $0 }), showsLineNumbers: false, showsScrollIndicators: true, wrapsLines: true)
                     .font(MobileEditorFont.font(size: 16))
                     .textEditorColors(TextEditorColors(
                         background: theme.editorColors.surface,

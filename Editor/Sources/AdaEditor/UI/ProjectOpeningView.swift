@@ -129,7 +129,7 @@ struct ProjectOpeningView: View {
         ) {
             ProjectOpeningRenameDialog(viewModel: viewModel)
         }
-        #if os(iOS)
+        #if os(iOS) || os(visionOS)
             .fullScreenCover(item: $presentedSettingsSection) { section in
                 EditorSettingsWindowView(
                     viewModel: EditorSettingsWindowViewModel(
@@ -266,7 +266,7 @@ struct ProjectOpeningView: View {
     }
 
     private func presentSettings(_ section: EditorSettingsSection) {
-        #if os(iOS)
+        #if os(iOS) || os(visionOS)
             presentedSettingsSection = section
         #else
             EditorSettingsWindowController.open(project: viewModel.selectedProject, selectedSection: section)

@@ -7,7 +7,7 @@ import StoreKit
 
 #if os(macOS)
     import AppKit
-#elseif os(iOS)
+#elseif os(iOS) || os(visionOS)
     import UIKit
 #endif
 
@@ -329,7 +329,15 @@ final class EditorCloudAccount: NSObject, ASWebAuthenticationPresentationContext
         guard let product = try await Product.products(for: [id]).first else {
             throw CloudError.message("Pro is unavailable in this storefront.")
         }
-        switch try await product.purchase(options: [.appAccountToken(owner)]) {
+        #if os(visionOS)
+            guard let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) else {
+                throw CloudError.message("Open a Studio window before purchasing Pro.")
+            }
+            let result = try await product.purchase(confirmIn: scene, options: [.appAccountToken(owner)])
+        #else
+            let result = try await product.purchase(options: [.appAccountToken(owner)])
+        #endif
+        switch result {
         case let .success(verification): try await acceptPurchase(verification)
         case .pending: status = "Purchase is awaiting approval."
         case .userCancelled: status = "Purchase cancelled."

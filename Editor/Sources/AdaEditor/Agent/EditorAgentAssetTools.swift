@@ -4,7 +4,9 @@ enum EditorAgentAssetTools {
     static func tools() -> [Tool] {
         let string: Value = .object(["type": "string"])
         let integer: Value = .object(["type": "integer", "minimum": 1, "maximum": 4096])
-        let tool = EditorMobileAgentTools.tool
+        func tool(_ name: String, _ description: String, _ properties: [String: Value], _ required: [String], _ readOnly: Bool) -> Tool {
+            EditorMobileAgentTools.tool(name, description, properties, required, readOnly: readOnly)
+        }
         return [
             tool(
                 "editor.image.read",

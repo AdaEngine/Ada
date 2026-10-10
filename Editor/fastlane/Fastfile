@@ -3,6 +3,7 @@ require "shellwords"
 require "open3"
 require "digest"
 require "fileutils"
+require "json"
 require_relative "update_feed"
 require_relative "standalone_signing"
 
@@ -46,10 +47,17 @@ def verify_macos_distribution(app, channel)
   end
 end
 
-desc "Archive and upload iOS or macOS using the Apple account configured in Xcode"
+desc "Archive and upload Studio (iOS, macOS, visionOS) or Player using the Xcode account"
 lane :upload_xcode do |options|
   target = options[:target].to_s
-  UI.user_error!("Use target:ios or target:macos") unless %w[ios macos].include?(target)
+  targets = {
+    "ios" => ["AdaEditor-iPadOS", "iOS", APP_IDENTIFIER, "Ada Studio"],
+    "macos" => ["AdaEditor-Distribution", "macOS", APP_IDENTIFIER, "Ada Studio"],
+    "visionos" => ["AdaEditor-visionOS", "visionOS", APP_IDENTIFIER, "Ada Studio"],
+    "player" => ["AdaPlayer-iOS", "iOS", "org.adaengine.player", "Ada Remote Player"]
+  }
+  UI.user_error!("Use target:ios, target:macos, target:visionos or target:player") unless targets.key?(target)
+  scheme, platform, identifier, product = targets.fetch(target)
   build_number = required_setting("BUILD_NUMBER")
   version = required_setting("MARKETING_VERSION")
   UI.user_error!("BUILD_NUMBER must be a positive integer") unless build_number.match?(/\A[1-9]\d*\z/)
@@ -59,9 +67,9 @@ lane :upload_xcode do |options|
   archive = File.join(output, "AdaEditor-#{version}-#{build_number}.xcarchive")
   build_options = {
     project: File.join(EDITOR_ROOT, "AdaEditor.xcodeproj"),
-    scheme: target == "ios" ? "AdaEditor-iPadOS" : "AdaEditor-Distribution",
+    scheme: scheme,
     configuration: "Release",
-    destination: target == "ios" ? "generic/platform=iOS" : "generic/platform=macOS",
+    destination: "generic/platform=#{platform}",
     archive_path: archive,
     derived_data_path: ENV.fetch("ADAEDITOR_DERIVED_DATA", File.join(output, "DerivedData")),
     output_directory: output,
@@ -76,14 +84,14 @@ lane :upload_xcode do |options|
     build_app(**build_options, skip_package_ipa: true, skip_package_pkg: true)
   end
 
-  app = File.join(archive, "Products", "Applications", "AdaEngine.app")
-  UI.user_error!("Archived AdaEngine.app is missing") unless File.directory?(app)
+  app = File.join(archive, "Products", "Applications", "#{product}.app")
+  UI.user_error!("Archived #{product}.app is missing") unless File.directory?(app)
   sh("/usr/bin/codesign", "--verify", "--strict", "--verbose=2", app)
   verify_macos_distribution(app, "appStore") if target == "macos"
   info = File.join(app, target == "macos" ? "Contents/Info.plist" : "Info.plist")
   metadata = CFPropertyList.native_types(CFPropertyList::List.new(data: File.binread(info)).value)
   {
-    "CFBundleIdentifier" => APP_IDENTIFIER,
+    "CFBundleIdentifier" => identifier,
     "CFBundleShortVersionString" => version,
     "CFBundleVersion" => build_number
   }.each do |key, expected|
@@ -100,7 +108,7 @@ lane :upload_xcode do |options|
     export_options: {
       destination: "upload",
       signingStyle: "automatic",
-      manageAppVersionAndBuildNumber: true,
+      manageAppVersionAndBuildNumber: false,
       uploadSymbols: true
     },
     export_xcargs: "-allowProvisioningUpdates"
@@ -228,13 +236,14 @@ platform :mac do
         "CODE_SIGN_STYLE=Manual",
         "DEVELOPMENT_TEAM=#{DEVELOPMENT_TEAM}",
         "CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO",
+        "OTHER_CODE_SIGN_FLAGS=--timestamp",
         "ADAEDITOR_UPDATE_FEED_URL=#{update_config[:feed]}",
         "ADAEDITOR_UPDATE_PUBLIC_KEY=#{update_config[:public_key]}"
       ]),
       export_xcargs: "-allowProvisioningUpdates"
     )
-    app = File.join(output, "AdaEngine.app")
-    UI.user_error!("Exported AdaEngine.app is missing") unless File.directory?(app)
+    app = File.join(output, "Ada Studio.app")
+    UI.user_error!("Exported Ada Studio.app is missing") unless File.directory?(app)
     EditorStandaloneSigning.sign(app: app, identity: "Developer ID Application", runner: ->(*arguments) { sh(*arguments) })
     sh("/usr/bin/codesign", "--verify", "--deep", "--strict", "--verbose=2", app)
     verify_macos_distribution(app, "standalone")
@@ -247,16 +256,24 @@ platform :mac do
   end
 
   desc "Build, notarize, staple, and package the macOS website release"
-  lane :website do
+  lane :website do |options|
     update_config = EditorUpdateFeed.publishing_configuration(ENV)
     # A named Keychain profile keeps notarization credentials out of the repository and logs.
     profile = required_setting("NOTARYTOOL_PROFILE")
-    app = standalone
+    app = options[:skip_build] ? File.join(EDITOR_ROOT, "build", "standalone", "Ada Studio.app") : standalone
+    UI.user_error!("Prepared Ada Studio.app is missing") unless File.directory?(app)
+    sh("/usr/bin/codesign", "--verify", "--deep", "--strict", "--verbose=2", app)
+    verify_macos_distribution(app, "standalone")
+    metadata = CFPropertyList.native_types(CFPropertyList::List.new(data: File.binread(File.join(app, "Contents/Info.plist"))).value)
+    unless metadata["CFBundleShortVersionString"] == required_setting("MARKETING_VERSION") && metadata["CFBundleVersion"] == required_setting("BUILD_NUMBER")
+      UI.user_error!("Prepared app version/build does not match this release")
+    end
     output = File.dirname(app)
     zip = File.join(output, "AdaEngine-#{ENV.fetch('MARKETING_VERSION')}-#{ENV.fetch('BUILD_NUMBER')}-macOS.zip")
     FileUtils.rm_f(zip)
     sh("/usr/bin/ditto", "-c", "-k", "--keepParent", app, zip)
-    sh("/usr/bin/xcrun", "notarytool", "submit", zip, "--keychain-profile", profile, "--wait")
+    notarization = JSON.parse(sh("/usr/bin/xcrun", "notarytool", "submit", zip, "--keychain-profile", profile, "--output-format", "json", "--wait"))
+    UI.user_error!("Notarization #{notarization['status']}: #{notarization['id']}") unless notarization["status"] == "Accepted"
     sh("/usr/bin/xcrun", "stapler", "staple", app)
     sh("/usr/bin/xcrun", "stapler", "validate", app)
     sh("/usr/sbin/spctl", "--assess", "--type", "execute", "--verbose=2", app)

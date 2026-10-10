@@ -25,7 +25,10 @@ def compiler_root(engine, explicit):
 
 def copy_inputs(root, destination, names):
     destination.mkdir(parents=True)
-    ignored = shutil.ignore_patterns(".git", ".build*", ".codegraph", "__pycache__", ".DS_Store", "*.o", "*.a")
+    ignored = shutil.ignore_patterns(
+        ".git", ".build*", ".codegraph", "__pycache__", ".DS_Store", "*.o", "*.a",
+        "dist", "build", "node_modules", "*.app", "*.dSYM", "*.xcarchive"
+    )
     for name in names:
         source = root / name
         if source.is_dir():

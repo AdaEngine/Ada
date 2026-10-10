@@ -5,21 +5,25 @@ Run commands from `Editor/`. Fastlane generates `AdaEditor.xcodeproj` from
 App Store IPA. The public configuration contains only the bundle ID
 `org.adaengine.editor` and development team `8PYCRS3EA3`.
 
-## Upload either platform with the Xcode account
+## Upload Studio or Player with the Xcode account
 
 For a Mac already signed into the developer account in Xcode, use automatic
 signing and Xcode's App Store Connect upload. This route does not require the
 Fastlane API key or a manually selected distribution profile:
 
 ```bash
-BUILD_NUMBER=2 MARKETING_VERSION=1.0 bundle exec fastlane upload_xcode target:ios
-BUILD_NUMBER=2 MARKETING_VERSION=1.0 bundle exec fastlane upload_xcode target:macos
+BUILD_NUMBER=20261010 MARKETING_VERSION=1.0.0 bundle exec fastlane upload_xcode target:ios
+BUILD_NUMBER=20261010 MARKETING_VERSION=1.0.0 bundle exec fastlane upload_xcode target:macos
+BUILD_NUMBER=20261010 MARKETING_VERSION=1.0.0 bundle exec fastlane upload_xcode target:visionos
+BUILD_NUMBER=20261010 MARKETING_VERSION=1.0.0 bundle exec fastlane upload_xcode target:player
 ```
 
 Choose the version and build number before running. Archives and logs are saved
-under `build/appstore/ios` and `build/appstore/macos`. The lane verifies the
+under `build/appstore/<target>`. Studio uses `org.adaengine.editor` on all three
+platforms; Player uses `org.adaengine.player` and requires its own App Store Connect
+app record. The lane verifies the
 archive's signature, bundle ID, version, and build number before uploading.
-Xcode may raise the uploaded build number if needed to avoid a collision.
+The export preserves the chosen build number; use a new number for each upload.
 `ADAEDITOR_DERIVED_DATA` can point to an existing task-owned build cache.
 
 To retry an upload from the same archive, pass `skip_archive:true` with the same
@@ -208,3 +212,9 @@ The standalone lane explicitly signs Sparkle's nested Updater, Autoupdate and XP
 helpers with Developer ID and secure timestamps before signing the enclosing
 framework and application. An outer framework signature alone can pass local
 verification while failing Apple's notarization checks.
+
+To retry notarization of the same prepared, signed app without recompiling, use
+`bundle exec fastlane mac website skip_build:true` with the same environment.
+The lane checks its signature, standalone channel, version and build before
+uploading and requires an explicit `Accepted` notarization result before stapling.
+The bundled source SDK excludes generated build output and nested app bundles.

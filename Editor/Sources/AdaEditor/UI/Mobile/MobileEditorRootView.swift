@@ -204,12 +204,6 @@ struct MobileEditorRootView: View {
                 }
                 .navigationBarTrailingItems {
                     HStack(spacing: 8) {
-                        Button("Publish") { publicationProject = project }
-                            .font(MobileEditorFont.font(size: 13))
-                            .foregroundColor(theme.editorColors.blue)
-                            .frame(minHeight: 40)
-                            .disabled(isAgentRunning)
-                            .accessibilityIdentifier("AdaEditor.Mobile.Publish")
                         EditorAICreditsBadge(compact: true, onOpen: {
                             navigationPath.append(MobileEditorDestination.settings)
                         })
