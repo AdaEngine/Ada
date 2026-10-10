@@ -54,6 +54,10 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connect to AdaEditor to receive and test your game on this device.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Record dictated game prompts using the shared Ada Studio voice input tools.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Convert dictated game prompts into text using the shared Ada Studio voice input tools.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_adaplayer._tcp</string>
