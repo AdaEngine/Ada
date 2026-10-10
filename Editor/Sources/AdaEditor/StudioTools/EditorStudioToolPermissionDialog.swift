@@ -60,13 +60,22 @@ struct EditorStudioToolPermissionDialog: View {
                             Text(permission.studioAccessDetail).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
                         }
                     }
-                    Text("You can revoke access in Settings → Project → Studio Tools.")
-                        .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
-                    HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("You can revoke access in").font(.system(size: 11))
+                        HStack(spacing: 4) {
+                            Text("Settings").font(.system(size: 11))
+                            settingsPathArrow
+                            Text("Project").font(.system(size: 11))
+                            settingsPathArrow
+                            Text("Studio Tools").font(.system(size: 11))
+                        }
+                    }
+                    .foregroundColor(theme.editorColors.muted)
+                    HStack(spacing: 8) {
                         Spacer()
-                        Button("Not Now") { host.cancelPermissionRequest(request.id) }
+                        dialogButton(title: "Not Now", isPrimary: false) { host.cancelPermissionRequest(request.id) }
                             .accessibilityIdentifier("studio.tools.permissions.cancel")
-                        Button("Allow and Enable") { host.approve(request.id) }
+                        dialogButton(title: "Allow and Enable", isPrimary: true) { host.approve(request.id) }
                             .accessibilityIdentifier("studio.tools.permissions.allow")
                     }
                 }
@@ -79,6 +88,30 @@ struct EditorStudioToolPermissionDialog: View {
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .keyboardShortcuts([KeyboardShortcutAction(.escape) { host.cancelPermissionRequest(request.id) }])
+    }
+
+    private var settingsPathArrow: some View {
+        var attributes = TextAttributeContainer()
+        attributes.font = AdaEditorMaterialSymbolFont.font(size: 12)
+        attributes.foregroundColor = theme.editorColors.muted
+        return Text(AttributedText("\u{E5CC}", attributes: attributes))
+            .frame(width: 12, height: 12)
+    }
+
+    private func dialogButton(title: String, isPrimary: Bool, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.system(size: 12))
+            .foregroundColor(isPrimary ? theme.editorColors.text : theme.editorColors.muted)
+            .padding(.horizontal, 14)
+            .frame(height: 30)
+            .background(
+                RoundedRectangleShape(cornerRadius: 6)
+                    .fill(isPrimary ? theme.editorColors.blue.opacity(0.28) : theme.editorColors.background)
+            )
+            .overlay {
+                RoundedRectangleShape(cornerRadius: 6)
+                    .stroke(isPrimary ? theme.editorColors.blue.opacity(0.72) : theme.editorColors.border, lineWidth: 1)
+            }
     }
 }
 

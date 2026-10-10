@@ -24,58 +24,31 @@ struct EditorTopToolbar: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        ZStack {
-            SearchBar(
-                text: viewModel.searchTextBinding,
-                prompt: viewModel.searchPrompt,
-                width: searchWidth
-            )
-            .searchBarStyle(EditorToolbarSearchBarStyle(theme: theme))
-            .accessibilityIdentifier(Self.searchAccessibilityIdentifier)
-
+        EditorToolbarLayout(searchWidth: metrics.toolbarSearchWidth) {
             HStack(spacing: 12) {
                 Color.clear
                     .frame(width: metrics.toolbarWindowControlClearance, height: 1)
-
                 projectSwitcherButton
                 #if os(macOS) || os(Windows) || os(Linux)
                 if let interface {
                     EditorInterfaceModePicker(state: interface)
                 }
                 #endif
+            }
 
-                Spacer()
+            SearchBar(text: viewModel.searchTextBinding, prompt: viewModel.searchPrompt)
+                .searchBarStyle(EditorToolbarSearchBarStyle(theme: theme))
+                .accessibilityIdentifier(Self.searchAccessibilityIdentifier)
 
+            HStack(spacing: 12) {
                 EditorAICreditsBadge(compact: true, onOpen: onOpenCloud)
-
                 EditorUpdateButton()
-
-                if metrics.showsToolbarSceneName && EditorUpdateCenter.shared.availableVersion == nil {
-                    Text(viewModel.sceneName)
-                        .font(.system(size: 12))
-                        .foregroundColor(theme.editorColors.muted)
-                        .lineLimit(1)
-                }
-
                 runDestinationControls
                 runStopControls
             }
             .padding(.trailing, 16)
-            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
-    }
-
-    private var searchWidth: Float {
-        #if os(macOS) || os(Windows) || os(Linux)
-        guard interface != nil else {
-            return metrics.toolbarSearchWidth
-        }
-        let leadingControls = metrics.toolbarWindowControlClearance + metrics.toolbarProjectSwitcherWidth + 104 + 36
-        return min(metrics.toolbarSearchWidth, max(120, metrics.size.width - leadingControls * 2))
-        #else
-        return metrics.toolbarSearchWidth
-        #endif
     }
 
     private var projectSwitcherButton: some View {
@@ -113,7 +86,7 @@ struct EditorTopToolbar: View {
             .padding(.horizontal, 8)
             .frame(width: metrics.toolbarRunDestinationWidth, height: 28)
         }
-        .buttonStyle(DefaultButtonStyle())
+        .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
         .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surfaceElevated))
         .overlay {
             RoundedRectangleShape(cornerRadius: 8)
@@ -145,7 +118,7 @@ struct EditorTopToolbar: View {
                 .frame(width: 30, height: 30)
         }
         .foregroundColor(color)
-        .buttonStyle(DefaultButtonStyle())
+        .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
         .accessibilityIdentifier("AdaEditor.Toolbar.\(title)")
     }
 }
@@ -184,7 +157,7 @@ struct EditorRunDestinationMenu: View {
                         .frame(width: menuWidth, height: EditorRunDestinationMenuLayout.rowHeight)
                     }
                 )
-                .buttonStyle(DefaultButtonStyle())
+                .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
                 .accessibilityIdentifier("AdaEditor.RunDestination.\(destination.rawValue)")
             }
             if selectedDestination == .android {
@@ -203,7 +176,7 @@ struct EditorRunDestinationMenu: View {
                         .foregroundColor(theme.editorColors.text).padding(.horizontal, 10)
                         .frame(width: menuWidth, height: 42)
                     }
-                    .buttonStyle(DefaultButtonStyle()).disabled(!target.isAvailable)
+                    .buttonStyle(EditorChromeHoverButtonStyle(theme: theme)).disabled(!target.isAvailable)
                     .accessibilityIdentifier("AdaEditor.Android.Target." + target.id)
                 }
                 }

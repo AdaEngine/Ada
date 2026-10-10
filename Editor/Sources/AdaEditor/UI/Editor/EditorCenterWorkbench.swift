@@ -142,12 +142,15 @@ extension EditorCenterWorkbench {
                     .padding(.horizontal, 8)
                     .accessibilityIdentifier("AdaEditor.Workbench.Split.Merge.\(pane.rawValue)")
             } else if let document = viewModel.selectedDocument(in: pane) {
-                Button("Split") { viewModel.splitDocument(id: document.id) }
-                    .buttonStyle(DefaultButtonStyle())
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.editorColors.blue)
-                    .padding(.horizontal, 8)
-                    .accessibilityIdentifier("AdaEditor.Workbench.Split")
+                Button(action: { viewModel.splitDocument(id: document.id) }) {
+                    Text("\u{E949}")
+                        .font(AdaEditorMaterialSymbolFont.font(size: 18))
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
+                .foregroundColor(theme.editorColors.blue)
+                .padding(.horizontal, 4)
+                .accessibilityIdentifier("AdaEditor.Workbench.Split")
             }
         }
         .background(theme.editorColors.surfaceElevated)

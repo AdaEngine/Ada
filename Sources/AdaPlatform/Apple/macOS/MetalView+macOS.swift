@@ -181,8 +181,14 @@
             }
 
             let position = self.mousePosition(for: event)
-            if shouldPerformWindowDrag(at: position, with: event) {
-                event.window?.performDrag(with: event)
+            if (event.clickCount == 1 || event.clickCount == 2), isWindowDragRegion(at: position, with: event) {
+                if event.clickCount == 2 {
+                    if let nsWindow = event.window, nsWindow.styleMask.contains(.resizable), !nsWindow.styleMask.contains(.fullScreen) {
+                        nsWindow.performZoom(nil)
+                    }
+                } else {
+                    event.window?.performDrag(with: event)
+                }
                 return
             }
 
@@ -467,9 +473,8 @@
             return position
         }
 
-        private func shouldPerformWindowDrag(at position: Point, with event: NSEvent) -> Bool {
+        private func isWindowDragRegion(at position: Point, with event: NSEvent) -> Bool {
             guard
-                event.clickCount == 1,
                 let nsWindow = event.window,
                 nsWindow.styleMask.contains(.fullSizeContentView),
                 let uiWindow = (windowManager as? MacOSWindowManager)?.findWindow(for: nsWindow)

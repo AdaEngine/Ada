@@ -71,7 +71,7 @@ struct AdaEngineStyleLayoutMetrics: Hashable {
     }
 
     var toolbarSearchWidth: Float {
-        let rightControlWidth: Float = (showsToolbarSceneName ? 92 : 0) + toolbarRunDestinationWidth + toolbarRunControlsWidth + 36
+        let rightControlWidth: Float = toolbarRunDestinationWidth + toolbarRunControlsWidth + 36
         let reservedSideWidth = max(toolbarLeadingSpacerWidth, rightControlWidth)
         let availableWidth = size.width - reservedSideWidth * 2
         let minimumWidth: Float = size.width < 520 ? 120 : 180

@@ -8,6 +8,42 @@ import Testing
 
 @Suite("Editor top toolbar")
 struct EditorTopToolbarTests {
+    @Test("credit counter stays clear of centered search", arguments: [Float(1_024), 1_280, 1_728])
+    @MainActor
+    func creditCounterDoesNotOverlapSearch(width: Float) throws {
+        prepareRendererIfNeeded()
+        let size = Size(width: width, height: AdaEngineStyleLayoutSpec.topToolbarHeight)
+        let container = UIContainerView(
+            rootView: EditorTopToolbar(
+                project: EditorProjectReference(name: "Example", path: "/tmp/Example"),
+                isProjectSwitcherPresented: false,
+                isRunDestinationMenuPresented: false,
+                viewModel: EditorToolbarViewModel(),
+                runDestination: .macOS,
+                isRunEnabled: true,
+                isStopEnabled: false,
+                onToggleRunDestinationMenu: {},
+                onToggleProjectSwitcher: {},
+                onRun: {},
+                onStop: {},
+                onDebug: {},
+                interface: EditorInterfaceState(projectPath: "/tmp/ToolbarLayoutTest")
+            )
+            .environment(\.metrics, AdaEngineStyleLayoutMetrics(size: size))
+        )
+        container.frame = Rect(origin: .zero, size: size)
+        container.bounds.size = size
+        container.layoutIfNeeded()
+
+        let search = try container.uiNode(matching: .accessibilityIdentifier(EditorTopToolbar.searchAccessibilityIdentifier))
+        let credits = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Cloud.AICredits.Counter"))
+        let interface = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.InterfaceMode"))
+        #expect(abs(search.absoluteFrame.midX - width / 2) < 0.5)
+        #expect(search.absoluteFrame.width >= 120)
+        #expect(search.absoluteFrame.maxX + 8 <= credits.absoluteFrame.minX)
+        #expect(interface.absoluteFrame.maxX + 8 <= search.absoluteFrame.minX)
+    }
+
     @Test("run destination uses a dropdown menu")
     @MainActor
     func runDestinationMenuSelectsDestination() throws {

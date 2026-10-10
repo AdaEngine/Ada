@@ -247,6 +247,7 @@ enum AdaEditorMaterialSymbolFont {
         0xE900,
         0xE913,
         0xE925,
+        0xE949,
         0xE97A,
         0xEA23,
         0xEAD5,
@@ -282,6 +283,19 @@ enum AdaEditorMaterialSymbolFont {
         }
 
         return Font(fontResource: resource, pointSize: size)
+    }
+}
+
+struct EditorChromeHoverButtonStyle: ButtonStyle {
+    let theme: Theme
+
+    func makeBody(configuration: Configuration) -> some View {
+        let highlighted = configuration.state.isEnabled && (configuration.isHighlighted || configuration.isPressed || configuration.state.contains(.focused))
+        return configuration.label
+            .background(
+                RoundedRectangleShape(cornerRadius: 5)
+                    .fill(highlighted ? theme.editorColors.text.opacity(0.10) : Color.clear)
+            )
     }
 }
 

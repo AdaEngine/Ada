@@ -185,9 +185,6 @@ struct EditorAgentWorkspace: View {
             }
             .buttonStyle(DefaultButtonStyle())
             .accessibilityIdentifier("AdaEditor.AgentWorkspace.ToggleArtifact")
-            Button("Editor") { viewModel.interface.mode = .editor }
-                .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
-                .accessibilityIdentifier("AdaEditor.AgentWorkspace.OpenEditor")
         }
         .padding(.horizontal, 12)
         .frame(height: 30)

@@ -21,6 +21,8 @@ struct EditorStudioToolsSettings: View {
                         Spacer()
                         if host.isAuthorized(definition) {
                             Button("Revoke Access") { host.disable(definition.schema.id) }
+                                .font(.system(size: 12))
+                                .foregroundColor(Color(red: 232 / 255, green: 96 / 255, blue: 96 / 255))
                                 .accessibilityIdentifier("studio.tools.revoke." + definition.schema.id)
                         } else {
                             Button("Enable…") { host.enable(definition.schema.id, presentation: .settings) }

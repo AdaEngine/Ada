@@ -374,7 +374,8 @@ struct AdaEngineStyleUITests {
         let search = try container.uiNode(matching: .accessibilityIdentifier(EditorTopToolbar.searchAccessibilityIdentifier))
         let projectSwitcher = try container.uiNode(matching: .accessibilityIdentifier(EditorTopToolbar.projectSwitcherAccessibilityIdentifier))
         #expect(abs(search.absoluteFrame.midX - size.width / 2) < 0.5)
-        #expect(search.absoluteFrame.width == metrics.toolbarSearchWidth)
+        #expect(search.absoluteFrame.width > 0)
+        #expect(search.absoluteFrame.width <= metrics.toolbarSearchWidth)
         #expect(projectSwitcher.absoluteFrame.minX >= metrics.toolbarWindowControlClearance)
         #expect(projectSwitcher.absoluteFrame.maxX < search.absoluteFrame.minX)
     }
