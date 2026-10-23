@@ -1,0 +1,94 @@
+.agent-canvas-activity {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 0 var(--viewport-right, 0px) 0 var(--viewport-left, 0px);
+  pointer-events: none;
+  background: #10132124;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  animation: agent-canvas-reveal 0.35s ease-out both;
+}
+.agent-canvas-progress {
+  display: grid;
+  justify-items: center;
+  gap: 1.25rem;
+  padding: 2.2rem 1.8rem;
+  max-width: 100%;
+  text-align: center;
+}
+.agent-canvas-wave {
+  display: grid;
+  grid-template-columns: repeat(11, 5px);
+  gap: 13px;
+  padding: 18px 0;
+  transform: perspective(400px) rotateX(24deg) rotateZ(-8deg);
+  filter: drop-shadow(0 0 20px #9d88ff55);
+}
+.agent-canvas-wave i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #c2b1ff;
+  box-shadow: 0 0 7px #a58aff88;
+  opacity: var(--dot-opacity);
+  animation: agent-canvas-wave 2.3s ease-in-out infinite;
+  animation-delay: var(--wave-delay);
+  will-change: transform, opacity;
+}
+.agent-canvas-wave i:nth-child(3n) {
+  background: #9edcfa;
+}
+.agent-canvas-progress p {
+  margin: 0;
+  padding: 0.65rem 1.1rem;
+  border: 1px solid #d2c6ff1c;
+  border-radius: 999px;
+  background: #171923b8;
+  color: #eee9ff;
+  box-shadow:
+    0 8px 30px #080b2233,
+    0 0 28px #9c8aff14;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.5;
+  text-wrap: balance;
+}
+.stage-surface > .runtime-loading {
+  z-index: 2;
+}
+@keyframes agent-canvas-wave {
+  0%,
+  100% {
+    transform: translateY(5px) scale(0.75);
+    opacity: 0.35;
+  }
+  45% {
+    transform: translateY(-12px) scale(1.25);
+    opacity: 1;
+    box-shadow: 0 0 12px #bdadffcc;
+  }
+  65% {
+    transform: translateY(-3px) scale(0.95);
+    opacity: var(--dot-opacity);
+  }
+}
+@keyframes agent-canvas-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-canvas-activity,
+  .agent-canvas-wave i {
+    animation: none;
+  }
+  .agent-canvas-wave i {
+    will-change: auto;
+  }
+}
