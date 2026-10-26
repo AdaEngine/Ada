@@ -51,6 +51,7 @@ actor EditorAdaScriptNativeExporter {
         try distribution.validate(buildSystem: .swiftpm)
         guard project.build.system.isAdaScript else { throw EditorPreviewBuildFailure(message: "Native export requires an AdaScript project.") }
         guard project.runtime.entry.view == nil else { throw EditorAdaScriptProjectBuildError.uiViewsUnavailable }
+        _ = try EditorProjectStorageIdentity.resolve(project, nativeFallback: true)
         let root = root.resolvingSymlinksInPath()
         let output = output.standardizedFileURL
         guard output != root, !root.path.hasPrefix(output.path + "/"), output.lastPathComponent != ".ada" else {
@@ -202,7 +203,8 @@ actor EditorAdaScriptNativeExporter {
             try Self.packageApp(
                 binaryDirectory: URL(fileURLWithPath: String(path)),
                 to: stage.appendingPathComponent("AdaNativeGame.app"),
-                title: project.project.displayName ?? project.project.name ?? "AdaScript Game"
+                title: project.project.displayName ?? project.project.name ?? "AdaScript Game",
+                bundleIdentifier: project.project.bundleIdentifier ?? "org.adaengine.nativegame"
             )
         } else {
             #if os(Windows)
@@ -434,7 +436,11 @@ actor EditorAdaScriptNativeExporter {
         """
     }
 
-    private static func player(project: AdaProject, sources: [AdaScriptSource], plugins: EditorAdaScriptResolvedRuntimePlugins, destination: EditorAdaScriptNativeExportOptions.Destination, interpreted: Bool) -> String {
+    static func player(project: AdaProject, sources: [AdaScriptSource], plugins: EditorAdaScriptResolvedRuntimePlugins, destination: EditorAdaScriptNativeExportOptions.Destination, interpreted: Bool) throws -> String {
+        let storageIdentifier = try EditorProjectStorageIdentity.resolve(project, nativeFallback: true)
+        let assetsPlugin = storageIdentifier.map {
+            "AssetsPlugin(directories: try ProjectDirectories(source: assets.deletingLastPathComponent(), assetsDirectory: assets, storageIdentifier: \(quote($0))))"
+        } ?? "AssetsPlugin(assetDirectory: assets)"
         let entryPoint = destination == .android ? """
         #if os(Android)
         @_cdecl("ada_android_start")
@@ -477,6 +483,7 @@ actor EditorAdaScriptNativeExporter {
             case .audio: "app.addPlugin(AudioPlugin(masterVolume: \(plugins.audio.masterVolume)))"
             case .tilemap: "app.addPlugin(TileMapPlugin())"
             case .physics2D: "app.addPlugin(Physics2DPlugin(gravity: [\(plugins.physics2DGravity[0]), \(plugins.physics2DGravity[1])]))"
+            case .navigation3D: "app.addPlugin(Navigation3DPlugin())"
             case .physics3D: "app.addPlugin(Physics3DPlugin(gravity: Vector3(\(plugins.physics3D.gravity[0]), \(plugins.physics3D.gravity[1]), \(plugins.physics3D.gravity[2])), subStepCount: \(plugins.physics3D.subStepCount)))"
             case .model3D: nil
             case .multiplayer: "app.addPlugin(NativeGameNetwork())"
@@ -520,7 +527,7 @@ actor EditorAdaScriptNativeExporter {
                         let assets = assetURL.resolvingSymlinksInPath().standardizedFileURL
                         let actions = try JSONDecoder().decode([InputAction].self, from: Data(contentsOf: assets.appendingPathComponent("input-actions.json")))
                         app.addPlugin(TransformPlugin()).addPlugin(InputPlugin(actions: actions)).addPlugin(RenderWorldPlugin()).addPlugin(EventsPlugin()).addPlugin(CameraPlugin())
-                        app.addPlugin(AssetsPlugin(assetDirectory: assets)).addPlugin(VisibilityPlugin()).addPlugin(TextPlugin()).addPlugin(ScenePlugin(includesModel3D: \(plugins.contains(.model3D)))).addPlugin(ScriptableObjectPlugin())
+                        app.addPlugin(\(assetsPlugin)).addPlugin(VisibilityPlugin()).addPlugin(TextPlugin()).addPlugin(ScenePlugin(includesModel3D: \(plugins.contains(.model3D)))).addPlugin(ScriptableObjectPlugin())
                         \(pluginCode)
                         \(moduleSetup)
                         let plugin = try \(pluginType)(\(initializerArguments), startupSystemIdentifier: \(project.runtime.entry.startupSystem.map(quote) ?? "nil")\(interpreted ? "" : ", preloadedAssets: " + preloadExpression))
@@ -649,7 +656,8 @@ actor EditorAdaScriptNativeExporter {
         """
     }
 
-    private static func packageApp(binaryDirectory: URL, to bundle: URL, title: String) throws {
+    static func packageApp(binaryDirectory: URL, to bundle: URL, title: String, bundleIdentifier: String = "org.adaengine.nativegame") throws {
+        try ProjectDirectories.validateStorageIdentifier(bundleIdentifier)
         let macOS = bundle.appendingPathComponent("Contents/MacOS")
         let resources = bundle.appendingPathComponent("Contents/Resources")
         try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
@@ -659,7 +667,7 @@ actor EditorAdaScriptNativeExporter {
             try FileManager.default.copyItem(at: url, to: bundle.appendingPathComponent(url.lastPathComponent))
         }
         let plist: [String: Any] = [
-            "CFBundleExecutable": "AdaNativeGame", "CFBundleIdentifier": "org.adaengine.nativegame", "CFBundleName": title, "CFBundlePackageType": "APPL",
+            "CFBundleExecutable": "AdaNativeGame", "CFBundleIdentifier": bundleIdentifier, "CFBundleName": title, "CFBundlePackageType": "APPL",
             "NSPrincipalClass": "NSApplication", "LSMinimumSystemVersion": "15.0",
         ]
         try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0).write(to: bundle.appendingPathComponent("Contents/Info.plist"))

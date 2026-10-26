@@ -7,6 +7,26 @@ import Testing
 @MainActor
 @Suite("Real Tint SPIR-V to WGSL")
 struct TintShaderCompilerTests {
+    @Test(
+        .enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_TINT"] == "1"),
+        arguments: ["flat3d.glsl", "directional_shadow_3d.glsl", "motion_3d.glsl"]
+    )
+    func compilesFreshReflectedMeshPasses(shader: String) async throws {
+        unsafe RenderEngine.configurations.preferredBackend = .webgpu
+        try RenderEngine.setupRenderEngine()
+        let root = ProcessInfo.processInfo.environment["ADAENGINE_SHADER_SOURCE_ROOT"].map { URL(fileURLWithPath: $0) }
+            ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let compiler = try ShaderCompiler(from: root.appendingPathComponent("Sources/AdaCorePipelines/Assets/Shaders/\(shader)"))
+        for stage in [ShaderStage.vertex, .fragment] {
+            let spirv = try compiler.compileSpirvBin(for: stage, ignoreCache: true)
+            let result = try await WGSLShaderCompiler().compile(
+                spirvData: spirv.data, entryPoint: "reflected_mesh_validation", stage: stage, defines: []
+            )
+            #expect(result.source.contains("fn reflected_mesh_validation("))
+            #expect(result.language == .wgsl)
+        }
+    }
+
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_TINT"] == "1"), arguments: ["glass.glsl", "gradient.glsl"])
     func compilesFreshGlassBlur(shader: String) async throws {
         unsafe RenderEngine.configurations.preferredBackend = .webgpu

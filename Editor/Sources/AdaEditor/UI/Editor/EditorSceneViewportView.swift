@@ -82,7 +82,7 @@ struct EditorSceneViewportView: View {
                                 viewportModel.threeDPitch = 0
                                 viewportModel.perspectiveBlend = 1
                             }
-                            configureSceneViewApp(&app)
+                            guard configureSceneViewApp(&app) else { return }
                             let result = EditorSceneFileLoader.load(
                                 content: document.content,
                                 into: app.main,
@@ -157,8 +157,8 @@ struct EditorSceneViewportView: View {
         }
     }
 
-    private func configurePlayWorld(_ app: inout AppWorlds) {
-        configureSceneViewApp(&app)
+    func configurePlayWorld(_ app: inout AppWorlds) {
+        guard configureSceneViewApp(&app) else { return }
         performanceSession.attach(app, title: document.title)
         var runtimeInstalled = true
         do {
@@ -177,19 +177,20 @@ struct EditorSceneViewportView: View {
             runtimeWarnings = [error.localizedDescription]
             runtimeInstalled = false
         }
-        let result = EditorSceneFileLoader.load(
-            content: document.content,
-            into: app.main,
-            sourceURL: document.absolutePath.map { URL(fileURLWithPath: $0) },
-            resourceRootURL: resourceRootURL
-        )
-        if runtimeInstalled {
-            runtimeWarnings = result.warnings
+        guard let model = EditorSceneFileLoader.model(from: document.content) else {
+            runtimeWarnings = ["Unable to play scene: invalid scene document."]
+            return
         }
-        if runtimeInstalled, result.warnings.isEmpty, document.absolutePath != nil,
-            let model = document.sceneModel {
-            EditorAchievementBootstrap.center?.record(EditorAchievementRules.playedScene(model, adaScript: playRuntime != nil))
-        }
+        let sourceURL = document.absolutePath.map { URL(fileURLWithPath: $0) }
+        let assets = resourceRootURL ?? sourceURL?.deletingLastPathComponent() ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let reportsLoad = runtimeInstalled
+        app.addPlugin(EditorAdaScriptRuntimeEntryPlugin(sceneModel: model, assetsDirectory: assets, sourceURL: sourceURL,
+            recordsAchievement: false, onInitialSceneLoaded: { result in
+                if reportsLoad { runtimeWarnings = result.warnings }
+                if reportsLoad, result.warnings.isEmpty, sourceURL != nil {
+                    EditorAchievementBootstrap.center?.record(EditorAchievementRules.playedScene(model, adaScript: playRuntime != nil))
+                }
+            }))
     }
 
     @MainActor
@@ -209,7 +210,21 @@ struct EditorSceneViewportView: View {
         return resourceRoot
     }
 
-    private func configureSceneViewApp(_ app: inout AppWorlds) {
+    @MainActor
+    static func assetDirectories(for resourceRoot: URL) throws -> ProjectDirectories {
+        let assets = resourceRoot.standardizedFileURL
+        let source = assets.deletingLastPathComponent()
+        let projectRoot = uiProjectRoot(from: assets)
+        if FileManager.default.fileExists(atPath: ProjectSystem.metadataURL(forProjectAt: projectRoot).path) {
+            let project = try ProjectSystem.loadProject(at: projectRoot)
+            if let identifier = try EditorProjectStorageIdentity.resolve(project) {
+                return try ProjectDirectories(source: projectRoot, assetsDirectory: assets, storageIdentifier: identifier)
+            }
+        }
+        return ProjectDirectories(source: source, assetsDirectory: assets)
+    }
+
+    private func configureSceneViewApp(_ app: inout AppWorlds) -> Bool {
         app.runtimeLogSource = isPlayingThisDocument ? "Game" : "Editor"
         if let resourceRootURL {
             let runtime = UIComponentRuntime(resourceRoot: resourceRootURL, catalog: uiCatalog)
@@ -224,7 +239,13 @@ struct EditorSceneViewportView: View {
         app.addPlugin(EventsPlugin())
         app.addPlugin(CameraPlugin())
         if let resourceRootURL {
-            app.addPlugin(AssetsPlugin(assetDirectory: resourceRootURL))
+            do {
+                app.addPlugin(AssetsPlugin(directories: try Self.assetDirectories(for: resourceRootURL)))
+            } catch {
+                runtimeWarnings = [error.localizedDescription]
+                RuntimeLogStore.shared.append(level: "error", label: "AdaScript", message: error.localizedDescription)
+                return false
+            }
         } else {
             app.addPlugin(AssetsPlugin(filePath: #filePath))
         }
@@ -244,6 +265,7 @@ struct EditorSceneViewportView: View {
         app.addPlugin(Core3DPlugin(includes2D: true))
         app.addPlugin(Light2DPlugin())
         app.addPlugin(UpscalePlugin())
+        return true
     }
 
     @MainActor

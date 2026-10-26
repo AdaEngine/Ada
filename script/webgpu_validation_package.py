@@ -38,6 +38,7 @@ for relative in [
     "Tests/AdaEngineTests/PluginLoadingTests.swift",
     "Tests/AdaEngineTests/WGPUVisibilitySceneTests.swift",
     "Tests/AdaEngineTests/Render3DDebugViewTests.swift",
+    "Tests/AdaEngineTests/Render3DReflectedFacingTests.swift",
     "Tests/AdaEngineTests/Render3DShaderGraphTests.swift",
     "Tests/AdaEngineTests/Render3DMaterialExtensionTests.swift",
     "Tests/AdaEngineTests/Render3DFogTests.swift",

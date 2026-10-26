@@ -21,12 +21,14 @@ package protocol OffscreenViewportDelegate: AnyObject {
     func shutdown()
     func tick(_ deltaTime: AdaUtils.TimeInterval)
     func receiveInputEvent(_ event: any InputEvent)
+    func releasePointerCapture()
     func updateMousePosition(_ position: Point)
     func updateSize(_ size: SizeInt, scaleFactor: Float)
     func setRenderingEnabled(_ enabled: Bool)
 }
 
 extension OffscreenViewportDelegate {
+    func releasePointerCapture() {}
     func setRenderingEnabled(_: Bool) {}
     var renderFrameDidChange: (@MainActor @Sendable () -> Void)? {
         get { nil }
@@ -240,6 +242,7 @@ private final class OffscreenViewportNode: ViewNode {
             window: event.window,
             button: event.button,
             scrollDelta: event.scrollDelta,
+            motionDelta: event.motionDelta,
             mousePosition: localPosition,
             phase: event.phase,
             modifierKeys: event.modifierKeys,
@@ -319,6 +322,7 @@ private final class OffscreenViewportNode: ViewNode {
     }
 
     private func cancelActiveInput() {
+        viewportRenderer.releasePointerCapture()
         for event in pressedKeys.values {
             viewportRenderer.receiveInputEvent(
                 KeyEvent(window: event.window, keyCode: event.keyCode, modifiers: event.modifiers, status: .up, time: event.time, isRepeated: false)
@@ -452,5 +456,7 @@ private final class OffscreenViewportContainerNode<Content: View>: ViewContainer
     private func shutdownDelegate() {
         viewportRenderer?.shutdown()
         viewportRenderer = nil
+        // Descendants retain their delegate and bootstrap state. Reattachment needs fresh nodes.
+        reconcileChildNodes(from: [])
     }
 }

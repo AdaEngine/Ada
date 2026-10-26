@@ -37,6 +37,7 @@ layout (location = 2) out vec2 v_UV;
 layout (location = 3) out vec2 v_UV1;
 layout (location = 4) out vec4 v_ColorFlags;
 layout (location = 5) out float v_Fade;
+layout (location = 6) flat out float v_ModelOrientation;
 [[main]]
 void motion_vertex() {
     mat4 skin = mat4(1.0), previousSkin = mat4(1.0);
@@ -52,7 +53,9 @@ void motion_vertex() {
     applyMorphPosition(localPosition);
     previousLocalPosition = previousMorphedPosition(a_Position);
 #endif
-    vec4 world = mat4(a_Model0, a_Model1, a_Model2, a_Model3) * skin * vec4(localPosition, 1.0);
+    mat4 model = mat4(a_Model0, a_Model1, a_Model2, a_Model3) * skin;
+    v_ModelOrientation = determinant(mat3(model)) < 0.0 ? -1.0 : 1.0;
+    vec4 world = model * vec4(localPosition, 1.0);
     vec4 previousWorld = mat4(a_PreviousModel0, a_PreviousModel1, a_PreviousModel2, a_PreviousModel3) * previousSkin * vec4(previousLocalPosition, 1.0);
     v_CurrentClip = u_CurrentViewProjection * world;
     v_PreviousClip = u_Parameters.z > 0.5 ? v_CurrentClip : u_PreviousViewProjection * previousWorld;
@@ -69,6 +72,7 @@ layout (location = 2) in vec2 v_UV;
 layout (location = 3) in vec2 v_UV1;
 layout (location = 4) in vec4 v_ColorFlags;
 layout (location = 5) in float v_Fade;
+layout (location = 6) flat in float v_ModelOrientation;
 layout (location = 0) out vec4 o_Motion;
 layout (location = 1) out vec4 o_Reactive;
 layout (binding = 4) uniform texture2D u_BaseColor;
@@ -82,7 +86,8 @@ layout (binding = 15) uniform PBR3DUniform {
 #define ADA_GRAPH_SOURCE_MARKER 1
 [[main]]
 void motion_fragment() {
-    if (u_SurfaceFlags.x < 0.5 && !gl_FrontFacing) { discard; }
+    bool frontFacing = v_ModelOrientation < 0.0 ? !gl_FrontFacing : gl_FrontFacing;
+    if (u_SurfaceFlags.x < 0.5 && !frontFacing) { discard; }
     if (v_Fade > 0.0) {
         int x = int(mod(floor(gl_FragCoord.x), 4.0)), y = int(mod(floor(gl_FragCoord.y), 4.0));
         const float values[16] = float[](0.0,8.0,2.0,10.0,12.0,4.0,14.0,6.0,3.0,11.0,1.0,9.0,15.0,7.0,13.0,5.0);

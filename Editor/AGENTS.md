@@ -484,7 +484,11 @@ its `world` field. `editor.play.run_scenario` replays timed key/mouse input in a
 isolated offscreen runtime (or the running Play game), saves frames under
 `.ada/workspace/agent-captures`, and returns entity/component snapshots, script
 logs and limits-bounded results; the offscreen runtime renders scene cameras, not
-the `@view` HUD. Guide: [MobileAgentTools.md](Documentation/MobileAgentTools.md#desktop-game-verification).
+the `@view` HUD. Snapshots include `componentFields` for native and world-scoped
+AdaScript component schemas, preserving structured scalar/vector values. Watch
+filters accept qualified native names and runtime stable IDs/aliases. Timed pointer
+moves emit relative motion events as well as position updates. Coverage:
+`EditorScenarioComponentSnapshotTests`. Guide: [MobileAgentTools.md](Documentation/MobileAgentTools.md#desktop-game-verification).
 Coverage: [EditorPlayScenarioTests.swift](Tests/AdaEditorTests/EditorPlayScenarioTests.swift),
 engine [SceneViewFrameCaptureTests.swift](../Tests/AdaEngineTests/SceneViewFrameCaptureTests.swift).
 

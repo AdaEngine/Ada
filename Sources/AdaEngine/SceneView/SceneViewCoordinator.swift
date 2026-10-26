@@ -70,6 +70,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         var present: (@MainActor () -> Void)?
         var isPresentationPrepared = false
         var isCompleted = false
+        var hasCheckedSubmission = false
     }
 
     private struct RetiredDisplayTarget {
@@ -159,6 +160,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     func shutdown() {
+        releasePointerCapture()
         isShutdown = true
         frameSource.map { SceneViewFrameRegistry.unregister($0) }
         stopAudioPlaybacks()
@@ -256,9 +258,14 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             return
         }
         let input = app.main.getRefResource(Input.self)
+        input.wrappedValue.attachPointerDriver(UIWindowManager.shared)
         // Parse on the next preUpdate. Flushing during an in-flight async frame
         // lets its postUpdate cleanup discard the event before input systems see it.
         input.wrappedValue.receiveEvent(event)
+    }
+
+    func releasePointerCapture() {
+        appWorlds?.main.getResource(Input.self)?.releasePointerCapture()
     }
 
     func updateMousePosition(_ position: Point) {
@@ -523,6 +530,26 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         pendingDisplayTargets[index].isCompleted = true
     }
 
+    private func finishRenderSubmission(isCameraOutput: (RenderTexture) -> Bool) {
+        // Scene navigation can replace every camera after a UI tick reserved a target.
+        // That frame never renders the reservation; keeping it would block the FIFO forever.
+        // Only check new reservations, preserving older targets whose GPU work is still in flight.
+        pendingDisplayTargets.removeAll { pending in
+            guard !pending.hasCheckedSubmission, !pending.isCompleted,
+                !isCameraOutput(pending.texture) else { return false }
+            // Hosts without camera extraction can drive completion themselves. Keep a target
+            // that is still bound to an active scene camera in those worlds too.
+            return appWorlds?.main.getEntities().contains { entity in
+                guard let camera = entity.components[Camera.self], camera.isActive,
+                    case let .texture(handle) = camera.renderTarget else { return false }
+                return handle.asset === pending.texture
+            } != true
+        }
+        for index in pendingDisplayTargets.indices {
+            pendingDisplayTargets[index].hasCheckedSubmission = true
+        }
+    }
+
     private func prepareNextRenderTarget() {
         if let targetRenderTexture,
             !isDisplayUnavailable(targetRenderTexture) {
@@ -633,8 +660,13 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     private func configureContentScheduling(in app: AppWorlds) {
-        app.insertResource(ContentUpdateTarget(coordinator: self))
+        let target = ContentUpdateTarget(coordinator: self)
+        app.insertResource(target)
         app.addSystem(ContentUpdateSystem.self, on: .preUpdate)
+        if let renderWorld = app.getSubworldBuilder(by: .renderWorld) {
+            renderWorld.insertResource(target)
+            renderWorld.addSystem(FrameSubmissionSystem.self, on: .postUpdate)
+        }
     }
 
     @MainActor
@@ -643,6 +675,26 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
 
         init(coordinator: SceneViewCoordinator) {
             self.coordinator = coordinator
+        }
+    }
+
+    private struct FrameSubmissionSystem: System {
+        @Query<Camera, RenderViewTarget> private var cameras
+        @Res<ContentUpdateTarget> private var target
+
+        var queries: SystemQueries { SystemQueries(queries: [_cameras, _target]) }
+
+        init(world _: World) {}
+
+        @MainActor
+        func update(context _: UpdateContext) {
+            target.coordinator?.finishRenderSubmission { texture in
+                var isOutput = false
+                cameras.forEach { camera, viewTarget in
+                    if camera.isActive, viewTarget.outputTexture === texture { isOutput = true }
+                }
+                return isOutput
+            }
         }
     }
 

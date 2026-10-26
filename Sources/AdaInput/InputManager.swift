@@ -45,6 +45,10 @@ public struct Input: Resource, Sendable {
     var justReleasedActions: Set<String> = []
     var actionScrollDirections: Set<InputAxisDirection> = []
     var actionMouseMoved = false
+    var mouseDelta: Vector2 = .zero
+    var mouseWindow: RID?
+    private let pointerOwner = UUID()
+    private weak var pointerDriver: (any InputPointerDriver)?
     var actionTouchPhases: Set<InputTouchPhase> = []
 
     var gamepads: [Int: Gamepad] = [:]
@@ -128,17 +132,29 @@ public struct Input: Resource, Sendable {
         self.mousePosition
     }
 
+    /// Relative motion accumulated this input frame, in logical pointer units.
+    public func getMouseDelta() -> Vector2 { mouseDelta }
+
+    /// Installs a platform driver without retaining the window manager.
+    @_spi(Internal) @MainActor
+    public mutating func attachPointerDriver(_ driver: (any InputPointerDriver)?) {
+        pointerDriver = driver
+    }
+
+    @MainActor
+    public func releasePointerCapture() { pointerDriver?.releaseMouseMode(owner: pointerOwner) }
+
     /// Get mouse mode for active window.
     @MainActor
     public func getMouseMode() -> MouseMode {
-        //        Application.shared.windowManager.getMouseMode()
-        return .visible
+        pointerDriver?.mouseMode(owner: pointerOwner) ?? .visible
     }
 
     /// Set mouse mode for active window.
     @MainActor
-    public mutating func setMouseMode(_: MouseMode) {
-        //        Application.shared.windowManager.setMouseMode(mode)
+    public mutating func setMouseMode(_ mode: MouseMode) {
+        if mode == .visible { releasePointerCapture() }
+        else { pointerDriver?.requestMouseMode(mode, owner: pointerOwner, window: mouseWindow) }
     }
 
     /// Set current cursor shape.
@@ -231,9 +247,9 @@ extension Input {
     // No need to redefine it here.
 
     /// Available list of mouse modes.
-    public enum MouseMode {
-        /// Captures the mouse. The mouse will be hidden and its position locked at the center of the window manager's window.
-        /// - WARNING: Not supported.
+    public enum MouseMode: Sendable {
+        /// Hides and freezes the system cursor while relative motion remains available.
+        /// Supported by the macOS driver; unsupported hosts remain visible.
         case captured
 
         /// Makes the mouse cursor visible if it is hidden.

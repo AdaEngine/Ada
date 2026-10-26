@@ -52,6 +52,7 @@ enum EditorAdaScriptRuntimePluginCatalog {
         .init(dependencies: [.core2D, .mesh2D, .sprite], displayName: "2D Lighting", id: .light2D),
         .init(dependencies: [.core2D], displayName: "2D Physics", id: .physics2D),
         .init(dependencies: [.core3D], displayName: "3D Physics", id: .physics3D),
+        .init(dependencies: [.physics3D], displayName: "3D Navigation", id: .navigation3D),
         .init(dependencies: [.core2D, .sprite], displayName: "Multiplayer", id: .multiplayer),
         .init(dependencies: [.core2D, .mesh2D, .sprite], displayName: "Tilemaps", id: .tilemap),
         .init(dependencies: [], displayName: "Audio", id: .audio),
@@ -73,7 +74,7 @@ enum EditorAdaScriptRuntimePluginCatalog {
             "Simulation",
             sections: [
                 .init("2D", plugins: [.physics2D, .tilemap]),
-                .init("3D", plugins: [.physics3D]),
+                .init("3D", plugins: [.physics3D, .navigation3D]),
             ]
         ),
         .init("Platform", plugins: [.audio, .upscale]),

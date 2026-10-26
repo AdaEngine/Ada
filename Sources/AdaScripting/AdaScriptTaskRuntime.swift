@@ -342,6 +342,10 @@ enum AdaScriptTaskPrelude {
     }
 
     class Saves {
+        static func readAsync(path) {
+            return __adaTaskFromOperation(__adaAsync.readText(path));
+        }
+
         static func writeAsync(path, text) {
             return __adaTaskFromOperation(__adaAsync.writeText(path, text));
         }

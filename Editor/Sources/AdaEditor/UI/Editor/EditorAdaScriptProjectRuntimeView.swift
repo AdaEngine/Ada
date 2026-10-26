@@ -24,9 +24,11 @@ struct EditorAdaScriptProjectRuntimeView: View {
     private let previewCapture: EditorProjectPreviewCapture?
     private let entryView: AdaScriptView?
     private let scriptPlugin: AdaScriptPlugin?
+    private let objectCatalog: AdaScriptObjectCatalog
+    private let directories: ProjectDirectories
     @State private var overlaySession = EditorSceneUIOverlaySession()
 
-    var diagnostics: [String] { scriptPlugin?.diagnostics ?? [] }
+    var diagnostics: [String] { (scriptPlugin?.diagnostics ?? []) + objectCatalog.diagnostics }
 
     init(
         artifact: EditorAdaScriptProjectBuildArtifact,
@@ -36,6 +38,7 @@ struct EditorAdaScriptProjectRuntimeView: View {
         self.artifact = artifact
         self.controls = controls
         self.previewCapture = previewCapture
+        directories = try artifact.assetDirectories()
         EditorComponentRegistry.registerBuiltIns()
         // Scriptable UI resolves resource types before the world's plugins start.
         if artifact.plugins.contains(.multiplayer) {
@@ -47,7 +50,7 @@ struct EditorAdaScriptProjectRuntimeView: View {
                 identifier: identifier
             )
         }
-        try artifact.scenePlayRuntime.registerScriptableObjects()
+        self.objectCatalog = try artifact.scenePlayRuntime.makeScriptableCatalog()
         self.scriptPlugin = try artifact.scenePlayRuntime.makeScriptPlugin()
     }
 
@@ -108,12 +111,12 @@ struct EditorAdaScriptProjectRuntimeView: View {
         app.addPlugin(RenderWorldPlugin())
         app.addPlugin(EventsPlugin())
         app.addPlugin(CameraPlugin())
-        app.addPlugin(AssetsPlugin(assetDirectory: artifact.assetsDirectory))
+        app.addPlugin(AssetsPlugin(directories: directories))
         app.addPlugin(VisibilityPlugin())
         app.addPlugin(TextPlugin())
         app.addPlugin(ScenePlugin(includesModel3D: artifact.plugins.contains(.model3D)))
         app.addPlugin(Camera2DControllerPlugin())
-        app.addPlugin(ScriptableObjectPlugin())
+        app.addPlugin(EditorProjectScriptObjectsPlugin(catalog: objectCatalog))
         installFeaturePlugins(in: &app)
         if let scriptPlugin {
             app.addPlugin(scriptPlugin)
@@ -126,7 +129,8 @@ struct EditorAdaScriptProjectRuntimeView: View {
             app: app,
             scriptPlugin: scriptPlugin,
             sources: artifact.sources,
-            scriptableSchemas: artifact.scenePlayRuntime.schemas
+            scriptableSchemas: artifact.scenePlayRuntime.schemas,
+            scriptableCatalog: objectCatalog
         )
     }
 
@@ -172,6 +176,8 @@ struct EditorAdaScriptProjectRuntimeView: View {
         in app: inout AppWorlds
     ) -> Bool {
         switch pluginID {
+        case .navigation3D:
+            app.addPlugin(Navigation3DPlugin())
         case .physics2D:
             let gravity = artifact.plugins.physics2DGravity
             app.addPlugin(Physics2DPlugin(gravity: [Float(gravity[0]), Float(gravity[1])]))
@@ -203,6 +209,9 @@ struct EditorAdaScriptProjectRuntimeView: View {
 struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
     let sceneModel: EditorSceneModel
     let assetsDirectory: URL
+    var sourceURL: URL? = nil
+    var recordsAchievement = true
+    var onInitialSceneLoaded: (@MainActor @Sendable (EditorSceneRuntimeLoadResult) -> Void)? = nil
 
     func setup(in app: borrowing AppWorlds) {
         guard let navigator = app.main.getResource(SceneNavigator.self) else {
@@ -225,13 +234,14 @@ struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
             }
         }
         let scene = Scene(name: sceneModel.scene.name)
-        let result = EditorSceneFileLoader.load(model: sceneModel, into: scene.world, resourceRootURL: assetsDirectory)
+        let result = EditorSceneFileLoader.load(model: sceneModel, into: scene.world, sourceURL: sourceURL, resourceRootURL: assetsDirectory)
         navigator.installInitialScene(scene, make: {
             let scene = Scene(name: sceneModel.scene.name)
-            _ = EditorSceneFileLoader.load(model: sceneModel, into: scene.world, resourceRootURL: assetsDirectory)
+            _ = EditorSceneFileLoader.load(model: sceneModel, into: scene.world, sourceURL: sourceURL, resourceRootURL: assetsDirectory)
             return scene
         })
-        if result.warnings.isEmpty {
+        onInitialSceneLoaded?(result)
+        if recordsAchievement, result.warnings.isEmpty {
             EditorAchievementBootstrap.center?.record(EditorAchievementRules.playedScene(sceneModel, adaScript: true))
         }
     }

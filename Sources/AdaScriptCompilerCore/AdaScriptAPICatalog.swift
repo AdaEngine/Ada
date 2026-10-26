@@ -7,6 +7,7 @@ public extension AdaScriptTypeEnvironment {
             members: standardMembers,
             values: [
                 "Assets": .named("Assets"),
+                "Identifiers": .named("Identifiers"),
                 "Math": .named("Math"),
                 "Saves": .named("Saves"),
                 "SpriteAnchor": .named("SpriteAnchorFactory"),
@@ -31,6 +32,7 @@ public extension AdaScriptTypeEnvironment {
     ]
 
     private static let standardMembers: [String: [String: AdaScriptMemberType]] = [
+        "Identifiers": members([method("uuid", parameters: [], returning: .string, detail: "uuid() -> String — fresh canonical lowercase UUID")]),
         "Sprite": shaderComponentMembers,
         "Mesh3DComponent": shaderComponentMembers,
         "$AdaShaderGraph": members([
@@ -276,7 +278,21 @@ public extension AdaScriptTypeEnvironment {
             method("available", parameters: [], returning: .bool, detail: "available() -> Bool — whether an optional multiplayer resource is bound"),
             method("send", parameters: [.any], returning: .void, detail: "send(command) — send a typed multiplayer command")
         ]),
+        "SaveResult": members([
+            method("isSuccess", parameters: [], returning: .bool, detail: "Whether the operation succeeded"),
+            method("exists", parameters: [], returning: .bool, detail: "Whether readAsync found a file; false for other operations"),
+            method("value", parameters: [], returning: .string, detail: "Operation payload; readAsync returns the UTF-8 contents"),
+            method("errorCode", parameters: [], returning: .string, detail: "Typed operation failure code"),
+            method("message", parameters: [], returning: .string, detail: "Operation failure description"),
+            method("committed", parameters: [], returning: .bool, detail: "Whether a write committed"),
+        ]),
         "Saves": members([
+            method(
+                "readAsync",
+                parameters: [.string],
+                returning: .named("SaveResult"),
+                detail: "readAsync(path) -> SaveResult — UTF-8, at most 4 MiB; missing files succeed with exists() == false"
+            ),
             method("begin", parameters: [.string], returning: .named("SaveWriter"), detail: "begin(path) -> SaveWriter"),
             method("writeAsync", parameters: [.string, .string], returning: .named("SaveResult"), detail: "writeAsync(path, text) -> SaveResult"),
         ]),

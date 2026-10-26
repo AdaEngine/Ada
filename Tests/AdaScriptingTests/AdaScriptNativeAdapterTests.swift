@@ -247,6 +247,22 @@ struct AdaScriptNativeAdapterTests {
         #expect(!child.isActive)
         #expect(scene.world.readComponentField(component: descriptor.componentID, entity: child.id, field: descriptor.fields[0]) == .double(12.5))
     }
+    @Test func identifiersAreStatelessNativeGlobals() throws {
+        let pointer = try #require(ada_native_hosts_get_module())
+        let module = unsafe try NativeModule(module: pointer)
+        let runtime = NativeAsyncRuntime(module: module)
+        guard case let .host(identifiers) = try #require(runtime.globals["Identifiers"]) else { Issue.record("Expected identifiers host"); return }
+        #expect(try identifiers.call("sleep", arguments: [.double(0)]) == nil)
+        #expect(try identifiers.call("uuid", arguments: [.integer(1)]) == nil)
+        let instance = try module.makeInstance(type: "HostProbe")
+        var values = Set<String>()
+        for _ in 0..<16 {
+            let result = try module.invoke(instance, method: "identifier", globals: runtime.globals)
+            guard case let .string(value) = result else { Issue.record("Expected native UUID"); return }
+            #expect(UUID(uuidString: value)?.uuidString.lowercased() == value)
+            #expect(values.insert(value).inserted)
+        }
+    }
 }
 private final class NativeScriptAsset: Asset, @unchecked Sendable {
     var assetMetaInfo: AssetMetaInfo?
@@ -255,5 +271,6 @@ private final class NativeScriptAsset: Asset, @unchecked Sendable {
     init(from decoder: any AssetDecoder) throws { value = try decoder.decode(String.self) }
     func encodeContents(with encoder: any AssetEncoder) throws { try encoder.encode(value) }
     static func extensions() -> [String] { ["nativeasset"] }
+
 }
 #endif

@@ -81,7 +81,7 @@ enum EditorScriptComponentCatalog {
                 continue
             }
             guard
-                let value = reflected(saved),
+                let value = reflected(saved, as: field.kind),
                 let updated = field.write(component, value) as? RuntimeComponentPayload
             else {
                 throw DecodingError.dataCorrupted(
@@ -91,6 +91,23 @@ enum EditorScriptComponentCatalog {
             component = updated
         }
         return component
+    }
+
+    private static func reflected(_ value: EditorSceneValue, as kind: ReflectedFieldKind) -> ReflectedFieldValue? {
+        switch kind {
+        case let .optional(wrapped):
+            if case .null = value { return .null }
+            return reflected(value, as: wrapped)
+        case .float:
+            // Scene encoders may spell integral floating-point values without a decimal point.
+            switch value {
+            case let .int(number): return .double(Double(number))
+            case let .uint(number): return .double(Double(number))
+            default: return reflected(value)
+            }
+        default:
+            return reflected(value)
+        }
     }
 
     private static func reflected(_ value: EditorSceneValue) -> ReflectedFieldValue? {

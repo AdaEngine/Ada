@@ -39,6 +39,7 @@ final class EditorGameWindowControls {
     @ObservationIgnored private weak var window: UIWindow?
     @ObservationIgnored private weak var appWorlds: AppWorlds?
     @ObservationIgnored private var scriptPlugin: AdaScriptPlugin?
+    @ObservationIgnored private var scriptableCatalog: AdaScriptObjectCatalog?
     @ObservationIgnored private var activeSources: [AdaScriptSource] = []
     @ObservationIgnored private var activeScriptableSchemas: [AdaScriptObjectSchema] = []
     @ObservationIgnored private weak var inspector: EditorInspectorSidebarViewModel?
@@ -64,9 +65,16 @@ final class EditorGameWindowControls {
         inspection.attach(world)
     }
 
-    func attach(app: AppWorlds, scriptPlugin: AdaScriptPlugin?, sources: [AdaScriptSource], scriptableSchemas: [AdaScriptObjectSchema]) {
+    func attach(
+        app: AppWorlds,
+        scriptPlugin: AdaScriptPlugin?,
+        sources: [AdaScriptSource],
+        scriptableSchemas: [AdaScriptObjectSchema],
+        scriptableCatalog: AdaScriptObjectCatalog? = nil
+    ) {
         appWorlds = app
         self.scriptPlugin = scriptPlugin
+        self.scriptableCatalog = scriptableCatalog
         activeSources = sources
         activeScriptableSchemas = scriptableSchemas
     }
@@ -91,7 +99,8 @@ final class EditorGameWindowControls {
         let scriptableObjects = activeScriptableSchemas.isEmpty ? nil : try AdaScriptObjectRegistration.prepareReload(
             schemas: activeScriptableSchemas,
             sources: sources,
-            moduleName: artifact.moduleName
+            moduleName: artifact.moduleName,
+            replacing: scriptableCatalog
         )
         try await scriptPlugin.reload(
             sources: sources,
@@ -139,6 +148,7 @@ final class EditorGameWindowControls {
     func finish() {
         appWorlds = nil
         scriptPlugin = nil
+        scriptableCatalog = nil
         activeSources = []
         activeScriptableSchemas = []
         inspector?.runtimeSelection = nil

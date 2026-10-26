@@ -38,7 +38,7 @@ final class EditorAgentSimulation {
         app.addPlugin(TransformPlugin())
         app.addPlugin(inputPlugin)
         app.addPlugin(EventsPlugin())
-        app.addPlugin(AssetsPlugin(assetDirectory: artifact.assetsDirectory))
+        app.addPlugin(AssetsPlugin(directories: try artifact.assetDirectories()))
         app.addPlugin(ScenePlugin(includesModel3D: false))
         app.addPlugin(ScriptableObjectPlugin())
         if artifact.plugins.contains(.physics2D) {

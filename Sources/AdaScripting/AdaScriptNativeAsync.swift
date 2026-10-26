@@ -47,6 +47,7 @@ final class NativeAsyncRuntime: NativeHostObject, @unchecked Sendable {
     private let module: NativeModule
     private let lock = NSLock()
     private let clock = NativeAsyncClock()
+    private let identifiers = NativeIdentifiersHost()
     private var tasks: [UInt: NativeTask] = [:]
     private var operations: [any NativePendingOperation] = []
     private var active = true
@@ -57,7 +58,7 @@ final class NativeAsyncRuntime: NativeHostObject, @unchecked Sendable {
     }
     deinit { cancelAll() }
     var globals: [String: NativeValue] {
-        ["Tasks": .host(self), "Time": .host(self), "__adaTaskFromOperation": .host(self)]
+        ["Tasks": .host(self), "Time": .host(self), "Identifiers": .host(identifiers), "__adaTaskFromOperation": .host(self)]
     }
     func advance(deltaTime: Double) {
         clock.advance(deltaTime)

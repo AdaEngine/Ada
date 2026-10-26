@@ -58,6 +58,17 @@ struct UIViewRepresentableInteractionTests {
         #expect(abs(matrix.y.y) == 80)
         #expect(clip == Rect(x: 240, y: 180, width: 120, height: 160))
     }
+
+    @Test func relativeMotionSurvivesRepresentableCoordinateConversion() {
+        let probe = InputProbeView()
+        let tester = ViewTester {
+            ProbeRepresentable(value: 0, existing: probe).frame(width: 100, height: 80).padding(30)
+        }.setSize(Size(width: 160, height: 140)).performLayout()
+        tester.containerView.onMouseEvent(MouseEvent(window: .empty, button: .none, motionDelta: [8, -4],
+            mousePosition: [45, 55], phase: .changed, modifierKeys: [], time: 0))
+        #expect(probe.lastPoint == [15, 25])
+        #expect(probe.lastMotion == [8, -4])
+    }
 }
 
 @MainActor
@@ -73,12 +84,14 @@ private struct ProbeRepresentable: UIViewRepresentable {
 private final class InputProbeView: UIView {
     var value = 0
     var lastPoint: Point?
+    var lastMotion: Vector2?
     var mouseCount = 0
     var keyCount = 0
     override var acceptsKeyboardFocus: Bool { true }
 
     override func onMouseEvent(_ event: MouseEvent) {
         lastPoint = event.mousePosition
+        lastMotion = event.motionDelta
         mouseCount += 1
     }
     override func onKeyEvent(_ event: KeyEvent) { keyCount += 1 }

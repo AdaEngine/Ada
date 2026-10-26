@@ -158,6 +158,7 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
 
         let runtimeBundle = try AdaScriptRuntimeCoordinator.lock.withLock {
             let virtualMachine = GravityVirtualMachine(settings: .init(), delegate: delegate)
+            try AdaScriptIdentifiers.bind(to: virtualMachine)
             let suspensionPolicy = AdaScriptSuspensionPolicy(scriptNonSendableTypes: module.nonSendableTypeNames)
             let taskRuntime = AdaScriptTaskRuntime.make(
                 virtualMachine: virtualMachine,

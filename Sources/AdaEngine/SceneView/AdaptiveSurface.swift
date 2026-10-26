@@ -153,6 +153,7 @@ final class AdaptiveSurfaceHost: UIView {
                     window: event.window,
                     button: event.button,
                     scrollDelta: event.scrollDelta,
+                    motionDelta: event.motionDelta,
                     mousePosition: previewPoint(from: event.mousePosition),
                     phase: event.phase,
                     modifierKeys: event.modifierKeys,

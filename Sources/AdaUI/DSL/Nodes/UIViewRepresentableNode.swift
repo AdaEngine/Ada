@@ -123,6 +123,7 @@ final class UIViewRepresentableNode<Representable: UIViewRepresentable>: ViewNod
                 window: event.window,
                 button: event.button,
                 scrollDelta: event.scrollDelta,
+                motionDelta: event.motionDelta,
                 mousePosition: event.mousePosition - origin,
                 phase: event.phase,
                 modifierKeys: event.modifierKeys,

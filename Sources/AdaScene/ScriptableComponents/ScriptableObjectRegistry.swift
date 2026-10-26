@@ -125,24 +125,27 @@ public enum ScriptableObjectRegistry {
     @MainActor
     public static func replaceScriptDescriptors(_ descriptors: [ScriptableObjectDescriptor]) throws {
         try lock.withLock {
+            let scope = AppWorldsExecutionContext.currentID.flatMap { id in
+                (unsafe descriptorsByScope[id]) == nil ? nil : id
+            }
+            var current = scope.flatMap { unsafe descriptorsByScope[$0] } ?? (unsafe descriptorsByName)
             for descriptor in descriptors {
-                guard let previous = unsafe descriptorsByName[descriptor.identifier],
+                guard let previous = current[descriptor.identifier],
                     previous.runtimeType == nil,
                     previous.aliases == descriptor.aliases,
                     previous.version == descriptor.version,
                     previous.declaredAccess == descriptor.declaredAccess,
                     previous.exportedFields == descriptor.exportedFields,
-                    previous.requiredComponents == descriptor.requiredComponents
-                else {
+                    previous.requiredComponents == descriptor.requiredComponents else {
                     throw ScriptableObjectCodingError.duplicateIdentifier(descriptor.identifier)
                 }
             }
             for descriptor in descriptors {
-                unsafe descriptorsByName[descriptor.identifier] = descriptor
-                for alias in descriptor.aliases {
-                    unsafe descriptorsByName[alias] = descriptor
-                }
+                current[descriptor.identifier] = descriptor
+                for alias in descriptor.aliases { current[alias] = descriptor }
             }
+            if let scope { unsafe descriptorsByScope[scope] = current }
+            else { unsafe descriptorsByName = current }
         }
     }
 

@@ -130,7 +130,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                     environment.imageBasedLighting?.asset.asset == nil ? 0 : 1,
                     max(0, environment.imageBasedLighting?.intensity ?? 1),
                     environment.imageBasedLighting?.rotation ?? 0,
-                    environment.imageBasedLighting?.asset.asset?.radiance == nil ? 0 : 1
+                    environment.skyboxUsesImageBasedLighting && environment.imageBasedLighting?.asset.asset?.radiance != nil ? 1 : 0
                 ),
                 quality: Vector4(
                     environment.ambientOcclusion.isEnabled ? 1 : 0,

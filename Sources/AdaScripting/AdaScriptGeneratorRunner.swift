@@ -29,6 +29,7 @@ enum AdaScriptGeneratorRunner {
         let delegate = AnnotatedGravityRuntimeDelegate(module: module, sourcesByPath: guarded)
         try AdaScriptRuntimeCoordinator.lock.withLock {
             let vm = GravityVirtualMachine(settings: .init(), delegate: delegate)
+            try AdaScriptIdentifiers.bind(to: vm)
             let budget = try AdaScriptCommunityBudget.install(in: vm, policy: policy)
             let prelude = try AdaScriptCommunityLowerer.instrument(source: AdaScriptStandardLibrary.communitySource + builderPrelude)
             try vm.bindClass(with: Bridge.self)

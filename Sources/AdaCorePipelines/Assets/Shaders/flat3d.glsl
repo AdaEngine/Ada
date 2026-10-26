@@ -73,6 +73,7 @@ struct VertexOut
 };
 
 layout (location = 0) out VertexOut Output;
+layout (location = 14) flat out float ModelOrientation;
 
 [[main]]
 void flat3d_vertex()
@@ -89,7 +90,9 @@ void flat3d_vertex()
 #endif
     mat4 model = mat4(a_Model0, a_Model1, a_Model2, a_Model3) * skinTransform();
     mat3 basis = mat3(model);
-    mat3 normalMatrix = abs(determinant(basis)) > 0.000001 ? transpose(inverse(basis)) : mat3(1.0);
+    float basisDeterminant = determinant(basis);
+    ModelOrientation = basisDeterminant < 0.0 ? -1.0 : 1.0;
+    mat3 normalMatrix = abs(basisDeterminant) > 0.000001 ? transpose(inverse(basis)) : mat3(1.0);
     vec3 normal = normalize(normalMatrix * localNormal);
     vec4 worldPosition = model * vec4(localPosition, 1.0);
     vec3 worldTangent = normalize(mat3(model) * localTangent);
@@ -97,7 +100,7 @@ void flat3d_vertex()
     Output.WorldPosition = worldPosition.xyz;
     Output.ViewPosition = (u_ViewMatrix * worldPosition).xyz;
     Output.ViewNormal = normalize(mat3(u_ViewMatrix) * normal);
-    Output.ViewTangent = vec4(normalize(mat3(u_ViewMatrix) * worldTangent), a_Tangent.w);
+    Output.ViewTangent = vec4(normalize(mat3(u_ViewMatrix) * worldTangent), a_Tangent.w * ModelOrientation);
     Output.TextureCoordinate = a_TextureCoordinate;
     Output.TextureCoordinate1 = a_TextureCoordinate1;
     Output.TextureFlags = a_TextureFlags;
@@ -227,6 +230,12 @@ struct VertexOut
 };
 
 layout (location = 0) in VertexOut Input;
+layout (location = 14) flat in float ModelOrientation;
+
+bool surfaceFrontFacing() {
+    // Reflection reverses raster winding, while inverse-transpose normals still face physically outward.
+    return ModelOrientation < 0.0 ? !gl_FrontFacing : gl_FrontFacing;
+}
 
 struct LocalLight3D {
     vec4 positionRange;
@@ -744,7 +753,7 @@ AdaPBRSurface ada_material_surface() {
     } else {
         normal = normalize(cotangentFrame(geometric, Input.ViewPosition, Input.TextureCoordinate) * tangentNormal);
     }
-    if (!gl_FrontFacing && u_SurfaceFlags.x > 0.5) { normal = -normal; }
+    if (!surfaceFrontFacing() && u_SurfaceFlags.x > 0.5) { normal = -normal; }
     return AdaPBRSurface(baseColor, normal, clamp(graph.roughness, 0.04, 1.0), clamp(graph.metallic, 0.0, 1.0), opacity,
         clamp(graph.occlusion, 0.0, 1.0), max(graph.emission, vec3(0.0)));
     #else
@@ -768,7 +777,7 @@ AdaPBRSurface ada_material_surface() {
     }
 
     vec3 normal = materialNormal();
-    if (!gl_FrontFacing && u_SurfaceFlags.x > 0.5) { normal = -normal; }
+    if (!surfaceFrontFacing() && u_SurfaceFlags.x > 0.5) { normal = -normal; }
     return AdaPBRSurface(baseColor, normal, roughness, metallic, opacity, 1.0, vec3(0.0));
     #endif
 }
@@ -778,7 +787,7 @@ void flat3d_fragment()
 {
     if (u_SurfaceFlags.z > 0.5) { g_ParallaxDelta = parallaxDelta(); }
     if (Input.ShadowFlags.w > 0.0 && visibilityDither(gl_FragCoord.xy) < Input.ShadowFlags.w) { discard; }
-    if (u_SurfaceFlags.x < 0.5 && !gl_FrontFacing) { discard; }
+    if (u_SurfaceFlags.x < 0.5 && !surfaceFrontFacing()) { discard; }
     AdaPBRSurface surface = ada_material_surface();
     vec4 baseColor = surface.baseColor;
     float opacity = surface.opacity;
@@ -826,7 +835,7 @@ void flat3d_fragment()
 
     g_Clearcoat = vec2(u_Coat.x, clamp(u_Coat.y, 0.04, 1.0));
     g_CoatNormal = normalize(Input.ViewNormal);
-    if (!gl_FrontFacing && u_SurfaceFlags.x > 0.5) { g_CoatNormal = -g_CoatNormal; }
+    if (!surfaceFrontFacing() && u_SurfaceFlags.x > 0.5) { g_CoatNormal = -g_CoatNormal; }
 #ifdef ADA_CLEARCOAT_TEXTURE
     g_Clearcoat.x *= texture(sampler2D(u_ClearcoatTexture, u_BaseColorSampler), layerUV(0)).r;
 #endif

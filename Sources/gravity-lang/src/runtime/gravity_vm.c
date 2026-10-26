@@ -258,7 +258,7 @@ static bool gravity_check_stack (gravity_vm *vm, gravity_fiber_t *fiber, uint32_
     // check stack size
 	uint32_t stack_size = (uint32_t)(fiber->stacktop - fiber->stack);
     uint32_t stack_needed = MAXNUM(stack_size, DEFAULT_MINSTACK_SIZE);
-    if (fiber->stackalloc >= stack_needed) return true;
+    if (fiber->stackalloc >= stack_needed) goto clear_stack;
     gravity_value_t *old_stack = fiber->stack;
 
     // perform stack reallocation (power_of2_ceil returns 0 if argument is bigger than 2^31)
@@ -286,7 +286,7 @@ static bool gravity_check_stack (gravity_vm *vm, gravity_fiber_t *fiber, uint32_
     STAT_STACK_REALLOCATED(vm);
 
     // check if reallocation moved the stack
-    if (fiber->stack == old_stack) return true;
+    if (fiber->stack == old_stack) goto clear_stack;
 
     // re-compute ptr offset
     ptrdiff_t offset = (ptrdiff_t)(fiber->stack - old_stack);
@@ -309,6 +309,13 @@ static bool gravity_check_stack (gravity_vm *vm, gravity_fiber_t *fiber, uint32_
     // stack is changed so update currently used stackstart
     *stackstart += offset;
 
+clear_stack:
+    // Slots above the previous top are no longer live and may reference objects
+    // reclaimed by an earlier collection. Clear them before exposing the new
+    // register window to GC, preserving the caller's registers and arguments.
+    for (gravity_value_t *slot = fiber->stacktop - stacktopdelta; slot < fiber->stacktop; ++slot) {
+        *slot = VALUE_FROM_NULL;
+    }
     return true;
 }
 

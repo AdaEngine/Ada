@@ -112,6 +112,9 @@ public struct ImageBasedLightingSettings: Codable, Sendable {
 @Component
 public struct Environment3D: Codable, Sendable {
     public var skybox: Skybox3D
+    /// Displays IBL radiance as the sky when available. False uses the skybox texture or procedural sky
+    /// while preserving the IBL asset and its contribution to material lighting.
+    public var skyboxUsesImageBasedLighting: Bool = true
     public var screenSpaceReflection: ScreenSpaceReflection
     public var imageBasedLighting: ImageBasedLightingSettings?
 
@@ -128,6 +131,41 @@ public struct Environment3D: Codable, Sendable {
     public var fog: Fog3D = Fog3D()
     /// Evaluate only the local lights that reach each screen tile. Disabling it falls back to the flat per-pixel loop.
     public var tiledLocalLights: Bool = true
+
+    /// Flat reflected atmosphere controls preserve the other nested environment settings.
+    public var skyZenithColor: Color {
+        get { skybox.zenithColor }
+        set { skybox.zenithColor = newValue }
+    }
+    public var skyHorizonColor: Color {
+        get { skybox.horizonColor }
+        set { skybox.horizonColor = newValue }
+    }
+    public var skyGroundColor: Color {
+        get { skybox.groundColor }
+        set { skybox.groundColor = newValue }
+    }
+    public var skyIntensity: Float {
+        get { skybox.intensity }
+        set { skybox.intensity = newValue }
+    }
+    public var starfieldEnabled: Bool {
+        get { skybox.starfield.isEnabled }
+        set { skybox.starfield.isEnabled = newValue }
+    }
+    public var starfieldIntensity: Float {
+        get { skybox.starfield.intensity }
+        set { skybox.starfield.intensity = newValue }
+    }
+    /// Linear IBL scaling. An absent IBL reads as zero; writing does not create or load one.
+    public var imageBasedLightingIntensity: Float {
+        get { imageBasedLighting?.intensity ?? 0 }
+        set { imageBasedLighting?.intensity = newValue }
+    }
+    public var fogColor: Color {
+        get { fog.color }
+        set { fog.color = newValue }
+    }
 
     /// Flat reflected controls for script and inspector access to render quality settings.
     public var shadowsEnabled: Bool {
@@ -255,13 +293,14 @@ public struct Environment3D: Codable, Sendable {
     }
 
     private enum CodingKeys: CodingKey {
-        case skybox, screenSpaceReflection, imageBasedLighting, shadows,
+        case skybox, skyboxUsesImageBasedLighting, screenSpaceReflection, imageBasedLighting, shadows,
              ambientOcclusion, antiAliasing, meshVisibility, localShadows, debugView, postProcess, fog, tiledLocalLights
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         skybox = try container.decodeIfPresent(Skybox3D.self, forKey: .skybox) ?? Skybox3D()
+        skyboxUsesImageBasedLighting = try container.decodeIfPresent(Bool.self, forKey: .skyboxUsesImageBasedLighting) ?? true
         screenSpaceReflection = try container.decodeIfPresent(ScreenSpaceReflection.self, forKey: .screenSpaceReflection) ?? ScreenSpaceReflection()
         imageBasedLighting = try container.decodeIfPresent(ImageBasedLightingSettings.self, forKey: .imageBasedLighting)
         shadows = try container.decodeIfPresent(ShadowSettings3D.self, forKey: .shadows) ?? ShadowSettings3D()

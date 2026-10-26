@@ -22,6 +22,9 @@ final class TextViewNode: ViewNode {
             self.layoutManager.setTextContainer(self.textContainer)
             self.drawLayoutManager.setTextContainer(self.textContainer)
             self.sizeCache = [:]
+            Self.recordLayoutMutationRequiringAncestorPass()
+            self.invalidateNearestLayer()
+            owner?.containerView?.setNeedsLayout()
         }
     }
 

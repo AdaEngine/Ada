@@ -280,4 +280,10 @@ struct GravityLanguageSemanticTests {
             }
         }
         """
+    @Test func identifierCompletionUsesTheRuntimeCatalog() {
+        let service = GravityLanguageService()
+        #expect(service.completions(text: "Ident", position: .init(line: 0, utf16Column: 5)).contains { $0.label == "Identifiers" })
+        let members = service.completions(text: "Identifiers.", position: .init(line: 0, utf16Column: 12))
+        #expect(members.contains { $0.label == "uuid" && $0.insertText == "uuid()" })
+    }
 }

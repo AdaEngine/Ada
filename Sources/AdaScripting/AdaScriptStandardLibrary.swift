@@ -11,6 +11,7 @@ enum AdaScriptStandardLibrary {
             .replacingOccurrences(of: "return System.exit(code);", with: "Fiber.abort(\"Process control is unavailable\");")
     }
     static let source = """
+    extern var Identifiers;
     // The VM's native print closure does not forward all arguments through apply().
     func print() {
         for (var value in _args) { System.put(value); }

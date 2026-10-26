@@ -51,7 +51,7 @@ public enum WindowCaptionAction: Sendable, Equatable {
 /// Base class using to manage windows in application. All created window should be registred there.
 /// Application has only one window manager per instance.
 @MainActor
-open class UIWindowManager {
+open class UIWindowManager: InputPointerDriver {
     public private(set) static var shared: UIWindowManager!
 
     /// Returns all windows registred in current process.
@@ -61,7 +61,34 @@ open class UIWindowManager {
     public private(set) var activeWindow: UIWindow?
 
     @_spi(Internal)
-    public var inputRef: Ref<Input>?
+    public var inputRef: Ref<Input>? {
+        didSet { inputRef?.wrappedValue.attachPointerDriver(self) }
+    }
+    private var pointerOwner: UUID?
+    private var pointerWindow: UIWindow.ID?
+
+    func pointerIsCaptured(in window: UIWindow.ID) -> Bool {
+        pointerWindow == window && pointerOwner != nil && getMouseMode() == .captured
+    }
+
+    public func requestMouseMode(_ mode: Input.MouseMode, owner: UUID, window: RID?) {
+        guard let window, window != .empty, activeWindow?.id == window else { return }
+        pointerOwner = owner
+        pointerWindow = window
+        setMouseMode(mode)
+    }
+
+    public func releaseMouseMode(owner: UUID) {
+        guard pointerOwner == owner else { return }
+        setMouseMode(.visible)
+        pointerOwner = nil
+        pointerWindow = nil
+    }
+
+    public func mouseMode(owner: UUID) -> Input.MouseMode {
+        guard pointerOwner == owner else { return .visible }
+        return getMouseMode()
+    }
 
     public init() {}
 
@@ -127,6 +154,7 @@ open class UIWindowManager {
         }
 
         window.isActive = false
+        if pointerWindow == window.id, let pointerOwner { releaseMouseMode(owner: pointerOwner) }
         self.activeWindow = nil
         ContextMenuPresentationCenter.dismissForDeactivation?(window)
         window.windowDidResignActive()
@@ -159,6 +187,7 @@ open class UIWindowManager {
     open func textInputFocusDidChange(_: Bool) {}
 
     public final func removeWindow(_ window: UIWindow, setActiveAnotherIfNeeded: Bool = true) {
+        if pointerWindow == window.id, let pointerOwner { releaseMouseMode(owner: pointerOwner) }
         guard let window = self.windows[window.id] else {
             assertionFailure("We don't have window in windows stack. That strange problem.")
             return
