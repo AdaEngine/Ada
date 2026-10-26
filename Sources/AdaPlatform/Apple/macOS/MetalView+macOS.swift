@@ -161,6 +161,7 @@
             let mouseEvent = MouseEvent(
                 window: self.windowID,
                 button: .left,
+                motionDelta: Vector2(x: Float(event.deltaX), y: Float(event.deltaY)),
                 mousePosition: position,
                 phase: .ended,
                 modifierKeys: KeyModifier(modifiers: event.modifierFlags),
@@ -197,6 +198,7 @@
             let mouseEvent = MouseEvent(
                 window: self.windowID,
                 button: .left,
+                motionDelta: Vector2(x: Float(event.deltaX), y: Float(event.deltaY)),
                 mousePosition: position,
                 phase: isContinious ? .changed : .began,
                 modifierKeys: KeyModifier(modifiers: event.modifierFlags),
@@ -219,6 +221,7 @@
             let mouseEvent = MouseEvent(
                 window: self.windowID,
                 button: .right,
+                motionDelta: Vector2(x: Float(event.deltaX), y: Float(event.deltaY)),
                 mousePosition: position,
                 phase: isContinious ? .changed : .began,
                 modifierKeys: KeyModifier(modifiers: event.modifierFlags),
@@ -235,6 +238,7 @@
             let mouseEvent = MouseEvent(
                 window: self.windowID,
                 button: .right,
+                motionDelta: Vector2(x: Float(event.deltaX), y: Float(event.deltaY)),
                 mousePosition: position,
                 phase: .ended,
                 modifierKeys: KeyModifier(modifiers: event.modifierFlags),
@@ -260,6 +264,7 @@
             let mouseEvent = MouseEvent(
                 window: self.windowID,
                 button: .middle,
+                motionDelta: Vector2(x: Float(event.deltaX), y: Float(event.deltaY)),
                 mousePosition: position,
                 phase: isContinuous ? .changed : .began,
                 modifierKeys: KeyModifier(modifiers: event.modifierFlags),
@@ -280,6 +285,7 @@
             let mouseEvent = MouseEvent(
                 window: self.windowID,
                 button: .middle,
+                motionDelta: Vector2(x: Float(event.deltaX), y: Float(event.deltaY)),
                 mousePosition: position,
                 phase: .ended,
                 modifierKeys: KeyModifier(modifiers: event.modifierFlags),
@@ -300,6 +306,7 @@
             let mouseEvent = MouseEvent(
                 window: self.windowID,
                 button: .middle,
+                motionDelta: Vector2(x: Float(event.deltaX), y: Float(event.deltaY)),
                 mousePosition: position,
                 phase: .changed,
                 modifierKeys: KeyModifier(modifiers: event.modifierFlags),
@@ -317,6 +324,7 @@
             let event = MouseEvent(
                 window: self.windowID,
                 button: .none,
+                motionDelta: Vector2(x: Float(event.deltaX), y: Float(event.deltaY)),
                 mousePosition: position,
                 phase: .changed,
                 modifierKeys: KeyModifier(modifiers: event.modifierFlags),
@@ -332,6 +340,7 @@
             let event = MouseEvent(
                 window: self.windowID,
                 button: .left,
+                motionDelta: Vector2(x: Float(event.deltaX), y: Float(event.deltaY)),
                 mousePosition: position,
                 phase: .changed,
                 modifierKeys: KeyModifier(modifiers: event.modifierFlags),
@@ -347,6 +356,7 @@
             let event = MouseEvent(
                 window: self.windowID,
                 button: .right,
+                motionDelta: Vector2(x: Float(event.deltaX), y: Float(event.deltaY)),
                 mousePosition: position,
                 phase: .changed,
                 modifierKeys: KeyModifier(modifiers: event.modifierFlags),

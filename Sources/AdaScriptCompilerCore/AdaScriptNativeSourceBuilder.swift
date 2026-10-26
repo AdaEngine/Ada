@@ -36,7 +36,7 @@ public enum AdaScriptNativeSourceBuilder {
                 )
             )
         }
-        let globals = ["Assets", "multiplayer", "__adaAssets", "__adaComponentFactory", "__adaNetworkFactory", "Tasks", "Time", "__adaTaskFromOperation"]
+        let globals = ["Identifiers", "Assets", "multiplayer", "__adaAssets", "__adaComponentFactory", "__adaNetworkFactory", "Tasks", "Time", "__adaTaskFromOperation"]
         var declared = Set<String>()
         for source in prepared {
             var lexer = Lexer(source: source.source)

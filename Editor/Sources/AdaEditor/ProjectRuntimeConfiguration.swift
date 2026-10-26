@@ -28,6 +28,7 @@ public struct AdaProjectRuntimePluginID: Codable, Equatable, Hashable, RawRepres
     public static let mesh2D = Self(rawValue: "mesh2d")
     public static let multiplayer = Self(rawValue: "multiplayer")
     public static let model3D = Self(rawValue: "model3d")
+    public static let navigation3D = Self(rawValue: "navigation3d")
     public static let physics2D = Self(rawValue: "physics2d")
     public static let physics3D = Self(rawValue: "physics3d")
     public static let sprite = Self(rawValue: "sprite")
@@ -36,7 +37,7 @@ public struct AdaProjectRuntimePluginID: Codable, Equatable, Hashable, RawRepres
 
     public static let knownValues: Set<Self> = [
         .audio, .core2D, .core3D, .light2D, .mesh2D, .model3D,
-        .multiplayer, .physics2D, .physics3D, .sprite, .tilemap, .upscale,
+        .multiplayer, .navigation3D, .physics2D, .physics3D, .sprite, .tilemap, .upscale,
     ]
 }
 

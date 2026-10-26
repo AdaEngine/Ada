@@ -31,6 +31,7 @@ layout (location = 1) out vec2 v_UV1;
 layout (location = 2) out float v_Alpha;
 layout (location = 3) out vec4 v_TileBounds;
 layout (location = 4) out float v_Fade;
+layout (location = 5) flat out float v_ModelOrientation;
 layout (location = 5) in vec4 a_Model0;
 layout (location = 6) in vec4 a_Model1;
 layout (location = 7) in vec4 a_Model2;
@@ -49,6 +50,7 @@ void directional_shadow_3d_vertex()
     applyMorphPosition(localPosition);
 #endif
     mat4 model = mat4(a_Model0, a_Model1, a_Model2, a_Model3) * skinTransform();
+    v_ModelOrientation = determinant(mat3(model)) < 0.0 ? -1.0 : 1.0;
     v_Fade = a_ShadowFlags.w;
     v_TileBounds = u_TileBounds;
     v_UV0 = a_TextureCoordinate;
@@ -66,6 +68,7 @@ layout (location = 1) in vec2 v_UV1;
 layout (location = 2) in float v_Alpha;
 layout (location = 3) in vec4 v_TileBounds;
 layout (location = 4) in float v_Fade;
+layout (location = 5) flat in float v_ModelOrientation;
 layout (binding = 4) uniform texture2D u_BaseColorTexture;
 layout (binding = 7) uniform sampler u_BaseColorSampler;
 layout (binding = 15) uniform PBR3DUniform {
@@ -89,7 +92,8 @@ void directional_shadow_3d_fragment()
         const float values[16] = float[](0.0,8.0,2.0,10.0,12.0,4.0,14.0,6.0,3.0,11.0,1.0,9.0,15.0,7.0,13.0,5.0);
         if ((values[y * 4 + x] + 0.5) / 16.0 < v_Fade) { discard; }
     }
-    if (u_SurfaceFlags.x < 0.5 && !gl_FrontFacing) { discard; }
+    bool frontFacing = v_ModelOrientation < 0.0 ? !gl_FrontFacing : gl_FrontFacing;
+    if (u_SurfaceFlags.x < 0.5 && !frontFacing) { discard; }
     if (u_SurfaceProperties.w > 0.5 && u_SurfaceProperties.w < 1.5) {
         #ifdef ADA_SHADER_GRAPH
         AdaGraphSurface graph = ada_graph_evaluate(v_UV0);

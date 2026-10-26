@@ -5,10 +5,28 @@ import Math
 /// Use on a root entity without `PhysicsBody3DComponent`; visual scale does not resize the capsule.
 /// The controller collides with physics bodies, ignores sensors, and does not push dynamic bodies
 /// or register a body that other character controllers can collide with.
+/// Supported walking automatically steps over solid ledges up to 5% of the resolved height,
+/// provided the full capsule can sweep up, forward, and down to a walkable landing.
 @Component
 public struct CharacterController3DComponent: Codable, Sendable {
     public let radius: Float
-    public let height: Float
+    /// Actual resolved capsule height. Runtime requests never move the feet to make room.
+    public internal(set) var height: Float
+    /// Height requested for the next fixed move. Must have finite geometry dimensions and be at least twice the radius.
+    /// Shrinking is immediate; growth waits for solid-body clearance and retries while requested.
+    /// Invalid requests retain the previous valid target, so nonfinite commands cannot enter saved state.
+    public var requestedHeight: Float {
+        didSet {
+            guard requestedHeight.isFinite, (requestedHeight * requestedHeight).isFinite, requestedHeight >= radius * 2 else {
+                requestedHeight = oldValue
+                heightChangeBlocked = true
+                return
+            }
+            if requestedHeight != oldValue || requestedHeight == height { heightChangeBlocked = false }
+        }
+    }
+    /// The most recent request was invalid or could not fit. Sensors do not block resizing.
+    public internal(set) var heightChangeBlocked: Bool = false
 
     /// Requested world-space horizontal velocity. The Y component is ignored.
     public var desiredVelocity: Vector3 = .zero
@@ -36,16 +54,18 @@ public struct CharacterController3DComponent: Codable, Sendable {
     public init(radius: Float = 0.4, height: Float = 1.8) {
         self.radius = radius.isFinite && radius > 0 ? radius : 0.4
         self.height = height.isFinite ? max(height, self.radius * 2) : max(1.8, self.radius * 2)
+        self.requestedHeight = self.height
     }
 
     private enum CodingKeys: CodingKey {
-        case radius, height, acceleration, deceleration, jumpSpeed, maximumFallSpeed, minimumGroundNormalY, groundSnapDistance
+        case radius, height, requestedHeight, acceleration, deceleration, jumpSpeed, maximumFallSpeed, minimumGroundNormalY, groundSnapDistance
     }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         self.init(radius: try values.decodeIfPresent(Float.self, forKey: .radius) ?? 0.4,
                   height: try values.decodeIfPresent(Float.self, forKey: .height) ?? 1.8)
+        requestedHeight = try values.decodeIfPresent(Float.self, forKey: .requestedHeight) ?? height
         acceleration = try values.decodeIfPresent(Float.self, forKey: .acceleration) ?? 14
         deceleration = try values.decodeIfPresent(Float.self, forKey: .deceleration) ?? 20
         jumpSpeed = try values.decodeIfPresent(Float.self, forKey: .jumpSpeed) ?? 5

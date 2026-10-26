@@ -193,7 +193,7 @@ struct EditorStudioToolsTests {
             source: """
                 @tool(id: "readonly", permissions: ["editor.documents.read"])
                 class ReadOnly {
-                    func activate(editor) { editor.addPanel("panel", "Panel", "right", "Panel.ui"); }
+                    func activate(editor) { assert(Identifiers.uuid().length == 36); editor.addPanel("panel", "Panel", "right", "Panel.ui"); }
                     func edit(editor) { editor.createEntity("Denied", 0.0, 0.0); }
                 }
                 """

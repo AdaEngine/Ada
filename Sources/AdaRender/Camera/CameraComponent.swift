@@ -85,6 +85,20 @@ public struct Camera: Sendable {
     /// Base projection in camera
     public var projection: Projection = .orthographic(OrthographicProjection())
 
+    /// Vertical perspective field of view, in degrees. Returns zero for other
+    /// projections; writes to them are ignored. Finite values clamp to 1...179.
+    public var fieldOfViewDegrees: Float {
+        get {
+            guard case let .perspective(value) = projection else { return 0 }
+            return value.fieldOfView.degrees
+        }
+        set {
+            guard newValue.isFinite, case var .perspective(value) = projection else { return }
+            value.fieldOfView = .degrees(min(max(newValue, 1), 179))
+            projection = .perspective(value)
+        }
+    }
+
     /// Physical viewport (logicalViewport * scale)
     public var viewport: Viewport = Viewport()
 

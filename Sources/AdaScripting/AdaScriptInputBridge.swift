@@ -23,6 +23,8 @@ final class AdaScriptInputBridge: @unchecked Sendable, AdaScriptNonSendableBridg
     /// Pointer coordinates in the active window; zero after this callback's lease expires.
     var mouseX: Double { Double(snapshot?.getMousePosition().x ?? 0) }
     var mouseY: Double { Double(snapshot?.getMousePosition().y ?? 0) }
+    var mouseDeltaX: Double { Double(snapshot?.getMouseDelta().x ?? 0) }
+    var mouseDeltaY: Double { Double(snapshot?.getMouseDelta().y ?? 0) }
 
     @GSExportableIgnore
     func invalidate() { snapshot = nil }

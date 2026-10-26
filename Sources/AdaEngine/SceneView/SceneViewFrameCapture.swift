@@ -3,7 +3,7 @@
 //  AdaEngine
 //
 
-import AdaApp
+@_spi(Internal) import AdaApp
 import AdaECS
 @_spi(Internal) import AdaInput
 @_spi(Internal) import AdaRender
@@ -86,6 +86,13 @@ public final class SceneViewFrameSource {
 
     /// The scene world the frames are rendered from.
     public var world: World? { coordinator?.appWorlds?.main }
+
+    /// Runs inspection with the source game's runtime-service scope, including scriptable factories.
+    public func withWorldExecutionContext<Result>(_ operation: (World) throws -> Result) rethrows -> Result? {
+        guard let app = coordinator?.appWorlds else { return nil }
+        return try app.withExecutionContext { try operation(app.main) }
+    }
+
 
     /// Active cameras with their entity identifiers.
     public var activeCameras: [(id: Int, name: String)] {

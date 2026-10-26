@@ -41,6 +41,8 @@ public struct Physics3DPlugin: Plugin {
         PhysicsBody3DInitialized.registerComponent()
         CharacterController3DComponent.registerComponent()
         CameraCollision3DComponent.registerComponent()
+        Raycast3DComponent.registerComponent()
+        OverlapBox3DComponent.registerComponent()
         app.addSystem(CameraCollision3DSystem.self, on: .postUpdate)
 
         if app.getResource(PhysicsDebugOptions.self) == nil {
@@ -61,6 +63,8 @@ public struct Physics3DPlugin: Plugin {
             .addSystem(Physics3DUpdateSystem.self, on: .physicsStep)
             .addSystem(Physics3DWritebackSystem.self, on: .physicsWriteback)
             .addSystem(CharacterController3DSystem.self, on: .physicsWriteback)
+            .addSystem(Raycast3DSystem.self, on: .physicsWriteback)
+            .addSystem(OverlapBox3DSystem.self, on: .physicsWriteback)
 
         guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else {
             return

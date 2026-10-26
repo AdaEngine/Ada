@@ -50,4 +50,10 @@ struct AdaScriptNativeSourceTests {
         #expect(prepared[1].source.contains("@rpc(id: \"test.move\") func Move(source, amount)"))
         #expect(prepared[1].source.contains("__adaNetworkFactory.makeNamed(\"Move\", [27])"))
     }
+    @Test func identifierGlobalIsPreparedForNativeCompilation() throws {
+        let sources = [AdaScriptCompilerSource(path: "ID.ada", source: "func make() { return Identifiers.uuid(); }")]
+        let prepared = try AdaScriptNativeSourceBuilder.prepare(sources: sources, constructors: [:])
+        #expect(prepared[0].source.contains("extern var Identifiers;"))
+        #expect(!AdaScriptNativeSourceBuilder.requiresInterpretedRuntime(sources: sources))
+    }
 }

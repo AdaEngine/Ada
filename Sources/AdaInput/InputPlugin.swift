@@ -23,6 +23,7 @@ public struct InputPlugin: Plugin {
     }
 
     public func setup(in app: AppWorlds) {
+        MouseCaptureComponent.registerComponent()
         #if canImport(Darwin)
             let appleGameControllerManager = AppleGameControllerManager()
             controllerEngine = appleGameControllerManager
@@ -51,9 +52,11 @@ public struct InputPlugin: Plugin {
             .addSystem(InputStartupSystem.self, on: .startup)
             .addSystem(InputEventParseSystem.self, on: .preUpdate)
             .addSystem(InputEventsCleanupSystem.self, on: .postUpdate)
+            .addSystem(MouseCaptureSystem.self, on: .postUpdate)
     }
 
-    public func destroy(for _: borrowing AppWorlds) {
+    public func destroy(for app: borrowing AppWorlds) {
+        app.main.getResource(Input.self)?.releasePointerCapture()
         controllerEngine?.stopMonitoring()
     }
 }
@@ -70,6 +73,7 @@ public struct InputEventParseSystem {
     @MainActor
     public func update(context _: UpdateContext) {
         input.beginActionFrame()
+        input.mouseDelta = .zero
         input.flushPendingEvents()
         for event in input.eventsPool {
             switch event {
@@ -84,6 +88,16 @@ public struct InputEventParseSystem {
                     input.keyEvents.remove(keyEvent.keyCode)
                 }
             case let mouseEvent as MouseEvent:
+                if mouseEvent.button != .scrollWheel, mouseEvent.phase == .changed {
+                    let previous = input.pointerLocations[.mouse(window: mouseEvent.window)]
+                    if let delta = mouseEvent.motionDelta {
+                        if delta.x.isFinite && delta.y.isFinite { input.mouseDelta += delta }
+                    } else if let previous {
+                        let delta = mouseEvent.mousePosition - previous
+                        if delta.x.isFinite && delta.y.isFinite { input.mouseDelta += delta }
+                    }
+                }
+                input.mouseWindow = mouseEvent.window
                 input.pointerLocations[.mouse(window: mouseEvent.window)] = mouseEvent.mousePosition
                 input.mouseEvents[mouseEvent.button] = mouseEvent
                 if mouseEvent.button == .scrollWheel, mouseEvent.scrollDelta.y != 0 {

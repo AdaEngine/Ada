@@ -1173,6 +1173,17 @@ extension URL {
     }
 }
 
+public enum ProjectDirectoriesError: Error, LocalizedError, Sendable {
+    case invalidStorageIdentifier(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case let .invalidStorageIdentifier(value):
+            "Invalid application storage identifier '\(value)'. Use 1...200 ASCII letters, digits, dots, hyphens or underscores, excluding '.' and '..'."
+        }
+    }
+}
+
 public struct ProjectDirectories: Sendable {
     /// Source directory is a directory where we store all source code for the project.
     public let source: URL
@@ -1215,6 +1226,27 @@ public struct ProjectDirectories: Sendable {
 
     public var packageDirectory: URL {
         source
+    }
+
+    /// Keeps persistent and cache roots stable across project moves and exported resource bundles.
+    public init(source: URL, assetsDirectory: URL, storageIdentifier: String, restrictToVirtualRoots: Bool = false) throws(ProjectDirectoriesError) {
+        try Self.validateStorageIdentifier(storageIdentifier)
+        self.init(
+            source: source, assetsDirectory: assetsDirectory,
+            userDataDirectory: Self.defaultDirectory(for: .applicationSupportDirectory, namespace: storageIdentifier, fallbackRoot: source.appendingPathComponent(".ada/user")),
+            cacheDirectory: Self.defaultDirectory(for: .cachesDirectory, namespace: storageIdentifier, fallbackRoot: source.appendingPathComponent(".ada/cache")),
+            restrictToVirtualRoots: restrictToVirtualRoots
+        )
+    }
+
+    /// Validates one portable directory component without touching the filesystem.
+    public static func validateStorageIdentifier(_ identifier: String) throws(ProjectDirectoriesError) {
+        let allowed = identifier.utf8.allSatisfy { byte in
+            (65...90).contains(byte) || (97...122).contains(byte) || (48...57).contains(byte) || [45, 46, 95].contains(byte)
+        }
+        guard !identifier.isEmpty, identifier.utf8.count <= 200, identifier != ".", identifier != "..", allowed else {
+            throw .invalidStorageIdentifier(identifier)
+        }
     }
 
     private static func defaultDirectory(

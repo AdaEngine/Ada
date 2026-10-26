@@ -16,6 +16,7 @@ struct EditorAdaScriptProjectBuildReport: Equatable, Sendable {
 
 struct EditorAdaScriptProjectBuildArtifact: Sendable {
     let assetsDirectory: URL
+    let storageIdentifier: String?
     let entry: AdaProjectRuntimeEntry
     let moduleName: String
     let plugins: EditorAdaScriptResolvedRuntimePlugins
@@ -24,6 +25,14 @@ struct EditorAdaScriptProjectBuildArtifact: Sendable {
     let scenePlayRuntime: EditorScenePlayRuntime
     let sources: [AdaScriptSource]
     let window: AdaProjectRuntimeWindow
+
+    func assetDirectories() throws -> ProjectDirectories {
+        let source = assetsDirectory.deletingLastPathComponent()
+        if let storageIdentifier {
+            return try ProjectDirectories(source: source, assetsDirectory: assetsDirectory, storageIdentifier: storageIdentifier)
+        }
+        return ProjectDirectories(source: source, assetsDirectory: assetsDirectory)
+    }
 }
 
 enum EditorAdaScriptProjectBuildError: Error, Equatable, LocalizedError, Sendable {
@@ -82,6 +91,7 @@ struct EditorAdaScriptProjectBuilder {
         guard project.runtime.entry.view == nil else {
             throw EditorAdaScriptProjectBuildError.uiViewsUnavailable
         }
+        let storageIdentifier = try EditorProjectStorageIdentity.resolve(project)
 
         let sourceRoot = project.paths.sources ?? "Sources"
         let sources =
@@ -137,6 +147,7 @@ struct EditorAdaScriptProjectBuilder {
         let assetsPath = project.paths.assets ?? "Assets"
         return EditorAdaScriptProjectBuildArtifact(
             assetsDirectory: projectURL.appendingPathComponent(assetsPath, isDirectory: true),
+            storageIdentifier: storageIdentifier,
             entry: preparedEntry.entry,
             moduleName: project.runtime.moduleName,
             plugins: plugins,
@@ -247,6 +258,21 @@ struct EditorAdaScriptProjectBuilder {
             return file.lastPathComponent
         }
         return filePath.dropFirst(rootPath.count).joined(separator: "/")
+    }
+}
+
+enum EditorProjectStorageIdentity {
+    static func resolve(_ project: AdaProject, nativeFallback: Bool = false) throws -> String? {
+        for explicit in [project.project.bundleIdentifier, project.project.id].compactMap({ $0 }) {
+            try ProjectDirectories.validateStorageIdentifier(explicit)
+        }
+        if let identifier = project.project.bundleIdentifier ?? project.project.id { return identifier }
+        guard nativeFallback, let name = project.project.name, !name.isEmpty else { return nil }
+        if (try? ProjectDirectories.validateStorageIdentifier(name)) != nil { return name }
+        // Legacy display names may contain spaces or slashes; do not turn them into path components.
+        var hash: UInt64 = 14695981039346656037
+        for byte in name.utf8 { hash = (hash ^ UInt64(byte)) &* 1099511628211 }
+        return "project-" + String(hash, radix: 16)
     }
 }
 

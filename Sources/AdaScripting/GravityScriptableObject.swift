@@ -51,10 +51,19 @@ public struct AdaScriptObjectBinding: Equatable, Sendable {
 /// Prepared per-game factories and diagnostics; compilation does not register global aliases.
 @MainActor
 public final class AdaScriptObjectCatalog {
-    public let descriptors: [ScriptableObjectDescriptor]
-    private let runtime: GravityScriptableModuleRuntime?
+    public private(set) var descriptors: [ScriptableObjectDescriptor]
+    private var runtime: GravityScriptableModuleRuntime?
 
     public var diagnostics: [String] { AdaScriptRuntimeCoordinator.lock.withLock { runtime?.diagnostics ?? [] } }
+
+    // The reload candidate advances this owner only after rebinding the running world.
+    // swiftlint:disable:next strict_fileprivate
+    fileprivate func replaceGeneration(descriptors: [ScriptableObjectDescriptor], runtime: GravityScriptableModuleRuntime) {
+        AdaScriptRuntimeCoordinator.lock.withLock {
+            self.descriptors = descriptors
+            self.runtime = runtime
+        }
+    }
 
     public init(schemas: [AdaScriptObjectSchema], sources: [AdaScriptSource], communityPolicy: AdaScriptCommunityPolicy? = nil) throws {
         guard !schemas.isEmpty else { runtime = nil; descriptors = []; return }
@@ -76,16 +85,19 @@ public final class AdaScriptObjectCatalog {
 
 public enum AdaScriptObjectRegistration {
     /// Compiles replacement scriptable objects without touching the running world.
+    /// Pass the running catalog to advance its factories and diagnostics only after activation succeeds.
     @MainActor
     public static func prepareReload(
         schemas: [AdaScriptObjectSchema],
         sources: [AdaScriptSource],
-        moduleName: String
+        moduleName: String,
+        replacing catalog: AdaScriptObjectCatalog? = nil
     ) throws -> AdaScriptObjectReloadCandidate {
         try AdaScriptObjectReloadCandidate(
             schemas: schemas,
             sources: sources,
-            moduleName: moduleName
+            moduleName: moduleName,
+            replacing: catalog
         )
     }
 
@@ -133,11 +145,20 @@ public enum AdaScriptObjectRegistration {
 public final class AdaScriptObjectReloadCandidate {
     private let definitions: [String: GravityScriptableDefinition]
     private let descriptors: [ScriptableObjectDescriptor]
+    private let runtime: GravityScriptableModuleRuntime
+    private let catalogToReplace: AdaScriptObjectCatalog?
 
     // Shared with the registration factory in this file only.
     // swiftlint:disable:next strict_fileprivate
-    fileprivate init(schemas: [AdaScriptObjectSchema], sources: [AdaScriptSource], moduleName _: String) throws {
+    fileprivate init(
+        schemas: [AdaScriptObjectSchema],
+        sources: [AdaScriptSource],
+        moduleName _: String,
+        replacing catalog: AdaScriptObjectCatalog?
+    ) throws {
         let runtime = try GravityScriptableModuleRuntime(sources: sources, schemas: schemas)
+        self.runtime = runtime
+        self.catalogToReplace = catalog
         let definitions = try schemas.map { try GravityScriptableDefinition(schema: $0, runtime: runtime) }
         self.definitions = Dictionary(uniqueKeysWithValues: definitions.map { ($0.schema.identifier, $0) })
         self.descriptors = definitions.map { definition in
@@ -174,6 +195,7 @@ public final class AdaScriptObjectReloadCandidate {
                 object.replaceDefinition(definition)
             }
         }
+        catalogToReplace?.replaceGeneration(descriptors: descriptors, runtime: runtime)
     }
 }
 
@@ -322,6 +344,7 @@ private final class GravityScriptableObject: ScriptableObject, @unchecked Sendab
     // swiftlint:disable:next strict_fileprivate
     fileprivate var definition: GravityScriptableDefinition
     private var instanceID: Foundation.UUID?
+    private var initializationFailed = false
     private var payload: [String: ReflectedFieldValue]
 
     @MainActor
@@ -391,12 +414,13 @@ private final class GravityScriptableObject: ScriptableObject, @unchecked Sendab
 
     override func encode(to encoder: Encoder) throws {
         if let instanceID {
-            payload = definition.runtime.snapshot(instanceID: instanceID, fields: definition.schema.fields.keys)
+            payload.merge(definition.runtime.snapshot(instanceID: instanceID, fields: definition.schema.fields.keys)) { _, updated in updated }
         }
         try GravityScriptablePayload.encode(payload, to: encoder)
     }
 
     override func ready(context: ScriptableObjectContext) {
+        guard !initializationFailed else { return }
         do {
             try definition.validateRequiredBindings(context: context)
             let instanceID = try definition.runtime.instantiate(
@@ -412,11 +436,13 @@ private final class GravityScriptableObject: ScriptableObject, @unchecked Sendab
             )
             refreshPayload()
         } catch {
+            initializationFailed = true
             definition.runtime.report("Unable to start \(definition.schema.identifier): \(error)")
         }
     }
 
     override func update(context: ScriptableObjectContext) {
+        guard !initializationFailed else { return }
         if instanceID == nil { ready(context: context) }
         call(method: "update", context: context)
     }
@@ -471,7 +497,7 @@ private final class GravityScriptableObject: ScriptableObject, @unchecked Sendab
         guard let instanceID else {
             return
         }
-        payload = definition.runtime.snapshot(instanceID: instanceID, fields: definition.schema.fields.keys)
+        payload.merge(definition.runtime.snapshot(instanceID: instanceID, fields: definition.schema.fields.keys)) { _, updated in updated }
     }
 
     @MainActor
@@ -483,6 +509,7 @@ private final class GravityScriptableObject: ScriptableObject, @unchecked Sendab
             self.instanceID = nil
         }
         definition = next
+        initializationFailed = false
     }
 }
 
@@ -523,6 +550,49 @@ private final class GravityScriptableLifecycleContext: @unchecked Sendable, AdaS
     }
 }
 
+/// Allows shared world modules to compile without granting a synchronous callback an async owner.
+private enum GravityScriptableAsyncBoundary {
+    static let source = """
+    func __adaScriptableAsyncUnavailable() {
+        Fiber.abort("Async tasks require a world-owned @system; scriptable callbacks cannot start or resume them.");
+    }
+    class __AdaTask {
+        var fiber = null;
+        var value = null;
+        var done = false;
+        var cancelled = false;
+        var started = false;
+        var operation = null;
+        // Async lowering constructs this before creating the Fiber or executing authored code.
+        func init() { __adaScriptableAsyncUnavailable(); }
+        func capture(values) { __adaScriptableAsyncUnavailable(); }
+        func complete(value) { __adaScriptableAsyncUnavailable(); }
+        func resume() { __adaScriptableAsyncUnavailable(); }
+        func cancel() { __adaScriptableAsyncUnavailable(); }
+        func status() { __adaScriptableAsyncUnavailable(); }
+        func isComplete() { __adaScriptableAsyncUnavailable(); }
+        func didFail() { __adaScriptableAsyncUnavailable(); }
+        func nativeOperation() { __adaScriptableAsyncUnavailable(); }
+    }
+    func __adaAwait(task) { __adaScriptableAsyncUnavailable(); }
+    func __adaTaskFromOperation(operation) { __adaScriptableAsyncUnavailable(); }
+    class Tasks {
+        static func start(task) { __adaScriptableAsyncUnavailable(); }
+        static func promise() { __adaScriptableAsyncUnavailable(); }
+        static func nextFrame() { __adaScriptableAsyncUnavailable(); }
+    }
+    class Time {
+        static func sleep(seconds) { __adaScriptableAsyncUnavailable(); }
+        static func sleepRealTime(seconds) { __adaScriptableAsyncUnavailable(); }
+    }
+    class Saves {
+        static func begin(path) { __adaScriptableAsyncUnavailable(); }
+        static func readAsync(path) { __adaScriptableAsyncUnavailable(); }
+        static func writeAsync(path, text) { __adaScriptableAsyncUnavailable(); }
+    }
+    """
+}
+
 private final class GravityScriptableModuleRuntime: @unchecked Sendable {
     private enum LifecycleCallback: String, CaseIterable {
         case ready
@@ -543,6 +613,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
     private let virtualMachine: GravityVirtualMachine
     private var classNamesByInstance: [Foundation.UUID: String] = [:]
     private var instances: [Foundation.UUID: GSValue] = [:]
+    private var hasFailed = false
 
     private let communityBudget: AdaScriptCommunityBudget?
     var diagnostics: [String] { delegate.errors }
@@ -603,6 +674,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         let delegate = AnnotatedGravityRuntimeDelegate(module: module, sourcesByPath: guarded)
         self.delegate = delegate
         let virtualMachine = GravityVirtualMachine(settings: .init(), delegate: delegate)
+        try AdaScriptIdentifiers.bind(to: virtualMachine)
         self.virtualMachine = virtualMachine
         self.communityBudget = try communityPolicy.map { try AdaScriptCommunityBudget.install(in: virtualMachine, policy: $0) }
 
@@ -648,6 +720,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
             .sorted()
         let generatedSource = (factories + getters).joined(separator: "\n")
         let runtimeSource = (communityPolicy == nil ? "" : "extern var __adaUGCBudget;\n") + (communityPolicy == nil ? AdaScriptStandardLibrary.source : AdaScriptStandardLibrary.communitySource) + "\n"
+                + GravityScriptableAsyncBoundary.source + "\n"
                 + AdaScriptComponentRuntime.prelude(constructors: componentConstructors, authoredSource: module.combinedSource)
                 + AdaScriptNetworkBridge.prelude(commands: networkCommands)
                 + module.entrySource
@@ -672,30 +745,39 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
     func instantiate(className: String, payload: [String: ReflectedFieldValue]) throws -> Foundation.UUID {
         try AdaScriptRuntimeCoordinator.lock.withLock {
             if communityBudget != nil, !delegate.errors.isEmpty { throw AdaScriptError.compilation(delegate.errors) }
+            guard !hasFailed else { throw AdaScriptError.invalidManifest("The scriptable module is quarantined until reload.") }
             communityBudget?.reset()
             guard let factoryName = factoryNamesByClass[className] else {
                 throw AdaScriptError.invalidManifest("Missing @scriptable factory for '\(className)'")
             }
             // Each construction starts a fresh synchronous call stack; live instances remain rooted in globals.
             virtualMachine.reset()
+            let diagnosticStart = delegate.errors.count
             let factory = virtualMachine.getValue(forKey: factoryName)
             guard
                 factory.isClosure,
                 let instance = factory.callConstructor(with: []),
                 instance.isInstance
             else {
-                throw AdaScriptError.invalidManifest("Unable to instantiate @scriptable class '\(className)': \(delegate.errors.last ?? "no VM diagnostic")")
+                hasFailed = true
+                throw AdaScriptError.invalidManifest("Unable to instantiate @scriptable class '\(className)': \(delegate.errors.dropFirst(diagnosticStart).last ?? "no VM diagnostic")")
             }
             let identifier = Foundation.UUID()
             // A Swift GSValue is not a VM GC root. Keep live script instances in the
             // VM global table until detach; otherwise allocation-heavy UI bindings
             // can collect an instance while its Swift handle remains alive.
-            virtualMachine.setValue(instance, forKey: "__ada_live_script_" + identifier.uuidString)
-            for (name, value) in payload {
-                _ = instance.setStoredProperty(
-                    named: name,
-                    to: AnnotatedGravityValueBridge.makeGravityValue(value, virtualMachine: virtualMachine)
-                )
+            // Publishing the instance and storing converted payloads both allocate lookup keys.
+            // Protect this native insertion window after the user factory has returned normally.
+            do {
+                virtualMachine.setGCEnabled(false)
+                defer { virtualMachine.setGCEnabled(true) }
+                virtualMachine.setValue(instance, forKey: "__ada_live_script_" + identifier.uuidString)
+                for (name, value) in payload {
+                    _ = instance.setStoredProperty(
+                        named: name,
+                        to: AnnotatedGravityValueBridge.makeGravityValue(value, virtualMachine: virtualMachine)
+                    )
+                }
             }
             instances[identifier] = instance
             classNamesByInstance[identifier] = className
@@ -712,7 +794,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         AdaScriptRuntimeCoordinator.lock.withLock {
             if communityBudget != nil, !delegate.errors.isEmpty { return }
             communityBudget?.reset()
-            guard let instance = instances[instanceID], instance.hasMethod(named: method) else {
+            guard !hasFailed, let instance = instances[instanceID], instance.hasMethod(named: method) else {
                 return
             }
             let graphLease = AnnotatedGravityQueryLease()
@@ -725,10 +807,11 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
             )
             if let communityBudget { lifecycleContext.world.commands.restrictCommunitySpawns { communityBudget.permitSpawn() } }
             defer { lifecycleContext.world.invalidate() }
-            _ = instance.callMethod(
-                named: method,
-                with: [lifecycleContext]
-            )
+            let diagnosticStart = delegate.errors.count
+            _ = instance.callMethod(named: method, with: [lifecycleContext])
+            if delegate.errors.count > diagnosticStart {
+                hasFailed = true
+            }
         }
     }
 
@@ -741,7 +824,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         AdaScriptRuntimeCoordinator.lock.withLock {
             if communityBudget != nil, !delegate.errors.isEmpty { return }
             communityBudget?.reset()
-            guard let instance = instances[instanceID], instance.hasMethod(named: "event") else {
+            guard !hasFailed, let instance = instances[instanceID], instance.hasMethod(named: "event") else {
                 return
             }
             let graphLease = AnnotatedGravityQueryLease()
@@ -754,10 +837,11 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
             )
             if let communityBudget { lifecycleContext.world.commands.restrictCommunitySpawns { communityBudget.permitSpawn() } }
             defer { lifecycleContext.world.invalidate() }
-            _ = instance.callMethod(
-                named: "event",
-                with: [events, lifecycleContext]
-            )
+            let diagnosticStart = delegate.errors.count
+            _ = instance.callMethod(named: "event", with: [events, lifecycleContext])
+            if delegate.errors.count > diagnosticStart {
+                hasFailed = true
+            }
         }
     }
 
@@ -768,7 +852,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         AdaScriptRuntimeCoordinator.lock.withLock {
             if communityBudget != nil, !delegate.errors.isEmpty { return [:] }
             communityBudget?.reset()
-            guard let instance = instances[instanceID] else {
+            guard !hasFailed, let instance = instances[instanceID] else {
                 return [:]
             }
             guard
@@ -778,6 +862,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
                 return [:]
             }
             return fields.reduce(into: [:]) { result, field in
+                guard !hasFailed else { return }
                 guard let getterName = getterNames[field] else {
                     return
                 }
@@ -787,6 +872,8 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
                     let value = getter.callConstructor(with: [instance]),
                     let converted = AnnotatedGravityValueBridge.makeReflectedFieldValue(value)
                 else {
+                    hasFailed = true
+                    report("Unable to read exported field '\(className).\(field)'; the scriptable module is quarantined until reload.")
                     return
                 }
                 result[field] = converted
@@ -804,13 +891,30 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
 
     func write(instanceID: Foundation.UUID, field: String, value: ReflectedFieldValue) -> Bool {
         AdaScriptRuntimeCoordinator.lock.withLock {
-            guard let instance = instances[instanceID] else {
+            guard !hasFailed else {
+                let firstDiagnostic = delegate.errors.first.map { String($0.prefix(500)) } ?? "No VM diagnostic"
+                let message = "Exported field write refused [quarantined]: \(field); \(firstDiagnostic)"
+                // Retain the first failure rather than implying the UI value has the wrong type.
+                // Repeated edits must not grow the diagnostic list or repeat the same log.
+                if !delegate.errors.contains(message) { report(message) }
                 return false
             }
-            return instance.setStoredProperty(
+            guard let instance = instances[instanceID] else {
+                Logger(label: "org.adaengine.AdaScript").error("Exported field write refused [missing-instance]: \(field)")
+                return false
+            }
+            // Keep the converted UI value alive across the allocating stored-property lookup.
+            virtualMachine.setGCEnabled(false)
+            defer { virtualMachine.setGCEnabled(true) }
+            let written = instance.setStoredProperty(
                 named: field,
                 to: AnnotatedGravityValueBridge.makeGravityValue(value, virtualMachine: virtualMachine)
             )
+            if !written {
+                let reason = instance.isInstance ? "missing-stored-property" : "invalid-instance-value"
+                Logger(label: "org.adaengine.AdaScript").error("Exported field write refused [\(reason)]: \(field)")
+            }
+            return written
         }
     }
 
@@ -820,6 +924,11 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         context: ScriptableObjectContext,
         graphLease: AnnotatedGravityQueryLease
     ) -> [AdaScriptInputBridge] {
+        // As in system binding, Swift-held bridge values are not VM GC roots yet.
+        // Property lookup may allocate a key before setStoredProperty roots them.
+        // Keep only this native binding window protected; user callbacks collect normally.
+        virtualMachine.setGCEnabled(false)
+        defer { virtualMachine.setGCEnabled(true) }
         var inputBindings: [AdaScriptInputBridge] = []
         for binding in bindings {
             let propertyName: String

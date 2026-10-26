@@ -12,6 +12,7 @@
     @_spi(Internal) import AdaUI
     import AdaUtils
     import AppKit
+    import CoreGraphics
     import Math
 
     final class MacOSWindowManager: UIWindowManager {
@@ -292,6 +293,7 @@
 
         private var currentShape: Input.CursorShape = .arrow
         private var mouseMode: Input.MouseMode = .visible
+        private var ownsCursorHide = false
         private var cursors: [Input.CursorShape: (NSCursor, Texture2D, Vector2)] = [:]
 
         override func setCursorShape(_ shape: Input.CursorShape) {
@@ -424,20 +426,22 @@
                 return
             }
 
-            self.mouseMode = mode
-
-            switch mode {
-            case .captured:
-                break
-            case .visible:
-                NSCursor.unhide()
-            case .hidden:
-                NSCursor.hide()
-            case .confinedHidden:
-                break
-            case .confined:
-                break
+            guard mode != .confined && mode != .confinedHidden else { return }
+            let capturing = mode == .captured
+            if capturing {
+                guard let window = activeWindow?.systemWindow as? NSWindow, window.isKeyWindow else { return }
+                // Freeze the click position: a SceneView can occupy only part of
+                // its native window, whose center may belong to another panel.
+                guard CGAssociateMouseAndMouseCursorPosition(0) == .success else { return }
+            } else if self.mouseMode == .captured {
+                _ = CGAssociateMouseAndMouseCursorPosition(1)
             }
+            let hidden = capturing || mode == .hidden
+            if hidden != ownsCursorHide {
+                if hidden { NSCursor.hide() } else { NSCursor.unhide() }
+                ownsCursorHide = hidden
+            }
+            self.mouseMode = mode
         }
 
         override func getMouseMode() -> Input.MouseMode {

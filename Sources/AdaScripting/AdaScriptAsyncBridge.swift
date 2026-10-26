@@ -20,18 +20,24 @@ final class AdaScriptAsyncResult: @unchecked Sendable, AdaScriptSuspensionSafeBr
     @GSExportableIgnore
     private var didCommit = false
 
+    @GSExportableIgnore
+    private var didExist = false
+
     func isSuccess() -> Bool { successful }
     func value() -> String { output }
     func errorCode() -> String { code }
     func message() -> String { detail }
     func committed() -> Bool { didCommit }
+    /// Whether readAsync found a file; false for missing files and other operations.
+    func exists() -> Bool { didExist }
 
     @GSExportableIgnore
-    static func success(_ value: String = "", committed: Bool = false) -> AdaScriptAsyncResult {
+    static func success(_ value: String = "", committed: Bool = false, exists: Bool = false) -> AdaScriptAsyncResult {
         let result = AdaScriptAsyncResult()
         result.successful = true
         result.output = value
         result.didCommit = committed
+        result.didExist = exists
         return result
     }
 
@@ -206,6 +212,61 @@ final class AdaScriptAsyncHost: @unchecked Sendable {
         #endif
     }
 
+    /// Reads at most 4 MiB of UTF-8 from the current @user:// or @cache:// root.
+    /// Missing files succeed with exists() == false; empty files exist with an empty value().
+    func readText(_ path: String) -> AdaScriptAsyncOperation {
+        let operation = AdaScriptAsyncOperation()
+        operation.onCompletion = onWake
+        #if WASM
+            operation.complete(.failure("unsupportedOperation", message: "Background file reads are unavailable in the current WebAssembly filesystem"))
+            return operation
+        #else
+        // Capture the scoped canonical URL before the worker runs or another world enters the VM.
+        guard let url = readableURL(for: path) else {
+            operation.complete(.failure("invalidPath", message: "Save path must remain within a writable virtual root"))
+            return operation
+        }
+        let task = Task {
+            do {
+                try Task.checkCancellation()
+                let attributes = try url.resourceValues(forKeys: [.isRegularFileKey])
+                guard attributes.isRegularFile == true else {
+                    operation.complete(.failure("readFailed", message: "Save path is not a regular file"))
+                    return
+                }
+                let handle = try FileHandle(forReadingFrom: url)
+                defer { try? handle.close() }
+                let limit = 4 * 1_024 * 1_024
+                var data = Data()
+                while data.count <= limit {
+                    try Task.checkCancellation()
+                    let chunk = try handle.read(upToCount: min(65_536, limit + 1 - data.count)) ?? Data()
+                    if chunk.isEmpty { break }
+                    data.append(chunk)
+                }
+                try Task.checkCancellation()
+                guard data.count <= limit else {
+                    operation.complete(.failure("fileTooLarge", message: "Save reads are limited to 4 MiB"))
+                    return
+                }
+                guard let text = String(data: data, encoding: .utf8) else {
+                    operation.complete(.failure("invalidUTF8", message: "Save contents are not valid UTF-8"))
+                    return
+                }
+                operation.complete(.success(text, exists: true))
+            } catch is CancellationError {
+                operation.complete(.failure("cancelled", message: "Save read was cancelled"))
+            } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+                operation.complete(.success())
+            } catch {
+                operation.complete(.failure("readFailed", message: error.localizedDescription))
+            }
+        }
+        operation.installCancellationAction { task.cancel() }
+        return operation
+        #endif
+    }
+
     func beginSave(_ path: String) -> AdaScriptSaveWriter {
         let writer: AdaScriptSaveWriter
         #if WASM
@@ -248,6 +309,21 @@ final class AdaScriptAsyncHost: @unchecked Sendable {
             return nil
         }
         return url
+    }
+
+    @GSExportableIgnore
+    private func readableURL(for path: String) -> URL? {
+        guard let url = writableURL(for: path) else {
+            return nil
+        }
+        let virtualRoot = path.hasPrefix("@user://") ? "@user://" : "@cache://"
+        let root = AssetsManager.resolveAssetURL(at: virtualRoot).resolvingSymlinksInPath().standardizedFileURL
+        let resolved = url.resolvingSymlinksInPath().standardizedFileURL
+        // Unlike replacement writes, reads follow the final file link as well as directory links.
+        guard resolved.path.hasPrefix(root.path + "/") else {
+            return nil
+        }
+        return resolved
     }
 
     @GSExportableIgnore

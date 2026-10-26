@@ -14,6 +14,8 @@ public struct Navigation3DPlugin: Plugin {
 
     public func setup(in app: AppWorlds) {
         AssetsManager.registerAssetType(NavigationMeshAsset.self)
+        NavigationMap3DSource.registerComponent()
+        app.addSystem(NavigationMap3DSourceSystem.self, on: .preUpdate)
         RuntimeTypeRegistry.registerComponent(
             NavigationAgent3DComponent.self,
             names: ["NavigationAgent3DComponent", String(reflecting: NavigationAgent3DComponent.self)],
@@ -31,7 +33,7 @@ public struct Navigation3DPlugin: Plugin {
 
 /// Runtime route state; replace the follower's path after a new navigation query.
 @Component
-public struct NavigationAgent3DComponent: Sendable {
+public struct NavigationAgent3DComponent: Codable, Sendable {
     public var follower: NavigationPathFollower
     public internal(set) var lastError: NavigationError?
     /// Minimum interval between retries for a blocked or unreachable target.
@@ -64,6 +66,27 @@ public struct NavigationAgent3DComponent: Sendable {
     @AdaScriptInit
     public init(follower: NavigationPathFollower = NavigationPathFollower()) {
         self.follower = follower
+    }
+}
+
+extension NavigationAgent3DComponent {
+    private enum CodingKeys: CodingKey { case maximumSpeed, arrivalTolerance, repathInterval, targetRepathDistance }
+
+    public init(from decoder: any Decoder) throws {
+        self.init()
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        maximumSpeed = try values.decodeIfPresent(Float.self, forKey: .maximumSpeed) ?? maximumSpeed
+        arrivalTolerance = try values.decodeIfPresent(Float.self, forKey: .arrivalTolerance) ?? arrivalTolerance
+        repathInterval = try values.decodeIfPresent(Float.self, forKey: .repathInterval) ?? repathInterval
+        targetRepathDistance = try values.decodeIfPresent(Float.self, forKey: .targetRepathDistance) ?? targetRepathDistance
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(maximumSpeed, forKey: .maximumSpeed)
+        try values.encode(arrivalTolerance, forKey: .arrivalTolerance)
+        try values.encode(repathInterval, forKey: .repathInterval)
+        try values.encode(targetRepathDistance, forKey: .targetRepathDistance)
     }
 }
 

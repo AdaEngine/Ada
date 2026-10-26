@@ -94,4 +94,84 @@ struct EditorScriptComponentCatalogTests {
         #expect(world.getRuntimeComponent(runtimeID, from: a)?.values.first == .int(7))
         #expect(world.getRuntimeComponent(runtimeID, from: b)?.values[2] == .string("moving"))
     }
+
+    @Test("Integer JSON numbers instantiate floating-point scene fields")
+    @MainActor
+    func integralNumbersLoadFloatingPointFields() throws {
+        try withNumericComponents { components in
+            try assertNumericScene(Self.numericScene, components: components)
+            let inventory = try #require(components.first { $0.schema.id == "test.inventory" })
+            for invalid: EditorSceneValue in [.bool(true), .string("5"), .double(.nan), .double(.infinity)] {
+                #expect(throws: DecodingError.self) {
+                    try EditorScriptComponentCatalog.decode(["mass": invalid], as: inventory.runtime)
+                }
+            }
+        }
+    }
+
+    @Test("Save and reopen preserve runtime fields through YAML and canonical JSON")
+    @MainActor
+    func numericSceneSaveReopen() throws {
+        try withNumericComponents { components in
+            var model = try EditorSceneModel.decode(from: Self.numericScene)
+            model.entities[0].components["test.health"]?["current"] = .double(100)
+            model.entities[0].components["test.inventory"]?["mass"] = .double(5)
+            model.entities[0].components["test.extraction"]?["closeAt"] = .double(1080)
+            model.entities[0].components["test.extraction"]?["holdSeconds"] = .double(8)
+            let yaml = try model.encodedYAML()
+            let json = String(decoding: try JSONEncoder().encode(model), as: UTF8.self)
+            let canonical = try EditorSceneModel.decode(from: json)
+            #expect(canonical.entities[0].components["test.extraction"]?["closeAt"] == .int(1080))
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("EditorNumericScene-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            for (index, content) in [yaml, json].enumerated() {
+                let file = root.appendingPathComponent("Reopened-\(index).ascn")
+                try content.write(to: file, atomically: true, encoding: .utf8)
+                try assertNumericScene(String(contentsOf: file, encoding: .utf8), components: components)
+            }
+        }
+    }
+
+    private static let numericScene = """
+        {"format":"ada.scene","schemaVersion":1,"scene":{"id":"numbers","name":"Numbers"},"entities":[
+            {"id":"survivor","name":"Survivor","enabled":true,"components":{
+                "test.health":{"current":100},"test.inventory":{"mass":5},
+                "test.extraction":{"closeAt":1080,"holdSeconds":8}
+            }}
+        ]}
+        """
+
+    @MainActor
+    private func withNumericComponents(_ operation: ([EditorScriptDataComponent]) throws -> Void) throws {
+        let sources = [AdaScriptCompilerSource(path: "NumericComponents.ada", source: """
+            @component(id: "test.health")
+            struct Health { @export var current = 100.0; }
+            @component(id: "test.inventory")
+            struct Inventory { @export var mass = 0.0; }
+            @component(id: "test.extraction")
+            struct Extraction { @export var closeAt = 1080.0; @export var holdSeconds = 8.0; }
+            """)]
+        let components = EditorScriptComponentCatalog.makeComponents(from: try AdaScriptSchemaParser.parse(sources: sources))
+        let store = EditorScriptComponentStore.shared
+        let previous = store.components
+        store.replace(with: components)
+        defer { store.replace(with: previous) }
+        try operation(components)
+    }
+
+    @MainActor
+    private func assertNumericScene(_ content: String, components: [EditorScriptDataComponent]) throws {
+        let world = World(name: "Numeric scene roundtrip")
+        let result = EditorSceneFileLoader.load(content: content, into: world, loadsScriptableObjects: false)
+        #expect(result.warnings.isEmpty, "\(result.warnings)")
+        let entity = try #require(result.entitiesByEditorID["survivor"])
+        for (id, key, expected) in [("test.health", "current", 100.0), ("test.inventory", "mass", 5.0),
+                                    ("test.extraction", "closeAt", 1080.0), ("test.extraction", "holdSeconds", 8.0)] {
+            let descriptor = try #require(components.first { $0.schema.id == id }?.runtime)
+            let payload = try #require(world.getRuntimeComponent(descriptor.componentID, from: entity))
+            let field = try #require(descriptor.fields.first { $0.key == key })
+            #expect(field.read(payload) == .double(expected))
+        }
+    }
 }

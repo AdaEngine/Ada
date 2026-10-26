@@ -181,6 +181,7 @@ enum GravityBuiltins {
             GravityCompletionCandidate(detail: "AdaScript task scheduler", insertText: "Tasks", kind: .class, label: "Tasks", sortText: "18"),
             GravityCompletionCandidate(detail: "AdaScript timers", insertText: "Time", kind: .class, label: "Time", sortText: "18"),
             GravityCompletionCandidate(detail: "Background save operations", insertText: "Saves", kind: .class, label: "Saves", sortText: "18"),
+            GravityCompletionCandidate(detail: "Host-generated UUIDs", insertText: "Identifiers", kind: .class, label: "Identifiers", sortText: "18"),
             GravityCompletionCandidate(
                 detail: "Three-dimensional vector",
                 insertText: "Vector3(0, 0, 0)",

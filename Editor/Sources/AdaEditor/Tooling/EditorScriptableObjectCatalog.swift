@@ -1,3 +1,4 @@
+@_spi(Internal) import AdaApp
 import AdaEngine
 import AdaScriptCompilerCore
 import Foundation
@@ -50,6 +51,12 @@ struct EditorScenePlayRuntime: Sendable {
             sources: sources,
             moduleName: moduleName
         )
+    }
+
+    @MainActor
+    func makeScriptableCatalog() throws -> AdaScriptObjectCatalog {
+        EditorScriptComponentStore.shared.replace(with: EditorScriptComponentCatalog.makeComponents(from: try AdaScriptSchemaParser.parse(sources: sources)))
+        return try AdaScriptObjectCatalog(schemas: schemas, sources: sources)
     }
 
     func makeScriptPlugin() throws -> AdaScriptPlugin? {
@@ -178,4 +185,31 @@ enum EditorScriptableObjectCatalogLoader {
             )
         )
     }
+}
+
+/// Each game owns its scriptable VM and factories; stopping it removes only its scope.
+struct EditorProjectScriptObjectsPlugin: Plugin {
+    let catalog: AdaScriptObjectCatalog
+
+    @MainActor
+    func setup(in app: borrowing AppWorlds) {
+        do {
+            try ScriptableObjectRegistry.install(catalog.descriptors, in: app.executionID)
+            app.main.insertResource(EditorProjectScriptObjectsScope(id: app.executionID))
+            app.withExecutionContext { ScriptableObjectPlugin().setup(in: app) }
+        } catch {
+            RuntimeLogStore.shared.append(level: "error", label: "AdaScript", message: error.localizedDescription)
+        }
+    }
+
+    func destroy(for app: borrowing AppWorlds) { ScriptableObjectRegistry.removeScope(app.executionID) }
+}
+
+/// World storage owns the scope even when the embedded host releases it without calling Plugin.destroy.
+private final class EditorProjectScriptObjectsScope: Resource, Sendable {
+    private let id: UUID
+
+    init(id: UUID) { self.id = id }
+
+    deinit { ScriptableObjectRegistry.removeScope(id) }
 }

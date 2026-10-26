@@ -165,7 +165,10 @@
                                     DEBUG_VM_RAW("******\tEXEC %s (%p) ******\n", func->identifier, func)
 
 #define USE_ARGS(_c)                (_c->f->tag == EXEC_TYPE_NATIVE && _c->f->useargs)
-#define PUSH_FRAME(_c,_s,_r,_n)     gravity_callframe_t *cframe = gravity_new_callframe(vm, fiber);                 \
+// A native getter/constructor can be selected after the original call's stack check.
+#define PUSH_FRAME(_c,_s,_r,_n)     uint32_t frame_stackdelta = (uint32_t)MAXNUM((_s) + FN_COUNTREG(_c->f, _n) - fiber->stacktop, 0); \
+                                    if (!gravity_check_stack(vm, fiber, frame_stackdelta, &stackstart)) return false; \
+                                    gravity_callframe_t *cframe = gravity_new_callframe(vm, fiber);                 \
                                     if (!cframe) return false;                                                      \
                                     cframe->closure = _c;                                                           \
                                     cframe->stackstart = _s;                                                        \

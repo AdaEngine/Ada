@@ -191,6 +191,18 @@ struct OffscreenViewportTests {
         #expect(event.time == 1)
     }
 
+    @Test func relativeMotionSurvivesViewportCoordinateConversion() throws {
+        let delegate = MockViewportDelegate()
+        let tester = ViewTester {
+            OffscreenViewportView(delegate: delegate).padding(20)
+        }.setSize(Size(width: 400, height: 300)).performLayout()
+        tester.containerView.onMouseEvent(MouseEvent(window: RID(), button: .none, motionDelta: [12, -7],
+            mousePosition: [100, 80], phase: .changed, modifierKeys: [], time: 0))
+        let event = try #require(delegate.receivedInputEvents.first as? MouseEvent)
+        #expect(event.mousePosition == [80, 60])
+        #expect(event.motionDelta == [12, -7])
+    }
+
     @Test
     func containerCreatesDelegate_onlyOnce() {
         var factoryCallCount = 0

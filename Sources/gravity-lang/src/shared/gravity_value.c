@@ -1381,9 +1381,13 @@ gravity_fiber_t *gravity_fiber_new (gravity_vm *vm, gravity_closure_t *closure, 
     fiber->caller = NULL;
     fiber->result = VALUE_FROM_NULL;
 
+    // The initial function can write locals before its first CALL. Its complete
+    // register window must already be active when that call checks the stack.
+    uint32_t nregisters = closure ? FN_COUNTREG(closure->f, 0) : 0;
+    if (nstack < nregisters) nstack = nregisters;
     if (nstack < DEFAULT_MINSTACK_SIZE) nstack = DEFAULT_MINSTACK_SIZE;
     fiber->stack = (gravity_value_t *)mem_alloc(NULL, sizeof(gravity_value_t) * nstack);
-    fiber->stacktop = fiber->stack;
+    fiber->stacktop = fiber->stack + nregisters;
     fiber->stackalloc = nstack;
 
     if (nframes < DEFAULT_MINCFRAME_SIZE) nframes = DEFAULT_MINCFRAME_SIZE;
@@ -1448,6 +1452,12 @@ void gravity_fiber_reassign (gravity_fiber_t *fiber, gravity_closure_t *closure,
             fiber->stacktop += offset;
             frame->stackstart += offset; // frame 0 stackstart is always at the base
         }
+    }
+
+    // An outer call reuses the fiber after its previous frame stopped being a
+    // GC root. Initialize its new window before the caller installs arguments.
+    for (gravity_value_t *slot = fiber->stacktop - FN_COUNTREG(closure->f, nargs); slot < fiber->stacktop; ++slot) {
+        *slot = VALUE_FROM_NULL;
     }
 }
 

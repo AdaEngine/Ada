@@ -1,4 +1,4 @@
-import AdaApp
+@_spi(Internal) import AdaApp
 @_spi(Scripting) import AdaECS
 import AdaInput
 import AdaMultiplayer
@@ -209,7 +209,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             let prepared = try candidate.plans.map { plan in
                 try (plan, Self.prepare(plan, pluginIdentifier: name, world: app.main))
             }
-            try scriptableObjects?.activate(in: app.main)
+            try app.withExecutionContext { try scriptableObjects?.activate(in: app.main) }
             for scheduler in Set(plans.map(\.scheduler)) {
                 app.main.schedulers.removeSystem(AnnotatedGravityScriptSystem.self, for: scheduler)
             }
@@ -1110,6 +1110,7 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         defer { AdaScriptRuntimeCoordinator.lock.unlock() }
 
         let virtualMachine = GravityVirtualMachine(settings: .init(), delegate: delegate)
+        try AdaScriptIdentifiers.bind(to: virtualMachine)
         self.virtualMachine = virtualMachine
         if let communityPolicy {
             self.communityBudget = try AdaScriptCommunityBudget.install(in: virtualMachine, policy: communityPolicy)

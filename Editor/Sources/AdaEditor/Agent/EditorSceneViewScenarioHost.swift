@@ -26,6 +26,7 @@ final class EditorSceneViewScenarioHost: EditorPlayScenarioHost {
         self.logSource = logSource
         self.stopHook = stopHook
         self.diagnosticsProvider = diagnostics
+        self.pointer = source.world?.getResource(Input.self)?.getMousePosition() ?? .zero
         RuntimeLogStore.shared.setEnabled(true)
         self.logCursor = RuntimeLogStore.shared.read(after: Int.max, limit: 1).nextCursor
     }
@@ -112,8 +113,12 @@ final class EditorSceneViewScenarioHost: EditorPlayScenarioHost {
             source.movePointer(to: pointer)
             source.send(MouseEvent(window: window, button: button, mousePosition: pointer, phase: down ? .began : .ended, modifierKeys: [], time: now))
         case let .pointer(x, y):
-            pointer = Point(x, y)
+            let next = Point(x, y)
+            let delta = next - pointer
+            pointer = next
             source.movePointer(to: pointer)
+            source.send(MouseEvent(window: window, button: .none, motionDelta: delta,
+                mousePosition: pointer, phase: .changed, modifierKeys: [], time: now))
         }
     }
 
@@ -129,9 +134,10 @@ final class EditorSceneViewScenarioHost: EditorPlayScenarioHost {
     }
 
     func snapshot(watch: EditorPlayScenario.Watch) -> [String: Any] {
-        guard let world = source.world else {
-            return ["error": "The game world is gone; the game stopped."]
-        }
+        source.withWorldExecutionContext { world in snapshot(watch: watch, in: world) } ?? ["error": "The game world is gone; the game stopped."]
+    }
+
+    private func snapshot(watch: EditorPlayScenario.Watch, in world: World) -> [String: Any] {
         let all = world.getEntities().filter { $0.name != "SceneView_Camera" }
         var chosen: [Entity] = []
         var missing: [String] = []
@@ -147,13 +153,9 @@ final class EditorSceneViewScenarioHost: EditorPlayScenarioHost {
         }
         let wanted = Set(watch.components.map { $0.lowercased() })
         let entities = chosen.map { entity -> [String: Any] in
-            var components: [String: String] = [:]
-            for entry in world.getComponents(for: entity.id) {
-                let name = entry.typeName.split(separator: ".").last.map(String.init) ?? entry.typeName
-                if !wanted.isEmpty, !wanted.contains(name.lowercased()) { continue }
-                components[name] = EditorPlayInspectionModel.summary(of: entry.component, typeName: entry.typeName)
-            }
-            var value: [String: Any] = ["id": entity.id, "name": entity.name, "active": entity.isActive, "components": components]
+            let captured = EditorScenarioComponentSnapshot.read(in: world, entity: entity.id, matching: wanted)
+            var value: [String: Any] = ["id": entity.id, "name": entity.name, "active": entity.isActive,
+                "components": captured.summaries, "componentFields": captured.fields]
             // AdaScript `@export` fields are the readable script state (score, phase, ...).
             let scripts = (world.get(ScriptableComponents.self, from: entity.id)?.scripts ?? []).map { script -> [String: Any] in
                 let descriptor = ScriptableObjectRegistry.descriptor(for: script)

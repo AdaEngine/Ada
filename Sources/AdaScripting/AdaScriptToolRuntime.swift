@@ -75,6 +75,7 @@ public final class AdaScriptToolRuntime {
         self.bridge = bridge
         let bundle = try AdaScriptRuntimeCoordinator.lock.withLock {
             let vm = GravityVirtualMachine(settings: .init(), delegate: delegate)
+            try AdaScriptIdentifiers.bind(to: vm)
             let budget = try AdaScriptCommunityBudget.install(in: vm, policy: .init(maximumCheckpoints: 20_000, maximumCallbackSeconds: 0.05))
             try vm.bindClass(with: AdaScriptToolBridge.self)
             let getters = schema.fields.enumerated().map { index, field in

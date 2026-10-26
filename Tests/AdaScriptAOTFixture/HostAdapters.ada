@@ -1,4 +1,5 @@
 extern var Assets;
+extern var Identifiers;
 extern var multiplayer;
 @component(id: "aot.host.position")
 struct HostPosition { @export var value = 5.0; }
@@ -30,6 +31,7 @@ class HostSystem {
     }
 }
 class HostProbe {
+    func identifier() { return Identifiers.uuid(); }
     func load(context) { return Assets.loadTyped("NativeScriptAsset", "@res://probe.nativeasset"); }
     func save(context) {
         var asset: NativeScriptAsset = Assets.preload("@res://probe.nativeasset");

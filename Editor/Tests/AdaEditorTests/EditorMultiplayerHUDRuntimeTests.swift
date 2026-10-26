@@ -1,3 +1,4 @@
+@_spi(Internal) import AdaApp
 import AdaEngine
 import AdaMultiplayer
 import Foundation
@@ -47,6 +48,7 @@ struct EditorMultiplayerHUDRuntimeTests {
         let plugins = try EditorAdaScriptRuntimePluginResolver.resolve(project.runtime.plugins)
         let artifact = EditorAdaScriptProjectBuildArtifact(
             assetsDirectory: FileManager.default.temporaryDirectory,
+            storageIdentifier: nil,
             entry: project.runtime.entry,
             moduleName: project.runtime.moduleName,
             plugins: plugins,
@@ -62,14 +64,16 @@ struct EditorMultiplayerHUDRuntimeTests {
         )
         // The original order threw unknownResource here, before plugins could start.
         _ = try EditorAdaScriptProjectRuntimeView(artifact: artifact)
-        let script = try ScriptableObjectRegistry.make(named: identifier)
+        let catalog = try runtime.makeScriptableCatalog()
         let world = World(name: "Network HUD regression")
         let app = AppWorlds(main: world)
         InputPlugin(actions: []).setup(in: app)
-        ScriptableObjectPlugin().setup(in: app)
+        EditorProjectScriptObjectsPlugin(catalog: catalog).setup(in: app)
+        defer { ScriptableObjectRegistry.removeScope(app.executionID) }
+        let script = try app.withExecutionContext { try ScriptableObjectRegistry.make(named: identifier) }
         world.insertResource(AdaScriptMultiplayerState(role: .host, localPeerID: PeerID(rawValue: UUID())))
         world.spawn { ScriptableComponents(scripts: [script]) }
-        await world.runScheduler(.update)
+        await app.withExecutionContext { await world.runScheduler(.update) }
         #expect(script.readExportedField("role") == .string("host"))
     }
 }

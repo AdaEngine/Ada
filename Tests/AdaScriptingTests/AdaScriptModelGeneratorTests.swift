@@ -10,6 +10,7 @@ struct AdaScriptModelGeneratorTests {
         let model = try AdaScriptModelGenerator.generate(
             source: """
             func build(model) {
+                assert(Identifiers.uuid().length == 36);
                 model.material(1, 0.8, 0.1, 0.1);
                 model.surface(1, 0.0, 0.4);
                 model.material(2, 0.1, 0.1, 0.9);
