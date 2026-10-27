@@ -306,7 +306,7 @@ final class TextEditorViewNode: ViewNode {
     override func onMouseLeave() { self.handleTextEditorMouseLeave() }
 
     override func onTextInputEvent(_ event: TextInputEvent) {
-        guard self.isFocused, event.session?.isActive != false else { return }
+        guard self.isFocused, environment.textEditorIsEditable, event.session?.isActive != false else { return }
 
         switch event.action {
         case .insert:

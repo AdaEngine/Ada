@@ -420,7 +420,7 @@ enum SwiftPMCommandKind: Equatable, Sendable {
     case build(target: String?, buildTests: Bool)
     case run(target: String?, arguments: [String])
     case runWeb(target: String, outputPath: String, serve: Bool)
-    case test(filter: String?)
+    case test(filter: String?, eventStreamPath: String? = nil)
     case update
     case clean
     case reset
@@ -621,8 +621,10 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
                 runArguments(target: target, runArguments: arguments)
             case let .runWeb(target, outputPath, serve):
                 webRunArguments(target: target, outputPath: outputPath, serve: serve)
-            case let .test(filter):
-                testArguments(filter: filter)
+            case let .test(filter, eventStreamPath):
+                testArguments(filter: filter) + (eventStreamPath.map {
+                    ["--event-stream-output-path", $0, "--event-stream-version", "0", "--xunit-output", $0 + ".xml"]
+                } ?? [])
             case .update:
                 ["package", "update"]
             case .clean:

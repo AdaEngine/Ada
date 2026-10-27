@@ -427,6 +427,7 @@ extension EditorViewModel {
                     self.workspaceStatus = .ready
                     self.buildActivity = nil
                     self.notificationWorkspaceRunID = nil
+                    self.tests.finish()
                     self.workspaceTask = nil
                     return
                 }
@@ -446,13 +447,18 @@ extension EditorViewModel {
                 self.pendingWebRunURL = nil
                 self.buildActivity?.finish(succeeded: result.succeeded)
                 self.replaceBuildDiagnostics(with: EditorDiagnostic.diagnostics(from: result, projectURL: projectURL))
-                self.showProblemsIfNeeded()
+                if case .test = kind {
+                    if self.activeOutputTab != "Tests" { self.showProblemsIfNeeded() }
+                } else {
+                    self.showProblemsIfNeeded()
+                }
                 self.workspaceStatus = result.succeeded ? .ready : .failed(result.combinedOutput)
                 self.finishWorkspaceActivity(
                     notificationRunID,
                     succeeded: result.succeeded,
                     detail: result.succeeded ? "" : result.combinedOutput
                 )
+                self.tests.finish()
                 self.workspaceTask = nil
             }
         }
@@ -541,6 +547,7 @@ extension EditorViewModel {
     }
 
     func appendOutput(_ lines: [String]) {
+        tests.consume(lines.joined(separator: "\n") + "\n")
         outputLines = EditorWorkspaceLogBuffer.appending(lines, to: outputLines)
     }
 

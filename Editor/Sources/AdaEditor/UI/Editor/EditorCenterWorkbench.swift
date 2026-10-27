@@ -365,7 +365,9 @@ extension EditorCenterWorkbench {
             return document.language == .swift ? "\u{E86F}" : "\u{E873}"
         case .asset(let document):
             switch document.kind {
-            case .shaderGraph, .particleEffect, .spriteAnimation, .atlas,
+            case .shaderGraph:
+                return EditorProjectFileAppearance.shaderGraph.symbol
+            case .particleEffect, .spriteAnimation, .atlas,
                 .tileSource,
                 .tileMap:
                 return "\u{E8F1}"
@@ -404,7 +406,9 @@ extension EditorCenterWorkbench {
             return theme.editorColors.blue
         case .asset(let document):
             switch document.kind {
-            case .shaderGraph, .particleEffect, .spriteAnimation, .atlas,
+            case .shaderGraph:
+                return EditorProjectFileAppearance.shaderGraph.color(in: theme.editorColors)
+            case .particleEffect, .spriteAnimation, .atlas,
                 .tileSource,
                 .tileMap:
                 return theme.editorColors.blue
@@ -455,7 +459,7 @@ extension EditorCenterWorkbench {
             EditorShaderGraphEditor(model: viewModel.shaderGraphModel(for: document), modelDocuments: viewModel.openDocuments.compactMap {
                 if case .asset(let asset) = $0, asset.kind == .model3D { return asset }
                 return nil
-            }).id(document.id)
+            }, workbench: viewModel).id(document.id)
         case .particleEffect:
             EditorParticleEffectAssetEditor(document: document, model: viewModel.particleEffectModel(for: document), workbench: viewModel)
                 .id(document.id)

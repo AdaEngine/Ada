@@ -9,6 +9,7 @@ extension EditorViewModel {
         _ settings: AdaProject,
         at projectURL: URL,
         filter: String?,
+        exactName: String? = nil,
         testTimeout: Duration = EditorAdaScriptTestRunner.defaultTestTimeout
     ) {
         guard workspaceTask == nil else { return }
@@ -29,6 +30,7 @@ extension EditorViewModel {
                         project: settings,
                         at: projectURL,
                         filter: filter,
+                        exactName: exactName,
                         testTimeout: testTimeout,
                         onResult: { continuation.yield($0) }
                     )
@@ -45,6 +47,7 @@ extension EditorViewModel {
             let result = await runner.value
             guard !Task.isCancelled, let self else { return }
             self.workspaceTask = nil
+            self.tests.finish()
             switch result {
             case let .success(outcomes):
                 let failed = outcomes.filter { !$0.passed }.count
@@ -55,7 +58,7 @@ extension EditorViewModel {
                 self.workspaceStatus = failed == 0 ? .ready : .failed(line)
                 self.footer.setWorkspaceFooterTitle(self.workspaceStatus.title)
                 self.finishWorkspaceActivity(notificationRunID, succeeded: failed == 0, detail: failed == 0 ? line : self.failureDetail(of: outcomes))
-                if failed > 0 { self.showProblemsIfNeeded() }
+                if failed > 0, self.activeOutputTab != "Tests" { self.showProblemsIfNeeded() }
             case let .failure(error):
                 let message = error.errorDescription ?? "AdaScript tests failed."
                 self.adaScriptTestSummary = nil
@@ -69,6 +72,7 @@ extension EditorViewModel {
     }
 
     private func receiveAdaScriptTestOutcome(_ outcome: EditorAdaScriptTestOutcome) {
+        tests.receive(outcome)
         adaScriptTestSummary?.outcomes.append(outcome)
         if outcome.passed {
             adaScriptTestSummary?.passed += 1

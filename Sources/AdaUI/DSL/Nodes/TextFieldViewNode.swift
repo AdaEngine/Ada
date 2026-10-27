@@ -42,6 +42,9 @@ final class TextFieldViewNode: ViewNode {
 
     private var placeholder: String
     private var onSubmit: (() -> Void)?
+    private var keyHandler: ((KeyEvent) -> Bool)?
+    private var caretChanged: ((Int) -> Void)?
+    private var lastReportedCaret: Int?
     private var textBinding: Binding<String>
 
     var text: String { didSet { if oldValue != text { invalidateInputComposition() } } }
@@ -77,6 +80,8 @@ final class TextFieldViewNode: ViewNode {
     init(inputs: _ViewInputs, content: TextField) {
         self.placeholder = content.placeholder
         self.onSubmit = content.onSubmit
+        self.keyHandler = content.keyHandler
+        self.caretChanged = content.caretChanged
         self.textBinding = content.text
         self.text = Self.normalizeInputText(content.text.wrappedValue)
         super.init(content: content)
@@ -129,11 +134,18 @@ final class TextFieldViewNode: ViewNode {
 
         self.placeholder = node.placeholder
         self.onSubmit = node.onSubmit
+        self.keyHandler = node.keyHandler
+        self.caretChanged = node.caretChanged
         self.textBinding = node.textBinding
 
         let externalText = Self.normalizeInputText(node.textBinding.wrappedValue)
         if externalText != self.text {
+            // Place the caret after the externally replaced span (completion, paste, etc.).
+            let prefix = zip(self.text, externalText).prefix(while: { $0 == $1 }).count
+            let suffix = zip(self.text.dropFirst(prefix).reversed(), externalText.dropFirst(prefix).reversed()).prefix(while: { $0 == $1 }).count
             self.text = externalText
+            self.selectionAnchor = externalText.count - suffix
+            self.selectionHead = self.selectionAnchor
             self.undoStack.removeAll(keepingCapacity: true)
             self.redoStack.removeAll(keepingCapacity: true)
         }
@@ -347,6 +359,8 @@ final class TextFieldViewNode: ViewNode {
             return
         }
 
+        if self.keyHandler?(event) == true { return }
+
         if self.handleShortcut(event) {
             self.resetCaretBlink()
             return
@@ -384,6 +398,10 @@ final class TextFieldViewNode: ViewNode {
     }
 
     override func update(_ deltaTime: AdaUtils.TimeInterval) {
+        if isFocused, lastReportedCaret != selectionHead {
+            lastReportedCaret = selectionHead
+            caretChanged?(selectionHead)
+        }
         // Closure bindings can change without rebuilding the owning view (for example,
         // live editor values). Refresh only this field and preserve local edits/undo
         // when the binding already matches the displayed text.

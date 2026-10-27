@@ -12,6 +12,7 @@ struct EditorNodeCanvas: View {
     var decorations: [EditorNodeCanvasDecoration] = []
     var onKeyEvent: (KeyEvent) -> Void = { _ in }
     var viewportSizeChanged: (Size) -> Void = { _ in }
+    var selectedWire: EditorNodeCanvasWire?
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -37,7 +38,11 @@ struct EditorNodeCanvas: View {
                     for wire in wires {
                         if let start = geometry.port(wire.source), let end = geometry.port(wire.target) {
                             if max(start.y, end.y) >= -20, min(start.y, end.y) <= size.height + 20 {
-                                Self.drawWire(context: &context, start: start, end: end, color: Self.portColor(wire.type))
+                                Self.drawWire(
+                                    context: &context, start: start, end: end,
+                                    color: wire == selectedWire ? theme.editorColors.blue : Self.portColor(wire.type),
+                                    lineWidth: wire == selectedWire ? 4 : 2
+                                )
                             }
                         }
                     }
@@ -57,22 +62,11 @@ struct EditorNodeCanvas: View {
                         card(item).scaleEffect([state.zoom, state.zoom], anchor: .topLeading).offset(x: bounds.minX, y: bounds.minY).allowsHitTesting(false)
                     }
                 }
-            }.frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading).mask(RectangleShape()).gesture(
-                DragGesture(minimumDistance: 0).onChanged { value in
-                    let frame = proxy.frame(in: .global)
-                    interaction?.drag(
-                        from: [value.startLocation.x - frame.minX, value.startLocation.y - frame.minY],
-                        to: [value.location.x - frame.minX, value.location.y - frame.minY],
-                        geometry: geometry,
-                        wires: wires,
-                        selection: selection,
-                        state: state
-                    )
-                }.onEnded { value in
-                    let frame = proxy.frame(in: .global)
-                    interaction?.end(at: [value.location.x - frame.minX, value.location.y - frame.minY], geometry: geometry)
-                }.onCancelled { interaction?.abort() }
-            ).accessibilityIdentifier("AdaEditor.NodeCanvas").onFocusedKeyEvent(onKeyEvent)
+                EditorNodeCanvasInput(
+                    geometry: geometry, wires: wires, selection: selection,
+                    state: state, interaction: interaction
+                )
+            }.frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading).mask(RectangleShape()).accessibilityIdentifier("AdaEditor.NodeCanvas").onFocusedKeyEvent(onKeyEvent)
                 .onAppear { viewportSizeChanged(proxy.size) }
                 .onChange(of: proxy.size) { _, size in viewportSizeChanged(size) }
         }
@@ -131,15 +125,12 @@ struct EditorNodeCanvas: View {
         }
     }
 
-    static func drawWire(context: inout UIGraphicsContext, start: Vector2, end: Vector2, color: Color) {
-        let bend = max(50, abs(end.x - start.x) * 0.5)
-        let a = start + Vector2(bend, 0), b = end - Vector2(bend, 0)
+    static func drawWire(context: inout UIGraphicsContext, start: Vector2, end: Vector2, color: Color, lineWidth: Float = 2) {
         var previous = start
         for index in 1...24 {
-            let t = Float(index) / 24, u = 1 - t
-            let point = start * (u * u * u) + a * (3 * u * u * t) + b * (3 * u * t * t) + end * (t * t * t)
+            let point = EditorNodeCanvasGeometry.wirePoint(from: start, to: end, t: Float(index) / 24)
             // Layout and picking use downward Y; primitive line commands use the renderer's upward Y.
-            context.drawLine(start: [previous.x, -previous.y], end: [point.x, -point.y], lineWidth: 2, color: color)
+            context.drawLine(start: [previous.x, -previous.y], end: [point.x, -point.y], lineWidth: lineWidth, color: color)
             previous = point
         }
     }

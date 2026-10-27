@@ -617,15 +617,31 @@ extension EditorViewModel {
     }
 
     func runTests(filter: String? = nil) {
+        guard workspaceTask == nil, projectURL != nil else { return }
         let filter = filter ?? (selectedTestFilter.isEmpty ? nil : selectedTestFilter)
+        tests.begin(filter: filter?.isEmpty == true ? nil : filter)
         if let projectURL,
             let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
             settings.build.system.isAdaScript {
-            guard saveDocumentsForNativeRun() else { return }
+            guard saveDocumentsForNativeRun() else { tests.finish(); return }
             runAdaScriptTests(settings, at: projectURL, filter: filter)
             return
         }
-        executeWorkspaceCommand(.test(filter: filter), statusTitle: "Test")
+        executeWorkspaceCommand(.test(filter: filter, eventStreamPath: tests.prepareSwiftReport().path), statusTitle: "Test")
+    }
+
+    func runTest(_ item: EditorTestItem) {
+        guard workspaceTask == nil, projectURL != nil else { return }
+        if let projectURL,
+           let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
+           settings.build.system.isAdaScript {
+            guard saveDocumentsForNativeRun() else { return }
+            tests.begin(filter: item.filter, exactID: item.id)
+            runAdaScriptTests(settings, at: projectURL, filter: item.filter, exactName: item.filter)
+        } else {
+            runTests(filter: item.exactSwiftFilter)
+            tests.begin(filter: nil, exactID: item.id)
+        }
     }
 
     func updateDependencies() {
@@ -683,6 +699,7 @@ extension EditorViewModel {
         workspaceStatus = .cancelled
         Task {
             await workspaceService.cancel()
+            tests.finish()
             #if os(macOS) || os(Windows) || os(Linux)
             await adaScriptWebExportRunner?.cancelAll()
             await cancellingAndroidRunner?.cancelAll()

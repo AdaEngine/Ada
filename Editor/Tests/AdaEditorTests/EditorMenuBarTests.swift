@@ -17,6 +17,9 @@ struct EditorMenuBarTests {
         #expect(menus.allSatisfy { !$0.items.isEmpty })
         #expect(menus.flatMap(\.items).filter { !$0.isSeparator }.allSatisfy { $0.isEnabled })
         #expect(menus.first?.placement == .application)
+        #if os(Windows) || os(Linux)
+        #expect(menus.first?.image != nil)
+        #endif
     }
 
     @Test

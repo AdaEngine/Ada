@@ -87,6 +87,29 @@ struct EditorNodeCanvasGeometry {
 
     func hitNode(_ point: Vector2) -> String? { nodes.reversed().first { bounds($0).contains(point: Point(point.x, point.y)) }?.id }
 
+    /// Pick the same curve segments that are drawn, with a screen-space tolerance at every zoom.
+    func hitWire(_ point: Vector2, wires: [EditorNodeCanvasWire]) -> EditorNodeCanvasWire? {
+        wires.reversed().first { wire in
+            guard let start = port(wire.source), let end = port(wire.target) else { return false }
+            var previous = start
+            for index in 1...24 {
+                let next = Self.wirePoint(from: start, to: end, t: Float(index) / 24)
+                let segment = next - previous
+                let offset = point - previous
+                let projection = min(1, max(0, (offset.x * segment.x + offset.y * segment.y) / max(0.001, segment.squaredLength)))
+                if (point - previous - segment * projection).squaredLength <= 49 { return true }
+                previous = next
+            }
+            return false
+        }
+    }
+
+    static func wirePoint(from start: Vector2, to end: Vector2, t: Float) -> Vector2 {
+        let bend = max(50, abs(end.x - start.x) * 0.5)
+        let a = start + Vector2(bend, 0), b = end - Vector2(bend, 0), u = 1 - t
+        return start * (u * u * u) + a * (3 * u * u * t) + b * (3 * u * t * t) + end * (t * t * t)
+    }
+
     func selected(in rect: Rect) -> Set<String> { Set(nodes.filter { rect.intersects(bounds($0)) }.map(\.id)) }
 }
 

@@ -814,6 +814,37 @@ struct TextEditorTests {
     }
 
     @Test
+    func readOnlyEditorPreservesSelectionAndRejectsMutations() throws {
+        var text = "uniform vec4 color;"
+        var pasteCalls = 0
+        let tester = ViewTester {
+            TextEditor(text: Binding(get: { text }, set: { text = $0 }))
+                .textEditorEditable(false)
+                .onTextEditorPaste { pasteCalls += 1; return true }
+                .font(.system(size: 12))
+                .frame(width: 360, height: 160)
+        }.setSize(Size(width: 380, height: 180)).performLayout()
+        let node = try #require(tester.sendMouseEvent(at: Point(100, 28), phase: .began) as? TextEditorViewNode)
+        tester.sendMouseEvent(at: Point(100, 28), phase: .ended)
+        tester.sendKeyEvent(.a, modifiers: [.control])
+        #expect(node.selectedText() == text)
+        tester.sendTextInput("replacement")
+        tester.sendKeyEvent(.backspace)
+        tester.sendKeyEvent(.enter)
+        tester.sendKeyEvent(.tab)
+        tester.sendKeyEvent(.x, modifiers: [.control])
+        tester.sendKeyEvent(.v, modifiers: [.control])
+        tester.sendKeyEvent(.z, modifiers: [.control])
+        tester.sendKeyEvent(.y, modifiers: [.control])
+        #expect(text == "uniform vec4 color;" && node.text == text)
+        #expect(node.selectedText() == text)
+        #expect(pasteCalls == 0)
+        #expect(node.undoStack.isEmpty && node.redoStack.isEmpty)
+        tester.sendKeyEvent(.arrowRight)
+        #expect(!node.hasSelection && node.caretOffset == text.count)
+    }
+
+    @Test
     func textEditor_sourceHighlightKeepsZeroLengthDiagnosticsVisible() {
         let range = TextEditorSourceRange(
             start: TextEditorSourcePosition(line: 2, column: 7),

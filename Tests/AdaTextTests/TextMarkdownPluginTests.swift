@@ -61,14 +61,36 @@ struct TextMarkdownPluginTests {
     }
 
     @Test
-    func unsupportedBlocks_degradeToReadableText() {
+    func unorderedLists_preserveMarkersAndTraits() {
         let text = AttributedText(markdown: """
         - one
         - **two**
         """)
 
-        #expect(text.text == "one\ntwo")
+        #expect(text.text == "• one\n• two")
         #expect(attributes(in: text, at: "two").fontTraits == .strong)
+    }
+
+    @Test func nestedAndOrderedListsPreserveStructure() {
+        let text = AttributedText(markdown: "3. first\n4. second\n   - child")
+        #expect(text.text == "3. first\n4. second\n  • child")
+    }
+
+    @Test func taskListsAndQuotesRemainReadable() {
+        let text = AttributedText(markdown: "- [x] done\n- [ ] pending\n\n> quoted **text**")
+        #expect(text.text == "• [x] done\n• [ ] pending\n\n> quoted text")
+        #expect(attributes(in: text, at: "text").fontTraits == .strong)
+    }
+
+    @Test func tableCellsAndRowsDoNotRunTogether() {
+        let text = AttributedText(markdown: "| Name | State |\n| --- | --- |\n| A | Done |\n| B | Ready |")
+        #expect(text.text == "Name | State\nA | Done\nB | Ready")
+    }
+
+    @Test func linksKeepTheirDestinationWithoutExposingMarkup() {
+        let text = AttributedText(markdown: "Read [AdaEngine](https://adaengine.org/docs).")
+        #expect(text.text == "Read AdaEngine.")
+        #expect(attributes(in: text, at: "AdaEngine").link == "https://adaengine.org/docs")
     }
 
     private func attributes(in text: AttributedText, at substring: String) -> TextAttributeContainer {

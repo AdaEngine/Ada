@@ -306,9 +306,10 @@ extension EditorViewModel {
     }
 
     func activateLeftBottomTool(_ item: EditorToolStripItem) {
-        if item.identifier == "logs", activeOutputTab != "Output" {
+        let consoleTab = EditorDistribution.current == .standalone ? "Terminal" : "Output"
+        if item.identifier == "logs", activeOutputTab != consoleTab {
             toolStrip.selectLeftBottomTool(item)
-            selectOutputTab("Output")
+            selectOutputTab(consoleTab)
             showBottomPanel = true
             return
         }
@@ -319,7 +320,7 @@ extension EditorViewModel {
 
         toolStrip.selectLeftBottomTool(item)
         if item.identifier == "logs" {
-            selectOutputTab("Output")
+            selectOutputTab(consoleTab)
         }
         if item.identifier == "build" {
             selectOutputTab("Build")

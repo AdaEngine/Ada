@@ -2,30 +2,48 @@
 import Foundation
 
 struct EditorShaderGraphEditor: View {
+    enum Presentation { case canvas, inspector }
+
     let model: EditorShaderGraphModel
+    var presentation: Presentation = .canvas
     var modelDocuments: [EditorAssetDocument] = []
+    var workbench: EditorWorkbenchViewModel?
     @Environment(\.theme) var theme
-    @State var canvas = EditorNodeCanvasState()
+    var canvas: EditorNodeCanvasState { model.canvas }
+    var canvasViewportSize: Size { model.canvasViewportSize }
     @State var interaction: EditorNodeCanvasInteraction?
     @State var search = EditorShaderGraphSearch()
-    @State var canvasViewportSize = Size(width: 480, height: 400)
     @State private var didFit = false
-    @State private var showsInspector = true
     @State private var showsSource = false
     @State private var operation = "constant"
     @State private var valueType = "float"
     @State private var preview = EditorShaderGraphPreview()
-    @State private var showsPreview = true
 
     var body: some View {
+        Group {
+            switch presentation {
+            case .canvas: workspace
+            case .inspector:
+                VStack(alignment: .leading, spacing: 0) {
+                    adaEditorInspectorTitle(theme: theme)
+                    inspector
+                }.accessibilityIdentifier("AdaEditor.ShaderGraph.Inspector")
+            }
+        }.onAppear {
+            if presentation == .inspector { preview.schedule(model.graph, basePath: model.url?.path) }
+        }.onChange(of: model.semanticRevision) { _, _ in
+            if presentation == .inspector { preview.schedule(model.graph, basePath: model.url?.path) }
+        }.onDisappear { preview.cancel() }
+    }
+
+    private var workspace: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
-                toolbar(size: geometry.size)
-                if search.isPresented { nodeSearch }
+                toolbar()
                 HStack(spacing: 0) {
                     if geometry.size.width >= 1_000 { parameterPanel.frame(width: 180) }
                     if showsSource {
-                        ScrollView { Text(verbatim: (try? model.graph?.compileGLSL().source) ?? "").font(.system(size: 11)).foregroundColor(theme.editorColors.text).padding(12) }
+                        EditorShaderGraphSourceView(model: model, workbench: workbench)
                     } else {
                         EditorNodeCanvas(
                             items: model.canvasItems,
@@ -37,15 +55,15 @@ struct EditorShaderGraphEditor: View {
                             decorations: model.canvasDecorations,
                             onKeyEvent: handleCanvasKey,
                             viewportSizeChanged: { size in
-                                canvasViewportSize = size
+                                model.canvasViewportSize = size
                                 if !didFit, size.width > 0, size.height > 0 {
                                     canvas.fit(model.canvasItems, in: size)
                                     didFit = true
                                 }
-                            }
+                            },
+                            selectedWire: model.selectedWire
                         ).contextMenu { graphContextMenu }
                     }
-                    if showsInspector { inspector.frame(width: min(270, geometry.size.width * 0.45)) }
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 if let message = model.diagnosticMessage {
                     Button {
@@ -55,6 +73,10 @@ struct EditorShaderGraphEditor: View {
                     }.buttonStyle(DefaultButtonStyle()).padding(8)
                 }
             }.frame(width: geometry.size.width, height: geometry.size.height)
+        }.overlay(anchor: .topLeading) {
+            if search.isPresented {
+                nodeSearch.padding(8).offset(y: 44)
+            }
         }.background(theme.editorColors.background).accessibilityIdentifier("AdaEditor.ShaderGraph.Editor").onAppear {
             let pointer = model.canvasInteraction()
             pointer.emptyDrop = { [weak pointer] endpoint, point in
@@ -62,53 +84,58 @@ struct EditorShaderGraphEditor: View {
                 search.replacedInput = pointer?.replacedInput
             }
             interaction = pointer
-            preview.schedule(model.graph, basePath: model.url?.path)
-        }.onChange(of: model.semanticRevision) { _, _ in preview.schedule(model.graph, basePath: model.url?.path) }.onDisappear {
+        }.onDisappear {
             interaction?.abort()
-            preview.cancel()
         }
     }
 
-    private func toolbar(size: Size) -> some View {
+    private func toolbar() -> some View {
         ScrollView(.horizontal) {
-        HStack(spacing: 8) {
-            Button(L10n.text("Undo")) { model.undo() }.disabled(!model.canUndo)
-            Button(L10n.text("Redo")) { model.redo() }.disabled(!model.canRedo)
-            Button(L10n.text("Save")) { model.save() }.disabled(!model.isDirty || model.isReadOnly).accessibilityIdentifier("AdaEditor.ShaderGraph.Save")
-            Button(L10n.text("Reload")) { model.reload() }
-            Button(L10n.text("Search Nodes")) { search.open(at: canvasPoint) }
+        HStack(spacing: 6) {
+            EditorShaderGraphAction(title: "Undo", glyph: "\u{E166}") { model.undo() }.disabled(!model.canUndo)
+            EditorShaderGraphAction(title: "Redo", glyph: "\u{E15A}") { model.redo() }.disabled(!model.canRedo)
+            EditorShaderGraphAction(title: "Save", glyph: "\u{E161}") { model.save() }.disabled(!model.isDirty || model.isReadOnly).accessibilityIdentifier("AdaEditor.ShaderGraph.Save")
+            EditorShaderGraphAction(title: "Reload", glyph: "\u{E5D5}") { model.reload() }
+            EditorShaderGraphAction(title: "Search Nodes", glyph: "\u{E8B6}", selected: search.isPresented) { search.open(at: canvasPoint) }
+                .accessibilityIdentifier("AdaEditor.ShaderGraph.OpenSearch")
             Spacer(minLength: 4)
-            Button("−") { canvas.zoom(by: 0.8, around: [size.width / 2, size.height / 2]) }
-            Button("+") { canvas.zoom(by: 1.25, around: [size.width / 2, size.height / 2]) }
-            Button(L10n.text("Fit")) { canvas.fit(model.canvasItems, in: Size(width: max(100, size.width - (showsInspector ? 270 : 0)), height: size.height - 48)) }
-            Button(L10n.text("Pan")) { canvas.panMode.toggle() }
-            Button(L10n.text("Source")) { showsSource.toggle() }
-            Button(L10n.text("Preview")) { showsPreview.toggle() }
-            Button(L10n.text("Inspector")) { showsInspector.toggle() }
-        }.buttonStyle(DefaultButtonStyle()).font(.system(size: 11)).foregroundColor(theme.editorColors.text).padding(.horizontal, 8).frame(height: 36)
-        }.frame(height: 36)
+            Button("−") { canvas.zoom(by: 0.8, around: [canvasViewportSize.width / 2, canvasViewportSize.height / 2]) }
+                .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, bordered: true))
+            Button("+") { canvas.zoom(by: 1.25, around: [canvasViewportSize.width / 2, canvasViewportSize.height / 2]) }
+                .buttonStyle(EditorUIDesignerButtonStyle(colors: theme.editorColors, bordered: true))
+            EditorShaderGraphAction(title: "Fit", glyph: "\u{E5D0}") { canvas.fit(model.canvasItems, in: canvasViewportSize) }
+            EditorShaderGraphAction(title: "Pan", glyph: "\u{E925}", selected: canvas.panMode) { canvas.panMode.toggle() }
+            EditorShaderGraphAction(title: "Source", glyph: "\u{E86F}", selected: showsSource) { showsSource.toggle() }
+                .accessibilityIdentifier("AdaEditor.ShaderGraph.Source")
+        }.foregroundColor(theme.editorColors.text).padding(.horizontal, 8).frame(height: 44)
+        }.frame(height: 44).background(theme.editorColors.surface)
     }
 
     private var inspector: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                if showsPreview { previewPanel }
-                Text(L10n.text("Add Node")).font(.system(size: 13, weight: .semibold))
-                EditorEnumField(
-                    cases: availableOperations.map { L10n.tr(EditorShaderGraphModel.operationTitle($0.rawValue)) },
-                    selection: Binding(
-                        get: { L10n.tr(EditorShaderGraphModel.operationTitle(operation)) },
-                        set: { title in operation = availableOperations.first { L10n.tr(EditorShaderGraphModel.operationTitle($0.rawValue)) == title }?.rawValue ?? "constant" }
-                    ),
-                    accessibilityID: "AdaEditor.ShaderGraph.Operation"
-                )
-                EditorEnumField(cases: availableTypes, selection: $valueType, accessibilityID: "AdaEditor.ShaderGraph.Type")
-                Button(L10n.text("Add Node")) { addNode() }.disabled(model.isReadOnly).accessibilityIdentifier("AdaEditor.ShaderGraph.AddNode")
-                Divider()
-                if let node = model.selectedNode { nodeInspector(node) } else { Text(L10n.text("Select a node to edit its properties.")).foregroundColor(theme.editorColors.muted) }
-                Divider()
-                if let graph = model.graph { outputInspector(graph) }
-                organizationPanel
+                EditorShaderGraphSection(title: "Preview", glyph: "\u{E8F4}") { previewPanel }
+                EditorShaderGraphSection(title: "Add Node", glyph: "\u{E145}") {
+                    Text(L10n.tr("Node Type")).foregroundColor(theme.editorColors.muted)
+                    EditorEnumField(
+                        cases: availableOperations.map { L10n.tr(EditorShaderGraphModel.operationTitle($0.rawValue)) },
+                        selection: Binding(
+                            get: { L10n.tr(EditorShaderGraphModel.operationTitle(operation)) },
+                            set: { title in operation = availableOperations.first { L10n.tr(EditorShaderGraphModel.operationTitle($0.rawValue)) == title }?.rawValue ?? "constant" }
+                        ),
+                        accessibilityID: "AdaEditor.ShaderGraph.Operation"
+                    )
+                    Text(L10n.tr("Value Type")).foregroundColor(theme.editorColors.muted)
+                    EditorEnumField(cases: availableTypes, selection: $valueType, accessibilityID: "AdaEditor.ShaderGraph.Type")
+                    EditorShaderGraphAction(title: "Add Node", glyph: "\u{E145}", selected: true) { addNode() }
+                        .disabled(model.isReadOnly).accessibilityIdentifier("AdaEditor.ShaderGraph.AddNode")
+                }
+                EditorShaderGraphSection(title: "Selected Node", glyph: "\u{E8F0}") {
+                    if let node = model.selectedNode { nodeInspector(node) }
+                    else { Text(L10n.text("Select a node to edit its properties.")).foregroundColor(theme.editorColors.muted) }
+                }
+                if let graph = model.graph { EditorShaderGraphSection(title: "Output", glyph: "\u{E5DA}") { outputInspector(graph) } }
+                EditorShaderGraphSection(title: "Graph Tools", glyph: "\u{E869}") { organizationPanel }
             }.padding(12)
         }.font(.system(size: 12)).foregroundColor(theme.editorColors.text).buttonStyle(DefaultButtonStyle()).background(theme.editorColors.surface)
     }
@@ -163,8 +190,8 @@ struct EditorShaderGraphEditor: View {
                     )
                 }
                 HStack {
-                    Button(preview.isPlaying ? L10n.text("Pause") : L10n.text("Play")) { preview.isPlaying.toggle() }
-                    Button(L10n.text("Restart")) { preview.restart() }
+                    EditorShaderGraphAction(title: preview.isPlaying ? "Pause" : "Play", glyph: preview.isPlaying ? "\u{E034}" : "\u{E037}") { preview.isPlaying.toggle() }
+                    EditorShaderGraphAction(title: "Restart", glyph: "\u{E5D5}") { preview.restart() }
                 }
             }
             if preview.isCompiling { Text(L10n.text("Compiling graph…")).foregroundColor(theme.editorColors.muted) }
@@ -175,7 +202,6 @@ struct EditorShaderGraphEditor: View {
                     Text(verbatim: error).foregroundColor(.red).lineLimit(4)
                 }
             }
-            Divider()
         }
     }
 
@@ -200,9 +226,13 @@ struct EditorShaderGraphEditor: View {
 
     private func nodeInspector(_ node: ShaderGraph.Node) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(verbatim: L10n.tr(EditorShaderGraphModel.operationTitle(node.kind))).font(.system(size: 13, weight: .semibold))
+            HStack {
+                Text(verbatim: node.label ?? node.reference ?? L10n.tr(EditorShaderGraphModel.operationTitle(node.kind))).lineLimit(2)
+                Spacer(minLength: 0)
+                EditorShaderGraphTypeBadge(type: node.type.rawValue)
+            }
             if (model.graph?.outputPorts(for: node).count ?? 0) > 1 {
-                Button(model.expandedPorts.contains(node.id) ? L10n.text("Hide Channels") : L10n.text("Show Channels")) {
+                EditorShaderGraphAction(title: model.expandedPorts.contains(node.id) ? "Hide Channels" : "Show Channels", glyph: "\u{E8F1}") {
                     if !model.expandedPorts.insert(node.id).inserted { model.expandedPorts.remove(node.id) }
                 }
             }
@@ -213,26 +243,22 @@ struct EditorShaderGraphEditor: View {
             if node.kind == "parameter", node.type == .texture2D {
                 field("Default Texture", value: node.defaultTexture ?? "") { value in model.editNode(node.id) { $0.defaultTexture = value.isEmpty ? nil : value } }
             }
-            ForEach(0..<node.value.count, id: \.self) { index in
-                field("Value", value: String(format: "%.5g", node.value[index])) { text in
-                    if let value = Float(text), value.isFinite, node.type != .bool || value == 0 || value == 1 { model.editNode(node.id) { $0.value[index] = value } }
-                }.accessibilityIdentifier("AdaEditor.ShaderGraph.Value.\(index)")
-            }
+            EditorShaderGraphValueEditor(model: model, node: node).id(node.id)
             ForEach(node.inputs.keys.sorted(), id: \.self) { port in
                 HStack {
                     Text(verbatim: L10n.tr(EditorShaderGraphModel.portTitle(port)))
                     Spacer()
-                    Button(L10n.text("Disconnect")) { model.editNode(node.id) { $0.inputs[port] = nil } }
+                    EditorShaderGraphAction(title: "Disconnect", glyph: "\u{E14C}") { model.editNode(node.id) { $0.inputs[port] = nil } }
                 }
             }
-            Button(L10n.text("Delete")) { model.removeSelection() }.disabled(node.id == model.graph?.output || model.isReadOnly)
+            EditorShaderGraphAction(title: "Delete", glyph: "\u{E872}", destructive: true) { model.removeSelection() }.disabled(node.id == model.graph?.output || model.isReadOnly)
         }.disabled(model.isReadOnly)
     }
 
     private func outputInspector(_ graph: ShaderGraph) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L10n.text("Output")).font(.system(size: 13, weight: .semibold))
             Text(verbatim: graph.target == .sprite ? "Sprite" : "PBR Surface")
+            Text(L10n.tr("Render Mode")).foregroundColor(theme.editorColors.muted)
             EditorEnumField(
                 cases: ShaderGraph.RenderSettings.Mode.allCases.map { L10n.tr($0.rawValue.capitalized) },
                 selection: Binding(

@@ -9,8 +9,20 @@ templates are ordinary editable graphs. The browser Studio does not author graph
 
 The canvas supports pan/zoom, Fit, multiple selection, dragging nodes, connecting
 compatible ports, rerouting wires and dropping a wire on empty space to search
-compatible nodes. Search filters by name and connected type. The Inspector edits
+compatible nodes. Hold the middle mouse button to pan, including over nodes and
+ports; the mouse wheel zooms around the pointer. Search opens over the canvas
+without moving or resizing it and filters by name and connected type.
+Click a wire to highlight it, then press Delete/Backspace or choose Delete in
+the context menu. This removes only the connection; Undo restores it.
+The workbench's contextual Inspector contains the preview, Add Node controls,
+node properties, output settings and organization tools. The Inspector edits
 node values, exposed parameter IDs/names, texture references and render settings.
+Toolbar actions use bordered icon buttons; active Pan and Source modes are highlighted.
+Search has an outlined input and separate result rows with value-type badges.
+Parameter cards show the selected parameter and reveal its node on click.
+Inspector sections separate preview, node creation, selection, output and graph tools.
+Color values provide a native color picker plus labeled linear R/G/B/A fields;
+vector values use X/Y/Z/W. Channel editing preserves fractional input and document history.
 Select a node and expand its channels when an individual vector component is
 needed. Groups and notes organize a graph; Copy/Paste remaps node/group IDs.
 Layout and organization do not change compiled shader code.
@@ -18,7 +30,10 @@ Layout and organization do not change compiled shader code.
 Undo/Redo records one transaction per gesture. Save and Save All use the normal
 workbench document path; split panes and restored tabs share the document model.
 An unsupported schema, conflicting external edit or read-only file is preserved
-and reported instead of overwritten. Source mode shows generated GLSL read-only.
+and reported instead of overwritten. Source mode opens generated GLSL in the shared
+code editor, using the workbench's font and syntax palette, line numbers, folding,
+selection/copy and horizontal/vertical scrolling. It refreshes after graph edits
+and Undo; generated code is read-only and does not become a separate saved asset.
 English and Russian use the same persisted identifiers.
 
 The preview uses the production renderer: Sprite, sphere, plane or the selected

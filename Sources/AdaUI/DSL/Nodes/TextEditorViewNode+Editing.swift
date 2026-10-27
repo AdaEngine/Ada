@@ -312,7 +312,7 @@ extension TextEditorViewNode {
     }
 
     func cutSelection() {
-        guard self.hasSelection else {
+        guard environment.textEditorIsEditable, self.hasSelection else {
             return
         }
         self.copySelection()
@@ -320,6 +320,7 @@ extension TextEditorViewNode {
     }
 
     func pasteText() {
+        guard environment.textEditorIsEditable else { return }
         if environment.textEditorPasteHandler?() == true {
             return
         }
@@ -330,6 +331,7 @@ extension TextEditorViewNode {
     }
 
     func undo() {
+        guard environment.textEditorIsEditable else { return }
         guard let previous = self.undoStack.popLast() else {
             return
         }
@@ -340,6 +342,7 @@ extension TextEditorViewNode {
     }
 
     func redo() {
+        guard environment.textEditorIsEditable else { return }
         guard let next = self.redoStack.popLast() else {
             return
         }
@@ -350,6 +353,7 @@ extension TextEditorViewNode {
     }
 
     func performEdit(_ block: () -> Bool) {
+        guard environment.textEditorIsEditable else { return }
         let previous = self.snapshot()
         guard block() else {
             return

@@ -91,7 +91,15 @@ public struct RuntimeLogHandler: LogHandler {
         set { metadata[key] = newValue }
     }
 
-    public func log(event: LogEvent) {
-        store.append(level: event.level.rawValue, label: label, message: event.message.description)
+    public func log(
+        level: Logger.Level,
+        message: Logger.Message,
+        metadata: Logger.Metadata?,
+        source: String,
+        file: String,
+        function: String,
+        line: UInt
+    ) {
+        store.append(level: level.rawValue, label: label, message: message.description)
     }
 }

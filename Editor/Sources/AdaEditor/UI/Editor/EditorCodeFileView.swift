@@ -114,6 +114,7 @@ extension EditorCodeFileView {
             .foregroundColor(colorPalette.plainText)
             .accentColor(theme.editorColors.blue)
             .textEditorColors(editorColors)
+            .textEditorEditable(!document.isReadOnly)
             .drawingGroup()
             .padding(10)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -369,7 +370,7 @@ extension EditorCodeFileView {
                 }
                 return sourceContextMenuItems?(document, EditorSourceLocation(textEditorPosition: position)) ?? []
             },
-            selectionHint: TextEditorSelectionHint(
+            selectionHint: document.isReadOnly ? nil : TextEditorSelectionHint(
                 text: "Press CMD + L to chat",
                 foreground: theme.editorColors.text,
                 background: theme.editorColors.surface,

@@ -13,7 +13,7 @@ struct EditorEnumField: View {
                 .lineLimit(1)
             Spacer()
             Text("\u{E5CF}")
-                .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                .environment(\.font, AdaEditorMaterialSymbolFont.font(size: 16))
         }
         .padding(.horizontal, 8)
         .frame(height: 30)

@@ -406,7 +406,11 @@ struct AdaEngineStyleUITests {
         #expect(compact.aiFlightBoxWidth <= compact.workbenchWidth)
         #expect(compact.aiFlightBoxHeight < desktop.aiFlightBoxHeight)
         #expect(compact.outputTabs.count < AdaEngineStyleContent.outputTabs.count)
+        #if os(macOS)
         #expect(compact.toolbarWindowControlClearance == 60)
+        #else
+        #expect(compact.toolbarWindowControlClearance == 0)
+        #endif
         #expect(!compact.showsToolbarSceneName)
         #expect(compact.toolbarRunDestinationWidth == 96)
         #expect(compact.toolbarRunControlsWidth == 98)
@@ -825,7 +829,8 @@ struct AdaEngineStyleUITests {
         #expect(AdaEngineStyleContent.topToolbarLabels.contains("main_scene"))
         #expect(!AdaEngineStyleContent.topToolbarLabels.contains("Hot Reload"))
         #expect(AdaEngineStyleContent.leftTopSidebarTools.map(\.title) == ["File Tree", "Source Control"])
-        #expect(AdaEngineStyleContent.leftBottomSidebarTools.map(\.title) == ["Logs", "Build", "Debug", "Animator"])
+        let consoleTitle = EditorDistribution.current == .standalone ? "Terminal" : "Logs"
+        #expect(AdaEngineStyleContent.leftBottomSidebarTools.map(\.title) == [consoleTitle, "Build", "Debug", "Animator"])
         #expect(AdaEngineStyleContent.rightSidebarTools.map(\.title) == ["Agent Chat", "Inspector", "Project Dependencies", "Swift Package Tasks", "Plugins", "Project Settings"])
         #expect(AdaEngineStyleContent.projectTreeItems == ["src", "EngineLoop.ada", "Renderer.ada", "Main.ascn"])
         #expect(AdaEngineStyleContent.editorTabs.contains("Main.ascn"))

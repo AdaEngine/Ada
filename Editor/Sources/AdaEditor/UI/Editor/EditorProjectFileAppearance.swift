@@ -3,7 +3,7 @@ import Foundation
 
 /// Visual identity is independent of the editor used to open a file.
 enum EditorProjectFileAppearance: Equatable {
-    case folder, scene, image, audio, tileSet, tileMap, atlas, particleEffect, spriteAnimation, font, material, mesh, shader, ui, code, configuration, document, generic
+    case folder, scene, image, audio, tileSet, tileMap, atlas, particleEffect, spriteAnimation, font, material, mesh, shader, shaderGraph, ui, code, configuration, document, generic
 
     static func resolve(for item: EditorProjectSidebarViewModel.Item) -> Self {
         if item.isFolder {
@@ -12,6 +12,7 @@ enum EditorProjectFileAppearance: Equatable {
 
         // Resource formats can also be classified as text or generic assets.
         switch URL(fileURLWithPath: item.title).pathExtension.lowercased() {
+        case "shadergraph": return .shaderGraph
         case "tileset": return .tileSet
         case "tilemap": return .tileMap
         case "atlas": return .atlas
@@ -55,6 +56,7 @@ enum EditorProjectFileAppearance: Equatable {
         case .material: EditorProjectTreeIcon.material
         case .mesh: EditorProjectTreeIcon.mesh
         case .shader: EditorProjectTreeIcon.shader
+        case .shaderGraph: "\u{E3E7}"
         case .ui: EditorProjectTreeIcon.ui
         case .code: EditorProjectTreeIcon.code
         case .configuration: EditorProjectTreeIcon.configuration
@@ -77,7 +79,7 @@ enum EditorProjectFileAppearance: Equatable {
         case .font: Color.fromHex(0xDA8EC4)
         case .material: Color.fromHex(0x6CC5D9)
         case .mesh: Color.fromHex(0xA99AE8)
-        case .shader: Color.fromHex(0xE4A85F)
+        case .shader, .shaderGraph: Color.fromHex(0xE4A85F)
         case .ui: Color.fromHex(0x82B3E8)
         case .configuration: Color.fromHex(0xB6BC78)
         case .document: colors.text.opacity(0.72)

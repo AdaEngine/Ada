@@ -26,8 +26,10 @@ struct EditorTopToolbar: View {
     var body: some View {
         EditorToolbarLayout(searchWidth: metrics.toolbarSearchWidth) {
             HStack(spacing: 12) {
+                #if os(macOS)
                 Color.clear
                     .frame(width: metrics.toolbarWindowControlClearance, height: 1)
+                #endif
                 projectSwitcherButton
                 #if os(macOS) || os(Windows) || os(Linux) || os(visionOS)
                 if let interface {

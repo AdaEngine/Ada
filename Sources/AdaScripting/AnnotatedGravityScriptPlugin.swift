@@ -156,8 +156,10 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     /// Runs the loaded `@test` functions, optionally only those whose name or display name contains `filter`.
     ///
     /// `onResult` is called after each test, so a caller can stream progress.
-    public func runTests(matching filter: String? = nil, onResult: ((AdaScriptTestResult) -> Void)? = nil) -> [AdaScriptTestResult] {
+    /// When supplied, `exactName` selects a single function name instead of substring matching.
+    public func runTests(matching filter: String? = nil, exactName: String? = nil, onResult: ((AdaScriptTestResult) -> Void)? = nil) -> [AdaScriptTestResult] {
         let selected = tests.filter { test in
+            if let exactName { return test.name == exactName }
             guard let filter, !filter.isEmpty else {
                 return true
             }

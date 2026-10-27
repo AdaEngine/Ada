@@ -10,8 +10,11 @@ enum EditorShaderGraphFileError: Error { case unavailable, changedOnDisk, unsave
 @MainActor
 final class EditorShaderGraphModel {
     let url: URL?
+    let canvas = EditorNodeCanvasState()
+    var canvasViewportSize = Size(width: 480, height: 400)
     private(set) var graph: ShaderGraph?
-    var selection = Set<String>()
+    var selection = Set<String>() { didSet { selectedWire = nil } }
+    var selectedWire: EditorNodeCanvasWire?
     var expandedPorts = Set<String>()
     private(set) var isDirty = false
     private(set) var isReadOnly = false
@@ -30,6 +33,7 @@ final class EditorShaderGraphModel {
     private struct Snapshot {
         let graph: ShaderGraph
         let selection: Set<String>
+        var selectedWire: EditorNodeCanvasWire?
     }
 
     init(url: URL?) {
@@ -113,7 +117,7 @@ final class EditorShaderGraphModel {
             return false
         }
         if transaction == nil {
-            undoStack.append(.init(graph: current, selection: selection))
+            undoStack.append(.init(graph: current, selection: selection, selectedWire: selectedWire))
             trimHistory()
             redoStack = []
         }
@@ -127,7 +131,7 @@ final class EditorShaderGraphModel {
         guard transaction == nil, let graph, !isReadOnly else {
             return
         }
-        transaction = .init(graph: graph, selection: selection)
+        transaction = .init(graph: graph, selection: selection, selectedWire: selectedWire)
     }
 
     func endTransaction() {
@@ -155,7 +159,7 @@ final class EditorShaderGraphModel {
         guard !isReadOnly, let current = graph, let previous = undoStack.popLast() else {
             return
         }
-        redoStack.append(.init(graph: current, selection: selection))
+        redoStack.append(.init(graph: current, selection: selection, selectedWire: selectedWire))
         adopt(previous)
     }
 
@@ -163,7 +167,7 @@ final class EditorShaderGraphModel {
         guard !isReadOnly, let current = graph, let next = redoStack.popLast() else {
             return
         }
-        undoStack.append(.init(graph: current, selection: selection))
+        undoStack.append(.init(graph: current, selection: selection, selectedWire: selectedWire))
         adopt(next)
     }
 
@@ -217,6 +221,11 @@ final class EditorShaderGraphModel {
     }
 
     func removeSelection() {
+        if let wire = selectedWire {
+            guard canvasWires.contains(wire) else { selectedWire = nil; return }
+            editNode(wire.target.node) { $0.inputs[wire.target.port] = nil }
+            return
+        }
         guard let graph else {
             return
         }
@@ -234,6 +243,7 @@ final class EditorShaderGraphModel {
         let semantic = graph?.nodes != snapshot.graph.nodes || graph?.target != snapshot.graph.target || graph?.renderSettings != snapshot.graph.renderSettings
         graph = snapshot.graph
         selection = snapshot.selection
+        selectedWire = snapshot.selectedWire
         didEdit(semantic: semantic)
     }
 

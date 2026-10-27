@@ -55,6 +55,7 @@ private struct MarkdownAttributedTextRenderer: MarkupVisitor {
     private(set) var result: AttributedText = ""
     private var attributes: TextAttributeContainer
     private let options: TextMarkdownOptions
+    private var listDepth = 0
 
     init(attributes: TextAttributeContainer, options: TextMarkdownOptions) {
         self.attributes = attributes
@@ -84,16 +85,59 @@ private struct MarkdownAttributedTextRenderer: MarkupVisitor {
     }
 
     mutating func visitUnorderedList(_ unorderedList: UnorderedList) {
-        self.renderChildren(of: unorderedList, separator: self.options.hardBreak)
+        renderList(unorderedList, start: nil)
     }
 
     mutating func visitOrderedList(_ orderedList: OrderedList) {
-        self.renderChildren(of: orderedList, separator: self.options.hardBreak)
+        renderList(orderedList, start: Int(orderedList.startIndex))
     }
 
     mutating func visitListItem(_ listItem: ListItem) {
-        self.renderChildren(of: listItem, separator: " ")
+        if let checkbox = listItem.checkbox { append(checkbox == .checked ? "[x] " : "[ ] ") }
+        for (index, child) in listItem.children.enumerated() {
+            if index > 0 { append(options.hardBreak) }
+            visit(child)
+        }
     }
+
+    private mutating func renderList(_ list: Markup, start: Int?) {
+        listDepth += 1
+        for (index, item) in list.children.enumerated() {
+            if index > 0 { append(options.hardBreak) }
+            append(String(repeating: "  ", count: listDepth - 1))
+            append(start.map { "\($0 + index). " } ?? "• ")
+            visit(item)
+        }
+        listDepth -= 1
+    }
+
+    mutating func visitBlockQuote(_ blockQuote: BlockQuote) {
+        append("> ")
+        renderChildren(of: blockQuote, separator: options.blockSeparator)
+    }
+
+    mutating func visitThematicBreak(_: ThematicBreak) { append("--------") }
+
+    mutating func visitLink(_ link: Link) {
+        pushAttributes { $0.link = link.destination }
+        renderChildren(of: link)
+        popAttributes()
+    }
+
+    mutating func visitImage(_ image: Markdown.Image) {
+        append("[Image: ")
+        renderChildren(of: image)
+        append("]")
+    }
+
+    mutating func visitTable(_ table: Table) { renderChildren(of: table, separator: options.hardBreak) }
+    mutating func visitTableHead(_ head: Table.Head) {
+        pushAttributes { $0.fontTraits.insert(.strong) }
+        renderChildren(of: head, separator: " | ")
+        popAttributes()
+    }
+    mutating func visitTableBody(_ body: Table.Body) { renderChildren(of: body, separator: options.hardBreak) }
+    mutating func visitTableRow(_ row: Table.Row) { renderChildren(of: row, separator: " | ") }
 
     mutating func visitCodeBlock(_ codeBlock: CodeBlock) {
         self.pushAttributes { attributes in

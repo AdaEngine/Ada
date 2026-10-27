@@ -72,6 +72,18 @@ extension Text: View, ViewNodeBuilder {
 }
 
 extension Text {
+    /// Enables pointer selection and the platform Copy / Select All shortcuts.
+    public func textSelection(_ behavior: TextSelectionBehavior) -> Text {
+        storage.selectionEnabled = behavior == .enabled
+        return self
+    }
+}
+
+public enum TextSelectionBehavior: Sendable {
+    case enabled, disabled
+}
+
+extension Text {
     /// Sets the default font for text in this view.
     public func font(_ font: Font?) -> Text {
         if let font {
@@ -163,6 +175,7 @@ extension Text {
         var lineLimit: Int?
         var lineBreakMode: LineBreakMode?
         var multilineTextAlignment: TextAlignment?
+        var selectionEnabled = false
 
         init(string: String) {
             self.text = AttributedText(string)

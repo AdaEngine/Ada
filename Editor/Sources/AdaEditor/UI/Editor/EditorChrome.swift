@@ -167,6 +167,7 @@ private struct EditorToolStripButton: View {
 
 enum AdaEditorMaterialSymbolFont {
     static let codepoints: [UInt32] = [
+        0xE000, 0xE5C5, 0xE836,
         0xE7F4,
         0xE001,
         0xE029,
@@ -179,6 +180,7 @@ enum AdaEditorMaterialSymbolFont {
         0xE145,
         0xE14C,
         0xE14D,
+        0xE14F,
         0xE15A,
         0xE15B,
         0xE157,

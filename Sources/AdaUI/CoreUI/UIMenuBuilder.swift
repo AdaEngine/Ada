@@ -136,6 +136,8 @@ public class UIMenu: Identifiable {
     public let id: String
     /// The menu’s title.
     public let title: String
+    /// Optional image used instead of the title in the in-window menu bar.
+    public let image: Image?
     /// The native menu surface where the menu is presented.
     public let placement: Placement
 
@@ -152,10 +154,12 @@ public class UIMenu: Identifiable {
     ///
     /// - Parameters:
     ///   - title: The menu’s title.
+    ///   - image: An image for the in-window menu bar. Native menus retain the title.
     ///   - placement: The native menu surface where the menu is presented.
-    public init(title: String, placement: Placement = .automatic) {
+    public init(title: String, image: Image? = nil, placement: Placement = .automatic) {
         self.id = title
         self.title = title
+        self.image = image
         self.placement = placement
     }
 

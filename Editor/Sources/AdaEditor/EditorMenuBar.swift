@@ -147,7 +147,7 @@ enum EditorMenuBar {
 
     private static func systemMenu() -> UIMenu {
         #if os(Windows) || os(Linux)
-        let menu = UIMenu(title: L10n.text("Studio"), placement: .application)
+        let menu = UIMenu(title: L10n.text("Studio"), image: applicationMenuLogo, placement: .application)
         #else
         let menu = UIMenu(title: L10n.text("System"), placement: .application)
         #endif
@@ -163,6 +163,10 @@ enum EditorMenuBar {
         menu.add(item("Debug Overlay: Focused Node", command: .debugOverlayFocusedNode))
         return menu
     }
+
+    #if os(Windows) || os(Linux)
+    private static let applicationMenuLogo = ProjectOpeningAssets.loadAdaEngineLogo()
+    #endif
 
     private static func fileMenu() -> UIMenu {
         menu(

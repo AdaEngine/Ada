@@ -108,6 +108,9 @@ struct EditorTopToolbarTests {
         #expect(run.absoluteFrame.width == 30)
         #expect(stop.absoluteFrame.width == 30)
         #expect(projectIcon.absoluteFrame.minX - projectSwitcher.absoluteFrame.minX <= 12)
+        #if os(Windows)
+        #expect(projectSwitcher.absoluteFrame.minX == 0)
+        #endif
         #expect(!AdaEngineStyleContent.topToolbarLabels.contains("Hot Reload"))
     }
 

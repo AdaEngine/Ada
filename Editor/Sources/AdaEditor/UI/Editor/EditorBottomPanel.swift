@@ -20,16 +20,18 @@ struct EditorBottomPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(metrics.outputTabs, id: \.self) { tab in
-                        outputTab(tab)
+            if viewModel.activeOutputTab != "Terminal" || EditorDistribution.current != .standalone {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(metrics.outputTabs, id: \.self) { tab in
+                            outputTab(tab)
+                        }
                     }
+                    .padding(.horizontal, 8)
                 }
-                .padding(.horizontal, 8)
+                .frame(height: 34)
+                .background(theme.editorColors.surface)
             }
-            .frame(height: 34)
-            .background(theme.editorColors.surface)
 
             if viewModel.activeOutputTab == "Output" {
                 HStack(spacing: 8) {
@@ -45,7 +47,9 @@ struct EditorBottomPanel: View {
                 .padding(.vertical, 6)
             }
 
-            if viewModel.activeOutputTab == "Performance" {
+            if viewModel.activeOutputTab == "Terminal", EditorDistribution.current == .standalone {
+                EditorTerminalPanel(viewModel: viewModel)
+            } else if viewModel.activeOutputTab == "Performance" {
                 EditorPerformancePanel(model: viewModel.performance)
             } else {
                 GeometryReader { geometry in
@@ -111,10 +115,7 @@ struct EditorBottomPanel: View {
             outputSectionTitle("Build Output")
             outputLog
         case "Tests":
-            commandButton("Run All Tests") { viewModel.runTests() }
-            ForEach(viewModel.testTargets, id: \.self) { target in
-                commandButton(L10n.text("Run \(target)")) { viewModel.runTests(filter: target) }
-            }
+            EditorTestsPanel(viewModel: viewModel)
         case "References":
             if viewModel.symbolReferences.isEmpty {
                 outputLine("No references.")
@@ -278,7 +279,7 @@ struct EditorBottomPanel: View {
         let active = tab == viewModel.activeOutputTab
 
         return Button(action: { viewModel.selectOutputTab(tab) }) {
-            Text(tab)
+            Text(L10n.tr(tab))
                 .font(.system(size: 12))
                 .foregroundColor(active ? theme.editorColors.text : theme.editorColors.muted)
                 .padding(.horizontal, metrics.outputTabHorizontalPadding)
@@ -294,7 +295,7 @@ struct EditorBottomPanel: View {
     }
 
     private func outputTabWidth(_ tab: String) -> Float {
-        Float(tab.count) * 7 + metrics.outputTabHorizontalPadding * 2
+        Float(L10n.tr(tab).count) * 7 + metrics.outputTabHorizontalPadding * 2
     }
 
     private var showsOutputControls: Bool {

@@ -17,6 +17,11 @@ if (-not $IsWindows -and $PSVersionTable.PSEdition -eq 'Core') {
 $env:ADAENGINE_HEADLESS = '0'
 $env:ADAENGINE_DISABLE_SWAN = '0'
 $env:ADAENGINE_PACKAGE_PATH = $studioRoot
+if (-not $env:ADAEDITOR_SWIFTTERM_PACKAGE_PATH) {
+    $studioSwiftTerm = & python (Join-Path $studioRoot 'script/ensure_windows_swiftterm.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Windows SwiftTerm preparation failed.' }
+    $env:ADAEDITOR_SWIFTTERM_PACKAGE_PATH = ($studioSwiftTerm | Select-Object -Last 1).Trim()
+}
 if (-not $env:ADA_MCP_LOCAL_PATH) {
     $studioMCP = & python (Join-Path $studioRoot 'script/ensure_windows_mcp.py')
     if ($LASTEXITCODE -ne 0) { throw 'Windows AdaMCP dependency preparation failed.' }

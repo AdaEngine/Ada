@@ -358,6 +358,11 @@ struct TextEditorPrimitive: View, ViewNodeBuilder {
 }
 
 extension View {
+    /// Controls text mutations while preserving selection, copying, folding and scrolling.
+    public func textEditorEditable(_ editable: Bool) -> some View {
+        environment(\.textEditorIsEditable, editable)
+    }
+
     /// Focuses the editor after its first layout and when `requestID` changes, without inspecting the view tree.
     public func textEditorAutofocus(_ enabled: Bool = true, requestID: Int = 0) -> some View {
         environment(\._textEditorAutofocus, enabled)
@@ -375,6 +380,7 @@ extension View {
 }
 
 extension EnvironmentValues {
+    @Entry var textEditorIsEditable: Bool = true
     @Entry var _textEditorAutofocus: Bool = false
     @Entry var _textEditorFocusRequestID: Int = 0
     @Entry public var textEditorPasteHandler: (@MainActor () -> Bool)? = nil

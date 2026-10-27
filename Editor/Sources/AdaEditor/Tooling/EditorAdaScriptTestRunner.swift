@@ -60,24 +60,35 @@ struct EditorAdaScriptTestRunner {
         return sources.contains { $0.source.contains("@test") }
     }
 
+    /// Discovers declarations without loading a VM or executing project code.
+    func discover(project: AdaProject, at projectURL: URL) throws(EditorAdaScriptTestError) -> [EditorTestItem] {
+        try loadSources(project: project, at: projectURL).flatMap { source in
+            AdaScriptSyntax.parse(source: source.source, path: source.path).tests.map { test in
+                EditorTestItem(id: source.path + ":" + test.name, name: test.displayName,
+                               filter: test.name, path: source.path, line: test.range.start.line + 1)
+            }
+        }
+    }
+
     /// Compiles the project with tests and runs them. Throws for load problems and when nothing matches.
     func run(
         project: AdaProject,
         at projectURL: URL,
         filter: String?,
+        exactName: String? = nil,
         testTimeout: Duration = Self.defaultTestTimeout,
         onResult: ((EditorAdaScriptTestOutcome) -> Void)? = nil
     ) throws(EditorAdaScriptTestError) -> [EditorAdaScriptTestOutcome] {
         let sources = try loadSources(project: project, at: projectURL)
         let results: [AdaScriptTestResult]
         do {
-            results = try AdaScriptTestProject.run(
+            let plugin = try AdaScriptPlugin(
                 sources: sources,
                 name: project.project.name ?? projectURL.lastPathComponent,
-                matching: filter,
-                testTimeout: testTimeout,
-                onResult: { onResult?(Self.outcome(of: $0)) }
+                includeTests: true,
+                testTimeout: testTimeout
             )
+            results = plugin.runTests(matching: filter, exactName: exactName, onResult: { onResult?(Self.outcome(of: $0)) })
         } catch let error as AdaScriptError {
             throw .loadFailed(error.errorDescription ?? error.localizedDescription)
         } catch {

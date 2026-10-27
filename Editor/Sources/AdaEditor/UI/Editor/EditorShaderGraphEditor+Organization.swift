@@ -4,49 +4,81 @@ extension EditorShaderGraphEditor {
     var canvasPoint: Vector2 { (Vector2(canvasViewportSize.width / 2, canvasViewportSize.height / 2) - canvas.pan) / canvas.zoom - Vector2(104, 50) }
 
     var nodeSearch: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                TextField(L10n.text("Search Nodes"), text: Binding(get: { search.query }, set: { search.query = $0 })).textFieldStyle(PlainTextFieldStyle()).accessibilityIdentifier(
-                    "AdaEditor.ShaderGraph.Search"
-                )
-                Button(L10n.text("Close")) { search.isPresented = false }
-            }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                EditorShaderGraphSymbol(glyph: "\u{E145}").foregroundColor(theme.editorColors.blue)
+                Text(L10n.tr("Add Node")).environment(\.font, .system(size: 13, weight: .semibold))
+                Spacer(minLength: 0)
+                EditorShaderGraphAction(title: "Close", glyph: "\u{E5CD}") { search.isPresented = false }
+            }.frame(height: 30)
+            HStack(spacing: 8) {
+                EditorShaderGraphSymbol(glyph: "\u{E8B6}").foregroundColor(theme.editorColors.muted)
+                TextField(L10n.text("Search Nodes"), text: Binding(get: { search.query }, set: { search.query = $0 }))
+                    .textFieldStyle(PlainTextFieldStyle()).accessibilityIdentifier("AdaEditor.ShaderGraph.Search")
+            }.padding(.horizontal, 8).frame(height: 34)
+                .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.background))
+                .overlay { RoundedRectangleShape(cornerRadius: 6).stroke(theme.editorColors.blue.opacity(0.65), lineWidth: 1) }
             if let graph = model.graph {
+                let entries = search.entries(in: graph)
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(search.entries(in: graph)) { entry in
+                    VStack(alignment: .leading, spacing: 5) {
+                        if entries.isEmpty { Text(L10n.tr("No matching nodes")).foregroundColor(theme.editorColors.muted).padding(12) }
+                        ForEach(entries) { entry in
                             Button {
                                 model.insert(entry, using: search)
                                 search.isPresented = false
                             } label: {
-                                Text(verbatim: entry.title).frame(maxWidth: .infinity, alignment: .leading)
+                                HStack(spacing: 8) {
+                                    EditorShaderGraphSymbol(glyph: "\u{E8F0}").foregroundColor(theme.editorColors.muted)
+                                    Text(verbatim: L10n.tr(EditorShaderGraphModel.operationTitle(entry.operation.rawValue))).lineLimit(1)
+                                    Spacer(minLength: 0)
+                                    EditorShaderGraphTypeBadge(type: entry.type.rawValue)
+                                    EditorShaderGraphSymbol(glyph: "\u{E145}", size: 14).foregroundColor(theme.editorColors.blue)
+                                }.padding(.horizontal, 8).frame(height: 32).frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surface))
+                                    .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.6), lineWidth: 1) }
                             }.accessibilityIdentifier("AdaEditor.ShaderGraph.Search.\(entry.id)")
                         }
                     }
-                }.frame(height: 160)
+                }.frame(height: 216)
             }
-        }.padding(10).font(.system(size: 12)).foregroundColor(theme.editorColors.text).buttonStyle(DefaultButtonStyle()).background(theme.editorColors.surface)
+        }.padding(12).frame(width: 360, height: 344, alignment: .topLeading)
+            .font(.system(size: 12)).foregroundColor(theme.editorColors.text).buttonStyle(DefaultButtonStyle())
+            .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surfaceElevated))
+            .overlay { RoundedRectangleShape(cornerRadius: 8).stroke(theme.editorColors.border, lineWidth: 1) }
+            .accessibilityIdentifier("AdaEditor.ShaderGraph.NodeSearch")
     }
 
     var parameterPanel: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(L10n.text("Parameters")).font(.system(size: 13, weight: .semibold))
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 6) {
+                    EditorShaderGraphSymbol(glyph: "\u{E869}").foregroundColor(theme.editorColors.muted)
+                    Text(L10n.text("Parameters")).environment(\.font, .system(size: 12, weight: .semibold))
+                }
                 ForEach((model.graph?.nodes ?? []).filter { $0.kind == "parameter" }, id: \.id) { node in
                     Button {
                         model.reveal(node.id, canvas: canvas, size: canvasViewportSize)
                     } label: {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(verbatim: node.label ?? node.reference ?? node.id).lineLimit(2)
-                            Text(verbatim: node.type.rawValue).font(.system(size: 10)).foregroundColor(theme.editorColors.muted)
-                        }
+                        HStack(spacing: 7) {
+                            CircleShape().fill(EditorNodeCanvas.portColor(node.type.rawValue)).frame(width: 8, height: 8)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(verbatim: node.label ?? node.reference ?? node.id).lineLimit(2)
+                                EditorShaderGraphTypeBadge(type: node.type.rawValue)
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                            EditorShaderGraphSymbol(glyph: "\u{E5CC}", size: 13).foregroundColor(theme.editorColors.muted)
+                        }.padding(8).frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+                            .background(RoundedRectangleShape(cornerRadius: 6).fill(
+                                model.selection.contains(node.id) ? theme.editorColors.blue.opacity(0.16) : theme.editorColors.surfaceElevated
+                            ))
+                            .overlay { RoundedRectangleShape(cornerRadius: 6).stroke(model.selection.contains(node.id) ? theme.editorColors.blue : theme.editorColors.border, lineWidth: 1) }
                     }.accessibilityIdentifier("AdaEditor.ShaderGraph.Parameter.\(node.id)")
                 }
-                Button(L10n.text("Add Parameter")) {
+                EditorShaderGraphAction(title: "Add Parameter", glyph: "\u{E145}") {
                     search.open(at: canvasPoint)
                     search.query = L10n.tr("Parameter")
                 }
-            }.padding(12)
+            }.padding(10)
         }.font(.system(size: 12)).foregroundColor(theme.editorColors.text).buttonStyle(DefaultButtonStyle()).background(theme.editorColors.surface)
     }
 
@@ -61,23 +93,20 @@ extension EditorShaderGraphEditor {
 
     var organizationPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Divider()
             HStack {
-                Button(L10n.text("Copy")) { copyNodes() }
-                Button(L10n.text("Paste")) { pasteNodes() }
+                EditorShaderGraphAction(title: "Copy", glyph: "\u{E14D}") { copyNodes() }
+                EditorShaderGraphAction(title: "Paste", glyph: "\u{E14F}") { pasteNodes() }
             }
-            Button(L10n.text("Copy Graph Source")) { if let graph = model.graph { UIClipboard.setString(EditorShaderGraphTemplates.encode(graph)) } }
-            HStack {
-                Button(L10n.text("Group Selection")) { model.groupSelection() }
-                Button(L10n.text("Add Comment")) { model.addComment(at: canvasPoint) }
-            }
+            EditorShaderGraphAction(title: "Copy Graph Source", glyph: "\u{E86F}") { if let graph = model.graph { UIClipboard.setString(EditorShaderGraphTemplates.encode(graph)) } }
+            EditorShaderGraphAction(title: "Group Selection", glyph: "\u{E8F1}") { model.groupSelection() }
+            EditorShaderGraphAction(title: "Add Comment", glyph: "\u{E0CA}") { model.addComment(at: canvasPoint) }
             if let graph = model.graph {
                 ForEach(graph.groups.keys.sorted(), id: \.self) { id in
                     if let group = graph.groups[id] {
                         field("Group", value: group.title) { value in model.edit(semantic: false) { $0.groups[id]?.title = value } }
                         HStack {
-                            Button(L10n.text("Select")) { model.selection = Set(group.nodes) }
-                            Button(L10n.text("Remove Group")) { model.edit(semantic: false) { $0.groups[id] = nil } }
+                            EditorShaderGraphAction(title: "Select", glyph: "\u{E5CA}") { model.selection = Set(group.nodes) }
+                            EditorShaderGraphAction(title: "Remove Group", glyph: "\u{E872}", destructive: true) { model.edit(semantic: false) { $0.groups[id] = nil } }
                         }
                     }
                 }
@@ -92,7 +121,7 @@ extension EditorShaderGraphEditor {
                                 if let value = Float(text), value.isFinite { model.edit(semantic: false) { $0.notes[id]?.position.y = value } }
                             }
                         }
-                        Button(L10n.text("Remove Comment")) { model.edit(semantic: false) { $0.notes[id] = nil } }
+                        EditorShaderGraphAction(title: "Remove Comment", glyph: "\u{E872}", destructive: true) { model.edit(semantic: false) { $0.notes[id] = nil } }
                     }
                 }
             }

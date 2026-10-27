@@ -7,6 +7,19 @@
 
 import AdaUtils
 
+/// Destination associated with rendered Markdown link text.
+public struct LinkTextAttribute: TextAttributeKey {
+    public typealias Value = String
+    public static let defaultValue = ""
+}
+
+extension TextAttributeContainer {
+    public var link: String? {
+        get { self[LinkTextAttribute.self] }
+        set { self[LinkTextAttribute.self] = newValue }
+    }
+}
+
 /// A type that defines an attribute’s name and type.
 public protocol TextAttributeKey {
     associatedtype Value: Hashable

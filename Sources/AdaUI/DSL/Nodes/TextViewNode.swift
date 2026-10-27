@@ -6,11 +6,20 @@
 //
 
 import AdaInput
+import Foundation
 import AdaText
 import AdaUtils
 import Math
 
 final class TextViewNode: ViewNode {
+    var selectionEnabled = false
+    var selectionAnchor: String.Index?
+    var selectionHead: String.Index?
+    var selectionIsDragging = false
+    var selectionIsFocused = false
+    var drawnTextOffset: Point = .zero
+    var selectableText: String { textContainer.text.text }
+    var selectionLayout: TextLayoutManager { drawLayoutManager }
     var layoutManager: TextLayoutManager
     private var drawLayoutManager: TextLayoutManager
     private var textContainer: TextContainer {
@@ -37,6 +46,7 @@ final class TextViewNode: ViewNode {
         self.drawLayoutManager = TextLayoutManager()
         self.drawLayoutManager.setTextContainer(self.textContainer)
         self.textRenderer = inputs.environment.textRenderer ?? DefaultRichTextRenderer()
+        self.selectionEnabled = content.storage.selectionEnabled
 
         super.init(content: content)
         self.applyResolvedEnvironmentSilently(inputs.environment)
@@ -129,6 +139,8 @@ final class TextViewNode: ViewNode {
             context.pushClipPath(RectangleShape().path(in: clipBounds))
         }
         context.translateBy(x: offset.x, y: offset.y)
+        self.drawnTextOffset = offset
+        self.drawSelection(in: &context)
 
         let layout = Text.Layout(lines: self.drawLayoutManager.textLines)
         self.textRenderer.draw(layout: layout, in: &context)
@@ -147,6 +159,11 @@ final class TextViewNode: ViewNode {
         }
 
         self.textRenderer = textNode.textRenderer
+        self.selectionEnabled = textNode.selectionEnabled
+        if self.selectableText != textNode.selectableText {
+            self.selectionAnchor = nil
+            self.selectionHead = nil
+        }
         self.textContainer = textNode.textContainer
     }
 
@@ -165,6 +182,62 @@ final class TextViewNode: ViewNode {
             return self
         }
         return nil
+    }
+
+    override var canBecomeFocused: Bool { selectionEnabled && environment.isEnabled }
+
+    override func onFocusChanged(isFocused: Bool) {
+        selectionIsFocused = isFocused
+        if !isFocused { selectionIsDragging = false }
+        invalidateSelection()
+    }
+
+    override func onMouseEvent(_ event: MouseEvent) {
+        guard selectionEnabled, environment.isEnabled else { return }
+        owner?.window?.windowManager.setCursorShape(.iBeam)
+        guard event.button == .left || selectionIsDragging else { return }
+        let index = closestTextIndex(to: selectionPointFromRoot(event.mousePosition))
+        switch event.phase {
+        case .began:
+            selectionIsDragging = true
+            if !event.modifierKeys.contains(.shift) || selectionAnchor == nil { selectionAnchor = index }
+            selectionHead = index
+        case .changed:
+            guard selectionIsDragging else { return }
+            selectionHead = index
+        case .ended, .cancelled:
+            guard selectionIsDragging else { return }
+            selectionHead = index
+            selectionIsDragging = false
+            if event.phase == .ended, selectedSourceRange == nil,
+               let link = link(at: index), let url = URL(string: link),
+               ["https", "http", "mailto"].contains(url.scheme?.lowercased() ?? "") {
+                environment.openURL(url)
+            }
+        }
+        invalidateSelection()
+    }
+
+    override func onMouseLeave() {
+        if selectionEnabled { owner?.window?.windowManager.setCursorShape(.arrow) }
+    }
+
+    override func onKeyEvent(_ event: KeyEvent) {
+        guard selectionEnabled, selectionIsFocused, event.status == .down else { return }
+        if event.modifiers.contains(.main) || event.modifiers.contains(.control) {
+            switch event.keyCode {
+            case .a:
+                selectionAnchor = selectableText.startIndex
+                selectionHead = selectableText.endIndex
+            case .c:
+                if let range = selectedSourceRange { UIClipboard.setString(String(selectableText[range])) }
+            default: return
+            }
+        } else if event.keyCode == .escape {
+            selectionAnchor = nil
+            selectionHead = nil
+        }
+        invalidateSelection()
     }
 
     private func refreshTextContainer() {
@@ -203,7 +276,21 @@ final class TextViewNode: ViewNode {
 struct DefaultRichTextRenderer: TextRenderer {
     func draw(layout: Text.Layout, in context: inout UIGraphicsContext) {
         for line in layout {
+            for run in line {
+                for glyph in run where glyph.attributes.fontTraits.contains(.code) {
+                    let size = Float(glyph.attributes.font.pointSize)
+                    context.drawRect(Rect(x: min(glyph.penOrigin.x, glyph.advanceX), y: -glyph.penOrigin.y - size * 0.9,
+                        width: max(1, abs(glyph.advanceX - glyph.penOrigin.x)), height: size * 1.25),
+                        color: glyph.attributes.foregroundColor.opacity(0.07))
+                }
+            }
             context.draw(line)
+            for run in line {
+                for glyph in run where glyph.attributes.link != nil {
+                    context.drawRect(Rect(x: min(glyph.penOrigin.x, glyph.advanceX), y: -glyph.penOrigin.y + 2,
+                        width: abs(glyph.advanceX - glyph.penOrigin.x), height: 1), color: context.environment.accentColor)
+                }
+            }
         }
     }
 }

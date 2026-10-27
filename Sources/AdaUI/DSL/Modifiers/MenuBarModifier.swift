@@ -60,8 +60,17 @@ private struct WindowMenuBar: View {
     var body: some View {
         HStack(spacing: 0) {
             ForEach(menus) { menu in
-                Text(menu.title)
-                    .font(.system(size: 12))
+                Group {
+                    if let image = menu.image {
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Text(menu.title)
+                            .font(.system(size: 12))
+                    }
+                }
                     .padding(.horizontal, 10)
                     .frame(height: caption.isVisible ? 32 : 26)
                     .contextMenu(opensOnPrimaryAction: true) {

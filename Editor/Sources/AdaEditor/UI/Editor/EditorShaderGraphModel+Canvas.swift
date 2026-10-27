@@ -41,6 +41,7 @@ extension EditorShaderGraphModel {
     func canvasInteraction() -> EditorNodeCanvasInteraction {
         let interaction = EditorNodeCanvasInteraction()
         interaction.select = { [weak self] in self?.selection = $0 }
+        interaction.selectWire = { [weak self] in self?.selectedWire = $0 }
         interaction.begin = { [weak self] in self?.beginTransaction() }
         interaction.commit = { [weak self] in self?.endTransaction() }
         interaction.cancel = { [weak self] in self?.cancelTransaction() }

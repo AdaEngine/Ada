@@ -5,6 +5,8 @@
 //  Created by Codex on 19.02.2026.
 //
 
+import AdaInput
+
 /// A control that displays an editable text interface.
 public struct TextField: View, ViewNodeBuilder {
     public typealias Body = Never
@@ -13,6 +15,22 @@ public struct TextField: View, ViewNodeBuilder {
     let placeholder: String
     let text: Binding<String>
     let onSubmit: (() -> Void)?
+    var keyHandler: ((KeyEvent) -> Bool)?
+    var caretChanged: ((Int) -> Void)?
+
+    /// Handles completion/navigation keys before the field's default editing behavior.
+    public func onKeyPress(_ handler: @escaping (KeyEvent) -> Bool) -> Self {
+        var copy = self
+        copy.keyHandler = handler
+        return copy
+    }
+
+    /// Reports the caret as a grapheme offset, including mouse and keyboard movement.
+    public func onCaretChange(_ handler: @escaping (Int) -> Void) -> Self {
+        var copy = self
+        copy.caretChanged = handler
+        return copy
+    }
 
     /// Creates a text field with an optional placeholder.
     ///

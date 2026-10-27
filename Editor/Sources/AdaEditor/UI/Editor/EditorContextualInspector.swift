@@ -46,6 +46,15 @@ struct EditorContextualInspector: View {
         case let .text(document):
             return AnyView(EditorFileInspector(document: .text(document)))
         case let .asset(document):
+            if document.kind == .shaderGraph {
+                return AnyView(EditorShaderGraphEditor(
+                    model: workbench.shaderGraphModel(for: document), presentation: .inspector,
+                    modelDocuments: workbench.openDocuments.compactMap {
+                        if case let .asset(asset) = $0, asset.kind == .model3D { return asset }
+                        return nil
+                    }
+                ).id(document.id))
+            }
             if document.kind == .image {
                 return AnyView(EditorTextureSettingsInspector(model: workbench.textureSettingsModel(for: document)))
             }

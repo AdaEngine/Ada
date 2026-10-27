@@ -9,6 +9,7 @@ import Observation
     private(set) var revision: UInt64 = 0
     private(set) var replacedInput: EditorNodeCanvasEndpoint?
     @ObservationIgnored var select: (Set<String>) -> Void = { _ in }
+    @ObservationIgnored var selectWire: (EditorNodeCanvasWire) -> Void = { _ in }
     @ObservationIgnored var move: ([String: Vector2]) -> Void = { _ in }
     @ObservationIgnored var begin: () -> Void = {}
     @ObservationIgnored var commit: () -> Void = {}
@@ -24,22 +25,31 @@ import Observation
         case nodes([String: Vector2])
         case pan(Vector2)
         case marquee
+        case selectedWire
     }
 
-    func drag(from start: Vector2, to point: Vector2, geometry: EditorNodeCanvasGeometry, wires: [EditorNodeCanvasWire], selection: Set<String>, state: EditorNodeCanvasState) {
+    func drag(
+        from start: Vector2, to point: Vector2, geometry: EditorNodeCanvasGeometry,
+        wires: [EditorNodeCanvasWire], selection: Set<String>, state: EditorNodeCanvasState, panning: Bool = false
+    ) {
         if operation == nil {
             origin = start
-            if let port = geometry.hitPort(start) {
+            if panning || state.panMode {
+                operation = .pan(state.pan)
+            } else if let port = geometry.hitPort(start) {
+                select([])
                 let fixed = !port.isOutput ? (wires.first { $0.target == port }?.source ?? port) : port
                 replacedInput = !port.isOutput && fixed != port ? port : nil
                 anchor = fixed
                 operation = .wire(fixed)
-            } else if state.panMode {
-                operation = .pan(state.pan)
             } else if let node = geometry.hitNode(start) {
                 let selected = selection.contains(node) ? selection : [node]
                 select(selected)
                 operation = .nodes(Dictionary(uniqueKeysWithValues: geometry.nodes.filter { selected.contains($0.id) }.map { ($0.id, geometry.origin($0)) }))
+            } else if let wire = geometry.hitWire(start, wires: wires) {
+                select([])
+                selectWire(wire)
+                operation = .selectedWire
             } else {
                 select([])
                 operation = .marquee

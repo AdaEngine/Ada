@@ -981,11 +981,8 @@
                 }
 
                 let character = String(scalar)
-                let sanitizedText =
-                    character
-                    .replacingOccurrences(of: "\r\n", with: " ")
-                    .replacingOccurrences(of: "\n", with: " ")
-                    .replacingOccurrences(of: "\r", with: " ")
+                // Editing controls handle Enter through KeyEvent. Do not turn its WM_CHAR into a space.
+                let sanitizedText = character
 
                 guard !sanitizedText.isEmpty else {
                     return

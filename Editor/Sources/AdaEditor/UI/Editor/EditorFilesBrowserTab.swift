@@ -103,21 +103,7 @@ struct EditorFilesBrowserTab: View {
     }
 
     private func icon(for item: EditorProjectSidebarViewModel.Item) -> String {
-        switch item.kind {
-        case .scene:
-            EditorProjectTreeIcon.scene
-        case .text:
-            EditorProjectTreeIcon.code
-        case .image:
-            EditorProjectTreeIcon.image
-        case .audio:
-            EditorProjectTreeIcon.audioFile
-        case .genericAsset,
-            .unsupported:
-            EditorProjectTreeIcon.description
-        case .folder:
-            EditorProjectTreeIcon.folder
-        }
+        EditorProjectFileAppearance.resolve(for: item).symbol
     }
 
     private func kindLabel(for item: EditorProjectSidebarViewModel.Item) -> String {

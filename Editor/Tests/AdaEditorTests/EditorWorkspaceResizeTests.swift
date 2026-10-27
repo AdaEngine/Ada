@@ -35,6 +35,48 @@ struct EditorWorkspaceResizeTests {
         #expect(layout.bottomPanelHeight == 72)
     }
 
+    @Test("resize highlight follows hover and stays visible throughout dragging", arguments: [true, false])
+    func resizeHighlight(horizontal: Bool) async throws {
+        let container = UIContainerView(
+            rootView: ZStack {
+                EditorResizeHandle(axis: horizontal ? .horizontal : .vertical)
+                    .frame(width: horizontal ? 8 : 200, height: horizontal ? 200 : 8)
+                    .accessibilityIdentifier("test.handle")
+            }
+            .frame(width: 200, height: 200)
+            .theme(.adaEditor)
+        )
+        container.frame = Rect(x: 0, y: 0, width: 200, height: 200)
+        container.bounds.size = container.frame.size
+        await settle(container)
+        let highlight = UINodeSelector.accessibilityIdentifier("AdaEditor.ResizeHandle.Highlight")
+        let handle = try container.uiNode(matching: .accessibilityIdentifier("test.handle")).absoluteFrame
+        let center = Point(handle.midX, handle.midY)
+        #expect(container.uiFindNodes(matching: highlight).isEmpty)
+
+        container.onMouseEvent(MouseEvent(window: RID(), button: .none, mousePosition: center, phase: .changed, modifierKeys: [], time: 0))
+        await settle(container)
+        let line = try container.uiNode(matching: highlight).absoluteFrame
+        #expect(line.width == (horizontal ? 3 : 192))
+        #expect(line.height == (horizontal ? 192 : 3))
+
+        let outside = Point(10, 10)
+        container.onMouseEvent(MouseEvent(window: RID(), button: .none, mousePosition: outside, phase: .changed, modifierKeys: [], time: 0))
+        await settle(container)
+        #expect(container.uiFindNodes(matching: highlight).isEmpty)
+
+        container.onMouseEvent(MouseEvent(window: RID(), button: .none, mousePosition: center, phase: .changed, modifierKeys: [], time: 0))
+        await settle(container)
+        for (phase, point) in [(MouseEvent.Phase.began, center), (.changed, outside)] {
+            container.onMouseEvent(MouseEvent(window: RID(), button: .left, mousePosition: point, phase: phase, modifierKeys: [], time: 0))
+            await settle(container)
+        }
+        #expect(!container.uiFindNodes(matching: highlight).isEmpty)
+        container.onMouseEvent(MouseEvent(window: RID(), button: .left, mousePosition: outside, phase: .ended, modifierKeys: [], time: 0))
+        await settle(container)
+        #expect(container.uiFindNodes(matching: highlight).isEmpty)
+    }
+
     @Test("panels and dividers fit even a tiny workspace", arguments: [Float(0), 1, 7, 8, 100, 187, 188, 219, 220, 227, 228, 400, 416, 600])
     func constrainedWorkspaceFits(extent: Float) {
         let layout = layout(size: Size(width: extent, height: extent))

@@ -298,7 +298,11 @@ struct EditorAgentChatUITests {
         for _ in 0..<20 { await Task.yield() }
         container.layoutIfNeeded()
         #expect(model.prompt == "/")
-        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Completion.command:compact"))
+        let row = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Completion.command:compact"))
+        let completions = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Completions"))
+        let composer = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Composer"))
+        #expect(row.absoluteFrame.height >= 48)
+        #expect(composer.absoluteFrame.minY - completions.absoluteFrame.maxY >= 8)
         container.onKeyEvent(KeyEvent(window: .empty, keyCode: .arrowDown, modifiers: [], status: .down, time: 0, isRepeated: false))
         #expect(model.selectedCompletionIndex == 1)
         container.onKeyEvent(KeyEvent(window: .empty, keyCode: .enter, modifiers: [], status: .down, time: 0, isRepeated: false))

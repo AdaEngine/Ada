@@ -57,3 +57,6 @@ Derived/
 # Local, machine-specific benchmark baselines
 .benchmarkBaselines/
 __pycache__/
+
+# Generated agent sessions from editor test fixtures.
+Editor/Tests/AdaEditorTests/Fixtures/**/.ada/workspace/agent/

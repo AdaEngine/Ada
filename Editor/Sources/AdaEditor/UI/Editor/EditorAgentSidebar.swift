@@ -483,23 +483,23 @@ struct EditorAgentSidebar: View {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(Array(viewModel.autocompleteSuggestions.enumerated()), id: \.element.id) { index, entry in
                             Button(action: { viewModel.insertAutocomplete(entry) }) {
-                                HStack(spacing: 8) {
-                                    Text(entry.kind)
-                                        .font(.system(size: 9))
+                                HStack(spacing: 10) {
+                                    Text(completionIcon(for: entry))
+                                        .font(AdaEditorMaterialSymbolFont.font(size: 20))
                                         .foregroundColor(theme.editorColors.blue)
-                                        .frame(width: 44, alignment: .leading)
+                                        .frame(width: 28)
 
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(entry.title).font(.system(size: 11)).lineLimit(1)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(entry.title).font(.system(size: 13)).lineLimit(1)
                                         if let detail = entry.detail, !detail.isEmpty {
-                                            Text(L10n.tr(detail)).font(.system(size: 9)).foregroundColor(theme.editorColors.muted).lineLimit(1)
+                                            Text(L10n.tr(detail)).font(.system(size: 11)).foregroundColor(theme.editorColors.muted).lineLimit(1)
                                         }
                                     }
                                     .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                                 }
                                 .foregroundColor(theme.editorColors.text)
-                                .padding(.horizontal, 8)
-                                .frame(height: 36)
+                                .padding(.horizontal, 10)
+                                .frame(height: 50)
                                 .background(
                                     RoundedRectangleShape(cornerRadius: 5)
                                         .fill(index == viewModel.selectedCompletionIndex ? theme.editorColors.blue.opacity(0.14) : .clear)
@@ -517,11 +517,20 @@ struct EditorAgentSidebar: View {
                     }
                 }
             }
-            .frame(height: min(216, Float(viewModel.autocompleteSuggestions.count) * 38))
+            .frame(height: min(258, Float(viewModel.autocompleteSuggestions.count) * 52 - 2))
             .padding(6)
             .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.background))
             .drawingGroup()
             .accessibilityIdentifier("AdaEditor.Agent.Completions")
+            .padding(.bottom, 8)
+        }
+    }
+
+    private func completionIcon(for entry: EditorAgentCompletion) -> String {
+        switch entry {
+        case let .file(file): file.isDirectory ? "\u{E2C7}" : "\u{E24D}"
+        case .skill: "\u{E65F}"
+        case .command: "\u{EB8E}"
         }
     }
 

@@ -435,7 +435,9 @@ public final class TextLayoutManager: @unchecked Sendable {
             ],
             advanceX: glyph.advanceX + offset,
             origin: glyph.origin,
-            size: glyph.size
+            size: glyph.size,
+            sourceRange: glyph.sourceRange,
+            penOrigin: Point(x: glyph.penOrigin.x + offset, y: glyph.penOrigin.y)
         )
     }
 
@@ -609,7 +611,8 @@ public final class TextLayoutManager: @unchecked Sendable {
                 pointSize: Double,
                 xOffset: Double = 0,
                 yOffset: Double = 0,
-                advanceX: Double
+                advanceX: Double,
+                sourceRange: Range<String.Index>
             ) {
                 let glyphFontHandle = fontResource.handle
                 let glyphMetrics = glyphFontHandle.metrics
@@ -648,7 +651,9 @@ public final class TextLayoutManager: @unchecked Sendable {
                         position: [Float(pl), Float(pb), Float(pr), Float(pt)],
                         advanceX: Float(advanceX),
                         origin: Point(x: -Float(glyphFontSize) / 2, y: Float(glyphFontSize) / 2),
-                        size: Size(width: Float(glyphFontSize), height: Float(glyphFontSize))
+                        size: Size(width: Float(glyphFontSize), height: Float(glyphFontSize)),
+                        sourceRange: sourceRange,
+                        penOrigin: Point(x: Float(baselineX), y: Float(baselineY))
                     )
                 )
             }
@@ -694,6 +699,16 @@ public final class TextLayoutManager: @unchecked Sendable {
 
                 let glyphFontScale = font.pointSize / fontResource.handle.metrics.emSize
                 let kern = Double(attributes.kern)
+                let clusters = Set(shapedGlyphs.map(\.cluster) + [runText.utf8.count]).sorted()
+                func sourceRange(for cluster: Int) -> Range<String.Index> {
+                    let lower = min(max(0, cluster), runText.utf8.count)
+                    let upper = clusters.first(where: { $0 > lower }) ?? runText.utf8.count
+                    let startUTF8 = attributedText.text.utf8.index(startIndex, offsetBy: lower)
+                    let endUTF8 = attributedText.text.utf8.index(startIndex, offsetBy: upper)
+                    let start = String.Index(startUTF8, within: attributedText.text) ?? startIndex
+                    let end = String.Index(endUTF8, within: attributedText.text) ?? runEndIndex
+                    return start..<end
+                }
 
                 func advance(from lowerBound: Int, to upperBound: Int) -> Double {
                     renderGlyphs[lowerBound..<upperBound]
@@ -751,7 +766,8 @@ public final class TextLayoutManager: @unchecked Sendable {
                             pointSize: font.pointSize,
                             xOffset: shapedGlyph.xOffset,
                             yOffset: shapedGlyph.yOffset,
-                            advanceX: x + (shapedGlyph.xAdvance * glyphFontScale) + kern
+                            advanceX: x + (shapedGlyph.xAdvance * glyphFontScale) + kern,
+                            sourceRange: sourceRange(for: shapedGlyph.cluster)
                         )
 
                         x += (shapedGlyph.xAdvance * glyphFontScale) + kern
@@ -905,7 +921,9 @@ public final class TextLayoutManager: @unchecked Sendable {
                             position: [Float(pl), Float(pb), Float(pr), Float(pt)],
                             advanceX: Float(nextCaretX),
                             origin: Point(x: -Float(glyphFontSize) / 2, y: Float(glyphFontSize) / 2),
-                            size: Size(width: Float(glyphFontSize), height: Float(glyphFontSize))
+                            size: Size(width: Float(glyphFontSize), height: Float(glyphFontSize)),
+                            sourceRange: index..<attributedText.text.index(after: index),
+                            penOrigin: Point(x: Float(x), y: Float(y))
                         )
                     )
 
@@ -1130,6 +1148,10 @@ public struct Glyph: Sendable, Equatable {
 
     /// Size of glyph.
     public let size: Size
+
+    /// Source cluster and pen position support selection without guessing from glyph counts.
+    public var sourceRange: Range<String.Index>? = nil
+    public var penOrigin: Point = .zero
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.size == rhs.size

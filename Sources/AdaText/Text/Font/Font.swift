@@ -47,6 +47,26 @@ extension Font {
         return Font(fontResource: resource, pointSize: size)
     }
 
+    /// A platform monospace font for code, with a bundled-font fallback.
+    public static func monospaced(size: Double) -> Font {
+        #if os(Windows)
+        let root = ProcessInfo.processInfo.environment["SystemRoot"] ?? "C:/Windows"
+        let paths = [root + "/Fonts/consola.ttf"]
+        #elseif os(macOS)
+        let paths = ["/System/Library/Fonts/Menlo.ttc"]
+        #elseif os(Linux)
+        let paths = ["/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", "/usr/share/fonts/truetype/liberation2/LiberationMono-Regular.ttf"]
+        #else
+        let paths: [String] = []
+        #endif
+        for path in paths where FileManager.default.fileExists(atPath: path) {
+            if let resource = FontResource.custom(fontPath: URL(fileURLWithPath: path)) {
+                return Font(fontResource: resource, pointSize: size)
+            }
+        }
+        return .system(size: size, weight: .semibold)
+    }
+
     public static func dynamic(
         fontPath: URL,
         size: Double,
@@ -70,6 +90,7 @@ extension Font {
 
     /// Returns a copy of this font with semantic text traits applied.
     public func applyingTraits(_ traits: TextFontTraits, scale: Double = 1) -> Font {
+        if traits.contains(.code) { return .monospaced(size: pointSize * scale) }
         guard !traits.isEmpty else {
             var font = self
             font.pointSize *= scale

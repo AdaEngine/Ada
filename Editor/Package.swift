@@ -11,7 +11,13 @@ let adaMCPURL = ProcessInfo.processInfo.environment["ADA_MCP_LOCAL_PATH"].map {
 let isAndroidStudio = ProcessInfo.processInfo.environment["ADAEDITOR_ANDROID"] == "1"
 let sloppyRuntimeLocalPath = ProcessInfo.processInfo.environment["SLOPPY_RUNTIME_LOCAL_PATH"] ?? "../../Sloppy/Packages/SloppyRuntime"
 let sloppyRuntimeURL = URL(fileURLWithPath: sloppyRuntimeLocalPath, relativeTo: URL(fileURLWithPath: #filePath).deletingLastPathComponent()).standardizedFileURL
+// Desktop Windows has no SloppyRuntime target dependency. Resolving the mobile-only
+// graph can nevertheless force an incompatible SwiftSyntax version into desktop builds.
+#if os(Windows)
+let hasSloppyRuntime = isAndroidStudio && FileManager.default.fileExists(atPath: sloppyRuntimeURL.appendingPathComponent("Package.swift").path)
+#else
 let hasSloppyRuntime = FileManager.default.fileExists(atPath: sloppyRuntimeURL.appendingPathComponent("Package.swift").path)
+#endif
 let sloppyRuntimePackage: [Package.Dependency] = hasSloppyRuntime
     ? [.package(name: "SloppyRuntimePortable", path: sloppyRuntimeURL.path)]
     : []
@@ -59,6 +65,8 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "StudioCore"),
+        ProcessInfo.processInfo.environment["ADAEDITOR_SWIFTTERM_PACKAGE_PATH"].map { .package(name: "SwiftTerm", path: $0) }
+            ?? .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", revision: "caa1bdd3f1396c5b0ed66121f299d1c8b42bc94c"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0"),
         .package(name: "AdaEngine", path: adaEngineLocalPath),
         .package(name: "AdaDebugging", path: "Debugging"),
@@ -71,6 +79,7 @@ let package = Package(
         .package(url: "https://github.com/alex-pinkus/tree-sitter-swift", branch: "with-generated-files"),
     ] + sloppyRuntimePackage + gravityAOTPackage,
     targets: [
+        .target(name: "CEditorTerminal", linkerSettings: [.linkedLibrary("util", .when(platforms: [.linux]))]),
         .target(name: "CAndroidStudio", dependencies: [
             .product(name: "CAndroid", package: "AdaEngine", condition: .when(platforms: [.android]))
         ]),
@@ -129,6 +138,8 @@ let package = Package(
                 "Yams",
                 .product(name: "Crypto", package: "swift-crypto"),
                 "AdaPackageManifestTool",
+                "CEditorTerminal",
+                .product(name: "SwiftTerm", package: "SwiftTerm"),
                 "GravityLanguageCore",
                 .target(name: "CAndroidStudio", condition: .when(platforms: [.android])),
             ] + sloppyRuntimeTarget + gravityAOTTarget,
@@ -148,6 +159,7 @@ let package = Package(
                 .product(name: "AdaDebugging", package: "AdaDebugging"),
                 .product(name: "AdaPlayerConnect", package: "AdaPlayerConnect"),
                 "AdaEditor",
+                .product(name: "SwiftTerm", package: "SwiftTerm"),
                 .product(name: "AdaSpine", package: "AdaEngine"),
                 .product(name: "AdaMCPCore", package: "AdaMCP"),
                 .product(name: "MCP", package: "AdaMCP"),

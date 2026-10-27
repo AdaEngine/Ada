@@ -162,7 +162,7 @@ extension TextEditorViewNode {
             return
         }
         var items = [TextEditorContextMenuItem(title: "Copy") { [weak self] in self?.copySelection() }]
-        if environment.isEnabled {
+        if environment.isEnabled && environment.textEditorIsEditable {
             items.append(TextEditorContextMenuItem(title: "Cut") { [weak self] in self?.cutSelection() })
             items.append(TextEditorContextMenuItem(title: "Paste") { [weak self] in self?.pasteText() })
         }

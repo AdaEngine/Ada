@@ -116,7 +116,7 @@ struct EditorPerformancePanel: View {
                     } else if model.target?.isRunning == true {
                         action(L10n.text("Record \(model.recordingDurationSeconds) s")) { model.record() }
                     }
-                    Text(L10n.text("Delay \(Int(model.recordingDelaySeconds)) s ▾"))
+                    menuLabel(L10n.text("Delay \(Int(model.recordingDelaySeconds)) s"))
                         .accessibilityIdentifier("AdaEditor.Performance.Delay")
                         .contextMenu(opensOnPrimaryAction: true) {
                             ForEach([0, 1, 3, 5, 10, 30, 60], id: \.self) { seconds in
@@ -125,7 +125,7 @@ struct EditorPerformancePanel: View {
                                 }
                             }
                         }
-                    Text(L10n.text("Duration \(model.recordingDurationSeconds) s ▾"))
+                    menuLabel(L10n.text("Duration \(model.recordingDurationSeconds) s"))
                         .accessibilityIdentifier("AdaEditor.Performance.Duration")
                         .contextMenu(opensOnPrimaryAction: true) {
                             ForEach([1, 5, 10, 30, 60, 120], id: \.self) { seconds in
@@ -134,7 +134,7 @@ struct EditorPerformancePanel: View {
                                 }
                             }
                         }
-                    Text(model.selectedCaptureID == nil ? "Live ▾" : "Capture ▾")
+                    menuLabel(L10n.tr(model.selectedCaptureID == nil ? "Live" : "Capture"))
                         .padding(.horizontal, 8)
                         .frame(height: 26)
                         .background(theme.editorColors.surface)
@@ -156,6 +156,13 @@ struct EditorPerformancePanel: View {
                 }
             }
             .frame(height: 28)
+        }
+    }
+
+    private func menuLabel(_ title: String) -> some View {
+        HStack(spacing: 4) {
+            Text(title)
+            Text("\u{E5C5}").environment(\.font, AdaEditorMaterialSymbolFont.font(size: 16))
         }
     }
 

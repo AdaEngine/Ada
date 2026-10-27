@@ -39,6 +39,16 @@ struct TextMarkdownTests {
         #expect(attributes.font.pointSize == 32)
     }
 
+    #if os(Windows) || os(macOS)
+    @Test func codeTraitUsesEqualWidthGlyphs() {
+        var attributes = TextAttributeContainer()
+        attributes.font = Font.system(size: 16).applyingTraits(.code)
+        let wide = "W".size(with: attributes).width
+        let narrow = "i".size(with: attributes).width
+        #expect(abs(wide - narrow) < 0.01)
+    }
+    #endif
+
     @Test
     func attributedTextInitializerPreservesExplicitRunColors() {
         var firstAttributes = TextAttributeContainer()

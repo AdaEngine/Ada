@@ -65,6 +65,7 @@ struct EditorAgentPromptEditor: View {
             )
             .font(.system(size: 14))
             .foregroundColor(theme.editorColors.text)
+            .accentColor(.white)
             .frame(height: composerHeight)
             .frame(minWidth: 0, maxWidth: .infinity)
             .textEditorColors(composerTextEditorColors)

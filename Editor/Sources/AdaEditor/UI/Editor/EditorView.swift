@@ -14,7 +14,7 @@ enum AdaEngineStyleContent {
         EditorToolStripItem(identifier: "sourceControl", title: "Source Control", icon: "\u{F1C4}"),
     ]
     static let leftBottomSidebarTools = [
-        EditorToolStripItem(identifier: "logs", title: "Logs", icon: "\u{EB8E}"),
+        EditorToolStripItem(identifier: "logs", title: EditorDistribution.current == .standalone ? "Terminal" : "Logs", icon: "\u{EB8E}"),
         EditorToolStripItem(identifier: "build", title: "Build", icon: "\u{E869}"),
         EditorToolStripItem(identifier: "debug", title: "Debug", icon: "\u{E868}"),
         EditorToolStripItem(identifier: "animator", title: "Animator", icon: "\u{E71C}"),
@@ -322,6 +322,8 @@ struct EditorView: View {
                 )
             }
             .onDisappear {
+                viewModel.terminals.stop()
+                viewModel.tests.stopDiscovery()
                 EditorAgentMCPTools.shared.deactivate(viewModel)
                 viewModel.disconnectAdaPlayer()
                 viewModel.playerPairingWindow?.close()
@@ -551,6 +553,10 @@ struct EditorResizeHandle: View {
     let onResize: (Size) -> Void
     let onResizeEnded: () -> Void
 
+    @State private var isHovered = false
+    @State private var isDragging = false
+    @Environment(\.theme) private var theme
+
     init(
         axis: Axis,
         onResize: @escaping (Size) -> Void = { _ in },
@@ -578,16 +584,32 @@ struct EditorResizeHandle: View {
     private var hitArea: some View {
         RectangleShape()
             .fill(Color.clear)
+            .overlay {
+                if isHovered || isDragging {
+                    RoundedRectangleShape(cornerRadius: 1.5)
+                        .fill(theme.editorColors.blue)
+                        .frame(width: axis == .horizontal ? 3 : nil, height: axis == .vertical ? 3 : nil)
+                        .accessibilityIdentifier("AdaEditor.ResizeHandle.Highlight")
+                        .padding(axis == .horizontal ? .vertical : .horizontal, 4)
+                        .allowsHitTesting(false)
+                }
+            }
+            .drawingGroup()
             .gesture(
                 DragGesture(minimumDistance: 1)
                     .onChanged { value in
+                        if !isDragging {
+                            isDragging = true
+                        }
                         onResize(value.translation)
                     }
                     .onEnded { _ in
+                        isDragging = false
                         onResizeEnded()
                     }
             )
             .cursorShape(cursorShape)
+            .onHover { isHovered = $0 }
     }
 
     private var cursorShape: Input.CursorShape {

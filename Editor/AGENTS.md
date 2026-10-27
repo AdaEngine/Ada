@@ -393,6 +393,17 @@ Coverage: [EditorAdaScriptHotReloadTests.swift](Tests/AdaEditorTests/EditorAdaSc
 
 ### Debugging and performance
 
+Standalone desktop has a workspace-owned SwiftTerm/AdaUI terminal backed by
+Unix PTY or Windows ConPTY. Terminal mode shows only shell tabs and icon actions;
+each tab retains an independent shell and the grid follows window/panel resizing.
+The left console tool opens Terminal; Output keeps
+the Game/Editor logs. Windows launchers prepare LF SwiftTerm sources through
+`ensure_windows_swiftterm.py` and `ADAEDITOR_SWIFTTERM_PACKAGE_PATH`; manual builds
+need that override too. Tests lists discovered AdaScript/Swift tests with statuses
+and exact single-function runs. See [WorkbenchPanels.md](Documentation/WorkbenchPanels.md)
+and `EditorTestExplorerTests`, `EditorTerminalTests`, `EditorWorkbenchPanelTests`.
+These source paths do not establish macOS/Linux UI validation.
+
 Swift/macOS debugging through `lldb-dap`: breakpoints, pause/continue/step,
 threads/frames, variables, watches and LLDB commands, with project persistence.
 Game Performance panel: update rate, CPU update/p95, process memory, entity count,
@@ -635,6 +646,17 @@ Guides: [Notifications.md](Documentation/Notifications.md),
 
 - Native Shader Graph includes typed graph/GLSL, Sprite and PBR materials,
   the AdaUI workbench editor and real AdaScript VM/AOT parameter bindings.
+  Graph preview and editing controls live in the contextual Inspector. Search
+  has a bordered search input and typed result rows; toolbar actions use visible
+  icon buttons and parameter cards show selection. Color nodes have the native
+  color picker and named RGBA channels; vectors use X/Y/Z/W fields.
+  Source uses the shared read-only code editor with GLSL highlighting, line numbers,
+  folding, selection/copy and workbench font/palette preferences; graph edits refresh it.
+  Search overlays the canvas; canvas-local input updates after layout/zoom changes and
+  supports middle-button panning over nodes/ports. Wires can be selected and
+  deleted with Delete/Backspace or the context menu, with Undo. File trees and tabs use the
+  Shader Graph icon. Coverage: `EditorNodeCanvasTests`, `EditorShaderGraphWorkbenchTests`,
+  `EditorShaderGraphControlsTests`, `EditorShaderGraphSourceTests`.
   Export acceptance is incomplete: browser Player startup, packaged native
   playback, final device Play and performance checks remain. See
   [ShaderGraph.md](Documentation/ShaderGraph.md) and

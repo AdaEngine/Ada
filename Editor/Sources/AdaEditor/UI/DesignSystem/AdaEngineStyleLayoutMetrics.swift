@@ -57,7 +57,11 @@ struct AdaEngineStyleLayoutMetrics: Hashable {
     }
 
     var toolbarWindowControlClearance: Float {
+        #if os(macOS)
         60
+        #else
+        0
+        #endif
     }
 
     var toolbarProjectSwitcherWidth: Float {
