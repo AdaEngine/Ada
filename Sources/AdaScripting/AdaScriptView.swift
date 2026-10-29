@@ -217,6 +217,7 @@ final class AdaScriptViewModuleRuntime: @unchecked Sendable {
             guard delegate.errors.isEmpty else {
                 throw AdaScriptError.compilation(delegate.errors)
             }
+            virtualMachine.setGCAllocationBudget(AdaScriptRuntimeCoordinator.garbageCollectionAllocationBudget)
             return (virtualMachine, taskRuntime, asyncHost)
         }
         self.virtualMachine = runtimeBundle.0

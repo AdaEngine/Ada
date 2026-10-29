@@ -1,6 +1,6 @@
 @_spi(Scripting) import AdaECS
 import AdaUtils
-import Gravity
+@_spi(Internal) import Gravity
 
 @GSExportable("AdaSystemContext")
 final class AnnotatedGravitySystemContext: @unchecked Sendable, AdaScriptNonSendableBridge {
@@ -129,40 +129,58 @@ enum AnnotatedGravityValueBridge {
         case let .double(value): GSValue(double: value, in: virtualMachine)
         case let .string(value): GSValue(string: value, in: virtualMachine)
         case let .array(values):
-            GSValue(newArrayIn: virtualMachine, items: values.map { makeGravityValue($0, virtualMachine: virtualMachine) as Any })
+            makeArray(values, virtualMachine: virtualMachine)
         case let .object(values):
-            GSValue(
-                newArrayIn: virtualMachine,
-                items: ["red", "green", "blue", "alpha"].compactMap { values[$0] }
-                    .map {
-                        makeGravityValue($0, virtualMachine: virtualMachine) as Any
-                    }
-            )
+            makeArray(["red", "green", "blue", "alpha"].compactMap { values[$0] }, virtualMachine: virtualMachine)
         }
     }
 
+    private static func makeArray(_ values: [ReflectedFieldValue], virtualMachine: GravityVirtualMachine) -> GSValue {
+        var scalars: [gravity_value_t] = []
+        scalars.reserveCapacity(values.count)
+        for value in values {
+            switch value {
+            case .null: scalars.append(gravity_value_from_null())
+            case let .bool(value): scalars.append(gravity_value_from_bool(value))
+            case let .int(value): scalars.append(gravity_value_from_int(gravity_int_t(value)))
+            case let .double(value): scalars.append(gravity_value_from_float(value))
+            default:
+                // Strings and nested lists retain their existing construction path.
+                return GSValue(newArrayIn: virtualMachine, items: values.map { makeGravityValue($0, virtualMachine: virtualMachine) as Any })
+            }
+        }
+        return virtualMachine.makeScalarList(scalars)
+    }
+
     static func makeReflectedFieldValue(_ value: GSValue) -> ReflectedFieldValue? {
-        if value.isNull || value.isUndefined {
+        makeReflectedFieldValue(value.value)
+    }
+
+    private static func makeReflectedFieldValue(_ value: gravity_value_t) -> ReflectedFieldValue? {
+        if gravity_value_isa_null(value) || gravity_value_isa_undefined(value) {
             return .null
         }
-        if value.isBool {
-            return .bool(value.toBoolean)
+        if gravity_value_isa_bool(value) {
+            return .bool(gravity_cast_value_as_bool(value))
         }
-        if value.isInteger {
-            guard let integer = Int(exactly: value.toInteger) else {
+        if gravity_value_isa_int(value) {
+            guard let integer = Int(exactly: value.n) else {
                 return nil
             }
             return .int(integer)
         }
-        if value.isDouble {
-            return .double(value.toDouble)
+        if gravity_value_isa_float(value) {
+            return .double(value.f)
         }
-        if value.isString {
-            return .string(value.toString)
+        if gravity_value_isa_string(value) {
+            return .string(String(cString: gravity_cast_value_as_cString(value)))
         }
-        if value.isList {
+        if gravity_value_isa_list(value) {
+            let count = gravity_list_count(value)
             var result: [ReflectedFieldValue] = []
-            for item in value.toList {
+            result.reserveCapacity(Int(count))
+            for index in 0..<count {
+                let item = gravity_list_get_value_at_index(value, Int32(index))
                 guard let converted = makeReflectedFieldValue(item) else {
                     return nil
                 }

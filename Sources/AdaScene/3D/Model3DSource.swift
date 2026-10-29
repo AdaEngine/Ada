@@ -185,15 +185,22 @@ public struct Model3DSourceSystem {
     @Query<Entity, Model3DSource> private var sources
     @Query<Entity, Model3DSourceState> private var instances
     @Commands private var commands
+    // The asset cache keeps weak handles. Retaining only handle.asset drops the
+    // cache key and reimports the same mesh/textures for every scene instance.
+    @Local private var modelHandles: [String: AssetHandle<ModelAsset3D>] = [:]
 
     public init(world _: World) {}
 
     public func update(context _: UpdateContext) async {
         var pending: [(Entity.ID, Model3DSource)] = []
+        var livePaths: Set<String> = []
         sources.forEach { entity, reference in
+            if !reference.source.isEmpty { livePaths.insert(reference.assetPath) }
+            livePaths.formUnion(reference.lod?.sources ?? [])
             let state = entity.components[Model3DSourceState.self]
             if state?.reference != reference { pending.append((entity.id, reference)) }
         }
+        for path in modelHandles.keys where !livePaths.contains(path) { modelHandles.removeValue(forKey: path) }
         instances.forEach { entity, state in
             guard entity.components[Model3DSource.self] == nil else {
                 return
@@ -210,10 +217,10 @@ public struct Model3DSourceSystem {
         for (id, reference) in pending {
             let result: Result<(ModelAsset3D?, [ModelAsset3D]), AssetError>
             do {
-                let model = reference.source.isEmpty ? nil : try await AssetsManager.load(ModelAsset3D.self, at: reference.assetPath).asset
+                let model = reference.source.isEmpty ? nil : try await loadModel(reference.assetPath)
                 var alternatives: [ModelAsset3D] = []
                 for source in reference.lod?.sources ?? [] {
-                    guard let level = try await AssetsManager.load(ModelAsset3D.self, at: source).asset else {
+                    guard let level = try await loadModel(source) else {
                         throw AssetError.message("Model LOD has not loaded: \(source)")
                     }
                     alternatives.append(level)
@@ -240,5 +247,12 @@ public struct Model3DSourceSystem {
                 }
             }
         }
+    }
+
+    private func loadModel(_ path: String) async throws -> ModelAsset3D? {
+        if let handle = modelHandles[path] { return handle.asset }
+        let handle = try await AssetsManager.load(ModelAsset3D.self, at: path)
+        modelHandles[path] = handle
+        return handle.asset
     }
 }

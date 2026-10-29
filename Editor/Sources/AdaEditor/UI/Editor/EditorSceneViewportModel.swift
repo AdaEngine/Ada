@@ -1,6 +1,7 @@
 #if os(Android)
 import Android
 #endif
+@_spi(Internal) import AdaApp
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 import Math
@@ -22,7 +23,8 @@ final class EditorSceneViewportModel {
     static let twoDCameraDepth: Float = -10
     private static let maximumTwoDZoom: Float = 150
 
-    private weak var world: World?
+    weak var world: World?
+    private weak var sceneApplication: AppWorlds?
     private var isImmersive = false
     private var spatialEdit: SpatialEdit?
     private struct SpatialEdit {
@@ -34,14 +36,28 @@ final class EditorSceneViewportModel {
     private var sceneEnvironmentCameraID: Entity.ID?
     var displayMode: EditorSceneViewportDisplayMode = .twoD
     var viewportSize: Size = .zero
-    private var entitiesByEditorID: [String: Entity.ID] = [:]
+    var entitiesByEditorID: [String: Entity.ID] = [:]
     private var editorIDsByEntityID: [Entity.ID: String] = [:]
-    private var sceneContent = ""
-    private(set) var sceneModel: EditorSceneModel?
+    var sceneContent = ""
+    var sceneModel: EditorSceneModel? {
+        didSet {
+            markerPositions = sceneModel?.entities.compactMap { entity in
+                guard let payload = entity.components[EditorBuiltInComponentType.transform],
+                    let position = Self.markerPosition(from: payload) else { return nil }
+                return MarkerPosition(id: entity.id, position: position)
+            } ?? []
+        }
+    }
+    private struct MarkerPosition {
+        let id: String
+        let position: Vector3
+    }
+    private var markerPositions: [MarkerPosition] = []
     private var sceneSourceURL: URL?
     private var sceneResourceRootURL: URL?
     private var scriptableObjectCatalog: [EditorScriptableObjectDescriptor] = []
-    private(set) var selectedEditorID: String?
+    var selectedEditorID: String?
+    let terrainEditing = EditorTerrainEditingState()
     private(set) var activeTool: EditorSceneViewportTool = .translate
     private(set) var hoveredGizmoHandle: EditorTransformGizmo.Handle?
     var presentedGizmo: PresentedGizmo?
@@ -61,6 +77,10 @@ final class EditorSceneViewportModel {
     private var mouseDownPosition: Point?
     private var transformDrag: TransformDrag?
     private var transformInspectorUpdateTask: Task<Void, Never>?
+    private var sceneLoadTask: Task<Void, Never>?
+    private var sceneLoadGeneration = 0
+    private var onSceneLoadingChanged: ((Bool) -> Void)?
+    private var onSceneLoaded: ((EditorSceneRuntimeLoadResult) -> Void)?
     private var suppressSelectionOnPointerEnd = false
     private var isTwoDPanning = false
     private var isThreeDRotating = false
@@ -68,8 +88,8 @@ final class EditorSceneViewportModel {
     private var touchDownPosition: Point?
 
     var onSelectEntity: ((String?) -> Void)?
-    private var onSelectionChanged: ((EditorInspectorSidebarViewModel.SelectedEntity?) -> Void)?
-    private var onDocumentContentChanged: ((String) -> Void)?
+    var onSelectionChanged: ((EditorInspectorSidebarViewModel.SelectedEntity?) -> Void)?
+    var onDocumentContentChanged: ((String) -> Void)?
     private var onTransformChanged: ((String, EditorComponentPayload) -> Void)?
 
     private struct TransformDrag {
@@ -115,6 +135,8 @@ final class EditorSceneViewportModel {
         guard contentChanged else {
             return nil
         }
+        endTerrainStroke(cancelled: true)
+        terrainEditing.hover = nil
         cancelTransformInspectorUpdate()
         self.sceneContent = sceneContent
         transformDrag = nil
@@ -135,6 +157,12 @@ final class EditorSceneViewportModel {
     }
 
     func disconnect() {
+        endTerrainStroke(cancelled: true)
+        sceneLoadGeneration += 1
+        sceneLoadTask?.cancel()
+        sceneLoadTask = nil
+        onSceneLoadingChanged = nil
+        onSceneLoaded = nil
         endSpatialTransform(cancelled: true)
         isImmersive = false
         lastPinchScale = nil
@@ -144,6 +172,7 @@ final class EditorSceneViewportModel {
         }
         depthGridEntityIDs.removeAll()
         world = nil
+        sceneApplication = nil
         presentedGizmo = nil
         cameraEntityID = nil
         sceneEnvironmentCameraID = nil
@@ -175,9 +204,80 @@ final class EditorSceneViewportModel {
 
     @discardableResult
     func reloadSceneRuntimeIfReady() -> EditorSceneRuntimeLoadResult? {
-        guard let world else {
+        guard let world, let model = sceneModel else {
             return nil
         }
+        let previousLoad = sceneLoadTask
+        previousLoad?.cancel()
+        sceneLoadGeneration += 1
+        let generation = sceneLoadGeneration
+        let needsAssets = model.entities.contains {
+            $0.components[EditorBuiltInComponentType.model3DSource] != nil
+                || $0.components[EditorBuiltInComponentType.spineSource] != nil
+                || $0.components[EditorBuiltInComponentType.sceneInstance] != nil
+        }
+        // The immersive editor supplies its own world lifecycle rather than a SceneView application.
+        guard !isImmersive && (needsAssets || model.entities.count > 128 || previousLoad != nil) else {
+            onSceneLoadingChanged?(false)
+            let result = installSceneRuntime(model, in: world)
+            onSceneLoaded?(result)
+            return result
+        }
+        onSceneLoadingChanged?(true)
+        let sourceURL = sceneSourceURL
+        let rootURL = sceneResourceRootURL
+        let previous = world.getResource(EditorSceneAssetCache.self) ?? EditorSceneAssetCache()
+        sceneLoadTask = Task { @MainActor [weak self, weak world] in
+            do {
+                let assets = try await EditorSceneAssetCache.prepare(
+                    model: model, sourceURL: sourceURL, resourceRootURL: rootURL, reusing: previous
+                )
+                // A cancelled install still owns cleanup of the entities it created.
+                await previousLoad?.value
+                guard !Task.isCancelled, let self, let world, self.sceneLoadGeneration == generation else { return }
+                let install = { @MainActor @Sendable () async throws -> EditorSceneRuntimeLoadResult? in
+                    guard !Task.isCancelled, self.sceneLoadGeneration == generation else { return nil }
+                    world.insertResource(assets)
+                    return try await self.installSceneRuntimeIncrementally(model, in: world)
+                }
+                // Keep the editor's frames running while this preview's update and
+                // extraction are suspended; its last completed texture stays visible.
+                let result: EditorSceneRuntimeLoadResult?
+                if let application = self.sceneApplication {
+                    result = try await application.withHostedUpdatesSuspended(install)
+                } else {
+                    result = try await install()
+                }
+                guard !Task.isCancelled, self.sceneLoadGeneration == generation, let result else { return }
+                self.sceneLoadTask = nil
+                self.onSceneLoadingChanged?(false)
+                self.onSceneLoaded?(result)
+            } catch is CancellationError {
+                // A newer document or a closed viewport owns the next load.
+            } catch {
+                guard let self, self.sceneLoadGeneration == generation else { return }
+                self.sceneLoadTask = nil
+                self.onSceneLoadingChanged?(false)
+                self.onSceneLoaded?(.emptyWithWarnings([error.localizedDescription]))
+            }
+        }
+        return nil
+    }
+
+    func loadSceneWorld(
+        _ world: World,
+        application: AppWorlds? = nil,
+        onLoadingChanged: @escaping (Bool) -> Void,
+        onLoaded: @escaping (EditorSceneRuntimeLoadResult) -> Void
+    ) {
+        self.world = world
+        sceneApplication = application
+        onSceneLoadingChanged = onLoadingChanged
+        onSceneLoaded = onLoaded
+        _ = reloadSceneRuntimeIfReady()
+    }
+
+    private func installSceneRuntime(_ model: EditorSceneModel, in world: World) -> EditorSceneRuntimeLoadResult {
 
         let previousEntityIDs = Set(entitiesByEditorID.values)
         entitiesByEditorID.removeAll()
@@ -193,18 +293,58 @@ final class EditorSceneViewportModel {
         world.flush()
 
         let result = EditorSceneFileLoader.load(
-            content: sceneContent,
+            model: model,
             into: world,
             loadsScriptableObjects: false,
+            loadsPhysicsBodies: isImmersive,
             sourceURL: sceneSourceURL,
             resourceRootURL: sceneResourceRootURL
         )
+        finishSceneRuntime(result, in: world)
+        return result
+    }
+
+    private func installSceneRuntimeIncrementally(_ model: EditorSceneModel, in world: World) async throws -> EditorSceneRuntimeLoadResult {
+        let previousEntityIDs = Set(entitiesByEditorID.values)
+        entitiesByEditorID.removeAll()
+        editorIDsByEntityID.removeAll()
+        transformDrag = nil
+        var batchStart = ContinuousClock.now
+        for id in previousEntityIDs where id != cameraEntityID {
+            world.removeEntity(id, recursively: true)
+            if batchStart.duration(to: .now) >= .milliseconds(8) {
+                world.flush()
+                await Task.yield()
+                batchStart = .now
+            }
+        }
+        world.flush()
+        try Task.checkCancellation()
+        let result = try await EditorSceneFileLoader.loadIncrementally(
+            model: model, into: world, sourceURL: sceneSourceURL, resourceRootURL: sceneResourceRootURL
+        )
+        if Task.isCancelled {
+            for id in result.entitiesByEditorID.values {
+                world.removeEntity(id, recursively: true)
+                if batchStart.duration(to: .now) >= .milliseconds(8) {
+                    world.flush()
+                    await Task.yield()
+                    batchStart = .now
+                }
+            }
+            world.flush()
+            throw CancellationError()
+        }
+        finishSceneRuntime(result, in: world)
+        return result
+    }
+
+    private func finishSceneRuntime(_ result: EditorSceneRuntimeLoadResult, in world: World) {
         entitiesByEditorID = result.entitiesByEditorID
         editorIDsByEntityID = result.editorIDsByEntityID
         refreshSceneEnvironmentCamera(in: world)
         cameraEntityID = isImmersive ? nil : findCameraEntity(in: world)?.id
         if !isImmersive { applyCamera() }
-        return result
     }
 
     func setDisplayMode(_ mode: EditorSceneViewportDisplayMode) {
@@ -216,6 +356,8 @@ final class EditorSceneViewportModel {
         endTransformDrag(cancelled: true)
         hoveredGizmoHandle = nil
         displayMode = mode
+        endTerrainStroke(cancelled: true)
+        terrainEditing.hover = nil
         if let world {
             EditorSceneViewportDepthGrid.setVisibility(mode == .threeD, entityIDs: depthGridEntityIDs, in: world)
         }
@@ -245,6 +387,7 @@ final class EditorSceneViewportModel {
 
     func update(deltaTime: Float) -> Bool {
         var didChange = advancePerspectiveTransition(deltaTime: deltaTime)
+        if updateTerrainStroke(deltaTime: deltaTime) { didChange = true }
         if depthGridEntityIDs.isEmpty, let world, unsafe RenderEngine.shared != nil {
             depthGridEntityIDs = EditorSceneViewportDepthGrid.install(in: world, isVisible: displayMode == .threeD)
             didChange = !depthGridEntityIDs.isEmpty || didChange
@@ -301,6 +444,7 @@ final class EditorSceneViewportModel {
     }
 
     func drawGrid(in context: inout UIGraphicsContext, size: Size, theme: Theme) {
+        drawTerrainBrush(in: &context, size: size, theme: theme)
         let blend = smoothPerspectiveBlend
         if blend < 1 {
             draw2DGrid(in: &context, size: size, theme: theme, opacity: 1 - blend)
@@ -320,6 +464,8 @@ final class EditorSceneViewportModel {
                     continue
                 }
                 let radius = max(5, min(18, icon.size * 8))
+                guard point.x >= -radius, point.x <= size.width + radius,
+                    point.y >= -radius, point.y <= size.height + radius else { continue }
                 let rect = Rect(x: point.x - radius, y: point.y - radius, width: radius * 2, height: radius * 2)
                 context.drawEllipse(in: rect, color: color(for: icon, theme: theme).opacity(icon.isExplicit ? 0.86 : 0.58))
             }
@@ -335,21 +481,22 @@ final class EditorSceneViewportModel {
             }
         }
 
-        guard let model = sceneModel else {
+        guard sceneModel != nil else {
             return nil
         }
 
         let selectedPoint = selectedEditorID.flatMap { gizmoWorldMatrix(for: $0) }
             .flatMap { project($0.origin, viewProjection: viewProjection, size: size) }
-        for entity in model.entities {
-            let isSelected = entity.id == selectedEditorID
+        for marker in markerPositions {
+            let isSelected = marker.id == selectedEditorID
             guard
-                let payload = entity.components[EditorBuiltInComponentType.transform],
-                let point = isSelected ? selectedPoint : projectedPoint(from: payload, viewProjection: viewProjection, size: size)
+                let point = isSelected ? selectedPoint : project(marker.position, viewProjection: viewProjection, size: size)
             else {
                 continue
             }
             let radius: Float = isSelected ? 6 : 4
+            guard point.x >= -radius, point.x <= size.width + radius,
+                point.y >= -radius, point.y <= size.height + radius else { continue }
             drawViewportMarker(
                 at: point,
                 radius: radius,
@@ -412,9 +559,9 @@ final class EditorSceneViewportModel {
     var statusSuffix: String {
         switch displayMode {
         case .twoD:
-            "2D zoom \(formatted(twoDZoom))"
+            L10n.text("2D zoom \(formatted(twoDZoom))")
         case .threeD:
-            "3D fly \(formatted(threeDPosition.x)), \(formatted(threeDPosition.y)), \(formatted(threeDPosition.z))"
+            L10n.text("3D fly \(formatted(threeDPosition.x)), \(formatted(threeDPosition.y)), \(formatted(threeDPosition.z))")
         }
     }
 }
@@ -423,6 +570,10 @@ extension EditorSceneViewportModel {
     func handleKeyEvent(_ event: KeyEvent) -> Bool {
         switch event.status {
         case .down:
+            if event.keyCode == .escape, terrainEditing.stroke != nil {
+                endTerrainStroke(cancelled: true)
+                return true
+            }
             if event.keyCode == .escape, transformDrag != nil {
                 endTransformDrag(cancelled: true)
                 return true
@@ -449,7 +600,13 @@ extension EditorSceneViewportModel {
 
     func handleMouseEvent(_ event: MouseEvent) -> Bool {
         if event.button == .scrollWheel {
-            return transformDrag != nil || handleScroll(event)
+            return terrainEditing.stroke != nil || transformDrag != nil || handleScroll(event)
+        }
+        if event.phase == .began, event.button == .right { endTerrainStroke() }
+        if terrainEditing.isEnabled, displayMode == .threeD, !isThreeDRotating, event.button != .right,
+           !pressedKeys.contains(.space) {
+            return handleTerrainPointer(at: event.mousePosition, began: event.phase == .began && event.button == .left,
+                                        ended: event.phase == .ended, cancelled: event.phase == .cancelled)
         }
         if event.phase == .changed, transformDrag == nil, !isTwoDPanning, !isThreeDRotating {
             let gizmo = interactionGizmo()
@@ -731,6 +888,10 @@ extension EditorSceneViewportModel {
         guard lastPinchScale == nil else {
             return true
         }
+        if terrainEditing.isEnabled, displayMode == .threeD {
+            return handleTerrainPointer(at: event.location, began: event.phase == .began,
+                                        ended: event.phase == .ended, cancelled: event.phase == .cancelled)
+        }
         switch event.phase {
         case .began:
             suppressSelectionOnPointerEnd = false
@@ -777,6 +938,7 @@ extension EditorSceneViewportModel {
             return false
         }
         if event.phase == .began {
+            endTerrainStroke(cancelled: true)
             endTransformDrag(cancelled: true)
             lastTouchPosition = nil
             touchDownPosition = nil
@@ -1104,24 +1266,8 @@ extension EditorSceneViewportModel {
             return nil
         }
 
-        return world.getEntities()
-            .compactMap { entity -> (editorID: String, distance: Float)? in
-                guard
-                    entity.id != cameraEntityID,
-                    let editorID = editorIDsByEntityID[entity.id],
-                    let worldMatrix = EditorPicking.worldMatrix(for: entity)
-                else {
-                    return nil
-                }
-
-                let bounds = entity.components[BoundingComponent.self] ?? entity.components[Mesh3DComponent.self].map { BoundingComponent(bounds: .aabb($0.mesh.bounds)) }
-                guard let distance = EditorPicking.intersectionDistance(ray: ray, matrix: worldMatrix, bounds: bounds) else {
-                    return nil
-                }
-                return (editorID, distance)
-            }
-            .min { lhs, rhs in lhs.distance < rhs.distance }?
-            .editorID
+        return EditorMeshPicking.pick(ray: ray, world: world, authoredEntities: entitiesByEditorID,
+                                      editorIDs: editorIDsByEntityID, cameraID: cameraEntityID)
     }
 }
 
@@ -1136,7 +1282,7 @@ extension EditorSceneViewportModel {
         }
 
         model.selectEntity(editorID)
-        if let content = try? model.encodedYAML() {
+        if let content = try? model.encodedYAML(updatingEditorStateIn: sceneContent) {
             sceneContent = content
             sceneModel = model
             onDocumentContentChanged?(content)
@@ -1144,7 +1290,7 @@ extension EditorSceneViewportModel {
         onSelectionChanged?(selectedEntityViewModel(editorID: editorID, model: model))
     }
 
-    private func selectedEntityViewModel(
+    func selectedEntityViewModel(
         editorID: String?,
         model: EditorSceneModel
     ) -> EditorInspectorSidebarViewModel.SelectedEntity? {
@@ -1292,14 +1438,14 @@ extension EditorSceneViewportModel {
         return try? EditorComponentPayloadDecoder.decode(EditorGizmo.self, payload: payload) as? EditorGizmo
     }
 
-    private func projectedPoint(from transformPayload: EditorComponentPayload, viewProjection: Transform3D, size: Size) -> Point? {
+    private static func markerPosition(from transformPayload: EditorComponentPayload) -> Vector3? {
         guard case let .array(position)? = transformPayload["position"], position.count >= 2 else {
             return nil
         }
 
         let world = Vector2(Float(position[0].doubleValue ?? 0), Float(position[1].doubleValue ?? 0))
         let z = position.count > 2 ? Float(position[2].doubleValue ?? 0) : 0
-        return project(Vector3(world.x, world.y, z), viewProjection: viewProjection, size: size)
+        return Vector3(world.x, world.y, z)
     }
 
     private func shortComponentName(_ componentName: String) -> String {

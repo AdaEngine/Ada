@@ -119,13 +119,15 @@ enum ProjectOpenPicker {
 
     @MainActor
     static func presentProjectLocationPicker(
+        title: String = projectLocationTitle,
+        message: String = projectLocationMessage,
         completion: @escaping @MainActor (ProjectLocationPickerResult) -> Void
     ) {
         #if canImport(AppKit)
             let panel = NSOpenPanel()
-            panel.title = L10n.tr(projectLocationTitle)
+            panel.title = L10n.tr(title)
             panel.prompt = L10n.tr(projectLocationPrompt)
-            panel.message = L10n.tr(projectLocationMessage)
+            panel.message = L10n.tr(message)
             panel.canChooseDirectories = true
             panel.canChooseFiles = false
             panel.allowsMultipleSelection = false
@@ -142,9 +144,9 @@ enum ProjectOpenPicker {
             }
             completion(.selected(retainSecurityScopedAccess(to: projectLocationURL(fromPickerSelection: selectedURL))))
         #elseif os(Windows)
-            Task { completion(await WindowsProjectFilePicker.folder(title: L10n.tr(projectLocationTitle))) }
+            Task { completion(await WindowsProjectFilePicker.folder(title: L10n.tr(title))) }
         #elseif os(Linux)
-            Task { completion(await LinuxProjectFilePicker.folder(title: L10n.tr(projectLocationTitle))) }
+            Task { completion(await LinuxProjectFilePicker.folder(title: L10n.tr(title))) }
         #elseif canImport(UIKit)
             guard let presenter = activeViewController() else {
                 completion(.unavailable("AdaEditor has no active window from which to open Files."))

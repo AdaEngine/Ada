@@ -34,12 +34,25 @@ final class UIViewRepresentableNode<Representable: UIViewRepresentable>: ViewNod
             return
         }
 
+        if view.window !== owner?.window {
+            view.window = owner?.window
+        }
+
         view.frame = self.frame
         view.safeAreaInsets = self.environment.safeAreaInsets
         view.userInterfaceIdiom = self.environment.userInterfaceIdiom
         view.colorScheme = self.environment.colorScheme
         self.representable.updateUIView(view, in: context)
         view.layoutSubviews()
+    }
+
+    override func didMove(to parent: ViewNode?) {
+        super.didMove(to: parent)
+        if parent == nil {
+            // A represented view can contain another UIContainerView and live
+            // SceneViews. Detach its window hierarchy even while the view is retained.
+            view?.window = nil
+        }
     }
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {

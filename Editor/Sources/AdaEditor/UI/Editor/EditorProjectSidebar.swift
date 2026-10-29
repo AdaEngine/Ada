@@ -107,7 +107,7 @@ struct EditorProjectSidebar: View {
                     ZStack(anchor: .topLeading) {
                         projectTreeBackground(width: geometry.size.width, height: geometry.size.height)
 
-                        ScrollView {
+                        ScrollView(showsIndicators: true) {
                             LazyVStack(viewModel.visibleItems, id: \.id, alignment: .leading, spacing: 2, estimatedRowHeight: 26) { item in
                                 projectTreeRow(item)
                             }

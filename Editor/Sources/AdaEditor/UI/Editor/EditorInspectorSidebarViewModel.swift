@@ -82,6 +82,9 @@ final class EditorInspectorSidebarViewModel {
     var selectedEntity: SelectedEntity?
     var runtimeSelection: EditorPlayInspectionModel.Snapshot?
     var isInspectingPlayMode = false
+    private(set) var terrainEditing: EditorTerrainEditingState?
+    @ObservationIgnored private var createTerrainAction: (() -> Void)?
+    @ObservationIgnored private var terrainSettingsChangedAction: (() -> Void)?
     var isComponentPickerPresented = false
     var componentSearchText = ""
     var scriptableObjectCatalog: [EditorScriptableObjectDescriptor] = []
@@ -181,6 +184,11 @@ final class EditorInspectorSidebarViewModel {
         removeScriptableObject: @escaping (String) -> Void,
         updateScriptableObjectField: @escaping (String, EditorComponentField, String) -> Void
     ) {
+        if sceneViewportActionOwner != ObjectIdentifier(owner) {
+            terrainEditing = nil
+            createTerrainAction = nil
+            terrainSettingsChangedAction = nil
+        }
         sceneViewportActionOwner = ObjectIdentifier(owner)
         self.applyGizmoChange = applyGizmoChange
         self.addEntity = addEntity
@@ -192,12 +200,31 @@ final class EditorInspectorSidebarViewModel {
         self.updateScriptableObjectField = updateScriptableObjectField
     }
 
+    func setTerrainTools(
+        owner: AnyObject,
+        state: EditorTerrainEditingState,
+        create: @escaping () -> Void,
+        settingsChanged: @escaping () -> Void
+    ) {
+        guard sceneViewportActionOwner == ObjectIdentifier(owner) else { return }
+        if terrainEditing !== state { terrainEditing = state }
+        createTerrainAction = create
+        terrainSettingsChangedAction = settingsChanged
+    }
+
+    func createTerrainRequested() { createTerrainAction?() }
+
+    func terrainSettingsChanged() { terrainSettingsChangedAction?() }
+
     func clearSceneViewportActions(owner: AnyObject) {
         guard sceneViewportActionOwner == ObjectIdentifier(owner) else {
             return
         }
 
         sceneViewportActionOwner = nil
+        terrainEditing = nil
+        createTerrainAction = nil
+        terrainSettingsChangedAction = nil
         applyGizmoChange = nil
         addEntity = nil
         addComponent = nil

@@ -70,6 +70,14 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner {
         setNeedsDisplay()
     }
 
+    override public func viewWillMove(to window: UIWindow?) {
+        super.viewWillMove(to: window)
+        // Nested containers have their own node tree. UIView removal must reach
+        // it so an embedded scene stops updating and releases pointer capture.
+        viewTree.rootNode.contentNode.parent = window == nil ? nil : viewTree.rootNode
+        if window != nil { setNeedsLayout() }
+    }
+
     /// Layout the subviews.
     ///
     /// - Note: This method is called when the container view is laid out.

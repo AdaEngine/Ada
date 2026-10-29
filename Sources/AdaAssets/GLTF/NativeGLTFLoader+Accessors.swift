@@ -27,26 +27,41 @@ extension NativeGLTFLoader {
                 throw GLTFError.invalidStride
             }
             let bufferViewOffset = bufferView.byteOffset ?? 0
-            let bufferViewEnd = bufferViewOffset + bufferView.byteLength
-            let startOffset = bufferViewOffset + (accessor.byteOffset ?? 0)
+            let accessorOffset = accessor.byteOffset ?? 0
             let buffer = buffers[bufferView.buffer]
-
-            for elementIndex in 0..<accessor.count {
-                let elementOffset = startOffset + elementIndex * byteStride
-                guard
-                    elementOffset >= bufferViewOffset,
-                    elementOffset + elementSize <= bufferViewEnd,
-                    elementOffset + elementSize <= buffer.count
-                else {
-                    throw GLTFError.bufferOutOfBounds
-                }
-                for componentIndex in 0..<componentCount {
-                    values[elementIndex * componentCount + componentIndex] = try readComponent(
-                        buffer,
-                        at: elementOffset + componentIndex * componentSize,
-                        componentType: accessor.componentType,
-                        normalized: accessor.normalized ?? false
-                    )
+            // Validate the entire strided range once, using subtraction/division
+            // so malformed lengths cannot overflow before reaching the bounds check.
+            guard bufferViewOffset >= 0, bufferView.byteLength >= 0, bufferViewOffset <= buffer.count,
+                  bufferView.byteLength <= buffer.count - bufferViewOffset,
+                  accessorOffset >= 0, accessorOffset <= bufferView.byteLength else {
+                throw GLTFError.bufferOutOfBounds
+            }
+            let remaining = bufferView.byteLength - accessorOffset
+            guard elementSize <= remaining, accessor.count - 1 <= (remaining - elementSize) / byteStride else {
+                throw GLTFError.bufferOutOfBounds
+            }
+            let startOffset = bufferViewOffset + accessorOffset
+            try buffer.withUnsafeBytes { bytes in
+                if accessor.componentType == 5126 {
+                    // The common position/normal/UV path avoids four Foundation
+                    // Data subscripts and a type switch for every floating value.
+                    for elementIndex in 0..<accessor.count {
+                        let elementOffset = startOffset + elementIndex * byteStride
+                        for componentIndex in 0..<componentCount {
+                            let bits = unsafe bytes.loadUnaligned(fromByteOffset: elementOffset + componentIndex * 4, as: UInt32.self)
+                            values[elementIndex * componentCount + componentIndex] = Double(Float(bitPattern: UInt32(littleEndian: bits)))
+                        }
+                    }
+                } else {
+                    for elementIndex in 0..<accessor.count {
+                        let elementOffset = startOffset + elementIndex * byteStride
+                        for componentIndex in 0..<componentCount {
+                            values[elementIndex * componentCount + componentIndex] = unsafe try readComponent(
+                                bytes, at: elementOffset + componentIndex * componentSize,
+                                componentType: accessor.componentType, normalized: accessor.normalized ?? false
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -152,20 +167,30 @@ extension NativeGLTFLoader {
     }
 
     private func readComponent(_ data: Data, at offset: Int, componentType: Int, normalized: Bool) throws -> Double {
+        try data.withUnsafeBytes { bytes in
+            unsafe try readComponent(bytes, at: offset, componentType: componentType, normalized: normalized)
+        }
+    }
+
+    private func readComponent(_ bytes: UnsafeRawBufferPointer, at offset: Int, componentType: Int, normalized: Bool) throws -> Double {
         let rawValue: Double
         switch componentType {
         case 5120:
-            rawValue = Double(Int8(bitPattern: data[offset]))
+            rawValue = Double(Int8(bitPattern: unsafe bytes[offset]))
         case 5121:
-            rawValue = Double(data[offset])
+            rawValue = Double(unsafe bytes[offset])
         case 5122:
-            rawValue = Double(Int16(bitPattern: readUInt16(data, at: offset)))
+            let value = unsafe bytes.loadUnaligned(fromByteOffset: offset, as: UInt16.self)
+            rawValue = Double(Int16(bitPattern: UInt16(littleEndian: value)))
         case 5123:
-            rawValue = Double(readUInt16(data, at: offset))
+            let value = unsafe bytes.loadUnaligned(fromByteOffset: offset, as: UInt16.self)
+            rawValue = Double(UInt16(littleEndian: value))
         case 5125:
-            rawValue = Double(readUInt32(data, at: offset))
+            let value = unsafe bytes.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
+            rawValue = Double(UInt32(littleEndian: value))
         case 5126:
-            rawValue = Double(Float(bitPattern: readUInt32(data, at: offset)))
+            let value = unsafe bytes.loadUnaligned(fromByteOffset: offset, as: UInt32.self)
+            rawValue = Double(Float(bitPattern: UInt32(littleEndian: value)))
         default:
             throw GLTFError.invalidComponentType(componentType)
         }
@@ -180,10 +205,6 @@ extension NativeGLTFLoader {
         case 5123: return rawValue / 65535
         default: return rawValue
         }
-    }
-
-    private func readUInt16(_ data: Data, at offset: Int) -> UInt16 {
-        UInt16(data[offset]) | UInt16(data[offset + 1]) << 8
     }
 
     func readUInt32(_ data: Data, at offset: Int) -> UInt32 {

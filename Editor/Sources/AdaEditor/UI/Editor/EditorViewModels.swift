@@ -277,6 +277,7 @@ struct EditorSceneDocument: Equatable, Sendable {
     var content: String
     var lastSavedContent: String?
     var isReadOnly: Bool = false
+    var isLoading = false
     var sceneModel: EditorSceneModel?
     var errorMessage: String?
     var isDirty: Bool

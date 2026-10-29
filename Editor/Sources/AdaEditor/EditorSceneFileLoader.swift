@@ -39,6 +39,7 @@ enum EditorSceneFileLoader {
         content: String,
         into world: World,
         loadsScriptableObjects: Bool = true,
+        loadsPhysicsBodies: Bool = true,
         sourceURL: URL? = nil,
         resourceRootURL: URL? = nil
     ) -> EditorSceneRuntimeLoadResult {
@@ -46,18 +47,8 @@ enum EditorSceneFileLoader {
             registerEditorSceneComponents(loadsScriptableObjects: loadsScriptableObjects)
             let sceneModel = try EditorSceneModel.decode(from: content)
             let sourceURL = sourceURL?.resolvingSymlinksInPath().standardizedFileURL
-            return ShaderGraphResourceScope.$rootPath.withValue(resourceRootURL?.path) {
-                instantiate(
-                    sceneModel,
-                    in: world,
-                    loadsScriptableObjects: loadsScriptableObjects,
-                    sourceURL: sourceURL,
-                    resourceRootURL: resourceRootURL,
-                    parentEntity: nil,
-                    idPrefix: "",
-                    ancestry: sourceURL.map { Set([$0]) } ?? []
-                )
-            }
+            return load(model: sceneModel, into: world, loadsScriptableObjects: loadsScriptableObjects, loadsPhysicsBodies: loadsPhysicsBodies,
+                        sourceURL: sourceURL, resourceRootURL: resourceRootURL)
         } catch {
             return .emptyWithWarnings([error.localizedDescription])
         }
@@ -69,21 +60,30 @@ enum EditorSceneFileLoader {
         model sceneModel: EditorSceneModel,
         into world: World,
         loadsScriptableObjects: Bool = true,
+        loadsPhysicsBodies: Bool = true,
         sourceURL: URL? = nil,
         resourceRootURL: URL? = nil
     ) -> EditorSceneRuntimeLoadResult {
         registerEditorSceneComponents(loadsScriptableObjects: loadsScriptableObjects)
         let sourceURL = sourceURL?.resolvingSymlinksInPath().standardizedFileURL
+        var assets = world.getResource(EditorSceneAssetCache.self) ?? EditorSceneAssetCache()
+        assets.beginLoad()
+        defer {
+            assets.finishLoad()
+            world.insertResource(assets)
+        }
         return ShaderGraphResourceScope.$rootPath.withValue(resourceRootURL?.path) {
             instantiate(
                 sceneModel,
                 in: world,
                 loadsScriptableObjects: loadsScriptableObjects,
+                loadsPhysicsBodies: loadsPhysicsBodies,
                 sourceURL: sourceURL,
                 resourceRootURL: resourceRootURL,
                 parentEntity: nil,
                 idPrefix: "",
-                ancestry: sourceURL.map { Set([$0]) } ?? []
+                ancestry: sourceURL.map { Set([$0]) } ?? [],
+                assets: &assets
             )
         }
     }
@@ -176,32 +176,108 @@ enum EditorSceneFileLoader {
         }
     }
 
+    /// Installs a prepared preview without holding the UI actor for the whole scene.
+    /// The caller suspends this world's hosted updates until installation finishes.
+    @MainActor
+    static func loadIncrementally(
+        model: EditorSceneModel, into world: World, sourceURL: URL?, resourceRootURL: URL?
+    ) async throws -> EditorSceneRuntimeLoadResult {
+        registerEditorSceneComponents(loadsScriptableObjects: false)
+        let sourceURL = sourceURL?.resolvingSymlinksInPath().standardizedFileURL
+        var assets = world.getResource(EditorSceneAssetCache.self) ?? EditorSceneAssetCache()
+        assets.beginLoad()
+        return try await ShaderGraphResourceScope.$rootPath.withValue(resourceRootURL?.path) {
+            let state = Instantiation(model, world: world, loadsScriptableObjects: false, loadsPhysicsBodies: false,
+                                      sourceURL: sourceURL, resourceRootURL: resourceRootURL, parentEntity: nil,
+                                      idPrefix: "", ancestry: sourceURL.map { Set([$0]) } ?? [], assets: assets)
+            defer {
+                state.assets.finishLoad()
+                world.insertResource(state.assets)
+            }
+            do {
+                var batchStart = ContinuousClock.now
+                for entity in model.entities {
+                    try Task.checkCancellation()
+                    state.instantiateEntity(entity)
+                    if batchStart.duration(to: .now) >= .milliseconds(8) {
+                        world.flush()
+                        await Task.yield()
+                        batchStart = .now
+                    }
+                }
+                try Task.checkCancellation()
+                return state.finish()
+            } catch {
+                state.removeAll()
+                throw error
+            }
+        }
+    }
+
     @MainActor
     private static func instantiate(
         _ sceneModel: EditorSceneModel,
         in world: World,
         loadsScriptableObjects: Bool,
+        loadsPhysicsBodies: Bool,
         sourceURL: URL?,
         resourceRootURL: URL?,
         parentEntity: Entity?,
         idPrefix: String,
-        ancestry: Set<URL>
+        ancestry: Set<URL>,
+        assets: inout EditorSceneAssetCache
     ) -> EditorSceneRuntimeLoadResult {
+        let state = Instantiation(sceneModel, world: world, loadsScriptableObjects: loadsScriptableObjects,
+                                  loadsPhysicsBodies: loadsPhysicsBodies, sourceURL: sourceURL, resourceRootURL: resourceRootURL,
+                                  parentEntity: parentEntity, idPrefix: idPrefix, ancestry: ancestry, assets: assets)
+        defer { assets = state.assets }
+        for entity in sceneModel.entities { state.instantiateEntity(entity) }
+        return state.finish()
+    }
+
+    @MainActor
+    private final class Instantiation {
+        let sceneModel: EditorSceneModel
+        let world: World
+        let loadsScriptableObjects: Bool
+        let loadsPhysicsBodies: Bool
+        let sourceURL: URL?
+        let resourceRootURL: URL?
+        let parentEntity: Entity?
+        let idPrefix: String
+        let ancestry: Set<URL>
+        var assets: EditorSceneAssetCache
         var warnings: [String] = []
-        if world.getResource(UIComponentRuntimeResource.self) == nil {
-            let runtime = UIComponentRuntime(resourceRoot: resourceRootURL ?? sourceURL?.deletingLastPathComponent() ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
-            runtime.enableAdaScript(sourceRoot: EditorSceneViewportView.uiProjectRoot(from: runtime.resources.rootURL))
-            world.insertResource(UIComponentRuntimeResource(runtime))
-        }
-        for script in EditorScriptComponentStore.shared.components {
-            world.registerRuntimeComponent(script.runtime)
-        }
-        var entityCount = sceneModel.entities.count
+        var entityCount: Int
         var entitiesByEditorID: [String: Entity] = [:]
         var runtimeEntityIDsByEditorID: [String: Entity.ID] = [:]
         var editorIDsByRuntimeEntityID: [Entity.ID: String] = [:]
 
-        for sceneEntity in sceneModel.entities {
+        init(_ sceneModel: EditorSceneModel, world: World, loadsScriptableObjects: Bool, loadsPhysicsBodies: Bool,
+             sourceURL: URL?, resourceRootURL: URL?, parentEntity: Entity?, idPrefix: String,
+             ancestry: Set<URL>, assets: EditorSceneAssetCache) {
+            self.sceneModel = sceneModel
+            self.world = world
+            self.loadsScriptableObjects = loadsScriptableObjects
+            self.loadsPhysicsBodies = loadsPhysicsBodies
+            self.sourceURL = sourceURL
+            self.resourceRootURL = resourceRootURL
+            self.parentEntity = parentEntity
+            self.idPrefix = idPrefix
+            self.ancestry = ancestry
+            self.assets = assets
+            self.entityCount = sceneModel.entities.count
+            if world.getResource(UIComponentRuntimeResource.self) == nil {
+                let runtime = UIComponentRuntime(resourceRoot: resourceRootURL ?? sourceURL?.deletingLastPathComponent() ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+                runtime.enableAdaScript(sourceRoot: EditorSceneViewportView.uiProjectRoot(from: runtime.resources.rootURL))
+                world.insertResource(UIComponentRuntimeResource(runtime))
+            }
+            for script in EditorScriptComponentStore.shared.components {
+                world.registerRuntimeComponent(script.runtime)
+            }
+        }
+
+        func instantiateEntity(_ sceneEntity: EditorSceneEntity) {
             let entity = world.spawn(sceneEntity.name)
             entity.isActive = sceneEntity.enabled
             let runtimeEditorID = "\(idPrefix)\(sceneEntity.id)"
@@ -213,6 +289,13 @@ enum EditorSceneFileLoader {
                 if componentName == EditorBuiltInComponentType.scriptableComponents, !loadsScriptableObjects {
                     continue
                 }
+                if !loadsPhysicsBodies,
+                   componentName == EditorBuiltInComponentType.physicsBody3D || componentName == EditorBuiltInComponentType.physicsBody2D {
+                    // The editor renders authored transforms without simulation.
+                    // Keep collider geometry in the document/Inspector rather than
+                    // decoding a second copy into an unused preview physics body.
+                    continue
+                }
                 guard
                     RuntimeTypeRegistry.componentType(named: componentName) != nil
                         || EditorComponentRegistry.descriptor(named: componentName) != nil
@@ -222,7 +305,7 @@ enum EditorSceneFileLoader {
                 }
 
                 do {
-                    let resolvedPayload = try resolvedComponentPayload(
+                    let resolvedPayload = try EditorSceneFileLoader.resolvedComponentPayload(
                         typeName: componentName, payload: componentPayload, sourceURL: sourceURL, resourceRootURL: resourceRootURL
                     )
                     if EditorScriptComponentStore.shared.component(forKey: componentName) != nil {
@@ -245,7 +328,7 @@ enum EditorSceneFileLoader {
                                 _ = try ui.resolveView(runtime: runtime)
                             }
                         }
-                        insertComponent(component, into: entity, in: world)
+                        EditorSceneFileLoader.insertComponent(component, into: entity, in: world)
                     } else {
                         warnings.append("Component is not decodable: \(componentName)")
                     }
@@ -253,12 +336,11 @@ enum EditorSceneFileLoader {
                     warnings.append("Failed to decode \(componentName): \(error.localizedDescription)")
                 }
             }
-            completeRuntimeBundle(for: entity, in: world)
+            EditorSceneFileLoader.completeRuntimeBundle(for: entity, in: world)
             #if !WASM
             if let reference = entity.components[SpineSource.self], !reference.source.isEmpty {
                 do {
-                    let handle = try AssetsManager.loadSync(SpineSkeleton.self, at: reference.source)
-                    guard let skeleton = handle.asset else { throw AssetError.message("Spine skeleton has not loaded.") }
+                    let skeleton = try assets.skeleton(at: reference.source)
                     try reference.instantiate(skeleton, on: entity)
                 } catch {
                     entity.components[SpineSourceState.self] = .init(reference: reference, error: error.localizedDescription)
@@ -267,13 +349,9 @@ enum EditorSceneFileLoader {
             }
             if let reference = entity.components[Model3DSource.self], !reference.source.isEmpty {
                 do {
-                    let model = try AssetsManager.loadSync(ModelAsset3D.self, at: reference.assetPath)
-                    guard let asset = model.asset else { throw AssetError.message("Model has not loaded.") }
+                    let asset = try assets.model(at: reference.assetPath)
                     let alternatives = try (reference.lod?.sources ?? []).map { source in
-                        guard let level = try AssetsManager.loadSync(ModelAsset3D.self, at: source).asset else {
-                            throw AssetError.message("Model LOD has not loaded.")
-                        }
-                        return level
+                        try assets.model(at: source)
                     }
                     let root = try reference.instantiate(asset, alternatives: alternatives, in: world, under: entity)
                     func registerNodes(_ node: Entity) {
@@ -290,72 +368,81 @@ enum EditorSceneFileLoader {
             #endif
         }
 
-        for sceneEntity in sceneModel.entities {
-            guard let parentID = sceneEntity.parent, !parentID.isEmpty else {
-                continue
-            }
-
-            guard let entity = entitiesByEditorID[sceneEntity.id] else {
-                continue
-            }
-
-            guard let parent = entitiesByEditorID[parentID] else {
-                warnings.append("Missing parent \(parentID) for entity \(sceneEntity.id)")
-                continue
-            }
-
-            parent.addChild(entity)
+        func removeAll() {
+            for entity in entitiesByEditorID.values { world.removeEntity(entity.id, recursively: true) }
+            world.flush()
         }
 
-        if let parentEntity {
-            for sceneEntity in sceneModel.entities where sceneEntity.parent == nil || sceneEntity.parent?.isEmpty == true {
-                if let entity = entitiesByEditorID[sceneEntity.id] {
-                    parentEntity.addChild(entity)
+        func finish() -> EditorSceneRuntimeLoadResult {
+            for sceneEntity in sceneModel.entities {
+                guard let parentID = sceneEntity.parent, !parentID.isEmpty else {
+                    continue
+                }
+
+                guard let entity = entitiesByEditorID[sceneEntity.id] else {
+                    continue
+                }
+
+                guard let parent = entitiesByEditorID[parentID] else {
+                    warnings.append("Missing parent \(parentID) for entity \(sceneEntity.id)")
+                    continue
+                }
+
+                parent.addChild(entity)
+            }
+
+            if let parentEntity {
+                for sceneEntity in sceneModel.entities where sceneEntity.parent == nil || sceneEntity.parent?.isEmpty == true {
+                    if let entity = entitiesByEditorID[sceneEntity.id] {
+                        parentEntity.addChild(entity)
+                    }
                 }
             }
-        }
 
-        for (editorEntityID, clips) in Dictionary(grouping: sceneModel.animations ?? [], by: \.targetEntityID) {
-            guard let entity = entitiesByEditorID[editorEntityID] else {
-                warnings.append("Missing animation target \(editorEntityID)")
-                continue
+            for (editorEntityID, clips) in Dictionary(grouping: sceneModel.animations ?? [], by: \.targetEntityID) {
+                guard let entity = entitiesByEditorID[editorEntityID] else {
+                    warnings.append("Missing animation target \(editorEntityID)")
+                    continue
+                }
+                guard let transform = world.get(Transform.self, from: entity.id) else {
+                    warnings.append("Animation target \(editorEntityID) has no Transform")
+                    continue
+                }
+                let runtimeClips = clips.map { $0.makeRuntimeClip(initialTransform: transform) }
+                guard !runtimeClips.isEmpty else {
+                    continue
+                }
+                world.insert(
+                    KeyframeAnimator(clips: runtimeClips, initialClipName: runtimeClips.first?.name, isPlaying: true),
+                    for: entity.id
+                )
             }
-            guard let transform = world.get(Transform.self, from: entity.id) else {
-                warnings.append("Animation target \(editorEntityID) has no Transform")
-                continue
+
+            let nested = EditorSceneFileLoader.instantiateNestedScenes(
+                in: sceneModel,
+                entitiesByEditorID: entitiesByEditorID,
+                world: world,
+                loadsScriptableObjects: loadsScriptableObjects,
+                loadsPhysicsBodies: loadsPhysicsBodies,
+                sourceURL: sourceURL,
+                resourceRootURL: resourceRootURL,
+                idPrefix: idPrefix,
+                ancestry: ancestry,
+                assets: &assets
+            )
+            entityCount += nested.entityCount
+            warnings.append(contentsOf: nested.warnings)
+            for (runtimeID, editorID) in nested.editorIDsByEntityID {
+                editorIDsByRuntimeEntityID[runtimeID] = editorID
             }
-            let runtimeClips = clips.map { $0.makeRuntimeClip(initialTransform: transform) }
-            guard !runtimeClips.isEmpty else {
-                continue
-            }
-            world.insert(
-                KeyframeAnimator(clips: runtimeClips, initialClipName: runtimeClips.first?.name, isPlaying: true),
-                for: entity.id
+
+            return EditorSceneRuntimeLoadResult(
+                entityCount: entityCount,
+                warnings: warnings,
+                entitiesByEditorID: runtimeEntityIDsByEditorID,
+                editorIDsByEntityID: editorIDsByRuntimeEntityID
             )
         }
-
-        let nested = instantiateNestedScenes(
-            in: sceneModel,
-            entitiesByEditorID: entitiesByEditorID,
-            world: world,
-            loadsScriptableObjects: loadsScriptableObjects,
-            sourceURL: sourceURL,
-            resourceRootURL: resourceRootURL,
-            idPrefix: idPrefix,
-            ancestry: ancestry
-        )
-        entityCount += nested.entityCount
-        warnings.append(contentsOf: nested.warnings)
-        for (runtimeID, editorID) in nested.editorIDsByEntityID {
-            editorIDsByRuntimeEntityID[runtimeID] = editorID
-        }
-
-        return EditorSceneRuntimeLoadResult(
-            entityCount: entityCount,
-            warnings: warnings,
-            entitiesByEditorID: runtimeEntityIDsByEditorID,
-            editorIDsByEntityID: editorIDsByRuntimeEntityID
-        )
     }
 
     private static func insertComponent(_ component: any Component, into entity: Entity, in world: World) {
@@ -373,10 +460,12 @@ enum EditorSceneFileLoader {
         entitiesByEditorID: [String: Entity],
         world: World,
         loadsScriptableObjects: Bool,
+        loadsPhysicsBodies: Bool,
         sourceURL: URL?,
         resourceRootURL: URL?,
         idPrefix: String,
-        ancestry: Set<URL>
+        ancestry: Set<URL>,
+        assets: inout EditorSceneAssetCache
     ) -> NestedSceneResult {
         var result = NestedSceneResult()
         for sceneEntity in sceneModel.entities {
@@ -405,11 +494,13 @@ enum EditorSceneFileLoader {
                     nestedModel,
                     in: world,
                     loadsScriptableObjects: loadsScriptableObjects,
+                    loadsPhysicsBodies: loadsPhysicsBodies,
                     sourceURL: nestedURL,
                     resourceRootURL: resourceRootURL,
                     parentEntity: instanceEntity,
                     idPrefix: "\(runtimeEditorID)/",
-                    ancestry: nestedAncestry
+                    ancestry: nestedAncestry,
+                    assets: &assets
                 )
                 result.entityCount += nested.entityCount
                 result.warnings.append(contentsOf: nested.warnings.map { "\(reference): \($0)" })
@@ -447,7 +538,7 @@ enum EditorSceneFileLoader {
         return resolved
     }
 
-    private static func resolveSceneReference(
+    static func resolveSceneReference(
         _ reference: String,
         relativeTo sourceURL: URL?,
         resourceRootURL: URL?

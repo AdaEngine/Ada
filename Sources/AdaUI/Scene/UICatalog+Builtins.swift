@@ -45,6 +45,11 @@ extension UICatalog {
         let verticalStack = [number("spacing", 8), choice("alignment", "center", ["leading", "center", "trailing"])]
         return [
             view("Text", [string("text", "Text")]) { AnyView(Text($0.string("text"))) },
+            view("ItemBoard", [.init("snapshot", type: .string, defaultValue: .string(""), isBinding: true), .init("command", type: .string, defaultValue: .string(""), isBinding: true)]) { c in
+                _ = try ItemBoardDocument.decode(c.string("snapshot"))
+                guard let resources = c.resources else { throw UIDiagnostic("ItemBoard requires a UI resource context.") }
+                return AnyView(ItemBoard(snapshot: c.textBinding("snapshot"), resources: resources, sourceURL: c.sourceURL, command: c.textBinding("command")))
+            },
             view("Image", [string("path"), bool("resizable", true), bool("template")] + imageCapParameters) { c in
                 guard let resources = c.resources else {
                     throw UIDiagnostic("Image requires a UI resource context.")

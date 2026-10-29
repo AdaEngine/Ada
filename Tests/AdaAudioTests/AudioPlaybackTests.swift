@@ -5,6 +5,28 @@ import Testing
 
 @Suite("Audio PCM playback")
 struct AudioPlaybackTests {
+    @Test("Playback reports completion without requiring a completion handler")
+    func observesCompletionWithoutHandler() throws {
+        let engine = try MiniAudioEngine(headless: true)
+        let sound = try engine.makeSound(from: Self.wav())
+        sound.start()
+        #expect(sound.state == .playing)
+        _ = unsafe try render(engine.engine, frames: 9_600)
+        #expect(sound.state == .finished)
+        sound.stop()
+        #expect(sound.state == .stopped)
+    }
+
+    @Test("Headless engine can start and stop without an output device")
+    func startsAndStopsWithoutDevice() throws {
+        let engine = try MiniAudioEngine(headless: true)
+        try engine.start()
+        try engine.stop()
+        try engine.start()
+        #expect(unsafe ma_engine_get_device(engine.engine.enginePtr) == nil)
+        try engine.stop()
+    }
+
     @Test("Encoded WAV remains valid after its temporary bytes are released; copies have independent playback cursors")
     func decodesOwnedMemoryAndCopies() throws {
         let engine = unsafe try MiniAudioStorage(headless: true)

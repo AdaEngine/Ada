@@ -101,6 +101,7 @@ extension Component {
         unsafe ReadFetch(data: nil)
     }
 
+    @inlinable
     public static func _queryFetch(
         for _: Entity,
         state _: ComponentId,
@@ -167,6 +168,7 @@ public struct RefFetch<T> {
 
 @safe
 public struct ReadFetch<T> {
+    @usableFromInline
     var data: UnsafeBufferPointer<T>?
 
     @usableFromInline
@@ -237,6 +239,7 @@ extension Ref: QueryTarget where T: Component {
         return newFetch
     }
 
+    @inlinable
     public static func _queryFetch(
         for _: Entity,
         state _: ComponentId,
@@ -274,6 +277,7 @@ extension Entity: QueryTarget {
         archetype _: Archetype
     ) {}
 
+    @inlinable
     public static func _queryFetch(
         for entity: Entity,
         state _: (),

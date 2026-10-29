@@ -1,5 +1,6 @@
 import AdaECS
 @_spi(Internal) import AdaRender
+import Foundation
 import Math
 
 /// Caches rest-space influence envelopes. Their transformed union bounds any normalized,
@@ -11,12 +12,41 @@ public struct AnimatedBounds3D: Resource {
     private struct MergedEntry { var buffers: [any VertexBuffer]; var envelopes: [AABB?] }
     private var merged: [[ObjectIdentifier]: MergedEntry] = [:]
     private var seenMerged: Set<[ObjectIdentifier]> = []
+    private struct PoseEntry {
+        let revision: SkinningPoseRevision
+        let buffers: [ObjectIdentifier]
+        let matrixCount: Int
+        let bounds: AABB?
+    }
+    private var poses: [UUID: PoseEntry] = [:]
+    private var seenPoses: Set<UUID> = []
     public init() {}
 
-    public mutating func beginFrame() { seen.removeAll(keepingCapacity: true); seenMerged.removeAll(keepingCapacity: true) }
+    public mutating func beginFrame() {
+        seen.removeAll(keepingCapacity: true)
+        seenMerged.removeAll(keepingCapacity: true)
+        seenPoses.removeAll(keepingCapacity: true)
+    }
     public mutating func finishFrame() {
         for key in cache.keys where !seen.contains(key) { cache.removeValue(forKey: key) }
         for key in merged.keys where !seenMerged.contains(key) { merged.removeValue(forKey: key) }
+        for key in poses.keys where !seenPoses.contains(key) { poses.removeValue(forKey: key) }
+    }
+
+    /// Reuses model-local bounds while the component-owned palette revision and geometry are unchanged.
+    /// Camera and world transforms do not change the local pose. Callers must advance the revision when matrices change.
+    public mutating func bounds(meshes: [Mesh], matrices: [Transform3D], revision: SkinningPoseRevision) -> AABB? {
+        let buffers = meshes.flatMap { $0.models.flatMap { $0.parts.map { ObjectIdentifier($0.vertexBuffer) } } }
+        seenPoses.insert(revision.id)
+        if let pose = poses[revision.id], pose.revision == revision, pose.buffers == buffers, pose.matrixCount == matrices.count {
+            // Keep the influence envelopes alive too, so resuming a paused animation needs no vertex scan.
+            seen.formUnion(buffers)
+            if meshes.count > 1 { seenMerged.insert(buffers) }
+            return pose.bounds
+        }
+        let result = meshes.count == 1 ? bounds(mesh: meshes[0], matrices: matrices) : bounds(meshes: meshes, matrices: matrices)
+        poses[revision.id] = PoseEntry(revision: revision, buffers: buffers, matrixCount: matrices.count, bounds: result)
+        return result
     }
 
     /// Unions rest-space envelopes once across LODs, then transforms each joint only once per pose.

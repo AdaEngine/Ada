@@ -33,6 +33,9 @@ public struct CharacterController3DComponent: Codable, Sendable {
     /// Acceleration and braking in meters per second squared.
     public var acceleration: Float = 14
     public var deceleration: Float = 20
+    /// Fraction of ground acceleration/braking available in air. Zero preserves takeoff momentum.
+    /// Defaults to one for compatibility with existing arcade controllers.
+    public var airControl: Float = 1
     public var jumpSpeed: Float = 5
     /// Set on a press edge. Consumed by the next fixed tick, including while airborne.
     public var jumpRequested: Bool = false
@@ -58,7 +61,7 @@ public struct CharacterController3DComponent: Codable, Sendable {
     }
 
     private enum CodingKeys: CodingKey {
-        case radius, height, requestedHeight, acceleration, deceleration, jumpSpeed, maximumFallSpeed, minimumGroundNormalY, groundSnapDistance
+        case radius, height, requestedHeight, acceleration, deceleration, airControl, jumpSpeed, maximumFallSpeed, minimumGroundNormalY, groundSnapDistance
     }
 
     public init(from decoder: any Decoder) throws {
@@ -68,6 +71,7 @@ public struct CharacterController3DComponent: Codable, Sendable {
         requestedHeight = try values.decodeIfPresent(Float.self, forKey: .requestedHeight) ?? height
         acceleration = try values.decodeIfPresent(Float.self, forKey: .acceleration) ?? 14
         deceleration = try values.decodeIfPresent(Float.self, forKey: .deceleration) ?? 20
+        airControl = try values.decodeIfPresent(Float.self, forKey: .airControl) ?? 1
         jumpSpeed = try values.decodeIfPresent(Float.self, forKey: .jumpSpeed) ?? 5
         maximumFallSpeed = try values.decodeIfPresent(Float.self, forKey: .maximumFallSpeed) ?? 50
         minimumGroundNormalY = try values.decodeIfPresent(Float.self, forKey: .minimumGroundNormalY) ?? 0.707107

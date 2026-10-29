@@ -4,6 +4,17 @@ import Testing
 
 @Suite("Studio portable projects")
 struct StudioDocumentTests {
+    @Test func fastJSONValuesPreserveCodableSemantics() throws {
+        for json in [
+            "null", "true", "false", "0", "1", "-1", "1.0", "-0.0", "1.5", "1e30",
+            "18446744073709551615", "-9223372036854775808",
+            "[null, true, false, 1, 1.25, \"true\", {\"vector\": [0, -1, 2.5]}]"
+        ] {
+            let data = Data(json.utf8)
+            #expect(try StudioValue.decode(data) == JSONDecoder().decode(StudioValue.self, from: data))
+        }
+    }
+
     @Test func agentProjectSourcePaths() {
         for path in ["AGENTS.md", "DESIGN.md", "PLAN.md", "PROGRESS.md", "Docs/Context.txt", "Tests/Rules.ada", ".ada/skills/my-game/SKILL.md", "Assets/Generated/Tree.vox"] {
             #expect(StudioSnapshot.validPath(path))

@@ -154,7 +154,44 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
     }
 
     static func decode(from content: String) throws -> Self {
-        try YAMLDecoder(encoding: .utf8).decode(Self.self, from: content)
+        // Generated scenes are commonly JSON. Sending their large mesh arrays
+        // through the YAML node graph adds substantial time and peak memory.
+        // Retain YAML flow mappings, which also begin with '{', as a fallback.
+        if content.first(where: { !$0.isWhitespace && $0 != "\u{FEFF}" }) == "{",
+           let model = try? decodeJSON(Data(content.utf8)) {
+            return model
+        }
+        return try YAMLDecoder(encoding: .utf8).decode(Self.self, from: content)
+    }
+
+    private static func decodeJSON(_ data: Data) throws -> Self {
+        // Decode the typed document envelope as usual, but keep large component
+        // arrays out of JSONDecoder's repeated StudioValue type probes.
+        let value = try EditorSceneValue.decode(data)
+        guard case var .object(document) = value, case var .array(entities) = document["entities"] else {
+            return try JSONDecoder().decode(Self.self, from: data)
+        }
+        var payloads: [[String: EditorComponentPayload]] = []
+        payloads.reserveCapacity(entities.count)
+        for index in entities.indices {
+            guard case var .object(entity) = entities[index], case let .object(components) = entity["components"] else {
+                return try JSONDecoder().decode(Self.self, from: data)
+            }
+            var typed: [String: EditorComponentPayload] = [:]
+            for (name, component) in components {
+                guard case let .object(payload) = component else {
+                    return try JSONDecoder().decode(Self.self, from: data)
+                }
+                typed[name] = payload
+            }
+            payloads.append(typed)
+            entity["components"] = .object([:])
+            entities[index] = .object(entity)
+        }
+        document["entities"] = .array(entities)
+        var model = try JSONDecoder().decode(Self.self, from: EditorSceneValue.object(document).encoded())
+        for index in model.entities.indices { model.entities[index].components = payloads[index] }
+        return model
     }
 
     func encodedYAML() throws -> String {

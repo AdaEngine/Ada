@@ -40,7 +40,7 @@ public struct MouseCaptureSystem {
     public func update(context _: UpdateContext) {
         var requested = false
         captures.forEach { requested = requested || $0.isRequested }
-        if requested != wasRequested {
+        if requested != wasRequested || (requested && input.getMouseMode() != .captured) {
             input.setMouseMode(requested ? .captured : .visible)
             wasRequested = requested
         }

@@ -71,6 +71,7 @@ struct EditorAgentSceneContext: Codable, Equatable, Sendable {
 
     init?(document: EditorSceneDocument) {
         guard
+            !document.isLoading,
             let model = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content),
             let selectedEntityID = model.editor?.selectedEntity,
             let entity = model.entities.first(where: { $0.id == selectedEntityID })

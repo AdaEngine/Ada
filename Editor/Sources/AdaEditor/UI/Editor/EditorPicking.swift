@@ -4,15 +4,17 @@ import Math
 enum EditorPicking {
     /// Input can arrive before transform propagation after a scene edit or reload.
     /// Compose current local transforms rather than reading a previous frame's global cache.
-    static func worldMatrix(for entity: Entity) -> Transform3D? {
-        guard let transform = entity.components[Transform.self] else {
+    static func worldMatrix(for entity: Entity, requiringVisible: Bool = false) -> Transform3D? {
+        guard let transform = entity.components[Transform.self],
+            !requiringVisible || (entity.isActive && entity.components[Visibility.self] != .hidden) else {
             return nil
         }
         var matrix = transform.matrix
         var ancestor = entity.parent
         var visited: Set<Entity.ID> = [entity.id]
         while let parent = ancestor {
-            guard visited.insert(parent.id).inserted else {
+            guard visited.insert(parent.id).inserted,
+                !requiringVisible || (parent.isActive && parent.components[Visibility.self] != .hidden) else {
                 return nil
             }
             guard let parentTransform = parent.components[Transform.self] else {
@@ -65,16 +67,23 @@ enum EditorPicking {
     }
 
     static func intersectionDistance(ray: Ray, matrix: Transform3D, bounds: BoundingComponent?) -> Float? {
-        guard abs(matrix.determinant) > 0.000001 else {
+        guard let localRay = localRay(ray, matrix: matrix) else {
             return nil
         }
+        let aabb = bounds == nil ? AABB(center: .zero, halfExtents: Vector3(0.35)) : localAABB(from: bounds)
+        return rayAABBIntersectionDistance(ray: localRay, aabb: aabb)
+    }
+
+    static func localRay(_ ray: Ray, matrix: Transform3D) -> Ray? {
+        let determinant = matrix.determinant
+        guard determinant.isFinite, determinant != 0 else { return nil }
         let inverse = matrix.inverse
         let origin = inverse * Vector4(ray.origin.x, ray.origin.y, ray.origin.z, 1)
         let direction = inverse * Vector4(ray.direction.x, ray.direction.y, ray.direction.z, 0)
+        guard origin.x.isFinite, origin.y.isFinite, origin.z.isFinite,
+            direction.x.isFinite, direction.y.isFinite, direction.z.isFinite else { return nil }
         // Do not normalize: the local ray parameter must still represent world distance.
-        let localRay = Ray(origin: origin.xyz, direction: direction.xyz)
-        let aabb = bounds == nil ? AABB(center: .zero, halfExtents: Vector3(0.35)) : localAABB(from: bounds)
-        return rayAABBIntersectionDistance(ray: localRay, aabb: aabb)
+        return Ray(origin: origin.xyz, direction: direction.xyz)
     }
 
     static func perspectiveRay(

@@ -20,23 +20,52 @@
         let device: WebGPU.GPUDevice
         let commandEncoder: WebGPU.GPUCommandEncoder
         private let spatialScaler: WGPUFSRSpatialScaler
+        private let instance: WebGPU.GPUInstance?
         private var completedHandlers: [@Sendable () -> Void] = []
 
-        init(device: WebGPU.GPUDevice, spatialScaler: WGPUFSRSpatialScaler) {
+        init(device: WebGPU.GPUDevice, spatialScaler: WGPUFSRSpatialScaler, instance: WebGPU.GPUInstance? = nil) {
             self.spatialScaler = spatialScaler
             self.device = device
+            self.instance = instance
             self.commandEncoder = webGPUDeviceLock.withLock { _ in
                 device.createCommandEncoder(descriptor: nil)
             }
         }
 
         func commit() {
-            let commandBuffer: WebGPU.GPUCommandBuffer = commandEncoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
+            let commandBuffer: WebGPU.GPUCommandBuffer = webGPUDeviceLock.withLock { _ in
+                commandEncoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
+            }
+            let handlers = completedHandlers
+            completedHandlers.removeAll()
+            #if WASM
             webGPUDeviceLock.withLock { _ in
                 device.queue.submit(commands: [commandBuffer])
             }
-            completedHandlers.forEach { $0() }
-            completedHandlers.removeAll()
+            handlers.forEach { $0() }
+            #else
+            let completion = handlers.isEmpty ? nil : WGPUCommandCompletion(instance: instance, command: commandBuffer, handlers: handlers)
+            webGPUDeviceLock.withLock { _ in
+                device.queue.submit(commands: [commandBuffer])
+                if let completion {
+                    let info = WebGPU.GPUQueueWorkDoneCallbackInfo(
+                        mode: instance == nil ? .allowSpontaneous : .allowProcessEvents,
+                        callback: { _, _ in completion.complete() }
+                    )
+                    // Swan's generated one-shot callback wrapper retains its Swift closure
+                    // without releasing it. Transfer that retain back on the callback.
+                    info.withWGPUStruct { native in
+                        native.callback = { status, message, userdata, _ in
+                            guard let userdata else { return }
+                            let callback = Unmanaged<AnyObject>.fromOpaque(userdata).takeRetainedValue() as! WebGPU.GPUQueueWorkDoneCallback
+                            callback(status, message.toString)
+                        }
+                        _ = device.queue.onSubmittedWorkDone(callbackInfo: native)
+                    }
+                }
+            }
+            completion?.pumpEvents()
+            #endif
         }
 
         func addCompletedHandler(_ handler: @escaping @Sendable () -> Void) {

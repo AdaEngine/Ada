@@ -6,6 +6,50 @@ import Testing
 @MainActor
 @Suite
 struct MeshVisibilityLOD3DTests {
+    @Test("posed bounds follow palette revisions, independent instances and LOD replacement")
+    func posedBoundsRevisionAndGeometryInvalidation() throws {
+        try setup()
+        func mesh(_ extent: Float) -> Mesh {
+            var descriptor = MeshDescriptor(name: "Revision bounds")
+            descriptor.positions = MeshBuffer([Vector3.zero, [extent, 0, 0], [0, extent, 0]])
+            descriptor[MeshDescriptor.jointIndices] = MeshBuffer(Array(repeating: Vector4.zero, count: 3))
+            descriptor[MeshDescriptor.jointWeights] = MeshBuffer(Array(repeating: Vector4(1, 0, 0, 0), count: 3))
+            descriptor.indicies = [0, 1, 2]
+            return Mesh.generate(from: [descriptor], renderDevice: unsafe RenderEngine.shared.renderDevice)
+        }
+        let base = mesh(1), wider = mesh(4)
+        let firstID = UUID(), secondID = UUID()
+        var cache = AnimatedBounds3D()
+        func sample(_ meshes: [Mesh], _ x: Float, _ revision: SkinningPoseRevision) throws -> AABB {
+            let result = cache.bounds(meshes: meshes, matrices: [Transform3D(translation: [x, 0, 0])], revision: revision)
+            return try #require(result)
+        }
+        cache.beginFrame()
+        let initial = try sample([base], 2, .init(id: firstID, generation: 0))
+        cache.finishFrame()
+        cache.beginFrame()
+        let retained = try sample([base], 2, .init(id: firstID, generation: 0))
+        #expect(retained.min == initial.min && retained.max == initial.max)
+        cache.finishFrame()
+        cache.beginFrame()
+        let moved = try sample([base], 7, .init(id: firstID, generation: 1))
+        let independent = try sample([base], -3, .init(id: secondID, generation: 1))
+        #expect(moved.min.x == 7 && moved.max.x == 8)
+        #expect(independent.min.x == -3 && independent.max.x == -2)
+        let lod = try sample([base, wider], 7, .init(id: firstID, generation: 1))
+        #expect(lod.max.x == 11)
+        let replaced = try sample([wider], -3, .init(id: secondID, generation: 1))
+        #expect(replaced.max.x == 1)
+        cache.finishFrame()
+        // Exercise release and re-use after an empty scene, without carrying a previous palette's bounds.
+        cache.beginFrame()
+        cache.finishFrame()
+        cache.beginFrame()
+        let reinserted = try sample([base], 12, .init(id: UUID(), generation: 0))
+        #expect(reinserted.min.x == 12 && reinserted.max.x == 13)
+        cache.finishFrame()
+    }
+
     @Test
     func shadowBatchesShareEquivalentBindingsAndPreserveMaterialEdits() throws {
         try setup()

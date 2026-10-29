@@ -1,5 +1,6 @@
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) @testable import AdaUI
+import Foundation
 import Testing
 @testable import AdaEditor
 
@@ -94,6 +95,73 @@ struct EditorWorkbenchPanelTests {
         #expect(resized.height == expanded.height)
         #expect(resized.maxY == 600)
         #expect(model.terminals.activeSession.terminal.cols == Int((resized.width - 12) / 8.4))
+    }
+
+    @Test func animatorFillsWorkspaceAndFollowsResize() async throws {
+        GLTFLoaderResolver.shared.setLoader(NativeGLTFLoader())
+        EditorComponentRegistry.registerBuiltIns()
+        let engine = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let modelURL = engine.appendingPathComponent("Tests/AdaEngineTests/Fixtures/SkeletalGardenAssets/TwoBoneRibbon.glb")
+        var scene = EditorSceneModel.default(projectName: "Animator layout")
+        let entity = scene.addEntity(template: .importedModel3D, parentID: scene.rootEntityID)
+        let index = try #require(scene.entities.firstIndex { $0.id == entity.id })
+        scene.entities[index].components[EditorBuiltInComponentType.model3DSource] = ["source": .string(modelURL.path)]
+        scene.selectEntity(entity.id)
+        let document = EditorSceneDocument(
+            id: "animator-layout", title: "Main.ascn", relativePath: "Main.ascn",
+            absolutePath: modelURL.deletingLastPathComponent().appendingPathComponent("Main.ascn").path,
+            content: try scene.encodedYAML(), sceneModel: scene, isDirty: false,
+            loadSummary: .init(entityCount: scene.entities.count, warnings: [])
+        )
+        let workbench = EditorWorkbenchViewModel(openDocuments: [.scene(document)], activeDocumentID: document.id)
+        let model = EditorViewModel(workbench: workbench)
+        model.showBottomPanel = true
+        #expect(model.skeletalAnimationTarget != nil)
+        let root = UIContainerView(rootView: EditorWorkspaceView(
+            viewModel: model,
+            leftPanel: { Color.clear }, mainPanel: { Color.clear }, rightPanel: { Color.clear },
+            bottomPanel: { EditorAnimationPanel(viewModel: model) }
+        ).theme(.adaEditor))
+        root.frame.size = Size(width: 1200, height: 700)
+        root.bounds.size = root.frame.size
+        await settle(root)
+        for _ in 0..<100 {
+            if !root.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.ModelPreview.Viewport")).isEmpty { break }
+            try await Task.sleep(for: .milliseconds(10))
+            await settle(root)
+        }
+        let initial = try root.uiNode(matching: .accessibilityIdentifier("AdaEditor.Animator.Panel")).absoluteFrame
+        #expect(initial.width == 1200)
+        #expect(initial.height == 180)
+        #expect(initial.maxY == 700)
+        let preview = try root.uiNode(matching: .accessibilityIdentifier("AdaEditor.ModelPreview.Viewport")).absoluteFrame
+        #expect(preview.minY >= initial.minY && preview.maxY <= initial.maxY)
+        let handle = try root.uiNode(matching: .accessibilityIdentifier("AdaEditor.Workspace.ResizeBottom")).absoluteFrame
+        let start = Point(handle.midX, handle.midY)
+        for (phase, point) in [(MouseEvent.Phase.began, start), (.changed, start - Point(0, 160)), (.ended, start - Point(0, 160))] {
+            root.onMouseEvent(MouseEvent(window: .empty, button: .left, mousePosition: point, phase: phase, modifierKeys: [], time: 0))
+            await settle(root)
+        }
+        let expanded = try root.uiNode(matching: .accessibilityIdentifier("AdaEditor.Animator.Panel")).absoluteFrame
+        let expandedPreview = try root.uiNode(matching: .accessibilityIdentifier("AdaEditor.ModelPreview.Viewport")).absoluteFrame
+        #expect(expanded.height == 340)
+        #expect(expanded.maxY == 700)
+        #expect(expandedPreview.height > preview.height)
+        #expect(expandedPreview.minY >= expanded.minY && expandedPreview.maxY <= expanded.maxY)
+
+        root.frame.size = Size(width: 900, height: 600)
+        root.bounds.size = root.frame.size
+        await settle(root)
+        let resized = try root.uiNode(matching: .accessibilityIdentifier("AdaEditor.Animator.Panel")).absoluteFrame
+        #expect(resized.width == 900)
+        #expect(resized.height == expanded.height)
+        #expect(resized.maxY == 600)
+        _ = try root.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Animator.MorphMode"))
+        await settle(root)
+        let morph = try root.uiNode(matching: .accessibilityIdentifier("AdaEditor.Animator.MorphTargets")).absoluteFrame
+        #expect(morph.minY >= resized.minY && morph.maxY <= resized.maxY)
+        #expect(morph.maxY == resized.maxY)
     }
 
     @Test func terminalDefaultsAndInverseTextStayReadable() {

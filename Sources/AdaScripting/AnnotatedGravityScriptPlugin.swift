@@ -4,8 +4,13 @@ import AdaInput
 import AdaMultiplayer
 import AdaScene
 import AdaScriptCompilerCore
+import AdaTransform
 import Foundation
 import Gravity
+
+/// Builds a world-local Swift implementation for an authored `@system` identifier.
+/// The plugin retains the authored scheduler, ordering and access declarations.
+public typealias AdaScriptNativeSystemFactory = @Sendable (World) throws -> any System
 
 /// Loads an annotation-driven Ada Script module.
 ///
@@ -43,6 +48,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         AdaScriptComponentRuntime.runtimeResourceLayouts(schemas: dataSchemas)
     }
     private var runtime: AnnotatedGravityRuntime
+    private let nativeSystemFactories: [String: AdaScriptNativeSystemFactory]
 
     public convenience init(contentsOf fileURL: URL) throws {
         try self.init(
@@ -70,7 +76,8 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         startupSystemIdentifier: String? = nil,
         communityPolicy: AdaScriptCommunityPolicy? = nil,
         includeTests: Bool = false,
-        testTimeout: Duration? = nil
+        testTimeout: Duration? = nil,
+        nativeSystemFactories: [String: AdaScriptNativeSystemFactory] = [:]
     ) throws {
         if communityPolicy != nil {
             for source in sources { try AdaScriptCommunityLowerer.validate(source: source.source) }
@@ -118,6 +125,9 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         for plan in plans {
             try module.requireSynchronousCallback(className: plan.className, method: "update", annotation: "@system")
         }
+        if let unknown = nativeSystemFactories.keys.sorted().first(where: { identifier in !plans.contains { $0.identifier == identifier } }) {
+            throw AdaScriptError.invalidManifest("Native system '\(unknown)' does not match an @system id.")
+        }
         for binding in rpcMethodBindings {
             try module.requireSynchronousCallback(className: binding.systemName, method: binding.commandName, annotation: "@rpc")
         }
@@ -142,6 +152,7 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         self.runtimeComponents = runtimeComponents
         self.runtime = runtime
         self.plans = plans
+        self.nativeSystemFactories = nativeSystemFactories
         try runtime.instantiateSystems(plans)
         runtime.testWorldFactory?.build = { [unowned self, runtime] in
             let world = World(name: "Ada Script test")
@@ -202,14 +213,15 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
         let candidate = try AdaScriptPlugin(
             sources: sources,
             name: name,
-            startupSystemIdentifier: startupSystemIdentifier
+            startupSystemIdentifier: startupSystemIdentifier,
+            nativeSystemFactories: nativeSystemFactories
         )
         guard candidate.dataSchemas == dataSchemas, candidate.networkCommands == networkCommands else {
             throw AdaScriptError.invalidManifest("AdaScript component, resource, and network schemas require a game restart.")
         }
         try await app.withExclusiveWorldAccess {
             let prepared = try candidate.plans.map { plan in
-                try (plan, Self.prepare(plan, pluginIdentifier: name, world: app.main))
+                try (plan, Self.prepare(plan, pluginIdentifier: name, world: app.main), candidate.nativeSystemFactories[plan.identifier]?(app.main))
             }
             try app.withExecutionContext { try scriptableObjects?.activate(in: app.main) }
             for scheduler in Set(plans.map(\.scheduler)) {
@@ -219,12 +231,13 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             let worldID = "world:\(ObjectIdentifier(app.main).hashValue)"
             runtime.cancelTasks(forWorld: worldID)
             app.main.schedulers.addSystem(AdaScriptTaskPumpSystem(pluginIdentifier: name, runtime: candidate.runtime), for: .update)
-            for (plan, preparedSystem) in prepared {
+            for (plan, preparedSystem, nativeSystem) in prepared {
                 app.main.schedulers.addSystem(
                     AnnotatedGravityScriptSystem(
                         pluginIdentifier: name,
                         runtime: candidate.runtime,
-                        preparedSystem: preparedSystem
+                        preparedSystem: preparedSystem,
+                        nativeSystem: nativeSystem
                     ),
                     for: plan.scheduler
                 )
@@ -239,12 +252,13 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             let startupSystems = prepared.filter { $0.0.scheduler == .startup }
             if !startupSystems.isEmpty {
                 let reloadScheduler = SchedulerName(rawValue: "AdaScripting.ReloadStartup.\(name)")
-                for (_, preparedSystem) in startupSystems {
+                for (_, preparedSystem, nativeSystem) in startupSystems {
                     app.main.schedulers.addSystem(
                         AnnotatedGravityScriptSystem(
                             pluginIdentifier: name,
                             runtime: runtime,
-                            preparedSystem: preparedSystem
+                            preparedSystem: preparedSystem,
+                            nativeSystem: nativeSystem
                         ),
                         for: reloadScheduler
                     )
@@ -309,7 +323,8 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
                     AnnotatedGravityScriptSystem(
                         pluginIdentifier: name,
                         runtime: runtime,
-                        preparedSystem: prepared
+                        preparedSystem: prepared,
+                        nativeSystem: try nativeSystemFactories[plan.identifier]?(app.main)
                     ),
                     for: prepared.scheduler
                 )
@@ -371,7 +386,10 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
             do {
                 let prepared = try Self.prepare(plan, pluginIdentifier: name, world: world)
                 world.schedulers.addSystem(
-                    AnnotatedGravityScriptSystem(pluginIdentifier: name, runtime: runtime, preparedSystem: prepared),
+                    AnnotatedGravityScriptSystem(
+                        pluginIdentifier: name, runtime: runtime, preparedSystem: prepared,
+                        nativeSystem: try nativeSystemFactories[plan.identifier]?(world)
+                    ),
                     for: prepared.scheduler
                 )
                 installed.insert(plan.className)
@@ -907,13 +925,18 @@ struct AnnotatedComponentAccess: Sendable {
     var isWritable = true
 }
 
+// All callbacks below share AdaScriptRuntimeCoordinator.lock. Declare that
+// serialization to the ECS planner instead of blocking competing worker tasks.
+private struct AdaScriptVMExecution: Resource {}
+
 private struct AdaScriptTaskPumpSystem: System {
     private let deltaTime = Res<DeltaTime?>()
+    private let vmAccess = ResMut<AdaScriptVMExecution?>()
     private let pluginIdentifier: String
     private let runtime: AnnotatedGravityRuntime?
 
     var systemIdentifier: String { Self.makeIdentifier(plugin: pluginIdentifier) }
-    var queries: SystemQueries { SystemQueries(queries: [deltaTime]) }
+    var queries: SystemQueries { SystemQueries(queries: [deltaTime, vmAccess]) }
 
     init(world _: World) {
         pluginIdentifier = "Unconfigured"
@@ -937,9 +960,11 @@ private struct AdaScriptTaskPumpSystem: System {
 
 private struct AnnotatedGravityScriptSystem: System {
     private let deltaTime = Res<DeltaTime?>()
+    private let vmAccess = ResMut<AdaScriptVMExecution?>()
     private let pluginIdentifier: String
     private let preparedSystem: PreparedAnnotatedSystem?
     private let runtime: AnnotatedGravityRuntime?
+    private let nativeSystem: (any System)?
 
     var systemIdentifier: String {
         guard let preparedSystem else {
@@ -955,7 +980,11 @@ private struct AnnotatedGravityScriptSystem: System {
         let pumpDependency: [SystemDependency] = preparedSystem.scheduler == .update
             ? [.after(AdaScriptTaskPumpSystem.makeIdentifier(plugin: pluginIdentifier))]
             : []
-        return pumpDependency + preparedSystem.dependencies
+        // Authored presentation writes must finish before local transforms are published for
+        // extraction. Otherwise camera/weapon entities can alternate between two frame poses.
+        let transformDependency: [SystemDependency] = preparedSystem.scheduler == .postUpdate
+            ? [.before(TransformSystem.self)] : []
+        return pumpDependency + transformDependency + preparedSystem.dependencies + (nativeSystem?.systemDependencies ?? [])
     }
 
     var queries: SystemQueries {
@@ -979,6 +1008,11 @@ private struct AnnotatedGravityScriptSystem: System {
             parameters.append(ExclusiveWorldAccess())
         }
         parameters.append(deltaTime)
+        if let nativeSystem {
+            parameters += nativeSystem.queries.queries
+        } else {
+            parameters.append(vmAccess)
+        }
         return SystemQueries(queries: parameters)
     }
 
@@ -986,15 +1020,18 @@ private struct AnnotatedGravityScriptSystem: System {
         self.pluginIdentifier = "Unconfigured"
         self.preparedSystem = nil
         self.runtime = nil
+        self.nativeSystem = nil
     }
 
     init(
         pluginIdentifier: String,
         runtime: AnnotatedGravityRuntime,
-        preparedSystem: PreparedAnnotatedSystem
+        preparedSystem: PreparedAnnotatedSystem,
+        nativeSystem: (any System)? = nil
     ) {
         self.pluginIdentifier = pluginIdentifier
         self.runtime = runtime
+        self.nativeSystem = nativeSystem
         self.preparedSystem = preparedSystem
     }
 
@@ -1003,6 +1040,10 @@ private struct AnnotatedGravityScriptSystem: System {
     }
 
     func update(context: UpdateContext) async {
+        if let nativeSystem {
+            await nativeSystem.update(context: context)
+            return
+        }
         guard let preparedSystem, let runtime else {
             return
         }
@@ -1213,6 +1254,9 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         if virtualMachine.getValue(forKey: "main").isClosure {
             throw AdaScriptError.invalidManifest("Ada Script modules must not declare main()")
         }
+        // Enable the real-time policy after module initialization has published
+        // its classes/functions. Compiler transfer temporarily holds unrooted code.
+        virtualMachine.setGCAllocationBudget(AdaScriptRuntimeCoordinator.garbageCollectionAllocationBudget)
     }
 
     func instantiateSystems(_ plans: [AnnotatedSystemPlan]) throws {

@@ -1,10 +1,38 @@
 import AdaAssets
 @_spi(Internal) import AdaRender
+import AdaUtils
 import Foundation
 import Math
+import Synchronization
 
 extension ModelAsset3D {
     private struct TextureKey: Hashable { let index: Int; let sRGB: Bool }
+
+    private struct ImportedTextureKey: Hashable {
+        let data: Data
+        let sRGB: Bool
+        let sampler: SamplerDescriptor
+        let device: ObjectIdentifier
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.device == rhs.device && lhs.sRGB == rhs.sRGB && lhs.sampler == rhs.sampler && lhs.data == rhs.data
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(device)
+            hasher.combine(sRGB)
+            hasher.combine(sampler.minFilter)
+            hasher.combine(sampler.magFilter)
+            hasher.combine(sampler.mipFilter)
+            hasher.combine(sampler.addressModeU)
+            hasher.combine(sampler.addressModeV)
+            hasher.combine(data)
+        }
+    }
+
+    // Materials own the textures. The index never keeps an unused GPU allocation alive.
+    // Compare encoded contents, not just URLs, so hot reload also sees edited images.
+    private static let importedTextures = Mutex<[ImportedTextureKey: WeakBox<Texture2D>]>([:])
 
     static func makeMaterials(_ result: GLTFImportResult) throws -> [Material] {
         var textures: [TextureKey: Texture2D] = [:]
@@ -21,9 +49,15 @@ extension ModelAsset3D {
             guard result.images.indices.contains(source.source), let data = result.images[source.source].data else {
                 throw AssetError.message("Texture \(index) has no image data")
             }
-            let image = try Image.decode(from: data)
             let input = source.sampler.flatMap { result.samplers.indices.contains($0) ? result.samplers[$0] : nil } ?? .init()
             let sampler = samplerDescriptor(input)
+            let sharedKey = ImportedTextureKey(data: data, sRGB: sRGB, sampler: sampler,
+                                               device: ObjectIdentifier(unsafe RenderEngine.shared.renderDevice))
+            if let value = importedTextures.withLock({ $0[sharedKey]?.value }) {
+                textures[key] = value
+                return value
+            }
+            let image = try Image.decode(from: data)
             let levels = try ImageMipmaps.make(from: image, colorSpace: sRGB ? .sRGB : .linear, includeMipmaps: sampler.mipFilter != .notMipmapped)
             let value = Texture2D(descriptor: TextureDescriptor(
                 width: image.width,
@@ -44,8 +78,14 @@ extension ModelAsset3D {
                     unsafe value.replaceRegion(RectInt(x: 0, y: 0, width: mip.width, height: mip.height), mipmapLevel: level, withBytes: base, bytesPerRow: mip.width * 4)
                 }
             }
-            textures[key] = value
-            return value
+            let shared = importedTextures.withLock { cache in
+                if let existing = cache[sharedKey]?.value { return existing }
+                cache = cache.filter { $0.value.value != nil }
+                cache[sharedKey] = WeakBox(value)
+                return value
+            }
+            textures[key] = shared
+            return shared
         }
         let materials: [Material] = try result.materials.map { source in
             let material = PBRMaterial()

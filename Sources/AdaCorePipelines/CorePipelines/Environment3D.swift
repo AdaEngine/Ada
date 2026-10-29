@@ -226,9 +226,77 @@ public struct Environment3D: Codable, Sendable {
         get { postProcess.depthOfField.focusDistance }
         set { postProcess.depthOfField.focusDistance = newValue }
     }
+    public var depthOfFieldAperture: Float {
+        get { postProcess.depthOfField.aperture }
+        set { postProcess.depthOfField.aperture = newValue }
+    }
+    public var depthOfFieldMaximumRadius: Float {
+        get { postProcess.depthOfField.maximumBlurRadius }
+        set { postProcess.depthOfField.maximumBlurRadius = newValue }
+    }
+    public var lensEnabled: Bool {
+        get { postProcess.lens.isEnabled }
+        set { postProcess.lens.isEnabled = newValue }
+    }
+    public var lensDistortion: Float {
+        get { postProcess.lens.distortion }
+        set { postProcess.lens.distortion = newValue }
+    }
+    public var chromaticAberration: Float {
+        get { postProcess.lens.chromaticAberration }
+        set { postProcess.lens.chromaticAberration = newValue }
+    }
+    public var edgeSoftness: Float {
+        get { postProcess.lens.edgeSoftness }
+        set { postProcess.lens.edgeSoftness = newValue }
+    }
+    public var filmGrain: Float {
+        get { postProcess.lens.filmGrain }
+        set { postProcess.lens.filmGrain = newValue }
+    }
+    public var rainLensAmount: Float {
+        get { postProcess.lens.rainAmount }
+        set { postProcess.lens.rainAmount = newValue }
+    }
+    public var rainLensTime: Float {
+        get { postProcess.lens.rainTime }
+        set { postProcess.lens.rainTime = newValue }
+    }
+    public var motionBlurEnabled: Bool {
+        get { postProcess.motionBlur.isEnabled }
+        set { postProcess.motionBlur.isEnabled = newValue }
+    }
+    public var shutterAngle: Float {
+        get { postProcess.motionBlur.shutterAngle }
+        set { postProcess.motionBlur.shutterAngle = newValue }
+    }
+    public var motionBlurMaximumVelocity: Float {
+        get { postProcess.motionBlur.maximumVelocity }
+        set { postProcess.motionBlur.maximumVelocity = newValue }
+    }
+    public var motionBlurSamples: Int {
+        get { postProcess.motionBlur.sampleCount }
+        set { postProcess.motionBlur.sampleCount = newValue }
+    }
     public var autoExposureEnabled: Bool {
         get { postProcess.autoExposure.isEnabled }
         set { postProcess.autoExposure.isEnabled = newValue }
+    }
+    public var autoExposureMinimumEV: Float {
+        get { postProcess.autoExposure.minimumEV }
+        set { postProcess.autoExposure.minimumEV = newValue }
+    }
+    public var autoExposureMaximumEV: Float {
+        get { postProcess.autoExposure.maximumEV }
+        set { postProcess.autoExposure.maximumEV = newValue }
+    }
+    public var autoExposureSpeedUp: Float {
+        get { postProcess.autoExposure.speedUp }
+        set { postProcess.autoExposure.speedUp = newValue }
+    }
+    public var autoExposureSpeedDown: Float {
+        get { postProcess.autoExposure.speedDown }
+        set { postProcess.autoExposure.speedDown = newValue }
     }
     public var bloomEnabled: Bool {
         get { postProcess.bloom.isEnabled }
@@ -319,8 +387,10 @@ extension Environment3D {
     /// Whether a pass after the color writers (a full-screen debug view or depth of field) still writes the
     /// output, so earlier passes must not yet report it as ready to present.
     var laterPassesWriteOutput: Bool {
-        debugView.replacesFinalImage || postProcess.depthOfField.changesImage
+        debugView.replacesFinalImage || postProcess.depthOfField.changesImage || cameraEffectsWriteOutput
     }
+
+    var cameraEffectsWriteOutput: Bool { postProcess.lens.changesImage || postProcess.motionBlur.changesImage }
 }
 
 /// Extracted environments keyed by the source camera entity.

@@ -73,4 +73,47 @@ struct AdaTransformTests: Sendable {
         let globalTransform = try #require(child.components[GlobalTransform.self])
         #expect(globalTransform.getTransform().position == Vector3(x: 17, y: 28, z: 39))
     }
+
+    @Test("Simultaneous ancestor and descendant edits preserve scaled hierarchy matrices")
+    func simultaneousHierarchyEdits() async throws {
+        var chain: [Entity] = []
+        for index in 0..<12 {
+            let entity = world.main.spawn { Transform(position: [Float(index), 1, 0]) }
+            chain.last?.addChild(entity)
+            chain.append(entity)
+        }
+        await world.main.runScheduler(.postUpdate)
+        world.main.clearTrackers()
+        for (index, entity) in chain.enumerated() {
+            entity.components[Transform.self] = Transform(scale: index == 0 ? [-1, 2, 1] : .one,
+                                                        position: [Float(index + 1), 2, -1])
+        }
+        await world.main.runScheduler(.postUpdate)
+        var expected = Transform3D.identity
+        for entity in chain {
+            expected = expected * (try #require(entity.components[Transform.self])).matrix
+            #expect(entity.components[GlobalTransform.self]?.matrix == expected)
+        }
+        // Only the leaf changes on the following tick; ancestors stay clean.
+        world.main.clearTrackers()
+        let leaf = try #require(chain.last)
+        leaf.components[Transform.self]?.position = [40, 3, -2]
+        await world.main.runScheduler(.postUpdate)
+        let parent = try #require(chain.dropLast().last?.components[GlobalTransform.self])
+        #expect(leaf.components[GlobalTransform.self]?.matrix == parent.matrix * (try #require(leaf.components[Transform.self])).matrix)
+    }
+
+    @Test("Transformless gaps do not suppress a dirty descendant")
+    func transformlessGap() async throws {
+        let root = world.main.spawn { Transform(position: [10, 0, 0]) }
+        let gap = world.main.spawn()
+        let leaf = world.main.spawn { Transform(position: [3, 0, 0]) }
+        root.addChild(gap); gap.addChild(leaf)
+        await world.main.runScheduler(.postUpdate)
+        world.main.clearTrackers()
+        root.components[Transform.self]?.position = [20, 0, 0]
+        leaf.components[Transform.self]?.position = [7, 0, 0]
+        await world.main.runScheduler(.postUpdate)
+        #expect(leaf.components[GlobalTransform.self]?.getTransform().position == Vector3(7, 0, 0))
+    }
 }

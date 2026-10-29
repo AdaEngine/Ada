@@ -202,9 +202,15 @@ struct Temporal3DIntegrationTests {
         #expect(pipeline.colorAttachments[0].sourceRGBBlendFactor == .zero)
         #expect(pipeline.colorAttachments[0].destinationRGBBlendFactor == .one)
         #expect(pipeline.colorAttachments[1].rgbBlendOperation == .max)
+        #expect(pipeline.colorAttachments[1].sourceRGBBlendFactor == .one)
+        #expect(pipeline.colorAttachments[1].destinationRGBBlendFactor == .one)
+        #expect(pipeline.colorAttachments[1].sourceAlphaBlendFactor == .one)
+        #expect(pipeline.colorAttachments[1].destinationAlphaBlendFactor == .one)
         #expect(pipeline.depthPixelFormat == .depth_32f)
         #expect(pipeline.depthStencilDescriptor?.isDepthWriteEnabled == false)
-        #expect(pipeline.vertexDescriptor.attributes[16].offset == 128)
+        for (column, location) in [1, 4, 10, 11].enumerated() {
+            #expect(pipeline.vertexDescriptor.attributes[location].offset == 128 + column * 16)
+        }
         #expect(PBR3DPipeline().configurate(with: configuration).depthPixelFormat == .depth_32f)
     }
 }

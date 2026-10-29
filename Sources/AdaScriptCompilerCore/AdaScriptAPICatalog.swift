@@ -238,6 +238,9 @@ public extension AdaScriptTypeEnvironment {
                 returning: .bool,
                 detail: "reloadScene() -> Bool — restart the active scene from its source"
             ),
+            method("sceneLoadingProgress", parameters: [], returning: .float, detail: "sceneLoadingProgress() -> Float — completed scene preparation, 0...1"),
+            method("sceneLoadingStage", parameters: [], returning: .string, detail: "sceneLoadingStage() -> String — idle, reading, assets, installing, ready or failed"),
+            method("sceneLoadingError", parameters: [], returning: .string, detail: "sceneLoadingError() -> String — last scene loading error, or empty"),
             method(
                 "spawn",
                 parameters: [.list(.any)],

@@ -20,7 +20,7 @@ extension EditorWorkbenchViewModel {
         }
         let resources = UISceneResources(rootURL: resourceRoot ?? sourceURL.deletingLastPathComponent())
         var result: [EditorUIBindingOwner] = []
-        for case let .scene(document) in openDocuments where !document.isReadOnly {
+        for case let .scene(document) in openDocuments where !document.isReadOnly && !document.isLoading {
             guard let scene = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content) else {
                 continue
             }

@@ -38,6 +38,7 @@ public final class AppWorlds {
     /// Skips this runtime in its host's automatic frame loop while retaining it
     /// for tooling and explicit updates (for example an inactive editor preview).
     package var isHostedUpdateSuspended = false
+    private var hostedUpdateSuspensionCount = 0
 
     #if ENABLE_RUN_IN_CONCURRENCY
         public typealias ApplicationRunnerBlock = () async -> Void
@@ -136,6 +137,15 @@ extension AppWorlds {
         return try await operation()
     }
 
+    /// Allows a host UI to keep drawing while an embedded world is prepared in
+    /// batches. Explicit updates still serialize with the exclusive operation.
+    @_spi(Internal)
+    public func withHostedUpdatesSuspended<T>(_ operation: @MainActor () async throws -> T) async throws -> T {
+        hostedUpdateSuspensionCount += 1
+        defer { hostedUpdateSuspensionCount -= 1 }
+        return try await withExclusiveWorldAccess(operation)
+    }
+
     /// Updates this world and its subworlds, serializing concurrent frame requests.
     public func update() async throws {
         while activeUpdates > 0 {
@@ -203,7 +213,7 @@ extension AppWorlds {
             await main.runScheduler(updateScheduler)
         }
 
-        for world in self.subWorlds.values where !world.isHostedUpdateSuspended {
+        for world in self.subWorlds.values where !world.isHostedUpdateSuspended && world.hostedUpdateSuspensionCount == 0 {
             unsafe await world.worldExctractor?.exctract(from: main, to: world.main)
             try await world.update()
         }

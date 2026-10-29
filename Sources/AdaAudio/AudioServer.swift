@@ -6,6 +6,7 @@
 //
 
 import AdaECS
+import AdaRender
 import AdaUtils
 import Foundation
 import Math
@@ -17,7 +18,15 @@ enum AudioError: Error {
 
 /// An instance that managed audio in the AdaEngine.
 public final class AudioServer: Resource {
-    nonisolated(unsafe) public internal(set) static var shared: AudioServer!
+    nonisolated(unsafe) private static var defaultServer: AudioServer?
+
+    /// The server belonging to the current offline recording, or the application server.
+    public internal(set) static var shared: AudioServer! {
+        get { unsafe offlineServer ?? defaultServer }
+        set { unsafe defaultServer = newValue }
+    }
+
+    @TaskLocal package static var offlineServer: AudioServer?
 
     let engine: AudioEngine
 
@@ -25,11 +34,30 @@ public final class AudioServer: Resource {
         self.engine = engine
     }
 
+    /// Initializes audio without a playback device when the active or configured renderer is headless.
     @_spi(AdaEngine)
     @MainActor
     public static func initialize() throws {
-        let engine = try MiniAudioEngine()
-        unsafe self.shared = AudioServer(engine: engine)
+        if offlineServer != nil { return }
+        unsafe self.shared = AudioServer(engine: try makeEngine())
+    }
+
+    /// Prepares an independently owned preview with its own master gain and output lifetime.
+    /// Headless rendering keeps preview output disabled, just like the shared server.
+    @MainActor
+    public static func preparePreview(from data: Data) throws -> AudioPlaybackController {
+        let engine = try makeEngine()
+        try engine.start()
+        let resource = AudioResource(sound: try engine.makeSound(from: data))
+        return try AudioPlaybackController(resource: resource)
+    }
+
+    @MainActor
+    private static func makeEngine() throws -> MiniAudioEngine {
+        // Keep decoding and playback APIs available without opening an output device.
+        // The active backend takes precedence over configuration changed after startup.
+        let backend = unsafe RenderEngine.shared?.type ?? RenderEngine.configurations.preferredBackend
+        return try MiniAudioEngine(headless: backend == .headless)
     }
 
     func update(_ deltaTime: AdaUtils.TimeInterval) {

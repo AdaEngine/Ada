@@ -33,6 +33,26 @@ struct NativeGLTFLoaderTests {
         #expect(result.images.first?.data == Data([1, 2, 3]))
     }
 
+    @Test(arguments: [-1, 5, Int.max])
+    func rejectsAccessorOffsetsOutsideTheView(offset: Int) throws {
+        var document = try #require(JSONSerialization.jsonObject(with: makeGLTF()) as? [String: Any])
+        var accessors = try #require(document["accessors"] as? [[String: Any]])
+        accessors[3]["byteOffset"] = offset
+        document["accessors"] = accessors
+        let data = try JSONSerialization.data(withJSONObject: document)
+        #expect(throws: (any Error).self) { try NativeGLTFLoader().load(data: data) }
+    }
+
+    @Test(arguments: [-1, 37, Int.max])
+    func rejectsBufferViewRangesOutsideTheBuffer(offset: Int) throws {
+        var document = try #require(JSONSerialization.jsonObject(with: makeGLTF()) as? [String: Any])
+        var views = try #require(document["bufferViews"] as? [[String: Any]])
+        views[4]["byteOffset"] = offset
+        document["bufferViews"] = views
+        let data = try JSONSerialization.data(withJSONObject: document)
+        #expect(throws: (any Error).self) { try NativeGLTFLoader().load(data: data) }
+    }
+
     private func makeGLTF() throws -> Data {
         var buffer = Data([1, 0, 0, 0])
         appendFloat(1, to: &buffer)

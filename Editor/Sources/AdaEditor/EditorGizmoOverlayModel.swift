@@ -13,26 +13,30 @@ enum EditorGizmoOverlayModel {
 
     @MainActor
     static func icons(in world: World, editorIDsByEntityID: [Entity.ID: String]) -> [Icon] {
-        world.getEntities()
-            .compactMap { entity in
-                guard
-                    let editorID = editorIDsByEntityID[entity.id],
-                    let transform = entity.components[Transform.self],
-                    let resolved = visibleGizmo(for: entity)
-                else {
-                    return nil
-                }
-
-                return Icon(
-                    editorEntityID: editorID,
-                    kind: resolved.gizmo.kind,
-                    name: resolved.gizmo.name,
-                    position: transform.position,
-                    size: resolved.gizmo.size,
-                    color: resolved.gizmo.color,
-                    isExplicit: resolved.isExplicit
-                )
+        // Bind only archetypes that can actually own an icon. Most authored entities
+        // and imported mesh descendants have none of these components.
+        let query = FilterQuery<Entity, Transform, Or<With<EditorGizmo>, With<Light2D>, With<SpotLightComponent>,
+                                                      With<PointLightComponent>, With<DirectionalLightComponent>, With<Camera>, With<AudioComponent>>>(from: world)
+        var icons: [Icon] = []
+        query.batched().forEach { entity, transform in
+            guard
+                let editorID = editorIDsByEntityID[entity.id],
+                let resolved = visibleGizmo(for: entity)
+            else {
+                return
             }
+
+            icons.append(Icon(
+                editorEntityID: editorID,
+                kind: resolved.gizmo.kind,
+                name: resolved.gizmo.name,
+                position: transform.position,
+                size: resolved.gizmo.size,
+                color: resolved.gizmo.color,
+                isExplicit: resolved.isExplicit
+            ))
+        }
+        return icons
     }
 
     @MainActor

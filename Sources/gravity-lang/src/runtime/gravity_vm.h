@@ -57,7 +57,16 @@ GRAVITY_API void                gravity_gray_object (gravity_vm* vm, gravity_obj
 GRAVITY_API void                gravity_gray_value (gravity_vm* vm, gravity_value_t v);
 GRAVITY_API void                gravity_gc_setenabled (gravity_vm* vm, bool enabled);
 GRAVITY_API void                gravity_gc_setvalues (gravity_vm *vm, gravity_int_t threshold, gravity_int_t minthreshold, gravity_float_t ratio);
+// Additional object-count trigger; zero preserves the byte-threshold-only policy.
+// Collections remain synchronous and tracing/root semantics are unchanged.
+GRAVITY_API void                gravity_gc_set_allocation_budget (gravity_vm *vm, uint32_t maximum_allocations);
 GRAVITY_API void                gravity_gc_start (gravity_vm* vm);
+// Optional process-wide profiling hook. Install before starting VM work.
+GRAVITY_API void                gravity_gc_set_timing_callback (void (*callback)(double milliseconds));
+// Optional phase/accounting samples, without per-frame tracing. Install before VM work.
+GRAVITY_API void                gravity_gc_set_statistics_callback (void (*callback)(double total_ms, double mark_ms, double sweep_ms,
+                                                                                   uint32_t objects_before, uint32_t objects_after,
+                                                                                   gravity_int_t accounted_bytes_before, gravity_int_t accounted_bytes_after));
 GRAVITY_API void                gravity_gc_tempnull (gravity_vm *vm, gravity_object_t *obj);
 GRAVITY_API void                gravity_gc_temppop (gravity_vm *vm);
 GRAVITY_API void                gravity_gc_temppush (gravity_vm *vm, gravity_object_t *obj);

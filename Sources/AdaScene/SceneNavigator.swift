@@ -19,6 +19,14 @@ public enum SceneNavigationError: Error, Sendable, LocalizedError {
 /// Application resources that are not supplied by the scene remain in the world.
 /// The lock protects request state shared with asset-loading tasks; world mutation runs only in setup or post-update.
 public final class SceneNavigator: Resource, @unchecked Sendable {
+    public struct LoadingProgress: Sendable {
+        public let fraction: Double
+        public let stage: String
+        public init(fraction: Double, stage: String) {
+            self.fraction = fraction
+            self.stage = stage
+        }
+    }
     private enum Source: Sendable {
         case path(String)
         case factory(@MainActor @Sendable () throws -> Scene)
@@ -49,7 +57,8 @@ public final class SceneNavigator: Resource, @unchecked Sendable {
     private var active: ActiveScene?
     private var prepared: PreparedScene?
     private var lastFailure: String?
-    private var sceneLoader: (@Sendable (String) async throws -> Scene)?
+    private var sceneLoader: (@Sendable (String, @escaping @Sendable (LoadingProgress) -> Void) async throws -> Scene)?
+    private var progress = LoadingProgress(fraction: 0, stage: "idle")
     private var willReplaceHandlers: [@Sendable () -> Void] = []
 
     public init(world: World) {
@@ -65,9 +74,15 @@ public final class SceneNavigator: Resource, @unchecked Sendable {
 
     /// The last loading error. The active scene is retained when loading fails.
     public var lastError: String? { lock.withLock { lastFailure } }
+    public var loadingProgress: LoadingProgress { lock.withLock { progress } }
 
     /// Override path loading for a host that uses a project-specific scene format.
     public func setSceneLoader(_ loader: @escaping @Sendable (String) async throws -> Scene) {
+        setSceneLoader { path, _ in try await loader(path) }
+    }
+
+    /// Progress belongs to one request; callbacks from superseded loads are ignored.
+    public func setSceneLoader(_ loader: @escaping @Sendable (String, @escaping @Sendable (LoadingProgress) -> Void) async throws -> Scene) {
         lock.withLock { sceneLoader = loader }
     }
 
@@ -137,6 +152,7 @@ public final class SceneNavigator: Resource, @unchecked Sendable {
             return
         }
         install(candidate.scene, source: candidate.source, in: world)
+        lock.withLock { progress = LoadingProgress(fraction: 1, stage: "ready") }
         candidate.completion?.resume()
     }
 
@@ -150,6 +166,7 @@ public final class SceneNavigator: Resource, @unchecked Sendable {
             prepared?.completion?.resume(throwing: SceneNavigationError.superseded)
             prepared = nil
             lastFailure = nil
+            progress = LoadingProgress(fraction: 0, stage: "reading")
             return generation
         }
         Task {
@@ -158,7 +175,13 @@ public final class SceneNavigator: Resource, @unchecked Sendable {
                 switch source {
                 case let .path(path):
                     if let sceneLoader = lock.withLock({ sceneLoader }) {
-                        scene = try await sceneLoader(path)
+                        scene = try await sceneLoader(path) { [weak self] update in
+                            self?.lock.withLock {
+                                guard self?.generation == request, self?.progress.stage != "failed", update.fraction.isFinite,
+                                      let current = self?.progress, update.fraction >= current.fraction else { return }
+                                self?.progress = LoadingProgress(fraction: min(0.99, max(0, update.fraction)), stage: update.stage)
+                            }
+                        }
                     } else {
                         scene = try unsafe await AssetsManager.loadFresh(Scene.self, at: path)
                     }
@@ -171,6 +194,7 @@ public final class SceneNavigator: Resource, @unchecked Sendable {
                         return
                     }
                     prepared = PreparedScene(generation: request, scene: scene, source: source, completion: completion)
+                    progress = LoadingProgress(fraction: 0.99, stage: "installing")
                 }
             } catch {
                 let message = error.localizedDescription
@@ -180,6 +204,7 @@ public final class SceneNavigator: Resource, @unchecked Sendable {
                         return false
                     }
                     lastFailure = message
+                    progress = LoadingProgress(fraction: progress.fraction, stage: "failed")
                     completion?.resume(throwing: error)
                     return true
                 }

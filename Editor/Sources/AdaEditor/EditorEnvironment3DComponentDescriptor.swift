@@ -42,6 +42,8 @@ extension EditorComponentRegistry {
             environmentField("postProcess.bloom.softKnee", "Bloom Soft Knee", .float, minimumValue: 0),
             environmentField("postProcess.bloom.scatter", "Bloom Scatter", .float, minimumValue: 0),
             environmentField("postProcess.depthOfField.isEnabled", "Depth of Field Enabled", .bool),
+            environmentField("postProcess.lens.rainAmount", "Rain on Lens", .float, minimumValue: 0),
+            environmentField("postProcess.lens.rainTime", "Rain Animation Time", .float, minimumValue: 0),
             environmentField("postProcess.depthOfField.focusDistance", "Focus Distance", .float, minimumValue: 0),
             environmentField("postProcess.depthOfField.aperture", "Aperture", .float, minimumValue: 0),
             environmentField("postProcess.depthOfField.maximumBlurRadius", "Maximum Blur Radius (px)", .float, minimumValue: 0),

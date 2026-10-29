@@ -1,0 +1,206 @@
+diff --git a/Sources/AdaMCPCore/AdaMCPRuntime+Entities.swift b/Sources/AdaMCPCore/AdaMCPRuntime+Entities.swift
+index d5b6a17..0c3317e 100644
+--- a/Sources/AdaMCPCore/AdaMCPRuntime+Entities.swift
++++ b/Sources/AdaMCPCore/AdaMCPRuntime+Entities.swift
+@@ -1,4 +1,5 @@
+ import AdaEngine
++import Foundation
+ import MCP
+ 
+ extension AdaMCPRuntime {
+@@ -34,7 +35,7 @@ extension AdaMCPRuntime {
+             if let active, entity.isActive != active {
+                 return false
+             }
+-            if let componentType, !resolved.world.main.hasComponent(named: componentType, in: entity.id) {
++            if let componentType, self.component(named: componentType, in: resolved.world.main, entity: entity.id) == nil {
+                 return false
+             }
+             return true
+@@ -69,14 +70,14 @@ extension AdaMCPRuntime {
+         guard resolved.world.main.getEntityByID(entityID) != nil else {
+             throw AdaMCPError.entityNotFound(world: resolved.name, entityID: entityID)
+         }
+-        guard let component = resolved.world.main.getComponent(named: componentType, from: entityID) else {
++        guard let component = self.component(named: componentType, in: resolved.world.main, entity: entityID) else {
+             throw AdaMCPError.componentNotFound(
+                 world: resolved.name,
+                 entityID: entityID,
+                 componentType: componentType
+             )
+         }
+-        return try self.inspectValue(component)
++        return try self.inspectComponent(component, in: resolved.world.main)
+     }
+ 
+     func entityPayload(worldName: String, entityID: Int) throws -> Value {
+@@ -118,11 +119,11 @@ private extension AdaMCPRuntime {
+ 
+         for (typeName, component) in world.getComponents(for: entity.id) {
+             do {
+-                payloads.append(try self.inspectValue(component))
++                payloads.append(try self.inspectComponent(component, in: world))
+             } catch {
+                 diagnostics.append(self.diagnosticValue(
+-                    code: "not_inspectable",
+-                    message: "Component \(typeName) on entity \(entity.id) is not inspectable."
++                    code: "inspection_failed",
++                    message: "Component \(typeName) on entity \(entity.id): \(error.localizedDescription)"
+                 ))
+             }
+         }
+diff --git a/Sources/AdaMCPCore/AdaMCPRuntime.swift b/Sources/AdaMCPCore/AdaMCPRuntime.swift
+index 43ac84f..8daae27 100644
+--- a/Sources/AdaMCPCore/AdaMCPRuntime.swift
++++ b/Sources/AdaMCPCore/AdaMCPRuntime.swift
+@@ -141,7 +141,7 @@ public final class AdaMCPRuntime {
+             ),
+             Tool(
+                 name: "entity.list_components",
+-                description: "List inspectable components for an entity.",
++                description: "List component fields, including world-scoped AdaScript schemas and bounded read-only reflection. Partial values include diagnostics.",
+                 inputSchema: Self.objectSchema(
+                     properties: [
+                         "world": .object(["type": "string"]),
+--- /dev/null
++++ b/Sources/AdaMCPCore/AdaMCPRuntime+ComponentInspection.swift
+@@ -0,0 +1,139 @@
++import AdaEngine
++import MCP
++
++extension AdaMCPRuntime {
++    /// Runtime component identities belong to the selected world, not the Swift carrier type.
++    func component(named name: String, in world: World, entity: Entity.ID) -> (any Component)? {
++        if let descriptor = world.runtimeComponentDescriptor(named: name) {
++            return world.getRuntimeComponent(descriptor.componentID, from: entity)
++        }
++        return world.getComponent(named: name, from: entity)
++    }
++
++    func inspectComponent(_ component: any Component, in world: World) throws -> Value {
++        if let runtime = component as? RuntimeComponentPayload {
++            if let descriptor = world.runtimeComponentDescriptor(id: runtime.componentID) {
++                let fields = descriptor.fields.reduce(into: [String: Value]()) { fields, field in
++                    if let value = field.read(runtime) { fields[field.key] = Self.componentFieldValue(value) }
++                }
++                return componentInspection(
++                    type: descriptor.stableID, fields: fields, source: "runtime_schema",
++                    metadata: ["displayName": .string(descriptor.name), "aliases": .array(descriptor.aliases.map(Value.string))]
++                )
++            }
++            return componentInspection(
++                type: runtime.stableID,
++                fields: ["values": .array(runtime.values.map(Self.componentFieldValue))],
++                source: "runtime_payload",
++                diagnostics: [diagnosticValue(code: "schema_unavailable", message: "Field names are unavailable; values retain their schema order.")]
++            )
++        }
++        // Explicit serializers remain authoritative, including their failures.
++        if registry.descriptor(for: component) != nil { return try inspectValue(component) }
++        let typeName = String(reflecting: type(of: component))
++        if let descriptor = ComponentReflectionRegistry.descriptor(named: typeName)
++            ?? (type(of: component) as? any ReflectableComponent.Type)?.componentDescriptor {
++            return componentInspection(
++                type: typeName, fields: descriptor.readPayload(from: component).mapValues(Self.componentFieldValue),
++                source: "component_schema"
++            )
++        }
++        var reader = MCPComponentMirror()
++        let value = reader.read(component)
++        return componentInspection(
++            type: typeName, fields: value.objectValue ?? ["value": value], source: "reflection",
++            diagnostics: reader.isPartial
++                ? [diagnosticValue(code: "partial_inspection", message: "Opaque references or bounded values are marked in fields.")]
++                : []
++        )
++    }
++
++    private func componentInspection(
++        type: String, fields: [String: Value], source: String,
++        metadata: [String: Value] = [:], diagnostics: [Value] = []
++    ) -> Value {
++        var payload = metadata
++        payload.merge([
++            "type": .string(type), "kind": .string("component"), "inspectionSource": .string(source),
++            "readOnly": .bool(true), "summary": .object(["fieldCount": .int(fields.count)]),
++            "fields": .object(fields), "diagnostics": .array(diagnostics)
++        ]) { _, new in new }
++        return .object(payload)
++    }
++
++    private static func componentFieldValue(_ value: ReflectedFieldValue) -> Value {
++        switch value {
++        case .null: .null
++        case let .bool(value): .bool(value)
++        case let .int(value): .int(value)
++        case let .double(value): value.isFinite ? .double(value) : .string(String(value))
++        case let .string(value): .string(value)
++        case let .array(values): .array(values.map(componentFieldValue))
++        case let .object(values): .object(values.mapValues(componentFieldValue))
++        }
++    }
++}
++
++/// Read-only fallback for value components without a registered schema. Never follows
++/// class references or pointers into world/VM/GPU state, nor invokes custom descriptions.
++private struct MCPComponentMirror {
++    private var remaining = 1024
++    private(set) var isPartial = false
++
++    mutating func read(_ value: Any, depth: Int = 0) -> Value {
++        guard remaining > 0, depth < 8 else { return marker(value, reason: "limit") }
++        remaining -= 1
++        switch value {
++        case let value as Bool: return .bool(value)
++        case let value as Int: return .int(value)
++        case let value as Int8: return .int(Int(value))
++        case let value as Int16: return .int(Int(value))
++        case let value as Int32: return .int(Int(value))
++        case let value as Int64: return Int(exactly: value).map(Value.int) ?? .string(String(value))
++        case let value as UInt: return Int(exactly: value).map(Value.int) ?? .string(String(value))
++        case let value as UInt8: return .int(Int(value))
++        case let value as UInt16: return .int(Int(value))
++        case let value as UInt32: return Int(exactly: value).map(Value.int) ?? .string(String(value))
++        case let value as UInt64: return Int(exactly: value).map(Value.int) ?? .string(String(value))
++        case let value as Float: return value.isFinite ? .double(Double(value)) : .string(String(value))
++        case let value as Double: return value.isFinite ? .double(value) : .string(String(value))
++        case let value as String:
++            if value.count > 4096 {
++                isPartial = true
++                return .object(["$truncated": .bool(true), "prefix": .string(String(value.prefix(4096)))])
++            }
++            return .string(value)
++        default: break
++        }
++        let mirror = Mirror(reflecting: value)
++        if mirror.displayStyle == .optional {
++            return mirror.children.first.map { read($0.value, depth: depth + 1) } ?? .null
++        }
++        guard mirror.displayStyle != .class else { return marker(value, reason: "reference") }
++        guard let style = mirror.displayStyle else { return marker(value, reason: "opaque") }
++        if style == .enum, mirror.children.isEmpty {
++            // No reflection API exposes the case name without invoking descriptions.
++            return marker(value, reason: "enum_without_schema")
++        }
++        var fields: [String: Value] = [:]
++        var items: [Value] = []
++        var limited = false
++        for (index, child) in mirror.children.enumerated() {
++            guard index < 128, remaining > 0 else { limited = true; break }
++            let item = read(child.value, depth: depth + 1)
++            if style == .collection || style == .set || style == .dictionary { items.append(item) }
++            else { fields[child.label ?? String(index)] = item }
++        }
++        if limited { isPartial = true }
++        if style == .collection || style == .set || style == .dictionary {
++            return limited ? .object(["$truncated": .bool(true), "items": .array(items)]) : .array(items)
++        }
++        if limited { fields["$truncated"] = .bool(true) }
++        return .object(fields)
++    }
++
++    private mutating func marker(_ value: Any, reason: String) -> Value {
++        isPartial = true
++        return .object(["$unavailable": .string(reason), "type": .string(String(reflecting: type(of: value)))])
++    }
++}

@@ -189,12 +189,32 @@ entity templates, rename/delete/duplicate/copy/paste/reparent operations.
 Reusable nested scenes through `SceneInstance` already exist.
 2D/3D viewport modes, camera navigation, picking, grid/rulers/orientation helpers
 and Move/Scale/Rotate tools. Scene edits have undo/redo.
+The native viewport's Terrain tool creates height-field ground and sculpts it
+with Raise/Lower/Smooth/Flatten brushes, radius/strength controls and a surface
+ring. Brush controls and Create Terrain live in the contextual Inspector, share
+the active viewport's state and clear with its action owner. The viewport retains
+its full height. A stroke commits one document-history edit; Escape restores its original
+heights. `Terrain3DSystem` generates meshes and, with `Physics3DPlugin`, matching
+static triangle colliders. Height samples persist in `AdaScene.Terrain3D` through
+scene loading and native export. Imported-mesh sculpting, texture painting and
+browser authoring remain separate. Guide: [Terrain.md](Documentation/Terrain.md).
+Coverage: [EditorTerrainTests.swift](Tests/AdaEditorTests/EditorTerrainTests.swift).
+Inspector layout, live language changes and owner lifecycle coverage:
+[EditorTerrainInspectorTests.swift](Tests/AdaEditorTests/EditorTerrainInspectorTests.swift).
 2D sprite picking shares the runtime hit test: CPU alpha masks, atlas regions,
 anchors, image modes and composed parent transforms before ECS propagation.
 Coverage: [EditorSpritePickingTests.swift](Tests/AdaEditorTests/EditorSpritePickingTests.swift).
 Selection reuses the parsed scene model and retains preview entities for editor-only
 state changes. Large terrain payloads use bulk YAML node construction; regression
 coverage: [EditorSceneSelectionRegressionTests.swift](Tests/AdaEditorTests/EditorSceneSelectionRegressionTests.swift).
+Large scene documents decode off the UI actor; previews prepare model/LOD/Spine
+assets asynchronously and install entities in batches while hosted frames are
+suspended. They retain shared handles per preview world, cancel stale loads and reuse unchanged imports. JSON
+component arrays use the portable value parser; edit worlds omit physics-body
+geometry while the document/Inspector and Play retain it. Imported models share
+matching texture contents without retaining unused GPU textures in the index.
+Guide: [SceneLoading.md](Documentation/SceneLoading.md). Coverage:
+[EditorSceneAssetCacheTests.swift](Tests/AdaEditorTests/EditorSceneAssetCacheTests.swift).
 The hierarchy and project tree own hover state and drawing caches per mounted row.
 Pointer-motion and neighboring-row cache coverage:
 [EditorSidebarHoverTests.swift](Tests/AdaEditorTests/EditorSidebarHoverTests.swift).
@@ -240,6 +260,9 @@ attachable scripts and exported script fields. Built-in and reflected component
 descriptors share the inspector catalog. Specialized editing exists for 2D/3D
 physics shapes, mesh primitives/material parameters, cameras, lights, 3D
 environment, tile maps and UI components. Live Play inspection has its own model.
+The reflected `ParticleEmitter3D` component authors world-space smoke/dust settings;
+runtime emission uses instanced soft billboards. See `../Documentation/Particles3D.md`
+for behavior and rendering boundaries.
 
 Entry points: [EditorComponentRegistry.swift](Sources/AdaEditor/EditorComponentRegistry.swift),
 [EditorInspectorSidebar.swift](Sources/AdaEditor/UI/Editor/EditorInspectorSidebar.swift),
@@ -304,7 +327,11 @@ orientation IDs. AdaScript can enqueue orientation changes to existing tiles.
 Coverage: [EditorTileOrientationTests.swift](Tests/AdaEditorTests/EditorTileOrientationTests.swift).
 The tile palette adapts its column count to the Inspector width and builds only
 rows near the visible scroll viewport.
-GLSL source editing and shader highlighting. Audio/generic assets currently use metadata previews.
+GLSL source editing and shader highlighting. Audio assets have Listen/Pause/Stop
+and a preview volume slider; WAV files decode through the engine's real audio
+resource path with independently owned preview output and gain. Opening a file does not autoplay. Leaving its tab cancels loading
+and stops playback; headless runs keep the engine's output disabled.
+Generic assets retain metadata previews. Coverage: `EditorAudioAssetPreviewTests`.
 Scene keyframe clips have timeline/curve modes, tracks, keyframe values/timing,
 interpolation and repeat modes. This is distinct from skeletal-animation tooling.
 
@@ -351,6 +378,18 @@ Coverage: [EditorTextureAtlasTests.swift](Tests/AdaEditorTests/EditorTextureAtla
 
 ### Build, Play, preview and export
 
+The shared desktop toolbar includes Movie Maker capture settings: project/current
+scene, FPS, resolution, duration, output path and audio. Preferences persist per
+project in `.ada/workspace/movie-maker.json`. Recording uses the engine's fixed-step
+PNG/WAV writer, prepares scene assets before frame zero, reports progress and supports
+Stop/cancellation without replacing existing takes. Project recording uses the AdaScript
+Play configuration; Swift projects can record Current Scene through Scene Play, rather
+than their external executable. Camera-external HUD overlays are not included.
+Guide: [MovieMaker.md](Documentation/MovieMaker.md). Entry points:
+`EditorMovieMakerModel`, `EditorMovieMakerRuntime`, `EditorMovieMakerDialog` and
+`EditorViewModel+MovieMaker`. Coverage: `EditorMovieMakerTests`, the mounted dialog
+test in `EditorLocalizationTests`, and opt-in `EditorMovieMakerGPUTests`.
+
 Build/Run/Stop, SwiftPM test/package commands, build output and navigable Problems.
 AdaScript projects run their `@test` functions in process (ADR-0024) through
 `EditorAdaScriptTestRunner` and `EditorViewModel.runAdaScriptTests`: sources from the project's
@@ -376,12 +415,26 @@ cross-platform Windows/Linux packaging from macOS remain unavailable.
 Android startup is generated from a top-level, nongeneric `@main App` in the
 export copy; private types and explicit target source lists are supported.
 
-Standalone macOS Studio includes `Contents/MacOS/adastudio` and a bundled source
+Standalone macOS Studio includes `Contents/MacOS/adastudio`; Windows distributions
+include a console `adastudio.exe` beside `AdaEditor.exe` and an adjacent source
 build SDK. The CLI dispatches before app/UI startup and reuses project inspection,
 AdaScript validation and native build/export services, with JSON diagnostics and
 stable exit codes. CLI/SDK staging is excluded from iOS and App Store wrappers.
-Host Swift/Xcode tools and Python 3 remain required; validation scope and current
+Windows inspect/validate run without external compilers; Web/Android export uses
+the configured WSL worker. Native Windows game packaging is not a CLI target yet.
+Host Swift/Xcode tools and Python 3 remain required for macOS builds; validation scope and current
 export limitations are documented in [CLI.md](Documentation/CLI.md).
+
+Runtime scene replacement decodes JSON scenes directly and prepares referenced
+models, LODs and Spine skeletons asynchronously before main-actor installation.
+Strong asset handles are retained through installation so synchronous component
+instantiation reuses the cache. Nested scenes are included and cycles fail before
+the active scene is replaced. SceneNavigator exposes monotonic progress and
+stage/error queries to AdaScript; request generations isolate stale callbacks.
+Windows pointer capture hides/confines/recenters the cursor, forwards relative
+motion and releases on focus loss/teardown. Coverage:
+`EditorRuntimeScenePreparationTests`, `EditorSceneLoadingProgressTests` and
+Last Autumn's `LastAutumnPointerTests` integration suite.
 
 Entry points: [EditorViewModel+Commands.swift](Sources/AdaEditor/UI/Editor/EditorViewModel+Commands.swift),
 [EditorViewModel+AdaScriptHotReload.swift](Sources/AdaEditor/UI/Editor/EditorViewModel+AdaScriptHotReload.swift),
@@ -502,6 +555,14 @@ moves emit relative motion events as well as position updates. Coverage:
 `EditorScenarioComponentSnapshotTests`. Guide: [MobileAgentTools.md](Documentation/MobileAgentTools.md#desktop-game-verification).
 Coverage: [EditorPlayScenarioTests.swift](Tests/AdaEditorTests/EditorPlayScenarioTests.swift),
 engine [SceneViewFrameCaptureTests.swift](../Tests/AdaEngineTests/SceneViewFrameCaptureTests.swift).
+
+The Windows AdaMCP staging patch adds world-scoped runtime schemas to
+`entity.list_components`, `component.get` and `entity.find`, including stable IDs
+and aliases. Native component reflection exposes live fields without a separate
+MCP registration; unknown value types have bounded read-only reflection with
+explicit partial-value markers. Explicit MCP serializers remain authoritative.
+Coverage: `EditorMCPComponentInspectionTests` and `script/test_ensure_windows_mcp.py`.
+This requires rebuilding Studio; already running processes retain their old tools.
 
 Native AI model tools on desktop and mobile inspect/validate GLB/glTF through
 CPU native import, import project-local dependency bundles and patch PBR material
@@ -673,7 +734,7 @@ Guides: [Notifications.md](Documentation/Notifications.md),
 - The embedded AdaScript Web Player's scene validation currently allows only
   Transform, Visibility and TileMapComponent. This restriction belongs to that
   path, not every AOT/Swift Web export path.
-- Audio/generic metadata previews do not provide audio playback in the asset browser; sounds play
+- Audio assets support explicit listening in their document tab and sounds play
   through the `AudioSource` component in Play. GLB/glTF
   import, preview, placement and clip playback exist; visual imported-material
   editing, skeleton editing and skeletal-clip authoring remain incomplete.

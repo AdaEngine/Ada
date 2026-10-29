@@ -1,3 +1,6 @@
+#if canImport(CoreFoundation)
+import CoreFoundation
+#endif
 import Foundation
 
 /// Portable scene and tool values, shared by native Studio and the browser.
@@ -47,7 +50,37 @@ public enum StudioValue: Codable, Equatable, Sendable {
         default: (try? String(decoding: encoded(), as: UTF8.self)) ?? ""
         }
     }
-    public static func decode(_ data: Data) throws -> Self { try JSONDecoder().decode(Self.self, from: data) }
+    /// Parses JSON values without probing every possible Codable type at every node.
+    public static func decode(_ data: Data) throws -> Self {
+        try fromJSON(JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]))
+    }
+
+    private static func fromJSON(_ value: Any) throws -> Self {
+        if value is NSNull { return .null }
+        if let number = value as? NSNumber {
+            let kind = unsafe String(cString: number.objCType)
+            #if canImport(CoreFoundation)
+            if CFGetTypeID(number) == CFBooleanGetTypeID() { return .bool(number.boolValue) }
+            #else
+            if kind == "c" { return .bool(number.boolValue) }
+            #endif
+            if kind == "f" || kind == "d" {
+                let value = number.doubleValue
+                if let integer = Int(exactly: value) { return .int(integer) }
+                if let integer = UInt64(exactly: value) { return .uint(integer) }
+                return .double(value)
+            }
+            if kind == "Q" {
+                let value = number.uint64Value
+                return Int(exactly: value).map(Self.int) ?? .uint(value)
+            }
+            return .int(number.intValue)
+        }
+        if let string = value as? String { return .string(string) }
+        if let array = value as? [Any] { return .array(try array.map(fromJSON)) }
+        if let object = value as? [String: Any] { return .object(try object.mapValues(fromJSON)) }
+        throw StudioError.invalid("Unsupported JSON value.")
+    }
     public func encoded() throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]

@@ -288,6 +288,9 @@ public struct VisibleMesh3DLists: Resource {
             let template = templates[Int(record.template)]
             var shadowFlags = template.shadowFlags
             shadowFlags.w = 1 - record.fade
+            // Positive Y belongs to atmospheres. Negative values carry an exact
+            // joint base without exceeding WebGPU's 16 vertex-attribute limit.
+            if sources[sourceIndex].skinningOffset > 0 { shadowFlags.y = -Float(sources[sourceIndex].skinningOffset) }
             if isShadowPass {
                 // A skinned pose changes without any CPU-visible identity change, so such a face is never reusable.
                 if sources[sourceIndex].skinningBuffer != nil || !sources[sourceIndex].morphBuffers.isEmpty { entry.isDynamic = true }

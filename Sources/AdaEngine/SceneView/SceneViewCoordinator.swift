@@ -104,8 +104,9 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
 
     deinit {
         let name = hostSubworldName
+        let host = hostWorlds
         Task { @MainActor in
-            AppWorldsSession.current?.removeSubworld(by: name)
+            host?.removeSubworld(by: name)
         }
     }
 
@@ -147,11 +148,17 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             try? await app.build()
             self.configureContentScheduling(in: app)
             guard !self.isShutdown else {
-                AppWorldsSession.current?.removeSubworld(by: self.hostSubworldName)
+                self.hostWorlds?.removeSubworld(by: self.hostSubworldName)
                 self.isBootstrapping = false
                 return
             }
             self.appWorlds = app
+            // Visible game UI may consume every click before it reaches the
+            // viewport. Install the driver before gameplay requests capture.
+            // Standalone offscreen runtimes must never capture a host cursor.
+            if self.isHostedSubworld, app.main.getResource(Input.self) != nil {
+                app.main.getRefResource(Input.self).wrappedValue.attachPointerDriver(UIWindowManager.shared)
+            }
             app.isHostedUpdateSuspended = !self.isRenderingEnabled
             self.hostWorlds?.addSubworld(app, by: self.hostSubworldName)
             self.isBootstrapping = false
@@ -164,7 +171,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         isShutdown = true
         frameSource.map { SceneViewFrameRegistry.unregister($0) }
         stopAudioPlaybacks()
-        AppWorldsSession.current?.removeSubworld(by: hostSubworldName)
+        hostWorlds?.removeSubworld(by: hostSubworldName)
         if let executionID = appWorlds?.executionID {
             Task { @AssetActor in
                 AssetsManager.destroyScope(executionID)

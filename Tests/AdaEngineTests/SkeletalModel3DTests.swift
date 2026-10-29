@@ -6,6 +6,32 @@ import Testing
 @MainActor
 @Suite
 struct SkeletalModel3DTests {
+    @Test("paused models retain authored node edits while another instance resumes its pose")
+    func pausedNodeEditsAndIndependentPoseUpdates() async throws {
+        let app = try await makeApp()
+        let model = try loadModel("TwoBoneRibbon")
+        let first = model.instantiate(in: app.main), second = model.instantiate(in: app.main)
+        await app.main.runScheduler(.preUpdate)
+        await app.main.runScheduler(.postUpdate, deltaTime: 0)
+        let firstMesh = try #require(skinnedMeshes(first).first)
+        let secondMesh = try #require(skinnedMeshes(second).first)
+        let initialGeneration = try #require(secondMesh.components[SkinnedMesh3DComponent.self]).poseGeneration
+        app.main.clearTrackers()
+        secondMesh.components[Transform.self] = Transform(position: [3, 4, 5])
+        await app.main.runScheduler(.postUpdate, deltaTime: 0)
+        #expect(FilterQuery<ModelAnimation3DComponent, Changed<ModelAnimation3DComponent>>(from: app.main).first == nil)
+        #expect(secondMesh.components[Transform.self]?.position == Vector3(3, 4, 5))
+        #expect(secondMesh.components[SkinnedMesh3DComponent.self]?.poseGeneration == initialGeneration)
+        var animation = try #require(first.components[ModelAnimation3DComponent.self])
+        try animation.player.play("Bend", transitionDuration: 0)
+        animation.player.seek(to: 0.5)
+        first.components[ModelAnimation3DComponent.self] = animation
+        await app.main.runScheduler(.postUpdate, deltaTime: 0)
+        #expect(firstMesh.components[SkinnedMesh3DComponent.self]?.matrices != secondMesh.components[SkinnedMesh3DComponent.self]?.matrices)
+        #expect(secondMesh.components[Transform.self]?.position == Vector3(3, 4, 5))
+        #expect(secondMesh.components[SkinnedMesh3DComponent.self]?.poseGeneration == initialGeneration)
+    }
+
     @Test
     func importsAndInstantiatesIndependentPlayersAndVertexInfluences() async throws {
         let app = try await makeApp()
@@ -35,7 +61,7 @@ struct SkeletalModel3DTests {
     }
 
     @Test
-    func independentSkinPalettesSplitBatchesAndReuseFrameBuffers() async throws {
+    func independentSkinPalettesShareBatchesAndReuseFrameBuffers() async throws {
         let app = try await makeApp()
         let model = try loadModel("TestHumanoid")
         let first = model.instantiate(in: app.main)
@@ -49,16 +75,64 @@ struct SkeletalModel3DTests {
         for _ in 0 ..< 4 {
             await renderWorld.runScheduler(.extract)
             let items = try VisibleMesh3D.capture(from: renderWorld).items
-            #expect(items.count == 2)
-            let firstBuffer = try #require(items.first { $0.entity == firstMesh.id }?.skinningBuffer)
-            let secondBuffer = try #require(items.first { $0.entity == secondMesh.id }?.skinningBuffer)
-            #expect(ObjectIdentifier(firstBuffer) != ObjectIdentifier(secondBuffer))
-            #expect(items.allSatisfy { $0.batchRange?.count == 1 })
+            #expect(items.count == 1)
+            let sources = try #require(renderWorld.getResource(ExtractedMesh3DSources.self)).meshes
+            let firstSource = try #require(sources.first { $0.entity == firstMesh.id })
+            let secondSource = try #require(sources.first { $0.entity == secondMesh.id })
+            let firstBuffer = try #require(firstSource.skinningBuffer)
+            let secondBuffer = try #require(secondSource.skinningBuffer)
+            #expect(ObjectIdentifier(firstBuffer) == ObjectIdentifier(secondBuffer))
+            #expect(firstSource.skinningOffset != secondSource.skinningOffset)
+            #expect(items.allSatisfy { $0.batchRange?.count == 2 })
             #expect(items.allSatisfy { $0.castShadows })
             buffers.append(ObjectIdentifier(firstBuffer))
         }
         #expect(buffers[0] == buffers[3])
         #expect(buffers[0] != buffers[1])
+    }
+
+    @Test("packed palettes preserve exact independent poses and their history after reordering")
+    func packedPoseContentsAndReorderedHistory() async throws {
+        let app = try await makeApp()
+        let device = unsafe RenderEngine.shared.renderDevice
+        var uniforms = Skinning3DUniforms()
+        let a = app.main.spawn().id, b = app.main.spawn().id, overflow = app.main.spawn().id
+        let first = [Transform3D](repeating: Transform3D(translation: [1, 2, 3]), count: Skinning3DUniforms.maximumJoints / 2)
+        let second = [Transform3D](repeating: Transform3D(translation: [-3, 4, 5]), count: Skinning3DUniforms.maximumJoints / 2)
+        uniforms.beginFrame(device: device)
+        let firstBufferValue = uniforms.writePacked(first, for: a, device: device, revision: nil)
+
+        let firstBuffer = try #require(firstBufferValue)
+        let secondBufferValue = uniforms.writePacked(second, for: b, device: device, revision: nil)
+
+        let secondBuffer = try #require(secondBufferValue)
+        let overflowBufferValue = uniforms.writePacked([.identity], for: overflow, device: device, revision: nil)
+
+        let overflowBuffer = try #require(overflowBufferValue)
+        uniforms.finishPackedWrites()
+        #expect(ObjectIdentifier(firstBuffer) == ObjectIdentifier(secondBuffer))
+        #expect(ObjectIdentifier(firstBuffer) != ObjectIdentifier(overflowBuffer))
+        #expect(uniforms.packedOffset(for: a) == 0 && uniforms.packedOffset(for: b) == Skinning3DUniforms.maximumJoints / 2)
+        let initial = try await firstBuffer.readData()
+        #expect(readMatrices(initial) == first + second)
+        uniforms.beginFrame(device: device)
+        _ = uniforms.writePacked(first, for: b, device: device, revision: nil)
+        let changedValue = uniforms.writePacked(second, for: a, device: device, revision: nil)
+
+        let changed = try #require(changedValue)
+        uniforms.finishPackedWrites()
+        #expect(uniforms.packedOffset(for: b) == 0 && uniforms.packedOffset(for: a) == Skinning3DUniforms.maximumJoints / 2)
+        #expect(readMatrices(try await changed.readData()) == first + second)
+        let previous = try #require(uniforms.previousBuffer(for: a))
+        #expect(readMatrices(try await previous.readData()) == second + first)
+    }
+
+    private func readMatrices(_ data: Data) -> [Transform3D] {
+        data.withUnsafeBytes { bytes in
+            (0 ..< data.count / MemoryLayout<Transform3D>.stride).map {
+                bytes.loadUnaligned(fromByteOffset: $0 * MemoryLayout<Transform3D>.stride, as: Transform3D.self)
+            }
+        }
     }
 
     @Test

@@ -280,6 +280,7 @@ enum EditorComponentRegistry {
         physicsBody2DDescriptor,
         mesh2DDescriptor,
         mesh3DDescriptor,
+        terrainDescriptor,
         model3DSourceDescriptor,
         spineSourceDescriptor,
         audioSourceDescriptor,
@@ -303,6 +304,7 @@ enum EditorComponentRegistry {
         guard !hasRegisteredBuiltIns else { return }
         DisplayLayout.registerRuntimeType()
         RuntimeTypeRegistry.registerComponent(ParticleEmitter.self, names: ["ParticleEmitter"])
+        RuntimeTypeRegistry.registerComponent(ParticleEmitter3D.self, names: ["ParticleEmitter3D"])
         AssetsManager.registerAssetType(ParticleEffect.self)
         RuntimeTypeRegistry.registerComponent(SpriteAnimator.self, names: ["SpriteAnimator"])
         AssetsManager.registerAssetType(SpriteAnimationSet.self)
@@ -344,11 +346,13 @@ enum EditorComponentRegistry {
         MorphWeights3DComponent.registerComponent()
         CharacterController3DComponent.registerComponent()
         CameraCollision3DComponent.registerComponent()
+        Raycast3DComponent.registerComponent()
         OverlapBox3DComponent.registerComponent()
         RuntimeTypeRegistry.registerComponent(UIComponent.self, names: ["UIComponent"])
         RuntimeTypeRegistry.registerComponent(PhysicsBody2DComponent.self, names: ["PhysicsBody2DComponent"])
         RuntimeTypeRegistry.registerComponent(Mesh2D.self, names: ["Mesh2D"])
         RuntimeTypeRegistry.registerComponent(Mesh3DComponent.self, names: ["Mesh3DComponent"])
+        RuntimeTypeRegistry.registerComponent(Terrain3D.self, names: ["Terrain3D"])
         RuntimeTypeRegistry.registerComponent(PhysicsBody3DComponent.self, names: ["PhysicsBody3DComponent"])
         RuntimeTypeRegistry.registerComponent(DirectionalLightComponent.self, names: ["DirectionalLightComponent"])
         RuntimeTypeRegistry.registerComponent(PointLightComponent.self, names: ["PointLightComponent"])

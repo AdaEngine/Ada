@@ -249,7 +249,7 @@ extension Input {
     /// Available list of mouse modes.
     public enum MouseMode: Sendable {
         /// Hides and freezes the system cursor while relative motion remains available.
-        /// Supported by the macOS driver; unsupported hosts remain visible.
+        /// Supported by the macOS and Windows drivers; unsupported hosts remain visible.
         case captured
 
         /// Makes the mouse cursor visible if it is hidden.

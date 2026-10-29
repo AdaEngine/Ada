@@ -1,4 +1,4 @@
-#if os(macOS)
+#if os(macOS) || os(Windows)
 import Foundation
 import Testing
 
@@ -7,9 +7,10 @@ import Testing
 @Suite("Ada Studio CLI", .serialized)
 struct EditorCLITests {
     @Test func strictArguments() throws {
-        let command = try EditorCLIInvocation(arguments: ["project", "inspect", "--project", "/tmp/Game With Spaces", "--format", "json"])
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("Game With Spaces")
+        let command = try EditorCLIInvocation(arguments: ["project", "inspect", "--project", root.path, "--format", "json"])
         #expect(command.command == .inspect)
-        #expect(command.projectURL.path == "/tmp/Game With Spaces")
+        #expect(command.projectURL.path == root.path)
         #expect(command.format == .json)
         for words in [
             ["build", "--configuration", "fast"], ["validate", "--unknown", "x"], ["build", "--output"],
@@ -20,6 +21,7 @@ struct EditorCLITests {
         }
         #expect(EditorCLI.isInvocation(["/Applications/Ada Studio.app/Contents/MacOS/adastudio", "validate"]))
         #expect(EditorCLI.isInvocation(["AdaEditor", "--ada-studio-cli", "validate"]))
+        #expect(EditorCLI.isInvocation(["adastudio.exe", "validate"]))
         #expect(!EditorCLI.isInvocation(["AdaEditor", "--ada-player"]))
         #expect(!EditorCLI.isInvocation(["AdaEditor", "something", "--ada-studio-cli"]))
     }
@@ -63,6 +65,7 @@ struct EditorCLITests {
         #expect(missingScene.diagnostics.contains { $0.message.contains("Main.ascn") })
     }
 
+    #if os(macOS)
     @Test func symlinkedProjectPathsAreRejected() async throws {
         let root = try fixture()
         let outside = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -80,6 +83,7 @@ struct EditorCLITests {
         #expect(report.exitCode == 3)
         #expect(report.diagnostics.contains { $0.message.contains("outside the project") })
     }
+    #endif
 
     @Test func bundleSDKSurvivesRelocationAndNeverFallsBackToCheckout() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -89,12 +93,30 @@ struct EditorCLITests {
         let sdkRoot = app.appendingPathComponent("Contents/Resources/BuildSDK")
         try FileManager.default.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
         #expect(throws: EditorCLIError.self) { try EditorBuildSDK.locate(executable: executable, environment: [:]) }
-        for path in ["AdaEngine/Package.swift", "AdaScript/Package.swift", "AdaScript/tools/aot_build.py", "AdaScript/gravity"] {
+        #if os(Windows)
+        let compiler = "AdaScript/gravity.exe"
+        #else
+        let compiler = "AdaScript/gravity"
+        #endif
+        for path in ["AdaEngine/Package.swift", "AdaScript/Package.swift", "AdaScript/tools/aot_build.py", compiler] {
             let url = sdkRoot.appendingPathComponent(path)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            #if os(Windows)
+            if path == compiler {
+                // Windows checks the executable itself; an empty .exe is not a
+                // valid tool fixture. Copy a small OS PE without executing it.
+                let windows = ProcessInfo.processInfo.environment["SystemRoot"] ?? "C:\\Windows"
+                try FileManager.default.copyItem(at: URL(fileURLWithPath: windows).appendingPathComponent("System32/cmd.exe"), to: url)
+            } else {
+                try Data().write(to: url)
+            }
+            #else
             try Data().write(to: url)
+            #endif
         }
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: sdkRoot.appendingPathComponent("AdaScript/gravity").path)
+        #if os(macOS)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: sdkRoot.appendingPathComponent(compiler).path)
+        #endif
         try Data("{\"schemaVersion\":1}".utf8).write(to: sdkRoot.appendingPathComponent("sdk.json"))
         let sdk = try EditorBuildSDK.locate(executable: executable, environment: [:])
         #expect(sdk.engineRoot.path == sdkRoot.appendingPathComponent("AdaEngine").path)
@@ -121,7 +143,7 @@ struct EditorCLITests {
         try Data("old build".utf8).write(to: previous)
         let invocation = try EditorCLIInvocation(arguments: [
             "build", "--project", root.path, "--sdk", root.appendingPathComponent("MissingSDK").path,
-            "--output", output.path
+            "--output", output.path, "--target", "android"
         ])
         let report = await EditorCLI.execute(invocation)
         #expect(report.exitCode == 4)

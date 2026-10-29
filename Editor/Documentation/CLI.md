@@ -1,11 +1,29 @@
 # Ada Studio CLI
 
-The standalone macOS application includes `Contents/MacOS/adastudio`. This is a
-second entry into the same executable: it dispatches before `AppRuntime` starts
+The standalone macOS application includes `Contents/MacOS/adastudio`; the Windows
+distribution includes a console `adastudio.exe` beside `AdaEditor.exe`. These are
+entries into the same native implementation: it dispatches before `AppRuntime` starts
 and uses the editor's project validator, AdaScript builder and native exporter.
 No window, recent-project update or agent connection is required. The iOS entry
 point, embedded runtime and mobile agent tools retain their existing behavior;
-CLI implementation and SDK staging are macOS-only.
+CLI implementation and SDK staging are available on macOS and Windows.
+
+```powershell
+.\adastudio.exe --help
+.\adastudio.exe --version --format json
+.\adastudio.exe project inspect --project 'D:\Games\My Game' --format json
+.\adastudio.exe validate --project 'D:\Games\My Game' --format json
+```
+
+Windows `inspect`, `validate`, help/version and `agent-resources` run without
+opening a window or initializing a graphics adapter. Validation needs no external
+Swift compiler. `doctor` checks the bundled SDK and host Swift; Web/Android
+export uses the configured WSL worker and destination toolchains. A standalone
+Windows game executable is not an export target yet; macOS app packaging requires
+macOS. Unsupported targets return a structured environment diagnostic rather
+than invoking macOS tools on Windows. `AdaEditor.exe --ada-studio-cli <command>`
+also dispatches to the CLI; `adastudio.exe` preserves ordinary console wait,
+stdout/stderr and Ctrl+C behavior.
 
 ```bash
 STUDIO="/Applications/Ada Studio.app/Contents/MacOS/adastudio"
@@ -47,7 +65,8 @@ a separate signed iOS application requires a future Mac/remote build backend.
 
 ## SDK and distribution
 
-Only `AdaEditor-Standalone` stages the CLI and `Contents/Resources/BuildSDK`.
+Standalone macOS stages the CLI and `Contents/Resources/BuildSDK`; the Windows
+release packager stages the console executable and adjacent `BuildSDK`.
 The SDK contains the engine/compiler sources, resources, manifests, licenses
 and a prebuilt AdaScript compiler. External Swift/Xcode tools and Python 3 are
 required; SwiftPM may need network access to resolve package dependencies.

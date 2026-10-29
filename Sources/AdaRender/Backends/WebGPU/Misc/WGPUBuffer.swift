@@ -90,7 +90,9 @@
                 device.createCommandEncoder(descriptor: nil as WebGPU.GPUCommandEncoderDescriptor?)
             }
             encoder.copyBufferToBuffer(source: buffer, sourceOffset: 0, destination: staging, destinationOffset: 0, size: UInt64(length))
-            let command: WebGPU.GPUCommandBuffer = encoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
+            let command: WebGPU.GPUCommandBuffer = webGPUDeviceLock.withLock { _ in
+                encoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
+            }
             webGPUDeviceLock.withLock { _ in device.queue.submit(commands: [command]) }
             #if !WASM
             if let instance {
@@ -98,7 +100,7 @@
                 // even with spontaneous callbacks. Yield while the GPU works.
                 let result = Mutex<Result<Data, MapError>?>(nil)
                 defer { staging.destroy() }
-                _ = staging.mapAsync(mode: .read, offset: 0, size: length, callbackInfo: WebGPU.GPUBufferMapCallbackInfo(
+                let info = WebGPU.GPUBufferMapCallbackInfo(
                     mode: .allowProcessEvents,
                     callback: { [length] status, message in
                         let mapped: Result<Data, MapError>
@@ -113,11 +115,19 @@
                         }
                         result.withLock { $0 = mapped }
                     }
-                ))
+                )
+                info.withWGPUStruct { native in
+                    native.callback = { status, message, userdata, _ in
+                        guard let userdata else { return }
+                        let callback = Unmanaged<AnyObject>.fromOpaque(userdata).takeRetainedValue() as! WebGPU.GPUBufferMapCallback
+                        callback(status, message.toString)
+                    }
+                    _ = staging.mapAsync(mode: .read, offset: 0, size: length, callbackInfo: native)
+                }
                 let deadline = ContinuousClock.now + .seconds(30)
                 while true {
                     try Task.checkCancellation()
-                    instance.processEvents()
+                    webGPUDeviceLock.withLock { _ in instance.processEvents() }
                     if let mapped = result.withLock({ $0 }) { return try mapped.get() }
                     guard ContinuousClock.now < deadline else { throw MapError.failedToMap("GPU mapping timed out") }
                     try await Task.sleep(for: .milliseconds(1))

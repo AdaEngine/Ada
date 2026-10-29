@@ -9,15 +9,18 @@
 layout (location = 13) in vec4 a_JointIndices;
 layout (location = 14) in vec4 a_JointWeights;
 layout (binding = 14) uniform Skinning3DUniform {
-    mat4 u_JointMatrices[128];
+    mat4 u_JointMatrices[256];
 };
 
+layout (location = 12) in vec4 a_ShadowFlags;
+
 mat4 skinTransform() {
+    int jointBase = int(max(0.0, -a_ShadowFlags.y));
     if (a_JointIndices.x < 0.0) { return mat4(1.0); }
-    return u_JointMatrices[int(a_JointIndices.x)] * a_JointWeights.x
-        + u_JointMatrices[int(a_JointIndices.y)] * a_JointWeights.y
-        + u_JointMatrices[int(a_JointIndices.z)] * a_JointWeights.z
-        + u_JointMatrices[int(a_JointIndices.w)] * a_JointWeights.w;
+    return u_JointMatrices[jointBase + int(a_JointIndices.x)] * a_JointWeights.x
+        + u_JointMatrices[jointBase + int(a_JointIndices.y)] * a_JointWeights.y
+        + u_JointMatrices[jointBase + int(a_JointIndices.z)] * a_JointWeights.z
+        + u_JointMatrices[jointBase + int(a_JointIndices.w)] * a_JointWeights.w;
 }
 
 layout (location = 0) in vec3 a_Position;
@@ -25,7 +28,6 @@ layout (location = 2) in vec2 a_TextureCoordinate;
 layout (location = 15) in vec2 a_TextureCoordinate1;
 layout (location = 3) in vec4 a_VertexColor;
 layout (location = 9) in vec4 a_Color;
-layout (location = 12) in vec4 a_ShadowFlags;
 layout (location = 0) out vec2 v_UV0;
 layout (location = 1) out vec2 v_UV1;
 layout (location = 2) out float v_Alpha;

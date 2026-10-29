@@ -272,12 +272,16 @@ extension EditorViewModel {
                 do {
                     sceneDocument.content = try String(contentsOf: changedURL, encoding: .utf8)
                     sceneDocument.lastSavedContent = sceneDocument.content
-                    sceneDocument.sceneModel = EditorSceneFileLoader.model(from: sceneDocument.content)
-                    sceneDocument.loadSummary = EditorSceneFileLoader.summary(from: sceneDocument.content)
+                    sceneDocument.isLoading = sceneDocument.content.utf8.count > 256 * 1024
+                    sceneDocument.sceneModel = sceneDocument.isLoading ? nil : EditorSceneFileLoader.model(from: sceneDocument.content)
+                    sceneDocument.loadSummary = sceneDocument.sceneModel.map {
+                        EditorSceneLoadSummary(entityCount: $0.entities.count, warnings: [])
+                    } ?? (sceneDocument.isLoading ? .empty : EditorSceneFileLoader.summary(from: sceneDocument.content))
                     sceneDocument.statusMessage = "Reloaded"
                     sceneDocument.errorMessage = nil
                     workbench.replaceSceneDocument(sceneDocument)
                 } catch {
+                    sceneDocument.isLoading = false
                     sceneDocument.errorMessage = error.localizedDescription
                     sceneDocument.statusMessage = "Reload failed"
                     workbench.replaceSceneDocument(sceneDocument)

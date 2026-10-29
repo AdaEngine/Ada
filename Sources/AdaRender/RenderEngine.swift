@@ -29,6 +29,12 @@ public enum RenderUpscalingMode: Sendable, Equatable {
     case spatial(renderScale: Float)
 }
 
+/// Presentation pacing is independent of image quality and internal resolution.
+public enum RenderPresentationMode: Sendable, Equatable {
+    case synchronized
+    case uncapped
+}
+
 /// Render Engine is object that manage a GPU.
 public final class RenderEngine: RenderBackend, Sendable {
     public struct Configuration {
@@ -55,6 +61,8 @@ public final class RenderEngine: RenderBackend, Sendable {
 
     /// Setup configuration for render engine
     nonisolated(unsafe) public static var configurations: Configuration = Configuration()
+    /// Configure before creating render windows, like configurations above.
+    nonisolated(unsafe) public static var presentationMode: RenderPresentationMode = .synchronized
 
     /// Return instance of render engine for specific backend.
     nonisolated(unsafe) public private(set) static var shared: RenderEngine!

@@ -277,20 +277,23 @@
                 return
             }
 
-            self.uiThread.sync {
-                let scaleFactor = getWindowScaleFactor(systemWindow.hwnd)
+            let handle = UInt(bitPattern: systemWindow.hwnd)
+            // The HWND thread must not inherit MainActor from this caller.
+            let resize: @Sendable () -> Void = {
+                guard let hwnd = HWND(bitPattern: handle) else { return }
+                let scaleFactor = getWindowScaleFactor(hwnd)
                 let dpi = UINT(max((scaleFactor * 96).rounded(), 96))
-                let style = DWORD(bitPattern: unsafe GetWindowLongW(systemWindow.hwnd, GWL_STYLE))
-                let extendedStyle = DWORD(bitPattern: unsafe GetWindowLongW(systemWindow.hwnd, GWL_EXSTYLE))
+                let style = DWORD(bitPattern: unsafe GetWindowLongW(hwnd, GWL_STYLE))
+                let extendedStyle = DWORD(bitPattern: unsafe GetWindowLongW(hwnd, GWL_EXSTYLE))
                 var rect = RECT()
-                unsafe GetClientRect(systemWindow.hwnd, &rect)
+                unsafe GetClientRect(hwnd, &rect)
                 rect.right = LONG((size.width * scaleFactor).rounded())
                 rect.bottom = LONG((size.height * scaleFactor).rounded())
 
                 adjustWindowsClientRect(&rect, style: style, extendedStyle: extendedStyle, dpi: dpi,
-                    customTitleBar: windowsTitleBars.withLock { $0[UInt(bitPattern: systemWindow.hwnd)] != nil })
+                    customTitleBar: windowsTitleBars.withLock { $0[handle] != nil })
                 unsafe SetWindowPos(
-                    systemWindow.hwnd,
+                    hwnd,
                     nil,
                     0,
                     0,
@@ -299,6 +302,7 @@
                     UINT(SWP_NOMOVE | SWP_NOZORDER)
                 )
             }
+            self.uiThread.sync(resize)
         }
 
         override func setMinimumSize(_ size: Size, for window: UIWindow) {
@@ -339,7 +343,11 @@
         override func updateCursor() {
             let resource = windowsCursorResource.withLock { $0 }
             let work: @Sendable () -> Void = {
-                unsafe SetCursor(LoadCursorW(nil, UnsafePointer<WCHAR>(bitPattern: resource)))
+                if let window = unsafe GetForegroundWindow(), unsafe WindowsPointerCapture.isHidden(in: window) {
+                    unsafe SetCursor(nil)
+                } else {
+                    unsafe SetCursor(LoadCursorW(nil, UnsafePointer<WCHAR>(bitPattern: resource)))
+                }
             }
             uiThread.enqueue(work)
         }
@@ -352,12 +360,19 @@
             // TODO: Implement custom cursor images
         }
 
-        override func setMouseMode(_: Input.MouseMode) {
-            // TODO: Implement mouse mode changes
+        override func setMouseMode(_ mode: Input.MouseMode) {
+            let address = activeWindow.flatMap { windowHandles[$0.id] }.map { UInt(bitPattern: $0) }
+            // A plain closure inherits this method's MainActor isolation and
+            // traps when the HWND thread executes it under Swift 6 checking.
+            let work: @Sendable () -> Void = {
+                unsafe WindowsPointerCapture.setMode(mode, window: address.flatMap { HWND(bitPattern: $0) })
+            }
+            uiThread.sync(work)
+            updateCursor()
         }
 
         override func getMouseMode() -> Input.MouseMode {
-            return .visible
+            return WindowsPointerCapture.mode
         }
 
         func findWindow(for hwnd: HWND) -> UIWindow? {
@@ -699,6 +714,10 @@
         switch uMsg {
         case UInt32(WM_SETCURSOR):
             if Int16(truncatingIfNeeded: lParam) == Int16(HTCLIENT) {
+                if unsafe WindowsPointerCapture.isHidden(in: hwnd) {
+                    unsafe SetCursor(nil)
+                    return 1
+                }
                 let resource = windowsCursorResource.withLock { $0 }
                 unsafe SetCursor(LoadCursorW(nil, UnsafePointer<WCHAR>(bitPattern: resource)))
                 return 1
@@ -736,6 +755,7 @@
             return 0  // Prevent default window destruction
 
         case UInt32(WM_DESTROY):
+            unsafe WindowsPointerCapture.release(window: hwnd)
             // Window is being destroyed - clean up resources
             // This can happen if window is destroyed by system or by closeWindow
             Task { @MainActor in
@@ -896,6 +916,7 @@
             return 0
 
         case UInt32(WM_KILLFOCUS):
+            unsafe WindowsPointerCapture.release(window: hwnd)
             Task { @MainActor in
                 let windowManager = window.windowManager as? WindowsWindowManager
                 windowManager?.resetTextInputDecoderState(for: window.id)
@@ -1008,6 +1029,8 @@
             return 0
 
         case UInt32(WM_MOUSEMOVE), UInt32(WM_NCMOUSEMOVE):
+            let capturedMotion = uMsg == UInt32(WM_MOUSEMOVE)
+                ? unsafe WindowsPointerCapture.motion(window: hwnd, lParam: lParam, scale: getWindowScaleFactor(hwnd)) : nil
             Task { @MainActor in
                 let windowManager = window.windowManager as? WindowsWindowManager
                 guard
@@ -1018,7 +1041,7 @@
                 }
 
                 let scaleFactor = getWindowScaleFactor(systemWindow.hwnd)
-                let position = logicalMousePosition(
+                let position = capturedMotion?.0 ?? logicalMousePosition(
                     lParam: lParam,
                     hwnd: systemWindow.hwnd,
                     scaleFactor: scaleFactor,
@@ -1031,6 +1054,7 @@
                 let mouseEvent = MouseEvent(
                     window: window.id,
                     button: mouseButton,
+                    motionDelta: capturedMotion?.1,
                     mousePosition: position,
                     phase: .changed,
                     modifierKeys: modifiers,

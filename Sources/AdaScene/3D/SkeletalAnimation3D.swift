@@ -27,6 +27,11 @@ public struct ModelAnimation3DComponent: Component {
     var appliedGeneration: UInt64?
     var appliedPlayer: UUID?
 
+    var canSkipUpdate: Bool {
+        evaluationLOD == nil && !player.isPlaying && !player.hasPendingGraphEvents
+            && appliedPlayer == player.instanceID && appliedGeneration == player.poseGeneration
+    }
+
     public init(player: SkeletalAnimationPlayer) { self.player = player }
 }
 
@@ -101,19 +106,16 @@ public struct SkeletalAnimation3DSystem {
     public func update(context _: UpdateContext) {
         _ = transformAccess.wrappedValue
         var observers: [AnimationLOD3DObserver] = []
-        cameras.forEach { camera, graph in
+        cameras.batched().forEach { camera, graph in
             if camera.isActive, graph.subgraphLabel == .main3D {
                 observers.append(.init(camera: camera))
             }
         }
-        // These references are local to this update; no structural world mutations occur here.
-        var nodesByRoot: [Entity.ID: [(Int, Ref<Transform>)]] = [:]
-        nodes.forEach { binding, transform in nodesByRoot[binding.modelRoot, default: []].append((binding.nodeIndex, transform)) }
-        var morphByRoot: [Entity.ID: [(Int, Ref<MorphWeights3DComponent>)]] = [:]
-        morphNodes.forEach { binding, weights in morphByRoot[binding.modelRoot, default: []].append((binding.nodeIndex, weights)) }
-        var skinsByRoot: [Entity.ID: [Ref<SkinnedMesh3DComponent>]] = [:]
-        skins.forEach { skin in skinsByRoot[skin.wrappedValue.modelRoot, default: []].append(skin) }
-        models.forEach { root, animation in
+        var pendingPoses: [Entity.ID: SkeletalAnimationPlayer] = [:]
+        models.batched().forEach { root, animation in
+            // Reading this predicate borrows the component. Avoid copying all of a
+            // paused player's pose/clip arrays and marking it changed every frame.
+            guard !animation.wrappedValue.canSkipUpdate else { return }
             var value = animation.wrappedValue
             if value.appliedPlayer != value.player.instanceID { value.lodState = AnimationLOD3DState() }
             if let settings = value.evaluationLOD {
@@ -131,26 +133,32 @@ public struct SkeletalAnimation3DSystem {
                 animationEvents.send(ModelAnimation3DEvent(modelRoot: root.id, animation: event))
             }
             if value.appliedPlayer != value.player.instanceID || value.appliedGeneration != value.player.poseGeneration {
-                for (index, transform) in nodesByRoot[root.id] ?? [] {
-                    guard value.player.poses.indices.contains(index), value.player.rig.nodes[index].restPose != nil else { continue }
-                    let pose = value.player.poses[index]
-                    let next = Transform(rotation: pose.rotation, scale: pose.scale, position: pose.translation)
-                    if transform.wrappedValue != next { transform.wrappedValue = next }
-                }
-                for (index, component) in morphByRoot[root.id] ?? [] {
-                    guard value.player.morphWeights.indices.contains(index), value.player.animatedMorphNodes.contains(index) else { continue }
-                    let weights = value.player.morphWeights[index]
-                    // Only nodes some clip animates are written, so weights authored on a model (Model3DSource.morphWeights)
-                    // survive on the others. The weights must also match the node's targets.
-                    if !weights.isEmpty, component.wrappedValue.weights.count == weights.count, component.wrappedValue.weights != weights {
-                        component.wrappedValue.weights = weights
-                    }
-                }
-                for skin in skinsByRoot[root.id] ?? [] { skin.wrappedValue.updateMatrices(using: value.player) }
+                pendingPoses[root.id] = value.player
                 value.appliedGeneration = value.player.poseGeneration
                 value.appliedPlayer = value.player.instanceID
             }
             animation.wrappedValue = value
+        }
+        guard !pendingPoses.isEmpty else { return }
+        // Process node columns directly; static and paused model hierarchies need no grouping or pose writes.
+        nodes.batched().forEach { binding, transform in
+            guard let player = pendingPoses[binding.modelRoot], player.poses.indices.contains(binding.nodeIndex),
+                player.rig.nodes[binding.nodeIndex].restPose != nil else { return }
+            let pose = player.poses[binding.nodeIndex]
+            let next = Transform(rotation: pose.rotation, scale: pose.scale, position: pose.translation)
+            if transform.wrappedValue != next { transform.wrappedValue = next }
+        }
+        morphNodes.batched().forEach { binding, component in
+            guard let player = pendingPoses[binding.modelRoot], player.morphWeights.indices.contains(binding.nodeIndex),
+                player.animatedMorphNodes.contains(binding.nodeIndex) else { return }
+            let weights = player.morphWeights[binding.nodeIndex]
+            // Preserve authored weights on nodes that no clip animates.
+            if !weights.isEmpty, component.wrappedValue.weights.count == weights.count, component.wrappedValue.weights != weights {
+                component.wrappedValue.weights = weights
+            }
+        }
+        skins.batched().forEach { skin in
+            if let player = pendingPoses[skin.wrappedValue.modelRoot] { skin.wrappedValue.updateMatrices(using: player) }
         }
     }
 }

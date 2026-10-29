@@ -15,6 +15,7 @@ enum EditorAdaScriptProjectBuildOutcome: Sendable {
 final class EditorViewModel {
     let studioTools = EditorStudioToolHost()
     let performance = EditorPerformanceModel()
+    let movieMaker: EditorMovieMakerModel
     let tests = EditorTestExplorer()
     let terminals = EditorTerminalWorkspace()
     #if canImport(Network) || os(Windows)
@@ -224,6 +225,7 @@ final class EditorViewModel {
         }
 
         self.project = project
+        self.movieMaker = EditorMovieMakerModel(projectURL: project.map { URL(fileURLWithPath: $0.path, isDirectory: true) })
         self.interface = interface ?? EditorInterfaceState(projectPath: project?.path)
         self.workspaceService = workspaceService
         self.sourceControlService = sourceControlService

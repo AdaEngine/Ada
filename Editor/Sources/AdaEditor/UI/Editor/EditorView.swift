@@ -228,6 +228,18 @@ struct EditorView: View {
     var body: some View {
         // Keep the window presentation value small as editor overlays grow.
         AnyView(editorContent)
+            .fullScreenCover(isPresented: viewModel.movieMakerPresentation) {
+                EditorMovieMakerDialog(
+                    model: viewModel.movieMaker,
+                    canStart: viewModel.canStartMovie,
+                    onStart: viewModel.startMovieRecording,
+                    onBrowse: viewModel.browseMovieFolder,
+                    onClose: { viewModel.movieMaker.saveSettings(); viewModel.movieMaker.isPresented = false },
+                    onReveal: {
+                        if let url = viewModel.movieMaker.outputURL { _ = viewModel.externalURLOpener(url.deletingLastPathComponent()) }
+                    }
+                )
+            }
             .modifier(EditorStudioToolPermissionPresentation(host: viewModel.studioTools, presentation: .workspace))
             .modifier(EditorTextSearchPresentation(viewModel: viewModel))
             .fullScreenCover(isPresented: viewModel.isNewFileDialogPresentedBinding) {
@@ -330,6 +342,7 @@ struct EditorView: View {
                 viewModel.playerPairingWindow = nil
                 viewModel.stopProjectFileWatching()
                 viewModel.studioTools.close()
+                viewModel.movieMaker.cancel()
                 EditorNotificationRouter.shared.detach(viewModel)
                 viewModel.debugger.stop()
                 EditorMenuCommandRouter.shared.uninstall(owner: viewModel)

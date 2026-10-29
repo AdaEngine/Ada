@@ -21,6 +21,20 @@
 #define GRAVITY_INCLUDE_ENV
 #define GRAVITY_INCLUDE_FILE
 #include "../optionals/gravity_optionals.h"
+#include <stdatomic.h>
+
+typedef void (*gravity_gc_timing_callback)(double milliseconds);
+static _Atomic(gravity_gc_timing_callback) gc_timing_callback = NULL;
+typedef void (*gravity_gc_statistics_callback)(double, double, double, uint32_t, uint32_t, gravity_int_t, gravity_int_t);
+static _Atomic(gravity_gc_statistics_callback) gc_statistics_callback = NULL;
+
+void gravity_gc_set_timing_callback (gravity_gc_timing_callback callback) {
+    atomic_store_explicit(&gc_timing_callback, callback, memory_order_release);
+}
+
+void gravity_gc_set_statistics_callback (gravity_gc_statistics_callback callback) {
+    atomic_store_explicit(&gc_statistics_callback, callback, memory_order_release);
+}
 
 // MARK: Internals -
 static void gravity_gc_cleanup (gravity_vm *vm);
@@ -66,6 +80,8 @@ struct gravity_vm {
     // garbage collector
     int32_t             gcenabled;                      // flag to enable/disable garbage collector (was bool but it is now reference counted)
     gravity_int_t       memallocated;                   // total number of allocated memory
+    uint32_t            gcallocations;                  // objects transferred since the last collection
+    uint32_t            gcallocationbudget;             // optional object-count trigger (zero disables it)
     gravity_int_t       maxmemblock;                    // maximum block memory size allowed to allocate
     gravity_object_t    *gchead;                        // head of garbage collected objects
     gravity_int_t       gcminthreshold;                 // minimum GC threshold size to avoid spending too much time in GC
@@ -2361,8 +2377,13 @@ static void gravity_gc_transfer_object (gravity_vm *vm, gravity_object_t *obj) {
     vm->gchead = obj;
 }
 
+void gravity_gc_set_allocation_budget (gravity_vm *vm, uint32_t maximum_allocations) {
+    vm->gcallocationbudget = maximum_allocations;
+}
+
 static void gravity_gc_check (gravity_vm *vm) {
-	if (vm->memallocated >= vm->gcthreshold) gravity_gc_start(vm);
+    if (vm->memallocated >= vm->gcthreshold ||
+        (vm->gcallocationbudget && vm->gcallocations >= vm->gcallocationbudget)) gravity_gc_start(vm);
 }
 
 static void gravity_gc_transfer (gravity_vm *vm, gravity_object_t *obj) {
@@ -2381,11 +2402,12 @@ static void gravity_gc_transfer (gravity_vm *vm, gravity_object_t *obj) {
         #endif
         gravity_gc_start(vm);
         #else
-        if (vm->memallocated >= vm->gcthreshold) gravity_gc_start(vm);
+        gravity_gc_check(vm);
         #endif
     }
 
     gravity_gc_transfer_object(vm, obj);
+    if (vm->gcallocations < UINT32_MAX) ++vm->gcallocations;
     gravity_vm_memupdate(vm, gravity_object_size(vm, obj));
 }
 
@@ -2408,6 +2430,11 @@ static void gravity_gc_sweep (gravity_vm *vm) {
 
 void gravity_gc_start (gravity_vm *vm) {
     if (!vm->fiber) return;
+    gravity_gc_timing_callback timing_callback = atomic_load_explicit(&gc_timing_callback, memory_order_acquire);
+    gravity_gc_statistics_callback statistics_callback = atomic_load_explicit(&gc_statistics_callback, memory_order_acquire);
+    nanotime_t timing_start = (timing_callback || statistics_callback) ? nanotime() : 0;
+    uint32_t objects_before = statistics_callback ? vm->gccount : 0;
+    gravity_int_t bytes_before = statistics_callback ? vm->memallocated : 0;
 
     #if GRAVITY_GC_STATS
     gravity_int_t membefore = vm->memallocated;
@@ -2416,6 +2443,7 @@ void gravity_gc_start (gravity_vm *vm) {
 
     // reset memory counter
     vm->memallocated = 0;
+    vm->gcallocations = 0;
 
     // mark GC saved temp objects
     for (uint32_t i=0; i<marray_size(vm->gctemp); ++i) {
@@ -2435,8 +2463,11 @@ void gravity_gc_start (gravity_vm *vm) {
         gravity_object_blacken(vm, obj);
     }
 
+    nanotime_t mark_end = statistics_callback ? nanotime() : 0;
+
     // check unreachable objects (collect white objects)
     gravity_gc_sweep(vm);
+    nanotime_t sweep_end = statistics_callback ? nanotime() : 0;
 
     // dynamically update gcthreshold
     vm->gcthreshold = (gravity_int_t)(vm->memallocated + (vm->memallocated * vm->gcratio / 100));
@@ -2445,6 +2476,11 @@ void gravity_gc_start (gravity_vm *vm) {
     // this line prevents GC to run more than needed
     if (vm->gcthreshold < vm->gcthreshold_original) vm->gcthreshold = vm->gcthreshold_original;
     
+    if (timing_callback) timing_callback(millitime(timing_start, nanotime()));
+    if (statistics_callback) {
+        statistics_callback(millitime(timing_start, nanotime()), millitime(timing_start, mark_end), millitime(mark_end, sweep_end),
+                            objects_before, vm->gccount, bytes_before, vm->memallocated);
+    }
     #if GRAVITY_GC_STATS
     nanotime_t tend = nanotime();
     double gctime = millitime(tstart, tend);

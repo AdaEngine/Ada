@@ -124,6 +124,12 @@ public final class DynamicQueryCursor: @unchecked Sendable {
         entityID = -1
     }
 
+    /// Starts a separate traversal of the same query plan. Nested loops must not
+    /// advance or reset the cursor that owns an outer loop's component views.
+    public func makeIndependentCursor() -> DynamicQueryCursor {
+        DynamicQueryCursor(state: state, componentIDs: componentIDs, options: options)
+    }
+
     public func advance() -> Bool {
         guard let world = state.world else {
             return false

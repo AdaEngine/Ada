@@ -56,7 +56,6 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
     @Query<Entity, Camera, GlobalViewUniform, ExtractedCameraSource>
     private var query
 
-    @Res<ExtractedMesh3DSources> private var candidates
     @ResMut<VisibleMesh3DLists> private var lists
     @Res<Render3DVisibilityStatistics> private var statistics
 
@@ -92,7 +91,6 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
         query.update(from: world)
         _lighting.update(from: world)
         _environments.update(from: world)
-        _candidates.update(from: world)
         _lists.update(from: world)
         _statistics.update(from: world)
         _skinningUniforms.update(from: world)
@@ -107,7 +105,8 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
     }
 
     public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
-        guard let view = context.viewEntity else {
+        guard let view = context.viewEntity,
+            let candidates = context.world.getResource(ExtractedMesh3DSources.self) else {
             return []
         }
 
@@ -129,7 +128,9 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             }
 
             let count = min(max(settings.cascadeCount, 1), 3)
-            prepareTexturesIfNeeded(count: count)
+            // Three horizontal tiles must fit WebGPU's guaranteed 8192-pixel limit.
+            let tileResolution = min(max(settings.resolution, 256), count == 3 ? 2048 : 4096)
+            prepareTexturesIfNeeded(count: count, resolution: tileResolution)
             guard
                 let colorTexture = shadow.colorTexture,
                 let depthTexture = shadow.depthTexture
@@ -141,7 +142,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             let far = min(light.shadowDistance, camera.projection.far)
             let cascades: [ShadowCascade3D]
             if count == 1 {
-                let matrix = DirectionalShadow3DMath.makeViewProjection(cameraViewMatrix: viewUniform.viewMatrix, directionToLight: light.directionToLight, shadowDistance: far)
+                let matrix = DirectionalShadow3DMath.makeViewProjection(cameraViewMatrix: viewUniform.viewMatrix, directionToLight: light.directionToLight, shadowDistance: far, shadowMapResolution: tileResolution)
                 cascades = [.init(viewProjection: matrix, farDepth: far, radius: far / 2, corners: [])]
             } else {
                 cascades = DirectionalShadow3DMath.cascades(
@@ -152,7 +153,8 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                     directionToLight: light.directionToLight,
                     count: count,
                     lambda: settings.splitLambda,
-                    blendFraction: settings.blendFraction
+                    blendFraction: settings.blendFraction,
+                    resolution: tileResolution
                 )
             }
             let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
@@ -174,7 +176,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                     )
                 )
             )
-            let resolution = Float(DirectionalShadow3D.resolution)
+            let resolution = Float(tileResolution)
             for cascadeIndex in cascades.indices {
                 pass.setViewport(Rect(x: Float(cascadeIndex) * resolution, y: 0, width: resolution, height: resolution))
                 let preparationSpan = AdaTrace.startSpan("Render3D.ShadowPrepare")
@@ -270,10 +272,10 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
         return []
     }
 
-    private func prepareTexturesIfNeeded(count: Int) {
+    private func prepareTexturesIfNeeded(count: Int, resolution: Int) {
         let size = SizeInt(
-            width: DirectionalShadow3D.resolution * count,
-            height: DirectionalShadow3D.resolution
+            width: resolution * count,
+            height: resolution
         )
         if shadow.colorTexture?.size != size {
             shadow.colorTexture = RenderTexture(

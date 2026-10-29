@@ -8,6 +8,7 @@
 @testable import AdaPlatform
 @_spi(Internal) import AdaRender
 @testable import AdaUI
+import AdaUtils
 import Math
 import Testing
 
@@ -15,6 +16,68 @@ import Testing
 struct RenderingClipTests {
     init() async throws {
         try Application.prepareForTest()
+    }
+
+    @Test(arguments: [false, true], [Float(1), 2])
+    func nestedScrollViewportClipsFollowAncestorScrolling(horizontalOuter: Bool, scale: Float) throws {
+        let tester = ViewTester {
+            ScrollView(horizontalOuter ? .horizontal : .vertical) {
+                ScrollView(horizontalOuter ? .vertical : .horizontal) {
+                    Color.red.frame(width: 500, height: 400)
+                }
+                .accessibilityIdentifier("inner")
+                .frame(width: 300, height: 260)
+                .padding(12)
+            }
+            .accessibilityIdentifier("outer")
+            .padding(20)
+            .environment(\.scaleFactor, scale)
+        }
+        .setSize(Size(width: 240, height: 180))
+        .performLayout()
+        let outer = try #require(tester.findNodeByAccessibilityIdentifier("outer") as? ScrollViewNode)
+        let inner = try #require(tester.findNodeByAccessibilityIdentifier("inner") as? ScrollViewNode)
+        #expect(outer.scrollToVisibleRect(Rect(x: 210, y: 150, width: 20, height: 20), in: outer))
+        #expect(inner.scrollToVisibleRect(Rect(x: 400, y: 350, width: 20, height: 20), in: inner))
+        #expect(horizontalOuter ? outer.contentOffset.x > 0 : outer.contentOffset.y > 0)
+        #expect(horizontalOuter ? inner.contentOffset.y > 0 : inner.contentOffset.x > 0)
+
+        let layoutFrame = inner.absoluteFrame()
+        let origin = layoutFrame.origin - outer.contentOffset
+        let expected = Rect(
+            x: max(0, origin.x) * scale,
+            y: max(0, origin.y) * scale,
+            width: max(0, origin.x + layoutFrame.width - max(0, origin.x)) * scale,
+            height: max(0, origin.y + layoutFrame.height - max(0, origin.y)) * scale
+        )
+        let outerFrame = outer.absoluteFrame()
+        let expectedOuter = Rect(
+            origin: outerFrame.origin * scale,
+            size: Size(width: outerFrame.width * scale, height: outerFrame.height * scale)
+        )
+        let root = tester.containerView.viewTree.rootNode
+        for mode in [UIDebugOverlayMode.off, .layoutBounds, .focusedNode, .redraw] {
+            let context = UIGraphicsContext()
+            switch mode {
+            case .off:
+                root.draw(with: context)
+            case .layoutBounds:
+                root.drawInspectionLayoutBounds(with: context)
+            case .focusedNode:
+                root.drawInspectionSelectionBounds(with: context, mode: mode, focusedNode: inner, hitTestNode: nil)
+            case .redraw:
+                root.drawInspectionRedrawFlashes(with: context, baselineRevision: 0)
+            case .hitTestTarget:
+                break
+            }
+            let clips = context.getDrawCommands().compactMap { command -> Rect? in
+                if case let .pushClipRect(rect) = command { return rect }
+                return nil
+            }
+            #expect(clips.count == 2)
+            #expect(clips.first == expectedOuter)
+            #expect(clips.last == expected)
+        }
     }
 
     @Test(arguments: [Float(1), 0.75, 0.5])

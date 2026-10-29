@@ -81,6 +81,7 @@ struct EditorMorphTargetsPanel: View {
             if !status.isEmpty { Text(status).font(.system(size: 11)).foregroundColor(theme.editorColors.muted) }
         }
         .padding(8)
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
         .onAppear { load() }
         .onDisappear { preview.cancel() }
         .onChange(of: target.source) { old, new in

@@ -5,8 +5,8 @@
 #endif
 #include <AdaEngine/View.glsl>
 #include <AdaEngine/Morph.glsl>
-layout (binding = 14) uniform Skinning3DUniform { mat4 u_Joints[128]; };
-layout (binding = 24) uniform PreviousSkinning3DUniform { mat4 u_PreviousJoints[128]; };
+layout (binding = 14) uniform Skinning3DUniform { mat4 u_Joints[256]; };
+layout (binding = 24) uniform PreviousSkinning3DUniform { mat4 u_PreviousJoints[256]; };
 layout (binding = 23) uniform Temporal3DUniform {
     mat4 u_CurrentViewProjection;
     mat4 u_PreviousViewProjection;
@@ -22,15 +22,15 @@ layout (location = 6) in vec4 a_Model1;
 layout (location = 7) in vec4 a_Model2;
 layout (location = 8) in vec4 a_Model3;
 layout (location = 9) in vec4 a_Color;
-layout (location = 11) in vec4 a_TextureFlags;
 layout (location = 12) in vec4 a_ShadowFlags;
 layout (location = 13) in vec4 a_Joints;
 layout (location = 14) in vec4 a_Weights;
 layout (location = 15) in vec2 a_UV1;
-layout (location = 16) in vec4 a_PreviousModel0;
-layout (location = 17) in vec4 a_PreviousModel1;
-layout (location = 18) in vec4 a_PreviousModel2;
-layout (location = 19) in vec4 a_PreviousModel3;
+// Reuse normal/tangent/material/texture-flag locations to fit WebGPU's 16 attributes.
+layout (location = 1) in vec4 a_PreviousModel0;
+layout (location = 4) in vec4 a_PreviousModel1;
+layout (location = 10) in vec4 a_PreviousModel2;
+layout (location = 11) in vec4 a_PreviousModel3;
 layout (location = 0) out vec4 v_CurrentClip;
 layout (location = 1) out vec4 v_PreviousClip;
 layout (location = 2) out vec2 v_UV;
@@ -41,11 +41,12 @@ layout (location = 6) flat out float v_ModelOrientation;
 [[main]]
 void motion_vertex() {
     mat4 skin = mat4(1.0), previousSkin = mat4(1.0);
+    int jointBase = int(max(0.0, -a_ShadowFlags.y));
     if (a_Joints.x >= 0.0) {
-        skin = u_Joints[int(a_Joints.x)] * a_Weights.x + u_Joints[int(a_Joints.y)] * a_Weights.y
-             + u_Joints[int(a_Joints.z)] * a_Weights.z + u_Joints[int(a_Joints.w)] * a_Weights.w;
-        previousSkin = u_PreviousJoints[int(a_Joints.x)] * a_Weights.x + u_PreviousJoints[int(a_Joints.y)] * a_Weights.y
-             + u_PreviousJoints[int(a_Joints.z)] * a_Weights.z + u_PreviousJoints[int(a_Joints.w)] * a_Weights.w;
+        skin = u_Joints[jointBase + int(a_Joints.x)] * a_Weights.x + u_Joints[jointBase + int(a_Joints.y)] * a_Weights.y
+             + u_Joints[jointBase + int(a_Joints.z)] * a_Weights.z + u_Joints[jointBase + int(a_Joints.w)] * a_Weights.w;
+        previousSkin = u_PreviousJoints[jointBase + int(a_Joints.x)] * a_Weights.x + u_PreviousJoints[jointBase + int(a_Joints.y)] * a_Weights.y
+             + u_PreviousJoints[jointBase + int(a_Joints.z)] * a_Weights.z + u_PreviousJoints[jointBase + int(a_Joints.w)] * a_Weights.w;
     }
     vec3 localPosition = a_Position;
     vec3 previousLocalPosition = a_Position;
@@ -61,7 +62,7 @@ void motion_vertex() {
     v_PreviousClip = u_Parameters.z > 0.5 ? v_CurrentClip : u_PreviousViewProjection * previousWorld;
     gl_Position = u_ViewProjection * world;
     v_UV = a_UV; v_UV1 = a_UV1;
-    v_ColorFlags = vec4(a_Color.a * a_VertexColor.a, a_TextureFlags.x, a_ShadowFlags.y, 0.0);
+    v_ColorFlags = vec4(a_Color.a * a_VertexColor.a, 0.0, max(0.0, a_ShadowFlags.y), 0.0);
     v_Fade = a_ShadowFlags.w;
 }
 #version 450 core
@@ -100,7 +101,8 @@ void motion_fragment() {
         alpha *= graph.color.a * graph.alpha;
     }
     #else
-    if (v_ColorFlags.y > 0.5) {
+    // Opaque white is bound when the material has no base-color texture.
+    {
         vec2 uv = u_UVSets.x > 0.5 ? v_UV1 : v_UV;
         uv = vec2(dot(u_TextureTransforms[0].xy, uv), dot(u_TextureTransforms[0].zw, uv)) + u_TextureTransforms[1].xy;
         alpha *= texture(sampler2D(u_BaseColor, u_Sampler), uv).a;

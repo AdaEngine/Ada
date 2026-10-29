@@ -1,5 +1,5 @@
 import Foundation
-#if os(macOS)
+#if os(macOS) || os(Windows)
 
 /// Strict, noninteractive command contract shared by the bundled CLI and its tests.
 struct EditorCLIInvocation: Sendable {
@@ -109,8 +109,12 @@ struct EditorCLIInvocation: Sendable {
     Toolchain: --sdk <BuildSDK directory> --swift <Swift executable>
 
     Installed: "/Applications/Ada Studio.app/Contents/MacOS/adastudio" <command>
+    Windows:   adastudio.exe <command> (beside AdaEditor.exe)
+               AdaEditor.exe --ada-studio-cli <command>
     Source:    swift run AdaEditor --ada-studio-cli <command>
-    Build/export require standalone Studio, Xcode command-line tools and Python 3.
+    macOS app build/export require standalone Studio, Xcode command-line tools and Python 3.
+    On Windows, inspect/validate require no external build tools; Web/Android export use WSL.
+    Windows does not package macOS apps or a standalone Windows game through this CLI.
     Web export additionally requires a matching Swift WebAssembly SDK.
     Validation reads saved files; it does not validate every asset or execute gameplay.
     JSON goes to stdout, build logs to stderr. No UI or prompts are opened.

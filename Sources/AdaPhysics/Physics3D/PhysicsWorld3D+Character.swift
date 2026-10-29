@@ -95,11 +95,15 @@ extension PhysicsWorld3D {
         guard target.length.isFinite else {
             return
         }
-        let rate = target.length > 0.001 ? controller.acceleration : controller.deceleration
+        let jumped = controller.jumpRequested && controller.isGrounded && controller.jumpSpeed.isFinite && controller.jumpSpeed > 0
+        let control = controller.airControl.isFinite ? min(max(controller.airControl, 0), 1) : 0
+        // The takeoff tick retains the actual approach velocity, including when input is released
+        // or the camera turns on the same frame as Jump. Contacts still clip momentum below.
+        let authority: Float = controller.isGrounded && !jumped ? 1 : control
+        let rate = (target.length > 0.001 ? controller.acceleration : controller.deceleration) * authority
         let change = target - controller.horizontalVelocity
         let maxChange = max(0, rate.isFinite ? rate : 0) * deltaTime
         controller.horizontalVelocity += change.length > maxChange && change.length > 0 ? change.normalized * maxChange : change
-        let jumped = controller.jumpRequested && controller.isGrounded && controller.jumpSpeed.isFinite && controller.jumpSpeed > 0
         controller.jumpRequested = false
         if jumped { controller.verticalVelocity = controller.jumpSpeed }
         let fallLimit = controller.maximumFallSpeed.isFinite ? max(0, controller.maximumFallSpeed) : 50

@@ -238,6 +238,7 @@ extension EditorViewModel {
     }
 
     func runSelectedTarget() {
+        guard !movieMaker.isBusy else { return }
         guard saveDocumentsForNativeRun() else { return }
         guard !debugger.isActive else {
             return
@@ -528,6 +529,7 @@ extension EditorViewModel {
     }
 
     var isProjectRunning: Bool {
+        if movieMaker.isBusy { return true }
         if androidRunningSession != nil || isAdaPlayerActive {
             return true
         }
@@ -561,6 +563,7 @@ extension EditorViewModel {
     }
 
     func runActiveSceneInEditor() {
+        guard !movieMaker.isBusy else { return }
         guard !debugger.isActive else {
             return
         }
@@ -569,11 +572,11 @@ extension EditorViewModel {
         }
         reloadScriptableObjectSupport()
 
-        guard let document = sceneDocumentForPlay() else {
+        guard let document = sceneDocumentForPlay(), !document.isLoading else {
             return
         }
 
-        guard EditorSceneFileLoader.model(from: document.content) != nil else {
+        guard document.sceneModel != nil || EditorSceneFileLoader.model(from: document.content) != nil else {
             failPlayMode("Unable to play \(document.title): scene document is invalid.")
             return
         }
@@ -590,6 +593,7 @@ extension EditorViewModel {
     }
 
     func stopFromToolbar() {
+        if movieMaker.isBusy { movieMaker.stop(); return }
         if selectedRunDestination == .player, isAdaPlayerActive {
             stopAdaPlayer()
             return

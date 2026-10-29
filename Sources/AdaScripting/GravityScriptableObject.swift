@@ -735,6 +735,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         guard delegate.errors.isEmpty else {
             throw AdaScriptError.compilation(delegate.errors)
         }
+        virtualMachine.setGCAllocationBudget(AdaScriptRuntimeCoordinator.garbageCollectionAllocationBudget)
     }
 
     func report(_ message: String) {

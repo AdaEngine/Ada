@@ -1,4 +1,5 @@
 @_spi(AdaEngine) import AdaEngine
+@_spi(Internal) import AdaUI
 
 struct EditorSceneViewportOrientationCompass: View {
     let viewportModel: EditorSceneViewportModel
@@ -9,54 +10,72 @@ struct EditorSceneViewportOrientationCompass: View {
     private let axisLineWidth: Float = 4.5
 
     var body: some View {
-        let axes = compassAxes()
-
-        ZStack(anchor: .topLeading) {
-            Canvas { context, _ in
-                let center = Vector2(diameter * 0.5, diameter * 0.5)
-                for axis in axes {
-                    let positive = Vector2(
-                        center.x + axis.positive.x * axisLength,
-                        center.y - axis.positive.y * axisLength
-                    )
-                    let negative = Vector2(
-                        center.x - axis.positive.x * axisLength,
-                        center.y + axis.positive.y * axisLength
-                    )
-                    context.drawLine(
-                        start: Vector2(center.x, -center.y),
-                        end: Vector2(positive.x, -positive.y),
-                        lineWidth: axisLineWidth,
-                        color: axis.color.opacity(0.78 + max(0, axis.cameraDepth) * 0.22)
-                    )
-                    context.drawLine(
-                        start: Vector2(center.x, -center.y),
-                        end: Vector2(negative.x, -negative.y),
-                        lineWidth: axisLineWidth,
-                        color: axis.color.opacity(0.38 + max(0, -axis.cameraDepth) * 0.22)
-                    )
-                    context.drawEllipse(
-                        in: Rect(x: negative.x - 11, y: negative.y - 11, width: 22, height: 22),
-                        color: axis.color.opacity(0.42 + max(0, -axis.cameraDepth) * 0.36)
-                    )
-                }
+        // The compass has fixed geometry. Read the presented camera during drawing,
+        // so rotation never schedules a layout of the surrounding editor panels.
+        Canvas(drawingRevision: { presentation.presentedAnnotations?.generation ?? (UInt64.max - UInt64(presentation.revision)) }) { context, _ in
+            let axes = compassAxes()
+            let center = Vector2(diameter * 0.5, diameter * 0.5)
+            for axis in axes {
+                let positive = Vector2(
+                    center.x + axis.positive.x * axisLength,
+                    center.y - axis.positive.y * axisLength
+                )
+                let negative = Vector2(
+                    center.x - axis.positive.x * axisLength,
+                    center.y + axis.positive.y * axisLength
+                )
+                context.drawLine(
+                    start: Vector2(center.x, -center.y),
+                    end: Vector2(positive.x, -positive.y),
+                    lineWidth: axisLineWidth,
+                    color: axis.color.opacity(0.78 + max(0, axis.cameraDepth) * 0.22)
+                )
+                context.drawLine(
+                    start: Vector2(center.x, -center.y),
+                    end: Vector2(negative.x, -negative.y),
+                    lineWidth: axisLineWidth,
+                    color: axis.color.opacity(0.38 + max(0, -axis.cameraDepth) * 0.22)
+                )
+                context.drawEllipse(
+                    in: Rect(x: negative.x - 11, y: negative.y - 11, width: 22, height: 22),
+                    color: axis.color.opacity(0.42 + max(0, -axis.cameraDepth) * 0.36)
+                )
             }
-            .frame(width: diameter, height: diameter)
-
-            ForEach(axes) { axis in
-                Text(axis.name)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(Color.fromHex(0x16191D))
-                    .frame(width: 30, height: 30)
-                    .background(CircleShape().fill(axis.color))
-                    .offset(
-                        x: diameter * 0.5 + axis.positive.x * axisLength - 15,
-                        y: diameter * 0.5 - axis.positive.y * axisLength - 15
-                    )
+            for (index, axis) in axes.enumerated() {
+                let point = Vector2(center.x + axis.positive.x * axisLength, center.y - axis.positive.y * axisLength)
+                context.drawEllipse(in: Rect(x: point.x - 15, y: point.y - 15, width: 30, height: 30), color: axis.color)
+                context.drawContents(of: Self.axisLabels[index],
+                                     transform: context.transform * Transform3D(translation: [point.x - 15, -point.y + 15, 0]))
             }
         }
         .frame(width: diameter, height: diameter)
         .accessibilityIdentifier("AdaEditor.SceneViewport.OrientationCompass")
+    }
+
+    private static let axisLabels: [UIGraphicsContext] = ["X", "Y", "Z"].map { (name: String) -> UIGraphicsContext in
+        var attributes = TextAttributeContainer()
+        attributes.font = .system(size: 15, weight: .semibold)
+        attributes.foregroundColor = Color.fromHex(0x16191D)
+        let layout = TextLayoutManager()
+        layout.setTextContainer(TextContainer(text: AttributedText(name, attributes: attributes)))
+        layout.fitToSize(Size(width: 30, height: 30))
+        var minimum = Vector2(.infinity, .infinity), maximum = Vector2(-.infinity, -.infinity)
+        for line in layout.textLines {
+            for run in line {
+                for glyph in run {
+                    minimum = min(minimum, Vector2(glyph.position.x, glyph.position.y))
+                    maximum = max(maximum, Vector2(glyph.position.z, glyph.position.w))
+                }
+            }
+        }
+        var context = UIGraphicsContext()
+        if minimum.x.isFinite, maximum.x.isFinite {
+            let center = (minimum + maximum) * 0.5
+            context.translateBy(x: 15 - center.x, y: -15 - center.y)
+            for line in layout.textLines { context.draw(line) }
+        }
+        context.commitDraw()
+        return context
     }
 
     private func compassAxes() -> [CompassAxis] {

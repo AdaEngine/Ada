@@ -242,7 +242,9 @@
                         depthOrArrayLayers: 1
                     )
                 )
-                let commandBuffer: WebGPU.GPUCommandBuffer = encoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
+                let commandBuffer: WebGPU.GPUCommandBuffer = webGPUDeviceLock.withLock { _ in
+                    encoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
+                }
                 webGPUDeviceLock.withLock { _ in
                     device.queue.submit(commands: [commandBuffer])
                 }

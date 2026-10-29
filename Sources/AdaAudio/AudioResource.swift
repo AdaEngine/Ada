@@ -25,7 +25,7 @@ public final class AudioResource: Asset, @unchecked Sendable {
         ["audiores", "wav", "mp3", "flac"]
     }
 
-    private init(sound: Sound) {
+    init(sound: Sound) {
         self.sound = sound
     }
 

@@ -605,7 +605,8 @@ final class ScrollViewNode: LayoutViewContainerNode {
     override func draw(with context: UIGraphicsContext) {
         var context = context
         context.environment = environment
-        context.pushClipRect(self.absoluteFrame())
+        // The viewport follows ancestor scrolling, but not its own content offset.
+        context.pushClipRect(self.visualAbsoluteFrame())
         context.translateBy(x: -contentOffset.x, y: contentOffset.y)
         super.draw(with: context)
         context.popClipRect()
@@ -647,7 +648,7 @@ final class ScrollViewNode: LayoutViewContainerNode {
 
         var contentContext = context
         contentContext.environment = environment
-        contentContext.pushClipRect(self.absoluteFrame())
+        contentContext.pushClipRect(self.visualAbsoluteFrame())
         contentContext.translateBy(x: -contentOffset.x, y: contentOffset.y)
         contentContext.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
         super.drawInspectionChildLayoutBounds(with: contentContext)
@@ -670,7 +671,7 @@ final class ScrollViewNode: LayoutViewContainerNode {
 
         var contentContext = context
         contentContext.environment = environment
-        contentContext.pushClipRect(self.absoluteFrame())
+        contentContext.pushClipRect(self.visualAbsoluteFrame())
         contentContext.translateBy(x: -contentOffset.x, y: contentOffset.y)
         contentContext.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
         super
@@ -695,7 +696,7 @@ final class ScrollViewNode: LayoutViewContainerNode {
 
         var contentContext = context
         contentContext.environment = environment
-        contentContext.pushClipRect(self.absoluteFrame())
+        contentContext.pushClipRect(self.visualAbsoluteFrame())
         contentContext.translateBy(x: -contentOffset.x, y: contentOffset.y)
         contentContext.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
         super

@@ -27,7 +27,6 @@ public struct Main3DRenderNode: RenderNode {
     >
     private var query
 
-    @Res<ExtractedMesh3DSources> private var candidates
     @ResMut<VisibleMesh3DLists> private var lists
     @ResMut<GPUVisibility3DState> private var gpuVisibility
     @ResMut<Active3DInstanceBuffers> private var activeInstances
@@ -64,7 +63,6 @@ public struct Main3DRenderNode: RenderNode {
         _metrics.update(from: world)
         query.update(from: world)
         _lighting.update(from: world)
-        _candidates.update(from: world)
         _lists.update(from: world)
         _gpuVisibility.update(from: world)
         _activeInstances.update(from: world)
@@ -88,7 +86,10 @@ public struct Main3DRenderNode: RenderNode {
     }
 
     public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
-        guard let view = context.viewEntity else {
+        // Keep geometry only while encoding this view. A retained Res snapshot
+        // forces extraction to copy the whole array when even one mesh moves.
+        guard let view = context.viewEntity,
+            let candidates = context.world.getResource(ExtractedMesh3DSources.self) else {
             return []
         }
         // The shadow node updates this resource earlier in the same graph execution. Fetch it here instead of
@@ -166,7 +167,7 @@ public struct Main3DRenderNode: RenderNode {
                         shadowsEnabled ? 1 : 0,
                         max(0, directionalLight.shadowBias),
                         max(0, directionalLight.shadowSlopeBias),
-                        1 / Float(DirectionalShadow3D.resolution)
+                        1 / Float(shadow.colorTexture?.size.height ?? DirectionalShadow3D.resolution)
                     ),
                     shadowViewProjection1: shadow.viewProjection1,
                     shadowViewProjection2: shadow.viewProjection2,

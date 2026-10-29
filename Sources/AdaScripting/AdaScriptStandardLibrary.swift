@@ -38,6 +38,7 @@ enum AdaScriptStandardLibrary {
     func __adaMathAddVector(left, right) {
         assert(left is List && right is List && left.count == right.count && left.count > 0,
                "Math.addVector requires nonempty vectors of equal length");
+        if (left.count == 3) return [left[0] + right[0], left[1] + right[1], left[2] + right[2]];
         var result = [];
         for (var index in 0..<left.count) { result.push(left[index] + right[index]); }
         return result;
@@ -46,6 +47,7 @@ enum AdaScriptStandardLibrary {
     func __adaMathSubtractVector(left, right) {
         assert(left is List && right is List && left.count == right.count && left.count > 0,
                "Math.subtractVector requires nonempty vectors of equal length");
+        if (left.count == 3) return [left[0] - right[0], left[1] - right[1], left[2] - right[2]];
         var result = [];
         for (var index in 0..<left.count) { result.push(left[index] - right[index]); }
         return result;
@@ -53,6 +55,7 @@ enum AdaScriptStandardLibrary {
 
     func __adaMathScaleVector(vector, scalar) {
         assert(vector is List && vector.count > 0, "Math.scaleVector requires a nonempty vector");
+        if (vector.count == 3) return [vector[0] * scalar, vector[1] * scalar, vector[2] * scalar];
         var result = [];
         for (var component in vector) { result.push(component * scalar); }
         return result;
@@ -61,6 +64,8 @@ enum AdaScriptStandardLibrary {
     func __adaMathDot(left, right) {
         assert(left is List && right is List && left.count == right.count && left.count > 0,
                "Math.dot requires nonempty vectors of equal length");
+        // Keep the original double accumulator and left-to-right summation order.
+        if (left.count == 3) return 0.0 + left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
         var result = 0.0;
         for (var index in 0..<left.count) { result += left[index] * right[index]; }
         return result;
@@ -81,6 +86,7 @@ enum AdaScriptStandardLibrary {
     func __adaMathNormalize(vector) {
         var magnitude = __adaMathLength(vector);
         assert(magnitude > 0, "Math.normalize requires a nonzero vector");
+        if (vector.count == 3) return [vector[0] / magnitude, vector[1] / magnitude, vector[2] / magnitude];
         var result = [];
         for (var component in vector) { result.push(component / magnitude); }
         return result;
@@ -89,6 +95,12 @@ enum AdaScriptStandardLibrary {
     func __adaMathDistance(left, right) {
         assert(left is List && right is List && left.count == right.count && left.count > 0,
                "Math.distance requires nonempty vectors of equal length");
+        if (left.count == 3) {
+            var x = left[0] - right[0];
+            var y = left[1] - right[1];
+            var z = left[2] - right[2];
+            return Math.sqrt(0.0 + x * x + y * y + z * z);
+        }
         var difference = [];
         for (var index in 0..<left.count) { difference.push(left[index] - right[index]); }
         return __adaMathLength(difference);
@@ -97,6 +109,7 @@ enum AdaScriptStandardLibrary {
     func __adaMathLerpVector(left, right, amount) {
         assert(left is List && right is List && left.count == right.count && left.count > 0,
                "Math.lerpVector requires nonempty vectors of equal length");
+        if (left.count == 3) return [Math.lerp(left[0], right[0], amount), Math.lerp(left[1], right[1], amount), Math.lerp(left[2], right[2], amount)];
         var result = [];
         for (var index in 0..<left.count) {
             result.push(Math.lerp(left[index], right[index], amount));
@@ -108,6 +121,9 @@ enum AdaScriptStandardLibrary {
         assert(vector is List && minimum is List && maximum is List &&
                vector.count == minimum.count && vector.count == maximum.count && vector.count > 0,
                "Math.clampVector requires nonempty vectors of equal length");
+        if (vector.count == 3) return [__adaMathClamp(vector[0], minimum[0], maximum[0]),
+                                     __adaMathClamp(vector[1], minimum[1], maximum[1]),
+                                     __adaMathClamp(vector[2], minimum[2], maximum[2])];
         var result = [];
         for (var index in 0..<vector.count) {
             result.push(__adaMathClamp(vector[index], minimum[index], maximum[index]));

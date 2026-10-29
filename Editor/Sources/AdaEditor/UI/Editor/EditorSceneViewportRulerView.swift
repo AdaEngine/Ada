@@ -7,7 +7,8 @@ import Observation
 final class EditorViewportPresentation {
     @ObservationIgnored var revision: UInt = 0
     private(set) var rulerRevision: UInt = 0
-    private(set) var statusSuffix: String?
+    @ObservationIgnored private(set) var statusSuffix: String?
+    @ObservationIgnored private(set) var statusRevision: UInt64 = 0
     private(set) var compassOrientation: CompassOrientation?
 
     struct CompassOrientation: Equatable {
@@ -42,7 +43,10 @@ final class EditorViewportPresentation {
     func refresh(viewportModel: EditorSceneViewportModel) {
         revision &+= 1
         let suffix = viewportModel.statusSuffix
-        if statusSuffix != suffix { statusSuffix = suffix }
+        if statusSuffix != suffix {
+            statusSuffix = suffix
+            statusRevision &+= 1
+        }
         let state = viewportModel.smoothPerspectiveBlend < 1
             ? RulerState(center: viewportModel.twoDCenter, zoom: viewportModel.twoDZoom,
                          blend: viewportModel.smoothPerspectiveBlend, size: viewportModel.viewportSize)
@@ -190,8 +194,40 @@ struct EditorViewportStatusLabel: View {
     let entityCount: Int
 
     var body: some View {
-        Text(warning.map { "Scene warning: \($0)" }
-            ?? "Loaded \(entityCount) entities · \(presentation.statusSuffix ?? viewportModel.statusSuffix)")
-            .accessibilityIdentifier("AdaEditor.SceneViewport.Status")
+        Group {
+            if let warning {
+                Text(L10n.text("Scene warning: \(warning)"))
+            } else {
+                HStack(spacing: 0) {
+                    Text(L10n.text("Loaded \(entityCount) entities · "))
+                    // Position changes every flying frame. Draw it in a bounded leaf;
+                    // changing a Text's intrinsic width would relayout the workbench.
+                    Canvas(drawingRevision: { presentation.statusRevision }) { context, size in
+                        var attributes = TextAttributeContainer()
+                        attributes.font = context.environment.font ?? .system(size: 11)
+                        attributes.foregroundColor = context.environment.foregroundColor ?? .white
+                        let text = presentation.statusSuffix ?? viewportModel.statusSuffix
+                        let layout = TextLayoutManager()
+                        layout.setTextContainer(TextContainer(text: AttributedText(text, attributes: attributes)))
+                        layout.fitToSize(size)
+                        var top: Float = -.infinity, bottom: Float = .infinity
+                        for line in layout.textLines {
+                            for run in line {
+                                for glyph in run {
+                                    top = max(top, glyph.position.w)
+                                    bottom = min(bottom, glyph.position.y)
+                                }
+                            }
+                        }
+                        if top.isFinite, bottom.isFinite {
+                            context.translateBy(x: 0, y: -size.height / 2 - (top + bottom) / 2)
+                            for line in layout.textLines { context.draw(line) }
+                        }
+                    }
+                    .frame(width: 300, height: 14)
+                }
+            }
+        }
+        .accessibilityIdentifier("AdaEditor.SceneViewport.Status")
     }
 }

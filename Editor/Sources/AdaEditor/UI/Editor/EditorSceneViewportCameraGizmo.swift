@@ -14,13 +14,12 @@ enum EditorSceneViewportCameraGizmo {
         size: Size,
         theme: Theme
     ) {
-        for entity in world.getEntities() {
+        Query<Entity, Camera>(from: world).forEach { entity, camera in
             guard
-                let camera = entity.components[Camera.self],
                 let editorID = editorIDsByEntityID[entity.id],
                 let cameraTransform = viewportModel.gizmoWorldMatrix(for: editorID)
             else {
-                continue
+                return
             }
 
             drawCamera(

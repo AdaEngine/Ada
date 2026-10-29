@@ -14,6 +14,55 @@ import Testing
 struct EditorPhysicsInspectorTests {
     private let typeName = EditorBuiltInComponentType.physicsBody2D
 
+    @Test("Saved 3D raycasts load in the editor without starting physics", arguments: [false, true])
+    func raycastPreviewRegistration(incremental: Bool) async throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "RaycastPreview")))
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("RaycastPreview-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("Main.ascn")
+        var authored = Raycast3DComponent()
+        authored.origin = Vector3(1, 2, 3)
+        authored.destination = Vector3(4, 5, 6)
+        authored.excludingEntityID = 12
+        authored.includeSensors = true
+        authored.requestID = 7
+        let payload = try JSONDecoder().decode(EditorComponentPayload.self, from: JSONEncoder().encode(authored))
+        let scene = EditorSceneModel(scene: .init(id: "raycast-preview", name: "Raycast preview"), entities: [
+            .init(id: "default", name: "Default ray", enabled: true, parent: nil, components: ["AdaPhysics.Raycast3DComponent": [:]]),
+            .init(id: "authored", name: "Authored ray", enabled: true, parent: nil, components: ["AdaPhysics.Raycast3DComponent": payload]),
+        ])
+        try JSONEncoder().encode(scene).write(to: url)
+        let content = try String(contentsOf: url, encoding: .utf8)
+        let app = AppWorlds(main: World())
+        EditorSceneViewportView.configureSimulation(in: app, isPlaying: false)
+        let result: EditorSceneRuntimeLoadResult
+        if incremental {
+            result = try await EditorSceneFileLoader.loadIncrementally(
+                model: EditorSceneModel.decode(from: content), into: app.main, sourceURL: url, resourceRootURL: root
+            )
+        } else {
+            result = EditorSceneFileLoader.load(
+                content: content, into: app.main, loadsScriptableObjects: false, loadsPhysicsBodies: false,
+                sourceURL: url, resourceRootURL: root
+            )
+        }
+        #expect(result.warnings.isEmpty)
+        let defaultID = try #require(result.entitiesByEditorID["default"])
+        let defaultRay = try #require(app.main.getEntityByID(defaultID)?.components[Raycast3DComponent.self])
+        #expect(defaultRay.destination == Vector3(0, 0, 1))
+        #expect(!defaultRay.includeSensors)
+        let authoredID = try #require(result.entitiesByEditorID["authored"])
+        let restored = try #require(app.main.getEntityByID(authoredID)?.components[Raycast3DComponent.self])
+        #expect(restored.origin == authored.origin && restored.destination == authored.destination)
+        #expect(restored.includeSensors && restored.excludingEntityID == 12 && restored.requestID == 7)
+        #expect(restored.completedRequestID == -1)
+        #expect(app.main.getResource(Physics3DWorldHolder.self) == nil)
+    }
+
     @Test("New physics components have decodable defaults and editable fields")
     func defaultsAndLegacyPayload() throws {
         EditorComponentRegistry.registerBuiltIns()

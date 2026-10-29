@@ -86,7 +86,7 @@ public struct DepthOfField3DRenderNode: RenderNode {
             }
             encode(mode: 0, source: output, destination: scratch, viewport: Rect(x: 0, y: 0, width: Float(scratch.size.width), height: Float(scratch.size.height)))
             encode(mode: 1, source: scratch, destination: output, viewport: camera.viewport.rect)
-            if notifiesCompletion, !overlays.hasOverlay, let drawable = target.outputTexture, drawable === output {
+            if notifiesCompletion, !overlays.hasOverlay, !environment.cameraEffectsWriteOutput, let drawable = target.outputTexture, drawable === output {
                 command.addCompletedHandler { [drawable] in drawable.notifyRenderCompleted() }
             }
             if let metrics {

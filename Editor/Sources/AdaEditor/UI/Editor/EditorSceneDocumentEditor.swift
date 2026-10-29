@@ -12,12 +12,24 @@ struct EditorSceneDocumentEditor: View {
     let playModeState: EditorPlayModeState
     let playRuntime: EditorScenePlayRuntime?
     let onEntitySelected: (() -> Void)?
+    var onTerrainToolSelected: (() -> Void)? = nil
     let onPlay: (() -> Void)?
     let onStop: (() -> Void)?
 
     @Environment(\.theme) private var theme
 
     var body: some View {
+        if document.isLoading {
+            Text(L10n.text("Loading scene resources…"))
+                .foregroundColor(theme.editorColors.text)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityIdentifier("AdaEditor.SceneDocument.Loading")
+        } else {
+            loadedScene
+        }
+    }
+
+    private var loadedScene: some View {
         HStack(spacing: 0) {
             sceneHierarchy
                 .frame(width: Self.hierarchyWidth)
@@ -36,7 +48,8 @@ struct EditorSceneDocumentEditor: View {
                 onEntitySelected: onEntitySelected,
                 onPlay: onPlay,
                 onStop: onStop,
-                onDocumentChanged: { workbench.replaceSceneDocument($0) }
+                onDocumentChanged: { workbench.replaceSceneDocument($0) },
+                onTerrainToolSelected: onTerrainToolSelected
             )
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             .accessibilityIdentifier("AdaEditor.SceneEditor.ViewportPanel")

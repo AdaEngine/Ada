@@ -29,11 +29,15 @@ public struct Model3DPlugin: Plugin {
         app.addSystem(ModelAnimationPlayback3DSystem.self, on: .postUpdate)
         app.addSystem(Model3DSourceSystem.self, on: .preUpdate)
         Mesh3DComponent.registerComponent()
+        Terrain3D.registerComponent()
+        app.addSystem(Terrain3DSystem.self, on: .preUpdate)
         MeshLOD3DComponent.registerComponent()
         DirectionalLightComponent.registerComponent()
         PointLightComponent.registerComponent()
         SpotLightComponent.registerComponent()
         BillboardComponent.registerComponent()
+        ParticleEmitter3D.registerComponent()
+        app.addSystem(ParticleSimulation3DSystem.self, on: .postUpdate)
         ModelAnimation3DComponent.registerComponent()
         ModelNode3DComponent.registerComponent()
         SkinnedMesh3DComponent.registerComponent()
@@ -55,7 +59,10 @@ public struct Model3DPlugin: Plugin {
 
         renderWorld
             .insertResource(ExtractedLighting3D())
+            .insertResource(ExtractedParticles3D())
+            .addSystem(ExtractParticles3DSystem.self, on: .extract)
             .insertResource(ExtractedMesh3DSources())
+            .insertResource(Model3DExtractionCache())
             .insertResource(AnimatedBounds3D())
             .insertResource(Active3DInstanceBuffers())
             .insertResource(Skinning3DUniforms())
@@ -71,7 +78,6 @@ public struct Model3DPlugin: Plugin {
 
 @System
 func ExtractModel3D(
-    _ world: World,
     _ query: Extract<Query<Entity,
     Mesh3DComponent,
     GlobalTransform>>,
@@ -93,105 +99,20 @@ func ExtractModel3D(
     _ skinningUniforms: ResMut<Skinning3DUniforms>,
     _ materialUniforms: ResMut<PBR3DUniforms>,
     _ renderDevice: Res<RenderDeviceHandler>,
-    _ drawPass: Res<Model3DDrawPass>
+    _ drawPass: Res<Model3DDrawPass>,
+    _ cache: ResMut<Model3DExtractionCache>,
+    _ mainWorld: Res<MainWorld?>,
+    _ clock: Res<ShaderGraphClock?>
 ) {
-    animatedBounds.wrappedValue.beginFrame()
-    var previousTransforms: [Entity.ID: Transform3D] = [:]
-    for source in sources.meshes { previousTransforms[source.entity] = source.transform }
-    sources.meshes.removeAll(keepingCapacity: true)
-    // These typed queries declare all optional/hierarchical component reads without requiring them on a mesh.
-    _ = visibilityAccess.wrappedValue
-    _ = noCullingAccess.wrappedValue
-    _ = hierarchyAccess.wrappedValue
-    var lodByEntity: [Entity.ID: MeshLOD3DComponent] = [:]
-    lods.wrappedValue.forEach { entity, lod in lodByEntity[entity.id] = lod }
-    var posedBounds: [Entity.ID: AABB] = [:]
-    skinningUniforms.wrappedValue.beginFrame(device: renderDevice.renderDevice)
-    morphUniforms.wrappedValue.beginFrame()
-    var morphByEntity: [Entity.ID: [Float]] = [:]
-    morphs.wrappedValue.forEach { entity, morph in morphByEntity[entity.id] = morph.weights }
-    // Morph deltas are applied before skinning, so a joint matrix that scales also scales the displacement.
-    var skinScale: [Entity.ID: Float] = [:]
-    skins.wrappedValue.forEach { entity, skin in
-        _ = skinningUniforms.wrappedValue.write(skin.matrices, for: entity.id, device: renderDevice.renderDevice, revision: .init(id: skin.paletteID, generation: skin.poseGeneration))
-        if let mesh = entity.components[Mesh3DComponent.self]?.mesh {
-            let lod = lodByEntity[entity.id]
-            let meshes = lod?.skeletonCompatible == true ? [mesh] + (lod?.alternatives ?? []) : [mesh]
-            let bounds = meshes.count > 1
-                ? animatedBounds.wrappedValue.bounds(meshes: meshes, matrices: skin.matrices)
-                : animatedBounds.wrappedValue.bounds(mesh: mesh, matrices: skin.matrices)
-            posedBounds[entity.id] = bounds
-        }
-        var largest: Float = 1
-        for matrix in skin.matrices {
-            largest = max(largest, matrix.x.xyz.length, matrix.y.xyz.length, matrix.z.xyz.length)
-        }
-        skinScale[entity.id] = largest
-    }
-    materialUniforms.wrappedValue.beginFrame()
-
-    // Many mesh parts share the same model ancestors. Resolve each ancestor's
-    // visibility once per extraction, including hidden parents without meshes.
-    var hiddenHierarchy: [Entity.ID: Bool] = [:]
-    func isHidden(_ entity: Entity) -> Bool {
-        if let hidden = hiddenHierarchy[entity.id] { return hidden }
-        let hidden = entity.components[Visibility.self] == .hidden || entity.parent.map(isHidden) == true
-        hiddenHierarchy[entity.id] = hidden
-        return hidden
-    }
-
-    query.wrappedValue.forEach { entity, mesh3d, transform in
-        for material in mesh3d.materials {
-            (material as? PBRMaterial)?.graphMaterial?.updateAutomaticTime(world.getResource(ShaderGraphClock.self)?.elapsed ?? 0)
-        }
-        let lod = lodByEntity[entity.id]
-        if isHidden(entity) { return }
-        let noCulling = entity.components[NoFrustumCulling.self]
-        let mesh = mesh3d.mesh
-        let palette = skinningUniforms.wrappedValue.buffer(for: entity.id)
-        var localBounds: AABB? = palette == nil ? mesh.bounds : posedBounds[entity.id]
-        if palette == nil, let lod {
-            for level in lod.alternatives { localBounds = localBounds.map { AABB(min: min($0.min, level.bounds.min), max: max($0.max, level.bounds.max)) } ?? level.bounds }
-        }
-        // Weights move vertices past the rest-pose bounds, so culling and shadow bounds grow by the most the weights can displace.
-        var morphBuffers: [UInt64: any UniformBuffer] = [:]
-        if mesh.hasMorphTargets, let weights = morphByEntity[entity.id] {
-            let written = morphUniforms.wrappedValue.write(weights: weights, mesh: mesh, for: entity.id, device: renderDevice.renderDevice)
-            var displacement: Float = 0
-            for (key, buffer) in written {
-                morphBuffers[Mesh3DRenderSource.morphKey(model: key.model, part: key.part)] = buffer
-                if let set = mesh.models[key.model].parts[key.part].morphTargets {
-                    displacement = max(displacement, set.maximumDisplacement(for: weights))
-                }
-            }
-            if displacement > 0, let bounds = localBounds {
-                let growth = Vector3.one * (displacement * (skinScale[entity.id] ?? 1))
-                localBounds = AABB(min: bounds.min - growth, max: bounds.max + growth)
-            }
-        }
-        sources.meshes.append(Mesh3DRenderSource(
-            entity: entity.id,
-            drawPass: drawPass.wrappedValue,
-            mesh: mesh,
-            materials: mesh3d.materials,
-            transform: transform.matrix,
-            bounds: localBounds.map { MeshVisibility3DMath.transformed($0, by: transform.matrix) },
-            // Level-of-detail meshes have their own vertices, which the morph deltas do not address.
-            alternatives: morphBuffers.isEmpty && (palette == nil || lod?.skeletonCompatible == true && localBounds != nil) ? lod?.alternatives ?? [] : [],
-            thresholds: lod?.screenThresholds ?? [],
-            hysteresis: lod?.hysteresis ?? 0.15,
-            maximumDistance: lod?.maximumDistance,
-            fadeDistance: lod?.fadeDistance ?? 4,
-            forceVisible: noCulling != nil,
-            castShadows: mesh3d.castShadows,
-            receiveShadows: mesh3d.receiveShadows,
-            skinningBuffer: palette,
-            previousTransform: previousTransforms[entity.id],
-            morphBuffers: morphBuffers
-        ))
-    }
-
-    animatedBounds.wrappedValue.finishFrame()
+    cache.wrappedValue.extract(
+        sourceWorldID: mainWorld.wrappedValue?.world.id, elapsed: clock.wrappedValue?.elapsed ?? 0,
+        query: query.wrappedValue, lods: lods.wrappedValue,
+        visibility: visibilityAccess.wrappedValue, noCulling: noCullingAccess.wrappedValue, hierarchy: hierarchyAccess.wrappedValue,
+        skins: skins.wrappedValue, morphs: morphs.wrappedValue,
+        sources: &sources.wrappedValue, animatedBounds: &animatedBounds.wrappedValue,
+        skinning: &skinningUniforms.wrappedValue, morphUniforms: &morphUniforms.wrappedValue,
+        materials: &materialUniforms.wrappedValue, device: renderDevice.renderDevice, drawPass: drawPass.wrappedValue
+    )
 }
 
 public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
@@ -264,7 +185,12 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
             return
         }
         let pbrMaterial = item.material as? PBRMaterial
-        let baseColorTexture = pbrMaterial?.baseColorTexture ?? Texture2D.whiteTexture
+        // The compact motion layout has no texture-presence attribute. Match the main
+        // pass's alpha test when the material selects a UV set this part does not have.
+        let baseUV = (pbrMaterial?.textureCoordinates.first ?? 0) == 1
+            ? MeshDescriptor.textureCoordinates1.id.name : MeshDescriptor.textureCoordinates.id.name
+        let motionHasBaseUV = part.vertexDescriptor.attributes.containsAttribute(by: baseUV)
+        let baseColorTexture = isMotion && !motionHasBaseUV ? Texture2D.whiteTexture : (pbrMaterial?.baseColorTexture ?? Texture2D.whiteTexture)
         let metallicRoughnessTexture = pbrMaterial?.metallicRoughnessTexture ?? Texture2D.whiteTexture
         let normalTexture = pbrMaterial?.normalTexture ?? Self.flatNormalTexture
         let emissiveTexture = pbrMaterial?.emissiveTexture ?? Texture2D.whiteTexture

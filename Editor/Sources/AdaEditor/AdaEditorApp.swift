@@ -25,7 +25,7 @@ enum AdaApplicationEntry {
         #if os(Windows)
         if try EditorWindowsCloudAuthentication.receiveLaunchCallback(CommandLine.arguments) { return }
         #endif
-        #if os(macOS)
+        #if os(macOS) || os(Windows)
             if EditorCLI.isInvocation(CommandLine.arguments) {
                 let code = await EditorCLI.run(arguments: CommandLine.arguments)
                 Foundation.exit(code)
@@ -60,13 +60,13 @@ enum AdaApplicationEntry {
 }
 
 struct AdaEditorApp: App {
-    #if DEBUG && os(macOS)
+    #if (DEBUG && os(macOS)) || os(Windows)
     private let launchProject: EditorProjectReference?
     #endif
 
     init() {
         EditorComponentRegistry.registerBuiltIns()
-        #if DEBUG && os(macOS)
+        #if (DEBUG && os(macOS)) || os(Windows)
         if let argument = CommandLine.arguments.first(where: { $0.hasPrefix("--editor-project=") }) {
             let path = String(argument.dropFirst("--editor-project=".count))
             do {
@@ -108,7 +108,7 @@ struct AdaEditorApp: App {
 
     var body: some AppScene {
         WindowGroup {
-            #if DEBUG && os(macOS)
+            #if (DEBUG && os(macOS)) || os(Windows)
             if let launchProject {
                 EditorView(project: launchProject)
             } else {

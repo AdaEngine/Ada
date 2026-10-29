@@ -130,6 +130,16 @@ extension FilterQuery {
     public func parallel(batchSize: Int = 4) -> ParallelQueryResult<Builder, F> {
         return ParallelQueryResult(state: self.state, batchSize: batchSize)
     }
+
+    /// Iterates sequentially with component columns bound once per chunk.
+    ///
+    /// Component writes through `Ref` are supported. Defer spawning, removal and
+    /// component insertion/removal with `Commands` until the traversal finishes:
+    /// structural changes invalidate the bound columns. Use ordinary iteration
+    /// when a callback needs to make immediate structural changes.
+    public func batched() -> BatchedQueryResult<Builder, F> {
+        BatchedQueryResult(state: state)
+    }
 }
 
 extension FilterQuery: SystemParameter {

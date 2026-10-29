@@ -118,6 +118,15 @@ final class NativeWorldHost: NativeHostObject {
                 commands.entity(id).remove(componentID, from: id)
             }
             return .boolean(true)
+        case "sceneLoadingProgress":
+            guard arguments.isEmpty else { return nil }
+            return .double(navigator?.loadingProgress.fraction ?? 0)
+        case "sceneLoadingStage":
+            guard arguments.isEmpty else { return nil }
+            return .string(navigator?.loadingProgress.stage ?? "idle")
+        case "sceneLoadingError":
+            guard arguments.isEmpty else { return nil }
+            return .string(navigator?.lastError ?? "")
         case "changeScene":
             guard arguments.count == 1, case .string(let path) = arguments[0], let navigator else {
                 return nil

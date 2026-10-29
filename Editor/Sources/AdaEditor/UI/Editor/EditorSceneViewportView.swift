@@ -13,6 +13,7 @@ struct EditorSceneViewportView: View {
     let onPlay: (() -> Void)?
     let onStop: (() -> Void)?
     let onDocumentChanged: (EditorSceneDocument) -> Void
+    var onTerrainToolSelected: (() -> Void)? = nil
     var initialDisplayMode: EditorSceneViewportDisplayMode = .twoD
     var isAssetPreview = false
     var onEditWorldReady: ((World) -> Void)?
@@ -20,6 +21,7 @@ struct EditorSceneViewportView: View {
     @State private var performanceSession = EditorGamePerformanceSession()
     @State var viewportPresentation = EditorViewportPresentation()
     @State var runtimeWarnings: [String] = []
+    @State private var isLoadingScene = false
     @State private var showsBones = false
     @State private var displayMode: EditorSceneViewportDisplayMode = .twoD
     @State private var activeTool: EditorSceneViewportTool = .translate
@@ -30,7 +32,7 @@ struct EditorSceneViewportView: View {
     var body: some View {
         // A declaration is required inside AdaUI's result builder.
         // swiftlint:disable:next redundant_discardable_let
-        let _ = isPlayingThisDocument ? preparePlayModeViewport() : configureViewportModel()
+        let _ = configureReadyViewport()
         ZStack {
             theme.editorColors.surfaceElevated
 
@@ -65,8 +67,16 @@ struct EditorSceneViewportView: View {
         return false
     }
 
+    private func configureReadyViewport() {
+        guard !document.isLoading, document.errorMessage == nil else { return }
+        if isPlayingThisDocument { preparePlayModeViewport() }
+        else { configureViewportModel() }
+    }
+
     private var hasImportedModels: Bool {
-        document.sceneModel?.entities.contains { $0.components[EditorBuiltInComponentType.model3DSource] != nil } == true
+        document.sceneModel?.entities.contains {
+            $0.components[EditorBuiltInComponentType.model3DSource] != nil || $0.components[EditorTerrainPayload.typeName] != nil
+        } == true
     }
 
     private var editViewport: some View {
@@ -83,19 +93,12 @@ struct EditorSceneViewportView: View {
                                 viewportModel.perspectiveBlend = 1
                             }
                             guard configureSceneViewApp(&app) else { return }
-                            let result = EditorSceneFileLoader.load(
-                                content: document.content,
-                                into: app.main,
-                                loadsScriptableObjects: false,
-                                sourceURL: document.absolutePath.map { URL(fileURLWithPath: $0) },
-                                resourceRootURL: resourceRootURL
-                            )
-                            if runtimeWarnings != result.warnings {
-                                runtimeWarnings = result.warnings
-                            }
-                            viewportModel.attachSceneWorld(app.main, loadResult: result)
-                            redrawViewport()
-                            onEditWorldReady?(app.main)
+                            let world = app.main
+                            viewportModel.loadSceneWorld(world, application: app, onLoadingChanged: { isLoadingScene = $0 }, onLoaded: { result in
+                                if runtimeWarnings != result.warnings { runtimeWarnings = result.warnings }
+                                redrawViewport()
+                                onEditWorldReady?(world)
+                            })
                         },
                         updateContent: { world, deltaTime in
                             world.getResource(EditorSkeleton3DOverlay.self)?.isEnabled = showsBones && displayMode == .threeD
@@ -124,6 +127,16 @@ struct EditorSceneViewportView: View {
 
                     sceneControls(size: geometry.size)
                     statusBar
+                    if isLoadingScene {
+                        Text(L10n.text("Loading scene resources…"))
+                            .font(.system(size: 13))
+                            .foregroundColor(theme.editorColors.text)
+                            .padding(12)
+                            .background(theme.editorColors.surface)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                            .allowsHitTesting(false)
+                            .accessibilityIdentifier("AdaEditor.SceneViewport.Loading")
+                    }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
                 .mask(RectangleShape())
@@ -305,6 +318,21 @@ struct EditorSceneViewportView: View {
                 .foregroundColor(theme.editorColors.muted)
             #endif
             Spacer()
+            if !isAssetPreview {
+                Button(action: {
+                    let enabled = !viewportModel.terrainEditing.isEnabled
+                    if enabled { selectViewportMode(.threeD) }
+                    viewportModel.setTerrainEditing(enabled)
+                    if enabled { (onTerrainToolSelected ?? onEntitySelected)?() }
+                    redrawViewport()
+                }) {
+                    Text(L10n.text("Terrain"))
+                        .font(.system(size: 11))
+                        .foregroundColor(viewportModel.terrainEditing.isEnabled ? theme.editorColors.blue : theme.editorColors.text)
+                }
+                .buttonStyle(DefaultButtonStyle())
+                .accessibilityIdentifier("AdaEditor.SceneViewport.Terrain")
+            }
             if displayMode == .threeD {
                 skeletonVisibilityButton
             }
@@ -425,6 +453,9 @@ struct EditorSceneViewportView: View {
     }
 
     private func selectViewportMode(_ mode: EditorSceneViewportDisplayMode) {
+        if mode == .twoD {
+            viewportModel.setTerrainEditing(false)
+        }
         displayMode = mode
         viewportModel.setDisplayMode(mode)
         redrawViewport()
@@ -489,6 +520,7 @@ struct EditorSceneViewportView: View {
     }
 
     private func selectTool(_ tool: EditorSceneViewportTool) {
+        viewportModel.setTerrainEditing(false)
         activeTool = tool
         viewportModel.setActiveTool(tool)
         redrawViewport()

@@ -20,8 +20,19 @@ struct EditorInspectorSidebar: View {
         ZStack(anchor: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
                 if showsTitle { adaEditorInspectorTitle(theme: theme) }
-                ScrollView {
+                ScrollView(showsIndicators: true) {
                     VStack(alignment: .leading, spacing: 0) {
+                        if !viewModel.isInspectingPlayMode, viewModel.runtimeSelection == nil,
+                           let terrain = viewModel.terrainEditing, terrain.isEnabled {
+                            inspectorSection("Terrain Brush") {
+                                EditorTerrainPanel(
+                                    state: terrain,
+                                    onCreate: viewModel.createTerrainRequested,
+                                    onChange: viewModel.terrainSettingsChanged
+                                )
+                            }
+                            .accessibilityIdentifier("AdaEditor.Inspector.Terrain")
+                        }
                         if let runtimeSelection = viewModel.runtimeSelection {
                             inspectorSection(L10n.text("PLAY MODE · \(runtimeSelection.name.uppercased())")) {
                                 Text(L10n.text("Entity #\(runtimeSelection.id)"))

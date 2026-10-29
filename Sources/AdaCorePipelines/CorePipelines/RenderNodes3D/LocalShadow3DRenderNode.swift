@@ -45,7 +45,6 @@ public struct LocalShadow3DRenderNode: RenderNode {
     @Res<ExtractedLighting3D> private var lighting
     @Res<Render3DLightStatistics> private var statistics
     @Res<ExtractedEnvironment3D> private var environments
-    @Res<ExtractedMesh3DSources> private var candidates
     @ResMut<LocalShadow3DViews> private var views
     @ResMut<LocalShadow3DScratch> private var scratch
     @ResMut<LocalLighting3DGPUScratch> private var uniforms
@@ -64,7 +63,6 @@ public struct LocalShadow3DRenderNode: RenderNode {
         _lighting.update(from: world)
         _environments.update(from: world)
         _statistics.update(from: world)
-        _candidates.update(from: world)
         _views.update(from: world)
         _scratch.update(from: world)
         _uniforms.update(from: world)
@@ -84,7 +82,8 @@ public struct LocalShadow3DRenderNode: RenderNode {
     }
 
     public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
-        guard let view = context.viewEntity else {
+        guard let view = context.viewEntity,
+            let candidates = context.world.getResource(ExtractedMesh3DSources.self) else {
             return []
         }
         var submitted: CommandBuffer?

@@ -126,7 +126,7 @@ extension EditorViewModel {
     }
 
     func synchronizeAgentSceneContext() {
-        guard case let .scene(document)? = workbench.activeDocument else {
+        guard case let .scene(document)? = workbench.activeDocument, !document.isLoading else {
             agent.setSceneContext(nil)
             return
         }
@@ -264,6 +264,7 @@ extension EditorViewModel {
             return nil
         }
 
+        let sceneModel = EditorSceneFileLoader.model(from: content)
         let document = EditorSceneDocument(
             id: "scene:\(startupScene)",
             title: sceneURL.lastPathComponent,
@@ -272,11 +273,12 @@ extension EditorViewModel {
             content: content,
             lastSavedContent: content,
             isReadOnly: Self.isSymbolicLink(at: sceneURL),
-            sceneModel: EditorSceneFileLoader.model(from: content),
+            sceneModel: sceneModel,
             errorMessage: nil,
             isDirty: false,
             statusMessage: Self.isSymbolicLink(at: sceneURL) ? "Read-only: symbolic link" : "Loaded",
-            loadSummary: EditorSceneFileLoader.summary(from: content)
+            loadSummary: sceneModel.map { EditorSceneLoadSummary(entityCount: $0.entities.count, warnings: []) }
+                ?? EditorSceneFileLoader.summary(from: content)
         )
         return document
     }

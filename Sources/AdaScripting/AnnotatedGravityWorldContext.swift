@@ -144,6 +144,10 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSenda
         return true
     }
 
+    func sceneLoadingProgress() -> Double { navigator?.loadingProgress.fraction ?? 0 }
+    func sceneLoadingStage() -> String { navigator?.loadingProgress.stage ?? "idle" }
+    func sceneLoadingError() -> String { navigator?.lastError ?? "" }
+
     func invalidate() {
         isActive = false
         commands.invalidate()

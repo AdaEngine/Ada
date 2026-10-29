@@ -9,8 +9,9 @@ public struct Temporal3DRenderNode: RenderNode {
     @Query<Entity, Camera, RenderViewTarget, GlobalViewUniform, ExtractedCameraSource> private var cameras
     @ResMut<Temporal3DViews> private var views
     @ResMut<Temporal3DPipelines> private var pipelines
-    @Res<VisibleMesh3DLists> private var lists
     @ResMut<ActiveMotion3DPass> private var motionPass
+    @ResMut<Active3DInstanceBuffers> private var activeInstances
+    @ResMut<View3DGPUScratch> private var viewUniforms
     @Res<Render3DTemporalStatistics> private var statistics
     @Res<RenderDeviceHandler> private var device
     @Res<Render3DPerformanceMetrics?> private var metrics
@@ -23,8 +24,9 @@ public struct Temporal3DRenderNode: RenderNode {
         cameras.update(from: world)
         _views.update(from: world)
         _pipelines.update(from: world)
-        _lists.update(from: world)
         _motionPass.update(from: world)
+        _activeInstances.update(from: world)
+        _viewUniforms.update(from: world)
         _statistics.update(from: world)
         _device.update(from: world)
         _metrics.update(from: world)
@@ -36,7 +38,8 @@ public struct Temporal3DRenderNode: RenderNode {
     }
 
     public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
-        guard let view = context.viewEntity else {
+        // Main3D prepared the current instance ring after graph update. Read it now.
+        guard let view = context.viewEntity, let lists = context.world.getResource(VisibleMesh3DLists.self) else {
             return []
         }
         var submitted: CommandBuffer?
@@ -85,8 +88,10 @@ public struct Temporal3DRenderNode: RenderNode {
                 )
             )
             mesh.setViewport(camera.viewport.rect)
-            mesh.setVertexBuffer(jittered, slot: GlobalBufferIndex.viewUniform)
+            let viewBuffer = viewUniforms.cache.write(jittered, view: source.entityId, pass: 2, device: device.renderDevice)
+            mesh.setVertexBuffer(viewBuffer, offset: 0, slot: GlobalBufferIndex.viewUniform)
             mesh.setVertexBuffer(buffer, offset: 0, slot: 23)
+            _activeInstances.wrappedValue = lists.buffers(view: source.entityId, pass: -1)
             motionPass.isEnabled = true
             do {
                 defer { motionPass.isEnabled = false }

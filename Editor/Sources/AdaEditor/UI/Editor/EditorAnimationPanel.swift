@@ -33,6 +33,7 @@ struct EditorAnimationPanel: View {
                 panelContent
             }
         }
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
         .background {
             RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
                 .fill(theme.editorColors.surfaceElevated)

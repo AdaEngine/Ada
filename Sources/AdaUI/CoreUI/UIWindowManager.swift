@@ -72,6 +72,7 @@ open class UIWindowManager: InputPointerDriver {
     }
 
     public func requestMouseMode(_ mode: Input.MouseMode, owner: UUID, window: RID?) {
+        let window = window ?? activeWindow?.id
         guard let window, window != .empty, activeWindow?.id == window else { return }
         pointerOwner = owner
         pointerWindow = window

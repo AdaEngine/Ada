@@ -104,7 +104,7 @@ struct EditorAdaScriptProjectRuntimeView: View {
     }
 
     /// Installs the game's plugins and scene. Shared by the Play window and offscreen automation runs.
-    func configureRuntime(_ app: inout AppWorlds) {
+    func configureRuntime(_ app: inout AppWorlds, includesEntryScene: Bool = true) {
         performanceSession.attach(app, title: artifact.report.entryDescription)
         app.addPlugin(TransformPlugin())
         app.addPlugin(InputPlugin(actions: artifact.scenePlayRuntime.inputActions))
@@ -121,7 +121,7 @@ struct EditorAdaScriptProjectRuntimeView: View {
         if let scriptPlugin {
             app.addPlugin(scriptPlugin)
         }
-        if let sceneModel = artifact.sceneModel {
+        if includesEntryScene, let sceneModel = artifact.sceneModel {
             app.addPlugin(EditorAdaScriptRuntimeEntryPlugin(sceneModel: sceneModel, assetsDirectory: artifact.assetsDirectory))
         }
         controls?.attach(world: app.main)
@@ -218,19 +218,20 @@ struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
             assertionFailure("ScenePlugin must install SceneNavigator before the runtime entry")
             return
         }
-        navigator.setSceneLoader { path in
+        navigator.setSceneLoader { path, reportProgress in
             let url = try Self.sceneURL(for: path, in: assetsDirectory)
-            let content = try String(contentsOf: url, encoding: .utf8)
+            let prepared = try await EditorRuntimeScenePreparation.prepare(at: url, assetsDirectory: assetsDirectory, reportProgress: reportProgress)
+            // Give the outgoing UI a frame to display the installation stage.
+            try await Task.sleep(for: .milliseconds(32))
             return try await MainActor.run {
-                guard let model = EditorSceneFileLoader.model(from: content) else {
-                    throw EditorRuntimeSceneNavigationError.invalidScene(path)
+                try withExtendedLifetime(prepared) {
+                    let scene = Scene(name: prepared.model.scene.name)
+                    let result = EditorSceneFileLoader.load(model: prepared.model, into: scene.world, sourceURL: url, resourceRootURL: assetsDirectory)
+                    guard result.warnings.isEmpty else {
+                        throw EditorRuntimeSceneNavigationError.invalidScene(result.warnings.joined(separator: "\n"))
+                    }
+                    return scene
                 }
-                let scene = Scene(name: model.scene.name)
-                let result = EditorSceneFileLoader.load(model: model, into: scene.world, sourceURL: url, resourceRootURL: assetsDirectory)
-                guard result.warnings.isEmpty else {
-                    throw EditorRuntimeSceneNavigationError.invalidScene(result.warnings.joined(separator: "\n"))
-                }
-                return scene
             }
         }
         let scene = Scene(name: sceneModel.scene.name)

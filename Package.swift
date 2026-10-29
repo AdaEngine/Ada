@@ -70,6 +70,7 @@ extension String {
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS, .watchOS, .visionOS]
 
 var products: [Product] = [
+    .executable(name: "MovieMakerDemo", targets: ["MovieMakerDemo"]),
     .executable(name: "NavigationDemo", targets: ["NavigationDemo"]),
     .executable(name: "Physics2DDemo", targets: ["Physics2DDemo"]),
     .library(name: "AdaNavigation", targets: ["AdaNavigation"]),
@@ -328,6 +329,12 @@ let adaEngineMacros: Target = .macro(
 
 var targets: [Target] = [
     .executableTarget(
+        name: "MovieMakerDemo",
+        dependencies: ["AdaEngine"],
+        path: "Demos/MovieMaker",
+        swiftSettings: swiftSettings
+    ),
+    .executableTarget(
         name: "Physics2DDemo",
         dependencies: ["AdaEngine"],
         path: "Demos/Physics2D",
@@ -567,6 +574,7 @@ var targets: [Target] = [
         dependencies: [
             "AdaApp",
             "AdaECS",
+            "AdaRender",
             "AdaUtils",
             "AdaAssets",
             "AdaTransform",
@@ -1559,8 +1567,6 @@ package.dependencies += [
     .package(url: "https://github.com/the-swift-collective/zlib.git", from: "1.3.2"),
     .package(url: "https://github.com/swiftlang/swift-subprocess.git", branch: "0.2.1"),
     .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.7.3"),
-    // Swan checks in BridgeJS generated with this ABI; update both together.
-    .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", exact: "0.59.0"),
     // TODO: SpectralDragon packages should move to AdaEngine
     ProcessInfo.processInfo.environment["ADAENGINE_YAMS_PACKAGE_PATH"].map { .package(name: "Yams", path: $0) }
         ?? .package(url: "https://github.com/SpectralDragon/Yams.git", revision: "fb676da"),
@@ -1568,6 +1574,21 @@ package.dependencies += [
     .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.5"),
     .package(url: "https://github.com/swiftlang/swift-syntax", "602.0.0"..<"604.0.0"),
 ]
+
+#if os(Windows)
+// Windows Web exports run in the Linux WSL worker. The WASI-only package's
+// command plugins cannot compile on a native Windows test host (Darwin stderr).
+// Platform conditions on product edges alone do not stop SwiftPM compiling them.
+for target in package.targets {
+    target.dependencies.removeAll { dependency in
+        if case let .productItem(_, name, _, _) = dependency { return name == "JavaScriptKit" }
+        return false
+    }
+}
+#else
+// Swan checks in BridgeJS generated with this ABI; update both together.
+package.dependencies.append(.package(url: "https://github.com/swiftwasm/JavaScriptKit.git", exact: "0.59.0"))
+#endif
 
 if isECSBenchmarkEnabled {
     package.dependencies.append(.package(

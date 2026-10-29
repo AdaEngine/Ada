@@ -73,7 +73,7 @@ enum EditorGameFrameCapture {
         let manager = FileManager.default
         try manager.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appendingPathComponent("\(name)-\(UUID().uuidString.prefix(8)).png")
-        try image.writePNG(to: url)
+        try image.pngData().write(to: url, options: .atomic)
         prune(directory, keeping: maxRetainedFiles)
         return url
     }

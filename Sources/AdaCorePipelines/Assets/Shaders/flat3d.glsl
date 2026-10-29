@@ -28,15 +28,18 @@ layout (binding = 1) uniform DirectionalLight3DUniform {
 layout (location = 13) in vec4 a_JointIndices;
 layout (location = 14) in vec4 a_JointWeights;
 layout (binding = 14) uniform Skinning3DUniform {
-    mat4 u_JointMatrices[128];
+    mat4 u_JointMatrices[256];
 };
 
+layout (location = 12) in vec4 a_ShadowFlags;
+
 mat4 skinTransform() {
+    int jointBase = int(max(0.0, -a_ShadowFlags.y));
     if (a_JointIndices.x < 0.0) { return mat4(1.0); }
-    return u_JointMatrices[int(a_JointIndices.x)] * a_JointWeights.x
-        + u_JointMatrices[int(a_JointIndices.y)] * a_JointWeights.y
-        + u_JointMatrices[int(a_JointIndices.z)] * a_JointWeights.z
-        + u_JointMatrices[int(a_JointIndices.w)] * a_JointWeights.w;
+    return u_JointMatrices[jointBase + int(a_JointIndices.x)] * a_JointWeights.x
+        + u_JointMatrices[jointBase + int(a_JointIndices.y)] * a_JointWeights.y
+        + u_JointMatrices[jointBase + int(a_JointIndices.z)] * a_JointWeights.z
+        + u_JointMatrices[jointBase + int(a_JointIndices.w)] * a_JointWeights.w;
 }
 
 layout (location = 0) in vec3 a_Position;
@@ -52,7 +55,6 @@ layout (location = 8) in vec4 a_Model3;
 layout (location = 9) in vec4 a_Color;
 layout (location = 10) in vec4 a_Material;
 layout (location = 11) in vec4 a_TextureFlags;
-layout (location = 12) in vec4 a_ShadowFlags;
 
 struct VertexOut
 {
@@ -105,6 +107,7 @@ void flat3d_vertex()
     Output.TextureCoordinate1 = a_TextureCoordinate1;
     Output.TextureFlags = a_TextureFlags;
     Output.ShadowFlags = a_ShadowFlags;
+    Output.ShadowFlags.y = max(0.0, Output.ShadowFlags.y);
     Output.ShadowPosition = a_ShadowFlags.x > 0.5
         ? u_ShadowViewProjection * worldPosition
         : vec4(0.0);
@@ -144,6 +147,7 @@ layout (binding = 8) uniform sampler u_MetallicRoughnessSampler;
 layout (binding = 9) uniform sampler u_NormalSampler;
 layout (binding = 10) uniform texture2D u_DirectionalShadowTexture;
 layout (binding = 11) uniform sampler u_DirectionalShadowSampler;
+#include <AdaEngine/ShadowPCF.glsl>
 layout (binding = 12) uniform texture2D u_EmissiveTexture;
 layout (binding = 13) uniform sampler u_EmissiveSampler;
 
@@ -524,15 +528,7 @@ float cascadeVisibility(int cascade, vec3 normal, vec3 lightDirection) {
     vec2 minimum = vec2(float(cascade) / count, 0.0) + u_ShadowAtlas.xy * 0.5;
     vec2 maximum = vec2(float(cascade + 1) / count, 1.0) - u_ShadowAtlas.xy * 0.5;
     float bias = u_ShadowParameters.y + u_ShadowParameters.z * (1.0 - max(dot(normal, lightDirection), 0.0));
-    float visibility = 0.0;
-    for (int y = -1; y <= 1; ++y) {
-        for (int x = -1; x <= 1; ++x) {
-            vec2 sampleUV = clamp(uv + vec2(float(x), float(y)) * u_ShadowAtlas.xy, minimum, maximum);
-            float storedDepth = texture(sampler2D(u_DirectionalShadowTexture, u_DirectionalShadowSampler), sampleUV).r;
-            visibility += projected.z - bias <= storedDepth ? 1.0 : 0.0;
-        }
-    }
-    return visibility / 9.0;
+    return adaDirectionalShadowPCF(uv, u_ShadowAtlas.xy, minimum, maximum, projected.z - bias);
 }
 
 float directionalShadow(vec3 normal, vec3 lightDirection) {

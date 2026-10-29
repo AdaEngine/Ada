@@ -95,14 +95,16 @@ public struct MultiThreadedSystemsGraphExecutor: SystemsGraphExecutor {
                 node.queries.update(from: world)
             }
 
-            await withTaskGroup(of: Void.self) { group in
-                for node in nodes {
-                    group.addTask {
-                        await executeSystem(
-                            system: node,
-                            world: world,
-                            scheduler: scheduler
-                        )
+            if nodes.count == 1, let node = nodes.first {
+                // A singleton has no parallel work. Avoid a child task and its
+                // executor hops for the common dependency-constrained case.
+                await executeSystemInline(system: node, world: world, scheduler: scheduler)
+            } else {
+                await withTaskGroup(of: Void.self) { group in
+                    for node in nodes {
+                        group.addTask {
+                            await executeSystem(system: node, world: world, scheduler: scheduler)
+                        }
                     }
                 }
             }
@@ -154,6 +156,14 @@ public struct MultiThreadedSystemsGraphExecutor: SystemsGraphExecutor {
 
 @concurrent
 private func executeSystem(
+    system: SystemsGraph.Node,
+    world: World,
+    scheduler: SchedulerName
+) async {
+    await executeSystemInline(system: system, world: world, scheduler: scheduler)
+}
+
+private func executeSystemInline(
     system: SystemsGraph.Node,
     world: World,
     scheduler: SchedulerName

@@ -107,6 +107,23 @@ extension EditorSceneViewportView {
                 }
             }
         )
+        if !isAssetPreview {
+            inspectorViewModel.setTerrainTools(
+                owner: viewportModel,
+                state: viewportModel.terrainEditing,
+                create: { [weak viewportModel] in
+                    guard let viewportModel else { return }
+                    viewportModel.createTerrain()
+                    viewportPresentation.refresh(viewportModel: viewportModel)
+                    viewProxy.setNeedsDisplay()
+                },
+                settingsChanged: { [weak viewportModel] in
+                    guard let viewportModel else { return }
+                    viewportPresentation.refresh(viewportModel: viewportModel)
+                    viewProxy.setNeedsDisplay()
+                }
+            )
+        }
     }
 
     func preparePlayModeViewport() {

@@ -33,7 +33,8 @@ extension EditorViewModel {
         switch item.kind {
         case .scene:
             let content = sceneFileContent(for: item)
-            let sceneModel = EditorSceneFileLoader.model(from: content.value)
+            let defersDecode = content.errorMessage == nil && content.value.utf8.count > 256 * 1_024
+            let sceneModel = defersDecode ? nil : EditorSceneFileLoader.model(from: content.value)
             return .scene(
                 EditorSceneDocument(
                     id: "scene:\(item.relativePath)",
@@ -43,11 +44,13 @@ extension EditorViewModel {
                     content: content.value,
                     lastSavedContent: content.errorMessage == nil ? content.value : nil,
                     isReadOnly: item.isSymbolicLink,
+                    isLoading: defersDecode,
                     sceneModel: sceneModel,
                     errorMessage: content.errorMessage,
                     isDirty: false,
                     statusMessage: item.isSymbolicLink ? "Read-only: symbolic link" : content.errorMessage == nil ? "Loaded" : nil,
-                    loadSummary: EditorSceneFileLoader.summary(from: content.value)
+                    loadSummary: sceneModel.map { EditorSceneLoadSummary(entityCount: $0.entities.count, warnings: []) }
+                        ?? (defersDecode ? .empty : EditorSceneFileLoader.summary(from: content.value))
                 )
             )
         case let .text(language):

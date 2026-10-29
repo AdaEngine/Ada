@@ -158,7 +158,7 @@
         }
 
         public func createCommandQueue() -> any CommandQueue {
-            return WGPUCommandQueue(device: context.device, spatialScaler: context.spatialScaler)
+            return WGPUCommandQueue(device: context.device, spatialScaler: context.spatialScaler, instance: context.instance)
         }
 
         @MainActor

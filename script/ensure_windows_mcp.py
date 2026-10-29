@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 REVISION = "ed7bb9076f9f8c91e2584ca9b7201df0e03defb1"  # Tool metadata support; keep in sync with Editor/Package.swift.
 
 
-PATCH_VERSION = "async-readback-v1"
+PATCH_VERSION = "component-inspection-v2"
+INSPECTION_PATCH = ROOT / "script" / "patches" / "adamcp-component-inspection.patch"
 CAPTURE_FILES = (
     "Sources/AdaMCPCore/RenderCaptureService.swift",
     "Sources/AdaMCPCore/AdaMCPRuntime+RenderGraph.swift",
@@ -119,6 +120,13 @@ def prepare_windows_package(source, destination):
         if current not in known_versions:
             raise RuntimeError(f"Unexpected AdaMCP staged modifications: {relative}")
         target.write_text(expected, encoding="utf-8")
+    applied = subprocess.run(
+        ["git", "apply", "--reverse", "--check", str(INSPECTION_PATCH)],
+        cwd=destination, capture_output=True,
+    )
+    if applied.returncode != 0:
+        subprocess.run(["git", "apply", "--check", str(INSPECTION_PATCH)], cwd=destination, check=True)
+        subprocess.run(["git", "apply", str(INSPECTION_PATCH)], cwd=destination, check=True)
     return destination
 
 

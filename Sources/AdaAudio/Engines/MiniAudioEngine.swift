@@ -162,12 +162,20 @@ final class MiniAudioEngineListener: AudioEngineListener, @unchecked Sendable {
 
 @unsafe
 final class MiniSound: Sound {
-    private(set) var state: SoundState = .ready
+    private var playbackState: SoundState = .ready
+
+    private(set) var state: SoundState {
+        get {
+            // Completion must be observable even without a registered completion handler.
+            unsafe playbackState == .playing && ma_sound_at_end(sound) == 1 ? .finished : playbackState
+        }
+        set { playbackState = newValue }
+    }
 
     private var completionHandler: (() -> Void)?
 
     private let sound: UnsafeMutablePointer<ma_sound>
-    private let engineOwner: MiniAudioStorage
+    let engineOwner: MiniAudioStorage
     private let memorySource: MiniAudioMemorySource?
 
     init(from fileURL: URL, engine: MiniAudioStorage) throws {

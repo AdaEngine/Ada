@@ -51,6 +51,7 @@ final class EditorWorkbenchViewModel {
     @ObservationIgnored var shaderGraphModels: [String: EditorShaderGraphModel] = [:]
     @ObservationIgnored var sceneUndoHistory: [String: [EditorSceneDocument]] = [:]
     @ObservationIgnored var sceneRedoHistory: [String: [EditorSceneDocument]] = [:]
+    @ObservationIgnored var sceneDecodeTasks: [String: Task<Void, Never>] = [:]
     var selectedPreviewID: String?
     var loadedPreview: EditorLoadedPreview?
 
@@ -106,6 +107,9 @@ final class EditorWorkbenchViewModel {
         }
         EditorUpdateCenter.shared.register(self)
         EditorCloudPreferences.shared.register(self)
+        for case let .scene(document) in openDocuments where document.isLoading {
+            prepareSceneDocument(id: document.id)
+        }
     }
 
     var aiPromptBinding: Binding<String> {
@@ -151,6 +155,7 @@ final class EditorWorkbenchViewModel {
         }
 
         selectDocument(id: document.id)
+        prepareSceneDocument(id: document.id)
     }
 
     func moveDocument(id: String, toIndex destinationIndex: Int) {
@@ -242,6 +247,7 @@ final class EditorWorkbenchViewModel {
         if closingDocument.isDirty, !saveDocument(closingDocument) {
             return
         }
+        sceneDecodeTasks.removeValue(forKey: documentID)?.cancel()
 
         let wasActiveDocument = activeDocumentID == documentID
         let closingPane = pane(for: documentID)

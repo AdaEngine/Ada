@@ -7,15 +7,22 @@ final class AnnotatedGravityQueryLease: @unchecked Sendable {
 }
 
 @GSExportable("AdaQuery")
-final class AnnotatedGravityQueryBridge: @unchecked Sendable, AdaScriptNonSendableBridge {
+final class AnnotatedGravityQueryBridge: @unchecked Sendable, AdaScriptNonSendableBridge, GravityGCTraceable {
     private let cursor: DynamicQueryCursor
-    private let row: AnnotatedGravityQueryRow
+    private var fallbackRow: GSValue?
+    private let componentAccesses: [AnnotatedComponentAccess]
     private let virtualMachine: GravityVirtualMachine
-    private var iterationIndex = 0
+    private var nextIteratorID = 0
+    private var iterations: [Int: Iteration] = [:]
     @GSExportableIgnore
     private(set) var isIterating = false
     private let lease: AnnotatedGravityQueryLease
     private let reportDiagnostic: @Sendable (String) -> Void
+
+    private struct Iteration {
+        let cursor: DynamicQueryCursor
+        let row: GSValue
+    }
 
     @GSExportableIgnore
     static func make(
@@ -39,16 +46,10 @@ final class AnnotatedGravityQueryBridge: @unchecked Sendable, AdaScriptNonSendab
         virtualMachine: GravityVirtualMachine
     ) {
         self.cursor = cursor
+        self.componentAccesses = componentAccesses
         self.virtualMachine = virtualMachine
         self.lease = AnnotatedGravityQueryLease()
         self.reportDiagnostic = reportDiagnostic
-        self.row = AnnotatedGravityQueryRow.make(
-            cursor: cursor,
-            componentAccesses: componentAccesses,
-            lease: lease,
-            reportDiagnostic: reportDiagnostic,
-            virtualMachine: virtualMachine
-        )
     }
 
     func iterate(_ previous: GSValue) -> GSValue {
@@ -56,32 +57,68 @@ final class AnnotatedGravityQueryBridge: @unchecked Sendable, AdaScriptNonSendab
             reportDiagnostic("Query capability is no longer valid")
             return GSValue(boolean: false, in: virtualMachine)
         }
+        let iteratorID: Int
         if previous.isNull || previous.isUndefined {
-            cursor.reset()
-            iterationIndex = 0
+            nextIteratorID += 1
+            iteratorID = nextIteratorID
+            let independent = cursor.makeIndependentCursor()
+            // Empty optional queries need no foreign row or component wrappers.
+            guard independent.advance() else {
+                isIterating = !iterations.isEmpty
+                return GSValue(boolean: false, in: virtualMachine)
+            }
+            iterations[iteratorID] = Iteration(
+                cursor: independent,
+                row: GSValue(object: AnnotatedGravityQueryRow.make(
+                    cursor: independent, componentAccesses: componentAccesses, lease: lease,
+                    reportDiagnostic: reportDiagnostic, virtualMachine: virtualMachine
+                ), in: virtualMachine)
+            )
+            isIterating = true
+            return GSValue(integer: iteratorID, in: virtualMachine)
+        } else if previous.isInteger, let identifier = Int(exactly: previous.toInteger) {
+            iteratorID = identifier
+        } else {
+            reportDiagnostic("Invalid query iterator")
+            return GSValue(boolean: false, in: virtualMachine)
         }
-        guard cursor.advance() else {
-            isIterating = false
+        guard let iteration = iterations[iteratorID], iteration.cursor.advance() else {
+            iterations.removeValue(forKey: iteratorID)
+            isIterating = !iterations.isEmpty
             return GSValue(boolean: false, in: virtualMachine)
         }
         isIterating = true
-        defer { iterationIndex += 1 }
-        return GSValue(integer: iterationIndex, in: virtualMachine)
+        // This token identifies the traversal, not its row number. A nested loop
+        // (including one exited with break) cannot overwrite the outer cursor.
+        return GSValue(integer: iteratorID, in: virtualMachine)
     }
 
-    func next(_: Int) -> AnnotatedGravityQueryRow {
-        row
+    func next(_ iteratorID: Int) -> GSValue {
+        if let row = iterations[iteratorID]?.row { return row }
+        if let fallbackRow { return fallbackRow }
+        let row = GSValue(object: AnnotatedGravityQueryRow.make(cursor: cursor, componentAccesses: componentAccesses,
+                                              lease: lease, reportDiagnostic: reportDiagnostic, virtualMachine: virtualMachine), in: virtualMachine)
+        fallbackRow = row
+        return row
+    }
+
+    @GSExportableIgnore
+    func traceGravityValues(_ visit: (GSValue) -> Void) {
+        for iteration in iterations.values { visit(iteration.row) }
+        if let fallbackRow { visit(fallbackRow) }
     }
 
     @GSExportableIgnore
     func invalidate() {
         lease.isActive = false
+        iterations.removeAll(keepingCapacity: true)
         isIterating = false
     }
 }
 
 @GSExportable("AdaQueryRow")
-final class AnnotatedGravityQueryRow: @unchecked Sendable, AdaScriptNonSendableBridge {
+final class AnnotatedGravityQueryRow: @unchecked Sendable, AdaScriptNonSendableBridge, GravityGCTraceable {
+    private var componentValues: [String: GSValue] = [:]
     var id: Int {
         guard lease.isActive else {
             reportDiagnostic("Query row is no longer valid")
@@ -179,7 +216,16 @@ final class AnnotatedGravityQueryRow: @unchecked Sendable, AdaScriptNonSendableB
         guard let view = component(named: alias) else {
             return nil
         }
-        return view.isPresent ? GSValue(object: view, in: virtualMachine) : GSValue(nullIn: virtualMachine)
+        guard view.isPresent else { return GSValue(nullIn: virtualMachine) }
+        if let cached = componentValues[alias] { return cached }
+        let value = GSValue(object: view, in: virtualMachine)
+        componentValues[alias] = value
+        return value
+    }
+
+    @GSExportableIgnore
+    func traceGravityValues(_ visit: (GSValue) -> Void) {
+        for value in componentValues.values { visit(value) }
     }
 }
 

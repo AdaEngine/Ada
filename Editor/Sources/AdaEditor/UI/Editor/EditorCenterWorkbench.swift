@@ -10,6 +10,7 @@ struct EditorCenterWorkbench: View {
     let onPlayScene: (() -> Void)?
     let onStopScene: (() -> Void)?
     let onSceneEntitySelected: (() -> Void)?
+    var onTerrainToolSelected: (() -> Void)? = nil
     let onSourceHover: ((EditorTextDocument, EditorSourceLocation?) -> Void)?
     let onGoToDefinition: ((EditorTextDocument, EditorSourceLocation) -> Void)?
     let onCompletionPosition: ((EditorTextDocument, EditorSourceLocation, String) -> Void)?
@@ -482,8 +483,10 @@ extension EditorCenterWorkbench {
         case .image:
             EditorImageAssetPreview(document: document, model: viewModel.textureSettingsModel(for: document))
                 .id(document.id)
-        case .audio,
-            .generic:
+        case .audio:
+            EditorAudioAssetPreview(document: document)
+                .id(document.id)
+        case .generic:
             assetMetadataPreview(document: document)
         }
     }
@@ -661,6 +664,7 @@ extension EditorCenterWorkbench {
             playModeState: playModeState,
             playRuntime: scenePlayRuntime,
             onEntitySelected: onSceneEntitySelected,
+            onTerrainToolSelected: onTerrainToolSelected,
             onPlay: onPlayScene,
             onStop: onStopScene
         )

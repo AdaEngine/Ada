@@ -25,10 +25,10 @@ public struct Motion3DPipeline: RenderPipelineConfigurator {
         descriptor.fragment = shader.asset.getShader(for: .fragment)
         descriptor.debugName = "Motion 3D"
         descriptor.backfaceCulling = false
-        descriptor.depthPixelFormat = .depth_32f
+        descriptor.depthPixelFormat = configuration.temporalDepth ? .depth_32f : .depth_32f_stencil8
         descriptor.depthStencilDescriptor = .init(isDepthTestEnabled: true, isDepthWriteEnabled: false, depthCompareOperator: .lessOrEqual)
-        for column in 0..<4 {
-            descriptor.vertexDescriptor.attributes[16 + column] = .attribute(.vector4, name: "previousModel\(column)", bufferIndex: 3, offset: 128 + column * 16)
+        for (column, location) in [1, 4, 10, 11].enumerated() {
+            descriptor.vertexDescriptor.attributes[location] = .attribute(.vector4, name: "previousModel\(column)", bufferIndex: 3, offset: 128 + column * 16)
         }
         descriptor.colorAttachments = [.init(format: .rgba_16f), .init(format: .bgra8)]
         if configuration.blended {
@@ -40,7 +40,17 @@ public struct Motion3DPipeline: RenderPipelineConfigurator {
                 destinationAlphaBlendFactor: .one,
                 destinationRGBBlendFactor: .one
             )
-            descriptor.colorAttachments[1] = .init(format: .bgra8, isBlendingEnabled: true, rgbBlendOperation: .max, alphaBlendOperation: .max)
+            // WebGPU requires both factors to be one for min/max operations.
+            descriptor.colorAttachments[1] = .init(
+                format: .bgra8,
+                isBlendingEnabled: true,
+                sourceRGBBlendFactor: .one,
+                sourceAlphaBlendFactor: .one,
+                rgbBlendOperation: .max,
+                alphaBlendOperation: .max,
+                destinationAlphaBlendFactor: .one,
+                destinationRGBBlendFactor: .one
+            )
         }
         return descriptor
     }

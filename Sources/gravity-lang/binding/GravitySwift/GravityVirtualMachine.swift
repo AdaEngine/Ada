@@ -37,10 +37,14 @@ public final class GravityVirtualMachine {
         vmDelegate.disable_gccheck_1 = settings.disableGarbageCollectorCheck
         vmDelegate.report_null_errors = settings.reportNullErrors
         vmDelegate.bridge_clone = bridgeClone
-        vmDelegate.bridge_free = bridgeFree
+        if delegate is any GravityMemoryControlVMDelegate { vmDelegate.bridge_free = bridgeFree }
+        else {
+            vmDelegate.bridge_free = bridgeRelease
+            vmDelegate.bridge_blacken = bridgeBlacken
+        }
         vmDelegate.bridge_equals = bridgeEquals
         vmDelegate.bridge_string = bridgeString
-        vmDelegate.bridge_size = bridgeSize
+        if delegate is any GravityMemoryControlVMDelegate { vmDelegate.bridge_size = bridgeSize }
         vmDelegate.bridge_initinstance = bridgeInitInstance
         vmDelegate.bridge_execute = bridgeExecute
         vmDelegate.bridge_setvalue = bridgeSetValue
@@ -126,6 +130,23 @@ public final class GravityVirtualMachine {
     /// Off/On Garbage Collector
     public func setGCEnabled(_ isEnabled: Bool) {
         gravity_gc_setenabled(self.vmPtr, isEnabled)
+    }
+
+    /// Adds an object-count collection trigger alongside the VM's byte thresholds.
+    /// Use zero to restore the original policy. This bounds accumulated temporary
+    /// objects, not collection time; large live graphs can still require long scans.
+    public func setGCAllocationBudget(_ maximumAllocations: UInt32) {
+        gravity_gc_set_allocation_budget(self.vmPtr, maximumAllocations)
+    }
+
+    /// Builds a list of immediate scalar values without per-element Swift wrappers.
+    /// Object references are excluded: a Swift array cannot root them during list allocation.
+    @_spi(Internal)
+    public func makeScalarList(_ values: [gravity_value_t]) -> GSValue {
+        precondition(values.allSatisfy { !gravity_value_isobject($0) }, "Scalar lists cannot contain VM objects")
+        let list = gravity_list_new(vmPtr, UInt32(values.count))
+        for value in values { gravity_list_push_value(list, value) }
+        return GSValue(value: gravity_value_from_object(list), in: self)
     }
 
     /// Get virtual machine execution time

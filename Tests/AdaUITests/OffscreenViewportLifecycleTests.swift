@@ -13,6 +13,28 @@ struct OffscreenViewportLifecycleTests {
         try Application.prepareForTest()
     }
 
+    @Test func removingRepresentedContainerShutsDownItsNestedViewport() throws {
+        var delegates: [LifecycleViewportDelegate] = []
+        let embedded = UIContainerView(rootView: OffscreenViewportContainer(delegateFactory: {
+            let delegate = LifecycleViewportDelegate()
+            delegates.append(delegate)
+            return delegate
+        }) { delegate in
+            OffscreenViewportView(delegate: delegate)
+        })
+        let representable = NestedViewportSurface(content: embedded)
+        let viewport = UIViewRepresentableNode(representable: representable, content: representable)
+        let parent = ViewContainerNode(content: EmptyView(), nodes: [])
+        parent.reconcileChildNodes(from: [viewport])
+        parent.place(in: .zero, anchor: .topLeading, proposal: .init(width: 400, height: 300))
+        parent.update(0.016)
+        let original = try #require(delegates.first)
+        #expect(original.bootstrapCount == 1 && original.tickCount == 1)
+        // Keep the UIView alive, as AdaptiveSceneView and retained UI overlays do.
+        parent.reconcileChildNodes(from: [])
+        #expect(original.shutdownCount == 1)
+    }
+
     @Test func reattachedViewportUsesItsNewDelegateForLayoutUpdateAndDrawing() throws {
         var delegates: [LifecycleViewportDelegate] = []
         let content = OffscreenViewportContainer(delegateFactory: {
@@ -56,6 +78,12 @@ struct OffscreenViewportLifecycleTests {
             return false
         })
     }
+}
+
+private struct NestedViewportSurface: UIViewRepresentable {
+    let content: UIView
+    func makeUIView(in _: Context) -> UIView { content }
+    func updateUIView(_: UIView, in _: Context) {}
 }
 
 @MainActor

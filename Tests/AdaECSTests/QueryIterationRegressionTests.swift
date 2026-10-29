@@ -1,4 +1,5 @@
 import AdaECS
+import Foundation
 import Testing
 
 @Component
@@ -33,6 +34,74 @@ struct SkippingEntityTarget: QueryTarget {
 
 @Suite("Query iteration regressions")
 struct QueryIterationRegressionTests {
+    @Test("Chunk traversal agrees with ordinary iteration after migration, deletion and empty archetypes")
+    func batchedReadEquivalence() {
+        let (world, entities) = fixture(2_400)
+        for index in stride(from: 0, to: entities.count, by: 11) { world.removeEntity(entities[index]) }
+        world.insert(IterationTagB(), for: entities[253].id)
+        let query = Query<Entity, IterationPosition, IterationVelocity>(from: world)
+        let expected = query.map { entity, position, velocity in [entity.id, position.value, velocity.value] }
+        var actual: [[Int]] = []
+        query.batched().forEach { entity, position, velocity in actual.append([entity.id, position.value, velocity.value]) }
+        #expect(actual == expected)
+        let custom = Query<SkippingEntityTarget, IterationPosition>(from: world)
+        let expectedCustom = custom.map { target, _ in target.id }
+        var actualCustom: [Entity.ID] = []
+        custom.batched().forEach { target, _ in actualCustom.append(target.id) }
+        #expect(actualCustom == expectedCustom)
+        world.clear()
+        var emptyCount = 0
+        Query<IterationPosition>(from: world).batched().forEach { _ in emptyCount += 1 }
+        #expect(emptyCount == 0)
+    }
+
+    @Test("Chunk traversal preserves nested filters, optional targets and mutable change ticks")
+    func batchedWritesAndFilters() {
+        let (world, _) = fixture(1_200)
+        world.clearTrackers()
+        Query<IterationPosition, Ref<IterationVelocity>?>(from: world).batched().forEach { position, velocity in
+            if position.value % 3 == 0 { velocity?.wrappedValue.value = position.value }
+        }
+        let changed = FilterQuery<Entity, IterationVelocity, And<With<IterationTagA>, Changed<IterationVelocity>>>(from: world)
+        let expected = changed.map { entity, velocity in [entity.id, velocity.value] }
+        var actual: [[Int]] = []
+        changed.batched().forEach { entity, velocity in actual.append([entity.id, velocity.value]) }
+        #expect(actual == expected && actual.count == 200)
+        world.clearTrackers()
+        var remaining = 0
+        FilterQuery<IterationVelocity, Changed<IterationVelocity>>(from: world).batched().forEach { _ in remaining += 1 }
+        #expect(remaining == 0)
+        enum Stop: Error, Equatable { case requested }
+        #expect(throws: Stop.requested) {
+            try Query<IterationPosition>(from: world).batched().forEach { _ in throw Stop.requested }
+        }
+        #expect(Query<IterationPosition>(from: world).count == 1_200)
+    }
+
+    /// Opt-in CPU measurement; speed is reported, never asserted in CI.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_PERF"] == "1"))
+    func batchedTraversalCost() {
+        let (world, _) = fixture(17_500)
+        let query = Query<Entity, IterationPosition, IterationVelocity>(from: world)
+        var checksums: [Int] = []
+        for batched in [false, true] {
+            var checksum = 0
+            let start = ContinuousClock.now
+            for _ in 0..<40 {
+                if batched {
+                    query.batched().forEach { entity, position, velocity in checksum &+= entity.id &+ position.value &+ velocity.value }
+                } else {
+                    query.forEach { entity, position, velocity in checksum &+= entity.id &+ position.value &+ velocity.value }
+                }
+            }
+            let elapsed = start.duration(to: .now)
+            let ms = (Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18) * 1_000 / 40
+            print("QUERY \(batched ? "batched" : "iterator"): \(ms) ms for 17500 entities")
+            checksums.append(checksum)
+        }
+        #expect(checksums[0] == checksums[1])
+    }
+
     private func fixture(_ count: Int) -> (World, [Entity]) {
         let world = World()
         let entities = (0..<count).map { index in

@@ -1,9 +1,11 @@
 """Exercise the Windows AdaMCP package staging without changing its pinned checkout."""
 import importlib.util
 import shutil
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("ensure_mcp", Path(__file__).with_name("ensure_windows_mcp.py"))
 mcp = importlib.util.module_from_spec(spec)
@@ -11,9 +13,19 @@ spec.loader.exec_module(mcp)
 
 
 class WindowsMCPStagingTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        patch_file = Path(temporary.name) / "inspection.patch"
+        patch_file.write_bytes(b"--- a/inspection.swift\n+++ b/inspection.swift\n@@ -1 +1 @@\n-before\n+after\n")
+        override = patch.object(mcp, "INSPECTION_PATCH", patch_file)
+        override.start()
+        self.addCleanup(override.stop)
+
     def make_source(self, root):
         source = root / "pinned"
         source.mkdir()
+        (source / "inspection.swift").write_bytes(b"before\n")
         (source / "Package.swift").write_text("// pinned package", encoding="utf-8")
         (source / ".git").mkdir()
         (source / "Packages").mkdir()
@@ -35,6 +47,8 @@ class WindowsMCPStagingTests(unittest.TestCase):
             snapshots = {relative: (source / relative).read_text() for relative, _, _ in mcp.PATCHES}
             mcp.prepare_windows_package(source, destination)
             mcp.prepare_windows_package(source, destination)
+            self.assertEqual((source / "inspection.swift").read_text(), "before\n")
+            self.assertEqual((destination / "inspection.swift").read_text(), "after\n")
             self.assertFalse((destination / ".git").exists())
             self.assertFalse((destination / "Packages").exists())
             self.assertTrue((destination / "Package.swift").is_file())
@@ -80,6 +94,18 @@ class WindowsMCPStagingTests(unittest.TestCase):
             (source / mcp.CAPTURE_FILES[0]).write_text("unexpected capture API", encoding="utf-8")
             with self.assertRaisesRegex(RuntimeError, "Unexpected AdaMCP compatibility source"):
                 mcp.prepare_windows_package(source, root / "windows")
+
+    def test_inspection_edits_are_preserved_and_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = self.make_source(root)
+            destination = root / "windows"
+            mcp.prepare_windows_package(source, destination)
+            target = destination / "inspection.swift"
+            target.write_bytes(b"user change\n")
+            with self.assertRaises(subprocess.CalledProcessError):
+                mcp.prepare_windows_package(source, destination)
+            self.assertEqual(target.read_text(), "user change\n")
 
 
 if __name__ == "__main__":

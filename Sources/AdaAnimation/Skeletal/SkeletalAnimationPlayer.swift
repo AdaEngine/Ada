@@ -27,6 +27,7 @@ public struct SkeletalAnimationPlayer: Sendable {
     private var transitionTime: Double = 0
     private var graphState: CompiledAnimationGraph?
     private var pendingGraphEvents: [AnimationGraphEvent] = []
+    package var hasPendingGraphEvents: Bool { !pendingGraphEvents.isEmpty }
     /// Occurrences omitted when a frame or undrained queue exceeds the 1,024-event budget.
     public private(set) var droppedGraphEventCount = 0
     public var graph: AnimationGraph? { graphState?.graph }

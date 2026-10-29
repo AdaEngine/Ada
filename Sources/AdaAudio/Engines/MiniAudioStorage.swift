@@ -7,7 +7,7 @@ import miniaudio
 final class MiniAudioStorage {
     let enginePtr: UnsafeMutablePointer<ma_engine>
     #if WASM
-    private let output: WebAudioOutput
+    private let output: WebAudioOutput?
     private var samples = [Float](repeating: 0, count: 4096 * 2)
     #endif
 
@@ -27,7 +27,7 @@ final class MiniAudioStorage {
             throw MAError.failed("Engine initialization failed", result)
         }
         #if WASM
-        do { output = try WebAudioOutput() } catch {
+        do { output = headless ? nil : try WebAudioOutput() } catch {
             ma_engine_uninit(pointer); pointer.deallocate(); throw error
         }
         #endif
@@ -36,22 +36,25 @@ final class MiniAudioStorage {
     deinit { ma_engine_uninit(enginePtr); enginePtr.deallocate() }
     func start() throws {
         #if WASM
-        output.start()
+        output?.start()
         #else
+        guard ma_engine_get_device(enginePtr) != nil else { return }
         let result = ma_engine_start(enginePtr)
         if result != MA_SUCCESS { throw MAError.failed("Failed to start", result) }
         #endif
     }
     func stop() throws {
         #if WASM
-        output.stop()
+        output?.stop()
         #else
+        guard ma_engine_get_device(enginePtr) != nil else { return }
         let result = ma_engine_stop(enginePtr)
         if result != MA_SUCCESS { throw MAError.failed("Failed to stop", result) }
         #endif
     }
     func update() {
         #if WASM
+        guard let output else { return }
         let frames = output.neededFrames
         guard frames > 0 else {
             return

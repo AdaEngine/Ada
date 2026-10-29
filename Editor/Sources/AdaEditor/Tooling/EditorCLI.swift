@@ -1,7 +1,9 @@
-#if os(macOS)
+#if os(macOS) || os(Windows)
 import AdaEngine
 import AdaScriptCompilerCore
+#if os(macOS)
 import Darwin
+#endif
 import Dispatch
 import Foundation
 
@@ -36,7 +38,7 @@ struct EditorCLIReport: Codable, Sendable {
 /// CLI mode exits before AppRuntime is initialized. No windows, recents or preferences are touched.
 enum EditorCLI {
     static func isInvocation(_ arguments: [String]) -> Bool {
-        arguments.first.map { URL(fileURLWithPath: $0).lastPathComponent == "adastudio" } == true
+        arguments.first.map { ["adastudio", "adastudio.exe"].contains(URL(fileURLWithPath: $0).lastPathComponent.lowercased()) } == true
             || arguments.dropFirst().first == "--ada-studio-cli"
     }
 
@@ -59,6 +61,7 @@ enum EditorCLI {
             }
         }
         // The CLI owns signal handling for its lifetime. Cancel both the task and tool processes.
+        #if os(macOS)
         let previous = signal(SIGINT, SIG_IGN)
         let interrupt = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
         interrupt.setEventHandler {
@@ -66,9 +69,16 @@ enum EditorCLI {
             Task { await runner.cancelAll() }
         }
         interrupt.resume()
+        #else
+        let interrupt = EditorCLIWindowsInterrupt { task.cancel(); Task { await runner.cancelAll() } }
+        #endif
         let report = await task.value
+        #if os(macOS)
         interrupt.cancel()
         signal(SIGINT, previous)
+        #else
+        interrupt.close()
+        #endif
         emit(report, format: invocation.format)
         return report.exitCode
     }
@@ -97,11 +107,11 @@ enum EditorCLI {
                 let swift = await swiftExecutable(for: invocation)
                 try await checkTools(swift: swift, runner: runner, at: sdk.engineRoot)
                 guard EditorDistribution.current.supportsSwiftProjects else {
-                    throw EditorCLIError.environment("Native builds require the standalone macOS distribution of Ada Studio.")
+                    throw EditorCLIError.environment("Build tools require the standalone distribution of Ada Studio.")
                 }
                 report.details = [
                     "engine": sdk.engineRoot.path, "compiler": sdk.compilerRoot.path, "swift": swift,
-                    "distribution": EditorDistribution.current.rawValue, "nativeTargets": "macos,web,android", "validation": "available"
+                    "distribution": EditorDistribution.current.rawValue, "nativeTargets": nativeTargets, "validation": "available"
                 ]
             case .inspect, .validate, .build, .export:
                 let root = invocation.projectURL
@@ -125,6 +135,11 @@ enum EditorCLI {
                 if invocation.command == .validate {
                     return report
                 }
+                #if os(Windows)
+                guard let requestedTarget = invocation.options["target"], requestedTarget != "macos" else {
+                    throw EditorCLIError.environment("Windows Studio can validate and run AdaScript projects locally. CLI app export supports --target web or android through the configured WSL toolchain; macOS app packaging requires macOS.")
+                }
+                #endif
                 if invocation.options["target"] == "android" {
                     let sdk = try EditorBuildSDK.locate(override: invocation.options["sdk"])
                     var configuration = EditorAndroidConfiguration.load(engineRoot: sdk.engineRoot)
@@ -165,11 +180,13 @@ enum EditorCLI {
                 }
                 #if canImport(GravityAOT)
                 guard EditorDistribution.current.supportsSwiftProjects else {
-                    throw EditorCLIError.environment("Native builds require the standalone macOS distribution of Ada Studio.")
+                    throw EditorCLIError.environment("Build tools require the standalone distribution of Ada Studio.")
                 }
                 let sdk = try EditorBuildSDK.locate(override: invocation.options["sdk"])
                 let swift = await swiftExecutable(for: invocation)
+                #if os(macOS)
                 try await checkTools(swift: swift, runner: runner, at: root)
+                #endif
                 let web = invocation.options["target"] == "web"
                 let target = web ? "Web" : "macOS"
                 let output = URL(fileURLWithPath: invocation.options["output"] ?? root.appendingPathComponent("Exports/\(target)").path).standardizedFileURL
@@ -261,7 +278,12 @@ enum EditorCLI {
     }
 
     private static func checkTools(swift: String, runner: any EditorProcessRunning, at root: URL) async throws {
-        for executable in [swift, "/usr/bin/clang", "/usr/bin/python3"] {
+        #if os(Windows)
+        let executables = [swift]
+        #else
+        let executables = [swift, "/usr/bin/clang", "/usr/bin/python3"]
+        #endif
+        for executable in executables {
             try Task.checkCancellation()
             let result = await runner.run(EditorProcessCommand(executablePath: executable, arguments: ["--version"], workingDirectory: root))
             try Task.checkCancellation()
@@ -269,6 +291,14 @@ enum EditorCLI {
                 throw EditorCLIError.environment("Required tool is unavailable: \(executable). \(result.combinedOutput)")
             }
         }
+    }
+
+    private static var nativeTargets: String {
+        #if os(Windows)
+        "web,android"
+        #else
+        "macos,web,android"
+        #endif
     }
 
     private static func failure(command: String, error: any Error, fallbackCode: Int32) -> EditorCLIReport {

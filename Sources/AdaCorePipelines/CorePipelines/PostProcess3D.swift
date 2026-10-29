@@ -285,6 +285,8 @@ public struct PostProcess3D: Codable, Sendable, Equatable {
     public var colorGrading: ColorGrading3D
     public var autoExposure: AutoExposure3D
     public var depthOfField: DepthOfField3D
+    public var lens: Lens3D
+    public var motionBlur: MotionBlur3D
 
     public init(
         exposureEV: Float = 0,
@@ -293,7 +295,9 @@ public struct PostProcess3D: Codable, Sendable, Equatable {
         vignette: Vignette3D = Vignette3D(),
         colorGrading: ColorGrading3D = ColorGrading3D(),
         autoExposure: AutoExposure3D = AutoExposure3D(),
-        depthOfField: DepthOfField3D = DepthOfField3D()
+        depthOfField: DepthOfField3D = DepthOfField3D(),
+        lens: Lens3D = Lens3D(),
+        motionBlur: MotionBlur3D = MotionBlur3D()
     ) {
         self.exposureEV = exposureEV
         self.bloom = bloom
@@ -302,9 +306,11 @@ public struct PostProcess3D: Codable, Sendable, Equatable {
         self.colorGrading = colorGrading
         self.autoExposure = autoExposure
         self.depthOfField = depthOfField
+        self.lens = lens
+        self.motionBlur = motionBlur
     }
 
-    private enum CodingKeys: CodingKey { case exposureEV, bloom, toneMapper, vignette, colorGrading, autoExposure, depthOfField }
+    private enum CodingKeys: CodingKey { case exposureEV, bloom, toneMapper, vignette, colorGrading, autoExposure, depthOfField, lens, motionBlur }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -315,6 +321,8 @@ public struct PostProcess3D: Codable, Sendable, Equatable {
         colorGrading = try container.decodeIfPresent(ColorGrading3D.self, forKey: .colorGrading) ?? ColorGrading3D()
         autoExposure = try container.decodeIfPresent(AutoExposure3D.self, forKey: .autoExposure) ?? AutoExposure3D()
         depthOfField = try container.decodeIfPresent(DepthOfField3D.self, forKey: .depthOfField) ?? DepthOfField3D()
+        lens = try container.decodeIfPresent(Lens3D.self, forKey: .lens) ?? Lens3D()
+        motionBlur = try container.decodeIfPresent(MotionBlur3D.self, forKey: .motionBlur) ?? MotionBlur3D()
     }
 
     /// Linear multiplier for `exposureEV`, limited to ±10 stops so a bad value cannot overflow half floats.

@@ -4,6 +4,42 @@ import Foundation
 import Observation
 
 extension EditorWorkbenchViewModel {
+    func prepareSceneDocument(id: String) {
+        sceneDecodeTasks.removeValue(forKey: id)?.cancel()
+        guard let document = sceneDocument(id: id), document.isLoading else { return }
+        let content = document.content
+        sceneDecodeTasks[id] = Task { @MainActor [weak self] in
+            let result: Result<EditorSceneModel, Error>
+            do { result = .success(try await Self.decodeSceneDocument(content)) }
+            catch is CancellationError { return }
+            catch { result = .failure(error) }
+            guard !Task.isCancelled, let self, let index = self.openDocuments.firstIndex(where: { $0.id == id }),
+                  case var .scene(current) = self.openDocuments[index], current.isLoading, current.content == content else { return }
+            current.isLoading = false
+            switch result {
+            case let .success(model):
+                current.sceneModel = model
+                current.loadSummary = .init(entityCount: model.entities.count, warnings: [])
+                current.errorMessage = nil
+            case let .failure(error):
+                current.errorMessage = error.localizedDescription
+                current.loadSummary = .init(entityCount: 0, warnings: [error.localizedDescription])
+            }
+            self.sceneDecodeTasks[id] = nil
+            // Preparation changes no authored data and must not enter Undo/history.
+            self.openDocuments[index] = .scene(current)
+            self.notifyActiveDocumentChangedIfNeeded(documentID: id)
+        }
+    }
+
+    @concurrent
+    private nonisolated static func decodeSceneDocument(_ content: String) async throws -> EditorSceneModel {
+        try Task.checkCancellation()
+        let model = try EditorSceneModel.decode(from: content)
+        try Task.checkCancellation()
+        return model
+    }
+
     func sceneLines(for document: EditorSceneDocument) -> [String] {
         let lines = document.content.components(separatedBy: .newlines)
         return lines.isEmpty ? [""] : lines
@@ -118,6 +154,7 @@ extension EditorWorkbenchViewModel {
 
     func appendSceneLine(documentID: String) {
         updateSceneDocument(id: documentID) { document in
+            guard !document.isLoading else { return }
             guard !document.isReadOnly else {
                 document.statusMessage = "Edit blocked: file is read-only"
                 return
@@ -133,6 +170,9 @@ extension EditorWorkbenchViewModel {
 
     @discardableResult
     func saveSceneDocument(id documentID: String) -> Bool {
+        if let document = sceneDocument(id: documentID), document.isLoading {
+            return !document.isDirty
+        }
         let previousContent = sceneDocument(id: documentID)?.lastSavedContent
         var didSave = false
         updateSceneDocument(id: documentID) { document in
@@ -147,7 +187,9 @@ extension EditorWorkbenchViewModel {
             }
 
             do {
-                let sceneModel = try EditorSceneModel.decode(from: document.content)
+                // Preparation and authored edits keep this validated model with its content.
+                // Autosaving a selection must not decode the large geometry payload again.
+                let sceneModel = try document.sceneModel ?? EditorSceneModel.decode(from: document.content)
                 if let lastSavedContent = document.lastSavedContent {
                     let currentDiskContent = try String(contentsOf: URL(fileURLWithPath: absolutePath), encoding: .utf8)
                     guard currentDiskContent == lastSavedContent else {
@@ -159,7 +201,7 @@ extension EditorWorkbenchViewModel {
 
                 try document.content.write(to: URL(fileURLWithPath: absolutePath), atomically: true, encoding: .utf8)
                 document.sceneModel = sceneModel
-                document.loadSummary = EditorSceneFileLoader.summary(from: document.content)
+                document.loadSummary = .init(entityCount: sceneModel.entities.count, warnings: [])
                 document.lastSavedContent = document.content
                 document.isDirty = false
                 document.errorMessage = nil
@@ -239,6 +281,7 @@ extension EditorWorkbenchViewModel {
             achievementScriptEdits.insert(document.id)
         }
         openDocuments[index] = .scene(document)
+        prepareSceneDocument(id: document.id)
         notifyActiveDocumentChangedIfNeeded(documentID: document.id)
         if document.isDirty,
             document.content != previousDocument.content || document.sceneModel != previousDocument.sceneModel || !previousDocument.isDirty {
@@ -253,14 +296,34 @@ extension EditorWorkbenchViewModel {
     }
 
     func selectSceneEntity(documentID: String, entityID: String?) {
-        updateSceneModelDocument(id: documentID, status: "Selected") { model in
+        updateSceneEditorState(id: documentID, status: "Selected") { model in
             model.selectEntity(entityID)
         }
     }
 
     func toggleSceneEntityExpanded(documentID: String, entityID: String) {
-        updateSceneModelDocument(id: documentID, status: "Hierarchy updated") { model in
+        updateSceneEditorState(id: documentID, status: "Hierarchy updated") { model in
             model.toggleEntityExpanded(entityID)
+        }
+    }
+
+    private func updateSceneEditorState(id: String, status: String, update: (inout EditorSceneModel) -> Void) {
+        updateSceneDocument(id: id) { document in
+            guard !document.isLoading, !document.isReadOnly,
+                var model = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content) else { return }
+            let previous = model.editor
+            update(&model)
+            guard previous != model.editor else { return }
+            do {
+                document.content = try model.encodedYAML(updatingEditorStateIn: document.content)
+                document.sceneModel = model
+                document.isDirty = true
+                document.statusMessage = status
+                document.errorMessage = nil
+            } catch {
+                document.statusMessage = "Scene encode failed"
+                document.errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -396,6 +459,7 @@ extension EditorWorkbenchViewModel {
 
     func updateSceneLine(documentID: String, lineIndex: Int, value: String) {
         updateSceneDocument(id: documentID) { document in
+            guard !document.isLoading else { return }
             guard !document.isReadOnly else {
                 document.statusMessage = "Edit blocked: file is read-only"
                 return
@@ -417,6 +481,7 @@ extension EditorWorkbenchViewModel {
 
     func updateSceneModelDocument(id documentID: String, status: String, update: (inout EditorSceneModel) -> Void) {
         updateSceneDocument(id: documentID) { document in
+            guard !document.isLoading else { return }
             guard !document.isReadOnly else {
                 document.statusMessage = "Edit blocked: file is read-only"
                 return

@@ -8,7 +8,8 @@ extension EditorWorkbenchViewModel {
         }
         var values: [EditorAchievementID: Int] = [:]
         let changed = previousContent != scene.content
-        if changed {
+        // Selection autosaves keep identical entity bytes; they need no achievement diff or full scene decode.
+        if changed, previousContent.map({ EditorSceneModel.onlyEditorStateChanged(from: $0, to: scene.content) }) != true {
             let previous = previousContent.flatMap { try? EditorSceneModel.decode(from: $0) }
             values = EditorAchievementRules.savedScene(
                 model,

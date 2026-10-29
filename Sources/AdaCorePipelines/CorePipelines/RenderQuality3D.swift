@@ -6,12 +6,27 @@ public struct ShadowSettings3D: Codable, Sendable {
     public var cascadeCount: Int
     public var splitLambda: Float
     public var blendFraction: Float
+    /// Pixels per cascade. Existing scenes retain their original allocation.
+    public var resolution: Int
 
-    public init(isEnabled: Bool = true, cascadeCount: Int = 1, splitLambda: Float = 0.65, blendFraction: Float = 0.1) {
+    public init(isEnabled: Bool = true, cascadeCount: Int = 1, splitLambda: Float = 0.65, blendFraction: Float = 0.1, resolution: Int = 1024) {
         self.isEnabled = isEnabled
         self.cascadeCount = cascadeCount
         self.splitLambda = splitLambda
         self.blendFraction = blendFraction
+        self.resolution = resolution
+    }
+
+    private enum CodingKeys: String, CodingKey { case isEnabled, cascadeCount, splitLambda, blendFraction, resolution }
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            isEnabled: try values.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true,
+            cascadeCount: try values.decodeIfPresent(Int.self, forKey: .cascadeCount) ?? 1,
+            splitLambda: try values.decodeIfPresent(Float.self, forKey: .splitLambda) ?? 0.65,
+            blendFraction: try values.decodeIfPresent(Float.self, forKey: .blendFraction) ?? 0.1,
+            resolution: try values.decodeIfPresent(Int.self, forKey: .resolution) ?? 1024
+        )
     }
 }
 

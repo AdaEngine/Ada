@@ -75,12 +75,17 @@ def smoke(directory):
         shader = Path(work) / "smoke.wgsl"
         shader.write_text("@vertex fn main() -> @builtin(position) vec4<f32> { return vec4<f32>(0.0); }", encoding="utf-8")
         for command in [[directory / "AdaEditor.exe", "--editor-mcp-stdio"],
+                        [directory / "adastudio.exe", "--help"],
                         [directory / "BuildSDK/AdaScript/gravity.exe", "--help"],
                         [directory / "AdaEngine_AdaRender.resources/tint.exe", shader, "--format", "wgsl"]]:
             result = subprocess.run([str(value) for value in command], input=b"", cwd=work,
                                     env=clean_environment(), capture_output=True, timeout=45)
             if result.returncode != 0:
                 raise RuntimeError(f"Packaged {command[0].name} failed ({result.returncode}): {result.stderr.decode(errors='replace')}")
+        cli = subprocess.run([str(directory / "adastudio.exe"), "--version", "--format", "json"],
+                             cwd=work, env=clean_environment(), capture_output=True, timeout=45)
+        if cli.returncode != 0 or not json.loads(cli.stdout).get("ok"):
+            raise RuntimeError(f"Packaged CLI version failed: {cli.stderr.decode(errors='replace')}")
 
 
 def package(binary_directory, compiler, tint, output, version, smoke_test=True, *, stage_only=False):
@@ -101,6 +106,9 @@ def package(binary_directory, compiler, tint, output, version, smoke_test=True, 
         # Preserve Swift's CRT entry point and PE resources, but open as a desktop
         # application instead of creating an extra console on double-click.
         run("llvm-objcopy", "--subsystem=windows", binary_directory / "AdaEditor.exe", directory / "AdaEditor.exe")
+        # A console PE has the same native implementation, but keeps stdout/stderr
+        # and shell wait semantics. CLI dispatch happens before any UI/GPU setup.
+        run("llvm-objcopy", "--subsystem=console", binary_directory / "AdaEditor.exe", directory / "adastudio.exe")
         for resource in binary_directory.glob("*.resources"):
             shutil.copytree(resource, directory / resource.name)
         for required in ["AdaEditor_AdaEditor.resources/Assets", "AdaEngine_AdaRender.resources"]:
@@ -129,7 +137,7 @@ def package(binary_directory, compiler, tint, output, version, smoke_test=True, 
                 raise RuntimeError(f"Dawn runtime is missing: {name_dll}")
             shutil.copy2(source, directory)
         search = [binary_directory] + runtime + [Path(path) for path in os.environ.get("PATH", "").split(os.pathsep) if path]
-        binaries = list(directory.glob("*.dll")) + [directory / "AdaEditor.exe", directory / "BuildSDK/AdaScript/gravity.exe",
+        binaries = list(directory.glob("*.dll")) + [directory / "AdaEditor.exe", directory / "adastudio.exe", directory / "BuildSDK/AdaScript/gravity.exe",
                                                   directory / "AdaEngine_AdaRender.resources/tint.exe"]
         bundle_dependencies(directory, binaries, search)
         for helper in [directory / "BuildSDK/AdaScript/gravity.exe", directory / "AdaEngine_AdaRender.resources/tint.exe"]:
@@ -161,6 +169,8 @@ def package(binary_directory, compiler, tint, output, version, smoke_test=True, 
         (directory / "README.txt").write_text(
             "Ada Studio for Windows x64\n\nExtract the entire ZIP, then open AdaEditor.exe.\n"
             "AdaPlayer: AdaEditor.exe --ada-player\n\n"
+            "CLI: adastudio.exe --help\n"
+            "     adastudio.exe validate --project D:\\Games\\MyGame --format json\n\n"
             "The Swift runtime, graphics DLLs, shader compiler and AdaScript source SDK are included.\n"
             "Building native Swift projects needs the Swift toolchain and Visual Studio C++ tools.\n"
             "Game export also needs Python/CMake; Web and Android use WSL and their SDKs.\n"

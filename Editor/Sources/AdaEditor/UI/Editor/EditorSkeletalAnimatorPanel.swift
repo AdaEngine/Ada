@@ -24,7 +24,7 @@ struct EditorSkeletalAnimatorPanel: View {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
                         EditorModelPreviewViewport(model: preview, camera: camera)
-                            .frame(minHeight: 130)
+                            .frame(minHeight: 0, maxHeight: .infinity)
                         Text(preview.graphEventLog.last ?? L10n.text("Event markers appear here during playback"))
                             .font(.system(size: 10)).foregroundColor(theme.editorColors.muted)
                             .accessibilityIdentifier("AdaEditor.AnimationGraph.EventLog")
@@ -37,6 +37,7 @@ struct EditorSkeletalAnimatorPanel: View {
             if !status.isEmpty { Text(status).font(.system(size: 11)).foregroundColor(theme.editorColors.muted) }
         }
         .padding(8)
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
         .onAppear { load() }
         .onDisappear { preview.cancel() }
         .onChange(of: target.source) { old, new in

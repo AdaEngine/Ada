@@ -22,10 +22,13 @@ struct EditorTopToolbarRegion: View {
             onStop: viewModel.stopFromToolbar,
             onDebug: debugAction,
             onOpenCloud: { viewModel.presentSettings(.general) },
-            interface: viewModel.interface
+            interface: viewModel.interface,
+            movieMaker: viewModel.movieMaker,
+            onMovieMaker: viewModel.movieMakerToolbarAction
         )
     }
     private var canRun: Bool {
+        if viewModel.movieMaker.isBusy { return false }
         if viewModel.selectedRunDestination == .player {
             return !viewModel.isAdaPlayerBusy
         }

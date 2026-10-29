@@ -7,6 +7,21 @@
 
 import CGravity
 
+/// Foreign instances retaining script values must expose those edges to the VM collector.
+/// Called synchronously while the VM is stopped for marking; it must not allocate VM objects.
+public protocol GravityGCTraceable: AnyObject {
+    func traceGravityValues(_ visit: (GSValue) -> Void)
+}
+
+func bridgeBlacken(_ vmPointer: OpaquePointer?, xdata: UnsafeMutableRawPointer?) {
+    guard let vmPointer, let xdata else { return }
+    let box = Unmanaged<_ValueBox>.fromOpaque(xdata).takeUnretainedValue()
+    guard let object = box.value as? any GravityGCTraceable else { return }
+    object.traceGravityValues { value in
+        if value.isObject, let pointer = value.toGravityObject { gravity_gray_object(vmPointer, pointer) }
+    }
+}
+
 func bridgeOptionalClasses(_ xdata: UnsafeMutableRawPointer?) -> UnsafeMutablePointer<UnsafePointer<Int8>?>? {
     guard let xdata, let vm = Unmanaged<AnyObject>.fromOpaque(xdata).takeUnretainedValue() as? GravityVirtualMachine else {
         return nil
@@ -49,23 +64,27 @@ func bridgeFree(_ vmPointer: OpaquePointer?, objptr: UnsafeMutablePointer<gravit
         }
         return
     }
-    let value = GSValue(object: objptr, in: vm)
-
     if let delegate = vm.delegate as? GravityMemoryControlVMDelegate {
-        delegate.virtualMachine(vm, didRequestFree: value)
+        delegate.virtualMachine(vm, didRequestFree: GSValue(object: objptr, in: vm))
         return
     }
 
-    if let xData = value.xData {
+    if let xData = gravity_value_xdata(gravity_value_from_object(objptr)) {
         Unmanaged<AnyObject>.fromOpaque(xData).release()
     }
 }
 
+/// The default delegate needs only ARC release, with no VM lookup or temporary
+/// Swift script-value allocation for every object reclaimed by the collector.
+func bridgeRelease(_ vmPointer: OpaquePointer?, objptr: UnsafeMutablePointer<gravity_object_t>?) {
+    guard let objptr, let xData = gravity_value_xdata(gravity_value_from_object(objptr)) else { return }
+    Unmanaged<AnyObject>.fromOpaque(xData).release()
+}
+
 func bridgeSize(_ vmPointer: OpaquePointer?, objptr: UnsafeMutablePointer<gravity_object_t>?) -> UInt32 {
     guard let vm = GravityVirtualMachine.getVM(vmPointer!) else { fatalError("Cannot found Virtual Machine") }
-    let value = GSValue(object: objptr, in: vm)
     if let delegate = vm.delegate as? GravityMemoryControlVMDelegate {
-        return delegate.virtualMachine(vm, didRequestSizeFor: value)
+        return delegate.virtualMachine(vm, didRequestSizeFor: GSValue(object: objptr, in: vm))
     }
     return 0
 }

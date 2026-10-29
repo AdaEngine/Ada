@@ -30,7 +30,7 @@ public struct TransformSystem {
     public init(world _: World) {}
 
     public func update(context _: UpdateContext) async {
-        self.query.forEach { _, transform, globalTransform in
+        self.query.batched().forEach { _, transform, globalTransform in
             globalTransform.wrappedValue = GlobalTransform(matrix: transform.matrix)
         }
     }
@@ -60,7 +60,14 @@ public struct ChildTransformSystem {
     public init(world _: World) {}
 
     public func update(context: UpdateContext) async {
-        self.query.forEach { entity, transform, relationship in
+        var dirty: Set<Entity.ID> = []
+        self.query.batched().forEach { entity, _, _ in dirty.insert(entity.id) }
+        var propagated: Set<Entity.ID> = []
+        self.query.batched().forEach { entity, transform, relationship in
+            // A changed ancestor will propagate the complete branch. Visiting
+            // every changed bone separately otherwise repeats all descendants.
+            guard !hasDirtyAncestor(entity.id, relationship: relationship, dirty: dirty, world: context.world) else { return }
+            guard propagated.insert(entity.id).inserted else { return }
             let globalTransform = resolveGlobalTransform(
                 for: entity,
                 transform: transform,
@@ -71,13 +78,36 @@ public struct ChildTransformSystem {
                 .entity(entity.id)
                 .insert(globalTransform)
 
-            let children = relationship.children.compactMap(context.world.getEntityByID)
             updateChildren(
-                children,
+                relationship.children,
                 world: context.world,
-                parentTransform: globalTransform
+                parentTransform: globalTransform,
+                propagated: &propagated
             )
         }
+        // Invalid cycles have no topmost dirty node. Bound their traversal too,
+        // while still updating each dirty entity at most once.
+        self.query.batched().forEach { entity, transform, relationship in
+            guard propagated.insert(entity.id).inserted else { return }
+            let global = resolveGlobalTransform(for: entity, transform: transform, relationship: relationship, world: context.world)
+            commands.entity(entity.id).insert(global)
+            updateChildren(relationship.children, world: context.world, parentTransform: global, propagated: &propagated)
+        }
+    }
+
+    private func hasDirtyAncestor(_ entity: Entity.ID, relationship: RelationshipComponent,
+                                  dirty: Set<Entity.ID>, world: World) -> Bool {
+        if let parent = relationship.parent, dirty.contains(parent) { return true }
+        var parent = relationship.parent
+        var visited: Set<Entity.ID> = [entity]
+        while let id = parent, visited.insert(id).inserted {
+            // Propagation stops at transformless nodes; descendants behind such
+            // a gap must keep their own independent update.
+            guard world.get(Transform.self, from: id) != nil else { return false }
+            if dirty.contains(id) { return true }
+            parent = world.get(RelationshipComponent.self, from: id)?.parent
+        }
+        return false
     }
 
     private func resolveGlobalTransform(
@@ -105,23 +135,23 @@ public struct ChildTransformSystem {
     /// - Parameter children: The children of the entity.
     /// - Parameter parentTransform: The parent transform of the entity.
     private func updateChildren(
-        _ children: [Entity],
+        _ children: some Sequence<Entity.ID>,
         world: World,
-        parentTransform: GlobalTransform
+        parentTransform: GlobalTransform,
+        propagated: inout Set<Entity.ID>
     ) {
         for child in children {
-            guard let childTransform = world.get(Transform.self, from: child.id) else {
+            guard propagated.insert(child).inserted, let childTransform = world.get(Transform.self, from: child) else {
                 continue
             }
 
             let newMatrix = parentTransform.matrix * childTransform.matrix
             commands
-                .entity(child.id)
+                .entity(child)
                 .insert(GlobalTransform(matrix: newMatrix))
 
-            let grandchildren = child.children
-            if !grandchildren.isEmpty {
-                updateChildren(grandchildren, world: world, parentTransform: GlobalTransform(matrix: newMatrix))
+            if let relationship = world.get(RelationshipComponent.self, from: child) {
+                updateChildren(relationship.children, world: world, parentTransform: GlobalTransform(matrix: newMatrix), propagated: &propagated)
             }
         }
     }

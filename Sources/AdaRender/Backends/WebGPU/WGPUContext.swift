@@ -251,6 +251,19 @@
             #else
                 let physicalWidth = max(Int((Float(size.width) * scaleFactor).rounded()), 1)
                 let physicalHeight = max(Int((Float(size.height) * scaleFactor).rounded()), 1)
+                var presentMode: WebGPU.GPUPresentMode = .fifo
+                if unsafe RenderEngine.presentationMode == .uncapped,
+                   let adapter = (RenderEngine.shared?.renderDevice as? WebGPURenderDevice)?.context.adapter {
+                    // Dawn owns these output arrays. The generated Swift wrapper
+                    // supplies pointers to empty input arrays, which Dawn rejects.
+                    var capabilities = WebGPU.GPUSurfaceCapabilities.WGPUType()
+                    defer { WebGPU.wgpuSurfaceCapabilitiesFreeMembers(capabilities) }
+                    if surface.getCapabilities(adapter: adapter, capabilities: &capabilities) == .success {
+                        let modes = UnsafeBufferPointer(start: capabilities.presentModes, count: capabilities.presentModeCount)
+                        if modes.contains(.immediate) { presentMode = .immediate }
+                        else if modes.contains(.mailbox) { presentMode = .mailbox }
+                    }
+                }
                 surface.configure(
                     config: WebGPU.GPUSurfaceConfiguration(
                         device: device,
@@ -260,7 +273,7 @@
                         height: UInt32(physicalHeight),
                         viewFormats: [],
                         alphaMode: .auto,
-                        presentMode: .fifo
+                        presentMode: presentMode
                     )
                 )
             #endif

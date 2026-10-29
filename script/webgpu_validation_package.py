@@ -26,11 +26,13 @@ for relative in [
     "Tests/AdaRenderTests/RenderGraphDiagnosticsTests.swift",
     "Tests/AdaRenderTests/RenderUpscalingTests.swift",
     "Tests/AdaEngineTests/Render3DFSRTests.swift",
+    "Tests/AdaEngineTests/Render3DSkinningBatchTests.swift",
     "Tests/AdaRenderTests/WindowFrameRequestsTests.swift",
     "Tests/AdaRenderTests/WGPUBindingStateTests.swift",
     "Tests/AdaRenderTests/WGPUVisibilityProcessorTests.swift",
     "Tests/AdaEngineTests/MaterialUploadReuseTests.swift",
     "Tests/AdaECSTests/OptionalResourceTests.swift",
+    "Tests/AdaTransformTests/AdaTransformTests.swift",
     "Tests/AdaRenderTests/ShaderIncluderTests.swift",
     "Tests/AdaRenderTests/ShaderCacheKeyTests.swift",
     # 3D post-processing and debug views render through the selected GPU backend and compare against references.
@@ -38,6 +40,7 @@ for relative in [
     "Tests/AdaEngineTests/PluginLoadingTests.swift",
     "Tests/AdaEngineTests/WGPUVisibilitySceneTests.swift",
     "Tests/AdaEngineTests/Render3DDebugViewTests.swift",
+    "Tests/AdaEngineTests/Render3DShadowFilteringTests.swift",
     "Tests/AdaEngineTests/Render3DReflectedFacingTests.swift",
     "Tests/AdaEngineTests/Render3DShaderGraphTests.swift",
     "Tests/AdaEngineTests/Render3DMaterialExtensionTests.swift",
@@ -46,6 +49,9 @@ for relative in [
     "Tests/AdaEngineTests/Render3DColorGradingTests.swift",
     "Tests/AdaEngineTests/Render3DAutoExposureTests.swift",
     "Tests/AdaEngineTests/Render3DDepthOfFieldTests.swift",
+    "Tests/AdaEngineTests/Render3DCameraEffectsTests.swift",
+    "Tests/AdaEngineTests/Render3DParticleTests.swift",
+    "Tests/AdaSceneTests/Particle3DTests.swift",
     "Tests/AdaEngineTests/Render3DReflectionTests.swift",
     "Tests/AdaEngineTests/Render3DPerformanceBenchmarkTests.swift",
     "Tests/AdaEngineTests/VisibleMesh3DListsEquivalenceTests.swift",
@@ -59,7 +65,7 @@ golden_frames = root / "Tests/AdaEngineTests/GoldenFrames"
 if golden_frames.is_dir():
     shutil.copytree(golden_frames, sources / "GoldenFrames", dirs_exist_ok=True)
 # AdaAssets has no package product; AdaScene re-exports it.
-modules = ["AdaApp", "AdaCorePipelines", "AdaECS", "AdaRender", "AdaScene", "AdaSprite", "AdaTilemap", "AdaTransform", "AdaUtils", "Math"]
+modules = ["AdaAnimation", "AdaApp", "AdaCorePipelines", "AdaECS", "AdaRender", "AdaScene", "AdaSprite", "AdaTilemap", "AdaTransform", "AdaUtils", "Math"]
 dependencies = ',\n'.join('.product(name: ' + json.dumps(module) + ', package: "AdaEngine")' for module in modules)
 (destination / "Package.swift").write_text('''// swift-tools-version: 6.2
 import PackageDescription

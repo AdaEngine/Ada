@@ -49,6 +49,8 @@ public struct Mesh3DRenderSource: Sendable {
     public var castShadows: Bool
     public var receiveShadows: Bool
     public var skinningBuffer: (any UniformBuffer)?
+    /// First joint of this instance inside a packed GPU palette.
+    public var skinningOffset: Int
     /// Morph weight buffers by mesh part (see ``morphKey(model:part:)``); empty for a mesh without morph weights.
     public var morphBuffers: [UInt64: any UniformBuffer]
 
@@ -74,7 +76,8 @@ public struct Mesh3DRenderSource: Sendable {
         receiveShadows: Bool = true,
         skinningBuffer: (any UniformBuffer)? = nil,
         previousTransform: Transform3D? = nil,
-        morphBuffers: [UInt64: any UniformBuffer] = [:]
+        morphBuffers: [UInt64: any UniformBuffer] = [:],
+        skinningOffset: Int = 0
     ) {
         self.morphBuffers = morphBuffers
         self.previousTransform = previousTransform ?? transform
@@ -93,6 +96,7 @@ public struct Mesh3DRenderSource: Sendable {
         self.castShadows = castShadows
         self.receiveShadows = receiveShadows
         self.skinningBuffer = skinningBuffer
+        self.skinningOffset = skinningOffset
     }
 }
 
