@@ -12,6 +12,13 @@ import AdaTransform
 import AdaUtils
 import Math
 
+/// Window parents retain their children after the owning ECS entity is removed.
+/// Track mounts per world so scene replacement also releases its old overlays.
+struct UIOverlayMounts: Resource {
+    var views: [ObjectIdentifier: UIView] = [:]
+    var active: Set<ObjectIdentifier> = []
+}
+
 @PlainSystem
 public struct UIComponentSystem: Sendable {
     @Query<Entity, UIComponent, GlobalTransform>
@@ -35,6 +42,9 @@ public struct UIComponentSystem: Sendable {
     @ResMut<UIRedrawRequest>
     private var redrawRequest
 
+    @ResMut<UIOverlayMounts>
+    private var overlays
+
     @Res<PrimaryWindowId>
     private var primaryWindowId
 
@@ -42,6 +52,7 @@ public struct UIComponentSystem: Sendable {
 
     @MainActor
     public func update(context _: UpdateContext) async {
+        overlays.active.removeAll(keepingCapacity: true)
         self.uiComponents.forEach { entity, component, transform in
             update(
                 entity: entity,
@@ -49,6 +60,11 @@ public struct UIComponentSystem: Sendable {
                 globalTransform: transform,
                 deltaTime: deltaTime.deltaTime
             )
+        }
+        for (id, view) in overlays.views where !overlays.active.contains(id) {
+            view.removeFromParentView()
+            overlays.views.removeValue(forKey: id)
+            redrawRequest.needsRedraw = true
         }
     }
 }
@@ -90,6 +106,9 @@ extension UIComponentSystem {
                     view.autoresizingRules = [.flexibleWidth, .flexibleHeight]
                     window.addSubview(view)
                 }
+                let id = ObjectIdentifier(view)
+                overlays.active.insert(id)
+                if overlays.views[id] == nil { overlays.views[id] = view }
                 // Overlay must match the window bounds during live resize. Using only
                 // `sizeThatFits` can under-fill the window while layout is settling, which
                 // breaks UI draw/compositing atop the scene (black or empty content region).

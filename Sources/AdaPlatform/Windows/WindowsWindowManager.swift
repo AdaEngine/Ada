@@ -187,9 +187,11 @@
 
             let systemWindow = unsafe WindowsSystemWindow(hwnd: hwnd, surface: windowsSurface)
             window.systemWindow = systemWindow
-            // The configured origin positions the HWND on screen. AdaUI draws
-            // and hit-tests inside the client area, whose origin is always zero.
-            if window.frame.origin != .zero {
+            // The HWND uses the resolved minimum size even when the configured
+            // frame is zero. Publish those client bounds before mounting AdaUI;
+            // otherwise overlays stay zero-sized until the first resize event.
+            // Screen positioning does not change the client area's zero origin.
+            if window.frame != Rect(origin: .zero, size: size) {
                 windowsSynchronizingFromSystem.insert(window.id)
                 window.frame = Rect(origin: .zero, size: size)
                 windowsSynchronizingFromSystem.remove(window.id)

@@ -27,6 +27,7 @@ public struct UIPlugin: Plugin {
             .insertResource(UIWindowPendingDrawViews())
             .insertResource(UIContextPendingDraw())
             .insertResource(UIRedrawRequest())
+            .insertResource(UIOverlayMounts())
             .insertResource(WindowFrameRequests())
 
         guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else {
