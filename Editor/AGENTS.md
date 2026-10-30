@@ -499,6 +499,16 @@ in Agent mode and restores the last normal window size after leaving immersion.
 Guide: [AgentInterface.md](Documentation/AgentInterface.md).
 Coverage: [EditorAgentWorkspaceTests.swift](Tests/AdaEditorTests/EditorAgentWorkspaceTests.swift).
 
+Native scene toolbars expose Annotate for the shared desktop workbench. 2D/3D
+viewport and hierarchy picks create numbered notes in the originating chat's
+editable composer, without scene edits or an automatic agent request. Up to
+eight notes can be collected, edited or removed before Send. Object references
+travel with the request and persist with sent messages; unsent notes remain in
+memory with native session drafts. Picking suppresses transform gizmos; camera
+navigation remains available. Play, model previews and individual rendered UI
+widgets are outside this path. Coverage: `EditorSceneAnnotationTests` and the
+mounted annotation editor check in `EditorLocalizationTests`.
+
 Desktop Git status, staging, commit, stash, pull/push, branch creation/checkout,
 history and diff review. Agent Chat includes transcript/session persistence,
 attachments, context selection, permissions, skills and agent settings.
@@ -692,6 +702,14 @@ Credit counters appear on the start screen, shared workspace toolbar and iPhone 
 Cloud settings show available/used/reserved credits and cycle activity. AI credits
 are separate from Cloud publishing Pro. Missing/disabled service and signed-out
 states do not imply a zero balance. Hosted Ada AI uses the shared Cloud account transport, Coder Next tool loop and server wallet. Desktop selects the built-in Ada AI entry; mobile selects Ada AI in Providers. Tool mutations require approval; Cloud conversations persist separately from external runtime sessions. Provider keys and settlement stay server-side, and external/BYOK agents remain independent.
+
+Native Ada AI exposes `editor.web.search/fetch/download` through its project-scoped
+tool host. Ask/Plan allow search and page reading; Build also permits downloads
+through the existing write approval flow. External desktop agents retain the
+same tools through AdaMCP, and mobile agents through their host bridge. Browser
+Studio's separate registry still has no internet search/proxy. Coverage:
+`EditorCloudWebToolTests`, `EditorCloudAgentTests`, `EditorWebToolTests`.
+
 Entry points: [EditorCloudAIClient.swift](Sources/AdaEditor/Cloud/EditorCloudAIClient.swift),
 [EditorAICreditsModel.swift](Sources/AdaEditor/Cloud/EditorAICreditsModel.swift).
 Coverage: [EditorAICreditsTests.swift](Tests/AdaEditorTests/EditorAICreditsTests.swift),

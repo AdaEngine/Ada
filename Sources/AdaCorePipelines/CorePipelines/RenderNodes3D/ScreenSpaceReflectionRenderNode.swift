@@ -171,6 +171,12 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                 } ?? false
                 uniform.diffuseGI.z = target.irradianceGridActive || lightmapped ? 1 : 0
             }
+            if context.world.getResource(PathTracing3DViews.self)?.entries[source.entityId]?.active == true {
+                // The traced HDR already owns every surface lighting term. Keep only presentation/fog here.
+                uniform.reflection.x = 0
+                uniform.quality.x = 0
+                uniform.diffuseGI = [0,0,1,0]
+            }
             let constants = scratch.cache.write(uniform, view: source.entityId, device: renderDevice.renderDevice)
 
             let environmentTexture = skybox.texture?.asset ?? Texture2D.whiteTexture

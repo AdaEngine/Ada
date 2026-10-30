@@ -63,6 +63,63 @@ float sunVisibility(vec3 world, float viewDepth) {
     return projected.z - u_ShadowAtlas.z <= stored ? 1.0 : 0.0;
 }
 
+// Positive means lit. Unlike a binary comparison, the signed separation lets a
+// step locate an occluder crossing inside the segment. Directional matrices are
+// orthographic; dividing by their depth-row length puts cascade gaps into the
+// same world-depth units before interpolation across a cascade boundary.
+float sunShadowGap(vec3 world, float viewDepth) {
+    if (u_ShadowAtlas.w < 0.5 || viewDepth > u_CascadeSplits.z) { return 10000.0; }
+    int count = int(u_CascadeSplits.w);
+    int cascade = min(viewDepth <= u_CascadeSplits.x ? 0 : (viewDepth <= u_CascadeSplits.y ? 1 : 2), count - 1);
+    mat4 transform;
+    if (cascade == 0) { transform = u_ShadowViewProjection0; }
+    else if (cascade == 1) { transform = u_ShadowViewProjection1; }
+    else { transform = u_ShadowViewProjection2; }
+    vec4 position = transform * vec4(world, 1.0);
+    vec3 projected = position.xyz / position.w;
+    vec2 localUV = projected.xy * vec2(0.5, -0.5) + 0.5;
+    if (projected.z < 0.0 || projected.z > 1.0 || any(lessThan(localUV, vec2(0.0))) || any(greaterThan(localUV, vec2(1.0)))) { return 10000.0; }
+    float cascadeCount = max(u_CascadeSplits.w, 1.0);
+    vec2 uv = vec2((localUV.x + float(cascade)) / cascadeCount, localUV.y);
+    vec2 minimum = vec2(float(cascade) / cascadeCount, 0.0) + u_ShadowAtlas.xy * 0.5;
+    vec2 maximum = vec2(float(cascade + 1) / cascadeCount, 1.0) - u_ShadowAtlas.xy * 0.5;
+    float stored = textureLod(sampler2D(u_DirectionalShadowTexture, u_Nearest), clamp(uv, minimum, maximum), 0.0).r;
+    vec3 depthRow = vec3(transform[0][2], transform[1][2], transform[2][2]);
+    return (stored + u_ShadowAtlas.z - projected.z) / max(length(depthRow), 0.00000001);
+}
+
+// Beer-Lambert scattering over the lit part of a constant-density segment.
+// Linear endpoint gaps give the exact crossing of a planar shadow boundary;
+// an occluded prefix attenuates the lit suffix instead of adding light through it.
+float litSegmentWeight(vec3 origin, vec3 direction, float viewRayZ, float startTravel, float stepLength,
+    float startGap, float endGap, float opticalDepth, float wholeSegment) {
+    if (startGap >= 0.0 && endGap >= 0.0) { return wholeSegment; }
+    if (startGap < 0.0 && endGap < 0.0) { return 0.0; }
+    // Stored shadow depth can jump at an atlas silhouette. Its gap magnitude is
+    // then not a reliable distance to the crossing. Refine only those segments
+    // whose endpoint visibility differs; fully lit/shadowed steps pay no extra
+    // shadow fetches. The final interpolation remains exact for a planar gap.
+    float lower = 0.0;
+    float upper = 1.0;
+    float lowerGap = startGap;
+    float upperGap = endGap;
+    for (int refine = 0; refine < 5; ++refine) {
+        float middle = (lower + upper) * 0.5;
+        float travel = startTravel + middle * stepLength;
+        float gap = sunShadowGap(origin + direction * travel, travel * viewRayZ);
+        if ((gap >= 0.0) == (lowerGap >= 0.0)) {
+            lower = middle;
+            lowerGap = gap;
+        } else {
+            upper = middle;
+            upperGap = gap;
+        }
+    }
+    float crossing = mix(lower, upper, clamp(lowerGap / (lowerGap - upperGap), 0.0, 1.0));
+    if (startGap >= 0.0) { return 1.0 - exp(-opticalDepth * crossing); }
+    return exp(-opticalDepth * crossing) * (1.0 - exp(-opticalDepth * (1.0 - crossing)));
+}
+
 float localVisibility(LocalLight3D light, vec3 world) {
     int slot=int(light.innerShadow.w);
     if(slot<0||slot>=4) { return 1.0; }
@@ -123,11 +180,11 @@ void volumetric_fog_fragment() {
     vec3 worldDirection = normalize((u_InverseView * vec4(viewRay, 0.0)).xyz);
     vec3 origin = u_InverseView[3].xyz;
     float phase = henyeyGreenstein(dot(worldDirection, u_SunDirection.xyz), u_SunDirection.w);
-    // There is no temporal accumulation of this half-resolution buffer. A
-    // screen-space interleaved offset therefore survives as a visible diagonal
-    // lattice in bright flashlight beams. Midpoint quadrature is deterministic
-    // along the ray and converges without painting a sampling grid onto the fog.
-    const float sampleOffset = 0.5;
+    bool boundedMedium = u_VolumeAmbientCount.w > 0.0;
+    float previousSunGap = 0.0;
+    if (boundedMedium) {
+        previousSunGap = sunShadowGap(origin + worldDirection * rangeStart, rangeStart * viewRay.z);
+    }
 
     float transmittance = 1.0;
     vec3 scattered = vec3(0.0);
@@ -135,7 +192,7 @@ void volumetric_fog_fragment() {
     float localOpticalDepth=0.0;
     for (int index = 0; index < 64; ++index) {
         if (index >= steps) { break; }
-        float travel = rangeStart + (float(index) + sampleOffset) * stepLength;
+        float travel = rangeStart + (float(index) + 0.5) * stepLength;
         vec3 world = origin + worldDirection * travel;
         float density = u_Medium.x * exp(clamp(-u_Medium.y * (world.y - u_Medium.z), -60.0, 60.0));
         vec3 scatteringDensity=vec3(density);
@@ -149,14 +206,30 @@ void volumetric_fog_fragment() {
             localDensity+=d; scatteringDensity+=d*u_Volumes[v*3+2].rgb;
         }
         float total=density+localDensity;
-        float segment=1.0-exp(-total*stepLength);
-        float sunVisible=sunVisibility(world,travel*viewRay.z);
-        vec3 sun=u_SunRadiance.rgb*(phase*sunVisible);
-        scattered+=transmittance*segment*(localRadiance(world,worldDirection)*scatteringDensity
-            +sun*(scatteringDensity-vec3(density))+localDensity*u_VolumeAmbientCount.rgb)/max(total,0.000001);
+        float opticalDepth=total*stepLength;
+        float segment=1.0-exp(-opticalDepth);
+        float sunVisible=0.0;
+        if (boundedMedium) {
+            // One new endpoint lookup per step; reuse it as the next start.
+            float endTravel = rangeStart + float(index + 1) * stepLength;
+            float nextSunGap = sunShadowGap(origin + worldDirection * endTravel, endTravel * viewRay.z);
+            float litWeight = litSegmentWeight(origin, worldDirection, viewRay.z,
+                rangeStart + float(index) * stepLength, stepLength, previousSunGap, nextSunGap, opticalDepth, segment);
+            previousSunGap = nextSunGap;
+            vec3 source = segment * (localRadiance(world,worldDirection)*scatteringDensity
+                +localDensity*u_VolumeAmbientCount.rgb)
+                +litWeight*u_SunRadiance.rgb*phase*scatteringDensity;
+            scattered += transmittance * source / max(total,0.000001);
+        } else {
+            // Preserve the established global height-fog integrator and references.
+            sunVisible=sunVisibility(world,travel*viewRay.z);
+            vec3 sun=u_SunRadiance.rgb*(phase*sunVisible);
+            scattered+=transmittance*segment*(localRadiance(world,worldDirection)*scatteringDensity
+                +sun*(scatteringDensity-vec3(density))+localDensity*u_VolumeAmbientCount.rgb)/max(total,0.000001);
+        }
         transmittance*=exp(-total*stepLength);
         // Preserve the established global sun-only integrator and its reference frames.
-        scatteredSun+=density*stepLength*transmittance*sunVisible;
+        if (!boundedMedium) { scatteredSun+=density*stepLength*transmittance*sunVisible; }
         localOpticalDepth+=localDensity*stepLength;
     }
     o_Color = vec4(scattered+u_SunRadiance.rgb*(scatteredSun*phase),min(1.0-exp(-localOpticalDepth),u_March.w));

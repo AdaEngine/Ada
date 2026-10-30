@@ -85,6 +85,8 @@
 
             if descriptor.textureUsage.contains(.read) {
                 wgpuUsage.insert(.copyDst)
+                // Sampled material images also feed CPU atlas preparation and asynchronous image inspection.
+                wgpuUsage.insert(.copySrc)
                 wgpuUsage.insert(.textureBinding)
             }
 

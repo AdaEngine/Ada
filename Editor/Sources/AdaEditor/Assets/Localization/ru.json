@@ -1,4 +1,7 @@
 {
+  "Add to message": "Добавить в сообщение",
+  "What should change here?": "Что здесь нужно изменить?",
+  "This annotation was edited in the message. Edit its text there or remove it.": "Эта заметка изменена в сообщении. Исправьте её там или удалите.",
   "Movie Maker": "Movie Maker",
   "Current Scene": "Текущая сцена",
   "Choose an FPS that divides 48000, such as 24, 30 or 60.": "Выберите FPS, на который делится 48000, например 24, 30 или 60.",

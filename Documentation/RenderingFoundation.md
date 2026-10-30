@@ -77,6 +77,16 @@ Global sun-only integration and its golden frames retain their earlier behavior.
 Local extinction is stored separately in alpha so the analytic global fog is
 not applied twice. Local boxes respect sky influence.
 
+For bounded media, sunlight is integrated across each step's shadow crossing
+instead of treating its midpoint as entirely lit or dark. Signed shadow-depth
+separation is normalized between cascades; adjacent steps reuse endpoint
+samples. Only intervals whose endpoint visibility differs perform five
+bisections, followed by exact Beer-Lambert integration of the lit prefix or
+suffix. This resolves atlas silhouette discontinuities without adding sampling
+noise or increasing the base ray count. The existing four-tap depth-aware
+reconstruction remains unchanged. Thin shadows whose two crossings both lie
+inside one interval can still be missed at a finite step count.
+
 This is single-scattering homogeneous local fog: no froxel history, multiple
 scattering, oriented shapes or animated density textures. The finite march
 range/step count can miss a very thin distant volume. Light budget follows the
@@ -105,3 +115,18 @@ DLSS/history suites. Last Autumn includes opt-in executable presets and captured
 evidence in `Evidence/RenderingFoundation`; default scenes keep their prior
 feature settings. Metal source support has not been accepted on Apple hardware
 by this Windows run.
+
+## Display gradients near black
+
+Display outputs use shared, screen-stable stochastic rounding before BGRA8
+quantization. A common RGB threshold preserves channel ordering in warm shadows;
+explicit normalized byte codes avoid implementation-dependent UNORM rounding
+at half-code boundaries. Exact black and white remain unchanged. This runs
+after tone mapping/LUT, and again after lens resampling in the non-copy camera
+resolve. The HDR temporal input is untouched, and there are no additional
+passes, textures, uniforms or CPU work. It replaces solid low-code color bands
+with subpixel coverage, rather than raising ambient light or adding film grain.
+
+`Render3DGPUTests/DisplayDither` verifies actual BGRA8 pixel endpoints, neighboring
+codes, warm-gradient spatial means, channel ordering and at most one code of
+per-pixel quantization error. It does not claim a higher-bit-depth display path.

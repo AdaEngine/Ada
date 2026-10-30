@@ -27,7 +27,8 @@ public struct ScreenSpaceGI3DRenderNode: RenderNode {
         views.forEach { entity, target, uniform, source in
             guard entity == view else { return }
             let settings = (environments.environments[source.entityId]?.screenSpaceGI ?? .init()).sanitized
-            guard settings.isEnabled, settings.intensity > 0,
+            guard context.world.getResource(PathTracing3DViews.self)?.entries[source.entityId]?.active != true,
+                settings.isEnabled, settings.intensity > 0,
                 let surface = target.diffuseSurface3DTexture, let position = target.viewPositionMetallic3DTexture,
                 let normal = target.normalRoughness3DTexture, let color = target.sceneColor3DTexture,
                 let indirect = target.indirectLighting3DTexture else {

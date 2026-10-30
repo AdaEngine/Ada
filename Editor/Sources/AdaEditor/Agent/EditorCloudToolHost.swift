@@ -8,15 +8,17 @@ final class EditorCloudToolHost {
         "editor_files_list", "editor_file_read", "editor_project_context", "editor_scene_list", "editor_scene_list_open", "editor_scene_get", "editor_asset_list",
         "editor_gravity_diagnostics", "editor_gravity_completion", "editor_gravity_hover", "editor_gravity_definition", "editor_skills_list", "editor_skills_read", "editor_docs_read",
         "editor_docs_search", "editor_api_describe", "editor_components_describe", "editor_examples_list", "editor_examples_read", "editor_output_read", "editor_task_status",
-        "editor_runtime_inspect", "editor_play_inspect", "editor_model_inspect", "editor_audio_inspect",
+        "editor_runtime_inspect", "editor_play_inspect", "editor_model_inspect", "editor_audio_inspect", "editor_web_search", "editor_web_fetch",
     ]
     let projectURL: URL
     private let mobile: EditorMobileAgentToolService
+    private let web: EditorAgentWebToolService
     private let isMobile: Bool
 
-    init(projectURL: URL, mobile: EditorMobileAgentToolService? = nil) {
+    init(projectURL: URL, mobile: EditorMobileAgentToolService? = nil, webClient: any EditorWebHTTPClient = EditorWebURLSessionClient()) {
         self.projectURL = projectURL.resolvingSymlinksInPath().standardizedFileURL
         self.mobile = mobile ?? EditorMobileAgentToolService(projectURL: projectURL)
+        self.web = EditorAgentWebToolService(projectURL: projectURL, client: webClient)
         self.isMobile = mobile != nil
     }
     deinit { Task { @MainActor [mobile] in mobile.finish() } }
@@ -24,7 +26,8 @@ final class EditorCloudToolHost {
         let inventory =
             isMobile
             ? EditorMobileAgentTools.tools() + [MobileEditorTool.build]
-            : EditorAgentMCPTools.tools() + EditorAgentWorkspaceMCPTools.tools() + EditorAgentGravityMCPTools.tools() + EditorAgentAuthoringMCPTools.tools()
+            : EditorAgentMCPTools.tools() + EditorAgentWorkspaceMCPTools.tools() + EditorAgentGravityMCPTools.tools()
+                + EditorAgentAuthoringMCPTools.tools() + EditorAgentWebTools.tools()
         return try (Self.fileTools + inventory).filter {
             // Publishing and provider-backed image operations require their own explicit flows.
             !["editor.community.submit", "editor.image.read", "editor.image.generate", "editor.image.edit"].contains($0.name)
@@ -51,6 +54,10 @@ final class EditorCloudToolHost {
             return result.payload
         }
         try requireDesktopProject()
+        if EditorAgentWebTools.contains(name) {
+            let value = try await web.execute(name: name, arguments: args)
+            return try EditorAgentToolEncoding.string(JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]))
+        }
         let result: CallTool.Result?
         if let value = EditorAgentMCPTools.shared.handle(name: name, arguments: args) {
             result = value
@@ -69,7 +76,7 @@ final class EditorCloudToolHost {
         return text
     }
     private func requireDesktopProject() throws {
-        guard EditorAgentMCPTools.shared.activeViewModel?.projectURL?.resolvingSymlinksInPath().standardizedFileURL == projectURL else {
+        guard EditorAgentMCPTools.shared.activeViewModel?.projectURL?.resolvingSymlinksInPath().standardizedFileURL.pathComponents == projectURL.pathComponents else {
             throw EditorAgentServiceError.providerFailure("A different project is open. Return to this project before continuing.")
         }
     }

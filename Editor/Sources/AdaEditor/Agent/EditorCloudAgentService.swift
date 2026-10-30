@@ -66,7 +66,9 @@ actor EditorCloudAgentService: EditorAgentServicing {
         guard tools.count <= 96, Set(tools.map(\.name)).count == tools.count else { throw EditorAIError.invalidResponse }
         var messages = request.session.events.compactMap { event -> EditorCloudValue? in
             guard let message = event.message, [.user, .assistant].contains(message.role) else { return nil }
-            return ["role": .string(message.role.rawValue), "content": .string(message.segments.compactMap(\.text).joined(separator: "\n"))]
+            let text = message.segments.compactMap(\.text).joined(separator: "\n")
+            let references = EditorAgentSceneAnnotation.referenceBlock(message.sceneAnnotations ?? [])
+            return ["role": .string(message.role.rawValue), "content": .string(text + (references.isEmpty ? "" : "\n\n" + references))]
         }
         if messages.last?["role"].string == "user" { messages.removeLast() }
         messages.append(["role": "user", "content": .string(EditorAgentPromptContext.text(for: request))])
@@ -114,7 +116,8 @@ actor EditorCloudAgentService: EditorAgentServicing {
                         case .object(let arguments) = try JSONDecoder().decode(EditorCloudValue.self, from: Data(raw.utf8))
                     else { throw EditorAIError.invalidResponse }
                     if !tool.readOnly {
-                        let details: [String] = [name, request.project.project.name ?? request.projectURL.lastPathComponent, arguments["path"]?.string ?? ""]
+                        let details: [String] = [name, request.project.project.name ?? request.projectURL.lastPathComponent,
+                            arguments["path"]?.string ?? arguments["destination"]?.string ?? ""]
                         let permissionSummary = details.joined(separator: "\n")
                         guard request.project.ai.agent.permissionMode != .deny,
                             await permission(session: request.session.id, toolID: id, name: permissionSummary, onEvent: onEvent)
@@ -125,7 +128,9 @@ actor EditorCloudAgentService: EditorAgentServicing {
                     try Task.checkCancellation()
                     output = try await tool.invoke(.object(arguments))
                     toolEvent.toolCall?.status = .completed
-                    if !tool.readOnly, let path = arguments["path"]?.string { await onProjectFileChanged(path) }
+                    if !tool.readOnly, let path = arguments["path"]?.string ?? (name == "editor_web_download" ? arguments["destination"]?.string : nil) {
+                        await onProjectFileChanged(path)
+                    }
                 } catch is CancellationError { throw CancellationError() } catch {
                     output = "Tool failed: " + error.localizedDescription
                     toolEvent.toolCall?.status = .failed

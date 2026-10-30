@@ -107,7 +107,8 @@ vec3 presentColor(vec3 linearColor) {
     if (u_Quality.z > 0.5) {
         return exposed;
     }
-    return adaApplyLut(adaOutputTransform(exposed, u_PostProcess.z), u_PostProcess.w);
+    vec3 display = adaApplyLut(adaOutputTransform(exposed, u_PostProcess.z), u_PostProcess.w);
+    return adaDitherDisplay(display, gl_FragCoord.xy);
 }
 
 // View-space depth the half-resolution volumetric pass saw at `uv`; sky counts as very far.
@@ -116,9 +117,9 @@ float volumetricDepthAt(vec2 uv) {
     return length(position) > 0.0001 ? position.z : 10000.0;
 }
 
-// Shadowed sun light marched through the fog by the half-resolution volumetric pass. The four surrounding
-// half-resolution texels are weighted by how close their depth is to this pixel's, so shafts do not bleed
-// across silhouettes.
+// Shadowed light marched through the fog by the half-resolution pass. Weight
+// the four surrounding texels by their depth agreement with this pixel, so
+// scattering does not cross foreground silhouettes.
 vec4 volumetricScatter(float depth) {
     if (u_FogRange.z < 0.5) {
         return vec4(0.0);

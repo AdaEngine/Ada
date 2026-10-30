@@ -4,6 +4,15 @@ import Foundation
 import Observation
 
 extension EditorViewModel {
+    func presentAgentForAnnotation() {
+        if interface.mode == .agent {
+            interface.showsArtifact = false
+        } else {
+            toolStrip.activeRightTool = "agentChat"
+            showRightPanel = true
+        }
+    }
+
     func handleTextSelection(document: EditorTextDocument, range: EditorSourceRange?, text: String?) {
         workbench.updateTextDocument(id: document.id) { updatedDocument in
             updatedDocument.selectionRange = range

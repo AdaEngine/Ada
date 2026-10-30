@@ -322,6 +322,7 @@ struct EditorAgentSidebar: View {
             codeSelectionIndicator
             contextPicker
             pendingAttachmentList
+            EditorSceneAnnotationChips(agent: viewModel)
             autocompleteList
             EditorAgentSuggestionsView(viewModel: viewModel)
             EditorAgentComposerSurface {

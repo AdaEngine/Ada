@@ -72,6 +72,12 @@ public struct Skinning3DUniforms: Resource {
         return entry.buffers[currentIndex]
     }
 
+    /// Current CPU palette, also used by portable world-space ray geometry preparation.
+    func matrices(for entity: Entity.ID) -> [Transform3D] {
+        guard let entry = entries[entity], entry.frame == frame else { return [] }
+        return entry.matrices
+    }
+
     public func previousBuffer(for entity: Entity.ID) -> (any UniformBuffer)? {
         guard let entry = entries[entity], entry.frame == frame else {
             return nil

@@ -55,7 +55,10 @@ public struct Main3DRenderNode: RenderNode {
 
     @Res<Render3DPerformanceMetrics?> private var metrics
 
-    public init() {}
+    private let pathTracingOverlaysOnly: Bool
+
+    public init() { pathTracingOverlaysOnly = false }
+    init(pathTracingOverlaysOnly: Bool) { self.pathTracingOverlaysOnly = pathTracingOverlaysOnly }
 
     public let inputResources: [RenderSlot] = [
         RenderSlot(name: InputNode.view, kind: .entity)
@@ -109,6 +112,10 @@ public struct Main3DRenderNode: RenderNode {
             if entity != view {
                 return
             }
+            let tracingRequested = environments.environments[source.entityId]?.pathTracing.isEnabled == true
+            if pathTracingOverlaysOnly && !tracingRequested { return }
+            let uniformPass = pathTracingOverlaysOnly ? 1 : 0
+            let localPass = pathTracingOverlaysOnly ? 1000 : 0
 
             guard
                 target.rendering3DUsesEnvironmentTargets,
@@ -120,7 +127,7 @@ public struct Main3DRenderNode: RenderNode {
                 return
             }
 
-            lists.prepare(
+            if !pathTracingOverlaysOnly { lists.prepare(
                 sources: candidates.meshes,
                 view: source.entityId,
                 pass: -1,
@@ -130,13 +137,20 @@ public struct Main3DRenderNode: RenderNode {
                 settings: environments.environments[source.entityId]?.meshVisibility ?? MeshVisibilitySettings3D(),
                 device: renderDevice.renderDevice,
                 materials: &_materials.wrappedValue
-            )
+            ) }
             var visibleItems = lists.items(view: source.entityId, pass: -1)
+            if tracingRequested {
+                visibleItems.removeAll { item in
+                    let overlay = PathTracing3DScene.isRasterOverlay(item.material, castsShadows: item.castShadows)
+                    return pathTracingOverlaysOnly ? !overlay : overlay
+                }
+            }
+            if pathTracingOverlaysOnly && visibleItems.isEmpty { return }
             _activeInstances.wrappedValue = lists.buffers(view: source.entityId, pass: -1)
-            statistics.record(lists.count(view: source.entityId, pass: -1), view: source.entityId, pass: -1)
+            if !pathTracingOverlaysOnly { statistics.record(lists.count(view: source.entityId, pass: -1), view: source.entityId, pass: -1) }
 
             let drawUniform = temporalViewUniform(uniform, target: target)
-            if environments.environments[source.entityId]?.meshVisibility.gpuOcclusion == true {
+            if !pathTracingOverlaysOnly && !tracingRequested && environments.environments[source.entityId]?.meshVisibility.gpuOcclusion == true {
                 visibilityCommand = gpuVisibility.encode(
                     view: source.entityId,
                     size: sceneColor.size,
@@ -150,7 +164,7 @@ public struct Main3DRenderNode: RenderNode {
                     identityPalette: context.world.getResource(Skinning3DUniforms.self)?.identityBuffer,
                     metrics: metrics
                 )
-            } else {
+            } else if !pathTracingOverlaysOnly {
                 gpuVisibility.clearOutput(for: source.entityId)
             }
             let directionalLight =
@@ -184,14 +198,15 @@ public struct Main3DRenderNode: RenderNode {
                     )
                 ),
                 view: source.entityId,
+                pass: uniformPass,
                 device: renderDevice.renderDevice
             )
 
             let localShadows = context.world.getResource(LocalShadow3DViews.self)?.entries[source.entityId]
-            let localConstants = localUniforms.write(view: source.entityId, count: 135, device: renderDevice.renderDevice) {
+            let localConstants = localUniforms.write(view: source.entityId, pass: localPass, count: 135, device: renderDevice.renderDevice) {
                 packLocalLighting(_lighting.wrappedValue, view: uniform.viewMatrix, shadows: localShadows, into: &$0)
             }
-            let localMatrices = localUniforms.write(view: source.entityId, pass: 1, count: 97, device: renderDevice.renderDevice) {
+            let localMatrices = localUniforms.write(view: source.entityId, pass: localPass+1, count: 97, device: renderDevice.renderDevice) {
                 packLocalShadowMatrices(localShadows, into: &$0)
             }
             let localTexture = localShadows?.color ?? Texture2D.whiteTexture
@@ -209,7 +224,7 @@ public struct Main3DRenderNode: RenderNode {
                     layout: tileLayout
                 )
                 : []
-            let tileConstants = localUniforms.write(view: source.entityId, pass: 2, count: 6, device: renderDevice.renderDevice) {
+            let tileConstants = localUniforms.write(view: source.entityId, pass: localPass+2, count: 6, device: renderDevice.renderDevice) {
                 $0[0] = drawUniform.projectionMatrix.x
                 $0[1] = drawUniform.projectionMatrix.y
                 $0[2] = drawUniform.projectionMatrix.z
@@ -223,8 +238,11 @@ public struct Main3DRenderNode: RenderNode {
             commandBuffer.label = "Main 3d Render Pass"
 
             let environmentSettings = environments.environments[source.entityId] ?? Environment3D()
+            let distanceFieldConstants = surfaceLighting.distanceFields.write(
+                DistanceField3DUniform(settings: environmentSettings.distanceField),
+                view: source.entityId, pass: uniformPass, device: renderDevice.renderDevice)
             let contact = environmentSettings.contactShadows.sanitized
-            let contactEnabled = contact.isEnabled && camera.rasterizationRateMap == nil
+            let contactEnabled = !pathTracingOverlaysOnly && contact.isEnabled && camera.rasterizationRateMap == nil
                 && environmentSettings.debugView == .none
             var contactTexture: Texture2D = .whiteTexture
             if contactEnabled {
@@ -248,7 +266,7 @@ public struct Main3DRenderNode: RenderNode {
                     try RenderItems<Opaque3DRenderItem>(items: casters).render(with: encoder, world: context.world, view: view)
                 }
                 encoder.endRenderPass()
-            } else {
+            } else if !pathTracingOverlaysOnly {
                 surfaceLighting.textures.removeValue(forKey: source.entityId)
             }
             let shadowSettings = environmentSettings.shadows
@@ -260,13 +278,13 @@ public struct Main3DRenderNode: RenderNode {
                     tan(finiteRenderValue(shadowSettings.lightAngularRadius, fallback: 0.27, range: 0...10) * .pi / 180),
                     finiteRenderValue(shadowSettings.maximumPenumbraTexels, fallback: 16, range: 1...32),
                     finiteRenderValue(shadowSettings.blockerSearchTexels, fallback: 8, range: 1...32)]),
-                view: source.entityId, device: renderDevice.renderDevice)
+                view: source.entityId, pass: uniformPass, device: renderDevice.renderDevice)
 
             let depthAttachment = target.depthTexture.map {
                 DepthStencilAttachmentDescriptor(
                     texture: $0,
-                    depthOperation: OperationDescriptor(loadAction: .clear, storeAction: .store),
-                    stencilOperation: target.temporalUpscalingActive ? nil : OperationDescriptor(loadAction: .clear, storeAction: .store)
+                    depthOperation: OperationDescriptor(loadAction: pathTracingOverlaysOnly ? .load : .clear, storeAction: .store),
+                    stencilOperation: target.temporalUpscalingActive ? nil : OperationDescriptor(loadAction: pathTracingOverlaysOnly ? .load : .clear, storeAction: .store)
                 )
             }
 
@@ -275,30 +293,30 @@ public struct Main3DRenderNode: RenderNode {
                 colorAttachments: [
                     .init(
                         texture: sceneColor,
-                        operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
+                        operation: OperationDescriptor(loadAction: pathTracingOverlaysOnly ? .load : .clear, storeAction: .store),
                         // The environment pass supplies the sky. Preserve transparent coverage here so
                         // world-space particles over empty GBuffer pixels can composite over that sky.
                         clearColor: Color(red: 0, green: 0, blue: 0, alpha: 0)
                     ),
                     .init(
                         texture: normalRoughness,
-                        operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
+                        operation: OperationDescriptor(loadAction: pathTracingOverlaysOnly ? .load : .clear, storeAction: .store),
                         clearColor: .black
                     ),
                     .init(
                         texture: viewPositionMetallic,
-                        operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
+                        operation: OperationDescriptor(loadAction: pathTracingOverlaysOnly ? .load : .clear, storeAction: .store),
                         clearColor: .black
                     ),
-                    .init(texture: indirect, operation: OperationDescriptor(loadAction: .clear, storeAction: .store), clearColor: .black),
+                    .init(texture: indirect, operation: OperationDescriptor(loadAction: pathTracingOverlaysOnly ? .load : .clear, storeAction: .store), clearColor: .black),
                 ],
                 depthStencilAttachment: depthAttachment
             )
             if let response = target.reflectionResponse3DTexture {
-                descriptor.colorAttachments.append(.init(texture: response, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .black))
+                descriptor.colorAttachments.append(.init(texture: response, operation: .init(loadAction: pathTracingOverlaysOnly ? .load : .clear, storeAction: .store), clearColor: .black))
             }
             if let surface = target.diffuseSurface3DTexture {
-                descriptor.colorAttachments.append(.init(texture: surface, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .black))
+                descriptor.colorAttachments.append(.init(texture: surface, operation: .init(loadAction: pathTracingOverlaysOnly ? .load : .clear, storeAction: .store), clearColor: .black))
             }
             let foveatedPass = try camera.rasterizationRateMap.map {
                 try commandBuffer.beginFoveatedRenderPass(descriptor, rateMap: $0)
@@ -307,7 +325,7 @@ public struct Main3DRenderNode: RenderNode {
 
             // Stable in-flight buffer identities keep material bind groups reusable
             // across frames; inline bytes allocate a new WebGPU buffer every pass.
-            let viewConstants = viewUniforms.cache.write(drawUniform, view: source.entityId, device: renderDevice.renderDevice)
+            let viewConstants = viewUniforms.cache.write(drawUniform, view: source.entityId, pass: uniformPass, device: renderDevice.renderDevice)
             renderPass.setVertexBuffer(viewConstants, offset: 0, slot: GlobalBufferIndex.viewUniform)
             renderPass.setVertexBuffer(lightConstants, offset: 0, slot: 1)
             renderPass.setFragmentBuffer(lightConstants, offset: 0, slot: 1)
@@ -316,8 +334,11 @@ public struct Main3DRenderNode: RenderNode {
             renderPass.setFragmentBuffer(tileConstants, offset: 0, slot: 27)
             renderPass.setFragmentBuffer(tileMaskBuffer, offset: 0, slot: 29)
             renderPass.setFragmentBuffer(surfaceConstants, offset: 0, slot: 42)
+            renderPass.setFragmentBuffer(distanceFieldConstants, offset: 0, slot: 50)
             renderPass.setResourceSet(.init(bindings: [
-                .init(binding: 41, shaderStages: .fragment, resource: .texture(contactTexture))
+                .init(binding: 41, shaderStages: .fragment, resource: .texture(contactTexture)),
+                .init(binding: 49, shaderStages: .fragment,
+                    resource: .texture(environmentSettings.distanceField?.asset.asset?.texture ?? Texture2D.whiteTexture))
             ]), index: 0)
             renderPass.setResourceSet(
                 RenderResourceSet(bindings: [
@@ -348,6 +369,7 @@ public struct Main3DRenderNode: RenderNode {
                     probeMaximum: Vector4(probe?.maximum ?? .zero, 0)
                 ),
                 view: source.entityId,
+                pass: uniformPass,
                 device: renderDevice.renderDevice
             )
             let diffuse = environment?.irradiance ?? Texture2D.whiteTexture
@@ -372,7 +394,7 @@ public struct Main3DRenderNode: RenderNode {
                 countsVisibilityBias: [Float(grid?.counts[0] ?? 2), Float(grid?.counts[1] ?? 2), Float(grid?.counts[2] ?? 2),
                     finiteRenderValue(gridSettings?.visibilityBias ?? 0.04, fallback: 0.04, range: 0...1)],
                 quality: [Float(grid?.visibilityResolution ?? 16), grid == nil ? 0 : 1, 3, dynamic == nil ? 0 : 1]),
-                view: source.entityId, device: renderDevice.renderDevice)
+                view: source.entityId, pass: uniformPass, device: renderDevice.renderDevice)
             renderPass.setFragmentBuffer(gridConstants, offset: 0, slot: 45)
             renderPass.setResourceSet(.init(bindings: [
                 .init(binding: 43, shaderStages: .fragment, resource: .texture(grid?.coefficients ?? Texture2D.whiteTexture)),
@@ -412,7 +434,8 @@ public struct Main3DRenderNode: RenderNode {
             renderPass.endRenderPass()
             try foveatedPass?.resolve()
             if let metrics {
-                commandBuffer.addCompletedTimingHandler { metrics.record(pass: "geometry", seconds: $0) }
+                let passName = pathTracingOverlaysOnly ? "pathTracingOverlays" : "geometry"
+                commandBuffer.addCompletedTimingHandler { metrics.record(pass: passName, seconds: $0) }
             }
             submitted = commandBuffer
         }

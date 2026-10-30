@@ -71,6 +71,57 @@ struct EditorCloudAgentTests {
             #expect(await count.value == 0)
         }
     }
+    @Test func downloadsShowTheirDestinationAndReportTheSavedFile() async throws {
+        let path = "Assets/Textures/sprite.png"
+        let gateway = Gateway(name: "editor_web_download", arguments: #"{"destination":"Assets/Textures/sprite.png"}"#)
+        let changed = Counter()
+        let tool = EditorCloudAgentTool(
+            name: "editor_web_download", definition: ["type": "function"], readOnly: false, invoke: { _ in "Downloaded" })
+        let service = EditorCloudAgentService(transportFactory: { { input, receive in try await gateway.respond(input, receive) } }, toolsFactory: { _ in [tool] })
+        _ = try await service.send(
+            request(),
+            onEvent: { event in
+                if let permission = event.permission {
+                    #expect(permission.summary.contains(path))
+                    await service.resolvePermission(requestID: permission.id, optionID: "allow")
+                }
+            }, onProjectFileChanged: { saved in
+                #expect(saved == path)
+                await changed.increment()
+            })
+        #expect(await changed.value == 1)
+    }
+    @Test(arguments: [EditorAgentChatMode.ask, .plan])
+    func planningCanResearchTheWebWithoutDownloading(mode: EditorAgentChatMode) async throws {
+        let count = Counter()
+        let tools = ["editor_web_search", "editor_web_fetch", "editor_web_download"].map { name in
+            EditorCloudAgentTool(
+                name: name, definition: ["type": "function", "function": ["name": .string(name)]], readOnly: name != "editor_web_download",
+                invoke: { _ in
+                    await count.increment()
+                    return "External reference"
+                })
+        }
+        let service = EditorCloudAgentService(
+            transportFactory: {
+                { input, receive in
+                    let advertised = input["tools"].array.compactMap { $0["function"]["name"].string }
+                    #expect(Set(advertised) == ["editor_web_search", "editor_web_fetch"])
+                    if await count.value == 0 {
+                        for name in advertised {
+                            try await receive(["type": "tool", "call": ["id": .string(name), "function": ["name": .string(name), "arguments": "{}"]]])
+                        }
+                    } else {
+                        try await receive(["type": "text", "text": "Found references"])
+                    }
+                    try await receive(["type": "complete"])
+                }
+            }, toolsFactory: { _ in tools })
+        let result = try await service.send(
+            request(mode: mode), onEvent: { event in #expect(event.permission == nil) }, onProjectFileChanged: { _ in Issue.record("Research changed a file") })
+        #expect(result.assistantText == "Found references")
+        #expect(await count.value == 2)
+    }
     @Test func incompleteResponseNeverRunsToolsOrAutomaticallyRetries() async {
         let count = Counter()
         let service = EditorCloudAgentService(
@@ -144,6 +195,12 @@ struct EditorCloudAgentTests {
     }
     private actor Gateway {
         var operations: [String] = []
+        let name: String
+        let arguments: String
+        init(name: String = "editor_file_write", arguments: String = #"{"path":"Sources/Game.ada"}"#) {
+            self.name = name
+            self.arguments = arguments
+        }
         func respond(_ input: EditorCloudValue, _ receive: @escaping @Sendable (EditorCloudValue) async throws -> Void) async throws {
             let operation = try #require(input["operationID"].string)
             operations.append(operation)
@@ -151,7 +208,7 @@ struct EditorCloudAgentTests {
             #expect(input["billingMode"].string == "ada")
             #expect(input["apiKey"] == .null)
             if operations.count == 1 {
-                try await receive(["type": "tool", "call": ["id": "call", "function": ["name": "editor_file_write", "arguments": #"{"path":"Sources/Game.ada"}"#]]])
+                try await receive(["type": "tool", "call": ["id": "call", "function": ["name": .string(name), "arguments": .string(arguments)]]])
             } else {
                 try await receive(["type": "text", "text": "Done"])
             }

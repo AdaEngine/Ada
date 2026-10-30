@@ -15,6 +15,8 @@ struct EditorSceneDocumentEditor: View {
     var onTerrainToolSelected: (() -> Void)? = nil
     let onPlay: (() -> Void)?
     let onStop: (() -> Void)?
+    var annotationAgent: EditorAgentViewModel?
+    var onAnnotationAdded: (() -> Void)?
 
     @Environment(\.theme) private var theme
 
@@ -49,7 +51,9 @@ struct EditorSceneDocumentEditor: View {
                 onPlay: onPlay,
                 onStop: onStop,
                 onDocumentChanged: { workbench.replaceSceneDocument($0) },
-                onTerrainToolSelected: onTerrainToolSelected
+                onTerrainToolSelected: onTerrainToolSelected,
+                annotationAgent: annotationAgent,
+                onAnnotationAdded: onAnnotationAdded
             )
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             .accessibilityIdentifier("AdaEditor.SceneEditor.ViewportPanel")
@@ -63,8 +67,13 @@ struct EditorSceneDocumentEditor: View {
             document: document,
             presentation: .embedded,
             onSelectEntity: { entityID in
-                workbench.selectSceneEntity(documentID: document.id, entityID: entityID)
-                onEntitySelected?()
+                if let annotationAgent, annotationAgent.sceneAnnotations.isSelecting,
+                   let context = EditorAgentSceneContext(document: document, entityID: entityID) {
+                    annotationAgent.sceneAnnotations.select(context)
+                } else {
+                    workbench.selectSceneEntity(documentID: document.id, entityID: entityID)
+                    onEntitySelected?()
+                }
             },
             onToggleEntityExpanded: { entityID in
                 workbench.toggleSceneEntityExpanded(documentID: document.id, entityID: entityID)

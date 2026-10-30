@@ -30,7 +30,9 @@ Debug Simulator builds accept `--mobile-agent-tools-smoke`. This runs the real p
 
 `editor.web.download` saves up to 16 MiB to an explicit project-relative destination under `Assets/` or `Downloads/`. Traversal, hidden files, symlink escapes and existing destinations are rejected. A staged file is moved into place only after a successful bounded request. Results include source/final URLs, MIME type and byte count; downloads do not execute or unpack files. Use `editor.asset.validate` before assigning downloaded resources.
 
-These tools are advertised to mobile API/Codex providers through the existing host bridge and to desktop agents through the existing AdaMCP endpoint. HTTP uses ephemeral sessions without cookies or stored credentials, a 30-second request timeout and up to five validated redirects. URL credentials, local hostnames and private IP literals are rejected. Web content is untrusted reference data; cite its source and preserve resource attribution.
+These tools are advertised to mobile API/Codex providers through the existing host bridge, to desktop agents through the existing AdaMCP endpoint, and to the built-in native Ada AI through its project-scoped Cloud tool host. Ada AI's Ask/Plan modes allow search and page reading; downloads are available in Build mode through the existing project-change approval flow. Browser Studio has a separate tool registry and does not expose these internet tools.
+
+HTTP uses ephemeral sessions without cookies or stored credentials, a 30-second request timeout and up to five validated redirects. URL credentials, local hostnames and private IP literals are rejected. Web content is untrusted reference data; cite its source and preserve resource attribution.
 
 The opt-in `ADA_WEB_LIVE_SMOKE=1` test runs the production mobile dispatcher and URLSession transport through a Brave query, then reads and downloads `example.com` into a temporary project.
 

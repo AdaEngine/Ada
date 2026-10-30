@@ -43,7 +43,7 @@ transient view state such as scroll positions is not guaranteed to be retained.
 ## Sessions and execution
 
 Both modes use the same project-scoped session store and agent service. Switching
-chats keeps each session's unsent text, attachments, selected-code context and
+chats keeps each session's unsent text, attachments, scene annotations, selected-code context and
 chat mode in memory. Unsent drafts are not persisted across app restarts.
 One turn runs at a time in each project window. Switching chats does not cancel
 that turn, and later events are saved to its original session. The tree marks the
@@ -53,3 +53,22 @@ chat. Provider/model controls still come from the existing agent configuration.
 
 The mode switch is available in the shared desktop and visionOS workspace. The dedicated
 iPhone UI and iOS agent implementation are outside this feature's scope.
+
+## Scene annotations
+
+Open a scene and choose **Annotate** in its toolbar. Click an object in the 2D or
+3D viewport, or in the hierarchy, write a note and choose **Add to message**.
+The assistant opens with an editable draft. Add more notes before pressing Send;
+adding a note never starts an agent turn. Up to eight notes fit in one message.
+
+Numbered chips above the composer edit or remove notes; remaining numbers stay
+stable. Manual edits in the composer remain authoritative. Object references
+include the originating scene and entity ID, so similarly named objects in
+different scenes remain distinct. Sent references persist with the conversation.
+Unsent notes follow the same in-memory lifetime as other native chat drafts.
+
+Annotation picking suppresses transform gizmos and scene selection writes.
+Camera navigation still works. Choose another editing tool or press Escape in
+the viewport to leave picking mode. Scene Play and standalone model previews do
+not expose annotation authoring. This operates on authored scene entities; it
+does not identify individual pixels or nested widgets inside a rendered UI.

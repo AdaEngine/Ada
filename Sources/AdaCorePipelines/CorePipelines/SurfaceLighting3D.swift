@@ -31,6 +31,7 @@ struct SurfaceLighting3DViews: Resource {
     struct Depth { var color: RenderTexture; var depth: RenderTexture }
     var textures: [Entity.ID: Depth] = [:]
     var uniforms = FrameUniformCache3D<SurfaceLighting3DUniform>()
+    var distanceFields = FrameUniformCache3D<DistanceField3DUniform>()
     var depthUniforms = FrameUniformCache3D<DirectionalShadowViewUniform>()
     private var retired: [Depth] = []
 
@@ -45,6 +46,6 @@ struct SurfaceLighting3DViews: Resource {
     }
     mutating func retain(_ active: [Entity.ID]) {
         for key in textures.keys where !active.contains(key) { textures.removeValue(forKey:key) }
-        uniforms.retainViews(active); depthUniforms.retainViews(active)
+        uniforms.retainViews(active); depthUniforms.retainViews(active); distanceFields.retainViews(active)
     }
 }

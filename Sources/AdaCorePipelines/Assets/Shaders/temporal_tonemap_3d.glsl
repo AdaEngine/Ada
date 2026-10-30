@@ -28,5 +28,6 @@ layout (location = 0) out vec4 o_Color;
 void temporal_tonemap_fragment() {
     vec2 uv = v_UV + (u_Parameters.w > 0.5 ? u_Parameters.xy : vec2(0.0));
     vec3 color = max(texture(sampler2D(u_Color, u_Sampler), uv).rgb, vec3(0.0));
-    o_Color = vec4(adaApplyLut(adaOutputTransform(color, u_ToneMapping.x), u_ToneMapping.y), 1.0);
+    vec3 display = adaApplyLut(adaOutputTransform(color, u_ToneMapping.x), u_ToneMapping.y);
+    o_Color = vec4(adaDitherDisplay(display, gl_FragCoord.xy), 1.0);
 }

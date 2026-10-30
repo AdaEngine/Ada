@@ -33,6 +33,8 @@ struct EditorCenterWorkbench: View {
     var showsDocumentTabs = true
     var projectItems: [EditorProjectSidebarViewModel.Item] = []
     var onOpenProjectItem: ((EditorProjectSidebarViewModel.Item) -> Void)?
+    var annotationAgent: EditorAgentViewModel?
+    var onAnnotationAdded: (() -> Void)?
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
@@ -666,7 +668,9 @@ extension EditorCenterWorkbench {
             onEntitySelected: onSceneEntitySelected,
             onTerrainToolSelected: onTerrainToolSelected,
             onPlay: onPlayScene,
-            onStop: onStopScene
+            onStop: onStopScene,
+            annotationAgent: annotationAgent,
+            onAnnotationAdded: onAnnotationAdded
         )
         .id("\(document.id).tilemap-\(viewModel.tileMapResourceRevision)")
         .accessibilityIdentifier("AdaEditor.SceneDocument.\(document.title)")

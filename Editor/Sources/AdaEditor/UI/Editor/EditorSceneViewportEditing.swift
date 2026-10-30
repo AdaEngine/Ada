@@ -43,6 +43,21 @@ extension EditorSceneViewportView {
             runtimeWarnings = loadResult.warnings
             viewProxy.redraw()
         }
+        if let agent = annotationAgent {
+            let annotations = agent.sceneAnnotations
+            viewportModel.setAnnotationMode(annotations.isSelecting)
+            viewportModel.annotationEntityIDs = annotations.items.filter { $0.context.sceneRelativePath == document.relativePath }
+                .map { $0.context.selectedEntityID }
+            if let draft = annotations.draft, draft.context.sceneRelativePath == document.relativePath {
+                viewportModel.annotationEntityIDs.append(draft.context.selectedEntityID)
+            }
+            viewportModel.onAnnotateEntity = { id in
+                guard let context = EditorAgentSceneContext(document: document, entityID: id) else { return }
+                annotations.select(context)
+                viewProxy.redraw()
+            }
+            viewportModel.onCancelAnnotation = { annotations.stopSelecting() }
+        }
         inspectorViewModel.setSceneViewportActions(
             owner: viewportModel,
             applyGizmoChange: { [weak viewportModel] gizmo in

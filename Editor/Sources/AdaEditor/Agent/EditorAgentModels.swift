@@ -69,11 +69,11 @@ struct EditorAgentSceneContext: Codable, Equatable, Sendable {
         self.entityYAML = entityYAML
     }
 
-    init?(document: EditorSceneDocument) {
+    init?(document: EditorSceneDocument, entityID: String? = nil) {
         guard
             !document.isLoading,
             let model = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content),
-            let selectedEntityID = model.editor?.selectedEntity,
+            let selectedEntityID = entityID ?? model.editor?.selectedEntity,
             let entity = model.entities.first(where: { $0.id == selectedEntityID })
         else {
             return nil
@@ -155,17 +155,20 @@ struct EditorAgentMessage: Codable, Equatable, Identifiable, Sendable {
     var role: EditorAgentRole
     var segments: [EditorAgentMessageSegment]
     var createdAt: Date
+    var sceneAnnotations: [EditorAgentSceneAnnotation]?
 
     init(
         id: String = UUID().uuidString,
         role: EditorAgentRole,
         segments: [EditorAgentMessageSegment],
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        sceneAnnotations: [EditorAgentSceneAnnotation]? = nil
     ) {
         self.id = id
         self.role = role
         self.segments = segments
         self.createdAt = createdAt
+        self.sceneAnnotations = sceneAnnotations
     }
 }
 

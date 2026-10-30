@@ -59,6 +59,10 @@ final class EditorSceneViewportModel {
     var selectedEditorID: String?
     let terrainEditing = EditorTerrainEditingState()
     private(set) var activeTool: EditorSceneViewportTool = .translate
+    private(set) var isAnnotating = false
+    var annotationEntityIDs: [String] = []
+    var onAnnotateEntity: ((String) -> Void)?
+    var onCancelAnnotation: (() -> Void)?
     private(set) var hoveredGizmoHandle: EditorTransformGizmo.Handle?
     var presentedGizmo: PresentedGizmo?
     var activeGizmoHandle: EditorTransformGizmo.Handle? { transformDrag?.interaction.handle }
@@ -188,6 +192,10 @@ final class EditorSceneViewportModel {
         touchDownPosition = nil
         hoveredGizmoHandle = nil
         onSelectEntity = nil
+        onAnnotateEntity = nil
+        onCancelAnnotation = nil
+        isAnnotating = false
+        annotationEntityIDs = []
         onSelectionChanged = nil
         onTransformChanged = nil
         onDocumentContentChanged = nil
@@ -376,6 +384,23 @@ final class EditorSceneViewportModel {
         activeTool = tool
     }
 
+    func setAnnotationMode(_ enabled: Bool) {
+        guard isAnnotating != enabled else { return }
+        endTransformDrag(cancelled: true)
+        if enabled { setTerrainEditing(false) }
+        hoveredGizmoHandle = nil
+        isAnnotating = enabled
+    }
+
+    func completeSelection(at point: Point) {
+        let id = displayMode == .twoD ? pick2D(at: point) : pick3D(at: point)
+        if isAnnotating {
+            if let id { onAnnotateEntity?(id) }
+        } else {
+            onSelectEntity?(id)
+        }
+    }
+
     func setViewportSize(_ size: Size) {
         guard size.width > 0 && size.height > 0 && size != viewportSize else {
             return
@@ -504,6 +529,10 @@ final class EditorSceneViewportModel {
                 in: &context
             )
         }
+        for id in annotationEntityIDs {
+            guard let matrix = gizmoWorldMatrix(for: id), let point = project(matrix.origin, viewProjection: viewProjection, size: size) else { continue }
+            drawViewportMarker(at: point, radius: 10, color: theme.editorColors.blue, in: &context)
+        }
         let gizmo = transformGizmo(size: size)
         gizmo?.draw(in: &context, highlighted: activeGizmoHandle ?? hoveredGizmoHandle)
         return gizmo
@@ -570,6 +599,11 @@ extension EditorSceneViewportModel {
     func handleKeyEvent(_ event: KeyEvent) -> Bool {
         switch event.status {
         case .down:
+            if event.keyCode == .escape, isAnnotating {
+                setAnnotationMode(false)
+                onCancelAnnotation?()
+                return true
+            }
             if event.keyCode == .escape, terrainEditing.stroke != nil {
                 endTerrainStroke(cancelled: true)
                 return true
@@ -608,7 +642,7 @@ extension EditorSceneViewportModel {
             return handleTerrainPointer(at: event.mousePosition, began: event.phase == .began && event.button == .left,
                                         ended: event.phase == .ended, cancelled: event.phase == .cancelled)
         }
-        if event.phase == .changed, transformDrag == nil, !isTwoDPanning, !isThreeDRotating {
+        if event.phase == .changed, !isAnnotating, transformDrag == nil, !isTwoDPanning, !isThreeDRotating {
             let gizmo = interactionGizmo()
             let handle = gizmo.flatMap { $0.hitTest(gizmoPosition(event.mousePosition, size: $0.size)) }
             if handle != hoveredGizmoHandle {
@@ -672,7 +706,7 @@ extension EditorSceneViewportModel {
             guard event.phase == .ended, !isTwoDPanning, event.button == .left, isClickEnd(at: event.mousePosition) else {
                 return isTwoDPanning
             }
-            onSelectEntity?(pick2D(at: event.mousePosition))
+            completeSelection(at: event.mousePosition)
             return true
         }
     }
@@ -722,7 +756,7 @@ extension EditorSceneViewportModel {
             guard event.phase == .ended, !isThreeDRotating, event.button == .left, isClickEnd(at: event.mousePosition) else {
                 return isThreeDRotating
             }
-            onSelectEntity?(pick3D(at: event.mousePosition))
+            completeSelection(at: event.mousePosition)
             return true
         }
     }
@@ -736,6 +770,7 @@ extension EditorSceneViewportModel {
 
     func beginTransformDragIfNeeded(at position: Point, button: MouseButton) -> Bool {
         guard
+            !isAnnotating,
             button == .left,
             let selectedEditorID,
             let entity = sceneModel?.entities.first(where: { $0.id == selectedEditorID }),
@@ -924,7 +959,7 @@ extension EditorSceneViewportModel {
                 }
                 endTransformDrag(cancelled: event.phase == .cancelled)
             } else if !suppressSelectionOnPointerEnd, event.phase == .ended, let touchDownPosition, (event.location - touchDownPosition).squaredLength < 16 {
-                onSelectEntity?(displayMode == .twoD ? pick2D(at: event.location) : pick3D(at: event.location))
+                completeSelection(at: event.location)
             }
             lastTouchPosition = nil
             touchDownPosition = nil

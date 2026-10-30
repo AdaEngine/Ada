@@ -9,11 +9,13 @@ final class EditorAgentViewModel {
     var sessions: [EditorAgentSessionSummary] = []
     var activeSession: EditorAgentSession? {
         didSet {
+            sceneAnnotations.selectSession(activeSession?.id)
             if let activeSession { a2ui.restoreIfNeeded(activeSession) }
             refreshPromptSuggestions()
         }
     }
     let a2ui = EditorAgentA2UIController()
+    let sceneAnnotations = EditorAgentSceneAnnotations()
     let promptSuggestions: EditorAgentPromptSuggestions
     var isSubmittingA2UI = false
     @ObservationIgnored private var a2uiSaveTasks: [String: Task<Void, Never>] = [:]
@@ -889,6 +891,7 @@ final class EditorAgentViewModel {
                 return EditorAgentAttachmentContext.attachment(forFileAt: url, projectURL: projectURL, fileManager: fileManager)
             }
         let attachmentsToSend = a2uiSubmission == nil ? uniqueAttachments(pendingAttachments + tokenAttachments) : []
+        let annotationsToSend = a2uiSubmission == nil ? sceneAnnotations.items : []
 
         let userSegments =
             [
@@ -904,7 +907,7 @@ final class EditorAgentViewModel {
         session.events.append(
             EditorAgentEvent(
                 kind: .message,
-                message: EditorAgentMessage(role: .user, segments: userSegments)
+                message: EditorAgentMessage(role: .user, segments: userSegments, sceneAnnotations: annotationsToSend.isEmpty ? nil : annotationsToSend)
             )
         )
         session.attachments.append(contentsOf: attachmentsToSend)
@@ -915,6 +918,7 @@ final class EditorAgentViewModel {
             prompt = ""
             autocompleteSuggestions = []
             pendingAttachments = []
+            sceneAnnotations.consume()
         }
         let attachments = attachmentsToSend
         let codeSelectionToSend = a2uiSubmission == nil ? codeSelection : nil
@@ -960,7 +964,8 @@ final class EditorAgentViewModel {
                     availableSkills: availableSkills,
                     a2uiAction: a2uiSubmission?.event,
                     a2uiFeedback: Array(ui.eventErrors.values.sorted().prefix(4)),
-                    a2uiEnabled: true
+                    a2uiEnabled: true,
+                    sceneAnnotations: annotationsToSend
                 ),
                 onEvent: { [weak self] event in
                     await MainActor.run {

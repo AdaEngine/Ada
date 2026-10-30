@@ -23,6 +23,8 @@ layout (binding = 5) uniform CameraEffects3DUniform {
     vec4 u_Rain;   // lens wetness, pause-safe seconds, aspect ratio, reserved
 };
 
+#include <AdaEngine/Tonemapping.glsl>
+
 vec2 bounded(vec2 uv) { return clamp(uv, u_Size.xy * 0.5, vec2(1.0) - u_Size.xy * 0.5); }
 vec3 colorAt(vec2 uv) { return textureLod(sampler2D(u_Color, u_Linear), bounded(uv), 0.0).rgb; }
 float depthAt(vec2 uv) {
@@ -116,5 +118,5 @@ void camera_effects_fragment() {
         color += vec3(noise * u_Lens.w);
     }
     color = rainOnLens(v_UV, color);
-    o_Color = vec4(clamp(color, 0.0, 1.0), 1.0);
+    o_Color = vec4(adaDitherDisplay(color, gl_FragCoord.xy), 1.0);
 }

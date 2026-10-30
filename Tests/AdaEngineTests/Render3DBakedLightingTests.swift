@@ -57,8 +57,8 @@ extension Render3DGPUTests {
             return Mesh.generate(from:[d],renderDevice:device)
         }
 
-        static func scene() async throws -> DebugViews.Scene {
-            let s = try await DebugViews.makeScene()
+        static func scene(pathTracingPresentation: Bool = false) async throws -> DebugViews.Scene {
+            let s = try await DebugViews.makeScene(pathTracingPresentation:pathTracingPresentation)
             try s.setSunIntensity(0)
             for entity in s.app.main.getEntities() where entity.id != s.camera.id && entity.id != s.sun.id { s.app.main.removeEntity(entity) }
             s.camera.components[Transform.self] = Transform(position:[0,0,-3.4])

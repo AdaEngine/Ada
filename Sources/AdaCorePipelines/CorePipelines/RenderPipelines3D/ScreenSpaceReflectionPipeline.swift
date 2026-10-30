@@ -16,7 +16,12 @@ public struct ScreenSpaceReflectionPipeline: Resource {
     let nearest: Sampler
 
     public init(device: RenderDevice) {
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/screen_space_reflection.glsl")
+        self.init(device: device, pathTracingPresentation: false)
+    }
+
+    public init(device: RenderDevice, pathTracingPresentation: Bool) {
+        let shader = CorePipelineShaders.loadRequiredBundled(at: pathTracingPresentation
+            ? "Shaders/path_tracing_composite_3d.glsl" : "Shaders/screen_space_reflection.glsl")
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),

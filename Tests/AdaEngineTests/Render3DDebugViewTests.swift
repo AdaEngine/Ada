@@ -256,7 +256,8 @@ extension Render3DGPUTests {
             emissiveSphere: Bool = false,
             farMarker: Bool = false,
             antiAliasing: AntiAliasing3D = .none,
-            temporalRenderScale: Float? = nil
+            temporalRenderScale: Float? = nil,
+            pathTracingPresentation: Bool = false
         ) async throws -> Scene {
             let backend = GoldenFrame.activeBackend ?? .metal
             let requested: RenderBackendType = backend == .webgpu ? .webgpu : .metal
@@ -278,7 +279,7 @@ extension Render3DGPUTests {
                 .addPlugin(AssetsPlugin(filePath: #filePath))
                 .addPlugin(VisibilityPlugin())
                 .addPlugin(ScenePlugin())
-                .addPlugin(Core3DPlugin())
+                .addPlugin(Core3DPlugin(pathTracingPresentation:pathTracingPresentation))
             if temporalRenderScale != nil {
                 // Temporal upscaling renders into a private texture that the upscale node copies to the target.
                 app.addPlugin(UpscalePlugin())

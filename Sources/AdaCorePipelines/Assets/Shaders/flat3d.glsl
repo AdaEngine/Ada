@@ -331,6 +331,7 @@ uint localLightMask() {
 
 const float PI = 3.14159265359;
 #include <AdaEngine/BakedDiffuse3D.glsl>
+#include <AdaEngine/DistanceField3D.glsl>
 
 vec3 srgbToLinear(vec3 value) {
     return mix(value / 12.92, pow((value + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), value));
@@ -969,6 +970,16 @@ void flat3d_fragment()
     // follows the geometric normal and can still be lit there.
     float shadowVisibility = (normalLight > 0.0 || hasClearcoat()) ? directionalShadow(normal, lightDirection) : 1.0;
     if (u_ContactQuality.z > 0.5) { shadowVisibility *= contactVisibility(normal, lightDirection, u_Contact.y); }
+    float distanceFieldVisibility = 1.0;
+    if (u_SDFTrace.w > 0.5 && u_ContactQuality.z > 0.5 && Input.ShadowFlags.x > 0.5
+        && (normalLight > 0.0 || hasClearcoat()) && (shadowVisibility > 0.0 || u_SDFTrace.w > 1.5)) {
+        vec3 sdfNormal = Input.ViewNormal;
+        if (!surfaceFrontFacing() && u_SurfaceFlags.x > 0.5) { sdfNormal = -sdfNormal; }
+        distanceFieldVisibility = adaDistanceFieldVisibility(Input.WorldPosition,
+            normalize(mat3(u_EnvironmentInverseView) * sdfNormal),
+            normalize(mat3(u_EnvironmentInverseView) * lightDirection), u_SDFCountsDistance.w);
+        shadowVisibility *= distanceFieldVisibility;
+    }
     vec3 directLighting = evaluateDirect(normal, viewDirection, lightDirection, baseColor.rgb, metallic, roughness, radiance) * shadowVisibility;
     directLighting += additionalLighting(normal, viewDirection, baseColor.rgb, metallic, roughness);
     vec3 ambient = baseColor.rgb * (1.0 - metallic) * max(u_LightRadianceAmbient.w, 0.0);
@@ -1016,6 +1027,9 @@ void flat3d_fragment()
     #endif
 
     color = vec4(directLighting + ambient + emissive, opacity);
+    if (u_SDFTrace.w > 1.5) {
+        color = vec4(mix(vec3(0.6, 0.025, 0.015), vec3(0.025, 0.65, 0.08), distanceFieldVisibility), opacity);
+    }
 #ifdef ADA_DIFFUSE_SURFACE
     vec3 giF0 = mix(g_Dielectric, baseColor.rgb, metallic);
     vec3 giFresnel = giF0 + (max(vec3(1.0 - roughness), giF0) - giF0) * pow(1.0 - max(dot(normal, viewDirection), 0.0), 5.0);

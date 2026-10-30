@@ -15,10 +15,18 @@ import Math
 /// Plugin for RenderWorld added 3D render capatibilites.
 public struct Core3DPlugin: Plugin {
     private let includes2D: Bool
+    private let pathTracingPresentation: Bool
 
     /// Enables depth-tested 2D content in the 3D graph. Requires `Core2DPlugin`.
     public init(includes2D: Bool = false) {
         self.includes2D = includes2D
+        self.pathTracingPresentation = false
+    }
+
+    /// Uses a presentation shader that consumes already traced surface HDR without another reflection pass.
+    public init(includes2D: Bool = false, pathTracingPresentation: Bool) {
+        self.includes2D = includes2D
+        self.pathTracingPresentation = pathTracingPresentation
     }
 
     /// Input slots of render graph.
@@ -34,6 +42,7 @@ public struct Core3DPlugin: Plugin {
         AssetsManager.registerAssetType(LightmapSet3D.self)
         AssetsManager.registerAssetType(IrradianceProbeGrid3D.self)
         AssetsManager.registerAssetType(ProbeTransport3D.self)
+        AssetsManager.registerAssetType(DistanceField3D.self)
 
         app.insertResource(DebugDraw3D())
 
@@ -55,6 +64,8 @@ public struct Core3DPlugin: Plugin {
         graph.addNode(LocalShadow3DRenderNode())
         graph.addNode(DynamicIrradiance3DRenderNode())
         graph.addNode(Main3DRenderNode())
+        graph.addNode(PathTracing3DRenderNode())
+        graph.addNode(PathTracingOverlays3DRenderNode())
         graph.addNode(Particles3DRenderNode())
         graph.addNode(ScreenSpaceGI3DRenderNode())
         graph.addNode(ScreenSpaceAO3DRenderNode())
@@ -82,6 +93,12 @@ public struct Core3DPlugin: Plugin {
         graph.addNodeEdge(from: DirectionalShadow3DRenderNode.name, to: LocalShadow3DRenderNode.name)
         graph.addNodeEdge(from: LocalShadow3DRenderNode.name, to: DynamicIrradiance3DRenderNode.name)
         graph.addNodeEdge(from: DynamicIrradiance3DRenderNode.name, to: Main3DRenderNode.name)
+        graph.addNodeEdge(from: Main3DRenderNode.name, to: PathTracing3DRenderNode.name)
+        graph.addNodeEdge(from: PathTracing3DRenderNode.name, to: PathTracingOverlays3DRenderNode.name)
+        graph.addNodeEdge(from: PathTracingOverlays3DRenderNode.name, to: ScreenSpaceGI3DRenderNode.name)
+        graph.addNodeEdge(from: PathTracingOverlays3DRenderNode.name, to: Particles3DRenderNode.name)
+        graph.addNodeEdge(from: PathTracingOverlays3DRenderNode.name, to: ScreenSpaceAO3DRenderNode.name)
+        graph.addNodeEdge(from: PathTracingOverlays3DRenderNode.name, to: VolumetricFog3DRenderNode.name)
         graph.addNodeEdge(from: DirectionalShadow3DRenderNode.name, to: Main3DRenderNode.name)
         graph.addNodeEdge(from: Main3DRenderNode.name, to: ScreenSpaceReflectionRenderNode.name)
         graph.addNodeEdge(from: Main3DRenderNode.name, to: ScreenSpaceAO3DRenderNode.name)
@@ -140,7 +157,7 @@ public struct Core3DPlugin: Plugin {
             .insertResource(DirectionalShadow3D())
             .insertResource(DirectionalShadow3DScratch())
             .insertResource(RenderPipelines(configurator: DirectionalShadow3DPipeline()))
-            .insertResource(ScreenSpaceReflectionPipeline(device: renderDevice))
+            .insertResource(ScreenSpaceReflectionPipeline(device: renderDevice, pathTracingPresentation: pathTracingPresentation))
             .insertResource(ScreenSpaceReflectionScratch())
             .insertResource(ScreenQuality3DPipelines(device: renderDevice))
             .insertResource(ScreenQuality3DScratch())
@@ -151,6 +168,8 @@ public struct Core3DPlugin: Plugin {
             .insertResource(CameraEffects3DViews(device: renderDevice))
             .insertResource(VolumetricFog3DViews(device: renderDevice))
             .insertResource(ScreenSpaceGI3DViews())
+            .insertResource(PathTracing3DViews())
+            .insertResource(Render3DPathTracingStatistics())
             .insertResource(DynamicIrradiance3DViews())
             .insertResource(Render3DDynamicGIStatistics())
             .insertResource(SurfaceLighting3DViews())

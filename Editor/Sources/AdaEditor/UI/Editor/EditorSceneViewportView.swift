@@ -17,6 +17,8 @@ struct EditorSceneViewportView: View {
     var initialDisplayMode: EditorSceneViewportDisplayMode = .twoD
     var isAssetPreview = false
     var onEditWorldReady: ((World) -> Void)?
+    var annotationAgent: EditorAgentViewModel?
+    var onAnnotationAdded: (() -> Void)?
 
     @State private var performanceSession = EditorGamePerformanceSession()
     @State var viewportPresentation = EditorViewportPresentation()
@@ -127,6 +129,20 @@ struct EditorSceneViewportView: View {
 
                     sceneControls(size: geometry.size)
                     statusBar
+                    if let agent = annotationAgent,
+                       (agent.sceneAnnotations.draft?.context.sceneRelativePath == document.relativePath && agent.sceneAnnotations.draft?.editingID == nil)
+                        || agent.sceneAnnotations.error != nil {
+                        VStack {
+                            HStack {
+                                Spacer()
+                                EditorSceneAnnotationEditor(agent: agent, onAdded: onAnnotationAdded)
+                                    .frame(width: min(310, max(0, geometry.size.width - 24)))
+                            }
+                            Spacer()
+                        }
+                        .padding(.top, 86)
+                        .padding(.trailing, 12)
+                    }
                     if isLoadingScene {
                         Text(L10n.text("Loading scene resources…"))
                             .font(.system(size: 13))
@@ -312,14 +328,32 @@ struct EditorSceneViewportView: View {
             Text(document.title)
                 .font(.system(size: 12))
                 .foregroundColor(theme.editorColors.text)
+                .lineLimit(1)
             #if !os(iOS)
             Text(document.relativePath)
                 .font(.system(size: 11))
                 .foregroundColor(theme.editorColors.muted)
+                .lineLimit(1)
             #endif
             Spacer()
             if !isAssetPreview {
+                if let agent = annotationAgent {
+                    Button(action: {
+                        agent.sceneAnnotations.toggleSelection()
+                        viewportModel.setAnnotationMode(agent.sceneAnnotations.isSelecting)
+                        redrawViewport()
+                    }) {
+                        Text(L10n.text("Annotate"))
+                            .font(.system(size: 11))
+                            .foregroundColor(agent.sceneAnnotations.isSelecting ? theme.editorColors.blue : theme.editorColors.text)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    .buttonStyle(DefaultButtonStyle())
+                    .disabled(agent.activeSession == nil || agent.isSending)
+                    .accessibilityIdentifier("AdaEditor.SceneViewport.Annotate")
+                }
                 Button(action: {
+                    annotationAgent?.sceneAnnotations.stopSelecting()
                     let enabled = !viewportModel.terrainEditing.isEnabled
                     if enabled { selectViewportMode(.threeD) }
                     viewportModel.setTerrainEditing(enabled)
@@ -520,6 +554,8 @@ struct EditorSceneViewportView: View {
     }
 
     private func selectTool(_ tool: EditorSceneViewportTool) {
+        annotationAgent?.sceneAnnotations.stopSelecting()
+        viewportModel.setAnnotationMode(false)
         viewportModel.setTerrainEditing(false)
         activeTool = tool
         viewportModel.setActiveTool(tool)
