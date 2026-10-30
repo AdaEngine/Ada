@@ -44,8 +44,10 @@ struct ParticleSimulation3D: Sendable {
             let progress = min(1, particle.age / particle.lifetime)
             let fadeIn = min(1, particle.age / 0.15)
             // Expansion conserves density and the final fade removes any pop on death.
-            let size = finite(settings.initialSize, fallback: 0.35, max: 100)
+            var size = finite(settings.initialSize, fallback: 0.35, max: 100)
                 + finite(settings.expansionRate, fallback: 0.45, max: 100) * particle.age
+            // Stable, per-puff variation breaks the repeated silhouette without extra particles.
+            if settings.particleStyle == 3 { size *= 0.8 + 0.2 * Math.sin(particle.phase) }
             let weather = settings.particleStyle == 1 || settings.particleStyle == 2
             let fade = weather ? min(1, particle.age / 0.025) * min(1, (particle.lifetime - particle.age) / 0.1) : fadeIn * (1 - progress) * (1 - progress)
             let alpha = finite(settings.opacity, fallback: 0.3, max: 1) * fade
@@ -53,7 +55,7 @@ struct ParticleSimulation3D: Sendable {
                 position: particle.position, size: size, color: valid(settings.color) ? settings.color : [0.5, 0.5, 0.5],
                 opacity: alpha, rotation: particle.phase + particle.age * 0.12,
                 softDistance: max(0.001, finite(settings.softDistance, fallback: 0.25, max: 10)),
-                style: min(2, max(0, settings.particleStyle)),
+                style: min(3, max(0, settings.particleStyle)),
                 aspectRatio: max(0.005, finite(settings.aspectRatio, fallback: 0.035, max: 1)), velocity: particle.velocity
             ))
         }
@@ -65,6 +67,7 @@ struct ParticleSimulation3D: Sendable {
         let acceleration = valid(settings.acceleration) ? settings.acceleration : .zero
         let drag = finite(settings.drag, fallback: 0.5, max: 100)
         let turbulence = finite(settings.turbulence, fallback: 0.25, max: 100)
+        let windBlend = Float(1 - Foundation.exp(-Double(drag * dt)))
         var index = 0
         while index < particles.count {
             particles[index].age += dt
@@ -76,7 +79,6 @@ struct ParticleSimulation3D: Sendable {
             let phase = particles[index].phase + particles[index].age * 1.7
             let eddy = Vector3(Math.sin(phase), Math.cos(phase * 1.3) * 0.5, Math.sin(phase * 0.7 + 2)) * turbulence
             particles[index].velocity += (acceleration + eddy) * dt
-            let windBlend = Float(1 - Foundation.exp(-Double(drag * dt)))
             particles[index].velocity += (wind - particles[index].velocity) * windBlend
             particles[index].position += particles[index].velocity * dt
             if settings.collisionPlaneEnabled, settings.collisionPlaneHeight.isFinite,

@@ -1,7 +1,8 @@
 import AdaAnimation
 import AdaAssets
+import AdaCorePipelines
 import AdaECS
-import AdaRender
+@_spi(Internal) import AdaRender
 import Foundation
 
 /// Portable mesh alternatives, retaining the base model's node and material ordering.
@@ -42,6 +43,9 @@ public struct Model3DSource: Codable, Equatable, Sendable {
     public var morphWeights: [String: Float]
     /// Overrides by the model document's global material index, encoded as a decimal key.
     public var graphMaterials: [String: ShaderGraphMaterialSource] = [:]
+    /// Sidecar for the derived model's UV1 atlas, never shared back into the imported material asset.
+    public var lightmapSource: String = ""
+    public var lightmapIntensity: Float = 1
 
     public init(source: String = "", animation: String = "", autoplay: Bool = false, repeats: Bool = true,
                 animationGraph: AnimationGraph? = nil, lod: Model3DSourceLOD? = nil, voxel: VoxelImportSettings? = nil,
@@ -57,12 +61,14 @@ public struct Model3DSource: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: CodingKey {
-        case source, animation, autoplay, repeats, animationGraph, lod, voxel, morphWeights, graphMaterials
+        case source, animation, autoplay, repeats, animationGraph, lod, voxel, morphWeights, graphMaterials, lightmapSource, lightmapIntensity
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         graphMaterials = try container.decodeIfPresent([String: ShaderGraphMaterialSource].self, forKey: .graphMaterials) ?? [:]
+        lightmapSource = try container.decodeIfPresent(String.self, forKey: .lightmapSource) ?? ""
+        lightmapIntensity = try container.decodeIfPresent(Float.self, forKey: .lightmapIntensity) ?? 1
         source = try container.decode(String.self, forKey: .source)
         animation = try container.decode(String.self, forKey: .animation)
         autoplay = try container.decode(Bool.self, forKey: .autoplay)
@@ -104,6 +110,30 @@ public struct Model3DSource: Codable, Equatable, Sendable {
                 throw ShaderGraphDiagnostic(code: .invalidReference, nodeID: key)
             }
             graphOverrides[index] = try Self.makeGraphOverride(copying: model.materials[index], source: source)
+        }
+        if !lightmapSource.isEmpty {
+            guard model.animationRig == nil, lod == nil else {
+                throw AssetError.message("Lightmaps require a static model without skeletal animation or LOD alternatives")
+            }
+            let handle = try AssetsManager.loadSync(LightmapSet3D.self, at: lightmapSource)
+            guard let maps = handle.asset else { throw AssetError.message("Lightmap sidecar was not loaded") }
+            guard maps.modelFile.isEmpty || URL(fileURLWithPath: source).lastPathComponent == maps.modelFile else {
+                throw AssetError.message("Lightmap sidecar belongs to another derived model")
+            }
+            for mesh in model.meshes { for modelPart in mesh.models { for part in modelPart.parts where maps.materials[part.materialIndex] != nil {
+                guard part.vertexDescriptor.attributes.containsAttribute(by: MeshDescriptor.textureCoordinates1.id.name) else {
+                    throw AssetError.message("Lightmapped model part has no UV1; use the baker's derived GLB")
+                }
+            } } }
+            for (index, texture) in maps.materials {
+                guard model.materials.indices.contains(index), let original = model.materials[index] as? PBRMaterial else {
+                    throw AssetError.message("Lightmap references an invalid PBR material")
+                }
+                let material = graphOverrides[index] ?? original.makeInstance()
+                material.lightmapTexture = texture
+                material.lightmapIntensity = lightmapIntensity.isFinite ? max(0, min(lightmapIntensity, 16)) : 1
+                graphOverrides[index] = material
+            }
         }
         let root = model.instantiate(in: world)
         if !graphOverrides.isEmpty {

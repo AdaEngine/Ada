@@ -26,6 +26,22 @@ public struct PBR3DPipeline: RenderPipelineConfigurator {
         descriptor.backfaceCulling = false
         if configuration.temporalDepth { descriptor.depthPixelFormat = .depth_32f }
         descriptor.depthStencilDescriptor?.isDepthWriteEnabled = !configuration.blended
+        if configuration.features.contains(.hybridReflection) {
+            descriptor.colorAttachments.append(.init(format: .rgba_16f))
+            if configuration.blended {
+                descriptor.colorAttachments[4].isBlendingEnabled = true
+                descriptor.colorAttachments[4].sourceRGBBlendFactor = .zero
+            }
+        }
+        if configuration.features.contains(.diffuseSurface) {
+            var attachment = RenderPipelineColorAttachmentDescriptor(format: .rgba8)
+            if configuration.blended {
+                attachment.isBlendingEnabled = true
+                attachment.sourceRGBBlendFactor = .zero
+                attachment.destinationRGBBlendFactor = .oneMinusSourceAlpha
+            }
+            descriptor.colorAttachments.append(attachment)
+        }
         if configuration.blended {
             for index in 1...2 {
                 descriptor.colorAttachments[index] = RenderPipelineColorAttachmentDescriptor(

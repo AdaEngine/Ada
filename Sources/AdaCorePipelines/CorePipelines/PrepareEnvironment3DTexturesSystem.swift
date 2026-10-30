@@ -3,6 +3,7 @@
 //  AdaEngine
 //
 
+import AdaAssets
 import AdaECS
 import AdaRender
 import Math
@@ -16,6 +17,7 @@ public struct PrepareEnvironment3DTexturesSystem {
     private var cameras
 
     @Res<ExtractedEnvironment3D> private var environments
+    @Res<RenderDeviceHandler> private var device
 
     public init(world _: World) {}
 
@@ -31,6 +33,7 @@ public struct PrepareEnvironment3DTexturesSystem {
             }
 
             let size = mainTexture.size
+            target.irradianceGridActive = environments.environments[source.entityId]?.irradianceProbes?.asset.asset != nil
             let scale = mainTexture.scaleFactor
             let depthFormat: PixelFormat = camera.temporalUpscaling != nil && target.depthTexture?.pixelFormat == .depth_32f ? .depth_32f : .depth_32f_stencil8
             if target.depthTexture?.size != size || target.depthTexture?.pixelFormat != depthFormat {
@@ -69,6 +72,20 @@ public struct PrepareEnvironment3DTexturesSystem {
                 target.indirectLighting3DTexture = RenderTexture(size: size, scaleFactor: scale, format: .rgba_16f, debugLabel: "3D Opaque Indirect Light")
             }
             let environment = environments.environments[source.entityId] ?? Environment3D()
+            let hybrid = environment.imageBasedLighting?.asset.asset != nil && environment.screenSpaceReflection.isEnabled
+                && environment.debugView == .none && device.renderDevice.supportsHybridReflections
+            if hybrid && target.reflectionResponse3DTexture?.size != size {
+                target.reflectionResponse3DTexture = RenderTexture(size: size, scaleFactor: scale, format: .rgba_16f, debugLabel: "3D Opaque Reflection Response")
+            } else if !hybrid {
+                target.reflectionResponse3DTexture = nil
+            }
+            if environment.screenSpaceGI.isEnabled && device.renderDevice.supportsLightingSurfaceBuffer && environment.debugView == .none {
+                if target.diffuseSurface3DTexture?.size != size {
+                    target.diffuseSurface3DTexture = RenderTexture(size: size, scaleFactor: scale, format: .rgba8, debugLabel: "3D Diffuse Surface Response")
+                }
+            } else {
+                target.diffuseSurface3DTexture = nil
+            }
             if environment.ambientOcclusion.isEnabled {
                 let halfSize = SizeInt(width: max(1, (size.width + 1) / 2), height: max(1, (size.height + 1) / 2))
                 if target.ambientOcclusion3DRawTexture?.size != halfSize {

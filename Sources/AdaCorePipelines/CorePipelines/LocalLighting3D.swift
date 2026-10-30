@@ -43,6 +43,7 @@ public struct ExtractedLocalLight3D: Sendable {
     public var shadowBias: Float
     public var shadowSlopeBias: Float
     public var shadowPriority: Int
+    public var indirectIntensity: Float
 
     public init(
         entity: Entity.ID,
@@ -57,7 +58,8 @@ public struct ExtractedLocalLight3D: Sendable {
         castsShadows: Bool = true,
         shadowBias: Float = 0.002,
         shadowSlopeBias: Float = 0.004,
-        shadowPriority: Int = 0
+        shadowPriority: Int = 0,
+        indirectIntensity: Float = 0
     ) {
         self.entity = entity
         self.kind = kind
@@ -72,6 +74,7 @@ public struct ExtractedLocalLight3D: Sendable {
         self.shadowBias = shadowBias
         self.shadowSlopeBias = shadowSlopeBias
         self.shadowPriority = shadowPriority
+        self.indirectIntensity = indirectIntensity
     }
 }
 
@@ -111,12 +114,17 @@ public enum LocalLighting3DMath {
         light.intensity / max((light.position - cameraPosition).squaredLength, 1)
     }
 
-    public static func select(_ lights: [ExtractedLocalLight3D], viewProjection: Transform3D, cameraPosition: Vector3) -> [ExtractedLocalLight3D] {
+    public static func select(_ lights: [ExtractedLocalLight3D], viewProjection: Transform3D, cameraPosition: Vector3, irradianceBounds: AABB? = nil) -> [ExtractedLocalLight3D] {
         var visible = lights.filter { light in
             light.intensity.isFinite && light.intensity > 0 && light.range.isFinite && light.range > 0
                 && isFinite(light.position) && isFinite(light.radiance)
                 && (light.kind == .point || (isFinite(light.direction) && light.direction.squaredLength > 0.000001))
-                && MeshVisibility3DMath.intersects(AABB(center: light.position, halfExtents: Vector3.one * light.range), viewProjection: viewProjection)
+                && (MeshVisibility3DMath.intersects(AABB(center: light.position, halfExtents: Vector3.one * light.range), viewProjection: viewProjection)
+                    || (light.indirectIntensity > 0 && irradianceBounds.map { bounds in
+                        let d = light.position-bounds.center
+                        let h = bounds.halfExtents+Vector3.one*light.range
+                        return abs(d.x)<=h.x && abs(d.y)<=h.y && abs(d.z)<=h.z
+                    } == true))
         }
         visible.sort {
             let a = influence($0, cameraPosition: cameraPosition)

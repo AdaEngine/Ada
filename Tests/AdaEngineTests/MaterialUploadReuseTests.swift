@@ -8,6 +8,38 @@ import Testing
 @Suite
 @MainActor
 struct MaterialUploadReuseTests {
+    @Test("Cross-frame material caching observes edits and releases unused owners")
+    func cachedMaterialExpiresAfterAnUnusedFrame() async throws {
+        let device = HeadlessRenderBackend().renderDevice
+        var uniforms = PBR3DUniforms()
+        let original = PBRMaterial()
+        uniforms.beginFrame()
+        uniforms.write(material: original, descriptor: VertexDescriptor(), device: device)
+        let initial = try #require(uniforms.buffer(for: original))
+        for _ in 0..<8 {
+            uniforms.beginFrame()
+            #expect(uniforms.buffer(for: original) == nil)
+            uniforms.write(material: original, descriptor: VertexDescriptor(), device: device)
+            #expect(uniforms.buffer(for: original) === initial)
+        }
+        original.normalScale = 3
+        uniforms.beginFrame()
+        uniforms.write(material: original, descriptor: VertexDescriptor(), device: device)
+        let edited = try #require(uniforms.buffer(for: original))
+        #expect(edited !== initial)
+        #expect(unsafe edited.contents().load(as: PBR3DUniform.self).properties.x == 3)
+        // The retained `original` above tests identity; use a second owner to
+        // verify that the cache cannot keep removed scene materials alive.
+        var transient: PBRMaterial? = PBRMaterial()
+        weak var transientOwner = transient
+        uniforms.write(material: try #require(transient), descriptor: VertexDescriptor(), device: device)
+        transient = nil
+        #expect(transientOwner != nil)
+        uniforms.beginFrame()
+        uniforms.beginFrame()
+        #expect(transientOwner == nil)
+    }
+
     @Test
     func everySharedUniformFieldInvalidatesTheMaterialSnapshot() throws {
         let device = HeadlessRenderBackend().renderDevice

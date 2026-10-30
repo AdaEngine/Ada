@@ -64,7 +64,7 @@ public struct Temporal3DRenderNode: RenderNode {
             skyConstants.previousViewProjection = target.temporalPreviousViewProjection * uniform.viewMatrix.inverse
             let skyBuffer = pipelines.uniform.write(skyConstants, view: source.entityId, pass: 1, device: device.renderDevice)
             let command = renderContext.commandQueue.makeCommandBuffer()
-            command.label = "Temporal 3D Motion + MetalFX"
+            command.label = "Temporal 3D Motion + Reconstruction"
             let attachments: [RenderPassColorAttachmentDescriptor] = [
                 .init(texture: motion, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .black),
                 .init(texture: reactive, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .black),

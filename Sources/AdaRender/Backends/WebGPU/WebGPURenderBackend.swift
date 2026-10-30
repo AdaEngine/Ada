@@ -115,7 +115,13 @@
             }
 
             private static var adapterOptions: WebGPU.GPURequestAdapterOptions {
-                #if os(Windows)
+                #if os(Windows) && canImport(CWebGPUDLSS)
+                    WebGPU.GPURequestAdapterOptions(
+                        powerPreference: .highPerformance,
+                        backendType: .D3D12,
+                        nextInChain: WebGPU.DawnTogglesDescriptor(enabledToggles: ["allow_unsafe_apis"])
+                    )
+                #elseif os(Windows)
                     WebGPU.GPURequestAdapterOptions(
                         powerPreference: .highPerformance,
                         backendType: .D3D12
@@ -163,11 +169,21 @@
                 // The complete PBR texture set and graph bindings exceed the baseline of 16.
                 let requiredLimits = WebGPU.GPULimits(
                     maxSampledTexturesPerShaderStage: min(32, supportedLimits.maxSampledTexturesPerShaderStage),
-                    maxSamplersPerShaderStage: min(32, supportedLimits.maxSamplersPerShaderStage)
+                    maxSamplersPerShaderStage: min(32, supportedLimits.maxSamplersPerShaderStage),
+                    maxColorAttachmentBytesPerSample: min(48, supportedLimits.maxColorAttachmentBytesPerSample)
                 )
+                var features: [WebGPU.GPUFeatureName] = [.depth32FloatStencil8, .float32Filterable]
+                var nativeToggles: (any WebGPU.GPUChainedStruct)?
+                #if os(Windows) && canImport(CWebGPUDLSS)
+                // Native-only Dawn extensions. This is never requested by browser WebGPU.
+                features += [.sharedTextureMemoryD3D12Resource, .sharedFenceDXGISharedHandle].filter {
+                    adapter.hasFeature(feature: $0)
+                }
+                nativeToggles = WebGPU.DawnTogglesDescriptor(enabledToggles: ["allow_unsafe_apis"])
+                #endif
                 let descriptor = WebGPU.GPUDeviceDescriptor(
                     label: "AdaEngine WebGPU Device",
-                    requiredFeatures: [.depth32FloatStencil8, .float32Filterable],
+                    requiredFeatures: features,
                     requiredLimits: requiredLimits,
                     defaultQueue: WebGPU.GPUQueueDescriptor(),
                     deviceLostCallbackInfo: WebGPU.GPUDeviceLostCallbackInfo(mode: .allowProcessEvents) { _, deviceLostReason, message in
@@ -177,7 +193,7 @@
                     // after invocation, but Dawn may call this callback many times over a device's
                     // lifetime. Disable it here to avoid dangling Swift callback userdata.
                     uncapturedErrorCallbackInfo: WebGPU.GPUUncapturedErrorCallbackInfo { _, _, _ in },
-                    nextInChain: nil
+                    nextInChain: nativeToggles
                 )
                 let requestCallbackInfo = WebGPU.GPURequestDeviceCallbackInfo(mode: .allowProcessEvents) { status, device, message in
                     requestStatus = status

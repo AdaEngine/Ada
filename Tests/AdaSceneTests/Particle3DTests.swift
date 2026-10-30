@@ -6,6 +6,23 @@ import Testing
 
 @Suite("3D particle simulation")
 struct Particle3DTests {
+    @Test func layeredSmokeRetainsItsStyleAndVariesPuffSizesWithoutChangingWeather() throws {
+        var settings = ParticleEmitter3D()
+        settings.particleStyle = 3; settings.isEmitting = false
+        settings.burstCount = 48; settings.maxParticles = 64; settings.lifetimeVariation = 0
+        settings.initialSize = 1; settings.expansionRate = 0
+        var simulation = ParticleSimulation3D(seed: 7)
+        simulation.emitBurst(settings: settings, transform: .identity)
+        simulation.advance(by: 0.2, settings: settings, transform: .identity)
+        let puffs = samples(simulation, settings)
+        #expect(puffs.count == 48 && puffs.allSatisfy { $0.style == 3 && $0.size >= 0.6 && $0.size <= 1 })
+        #expect(try #require(puffs.map(\.size).max()) - #require(puffs.map(\.size).min()) > 0.3)
+        let restored = try JSONDecoder().decode(ParticleEmitter3D.self, from: JSONEncoder().encode(settings))
+        #expect(restored.particleStyle == 3)
+        settings.particleStyle = 2
+        #expect(samples(simulation, settings).allSatisfy { $0.style == 2 && $0.size == 1 })
+    }
+
     @Test func boxPrecipitationFillsTheEyeNeighborhoodWithoutAHollowShell() {
         var settings = ParticleEmitter3D()
         settings.spawnBoxHalfExtents = [2, 2, 2]

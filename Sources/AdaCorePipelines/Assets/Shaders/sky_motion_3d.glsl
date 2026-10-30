@@ -25,6 +25,6 @@ void sky_motion_fragment() {
     vec4 previous = u_PreviousViewProjection * direction;
     // These matrices are projection-only for sky, with camera translation removed by W=0.
     bool valid = current.w > 0.00001 && previous.w > 0.00001;
-    o_Motion = vec4(valid && u_Parameters.z < 0.5 ? (previous.xy / previous.w - current.xy / current.w) * vec2(0.5, -0.5) : vec2(0.0), 0.0, 0.0);
+    o_Motion = vec4(valid && u_Parameters.z < 0.5 ? (previous.xy / previous.w - current.xy / current.w) * vec2(0.5, -0.5) : vec2(0.0), 1.0, valid ? 1.0 : 0.0);
     o_Reactive = vec4(valid ? 0.0 : 1.0);
 }

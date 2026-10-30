@@ -156,6 +156,8 @@
                 return .rgba16Float
             case .rgba_32f:
                 return .rgba32Float
+            case .r32f:
+                return .r32Float
             case .none:
                 return .invalid
             default:

@@ -138,30 +138,39 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
         }
 
         let isMotion = world.getResource(ActiveMotion3DPass.self)?.isEnabled == true
+        let isContact = world.getResource(ActiveContactDepth3DPass.self)?.isEnabled == true
         let morphed = item.morphBuffer != nil && part.morphTargets != nil
+        let hasLightmapUV = part.vertexDescriptor.attributes.containsAttribute(by: MeshDescriptor.textureCoordinates1.id.name)
+        let shadingFeatures = (item.material as? PBRMaterial)?.shaderFeatures ?? []
         let configuration = PBR3DConfiguration(
             vertex: part.vertexDescriptor,
             blended: (item.material as? PBRMaterial)?.effectiveAlphaMode == .blend,
             temporalDepth: view.components[RenderViewTarget.self]?.temporalUpscalingActive == true,
             // The motion shader has no shading layers, so its pipelines are not split by them.
-            features: (isMotion ? [] : (item.material as? PBRMaterial)?.shaderFeatures ?? []).union(morphed ? .morph : [])
+            features: (isMotion || isContact ? [] : hasLightmapUV ? shadingFeatures : shadingFeatures.subtracting(.lightmap)).union(morphed ? .morph : [])
+                .union(!isMotion && !isContact && view.components[RenderViewTarget.self]?.reflectionResponse3DTexture != nil ? .hybridReflection : [])
+                .union(!isMotion && !isContact && view.components[RenderViewTarget.self]?.diffuseSurface3DTexture != nil ? .diffuseSurface : [])
+                .union(!isMotion && !isContact && view.components[RenderViewTarget.self]?.irradianceGridActive == true ? .irradianceGrid : [])
         )
         var pipeline: any RenderPipeline
-        if isMotion {
+        if isContact {
+            let pipelines = world.getRefResource(RenderPipelines<ContactDepth3DPipeline>.self)
+            pipeline = pipelines.wrappedValue.pipeline(for: Shadow3DConfiguration(vertex: part.vertexDescriptor, morph: morphed), device: renderDevice)
+        } else if isMotion {
             let pipelines = world.getRefResource(RenderPipelines<Motion3DPipeline>.self)
             pipeline = pipelines.wrappedValue.pipeline(for: configuration, device: renderDevice)
         } else {
             let pipelines = world.getRefResource(RenderPipelines<PBR3DPipeline>.self)
             pipeline = pipelines.wrappedValue.pipeline(for: configuration, device: renderDevice)
         }
-        let usesGraph = !isMotion || (item.material as? PBRMaterial)?.effectiveAlphaMode != .opaque
+        let usesGraph = (!isMotion && !isContact) || (item.material as? PBRMaterial)?.effectiveAlphaMode != .opaque
         if usesGraph, let graph = (item.material as? PBRMaterial)?.graphMaterial {
             do {
                 pipeline = try ShaderGraph3DPipeline.make(
                     material: graph, base: pipeline, device: renderDevice,
-                    variant: "pbr:\(isMotion):\(configuration.blended):\(configuration.temporalDepth):\(configuration.features.rawValue)",
+                    variant: "pbr:\(isMotion):\(isContact):\(configuration.blended):\(configuration.temporalDepth):\(configuration.features.rawValue)",
                     features: configuration.features,
-                    template: isMotion ? "Shaders/motion_3d.glsl" : "Shaders/flat3d.glsl"
+                    template: isContact ? "Shaders/directional_shadow_3d.glsl" : (isMotion ? "Shaders/motion_3d.glsl" : "Shaders/flat3d.glsl")
                 )
             } catch {
                 graph.reportCompilationError(error)
@@ -201,7 +210,11 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
             layerBindings.append(.init(binding: Morph3DUniforms.binding, shaderStages: .vertex, resource: .uniformBuffer(morphBuffer, offset: 0)))
             layerBindings.append(.init(binding: Morph3DUniforms.textureBinding, shaderStages: .vertex, resource: .texture(morphSet.deltaTexture)))
         }
-        if !isMotion, let pbrMaterial {
+        if !isMotion && !isContact, let pbrMaterial {
+            if let map = pbrMaterial.lightmapTexture {
+                layerBindings.append(.init(binding: 46, shaderStages: .fragment, resource: .texture(map)))
+                layerBindings.append(.init(binding: 47, shaderStages: .fragment, resource: .sampler(map.sampler)))
+            }
             let features = pbrMaterial.shaderFeatures
             for kind in PBRLayerTexture.allCases where features.contains(kind.feature) {
                 if let layer = pbrMaterial.layerTextures[kind] {
@@ -248,7 +261,7 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
         )
         renderEncoder.setVertexBuffer(defaultVertexData, offset: 0, slot: 4)
         renderEncoder.setIndexBuffer(part.indexBuffer, offset: 0)
-        if !isMotion, let offset = item.indirectArgumentOffset, let arguments = active?.indirectArguments,
+        if !isMotion && !isContact, let offset = item.indirectArgumentOffset, let arguments = active?.indirectArguments,
            renderEncoder.drawIndexedIndirect(arguments: arguments, offset: offset) { return }
         renderEncoder.drawIndexed(
             indexCount: part.indexCount,

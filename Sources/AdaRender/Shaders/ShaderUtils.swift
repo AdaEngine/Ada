@@ -262,8 +262,10 @@ extension String {
     @inlinable
     @inline(__always)
     func getSubstring(from nsRange: NSRange) -> Substring {
-        let start = self.index(self.startIndex, offsetBy: nsRange.lowerBound)
-        let end = self.index(self.startIndex, offsetBy: nsRange.upperBound)
+        // NSRegularExpression counts UTF-16 code units. Swift character offsets
+        // differ for Windows CRLF (one Character) and non-ASCII source text.
+        let start = String.Index(utf16Offset: nsRange.lowerBound, in: self)
+        let end = String.Index(utf16Offset: nsRange.upperBound, in: self)
 
         return self[start..<end]
     }

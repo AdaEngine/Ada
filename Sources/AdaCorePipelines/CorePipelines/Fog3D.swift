@@ -3,6 +3,25 @@ import AdaUtils
 import Foundation
 import Math
 
+/// Axis-aligned local participating medium. Bounds and edge fade are in world units.
+public struct LocalFogVolume3D: Codable, Sendable, Equatable {
+    public var minimum: Vector3
+    public var maximum: Vector3
+    public var density: Float
+    public var albedo: Vector3
+    public var edgeFade: Float
+    public init(minimum: Vector3, maximum: Vector3, density: Float = 0.1, albedo: Vector3 = .one, edgeFade: Float = 0.25) {
+        self.minimum = minimum; self.maximum = maximum; self.density = density
+        self.albedo = albedo; self.edgeFade = edgeFade
+    }
+    var isValid: Bool {
+        minimum.x.isFinite && minimum.y.isFinite && minimum.z.isFinite
+            && maximum.x.isFinite && maximum.y.isFinite && maximum.z.isFinite
+            && maximum.x > minimum.x && maximum.y > minimum.y && maximum.z > minimum.z
+            && density.isFinite && density > 0
+    }
+}
+
 /// Shadowed sun light shafts marched through the fog medium.
 ///
 /// A half-resolution pass marches each view ray, samples the primary directional light's cascaded shadow map and
@@ -19,6 +38,8 @@ public struct VolumetricFog3D: Codable, Sendable, Equatable {
     public var steps: Int
     /// Farthest distance marched from the camera. Closer geometry ends the ray earlier.
     public var maxDistance: Float
+    /// At most eight local lights are evaluated per ray sample. Zero preserves sun-only shafts.
+    public var localLightLimit: Int = 4
 
     public init(isEnabled: Bool = false, intensity: Float = 1, anisotropy: Float = 0.4, steps: Int = 24, maxDistance: Float = 60) {
         self.isEnabled = isEnabled
@@ -28,7 +49,7 @@ public struct VolumetricFog3D: Codable, Sendable, Equatable {
         self.maxDistance = maxDistance
     }
 
-    private enum CodingKeys: CodingKey { case isEnabled, intensity, anisotropy, steps, maxDistance }
+    private enum CodingKeys: CodingKey { case isEnabled, intensity, anisotropy, steps, maxDistance, localLightLimit }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -38,18 +59,21 @@ public struct VolumetricFog3D: Codable, Sendable, Equatable {
         anisotropy = try container.decodeIfPresent(Float.self, forKey: .anisotropy) ?? defaults.anisotropy
         steps = try container.decodeIfPresent(Int.self, forKey: .steps) ?? defaults.steps
         maxDistance = try container.decodeIfPresent(Float.self, forKey: .maxDistance) ?? defaults.maxDistance
+        localLightLimit = try container.decodeIfPresent(Int.self, forKey: .localLightLimit) ?? defaults.localLightLimit
     }
 
     /// Settings clamped to ranges the shader handles, replacing non-finite values with defaults.
     var sanitized: VolumetricFog3D {
         let defaults = VolumetricFog3D()
-        return VolumetricFog3D(
+        var result = VolumetricFog3D(
             isEnabled: isEnabled,
             intensity: finiteRenderValue(intensity, fallback: defaults.intensity, range: 0...16),
             anisotropy: finiteRenderValue(anisotropy, fallback: defaults.anisotropy, range: -0.95...0.95),
             steps: min(max(steps, 4), 64),
             maxDistance: finiteRenderValue(maxDistance, fallback: defaults.maxDistance, range: 1...100_000)
         )
+        result.localLightLimit = min(max(localLightLimit, 0), 8)
+        return result
     }
 }
 
@@ -82,6 +106,8 @@ public struct Fog3D: Codable, Sendable, Equatable {
     public var sunExponent: Float
     /// Shadowed light shafts through this fog.
     public var volumetric: VolumetricFog3D
+    /// Up to eight overlapping local boxes, in addition to the global height fog.
+    public var localVolumes: [LocalFogVolume3D] = []
 
     public init(
         isEnabled: Bool = false,
@@ -110,7 +136,7 @@ public struct Fog3D: Codable, Sendable, Equatable {
     }
 
     private enum CodingKeys: CodingKey {
-        case isEnabled, color, density, heightFalloff, baseHeight, startDistance, maximumOpacity, skyInfluence, sunInscattering, sunExponent, volumetric
+        case isEnabled, color, density, heightFalloff, baseHeight, startDistance, maximumOpacity, skyInfluence, sunInscattering, sunExponent, volumetric, localVolumes
     }
 
     public init(from decoder: Decoder) throws {
@@ -127,12 +153,13 @@ public struct Fog3D: Codable, Sendable, Equatable {
         sunInscattering = try container.decodeIfPresent(Float.self, forKey: .sunInscattering) ?? defaults.sunInscattering
         sunExponent = try container.decodeIfPresent(Float.self, forKey: .sunExponent) ?? defaults.sunExponent
         volumetric = try container.decodeIfPresent(VolumetricFog3D.self, forKey: .volumetric) ?? defaults.volumetric
+        localVolumes = try container.decodeIfPresent([LocalFogVolume3D].self, forKey: .localVolumes) ?? []
     }
 
     /// Whether fog can change the image. A camera that returns `false` pays nothing for fog.
     var changesImage: Bool {
         let settings = sanitized
-        return isEnabled && settings.density > 0 && settings.maximumOpacity > 0
+        return isEnabled && (settings.density > 0 || settings.localVolumes.contains(where: \.isValid)) && settings.maximumOpacity > 0
     }
 
     /// Whether the light-shaft pass has work to do.
@@ -143,7 +170,7 @@ public struct Fog3D: Codable, Sendable, Equatable {
     /// Settings clamped to ranges the shader handles, replacing non-finite values with defaults.
     var sanitized: Fog3D {
         let defaults = Fog3D()
-        return Fog3D(
+        var result = Fog3D(
             isEnabled: isEnabled,
             color: color,
             density: finiteRenderValue(density, fallback: defaults.density, range: 0...10),
@@ -156,5 +183,7 @@ public struct Fog3D: Codable, Sendable, Equatable {
             sunExponent: finiteRenderValue(sunExponent, fallback: defaults.sunExponent, range: 1...256),
             volumetric: volumetric.sanitized
         )
+        result.localVolumes = Array(localVolumes.filter(\.isValid).prefix(8))
+        return result
     }
 }

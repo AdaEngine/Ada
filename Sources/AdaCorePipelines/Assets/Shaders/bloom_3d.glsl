@@ -27,7 +27,8 @@ vec3 fetch(vec2 uv) {
 float exposureScale() {
     float scale = u_Texel.z;
     if (u_Texel.w > 0.5) {
-        scale *= exp2(textureLod(sampler2D(u_Exposure, u_Sampler), vec2(0.5), 0.0).x);
+        vec2 state = textureLod(sampler2D(u_Exposure, u_Sampler), vec2(0.5), 0.0).rg;
+        scale *= exp2(state.x + state.y);
     }
     return scale;
 }

@@ -57,6 +57,8 @@ public struct PBR3DUniform: Sendable, Equatable {
     public let layerTransform7: PBR3DTextureTransform
     /// X is the clearcoat normal scale.
     public let layerParameters: Vector4
+    public let lightmapScaleOffset: Vector4
+    public let bakedParameters: Vector4
 
     public init(material: PBRMaterial?, descriptor _: VertexDescriptor) {
         func coordinate(_ slot: Int) -> Int {
@@ -119,6 +121,8 @@ public struct PBR3DUniform: Sendable, Equatable {
         layerTransform6 = layerTransform(.specular)
         layerTransform7 = layerTransform(.specularColor)
         layerParameters = Vector4(finiteRenderValue(layer(.clearcoatNormal)?.scale ?? 1, fallback: 1, range: 0...100), 0, 0, 0)
+        lightmapScaleOffset = material?.lightmapScaleOffset ?? [1, 1, 0, 0]
+        bakedParameters = [finiteRenderValue(material?.lightmapIntensity ?? 1, fallback: 1, range: 0...16), 0, 0, 0]
     }
 
     /// Reflectance at normal incidence of the dielectric layer: ((ior - 1) / (ior + 1))^2 tinted and scaled by the
@@ -149,6 +153,7 @@ public struct PBR3DUniform: Sendable, Equatable {
             bits(layerTransform4.matrix), bits(layerTransform4.offset), bits(layerTransform5.matrix), bits(layerTransform5.offset),
             bits(layerTransform6.matrix), bits(layerTransform6.offset), bits(layerTransform7.matrix), bits(layerTransform7.offset),
             bits(layerParameters),
+            bits(lightmapScaleOffset), bits(bakedParameters),
         ]
     }
 }
@@ -166,10 +171,12 @@ public struct PBR3DUniforms: Resource {
     }
     private struct Entry { let buffer: any UniformBuffer; var frame: Int }
     private struct MaterialEntry {
-        // Retain identity owners until the frame ends, preventing identifier reuse.
+        // Retain owners until an unused frame, preventing identifier reuse.
         let owner: Material
         let revision: UInt64?
         let buffer: any UniformBuffer
+        let key: Key
+        var frame: Int
     }
     private var entries: [Key: Entry] = [:]
     private var materialBuffers: [ObjectIdentifier: MaterialEntry] = [:]
@@ -179,15 +186,22 @@ public struct PBR3DUniforms: Resource {
 
     public mutating func beginFrame() {
         for (key, entry) in entries where entry.frame != frame { entries.removeValue(forKey: key) }
+        for (key, entry) in materialBuffers where entry.frame != frame { materialBuffers.removeValue(forKey: key) }
         frame &+= 1
-        materialBuffers.removeAll(keepingCapacity: true)
     }
 
     public mutating func write(material: Material, descriptor: VertexDescriptor, device: RenderDevice) {
         let identity = ObjectIdentifier(material)
         let pbr = material as? PBRMaterial
         let revision = pbr?.uniformRevision
-        if let entry = materialBuffers[identity], entry.revision == revision { return }
+        if var entry = materialBuffers[identity], entry.revision == revision {
+            if entry.frame != frame {
+                entry.frame = frame
+                materialBuffers[identity] = entry
+                entries[entry.key] = Entry(buffer: entry.buffer, frame: frame)
+            }
+            return
+        }
         let uniform = PBR3DUniform(material: pbr, descriptor: descriptor)
         let key = Key(uniform)
         if var entry = entries[key] {
@@ -195,16 +209,17 @@ public struct PBR3DUniforms: Resource {
                 entry.frame = frame
                 entries[key] = entry
             }
-            materialBuffers[identity] = MaterialEntry(owner: material, revision: revision, buffer: entry.buffer)
+            materialBuffers[identity] = MaterialEntry(owner: material, revision: revision, buffer: entry.buffer, key: key, frame: frame)
         } else {
             let buffer = device.createUniformBuffer(PBR3DUniform.self, binding: Self.binding)
             buffer.setData(uniform)
             entries[key] = Entry(buffer: buffer, frame: frame)
-            materialBuffers[identity] = MaterialEntry(owner: material, revision: revision, buffer: buffer)
+            materialBuffers[identity] = MaterialEntry(owner: material, revision: revision, buffer: buffer, key: key, frame: frame)
         }
     }
 
     public func buffer(for material: Material) -> (any UniformBuffer)? {
-        materialBuffers[ObjectIdentifier(material)]?.buffer
+        guard let entry = materialBuffers[ObjectIdentifier(material)], entry.frame == frame else { return nil }
+        return entry.buffer
     }
 }

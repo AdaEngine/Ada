@@ -261,6 +261,9 @@ public enum PixelFormat: Codable, Sendable {
     /// Ordinary format with four 32-bit floating-point components in RGBA order.
     case rgba_32f
 
+    /// One 32-bit floating-point color channel.
+    case r32f
+
     /// A 40-bit combined depth and stencil pixel format with a 32-bit floating-point value for depth and an 8-bit unsigned integer for stencil.
     case depth_32f_stencil8
 
@@ -284,6 +287,8 @@ extension PixelFormat {
             return 4
         case .rgba_16f:
             return 8
+        case .r32f:
+            return 4
         case .rgba_32f,
             .depth_32f_stencil8,
             .depth_32f:
@@ -311,6 +316,8 @@ extension PixelFormat {
             return 4
         case .rgba_16f:
             return 8
+        case .r32f:
+            return 4
         case .rgba_32f:
             return 16
         case .none,

@@ -29,6 +29,9 @@ if [[ "${OS:-}" == "Windows_NT" ]]; then
   # plugins (JavaScriptKit's PackageToJS currently cannot compile on Windows).
   swift build "${ada_validation_job_args[@]}" --package-path "$ada_validation_package" --product RenderingValidationPackageTests \
     --disable-sandbox --scratch-path "$ada_validation_scratch"
+  if [[ "${ADAENGINE_DLSS_TESTS:-}" == "1" ]]; then
+    "$ada_validation_python" script/build_dlss.py --stage-runtime "$ada_validation_scratch/x86_64-unknown-windows-msvc/debug"
+  fi
   swift test --package-path "$ada_validation_package" --skip-build --scratch-path "$ada_validation_scratch" \
     --no-parallel --filter "$ada_validation_filter"
 else

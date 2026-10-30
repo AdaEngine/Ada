@@ -224,7 +224,7 @@ public struct Flat3DPipeline: RenderPipelineConfigurator {
 
 
 /// Compiled shader variants by file and the features they include. A variant is compiled on first use and shared by every
-/// pipeline that needs it; if it fails to compile, the plain shader is used instead.
+/// pipeline that needs it. Fallbacks may drop optional shading layers, but retain morph and MRT contracts.
 final class PBR3DShaderVariants: @unchecked Sendable {
     private struct Key: Hashable {
         let path: String
@@ -250,7 +250,20 @@ final class PBR3DShaderVariants: @unchecked Sendable {
             variant = AssetHandle(try ShaderModule.createBundled(at: path, from: .adaModule, defines: features.enablingMacros))
         } catch {
             assertionFailure("Shader variant \(features.rawValue) of \(path) failed to compile: \(error)")
-            variant = fallback
+            // A plain shader has no fifth fragment output and cannot safely write a hybrid render pass.
+            // Morph changes the vertex contract too. These defines remain mandatory even when a layer fails.
+            let required = features.intersection([.hybridReflection, .morph, .diffuseSurface, .lightmap, .irradianceGrid])
+            if required.isEmpty {
+                variant = fallback
+            } else {
+                let requiredKey = Key(path: path, features: required)
+                if let compatible = variants[requiredKey] {
+                    variant = compatible
+                } else {
+                    variant = ShaderModule.loadRequiredBundled(at: path, from: .adaModule, defines: required.enablingMacros)
+                    variants[requiredKey] = variant
+                }
+            }
         }
         variants[key] = variant
         return variant

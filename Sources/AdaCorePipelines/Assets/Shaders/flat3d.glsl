@@ -125,6 +125,16 @@ layout (location = 0) out vec4 color;
 layout (location = 1) out vec4 normalRoughness;
 layout (location = 2) out vec4 viewPositionMetallic;
 layout (location = 3) out vec4 indirectLighting;
+#ifdef ADA_HYBRID_REFLECTION
+layout (location = 4) out vec4 reflectionResponse;
+#endif
+#ifdef ADA_DIFFUSE_SURFACE
+#ifdef ADA_HYBRID_REFLECTION
+layout (location = 5) out vec4 diffuseSurface;
+#else
+layout (location = 4) out vec4 diffuseSurface;
+#endif
+#endif
 
 #include <AdaEngine/Tonemapping.glsl>
 
@@ -170,6 +180,8 @@ layout (binding = 15) uniform PBR3DUniform {
     vec4 u_LayerSets[2];
     vec4 u_LayerTransforms[16];
     vec4 u_LayerParameters; // x clearcoat normal scale
+    vec4 u_LightmapScaleOffset;
+    vec4 u_BakedParameters;
 };
 
 // Layer textures exist only in the shader variants of materials that have them. They are read with the base color
@@ -213,6 +225,9 @@ layout (binding = 3) uniform sampler u_IBLSampler;
 layout (binding = 22) uniform IBL3DUniform {
     mat4 u_EnvironmentInverseView;
     vec4 u_IBLParameters;
+    vec4 u_ProbePosition;
+    vec4 u_ProbeMinimum;
+    vec4 u_ProbeMaximum;
 };
 
 struct VertexOut
@@ -266,6 +281,40 @@ layout (binding = 27) uniform LightTiles3DUniform {
 layout (binding = 29) uniform LightTileMasks3DUniform {
     uvec4 u_TileMasks[1024];
 };
+layout (binding = 41) uniform texture2D u_ContactSceneDepth;
+layout (binding = 42) uniform SurfaceLighting3DUniform {
+    mat4 u_ContactProjection;
+    mat4 u_ContactInverseProjection;
+    vec4 u_Contact; // enabled, ray length, thickness, bias (view-space meters)
+    vec4 u_ContactQuality; // steps, max distance, primary light casts shadows
+    vec4 u_ShadowFilter; // PCSS, tan angular radius, max filter radius, blocker search radius
+};
+
+float contactVisibility(vec3 normal, vec3 direction, float lightDistance) {
+    if (u_Contact.x < 0.5 || Input.ShadowFlags.x < 0.5 || Input.ViewPosition.z >= u_ContactQuality.y) { return 1.0; }
+    int steps = int(u_ContactQuality.x);
+    float reach = min(u_Contact.y, lightDistance);
+    vec3 origin = Input.ViewPosition + normal * u_Contact.w;
+    ivec2 size = textureSize(sampler2D(u_ContactSceneDepth, u_DirectionalShadowSampler), 0);
+    for (int i = 1; i <= 32; ++i) {
+        if (i > steps) { break; }
+        float t = (float(i) - 0.25) / float(steps);
+        vec3 query = origin + direction * (reach * t);
+        vec4 clip = u_ContactProjection * vec4(query, 1.0);
+        if (clip.w <= 0.0) { break; }
+        vec2 uv = clip.xy / clip.w * vec2(0.5,-0.5) + 0.5;
+        if (any(lessThanEqual(uv, vec2(0.0))) || any(greaterThanEqual(uv, vec2(1.0)))) { break; }
+        float depth = texelFetch(sampler2D(u_ContactSceneDepth, u_DirectionalShadowSampler), ivec2(uv * vec2(size)), 0).r;
+        if (depth >= 1.0) { continue; }
+        vec4 surface = u_ContactInverseProjection * vec4(uv * vec2(2.0,-2.0) + vec2(-1.0,1.0), depth, 1.0);
+        float gap = query.z - surface.z / surface.w;
+        if (gap > u_Contact.w && gap < u_Contact.z) {
+            float fade = 1.0 - smoothstep(u_ContactQuality.y * 0.8, u_ContactQuality.y, Input.ViewPosition.z);
+            return 1.0 - fade;
+        }
+    }
+    return 1.0;
+}
 
 // Bit mask of the local lights that may reach this fragment. The tile comes from projecting the view-space
 // position the same way the CPU bounded each light, so it holds for any backend's fragment coordinate origin.
@@ -281,6 +330,7 @@ uint localLightMask() {
 }
 
 const float PI = 3.14159265359;
+#include <AdaEngine/BakedDiffuse3D.glsl>
 
 vec3 srgbToLinear(vec3 value) {
     return mix(value / 12.92, pow((value + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), value));
@@ -330,6 +380,7 @@ float coatTransmission(float normalView) {
 
 // Reflectance of non-metals at normal incidence for this fragment: the material value times its specular textures.
 vec3 g_Dielectric = vec3(0.04);
+vec3 g_ReflectionResponse = vec3(0.0);
 
 // Sheen layer (cloth): rgb color, w roughness. A black color turns it off.
 vec4 g_Sheen = vec4(0.0);
@@ -432,7 +483,19 @@ vec2 environmentUV(vec3 direction) {
     return vec2(atan(direction.z, direction.x) / (2.0 * PI) + 0.5, asin(clamp(direction.y, -1.0, 1.0)) / PI + 0.5);
 }
 
+// A capture contains static geometry even when it lies behind the camera. Correct its finite-distance parallax.
+vec3 probeDirection(vec3 position, vec3 direction) {
+    if (u_ProbePosition.w < 0.5 || any(lessThan(position, u_ProbeMinimum.xyz)) || any(greaterThan(position, u_ProbeMaximum.xyz))) { return direction; }
+    vec3 safeDirection = mix(direction, vec3(0.000001), lessThan(abs(direction), vec3(0.000001)));
+    vec3 boundary = mix(u_ProbeMinimum.xyz, u_ProbeMaximum.xyz, greaterThanEqual(direction, vec3(0.0)));
+    vec3 travel = (boundary - position) / safeDirection;
+    travel = mix(travel, vec3(1e20), lessThan(abs(direction), vec3(0.000001)));
+    vec3 projected = position + direction * min(travel.x, min(travel.y, travel.z)) - u_ProbePosition.xyz;
+    return dot(projected, projected) > 0.000001 ? normalize(projected) : direction;
+}
+
 vec3 samplePrefiltered(vec3 direction, float roughness) {
+    direction = probeDirection(Input.WorldPosition, direction);
     vec2 uv = environmentUV(direction);
     float levels = max(u_IBLParameters.z, 2.0);
     float layer = roughness * (levels - 1.0);
@@ -445,7 +508,8 @@ vec3 samplePrefiltered(vec3 direction, float roughness) {
     return mix(left, right, layer - lower);
 }
 
-vec3 environmentLighting(vec3 normal, vec3 viewDirection, vec3 baseColor, float metallic, float roughness) {
+vec3 environmentLighting(vec3 normal, vec3 viewDirection, vec3 baseColor, float metallic, float roughness, vec4 baked, out vec3 bakedPart) {
+    bakedPart=vec3(0.0);
     vec3 worldNormal = normalize(mat3(u_EnvironmentInverseView) * normal);
     vec3 worldView = normalize(mat3(u_EnvironmentInverseView) * viewDirection);
     float ndotv = max(dot(normal, viewDirection), 0.0);
@@ -465,12 +529,26 @@ vec3 environmentLighting(vec3 normal, vec3 viewDirection, vec3 baseColor, float 
     vec2 lutSize = vec2(textureSize(sampler2D(u_BRDF, u_IBLSampler), 0));
     vec2 lutUV = clamp(vec2(ndotv, roughness), 0.5 / lutSize, vec2(1.0) - 0.5 / lutSize);
     vec2 lut = texture(sampler2D(u_BRDF, u_IBLSampler), lutUV).rg;
+    // Preserve the exact colored material response, including AO and transmission applied below. Anisotropy
+    // uses a different ray direction, so its base lobe stays on the correctly integrated probe in this first slice.
+    g_ReflectionResponse = hasAnisotropy() ? vec3(0.0) : (f0 * lut.x + lut.y);
     vec3 result = (diffuseWeight * irradiance * baseColor / PI + reflected * (f0 * lut.x + lut.y)) * u_IBLParameters.y;
+#if defined(ADA_LIGHTMAP) || defined(ADA_IRRADIANCE_GRID)
+    vec3 incident=mix(irradiance/PI*u_IBLParameters.y,baked.rgb,baked.a);
+    result=diffuseWeight*incident*baseColor+reflected*(f0*lut.x+lut.y)*u_IBLParameters.y;
+    bakedPart=diffuseWeight*baseColor*baked.rgb*baked.a;
+#endif
     if (hasSheen()) {
+        g_ReflectionResponse *= sheenTransmission();
         // Sheen under image-based lighting is approximated as a diffuse lobe with the average sheen albedo.
         result = result * sheenTransmission() + g_Sheen.rgb * SHEEN_ALBEDO * irradiance / PI * u_IBLParameters.y;
+#if defined(ADA_LIGHTMAP) || defined(ADA_IRRADIANCE_GRID)
+        result += g_Sheen.rgb*SHEEN_ALBEDO*(incident-irradiance/PI*u_IBLParameters.y);
+        bakedPart=bakedPart*sheenTransmission()+g_Sheen.rgb*SHEEN_ALBEDO*baked.rgb*baked.a;
+#endif
     }
     if (hasClearcoat()) {
+        g_ReflectionResponse *= coatTransmission(max(dot(g_CoatNormal, viewDirection), 0.0));
         // The coat reflects the environment along the geometric normal and dims the base layer beneath it.
         vec3 coatWorldNormal = normalize(mat3(u_EnvironmentInverseView) * g_CoatNormal);
         float coatNormalView = max(dot(g_CoatNormal, viewDirection), 0.0);
@@ -478,6 +556,7 @@ vec3 environmentLighting(vec3 normal, vec3 viewDirection, vec3 baseColor, float 
         vec2 coatLut = texture(sampler2D(u_BRDF, u_IBLSampler), coatLutUV).rg;
         vec3 coatReflected = samplePrefiltered(reflect(-worldView, coatWorldNormal), g_Clearcoat.y);
         result = result * coatTransmission(coatNormalView) + coatReflected * (0.04 * coatLut.x + coatLut.y) * g_Clearcoat.x * u_IBLParameters.y;
+        bakedPart*=coatTransmission(coatNormalView);
     }
     return result;
 }
@@ -516,10 +595,8 @@ vec3 materialNormal() {
 }
 
 float cascadeVisibility(int cascade, vec3 normal, vec3 lightDirection) {
-    vec4 position;
-    if (cascade == 0) { position = u_ShadowViewProjection * vec4(Input.WorldPosition, 1.0); }
-    else if (cascade == 1) { position = u_ShadowViewProjection1 * vec4(Input.WorldPosition, 1.0); }
-    else { position = u_ShadowViewProjection2 * vec4(Input.WorldPosition, 1.0); }
+    mat4 shadowMatrix = cascade == 0 ? u_ShadowViewProjection : (cascade == 1 ? u_ShadowViewProjection1 : u_ShadowViewProjection2);
+    vec4 position = shadowMatrix * vec4(Input.WorldPosition, 1.0);
     vec3 projected = position.xyz / position.w;
     vec2 localUV = projected.xy * vec2(0.5, -0.5) + 0.5;
     if (projected.z < 0.0 || projected.z > 1.0 || any(lessThan(localUV, vec2(0.0))) || any(greaterThan(localUV, vec2(1.0)))) { return 1.0; }
@@ -528,6 +605,9 @@ float cascadeVisibility(int cascade, vec3 normal, vec3 lightDirection) {
     vec2 minimum = vec2(float(cascade) / count, 0.0) + u_ShadowAtlas.xy * 0.5;
     vec2 maximum = vec2(float(cascade + 1) / count, 1.0) - u_ShadowAtlas.xy * 0.5;
     float bias = u_ShadowParameters.y + u_ShadowParameters.z * (1.0 - max(dot(normal, lightDirection), 0.0));
+    if (u_ShadowFilter.x > 0.5) {
+        return adaDirectionalShadowPCSS(uv, u_ShadowAtlas.xy, minimum, maximum, projected.z - bias, shadowMatrix, u_ShadowFilter, count);
+    }
     return adaDirectionalShadowPCF(uv, u_ShadowAtlas.xy, minimum, maximum, projected.z - bias);
 }
 
@@ -673,7 +753,8 @@ vec3 additionalLighting(vec3 normal, vec3 viewDirection, vec3 baseColor, float m
         // The shadow lookup (nine depth taps) only scales the contribution, so a light that adds nothing here
         // (facing away, or behind the surface) never needs it.
         if (max(contribution.r, max(contribution.g, contribution.b)) <= 0.0) { continue; }
-        result += contribution * localShadowVisibility(light, direction, normal);
+        float contact = light.innerShadow.w >= 0.0 ? contactVisibility(normal, direction, distance) : 1.0;
+        result += contribution * localShadowVisibility(light, direction, normal) * contact;
     }
     return result;
 }
@@ -871,6 +952,9 @@ void flat3d_fragment()
 
         color = vec4(atmosphereColor, alpha);
         indirectLighting = vec4(0.0, 0.0, 0.0, alpha);
+#ifdef ADA_HYBRID_REFLECTION
+        reflectionResponse = vec4(0.0, 0.0, 0.0, alpha);
+#endif
         normalRoughness = vec4(normal, 1.0);
         viewPositionMetallic = vec4(Input.ViewPosition, 0.0);
         return;
@@ -884,17 +968,36 @@ void flat3d_fragment()
     // The sun term is multiplied by n.l, so surfaces facing away from it skip the cascade lookups. The clearcoat
     // follows the geometric normal and can still be lit there.
     float shadowVisibility = (normalLight > 0.0 || hasClearcoat()) ? directionalShadow(normal, lightDirection) : 1.0;
+    if (u_ContactQuality.z > 0.5) { shadowVisibility *= contactVisibility(normal, lightDirection, u_Contact.y); }
     vec3 directLighting = evaluateDirect(normal, viewDirection, lightDirection, baseColor.rgb, metallic, roughness, radiance) * shadowVisibility;
     directLighting += additionalLighting(normal, viewDirection, baseColor.rgb, metallic, roughness);
     vec3 ambient = baseColor.rgb * (1.0 - metallic) * max(u_LightRadianceAmbient.w, 0.0);
-    if (u_IBLParameters.x > 0.5) { ambient = environmentLighting(normal, viewDirection, baseColor.rgb, metallic, roughness); }
+    vec4 baked=adaBakedDiffuse(Input.WorldPosition,normalize(mat3(u_EnvironmentInverseView)*normal),Input.TextureCoordinate1);
+    vec3 bakedPart=vec3(0.0);
+    if (u_IBLParameters.x > 0.5) { ambient = environmentLighting(normal, viewDirection, baseColor.rgb, metallic, roughness,baked,bakedPart); }
     else if (hasClearcoat()) { ambient *= coatTransmission(max(dot(g_CoatNormal, viewDirection), 0.0)); }
+#if defined(ADA_LIGHTMAP) || defined(ADA_IRRADIANCE_GRID)
+    if(u_IBLParameters.x<0.5) {
+        vec3 f0=mix(g_Dielectric,baseColor.rgb,metallic);
+        vec3 fresnel=f0+(max(vec3(1.0-roughness),f0)-f0)*pow(1.0-normalView,5.0);
+        vec3 bakedAmbient=(1.0-fresnel)*(1.0-metallic)*baseColor.rgb*baked.rgb;
+        if(hasSheen()) { bakedAmbient=bakedAmbient*sheenTransmission()+g_Sheen.rgb*SHEEN_ALBEDO*baked.rgb; }
+        if(hasClearcoat()) { bakedAmbient*=coatTransmission(max(dot(g_CoatNormal,viewDirection),0.0)); }
+        ambient=mix(ambient,bakedAmbient,baked.a);
+        bakedPart=bakedAmbient*baked.a;
+    }
+#endif
     #ifdef ADA_SHADER_GRAPH
     float occlusion = surface.occlusion;
     #else
     float occlusion = u_SurfaceFlags.y > 0.5 ? texture(sampler2D(u_OcclusionTexture, u_OcclusionSampler), materialUV(u_UVSets.w, 3)).r : 1.0;
     #endif
     ambient *= mix(1.0, occlusion, u_SurfaceProperties.y);
+#if defined(ADA_LIGHTMAP) || defined(ADA_IRRADIANCE_GRID)
+    // Geometry visibility is already baked. Material AO still affects runtime environment specular.
+    ambient += bakedPart * (1.0-mix(1.0,occlusion,u_SurfaceProperties.y));
+#endif
+    g_ReflectionResponse *= mix(1.0, occlusion, u_SurfaceProperties.y);
     float emissiveVisibility = 1.0;
     if (Input.EmissiveLightThreshold >= 0.0) {
         emissiveVisibility = 1.0 - smoothstep(
@@ -913,6 +1016,13 @@ void flat3d_fragment()
     #endif
 
     color = vec4(directLighting + ambient + emissive, opacity);
+#ifdef ADA_DIFFUSE_SURFACE
+    vec3 giF0 = mix(g_Dielectric, baseColor.rgb, metallic);
+    vec3 giFresnel = giF0 + (max(vec3(1.0 - roughness), giF0) - giF0) * pow(1.0 - max(dot(normal, viewDirection), 0.0), 5.0);
+    vec3 diffuseWeight = (vec3(1.0) - giFresnel) * (1.0 - metallic);
+    if (hasClearcoat()) { diffuseWeight *= coatTransmission(max(dot(g_CoatNormal, viewDirection), 0.0)); }
+    diffuseSurface = vec4(clamp(baseColor.rgb * diffuseWeight, vec3(0.0), vec3(1.0)), opacity);
+#endif
     if (u_ShadowAtlas.w > 0.5) {
         vec3 debugColor = u_ShadowAtlas.w < 1.5 ? adaLinearToSrgb(baseColor.rgb)
             : (u_ShadowAtlas.w < 2.5 ? cascadeTint(normalLight) : heatRamp(reachingLightCount() / 8.0));
@@ -920,6 +1030,9 @@ void flat3d_fragment()
     }
     // Transparent surfaces attenuate the opaque indirect buffer but do not contribute to it.
     indirectLighting = vec4(u_SurfaceProperties.w > 1.5 ? vec3(0.0) : ambient, opacity);
+#ifdef ADA_HYBRID_REFLECTION
+    reflectionResponse = vec4(u_SurfaceProperties.w > 1.5 ? vec3(0.0) : g_ReflectionResponse, opacity);
+#endif
     normalRoughness = vec4(normal, roughness);
     viewPositionMetallic = vec4(Input.ViewPosition, metallic);
 }

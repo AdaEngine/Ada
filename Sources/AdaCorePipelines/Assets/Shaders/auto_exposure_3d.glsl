@@ -34,8 +34,10 @@ vec4 meter() {
             float covered = length(textureLod(sampler2D(u_Auxiliary, u_Nearest), uv, 0.0).xyz) > 0.1 ? 1.0 : 0.0;
             vec3 color = max(textureLod(sampler2D(u_Source, u_Nearest), uv, 0.0).rgb, vec3(0.0));
             float luminance = clamp(dot(color, vec3(0.2126, 0.7152, 0.0722)), 0.0, 65000.0);
-            float metered = luminance > 0.001 ? covered : 0.0;
-            sum += vec2(log2(max(luminance, 0.001)), 1.0) * metered;
+            // Keep genuinely dim surfaces in the average. A hard 0.001 cut discarded dark rooms entirely
+            // and made their meter coverage jump as lights crossed that threshold. Exact black still holds.
+            float metered = luminance > 0.0 ? covered : 0.0;
+            sum += vec2(log2(max(luminance, 0.000001)), 1.0) * metered;
         }
     }
     return vec4(sum / 16.0, 0.0, 1.0);
@@ -53,14 +55,18 @@ vec4 adapt() {
     // frames of a scene are often only partly lit, so snapping to their measurement would strand a slow
     // adaptation at an extreme.
     bool initialized = previous.w > 0.5 && u_Limits.z < 0.5;
-    float base = initialized ? previous.x : clamp(0.0, u_Limits.x, u_Limits.y);
+    // Profiles may tighten the gain range while history is alive, including a paused (zero-speed) camera.
+    float base = clamp(initialized ? previous.x + previous.y : 0.0, u_Limits.x, u_Limits.y);
     float ev = base;
     if (valid) {
         float speed = desired > base ? u_Parameters.z : u_Parameters.w;
         float blend = speed >= 1000000.0 ? 1.0 : 1.0 - exp(-u_Parameters.y * speed);
         ev = mix(base, desired, blend);
     }
-    return vec4(ev, averageLog, coverage, 1.0);
+    // A single half loses small temporal steps at high FPS (e.g. 5.8 EV with slow adaptation toward 6 EV).
+    // Retain the rounding residual in a second half. These core packing operations require no f16 GPU feature.
+    float high = unpackHalf2x16(packHalf2x16(vec2(ev, 0.0))).x;
+    return vec4(high, ev - high, coverage, 1.0);
 }
 
 [[main]]

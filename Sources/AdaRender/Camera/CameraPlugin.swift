@@ -63,6 +63,10 @@ public struct RenderViewTarget: @unchecked Sendable {
 
     /// Opaque indirect-light contribution, attenuated by transparent foreground coverage.
     public var indirectLighting3DTexture: RenderTexture?
+    /// Opaque base specular BRDF response for replacing baked IBL with screen-space hits.
+    public var reflectionResponse3DTexture: RenderTexture?
+    /// Linear diffuse reflectance for screen-space diffuse transport. Allocated only when requested.
+    public var diffuseSurface3DTexture: RenderTexture?
     public var ambientOcclusion3DRawTexture: RenderTexture?
     public var ambientOcclusion3DTexture: RenderTexture?
     public var antiAliasing3DInputTexture: RenderTexture?
@@ -79,6 +83,7 @@ public struct RenderViewTarget: @unchecked Sendable {
     public var temporalPreviousView: Transform3D = .identity
     public var temporalReset = true
     public var temporalUpscalingActive = false
+    public var irradianceGridActive = false
 
     /// Resolved pixel-perfect settings for this frame. Nil when the camera is not pixel perfect or a feature that
     /// takes precedence (temporal upscaling, foveation) is active.
@@ -225,6 +230,8 @@ func ConfigurateRenderViewTarget(
                 renderViewTarget.normalRoughness3DTexture,
                 renderViewTarget.viewPositionMetallic3DTexture,
                 renderViewTarget.indirectLighting3DTexture,
+                renderViewTarget.reflectionResponse3DTexture,
+                renderViewTarget.diffuseSurface3DTexture,
                 renderViewTarget.ambientOcclusion3DRawTexture,
                 renderViewTarget.ambientOcclusion3DTexture,
                 renderViewTarget.antiAliasing3DInputTexture,
@@ -259,6 +266,8 @@ func ConfigurateRenderViewTarget(
             renderViewTarget.normalRoughness3DTexture = nil
             renderViewTarget.viewPositionMetallic3DTexture = nil
             renderViewTarget.indirectLighting3DTexture = nil
+            renderViewTarget.reflectionResponse3DTexture = nil
+            renderViewTarget.diffuseSurface3DTexture = nil
             renderViewTarget.ambientOcclusion3DRawTexture = nil
             renderViewTarget.ambientOcclusion3DTexture = nil
             renderViewTarget.antiAliasing3DInputTexture = nil

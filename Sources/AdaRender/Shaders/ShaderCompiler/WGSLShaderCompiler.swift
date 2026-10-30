@@ -10,7 +10,7 @@
     #if canImport(System)
         @unsafe @preconcurrency import System
     #else
-        @preconcurrency import SystemPackage
+        @unsafe @preconcurrency import SystemPackage
     #endif
 
     struct WGSLShaderCompiler: ShaderDeviceCompilerEngine {

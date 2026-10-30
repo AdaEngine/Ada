@@ -18,3 +18,31 @@ float adaDirectionalShadowPCF(vec2 uv, vec2 texelSize, vec2 minimum, vec2 maximu
     }
     return visibility / 9.0;
 }
+
+// Bounded PCSS: search for blockers, then grow the comparison footprint with
+// receiver/blocker separation. Clamp every tap to its own cascade atlas tile.
+float adaDirectionalShadowPCSS(vec2 uv, vec2 texel, vec2 minimum, vec2 maximum,
+    float receiverDepth, mat4 shadowMatrix, vec4 settings, float cascadeCount) {
+    float blockers = 0.0, depthSum = 0.0;
+    for (int i = 0; i < 16; ++i) {
+        float angle = float(i) * 2.39996323;
+        vec2 disk = vec2(cos(angle), sin(angle)) * sqrt((float(i) + 0.5) / 16.0);
+        vec2 sampleUV = clamp(uv + disk * texel * settings.w, minimum, maximum);
+        float depth = texture(sampler2D(u_DirectionalShadowTexture, u_DirectionalShadowSampler), sampleUV).r;
+        if (depth < receiverDepth) { blockers += 1.0; depthSum += depth; }
+    }
+    if (blockers < 0.5) { return 1.0; }
+    vec3 depthRow = vec3(shadowMatrix[0].z, shadowMatrix[1].z, shadowMatrix[2].z);
+    float separation = max(receiverDepth - depthSum / blockers, 0.0) / max(length(depthRow), 0.000001);
+    vec2 worldToUV = 0.5 * vec2(length(vec3(shadowMatrix[0].x,shadowMatrix[1].x,shadowMatrix[2].x)) / cascadeCount,
+        length(vec3(shadowMatrix[0].y,shadowMatrix[1].y,shadowMatrix[2].y)));
+    vec2 radius = clamp(separation * settings.y * worldToUV, texel, texel * settings.z);
+    float visibility = 0.0;
+    for (int i = 0; i < 24; ++i) {
+        float angle = float(i) * 2.39996323;
+        vec2 disk = vec2(cos(angle), sin(angle)) * sqrt((float(i) + 0.5) / 24.0);
+        float depth = texture(sampler2D(u_DirectionalShadowTexture, u_DirectionalShadowSampler), clamp(uv + disk * radius, minimum, maximum)).r;
+        visibility += receiverDepth <= depth ? 1.0 : 0.0;
+    }
+    return visibility / 24.0;
+}

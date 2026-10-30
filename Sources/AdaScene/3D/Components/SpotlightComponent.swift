@@ -21,6 +21,8 @@ public struct SpotLightComponent: Codable, Sendable {
     public var shadowBias: Float = 0.002
     public var shadowSlopeBias: Float = 0.004
     public var shadowPriority: Int = 0
+    /// Dynamic world-probe diffuse multiplier. Keep zero for lights already included in the static bake.
+    public var indirectIntensity: Float = 0
 
     public init(
         radiance: Vector3 = .one,
@@ -31,7 +33,8 @@ public struct SpotLightComponent: Codable, Sendable {
         outerConeAngle: Float = 35,
         shadowBias: Float = 0.002,
         shadowSlopeBias: Float = 0.004,
-        shadowPriority: Int = 0
+        shadowPriority: Int = 0,
+        indirectIntensity: Float = 0
     ) {
         self.radiance = radiance
         self.intensity = intensity
@@ -42,8 +45,9 @@ public struct SpotLightComponent: Codable, Sendable {
         self.shadowBias = shadowBias
         self.shadowSlopeBias = shadowSlopeBias
         self.shadowPriority = shadowPriority
+        self.indirectIntensity = indirectIntensity
     }
-    private enum CodingKeys: CodingKey { case radiance, intensity, castShadows, range, innerConeAngle, outerConeAngle, shadowBias, shadowSlopeBias, shadowPriority }
+    private enum CodingKeys: CodingKey { case radiance, intensity, castShadows, range, innerConeAngle, outerConeAngle, shadowBias, shadowSlopeBias, shadowPriority, indirectIntensity }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -56,7 +60,8 @@ public struct SpotLightComponent: Codable, Sendable {
             outerConeAngle: try values.decodeIfPresent(Float.self, forKey: .outerConeAngle) ?? 35,
             shadowBias: try values.decodeIfPresent(Float.self, forKey: .shadowBias) ?? 0.002,
             shadowSlopeBias: try values.decodeIfPresent(Float.self, forKey: .shadowSlopeBias) ?? 0.004,
-            shadowPriority: try values.decodeIfPresent(Int.self, forKey: .shadowPriority) ?? 0
+            shadowPriority: try values.decodeIfPresent(Int.self, forKey: .shadowPriority) ?? 0,
+            indirectIntensity: try values.decodeIfPresent(Float.self, forKey: .indirectIntensity) ?? 0
         )
     }
 }
@@ -72,6 +77,8 @@ public struct PointLightComponent: Codable, Sendable {
     public var shadowBias: Float = 0.002
     public var shadowSlopeBias: Float = 0.004
     public var shadowPriority: Int = 0
+    /// Dynamic world-probe diffuse multiplier. Keep zero for lights already included in the static bake.
+    public var indirectIntensity: Float = 0
 
     public init(
         radiance: Vector3 = .one,
@@ -80,7 +87,8 @@ public struct PointLightComponent: Codable, Sendable {
         range: Float = 10,
         shadowBias: Float = 0.002,
         shadowSlopeBias: Float = 0.004,
-        shadowPriority: Int = 0
+        shadowPriority: Int = 0,
+        indirectIntensity: Float = 0
     ) {
         self.radiance = radiance
         self.intensity = intensity
@@ -89,8 +97,9 @@ public struct PointLightComponent: Codable, Sendable {
         self.shadowBias = shadowBias
         self.shadowSlopeBias = shadowSlopeBias
         self.shadowPriority = shadowPriority
+        self.indirectIntensity = indirectIntensity
     }
-    private enum CodingKeys: CodingKey { case radiance, intensity, castShadows, range, shadowBias, shadowSlopeBias, shadowPriority }
+    private enum CodingKeys: CodingKey { case radiance, intensity, castShadows, range, shadowBias, shadowSlopeBias, shadowPriority, indirectIntensity }
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -101,7 +110,8 @@ public struct PointLightComponent: Codable, Sendable {
             range: try values.decodeIfPresent(Float.self, forKey: .range) ?? 10,
             shadowBias: try values.decodeIfPresent(Float.self, forKey: .shadowBias) ?? 0.002,
             shadowSlopeBias: try values.decodeIfPresent(Float.self, forKey: .shadowSlopeBias) ?? 0.004,
-            shadowPriority: try values.decodeIfPresent(Int.self, forKey: .shadowPriority) ?? 0
+            shadowPriority: try values.decodeIfPresent(Int.self, forKey: .shadowPriority) ?? 0,
+            indirectIntensity: try values.decodeIfPresent(Float.self, forKey: .indirectIntensity) ?? 0
         )
     }
 }

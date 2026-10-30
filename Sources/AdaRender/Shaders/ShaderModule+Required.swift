@@ -12,10 +12,18 @@ public extension ShaderModule {
     /// Missing built-in shaders are packaging errors, so this method terminates with
     /// the original loading diagnostic instead of propagating an unrecoverable error.
     static func loadRequiredBundled(at path: String, from bundle: Bundle) -> AssetHandle<ShaderModule> {
+        loadRequiredBundled(at: path, from: bundle, defines: [])
+    }
+
+    /// Loads a required built-in variant while preserving its vertex and fragment output contract.
+    static func loadRequiredBundled(at path: String, from bundle: Bundle, defines: [String]) -> AssetHandle<ShaderModule> {
         do {
-            return try loadBundled(at: path, from: bundle)
+            if defines.isEmpty {
+                return try loadBundled(at: path, from: bundle)
+            }
+            return AssetHandle(try createBundled(at: path, from: bundle, defines: defines))
         } catch {
-            preconditionFailure("Required bundled shader '\(path)' could not be loaded: \(error)")
+            preconditionFailure("Required bundled shader '\(path)' with defines \(defines) could not be loaded: \(error)")
         }
     }
 

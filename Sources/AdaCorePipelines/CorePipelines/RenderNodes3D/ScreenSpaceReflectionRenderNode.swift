@@ -87,6 +87,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
             let bloomTexture = environment.postProcess.bloom.isEnabled ? bloomViews.output(view: source.entityId) : nil
             let skybox = environment.skybox
             let reflection = environment.screenSpaceReflection
+            let probe = environment.localEnvironmentProbe
             let skyIntensity = max(0, skybox.intensity)
             let fog = environment.fog.sanitized
             let fogActive = environment.fog.changesImage
@@ -94,7 +95,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
             let sun = lighting.directionalLight
             let fogSunDirection = sun?.directionToLight.normalized ?? Vector3(0, 1, 0)
             let fogSunRadiance = sun.map { $0.radiance * $0.intensity } ?? .zero
-            let uniform = Environment3DUniform(
+            var uniform = Environment3DUniform(
                 projection: jitteredUniform.projectionMatrix,
                 inverseProjection: jitteredUniform.projectionMatrix.inverse,
                 inverseView: viewUniform.viewMatrix.inverse,
@@ -112,7 +113,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                     Float(min(max(reflection.maxSteps, 1), 64)),
                     max(0, reflection.intensity),
                     min(max(reflection.edgeFade, 0.001), 0.5),
-                    0
+                    Float(environment.imageBasedLighting?.asset.asset?.specularLevels ?? 2)
                 ),
                 environmentFlags: Vector4(
                     skybox.isEnabled ? 1 : 0,
@@ -136,7 +137,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                     environment.ambientOcclusion.isEnabled ? 1 : 0,
                     finiteRenderValue(environment.ambientOcclusion.radius, fallback: 0.65, range: 0.05...3),
                     target.temporalUpscalingActive ? 1 : 0,
-                    0
+                    target.reflectionResponse3DTexture == nil ? 0 : 1
                 ),
                 postProcess: Vector4(
                     environment.postProcess.exposureScale,
@@ -153,10 +154,23 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                 vignette: Vector4(environment.postProcess.vignette.sanitized.smoothness, autoExposureTexture == nil ? 0 : 1, 0, 0),
                 fogColor: Vector4(fog.color.asVector.xyz, fogActive ? fog.density : 0),
                 fogShape: Vector4(fog.heightFalloff, fog.baseHeight, fog.startDistance, fog.maximumOpacity),
-                fogRange: Vector4(fog.skyInfluence, fog.sunExponent, shafts == nil ? 0 : 1, 0),
+                fogRange: Vector4(fog.skyInfluence, fog.sunExponent, shafts == nil ? 0 : 1, fog.localVolumes.isEmpty ? 0 : 1),
                 fogSun: Vector4(fogSunDirection, fogActive && shafts == nil ? fog.sunInscattering : 0),
-                fogSunColor: Vector4(fogSunRadiance, 0)
+                fogSunColor: Vector4(fogSunRadiance, 0),
+                probePosition: Vector4(probe?.capturePosition ?? .zero, probe?.isValid == true ? 1 : 0),
+                probeMinimum: Vector4(probe?.minimum ?? .zero, 0),
+                probeMaximum: Vector4(probe?.maximum ?? .zero, 0)
             )
+            let giTexture = environment.screenSpaceGI.isEnabled
+                ? context.world.getResource(ScreenSpaceGI3DViews.self)?.textures[source.entityId]?.filtered : nil
+            uniform.diffuseGI = Vector4(giTexture == nil ? 0 : 1, environment.screenSpaceGI.sanitized.bias, 0, 0)
+            if environment.imageBasedLighting == nil {
+                let lightmapped = context.world.getResource(VisibleMesh3DLists.self)?.items(view: source.entityId, pass: -1).contains { item in
+                    (item.material as? PBRMaterial)?.lightmapTexture != nil && item.mesh.models[item.modelIndex].parts[item.partIndex]
+                        .vertexDescriptor.attributes.containsAttribute(by: MeshDescriptor.textureCoordinates1.id.name)
+                } ?? false
+                uniform.diffuseGI.z = target.irradianceGridActive || lightmapped ? 1 : 0
+            }
             let constants = scratch.cache.write(uniform, view: source.entityId, device: renderDevice.renderDevice)
 
             let environmentTexture = skybox.texture?.asset ?? Texture2D.whiteTexture
@@ -184,6 +198,11 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                         .init(binding: 11, shaderStages: .fragment, resource: .sampler(pipeline.nearest)),
                         .init(binding: 12, shaderStages: .fragment, resource: .texture(bloomTexture ?? Texture2D.whiteTexture)),
                         .init(binding: 16, shaderStages: .fragment, resource: .texture(shafts ?? Texture2D.whiteTexture)),
+                        .init(binding: 17, shaderStages: .fragment, resource: .texture(target.reflectionResponse3DTexture ?? Texture2D.whiteTexture)),
+                        .init(binding: 20, shaderStages: .fragment, resource: .texture(giTexture ?? Texture2D.whiteTexture)),
+                        .init(binding: 18, shaderStages: .fragment, resource: .texture(environment.imageBasedLighting?.asset.asset?.specular ?? Texture2D.whiteTexture)),
+                        // Match the PBR pass's atlas filtering exactly, including programmatically supplied maps.
+                        .init(binding: 19, shaderStages: .fragment, resource: .sampler((environment.imageBasedLighting?.asset.asset?.irradiance ?? Texture2D.whiteTexture).sampler)),
                         .init(binding: 13, shaderStages: .fragment, resource: .texture(gradingLUT?.texture ?? Texture2D.whiteTexture)),
                         .init(binding: 14, shaderStages: .fragment, resource: .sampler(pipeline.sampler)),
                         .init(binding: 15, shaderStages: .fragment, resource: .texture(autoExposureTexture ?? Texture2D.whiteTexture)),

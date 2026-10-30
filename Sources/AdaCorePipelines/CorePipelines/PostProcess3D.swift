@@ -113,9 +113,11 @@ public struct AutoExposure3D: Codable, Sendable, Equatable {
     public var minimumEV: Float
     /// Highest automatic correction in stops. A dim scene cannot be brightened beyond this.
     public var maximumEV: Float
-    /// How fast exposure rises when the scene gets darker, per second. `infinity` snaps instantly.
+    /// Exponential rate (1/seconds) when gain rises in darkness; 1 reaches 63% of the remaining EV change
+    /// in one second. Zero holds exposure, `infinity` snaps instantly. This is not stops per second.
     public var speedUp: Float
-    /// How fast exposure falls when the scene gets brighter, per second. `infinity` snaps instantly.
+    /// Exponential rate (1/seconds) when gain falls in brighter light. Use a larger value than speedUp for
+    /// faster adaptation when leaving darkness. Zero holds exposure, `infinity` snaps instantly.
     public var speedDown: Float
 
     public init(isEnabled: Bool = false, minimumEV: Float = -3, maximumEV: Float = 3, speedUp: Float = 1, speedDown: Float = 2.5) {

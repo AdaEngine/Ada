@@ -153,7 +153,7 @@ struct AutoExposure3DViews: Resource {
         linear = device.createSampler(from: .init(minFilter: .linear, magFilter: .linear, mipFilter: .notMipmapped))
     }
 
-    /// The texture whose first channel holds the adapted exposure in stops, once the view has run.
+    /// The texture whose red plus green channels hold adapted exposure in stops, once the view has run.
     func output(view: Entity.ID) -> RenderTexture? {
         guard let state = states[view], state.initialized else {
             return nil

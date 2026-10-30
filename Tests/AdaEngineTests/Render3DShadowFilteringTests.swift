@@ -33,7 +33,18 @@ extension Render3DGPUTests {
             }
         }
 
-        private func render(tile: Bool) async throws -> Image {
+        @Test func pcssPenumbraGrowsWithBlockerSeparation() async throws {
+            let image = try await render(tile: false, pcss: true)
+            var near = 0, far = 0
+            for x in 0..<image.width {
+                let p = image.getPixel(x:x,y:2)
+                if p.red > 0.1 && p.red < 0.9 { near += 1 }
+                if p.green > 0.1 && p.green < 0.9 { far += 1 }
+            }
+            #expect(far > near * 2, "PCSS must widen the penumbra behind a distant blocker: \(near), \(far)")
+        }
+
+        private func render(tile: Bool, pcss: Bool = false) async throws -> Image {
             let scene = try await DebugViews.makeScene()
             let device = scene.device
             let source = try ShaderSource(source: """
@@ -55,8 +66,13 @@ extension Render3DGPUTests {
             #include <AdaEngine/ShadowPCF.glsl>
             [[main]]
             void shadow_test_fragment() {
-                vec2 texel = vec2(0.125, 1.0);
-                \(tile ? """
+                vec2 texel = vec2(\(pcss ? "0.015625" : "0.125"), 1.0);
+                \(pcss ? """
+                vec4 settings=vec4(1.0,0.5,24.0,16.0);
+                float close=adaDirectionalShadowPCSS(vec2(v_UV.x,0.5),texel,vec2(0.0078125,0.5),vec2(0.9921875,0.5),0.21,mat4(1.0),settings,1.0);
+                float far=adaDirectionalShadowPCSS(vec2(v_UV.x,0.5),texel,vec2(0.0078125,0.5),vec2(0.9921875,0.5),0.8,mat4(1.0),settings,1.0);
+                o_Color=vec4(close,far,0.0,1.0);
+                """ : tile ? """
                 float shadow = adaDirectionalShadowPCF(vec2(v_UV.x * 0.5, 0.5), texel, vec2(0.0625, 0.5), vec2(0.4375, 0.5), 0.5);
                 float light = adaDirectionalShadowPCF(vec2(0.5 + v_UV.x * 0.5, 0.5), texel, vec2(0.5625, 0.5), vec2(0.9375, 0.5), 0.5);
                 o_Color = vec4(shadow, light, 0.0, 1.0);
@@ -72,8 +88,9 @@ extension Render3DGPUTests {
                 debugName: "Shadow PCF regression", backfaceCulling: false,
                 depthPixelFormat: .none, colorAttachments: [.init(format: .bgra8)]
             ))
-            var depths = Image(width: 8, height: 1, color: .black)
-            for x in 4..<8 { depths.setPixel(in: [Float(x), 0], color: .white) }
+            let size = pcss ? 64 : 8
+            var depths = Image(width: size, height: 1, color: pcss ? Color(red:0.2,green:0.2,blue:0.2) : .black)
+            for x in size/2..<size { depths.setPixel(in: [Float(x), 0], color: .white) }
             let texture = Texture2D(image: depths)
             let sampler = device.createSampler(from: .init(minFilter: .nearest, magFilter: .nearest))
             let target = RenderTexture(size: [128, 4], scaleFactor: 1, format: .bgra8)

@@ -37,6 +37,9 @@ extension PBRMaterial {
         result.anisotropyRotation = anisotropyRotation
         result.layerTextures = layerTextures
         result.graphMaterial = graphMaterial?.makeInstance()
+        result.lightmapTexture = lightmapTexture
+        result.lightmapScaleOffset = lightmapScaleOffset
+        result.lightmapIntensity = lightmapIntensity
         result.assetMetaInfo = assetMetaInfo
         return result
     }

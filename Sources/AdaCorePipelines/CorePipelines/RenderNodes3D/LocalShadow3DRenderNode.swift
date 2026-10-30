@@ -15,7 +15,7 @@ struct LocalShadow3DPipeline: RenderPipelineConfigurator {
     func configurate(with configuration: Shadow3DConfiguration) -> RenderPipelineDescriptor {
         var descriptor = base.configurate(with: configuration)
         descriptor.debugName = "Local Shadow 3D"
-        descriptor.colorAttachments = [.init(format: .rgba_16f)]
+        descriptor.colorAttachments = [.init(format: .r32f)]
         return descriptor
     }
 }
@@ -33,7 +33,7 @@ struct LocalShadow3DClear: Resource {
             backfaceCulling: false
         )
         descriptor.depthStencilDescriptor = DepthStencilDescriptor(isDepthTestEnabled: false, isDepthWriteEnabled: false, depthCompareOperator: .always)
-        descriptor.colorAttachments = [.init(format: .rgba_16f)]
+        descriptor.colorAttachments = [.init(format: .r32f)]
         pipeline = device.createRenderPipeline(from: descriptor)
     }
 }
@@ -94,7 +94,16 @@ public struct LocalShadow3DRenderNode: RenderNode {
             var entry = views.entries.removeValue(forKey: source.entityId) ?? LocalShadow3DViews.Entry()
             let environment = environments.environments[source.entityId] ?? Environment3D()
             let cameraPosition = uniform.viewMatrix.inverse.origin
-            entry.lights = LocalLighting3DMath.select(lighting.localLights, viewProjection: uniform.viewProjectionMatrix, cameraPosition: cameraPosition)
+            let probes = environment.irradianceProbes
+            let grid = probes?.asset.asset
+            let transport = probes?.dynamic?.transport.asset
+            var bounds: AABB?
+            if let grid, transport?.matches(grid) == true {
+                // A light may illuminate a bounce wall outside the receiver grid itself.
+                bounds = transport?.surfaceBounds
+            }
+            entry.lights = LocalLighting3DMath.select(lighting.localLights, viewProjection: uniform.viewProjectionMatrix,
+                cameraPosition: cameraPosition, irradianceBounds: bounds)
             let settings = environment.localShadows
             let budget = settings.isEnabled ? min(max(settings.maximumLights, 0), LocalLighting3DMath.maximumShadowLights) : 0
             entry.allocator.select(entry.lights, cameraPosition: cameraPosition, budget: budget)
@@ -112,7 +121,7 @@ public struct LocalShadow3DRenderNode: RenderNode {
                 entry.color = RenderTexture(
                     size: size,
                     scaleFactor: 1,
-                    format: .rgba_16f,
+                    format: .r32f,
                     debugLabel: "Local Shadow Atlas",
                     samplerDescription: .init(minFilter: .nearest, magFilter: .nearest, mipFilter: .notMipmapped)
                 )

@@ -19,6 +19,8 @@
 
     final class MetalRenderDevice: RenderDevice, @unchecked Sendable {
         var supportsInstancedVertexInputs: Bool { true }
+        var supportsHybridReflections: Bool { true }
+        var supportsLightingSurfaceBuffer: Bool { true }
         var supportsSpatialUpscaling: Bool {
             #if canImport(MetalFX) && (os(macOS) || os(iOS))
                 MTLFXSpatialScalerDescriptor.supportsDevice(device)

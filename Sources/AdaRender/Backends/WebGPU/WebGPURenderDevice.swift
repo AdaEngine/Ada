@@ -8,6 +8,7 @@
 #if WEBGPU_ENABLED && canImport(WebGPU)
     import AdaUtils
     import Foundation
+    import Math
     import Synchronization
     @unsafe @preconcurrency import WebGPU
 
@@ -16,9 +17,38 @@
         public var supportsInstancedVertexInputs: Bool { true }
         public var supportsSpatialUpscaling: Bool { true }
         public let context: WGPUContext
+        public let supportsHybridReflections: Bool
+        public let supportsLightingSurfaceBuffer: Bool
+
+        public var supportsTemporalUpscaling: Bool {
+            #if os(Windows) && canImport(CWebGPUDLSS)
+            context.dlssDevice != nil
+            #else
+            false
+            #endif
+        }
+
+        public func createTemporalUpscaler(inputSize: SizeInt, outputSize: SizeInt) -> (any TemporalUpscaler)? {
+            #if os(Windows) && canImport(CWebGPUDLSS)
+            guard let dlss = context.dlssDevice else { return nil }
+            return WGPUDLSSUpscaler(device: dlss, inputSize: inputSize, outputSize: outputSize)
+            #else
+            return nil
+            #endif
+        }
 
         init(context: WGPUContext) {
             self.context = context
+            #if WASM
+            // Browser builds currently return the plain precompiled module from createBundled(defines:).
+            // Until hybrid WGSL variants ship, retain the four-target IBL path rather than an undefined MRT.
+            supportsHybridReflections = false
+            supportsLightingSurfaceBuffer = false
+            #else
+            var limits = WebGPU.GPULimits()
+            supportsHybridReflections = context.device.getLimits(limits: &limits) == .success && limits.maxColorAttachmentBytesPerSample >= 40
+            supportsLightingSurfaceBuffer = limits.maxColorAttachmentBytesPerSample >= 48 && limits.maxColorAttachments >= 6
+            #endif
         }
 
         public func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? {

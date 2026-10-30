@@ -118,6 +118,10 @@ public class PBRMaterial: Material, @unchecked Sendable {
     public var emissiveFactor: Vector3 = .one { didSet { uniformRevision &+= 1 } }
     public var occlusionTexture: Texture2D? { didSet { uniformRevision &+= 1 } }
     public var occlusionStrength: Float = 1 { didSet { uniformRevision &+= 1 } }
+    /// Linear incident diffuse lighting / pi on UV1. Static lighting replaces diffuse IBL, preserving its specular.
+    public var lightmapTexture: Texture2D? { didSet { uniformRevision &+= 1 } }
+    public var lightmapScaleOffset: Vector4 = [1, 1, 0, 0] { didSet { uniformRevision &+= 1 } }
+    public var lightmapIntensity: Float = 1 { didSet { uniformRevision &+= 1 } }
     public var normalScale: Float = 1 { didSet { uniformRevision &+= 1 } }
     /// Height map for parallax occlusion mapping, read from the red channel (`1` is the top of the surface, `0` the
     /// deepest point). Use a linear (non-sRGB) texture. Parallax shifts every material texture that shares
@@ -178,6 +182,11 @@ public class PBRMaterial: Material, @unchecked Sendable {
         /// The draw's mesh has morph targets. A property of the draw, not of the material, so ``PBRMaterial/shaderFeatures``
         /// never contains it.
         public static let morph = Self(rawValue: 1 << 11)
+        /// The geometry pass stores the base specular response for hybrid IBL/SSR replacement.
+        public static let hybridReflection = Self(rawValue: 1 << 12)
+        public static let diffuseSurface = Self(rawValue: 1 << 13)
+        public static let lightmap = Self(rawValue: 1 << 14)
+        public static let irradianceGrid = Self(rawValue: 1 << 15)
 
         /// Every layer, without textures.
         public static let all: ShaderFeatures = [.clearcoat, .sheen, .anisotropy]
@@ -189,6 +198,10 @@ public class PBRMaterial: Material, @unchecked Sendable {
             if contains(.sheen) { macros.append("ADA_SHEEN") }
             if contains(.anisotropy) { macros.append("ADA_ANISOTROPY") }
             if contains(.morph) { macros.append("ADA_MORPH") }
+            if contains(.hybridReflection) { macros.append("ADA_HYBRID_REFLECTION") }
+            if contains(.diffuseSurface) { macros.append("ADA_DIFFUSE_SURFACE") }
+            if contains(.lightmap) { macros.append("ADA_LIGHTMAP") }
+            if contains(.irradianceGrid) { macros.append("ADA_IRRADIANCE_GRID") }
             for texture in PBRLayerTexture.allCases where contains(texture.feature) {
                 macros.append(texture.macro)
             }
@@ -199,6 +212,7 @@ public class PBRMaterial: Material, @unchecked Sendable {
     /// The layers and textures this material currently uses, from its factor values and textures.
     public var shaderFeatures: ShaderFeatures {
         var features: ShaderFeatures = []
+        if lightmapTexture != nil { features.insert(.lightmap) }
         if clearcoatFactor > 0 { features.insert(.clearcoat) }
         if max(sheenColorFactor.x, max(sheenColorFactor.y, sheenColorFactor.z)) > 0 { features.insert(.sheen) }
         if anisotropyStrength > 0 { features.insert(.anisotropy) }

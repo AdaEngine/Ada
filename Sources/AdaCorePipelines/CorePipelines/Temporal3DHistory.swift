@@ -80,6 +80,7 @@ struct Temporal3DViews: Resource {
         var inputSize = SizeInt.zero
         var outputSize = SizeInt.zero
         var encoded = false
+        var method: TemporalReconstructionMethod?
     }
     var entries: [Entity.ID: Entry] = [:]
     var frame = 0
@@ -99,13 +100,16 @@ struct PrepareTemporal3DSystem {
         cameras.forEach { camera, graph, target, uniform, source in
             guard camera.isActive, camera.rasterizationRateMap == nil, graph.subgraphLabel == .main3D,
                 let settings = camera.temporalUpscaling,
-                device.renderDevice.supportsTemporalUpscaling,
+                settings.method == .portable || device.renderDevice.supportsTemporalUpscaling,
                 let input = target.mainTexture, let output = target.outputTexture
             else { return }
             active.append(source.entityId)
             var entry = views.entries.removeValue(forKey: source.entityId) ?? Temporal3DViews.Entry()
-            if entry.inputSize != input.size || entry.outputSize != output.size {
-                entry.scaler = device.renderDevice.createTemporalUpscaler(inputSize: input.size, outputSize: output.size)
+            if entry.inputSize != input.size || entry.outputSize != output.size || entry.method != settings.method {
+                entry.scaler = settings.method == .portable
+                    ? PortableTemporal3DUpscaler(device: device.renderDevice, inputSize: input.size, outputSize: output.size, view: source.entityId)
+                    : device.renderDevice.createTemporalUpscaler(inputSize: input.size, outputSize: output.size)
+                entry.method = settings.method
                 entry.inputSize = input.size
                 entry.outputSize = output.size
                 entry.encoded = false

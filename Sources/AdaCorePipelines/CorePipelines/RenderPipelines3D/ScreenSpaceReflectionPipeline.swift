@@ -64,6 +64,10 @@ struct Environment3DUniform: Sendable {
     var fogRange: Vector4
     var fogSun: Vector4
     var fogSunColor: Vector4
+    var probePosition: Vector4 = .zero
+    var probeMinimum: Vector4 = .zero
+    var probeMaximum: Vector4 = .zero
+    var diffuseGI: Vector4 = .zero
 }
 
 public struct ScreenSpaceReflectionScratch: Resource, Sendable {

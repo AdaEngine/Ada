@@ -1,4 +1,5 @@
 #if os(macOS) || os(Windows) || os(Linux)
+@_spi(Internal) import AdaApp
 import AdaECS
 @_spi(Internal) import AdaRender
 import AdaScene
@@ -177,6 +178,157 @@ extension Render3DGPUTests {
             scene.camera.components[Transform.self] = transform
             let skyOnly = try await scene.render(.none, frames: 6)
             #expect(abs(Self.luminance(skyOnly.getPixel(x: 320, y: 240)) - skyMetered) <= 0.02, "Exposure must hold when no geometry is visible.")
+        }
+
+        /// A neutral emissive wall gives the real meter a known luminance, independent of sunlight/shadows.
+        private static func makeMeterScene() async throws -> (Render3DDebugViewGPUTests.Scene, PBRMaterial) {
+            let scene = try await Render3DDebugViewGPUTests.makeScene()
+            for entity in scene.app.main.getEntities() where entity.id != scene.camera.id && entity.id != scene.sun.id {
+                scene.app.main.removeEntity(entity)
+            }
+            try scene.setSunIntensity(0)
+            scene.camera.components[Transform.self] = Transform(position: [0, 0, -2])
+            try scene.configure {
+                $0.imageBasedLighting = nil
+                $0.screenSpaceReflection.isEnabled = false
+                $0.ambientOcclusion.isEnabled = false
+                $0.skybox.isEnabled = false
+                $0.postProcess.bloom.isEnabled = false
+            }
+            let material = PBRMaterial()
+            material.baseColorFactor = [0, 0, 0, 1]
+            material.metallicFactor = 0
+            material.emissiveFactor = .one
+            material.emissiveStrength = 0.002
+            scene.app.main.spawn("Exposure meter wall") {
+                Mesh3DComponent(mesh: Mesh.generateCube(size: [8, 8, 0.1], renderDevice: scene.device), materials: [material],
+                                castShadows: false, receiveShadows: false)
+                Transform()
+            }
+            return (scene, material)
+        }
+
+        /// Drive the production GPU adaptation with a deterministic clock; only the final frame is read back.
+        private static func advance(_ scene: Render3DDebugViewGPUTests.Scene, time: inout Double, step: Double, frames: Int = 1) async throws -> Image {
+            let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+            let state = world.getRefResource(AutoExposure3DViews.self)
+            for _ in 0..<frames {
+                time += step
+                let stamp = time
+                state.wrappedValue.clock = { stamp }
+                try await scene.app.update()
+            }
+            return try await scene.render(.none, frames: 0)
+        }
+
+        /// Test-only GPU readback of the two half channels. Runtime exposure stays entirely on the GPU.
+        private static func currentEV(_ scene: Render3DDebugViewGPUTests.Scene) async throws -> Float {
+            let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+            let texture = try #require(world.getResource(AutoExposure3DViews.self)?.output(view: scene.camera.id))
+            let state = try await Self.halfPixel(scene, texture: texture)
+            return state.x + state.y
+        }
+
+        private static func halfPixel(_ scene: Render3DDebugViewGPUTests.Scene, texture: Texture, x: Int = 0, y: Int = 0) async throws -> Vector4 {
+            let buffer = scene.device.createBuffer(label: "Exposure test readback", length: 256, options: .storageShared)
+            let command = scene.device.createCommandQueue().makeCommandBuffer()
+            let blit = command.beginBlitPass(.init())
+            blit.copyTextureToBuffer(source: texture, sourceOrigin: .init(x: x, y: y), sourceMipLevel: 0, sourceSlice: 0,
+                                     sourceSize: .init(width: 1, height: 1), destination: buffer, destinationOffset: 0,
+                                     destinationBytesPerRow: 256, destinationBytesPerImage: 256)
+            blit.endBlitPass()
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                command.addCompletedHandler { continuation.resume() }
+                command.commit()
+            }
+            let data = try await buffer.readData()
+            return data.withUnsafeBytes { bytes in
+                func channel(_ index: Int) -> Float {
+                    Float(Float16(bitPattern: unsafe bytes.loadUnaligned(fromByteOffset: index * 2, as: UInt16.self)))
+                }
+                return Vector4(channel(0), channel(1), channel(2), channel(3))
+            }
+        }
+
+        /// Newly spawned meshes need extraction before the first valid render. Check HDR itself so a sky-only
+        /// startup frame can never be mistaken for the metered wall or pass a display-brightness assertion.
+        private static func requireMeterWall(_ scene: Render3DDebugViewGPUTests.Scene, luminance expected: Float) async throws {
+            let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+            let camera = try #require(world.getEntities().first { $0.components[ExtractedCameraSource.self]?.entityId == scene.camera.id })
+            let texture = try #require(camera.components[RenderViewTarget.self]?.sceneColor3DTexture)
+            let pixel = try await Self.halfPixel(scene, texture: texture, x: 320, y: 240)
+            let relativeError = abs((pixel.x + pixel.y + pixel.z) / 3 - expected) / expected
+            try #require(pixel.w > 0.99 && relativeError < 0.01,
+                         "The extracted HDR wall must be visible at the requested luminance before measuring adaptation: \(pixel), expected \(expected).")
+        }
+
+        @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
+        func leavingDarknessOverexposesThenSettlesAndTheReturnIsSlower() async throws {
+            let (scene, wall) = try await Self.makeMeterScene()
+            var time: Double = 10
+            try scene.configure { $0.postProcess.autoExposure = Self.snapping }
+            let darkSettled = try await Self.advance(scene, time: &time, step: 1 / 60, frames: 6)
+            try await Self.requireMeterWall(scene, luminance: 0.002)
+            let darkEV = try await Self.currentEV(scene)
+            try scene.configure { $0.postProcess.autoExposure.speedUp = 0.5; $0.postProcess.autoExposure.speedDown = 2.5 }
+            wall.emissiveStrength = 2
+            let sunTransient = try await Self.advance(scene, time: &time, step: 1 / 60)
+            _ = try await Self.advance(scene, time: &time, step: 0.25, frames: 4)
+            let sunAfterOneSecond = try await Self.currentEV(scene)
+            let sunSettled = try await Self.advance(scene, time: &time, step: 0.25, frames: 20)
+            let sunEV = try await Self.currentEV(scene)
+            wall.emissiveStrength = 0.002
+            let darkTransient = try await Self.advance(scene, time: &time, step: 1 / 60)
+            _ = try await Self.advance(scene, time: &time, step: 0.25, frames: 4)
+            let darkAfterOneSecond = try await Self.currentEV(scene)
+            let range = darkEV - sunEV
+            let sunProgress = (darkEV - sunAfterOneSecond) / range
+            let darkProgress = (darkAfterOneSecond - sunEV) / range
+            let transient = Self.luminance(sunTransient.getPixel(x: 320, y: 240))
+            let settled = Self.luminance(sunSettled.getPixel(x: 320, y: 240))
+            #expect(range > 6, "The fixture must cross a large physical luminance range: \(range) stops.")
+            #expect(transient > settled + 0.2, "Leaving darkness must visibly overexpose before settling: \(transient) vs \(settled).")
+            #expect(Self.luminance(darkTransient.getPixel(x: 320, y: 240)) < Self.luminance(darkSettled.getPixel(x: 320, y: 240)) * 0.2)
+            #expect(sunProgress > 0.85 && darkProgress < 0.5 && sunProgress > darkProgress * 2,
+                    "At equal elapsed time, bright adaptation must be faster: \(sunProgress) vs \(darkProgress).")
+
+            try scene.configure { $0.postProcess.autoExposure.speedUp = 0; $0.postProcess.autoExposure.speedDown = 0 }
+            _ = try await Self.advance(scene, time: &time, step: 0.25, frames: 4)
+            #expect(abs(try await Self.currentEV(scene) - darkAfterOneSecond) < 0.00001, "Zero speeds freeze history for pause.")
+            try scene.configure { $0.postProcess.autoExposure.maximumEV = -1 }
+            _ = try await Self.advance(scene, time: &time, step: 0.25)
+            #expect(try await Self.currentEV(scene) <= -1 + 0.00001, "A tighter profile limit applies even while adaptation is held.")
+
+            try FileManager.default.createDirectory(at: GoldenFrame.outputDirectory, withIntermediateDirectories: true)
+            for (name, image) in [("dark-settled", darkSettled), ("sun-transient", sunTransient), ("sun-settled", sunSettled), ("dark-transient", darkTransient)] {
+                try image.writePNG(to: GoldenFrame.outputDirectory.appendingPathComponent("eye-adaptation-\(name).png"))
+            }
+            let measurements = ["darkEV": darkEV, "sunEV": sunEV, "sunTransientLuminance": transient, "sunSettledLuminance": settled,
+                                "sunProgressAfterOneSecond": sunProgress, "darkProgressAfterOneSecond": darkProgress]
+            try JSONEncoder().encode(measurements).write(to: GoldenFrame.outputDirectory.appendingPathComponent("eye-adaptation.json"))
+        }
+
+        @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
+        func dimSurfacesAreMeteredAndSlowAdaptationDoesNotStallAt140FPS() async throws {
+            let (scene, wall) = try await Self.makeMeterScene()
+            var time: Double = 10
+            wall.emissiveStrength = 0.00005
+            try scene.configure { $0.postProcess.autoExposure = AutoExposure3D(isEnabled: true, minimumEV: -10, maximumEV: 10,
+                                                                            speedUp: .infinity, speedDown: .infinity) }
+            let dim = try await Self.advance(scene, time: &time, step: 1 / 140, frames: 6)
+            try await Self.requireMeterWall(scene, luminance: 0.00005)
+            #expect(try await Self.currentEV(scene) > 8, "Positive luminance below 0.001 must still contribute to metering.")
+            #expect(Self.luminance(dim.getPixel(x: 320, y: 240)) > 0.1)
+            wall.emissiveStrength = 0.18 / 64
+            try scene.configure { $0.postProcess.autoExposure = AutoExposure3D(isEnabled: true, minimumEV: 5.8, maximumEV: 5.8,
+                                                                            speedUp: .infinity, speedDown: .infinity) }
+            _ = try await Self.advance(scene, time: &time, step: 1 / 140)
+            let initial = try await Self.currentEV(scene)
+            try scene.configure { $0.postProcess.autoExposure = AutoExposure3D(isEnabled: true, minimumEV: -6, maximumEV: 6, speedUp: 0.1, speedDown: 0.1) }
+            _ = try await Self.advance(scene, time: &time, step: 1 / 140, frames: 140)
+            let adapted = try await Self.currentEV(scene)
+            #expect(adapted > initial + 0.01 && adapted < 6,
+                    "Small real temporal increments must accumulate instead of rounding back to the same half EV: \(initial) -> \(adapted).")
         }
     }
 }

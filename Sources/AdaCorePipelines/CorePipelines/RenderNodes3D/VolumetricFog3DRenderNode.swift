@@ -16,6 +16,7 @@ public struct VolumetricFog3DRenderNode: RenderNode {
     @Res<ExtractedEnvironment3D> private var environments
     @Res<ExtractedLighting3D> private var lighting
     @ResMut<VolumetricFog3DViews> private var volumetric
+    @ResMut<LocalLighting3DGPUScratch> private var localUniforms
     @Res<RenderDeviceHandler> private var device
     @Res<Render3DPerformanceMetrics?> private var metrics
 
@@ -26,6 +27,7 @@ public struct VolumetricFog3DRenderNode: RenderNode {
         _environments.update(from: world)
         _lighting.update(from: world)
         _volumetric.update(from: world)
+        _localUniforms.update(from: world)
         _device.update(from: world)
         _metrics.update(from: world)
         var activeViews: [Entity.ID] = []
@@ -44,14 +46,17 @@ public struct VolumetricFog3DRenderNode: RenderNode {
                 return
             }
             guard let environment = environments.environments[source.entityId], environment.fog.volumetricActive,
-                !environment.debugView.replacesFinalImage, let sun = lighting.directionalLight,
+                !environment.debugView.replacesFinalImage,
                 target.rendering3DUsesEnvironmentTargets, let position = target.viewPositionMetallic3DTexture
             else {
                 volumetric.discard(view: source.entityId)
                 return
             }
             let fog = environment.fog.sanitized
+            let sun = lighting.directionalLight ?? ExtractedDirectionalLight3D(directionToLight: .up, radiance: .zero, intensity: 0)
             let settings = fog.volumetric
+            let localShadows = context.world.getResource(LocalShadow3DViews.self)?.entries[source.entityId]
+            let usesLocalMedium = !fog.localVolumes.isEmpty || (settings.localLightLimit > 0 && !(localShadows?.lights.isEmpty ?? true))
             let output = volumetric.output(view: source.entityId, fullSize: position.size, scaleFactor: position.scaleFactor)
             let shadowsEnabled = shadow.map { $0.isEnabled && sun.castsShadows && $0.colorTexture != nil } ?? false
             let atlas = shadow?.colorTexture?.size ?? SizeInt(width: 1024, height: 1024)
@@ -71,13 +76,30 @@ public struct VolumetricFog3DRenderNode: RenderNode {
                         shadowsEnabled ? 1 : 0
                     ),
                     sunDirection: Vector4(sun.directionToLight.normalized, settings.anisotropy),
-                    sunRadiance: Vector4(sun.radiance * (sun.intensity * settings.intensity), 0),
+                    sunRadiance: Vector4(sun.radiance * (sun.intensity * settings.intensity), settings.intensity),
                     medium: Vector4(fog.density, fog.heightFalloff, fog.baseHeight, fog.startDistance),
-                    march: Vector4(Float(settings.steps), settings.maxDistance, 0, 0)
+                    march: Vector4(Float(settings.steps), settings.maxDistance, usesLocalMedium ? Float(settings.localLightLimit) : 0, fog.maximumOpacity)
                 ),
                 view: source.entityId,
                 device: device.renderDevice
             )
+            let localConstants = localUniforms.write(view: source.entityId, pass: 3, count: 135, device: device.renderDevice) {
+                packLocalLighting(_lighting.wrappedValue, view: .identity, shadows: localShadows, into: &$0)
+            }
+            let localMatrices = localUniforms.write(view: source.entityId, pass: 4, count: 97, device: device.renderDevice) {
+                packLocalShadowMatrices(localShadows, into: &$0)
+            }
+            let volumeConstants = localUniforms.write(view: source.entityId, pass: 5, count: 25, device: device.renderDevice) { data in
+                let color = fog.color.asVector.xyz
+                data[0] = Vector4(color * color, Float(fog.localVolumes.count))
+                for (i, volume) in fog.localVolumes.enumerated() {
+                    data[1+i*3] = Vector4(volume.minimum, min(volume.density, 10))
+                    data[2+i*3] = Vector4(volume.maximum, finiteRenderValue(volume.edgeFade, fallback: 0.25, range: 0.001...100))
+                    data[3+i*3] = [finiteRenderValue(volume.albedo.x, fallback: 1, range: 0...1),
+                        finiteRenderValue(volume.albedo.y, fallback: 1, range: 0...1),
+                        finiteRenderValue(volume.albedo.z, fallback: 1, range: 0...1), settings.intensity]
+                }
+            }
             let command = renderContext.commandQueue.makeCommandBuffer()
             command.label = "Volumetric Fog 3D"
             let pass = command.beginRenderPass(RenderPassDescriptor(
@@ -86,12 +108,16 @@ public struct VolumetricFog3DRenderNode: RenderNode {
                 depthStencilAttachment: nil
             ))
             pass.setViewport(Rect(x: 0, y: 0, width: Float(output.size.width), height: Float(output.size.height)))
-            pass.setRenderPipelineState(volumetric.pipeline)
+            pass.setRenderPipelineState(usesLocalMedium ? volumetric.localLightingPipeline(device: device.renderDevice) : volumetric.pipeline)
             pass.setFragmentBuffer(constants, offset: 0, slot: 4)
+            pass.setFragmentBuffer(localConstants, offset: 0, slot: 25)
+            pass.setFragmentBuffer(localMatrices, offset: 0, slot: 28)
+            pass.setFragmentBuffer(volumeConstants, offset: 0, slot: 5)
             pass.setResourceSet(RenderResourceSet(bindings: [
                 .init(binding: 0, shaderStages: .fragment, resource: .texture(position)),
                 .init(binding: 1, shaderStages: .fragment, resource: .texture(shadow?.colorTexture ?? Texture2D.whiteTexture)),
                 .init(binding: 2, shaderStages: .fragment, resource: .sampler(volumetric.nearest)),
+                .init(binding: 26, shaderStages: .fragment, resource: .texture(localShadows?.color ?? Texture2D.whiteTexture)),
             ]), index: 0)
             pass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
             pass.endRenderPass()
@@ -124,6 +150,7 @@ struct VolumetricFog3DUniform: Sendable {
 /// The light-shaft pipeline and a half-resolution result texture per camera, created only while the effect runs.
 struct VolumetricFog3DViews: Resource {
     let pipeline: RenderPipeline
+    private var localPipeline: (any RenderPipeline)?
     let nearest: Sampler
     var uniform = FrameUniformCache3D<VolumetricFog3DUniform>()
     private var textures: [Entity.ID: RenderTexture] = [:]
@@ -141,6 +168,18 @@ struct VolumetricFog3DViews: Resource {
         descriptor.colorAttachments = [.init(format: .rgba_16f)]
         pipeline = device.createRenderPipeline(from: descriptor)
         nearest = device.createSampler(from: .init(minFilter: .nearest, magFilter: .nearest, mipFilter: .notMipmapped))
+    }
+
+    mutating func localLightingPipeline(device: RenderDevice) -> any RenderPipeline {
+        if let localPipeline { return localPipeline }
+        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/local_volumetric_fog_3d.glsl")
+        var descriptor = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex),
+            fragment: shader.asset.getShader(for: .fragment), debugName: "Local volumetric fog",
+            backfaceCulling: false, depthPixelFormat: .none)
+        descriptor.colorAttachments = [.init(format: .rgba_16f)]
+        let pipeline = device.createRenderPipeline(from: descriptor)
+        localPipeline = pipeline
+        return pipeline
     }
 
     /// The light-shaft texture for `view` if the effect ran for it.

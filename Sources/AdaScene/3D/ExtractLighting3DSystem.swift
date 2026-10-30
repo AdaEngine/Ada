@@ -82,7 +82,8 @@ func ExtractDirectionalLight3D(
                 castsShadows: light.castShadows,
                 shadowBias: light.shadowBias,
                 shadowSlopeBias: light.shadowSlopeBias,
-                shadowPriority: light.shadowPriority
+                shadowPriority: light.shadowPriority,
+                indirectIntensity: light.indirectIntensity.isFinite ? min(max(light.indirectIntensity, 0), 4) : 0
             )
         )
     }
@@ -108,7 +109,8 @@ func ExtractDirectionalLight3D(
                 castsShadows: light.castShadows,
                 shadowBias: light.shadowBias,
                 shadowSlopeBias: light.shadowSlopeBias,
-                shadowPriority: light.shadowPriority
+                shadowPriority: light.shadowPriority,
+                indirectIntensity: light.indirectIntensity.isFinite ? min(max(light.indirectIntensity, 0), 4) : 0
             )
         )
     }

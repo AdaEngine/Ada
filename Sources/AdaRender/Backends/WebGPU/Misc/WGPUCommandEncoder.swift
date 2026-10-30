@@ -18,7 +18,7 @@
             }
         }
         let device: WebGPU.GPUDevice
-        let commandEncoder: WebGPU.GPUCommandEncoder
+        private(set) var commandEncoder: WebGPU.GPUCommandEncoder
         private let spatialScaler: WGPUFSRSpatialScaler
         private let instance: WebGPU.GPUInstance?
         private var completedHandlers: [@Sendable () -> Void] = []
@@ -70,6 +70,18 @@
 
         func addCompletedHandler(_ handler: @escaping @Sendable () -> Void) {
             completedHandlers.append(handler)
+        }
+
+        /// Ends this command segment before an external GPU pass, then resumes
+        /// encoding. Completion handlers cover every segment and the external pass.
+        func withExternalGPUWork(_ work: () -> Bool) -> Bool {
+            webGPUDeviceLock.withLock { _ in
+                let prefix = commandEncoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
+                device.queue.submit(commands: [prefix])
+                let encoded = work()
+                commandEncoder = device.createCommandEncoder(descriptor: nil)
+                return encoded
+            }
         }
 
         func beginRenderPass(_ desc: RenderPassDescriptor) -> RenderCommandEncoder {

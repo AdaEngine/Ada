@@ -19,5 +19,9 @@ layout (binding = 0) uniform texture2D u_Depth;
 layout (binding = 1) uniform sampler u_Sampler;
 [[main]]
 void temporal_depth_fragment() {
-    gl_FragDepth = texture(sampler2D(u_Depth, u_Sampler), clamp(v_UV + u_Parameters.xy, vec2(0.0), vec2(1.0))).r;
+    // Depth32Float is not filterable in WebGPU. Integer loads also preserve
+    // exact depth values when reconstructing the output-resolution depth buffer.
+    ivec2 size = textureSize(sampler2D(u_Depth, u_Sampler), 0);
+    ivec2 pixel = clamp(ivec2((v_UV + u_Parameters.xy) * vec2(size)), ivec2(0), size - ivec2(1));
+    gl_FragDepth = texelFetch(sampler2D(u_Depth, u_Sampler), pixel, 0).r;
 }

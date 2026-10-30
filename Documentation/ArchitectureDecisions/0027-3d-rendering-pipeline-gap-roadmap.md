@@ -2,9 +2,135 @@
 
 - Status: Accepted
 - Date: 2026-10-16
-- Implementation: Partial (Stages 0 and 1 first slices; not released)
+- Implementation: Partial; native DLSS, the photorealism foundation, baked GI and dynamic local-light probe relighting implemented locally. Adaptive/retraced geometry GI, RT and virtualized geometry/shadows remain.
 
-## Context
+## Photorealism work, 2026-10-30
+
+This audit supersedes the absence claims in the original 2026-10-16 context
+below. It is the implementation contract for the Last Autumn rendering work.
+The user requested that the remaining gaps be recorded here and that the main
+practical subset be implemented. Existing cascaded shadows are retained.
+
+| Feature | Starting state on 2026-10-30 | Delivery / acceptance |
+| --- | --- | --- |
+| Windows DLSS / DLAA | Implemented through native WebGPU/Dawn + NGX; real GPU and game acceptance | Keep working; see [DLSS](../DLSS.md). This is not an absent feature. |
+| Portable TAA / temporal upscaling | MetalFX on Apple, DLSS on supported Windows adapters; no vendor-independent temporal reconstruction | Add motion/depth history, rejection and neighborhood clipping on the existing graph; verify native fallback and DLSS selection remain distinct. |
+| SSGI | Absent; static IBL/captures only | Bounded diffuse screen-space ray tracing with real receiver albedo, depth/normal rejection, HDR composition and an off path with no pass/target cost. Verify moving-light color transfer and occlusion with GPU pixels. Screen/off-screen limitations must remain explicit. |
+| Surface lightmaps | No complete system; corridor has static AO/visibility only | Add linear HDR diffuse-lightmap assets, UV1 sampling and a reproducible offline bake/import path. Verify per-texel lighting and no duplicate direct illumination. First delivery may be non-directional. |
+| Spatial irradiance probes | One capture per test scene, no spatial visibility | Add a bounded spatial grid, interpolation and visibility/leak controls, with a reproducible bake. A regular grid is not a complete Adaptive Probe Volumes or DDGI implementation. |
+| PCSS | Directional PCF only | Add blocker search and receiver/blocker-dependent penumbra, cascade-safe bounds and a compatibility PCF default. Verify penumbra changes with blocker separation. |
+| Contact shadows | SSAO only; no per-light visibility supplement | Add bounded screen-space rays toward actual light sources. Affect their direct light only; preserve emissive, baked/indirect light and sky. Verify source direction and an occluding fixture. |
+| Local volumetric lighting / fog | Half-resolution primary-sun shafts in global height fog | Add bounded local density volumes and point/spot scattering using the real local-shadow atlas. Verify a moved flashlight, a blocked cone and volume exit. |
+| Hardware RTGI / RT shadows | Absent | Remaining major work under ADR-0021: acceleration structures, native interop, hit shading, denoising and temporal validation. SSGI must not be described as RTGI. |
+| Virtual Shadow Maps | Absent; ordinary cached local maps and cascades exist | Remaining work: virtual page allocation, feedback, residency, invalidation and GPU-driven shadow rendering. PCSS does not close this item. |
+| Nanite / Lumen equivalents | Absent | Separate large systems, not the scope of this practical delivery. Do not use their names for the smaller implementations above. |
+
+Implementation order: diffuse transport (SSGI and baked spatial lighting),
+shadow quality/contact, local volumetrics, portable temporal reconstruction.
+Use existing render targets, settings, extraction and shader variants; defaults
+must preserve existing scenes. New limits and unsupported-device behavior must
+be visible in API/docs, not simulated by nonfunctional toggles.
+
+Acceptance is actual GPU output plus deterministic state/serialization checks,
+then the release game in the corridor and combat labs. Record input/output
+resolution, selected reconstruction, real encoded/fallback counts, GPU errors,
+and before/after images. Performance acceptance is separate: CPU frame cadence
+is not GPU time, generated frames are not simulation FPS, and the 140/144+ FPS
+target is not accepted without a controlled measurement. Keep a dated factual
+completion table here; planned items are not completed by merely adding fields.
+
+### Delivery recorded on 2026-10-30
+
+| Item | Actual delivery | Remaining limits |
+| --- | --- | --- |
+| DLSS / DLAA | Native WebGPU/Dawn + NGX retained; distinct from explicit portable TAA | Windows RTX only; no frame generation or ray reconstruction |
+| Portable TAA / TAAU | HDR color/depth history, motion reprojection, disocclusion rejection, YCoCg clipping, reactive mask, per-camera resets | Basic reconstruction; scene-specific ghosting/fine-detail review remains |
+| SSGI | One-bounce screen-space diffuse rays, receiver BRDF/albedo attachment, bilateral reconstruction and HDR composition | Visible opaque surfaces only; no hidden/off-screen transport or separate temporal GI denoiser; bloom/exposure metering still reads the earlier scene buffer |
+| PCSS | Directional blocker search and physical separation-dependent bounded penumbra, isolated cascade footprints | Local lights retain PCF; conventional shadow maps remain |
+| Contact shadows | Camera-depth prepass and per-source screen-space direct-light visibility | Primary sun and up to four shadow-atlas lights; screen-space/foveation limits |
+| Local volumetric fog | Eight additive density boxes, soft edges, colored scattering, bounded point/spot lighting and real local-shadow atlas | Single scattering and finite ray march; not a froxel system |
+| Surface lightmaps | Implemented: padded secondary-UV atlas in derived GLBs, linear HDR sidecars, per-material import, offline diffuse transport, mixed-lighting policy and GPU pixels | Non-directional; static opaque transport with triangle-centre source-radiance approximation; rebake after static changes |
+| Spatial irradiance probes | Implemented: regular L2 RGB SH grid, visibility, bake/import and optional GPU relighting of static surface paths by moving local lights | Fixed geometry paths; no adaptive APV, runtime relocation/retracing or complete DDGI |
+| RTGI / RT shadows, VSM, Nanite / Lumen equivalents | **Open** | Separate major systems; practical screen-space additions do not close them |
+
+The five practical additions default off (PCF remains the shadow default).
+Last Autumn supplies an opt-in `--render-foundation` preset and separate
+DLSS/portable-TAA launchers. This closes the first practical implementation
+slice, not the full roadmap. API, memory costs and algorithm limits are in
+[RenderingFoundation](../RenderingFoundation.md); reproducible native game
+reports and pixel captures are in Last Autumn's `Evidence/RenderingFoundation`.
+
+Validation includes direct-radiance color transfer and removal, per-source
+contact shadow pixels, PCSS blocker-distance penumbra growth, local fog with
+zero global density, a turned spotlight and shadow-atlas occlusion, and portable
+temporal history after motion, resize and cuts. The established sun-only fog
+shader remains a separate compatibility path. The full validation runs 261
+tests with 22 golden-image issues across 13 tests. A control run with HEAD's
+flat, reflection, directional-shadow and volumetric shaders in the task-local
+validation bundle reproduces all 22 issues (21 actual images pixel-identical;
+the auto-exposure capture varies with its frame timing). References have not
+been re-recorded. This is an unresolved existing rendering/reference baseline,
+not a green full-suite acceptance. See the evidence report for the focused
+feature checks and native game runs.
+
+### Baked diffuse GI delivery, 2026-10-30
+
+The base GI path now combines static surface lightmaps, spatial lighting for
+moving receivers, and the earlier screen-space dynamic bounce. The offline CPU
+BVH integrates sky visibility and static diffuse interreflection. Receiver maps
+store incident diffuse irradiance divided by pi; runtime analytic direct sun,
+point and spot lighting is excluded. The PBR shader replaces diffuse ambient,
+retains specular IBL, and avoids applying material AO twice to baked diffuse.
+The old procedural ambient fill is suppressed in baked views without IBL.
+Static diffuse now participates in the main HDR buffer, exposure metering and
+bloom. Existing SSGI subtracts that indirect buffer before tracing another bounce.
+
+The corridor has two fixed bakes (clear 12:00 and 00:00), each with 39 lightmaps,
+1485 probes (1312 valid), 16x16 octahedral visibility per probe, and 13.87 MiB of
+HDR texture data. Derived GLBs retain original UV0/PBR data; UV1 charts and any
+old UV1 AO are remapped into independent charts. Day/night geometry and charts
+are identical. Imported shared materials remain untouched; model instances own
+their bindings. Asynchronous model arrivals are reconciled with the selected
+lighting state. Baking/source/tool/output hashes are verified before packaging.
+
+Acceptance: four offline transport/visibility/UV/fingerprint tests, three
+game-side asset/fingerprint/relocation tests and 26 actual WebGPU/renderer-history
+checks pass, including loading the real derived model,
+sidecars and probe grid. Native day/night, state-change and reconstruction runs
+are recorded separately in Last Autumn's `Evidence/BakedGI`. No old golden
+reference has been re-recorded and the earlier full-suite baseline exception
+above remains distinct from this focused acceptance. See [BakedGI](../BakedGI.md)
+for formats, commands, cost and remaining approximation limits.
+
+### Dynamic local-light probe relighting, 2026-10-30
+
+Optional `.proberays` assets cache static world-space surface hits from each
+probe. A bounded pass after local shadows relights those hits from current
+point/spot sources, projects SH9, and updates per-view ping-pong histories.
+Source selection includes the cached surfaces' bounds independently of camera
+visibility. Real light-volume shadows occlude injection; unavailable shadow
+slots fail closed. Dynamic diffuse adds to lightmaps and spatial receivers
+before exposure/bloom. Old lights opt out with `indirectIntensity = 0`, so
+authored static bounces are not counted twice. The game preset disables SSGI
+to avoid duplicate first-bounce local lighting.
+
+The corridor reuses 1485 probes with 128 paths/probe (4.35 MiB static data),
+64 updates/frame and 15% history retention on refresh. One full sweep takes at
+most 24 rendered frames. No-source frames clear the whole field immediately.
+This closes moving-light off-screen first diffuse bounce for static geometry;
+it does not close runtime geometry/visibility retracing, adaptive probes,
+multi-bounce dynamic GI, hardware RTGI or transparent/specular transport.
+
+33 focused renderer/history/cache checks pass, including actual WebGPU pixels
+for a point light entirely behind the camera, lamp movement, a turned hidden
+spotlight, an off-screen shadow blocker, static-map receivers and immediate
+off clearing. Two game-side transport/provenance tests also pass. A Windows
+CRLF shader-parser regression was fixed and tested while integrating the pass.
+Full details and costs are in [DynamicGI](../DynamicGI.md); native package
+evidence is in Last Autumn's `Evidence/DynamicGI`. The prior golden-suite
+baseline exception remains open.
+
+## Context (original audit, 2026-10-16)
 
 ADR-0017 through ADR-0021 and ADR-0025 define the current 3D direction. This
 ADR records what the 3D pipeline still lacks after a source audit, groups the

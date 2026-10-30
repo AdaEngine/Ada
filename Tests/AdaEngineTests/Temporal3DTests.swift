@@ -1,4 +1,7 @@
-import AdaEngine
+import AdaApp
+import AdaTransform
+import AdaUtils
+import Math
 @_spi(Internal) @testable import AdaRender
 import Testing
 
@@ -120,7 +123,8 @@ struct Temporal3DIntegrationTests {
     @Test
     func previousSkinPaletteAndInstanceMatrixUseActualPriorPose() throws {
         try setup()
-        let device = unsafe RenderEngine.shared.renderDevice
+        // This test inspects CPU buffer contents; another suite may have initialized WebGPU.
+        let device = HeadlessRenderBackend().renderDevice
         let id = World().spawn().id
         var skins = Skinning3DUniforms()
         let rest = Transform3D(translation: [0, 0, 0])
@@ -175,6 +179,8 @@ struct Temporal3DIntegrationTests {
         world.insertResource(Temporal3DPipelines(device: device))
         world.insertResource(VisibleMesh3DLists())
         world.insertResource(ActiveMotion3DPass())
+        world.insertResource(Active3DInstanceBuffers())
+        world.insertResource(View3DGPUScratch())
         world.insertResource(RenderDeviceHandler(renderDevice: device))
         let statistics = Render3DTemporalStatistics()
         world.insertResource(statistics)

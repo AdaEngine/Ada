@@ -60,6 +60,11 @@ public protocol RenderDevice: AnyObject, Sendable {
     /// Whether the device supports temporal reconstruction of color, depth and motion.
     var supportsTemporalUpscaling: Bool { get }
 
+    /// Supports five HDR geometry targets (40 bytes per pixel), used for material-correct IBL/SSR blending.
+    var supportsHybridReflections: Bool { get }
+    /// A sixth color attachment for a linear diffuse surface response in the 3D pass.
+    var supportsLightingSurfaceBuffer: Bool { get }
+
     /// Creates an independent temporal history for fixed input/output sizes, or nil when unavailable.
     func createTemporalUpscaler(inputSize: SizeInt, outputSize: SizeInt) -> (any TemporalUpscaler)?
 
@@ -134,6 +139,8 @@ extension RenderDevice {
     public func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? { nil }
     public var supportsSpatialUpscaling: Bool { false }
     public var supportsTemporalUpscaling: Bool { false }
+    public var supportsHybridReflections: Bool { false }
+    public var supportsLightingSurfaceBuffer: Bool { false }
     public func createTemporalUpscaler(inputSize _: SizeInt, outputSize _: SizeInt) -> (any TemporalUpscaler)? { nil }
 
     /// Create a new GPU buffer with specific length and options.

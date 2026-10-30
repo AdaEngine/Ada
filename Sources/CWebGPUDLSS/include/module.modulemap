@@ -1,0 +1,4 @@
+module CWebGPUDLSS {
+    header "AdaWebGPUDLSS.h"
+    export *
+}

@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-05
-- Implementation: Partial (exposure and bloom local foundation; not released)
+- Implementation: Partial (exposure/bloom, baked GI and dynamic local-light probe relighting implemented locally; not released)
 
 ## Context
 
@@ -28,11 +28,45 @@ Dynamic global illumination remains a later decision driven by scene needs.
 
 - [x] Manual exposure and HDR bloom with per-camera settings and reusable targets (Metal; recorded in ADR-0027 Stage 1).
 - [ ] Local probe assets, influence volumes, selection/blending and Editor authoring.
-- [ ] Offline probe capture/baking and lightmap UV/import/material integration.
+- [x] Baked diffuse transport, lightmap UV1/import/material integration and regular spatial irradiance probes with visibility (2026-10-30; see delivery below).
+- [ ] Complete offline reflection-probe capture/baking workflow and Editor authoring.
 - [ ] Unified SSR/probe/future-RT reflection composition.
 - [ ] HDR/color-space tests, visual controls and GPU/memory budgets.
 
 ## Validation requirements
+
+### Baked diffuse GI delivery, 2026-10-30
+
+The new path bakes linear HDR irradiance/pi into non-directional lightmaps and
+a regular L2 SH grid with octahedral distance moments. Derived static GLBs own
+padded UV1 charts; imported instances bind independent material copies.
+Direct analytic lights and specular IBL remain runtime contributions. Baked
+diffuse replaces ambient diffuse without duplicate material AO and enters the
+HDR scene before exposure/bloom. This does not complete the local reflection
+probe/Editor or unified reflection composition checklist items above.
+
+The Last Autumn corridor has two fixed day/night states, 39 lightmaps and
+1485 probes (1312 valid) per state, using 13.87 MiB HDR texture data each.
+26 focused WebGPU/renderer-history tests, four offline transport tests and
+three game-side asset/provenance/relocation tests pass. Native day/night,
+reconstruction and state-change controls are recorded in the game's
+`Evidence/BakedGI`; update cadence is not GPU-time or performance acceptance.
+Apple hardware acceptance remains open. The previous full golden-suite
+exception in ADR-0027 remains separate; reference images were not changed.
+
+No adaptive placement, runtime probe updates, directional surface maps or
+dynamic off-screen GI is claimed. Source radiance uses triangle-centre
+approximations and visibility has finite angular resolution. See
+[BakedGI](../BakedGI.md) and [ADR-0027](0027-3d-rendering-pipeline-gap-roadmap.md)
+for API, reproduction, limitations and remaining work.
+
+Optional GPU relighting now updates these probes from moving point/spot lights
+using cached static surface paths and current light-volume shadows, including
+sources and bounce surfaces outside the camera view. This is one dynamic
+diffuse bounce with a bounded update schedule; geometry paths remain static.
+See [DynamicGI](../DynamicGI.md) and ADR-0027's dated follow-up.
+
+### General requirements
 
 Verify color space, highlight clipping, emission/bloom behavior, exposure
 changes and UI stability. Test overlapping probes, absent assets and multiple

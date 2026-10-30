@@ -283,6 +283,8 @@
                 .RGBA16Float
             case .rgba_32f:
                 .RGBA32Float
+            case .r32f:
+                .R32Float
             case .depth_32f_stencil8:
                 #if WASM
                     .Depth24PlusStencil8

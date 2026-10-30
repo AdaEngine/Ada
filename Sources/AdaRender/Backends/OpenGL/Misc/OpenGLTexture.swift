@@ -94,7 +94,7 @@
                 switch descriptor.pixelFormat {
                 case .rgba_16f:
                     dataType = GLenum(GL_HALF_FLOAT)
-                case .rgba_32f,
+                case .r32f, .rgba_32f,
                     .depth_32f,
                     .depth_32f_stencil8:
                     dataType = GLenum(GL_FLOAT)
@@ -257,6 +257,8 @@
                 return GL_RGBA16F
             case .rgba_32f:
                 return GL_RGBA32F
+            case .r32f:
+                return GL_R32F
             case .depth_32f_stencil8:
                 return GL_DEPTH32F_STENCIL8
             case .depth_32f:
@@ -268,6 +270,8 @@
 
         var glFormat: GLint {
             switch self {
+            case .r32f:
+                return GL_RED
             case .rgba8,
                 .rgba_16f,
                 .rgba_32f:

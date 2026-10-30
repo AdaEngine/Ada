@@ -9,6 +9,7 @@ import AdaAssets
 import AdaECS
 @_spi(Internal) import AdaRender
 import AdaUtils
+import Foundation
 import Math
 
 /// This render node is responsible for rendering opaque 3D meshes.
@@ -38,6 +39,7 @@ public struct Main3DRenderNode: RenderNode {
 
     @Res<ExtractedEnvironment3D> private var environments
     @ResMut<IBL3DScratch> private var ibl
+    @ResMut<SurfaceLighting3DViews> private var surfaceLighting
 
     @ResMut<LocalLighting3DGPUScratch> private var localUniforms
 
@@ -74,12 +76,15 @@ public struct Main3DRenderNode: RenderNode {
         _lightTiles.update(from: world)
         _environments.update(from: world)
         _ibl.update(from: world)
+        _surfaceLighting.update(from: world)
         _renderDevice.update(from: world)
         var activeViews: [Entity.ID] = []
         query.forEach { _, _, _, _, source in activeViews.append(source.entityId) }
         lightingScratch.cache.retainViews(activeViews)
         viewUniforms.cache.retainViews(activeViews)
         ibl.cache.retainViews(activeViews)
+        ibl.probes.retainViews(activeViews)
+        surfaceLighting.retain(activeViews)
         lightTiles.retainViews(activeViews)
         lists.retainViews(activeViews)
         gpuVisibility.retainViews(activeViews)
@@ -148,7 +153,6 @@ public struct Main3DRenderNode: RenderNode {
             } else {
                 gpuVisibility.clearOutput(for: source.entityId)
             }
-            let clearColor = camera.clearFlags.contains(.solid) ? camera.backgroundColor : .surfaceClearColor
             let directionalLight =
                 lighting.directionalLight
                 ?? ExtractedDirectionalLight3D(
@@ -218,6 +222,46 @@ public struct Main3DRenderNode: RenderNode {
             let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
             commandBuffer.label = "Main 3d Render Pass"
 
+            let environmentSettings = environments.environments[source.entityId] ?? Environment3D()
+            let contact = environmentSettings.contactShadows.sanitized
+            let contactEnabled = contact.isEnabled && camera.rasterizationRateMap == nil
+                && environmentSettings.debugView == .none
+            var contactTexture: Texture2D = .whiteTexture
+            if contactEnabled {
+                let depth = surfaceLighting.target(view: source.entityId, size: sceneColor.size, scale: sceneColor.scaleFactor)
+                contactTexture = depth.color
+                let encoder = commandBuffer.beginRenderPass(.init(label: "Contact depth prepass", colorAttachments: [
+                    .init(texture: depth.color, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .white)
+                ], depthStencilAttachment: .init(texture: depth.depth,
+                    depthOperation: .init(loadAction: .clear, storeAction: .dontCare),
+                    stencilOperation: .init(loadAction: .clear, storeAction: .dontCare))))
+                let constants = surfaceLighting.depthUniforms.write(
+                    DirectionalShadowViewUniform(viewProjection: drawUniform.viewProjectionMatrix,
+                        tileBounds: [0, 0, Float(sceneColor.size.width), Float(sceneColor.size.height)]),
+                    view: source.entityId, device: renderDevice.renderDevice)
+                encoder.setVertexBuffer(constants, offset: 0, slot: GlobalBufferIndex.viewUniform)
+                let active = context.world.getRefResource(ActiveContactDepth3DPass.self)
+                active.wrappedValue.isEnabled = true
+                do {
+                    defer { active.wrappedValue.isEnabled = false }
+                    let casters = visibleItems.filter { $0.castShadows && ($0.material as? PBRMaterial)?.effectiveAlphaMode != .blend }
+                    try RenderItems<Opaque3DRenderItem>(items: casters).render(with: encoder, world: context.world, view: view)
+                }
+                encoder.endRenderPass()
+            } else {
+                surfaceLighting.textures.removeValue(forKey: source.entityId)
+            }
+            let shadowSettings = environmentSettings.shadows
+            let surfaceConstants = surfaceLighting.uniforms.write(SurfaceLighting3DUniform(
+                projection: drawUniform.projectionMatrix, inverseProjection: drawUniform.projectionMatrix.inverse,
+                contact: [contactEnabled ? 1 : 0, contact.rayLength, contact.thickness, contact.bias],
+                quality: [Float(contact.steps), contact.maxDistance, directionalLight.castsShadows ? 1 : 0, 0],
+                shadowFilter: [shadowSettings.filter == .pcss ? 1 : 0,
+                    tan(finiteRenderValue(shadowSettings.lightAngularRadius, fallback: 0.27, range: 0...10) * .pi / 180),
+                    finiteRenderValue(shadowSettings.maximumPenumbraTexels, fallback: 16, range: 1...32),
+                    finiteRenderValue(shadowSettings.blockerSearchTexels, fallback: 8, range: 1...32)]),
+                view: source.entityId, device: renderDevice.renderDevice)
+
             let depthAttachment = target.depthTexture.map {
                 DepthStencilAttachmentDescriptor(
                     texture: $0,
@@ -226,13 +270,15 @@ public struct Main3DRenderNode: RenderNode {
                 )
             }
 
-            let descriptor = RenderPassDescriptor(
+            var descriptor = RenderPassDescriptor(
                 label: "Main 3d Render Pass",
                 colorAttachments: [
                     .init(
                         texture: sceneColor,
                         operation: OperationDescriptor(loadAction: .clear, storeAction: .store),
-                        clearColor: clearColor
+                        // The environment pass supplies the sky. Preserve transparent coverage here so
+                        // world-space particles over empty GBuffer pixels can composite over that sky.
+                        clearColor: Color(red: 0, green: 0, blue: 0, alpha: 0)
                     ),
                     .init(
                         texture: normalRoughness,
@@ -248,6 +294,12 @@ public struct Main3DRenderNode: RenderNode {
                 ],
                 depthStencilAttachment: depthAttachment
             )
+            if let response = target.reflectionResponse3DTexture {
+                descriptor.colorAttachments.append(.init(texture: response, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .black))
+            }
+            if let surface = target.diffuseSurface3DTexture {
+                descriptor.colorAttachments.append(.init(texture: surface, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .black))
+            }
             let foveatedPass = try camera.rasterizationRateMap.map {
                 try commandBuffer.beginFoveatedRenderPass(descriptor, rateMap: $0)
             }
@@ -263,6 +315,10 @@ public struct Main3DRenderNode: RenderNode {
             renderPass.setFragmentBuffer(localMatrices, offset: 0, slot: 28)
             renderPass.setFragmentBuffer(tileConstants, offset: 0, slot: 27)
             renderPass.setFragmentBuffer(tileMaskBuffer, offset: 0, slot: 29)
+            renderPass.setFragmentBuffer(surfaceConstants, offset: 0, slot: 42)
+            renderPass.setResourceSet(.init(bindings: [
+                .init(binding: 41, shaderStages: .fragment, resource: .texture(contactTexture))
+            ]), index: 0)
             renderPass.setResourceSet(
                 RenderResourceSet(bindings: [
                     .init(binding: 26, shaderStages: .fragment, resource: .texture(localTexture))
@@ -281,10 +337,15 @@ public struct Main3DRenderNode: RenderNode {
             )
             let settings = environments.environments[source.entityId]?.imageBasedLighting
             let environment = settings?.asset.asset
+            let probe = environments.environments[source.entityId]?.localEnvironmentProbe
+            let probeActive = probe?.isValid == true
             let iblConstants = ibl.cache.write(
                 IBL3DUniform(
                     inverseView: uniform.viewMatrix.inverse,
-                    parameters: Vector4(environment == nil ? 0 : 1, max(0, settings?.intensity ?? 1), Float(environment?.specularLevels ?? 2), settings?.rotation ?? 0)
+                    parameters: Vector4(environment == nil ? 0 : 1, max(0, settings?.intensity ?? 1), Float(environment?.specularLevels ?? 2), settings?.rotation ?? 0),
+                    probePosition: Vector4(probe?.capturePosition ?? .zero, probeActive ? 1 : 0),
+                    probeMinimum: Vector4(probe?.minimum ?? .zero, 0),
+                    probeMaximum: Vector4(probe?.maximum ?? .zero, 0)
                 ),
                 view: source.entityId,
                 device: renderDevice.renderDevice
@@ -302,6 +363,22 @@ public struct Main3DRenderNode: RenderNode {
                 index: 0
             )
             renderPass.setFragmentBuffer(iblConstants, offset: 0, slot: 22)
+            let gridSettings = environmentSettings.irradianceProbes
+            let grid = gridSettings?.asset.asset
+            let dynamic = context.world.getResource(DynamicIrradiance3DViews.self)?.entries[source.entityId]?.output
+            let gridConstants = ibl.probes.write(IrradianceGrid3DUniform(
+                originIntensity: Vector4(grid?.origin ?? .zero, finiteRenderValue(gridSettings?.intensity ?? 1, fallback: 1, range: 0...16)),
+                spacingNormalBias: Vector4(grid?.spacing ?? .one, finiteRenderValue(gridSettings?.normalBias ?? 0.08, fallback: 0.08, range: 0...0.5)),
+                countsVisibilityBias: [Float(grid?.counts[0] ?? 2), Float(grid?.counts[1] ?? 2), Float(grid?.counts[2] ?? 2),
+                    finiteRenderValue(gridSettings?.visibilityBias ?? 0.04, fallback: 0.04, range: 0...1)],
+                quality: [Float(grid?.visibilityResolution ?? 16), grid == nil ? 0 : 1, 3, dynamic == nil ? 0 : 1]),
+                view: source.entityId, device: renderDevice.renderDevice)
+            renderPass.setFragmentBuffer(gridConstants, offset: 0, slot: 45)
+            renderPass.setResourceSet(.init(bindings: [
+                .init(binding: 43, shaderStages: .fragment, resource: .texture(grid?.coefficients ?? Texture2D.whiteTexture)),
+                .init(binding: 44, shaderStages: .fragment, resource: .texture(grid?.visibility ?? Texture2D.whiteTexture)),
+                .init(binding: 48, shaderStages: .fragment, resource: .texture(dynamic ?? Texture2D.whiteTexture))
+            ]), index: 0)
             renderPass.setViewport(camera.viewport.rect)
             if environments.environments[source.entityId]?.debugView == .wireframe {
                 renderPass.setTriangleFillMode(.lines)

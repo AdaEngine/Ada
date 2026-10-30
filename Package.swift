@@ -250,6 +250,19 @@ var adaEngineDependencies: [Target.Dependency] = [
     "AdaSpatial"
 ]
 
+// Optional native DLSS interop, prepared by script/build_dlss.py. Dawn remains
+// the renderer; this target shares its selected D3D12 device and textures.
+let dlssBuildConfiguration: [String: Any]? = {
+    #if os(Windows)
+    guard !isHeadlessCIEnabled, ProcessInfo.processInfo.environment["ADAENGINE_DISABLE_DLSS"] != "1" else { return nil }
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    guard let data = try? Data(contentsOf: root.appendingPathComponent(".build-tools/dlss-interop/build.json")) else { return nil }
+    return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    #else
+    return nil
+    #endif
+}()
+
 var adaRenderDependencies: [Target.Dependency] = [
     .target(name: "CAndroid", condition: .when(platforms: [.android])),
     "AdaApp",
@@ -294,6 +307,9 @@ if !isHeadlessCIEnabled {
             ])
         )
     )
+}
+if dlssBuildConfiguration != nil {
+    adaRenderDependencies.append(.target(name: "CWebGPUDLSS", condition: .when(platforms: [.windows], traits: [.wgpuTrait])))
 }
 
 let adaEngineTarget: Target = .adaTarget(
@@ -1517,6 +1533,18 @@ targets.append(.executableTarget(
     swiftSettings: swiftSettings,
     linkerSettings: wasmExecutableLinkerSettings
 ))
+
+if let config = dlssBuildConfiguration,
+    let includes = config["includePaths"] as? [String], let libraries = config["libraries"] as? [String] {
+    let includeFlags = includes.flatMap { ["-I", $0] }
+    targets.append(.target(
+        name: "CWebGPUDLSS",
+        exclude: ["KernelBaseImports.def"],
+        cSettings: [.unsafeFlags(includeFlags)],
+        cxxSettings: [.unsafeFlags(includeFlags)],
+        linkerSettings: [.unsafeFlags(libraries), .linkedLibrary("d3d12"), .linkedLibrary("dxgi"), .linkedLibrary("dxguid")]
+    ))
+}
 
 // MARK: - Package -
 

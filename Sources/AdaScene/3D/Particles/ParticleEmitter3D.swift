@@ -24,7 +24,7 @@ public struct ParticleEmitter3D: Codable, Sendable {
     public var spawnRadius: Float = 0.12
     /// Nonzero extents select a uniformly filled box instead of a spherical spawn region.
     public var spawnBoxHalfExtents: Vector3 = .zero
-    /// 0 smoke, 1 falling rain, 2 snow. Existing emitters retain their smoke appearance.
+    /// 0 soft unlit smoke, 1 falling rain, 2 snow, 3 locally lit layered smoke.
     public var particleStyle: Int = 0
     /// Width divided by length for rain streaks.
     public var aspectRatio: Float = 0.035

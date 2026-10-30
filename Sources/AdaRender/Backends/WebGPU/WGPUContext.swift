@@ -37,6 +37,23 @@
         let instance: WebGPU.GPUInstance
 
         private let windows = Mutex<[WindowID: WGPURenderWindow]>([:])
+        #if os(Windows) && canImport(CWebGPUDLSS)
+        private struct DLSSState {
+            var attempted = false
+            var device: WGPUDLSSDevice?
+        }
+        private let dlss = Mutex(DLSSState())
+
+        var dlssDevice: WGPUDLSSDevice? {
+            dlss.withLock { state in
+                if !state.attempted {
+                    state.attempted = true
+                    state.device = webGPUDeviceLock.withLock { _ in WGPUDLSSDevice(device: device) }
+                }
+                return state.device?.isAvailable == true ? state.device : nil
+            }
+        }
+        #endif
 
         init(device: WebGPU.GPUDevice, adapter: WebGPU.GPUAdapter, instance: WebGPU.GPUInstance) {
             self.device = device

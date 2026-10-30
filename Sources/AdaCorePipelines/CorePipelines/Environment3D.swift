@@ -117,6 +117,11 @@ public struct Environment3D: Codable, Sendable {
     public var skyboxUsesImageBasedLighting: Bool = true
     public var screenSpaceReflection: ScreenSpaceReflection
     public var imageBasedLighting: ImageBasedLightingSettings?
+    /// Optional parallax volume for the static IBL capture. Nil retains infinite-distance environment lighting.
+    public var localEnvironmentProbe: LocalEnvironmentProbe3D? = nil
+    public var screenSpaceGI: ScreenSpaceGI3D = ScreenSpaceGI3D()
+    public var contactShadows: ContactShadows3D = ContactShadows3D()
+    public var irradianceProbes: IrradianceProbeSettings3D? = nil
 
     public var shadows: ShadowSettings3D
     public var ambientOcclusion: ScreenSpaceAO3D
@@ -131,6 +136,11 @@ public struct Environment3D: Codable, Sendable {
     public var fog: Fog3D = Fog3D()
     /// Evaluate only the local lights that reach each screen tile. Disabling it falls back to the flat per-pixel loop.
     public var tiledLocalLights: Bool = true
+
+    public var screenSpaceGIEnabled: Bool {
+        get { screenSpaceGI.isEnabled }
+        set { screenSpaceGI.isEnabled = newValue }
+    }
 
     /// Flat reflected atmosphere controls preserve the other nested environment settings.
     public var skyZenithColor: Color {
@@ -362,7 +372,7 @@ public struct Environment3D: Codable, Sendable {
 
     private enum CodingKeys: CodingKey {
         case skybox, skyboxUsesImageBasedLighting, screenSpaceReflection, imageBasedLighting, shadows,
-             ambientOcclusion, antiAliasing, meshVisibility, localShadows, debugView, postProcess, fog, tiledLocalLights
+             ambientOcclusion, antiAliasing, meshVisibility, localShadows, debugView, postProcess, fog, tiledLocalLights, localEnvironmentProbe, screenSpaceGI, contactShadows, irradianceProbes
     }
 
     public init(from decoder: Decoder) throws {
@@ -371,6 +381,10 @@ public struct Environment3D: Codable, Sendable {
         skyboxUsesImageBasedLighting = try container.decodeIfPresent(Bool.self, forKey: .skyboxUsesImageBasedLighting) ?? true
         screenSpaceReflection = try container.decodeIfPresent(ScreenSpaceReflection.self, forKey: .screenSpaceReflection) ?? ScreenSpaceReflection()
         imageBasedLighting = try container.decodeIfPresent(ImageBasedLightingSettings.self, forKey: .imageBasedLighting)
+        localEnvironmentProbe = try container.decodeIfPresent(LocalEnvironmentProbe3D.self, forKey: .localEnvironmentProbe)
+        screenSpaceGI = try container.decodeIfPresent(ScreenSpaceGI3D.self, forKey: .screenSpaceGI) ?? ScreenSpaceGI3D()
+        contactShadows = try container.decodeIfPresent(ContactShadows3D.self, forKey: .contactShadows) ?? ContactShadows3D()
+        irradianceProbes = try container.decodeIfPresent(IrradianceProbeSettings3D.self, forKey: .irradianceProbes)
         shadows = try container.decodeIfPresent(ShadowSettings3D.self, forKey: .shadows) ?? ShadowSettings3D()
         ambientOcclusion = try container.decodeIfPresent(ScreenSpaceAO3D.self, forKey: .ambientOcclusion) ?? ScreenSpaceAO3D()
         antiAliasing = try container.decodeIfPresent(AntiAliasing3D.self, forKey: .antiAliasing) ?? .none

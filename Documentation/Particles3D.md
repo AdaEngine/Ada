@@ -50,6 +50,30 @@ length and `aspectRatio` is width/length; looking along the fall direction
 foreshortens length while retaining width. Snow uses soft round flakes. Weather
 styles retain density through their lifetime rather than using smoke's long fade.
 
+For gunfire and dense clouds, `particleStyle = 3` selects layered, locally lit
+smoke. Three procedural density layers integrate an approximate transmittance;
+per-puff size variation breaks repeated silhouettes. This reuses the same bounded
+instanced draw and particle storage as style 0. It changes shader work, not the
+number of simulated particles. Style 0 and precipitation retain their appearance.
+
+Lit smoke receives the primary directional light and the eight strongest visible
+local lights selected by the existing light pass. Point and spot lights use range,
+inverse-square and cone falloff; local shadow visibility comes from the same-frame
+bounded opaque shadow atlas. A wall can therefore block a flashlight or muzzle
+light before it reaches a cloud. Expired lights are excluded immediately. This
+does not provide light multiple-scattering, sun shadowing inside smoke, fluid
+advection or volumetric self-shadowing. Billboards remain an approximation when
+viewed from different angles. Weather and legacy smoke stay unlit.
+
+Particles attenuate the opaque indirect-light and reflection-response targets
+with their alpha coverage, keeping later SSR/IBL compositing behind the cloud.
+The HDR scene starts with transparent black; empty opaque-GBuffer pixels retain
+the particle's premultiplied foreground over the sky in the environment composite.
+Smoke therefore also remains visible outdoors with no opaque surface behind it.
+Per-view frame-buffered light packets contain at most eight lights and share
+shadow projections; no CPU light evaluation runs per particle. The simulation
+also computes the exponential drag coefficient once per fixed step per emitter.
+
 `collisionPlaneEnabled` and `collisionPlaneHeight` remove particles below an
 authored horizontal ground plane. This is not arbitrary mesh collision. The
 depth buffer still occludes precipitation behind scene geometry. Surface water,
@@ -62,5 +86,7 @@ to zero, preserving the image of old scenes.
 
 `Particle3DTests` covers determinism, capacity, world-space drift, lifetime and
 pause behavior. `Render3DGPUTests/Particles` checks actual GPU visibility in front
-of geometry, occlusion behind it and hiding the emitter. Run the WebGPU checks
+of geometry, occlusion behind it, hiding the emitter, local-light response and
+blocking that light with an opaque shadow caster. `ParticleLighting3DTests` checks
+the bounded packed GPU layout and disabling stale/missing shadow state. Run the WebGPU checks
 through `script/validate_webgpu.sh`.

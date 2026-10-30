@@ -142,7 +142,8 @@ private final class HeadlessRenderDevice: RenderDevice, @unchecked Sendable {
     func unmap() {}
 }
 
-private final class HeadlessIndexBuffer: HeadlessBuffer, IndexBuffer {
+// These subclasses add only immutable metadata; raw storage keeps HeadlessBuffer's lifetime/serialization contract.
+@unsafe private final class HeadlessIndexBuffer: HeadlessBuffer, IndexBuffer, @unchecked Sendable {
     let indexFormat: IndexBufferFormat
 
     init(label: String?, length: Int, indexFormat: IndexBufferFormat) {
@@ -151,7 +152,7 @@ private final class HeadlessIndexBuffer: HeadlessBuffer, IndexBuffer {
     }
 }
 
-private final class HeadlessVertexBuffer: HeadlessBuffer, VertexBuffer {
+@unsafe private final class HeadlessVertexBuffer: HeadlessBuffer, VertexBuffer, @unchecked Sendable {
     let binding: Int
 
     init(label: String?, length: Int, binding: Int) {
@@ -160,7 +161,7 @@ private final class HeadlessVertexBuffer: HeadlessBuffer, VertexBuffer {
     }
 }
 
-private final class HeadlessUniformBuffer: HeadlessBuffer, UniformBuffer {
+@unsafe private final class HeadlessUniformBuffer: HeadlessBuffer, UniformBuffer, @unchecked Sendable {
     let binding: Int
 
     init(label: String?, length: Int, binding: Int) {

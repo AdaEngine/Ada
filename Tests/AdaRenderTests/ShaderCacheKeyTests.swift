@@ -5,6 +5,15 @@ import Testing
 
 @Suite("Shader cache keys")
 struct ShaderCacheKeyTests {
+    @Test func stageParserAcceptsWindowsLineEndings() throws {
+        let lf = "#version 450 core\n#pragma stage : vert\nvoid vertex() {}\n#version 450 core\n#pragma stage : frag\nvoid fragment() {}\n"
+        for source in [lf, lf.replacingOccurrences(of:"\n",with:"\r\n")] {
+            let split = try ShaderUtils.processGLSLShader(source:source)
+            #expect(split.count == 2)
+            #expect(split[.vertex]?.contains("void vertex()") == true)
+            #expect(split[.fragment]?.contains("void fragment()") == true)
+        }
+    }
     @Test func editingAnIncludedFileChangesTheSourceHash() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ShaderCacheKeyTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

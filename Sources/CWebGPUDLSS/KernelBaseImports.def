@@ -1,0 +1,3 @@
+LIBRARY KERNELBASE.dll
+EXPORTS
+    CompareObjectHandles

@@ -114,7 +114,9 @@ public struct Skinning3DUniforms: Resource {
         packedOffsets[entity] = base
         entries[entity] = Entry(buffers: packedPages[packedPage].buffers, frame: frame,
                                previousBuffers: packedPages[packedPage].previousBuffers, matrices: matrices, revision: revision,
-                               uploaded: Array(repeating: nil, count: bufferCount), previousUploaded: Array(repeating: nil, count: bufferCount), isPacked: true)
+                               // Packed uploads belong to the page. Individual
+                               // revision arrays are created only if it leaves it.
+                               uploaded: [], previousUploaded: [], isPacked: true)
         return packedPages[packedPage].buffers[currentIndex]
     }
 

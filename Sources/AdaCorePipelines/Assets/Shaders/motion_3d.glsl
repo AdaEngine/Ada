@@ -111,7 +111,7 @@ void motion_fragment() {
     if (u_SurfaceProperties.w > 0.5 && u_SurfaceProperties.w < 1.5 && alpha < u_SurfaceProperties.z) { discard; }
     bool valid = v_CurrentClip.w > 0.00001 && v_PreviousClip.w > 0.00001;
     vec2 motion = valid ? (v_PreviousClip.xy / v_PreviousClip.w - v_CurrentClip.xy / v_CurrentClip.w) * vec2(0.5, -0.5) : vec2(0.0);
-    o_Motion = vec4(motion, 0.0, 0.0);
+    o_Motion = vec4(motion, valid ? v_PreviousClip.z / v_PreviousClip.w : 1.0, valid ? 1.0 : 0.0);
     float reactive = u_SurfaceProperties.w > 1.5 ? clamp(alpha * 2.0, 0.0, 1.0) : 0.0;
     reactive = max(reactive, v_ColorFlags.z > 0.0 || !valid || v_Fade > 0.0 ? 1.0 : 0.0);
     o_Reactive = vec4(reactive);
