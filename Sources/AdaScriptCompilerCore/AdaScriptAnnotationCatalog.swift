@@ -30,7 +30,7 @@ public enum AdaScriptAnnotationCatalog {
             rule("eventWriter", [.property], "Bind a writer for one event name"),
             rule("events", [.property], "Bind the events of one name received since the previous frame"),
             rule("exclusiveWorld", [.class], "Allow immediate structural world changes"),
-            rule("export", [.property], "Export a stored field"),
+            rule("export", [.property], "Export a stored field; group: \"Camera/Auto Exposure\" defines up to four inspector subgroup levels"),
             rule("local", [.property], "Keep a replicated field local"),
             rule("network_command", [.struct], "Declare a typed network command"),
             rule("network_field", [.property, .parameter], "Tag a replicated field or RPC parameter"),

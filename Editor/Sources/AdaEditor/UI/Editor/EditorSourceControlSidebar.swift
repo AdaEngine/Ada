@@ -10,6 +10,7 @@ struct EditorSourceControlSidebar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             adaEditorPanelTitle("SOURCE CONTROL", trailing: viewModel.sourceControl.snapshot.branchTitle, theme: theme)
+            providerSection.padding(8)
             HStack(spacing: 6) {
                 tabButton(L10n.text("Changes (\(Set(viewModel.sourceControl.snapshot.files.map(\.path)).count))"), active: !viewModel.sourceControl.showsHistory) {
                     viewModel.sourceControl.showsHistory = false
@@ -89,12 +90,12 @@ struct EditorSourceControlSidebar: View {
                     .foregroundColor(theme.editorColors.blue)
                     .lineLimit(1)
             }
-            Text(viewModel.sourceControl.commandError ?? viewModel.sourceControl.statusMessage)
+            Text(L10n.tr(viewModel.sourceControl.commandError ?? viewModel.sourceControl.statusMessage))
                 .font(.system(size: 10))
                 .foregroundColor(theme.editorColors.muted)
                 .lineLimit(3)
             if shouldOfferGitRepositoryInitialization {
-                commandButton("Create .git", enabled: !viewModel.sourceControl.isRunning) {
+                commandButton(viewModel.sourceControl.provider.initializationTitle, enabled: !viewModel.sourceControl.isRunning) {
                     viewModel.createSourceControlRepository()
                 }
             }
@@ -187,8 +188,10 @@ struct EditorSourceControlSidebar: View {
     private var actionSection: some View {
         section("ACTIONS") {
             HStack(spacing: 8) {
-                commandButton("Stash", enabled: !viewModel.sourceControl.isRunning && viewModel.sourceControl.hasChanges) {
-                    viewModel.stashSourceControlChanges()
+                if viewModel.sourceControl.provider.supportsStash {
+                    commandButton("Stash", enabled: !viewModel.sourceControl.isRunning && viewModel.sourceControl.hasChanges) {
+                        viewModel.stashSourceControlChanges()
+                    }
                 }
                 commandButton("Pull", enabled: !viewModel.sourceControl.isRunning) {
                     viewModel.pullSourceControlChanges()
@@ -331,6 +334,38 @@ struct EditorSourceControlSidebar: View {
             return false
         }
         let message = (viewModel.sourceControl.commandError ?? viewModel.sourceControl.statusMessage).lowercased()
-        return message.contains("not a git repository")
+        return viewModel.sourceControl.provider.isAvailable
+            && (message.contains("not a git repository") || message.contains("No Lore repository was found.".lowercased()))
+    }
+
+    private var providerSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L10n.text("Version control")).font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+            HStack(spacing: 8) {
+                ForEach(EditorSourceControlProvider.allCases, id: \.rawValue) { provider in
+                    Button(action: { viewModel.selectSourceControlProvider(provider) }) {
+                        Text(provider.title)
+                            .font(.system(size: 12))
+                            .foregroundColor(theme.editorColors.text)
+                            .frame(maxWidth: .infinity, minHeight: 28, maxHeight: 28)
+                            .background(RoundedRectangleShape(cornerRadius: 4).fill(
+                                theme.editorColors.blue.opacity(viewModel.sourceControl.provider == provider ? 0.25 : 0.07)
+                            ))
+                    }
+                    .buttonStyle(DefaultButtonStyle())
+                    .disabled(viewModel.sourceControl.isRunning || !provider.isAvailable)
+                    .accessibilityIdentifier("AdaEditor.SourceControl.Provider.\(provider.rawValue)")
+                }
+            }
+            if !EditorSourceControlProvider.lore.isAvailable {
+                Text(L10n.text("Lore requires macOS with Apple silicon, Windows x64, or Linux x64/ARM64."))
+                    .font(.system(size: 10)).foregroundColor(theme.editorColors.muted)
+            }
+            if viewModel.sourceControl.provider == .lore {
+                EditorLoreIntroduction(openURL: viewModel.externalURLOpener)
+                Text(L10n.text("Lore commits the latest contents of staged files."))
+                    .font(.system(size: 10)).foregroundColor(theme.editorColors.muted)
+            }
+        }
     }
 }

@@ -17,8 +17,14 @@ struct EditorSceneDocumentEditor: View {
     let onStop: (() -> Void)?
     var annotationAgent: EditorAgentViewModel?
     var onAnnotationAdded: (() -> Void)?
+    var isActive = true
 
     @Environment(\.theme) private var theme
+    @State private var preferredHierarchyWidth: Float = {
+        let saved = UserDefaults.standard.float(forKey: "AdaEditor.SceneHierarchy.Width")
+        return saved > 0 ? saved : Self.hierarchyWidth
+    }()
+    @State private var hierarchyDragStart: Float?
 
     var body: some View {
         if document.isLoading {
@@ -32,39 +38,60 @@ struct EditorSceneDocumentEditor: View {
     }
 
     private var loadedScene: some View {
-        HStack(spacing: 0) {
-            sceneHierarchy
-                .frame(width: Self.hierarchyWidth)
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                sceneHierarchy
+                    .frame(width: EditorSceneHierarchyLayout.width(preferredHierarchyWidth, available: geometry.size.width))
+                    .frame(maxHeight: .infinity)
+                    .accessibilityIdentifier("AdaEditor.SceneEditor.HierarchyPanel")
+                ZStack {
+                    RectangleShape().fill(theme.editorColors.border.opacity(0.5)).frame(width: 1)
+                    EditorResizeHandle(
+                        axis: .horizontal,
+                        onResize: { translation in
+                            let start = hierarchyDragStart ?? EditorSceneHierarchyLayout.width(preferredHierarchyWidth, available: geometry.size.width)
+                            hierarchyDragStart = start
+                            preferredHierarchyWidth = EditorSceneHierarchyLayout.width(start + translation.width, available: geometry.size.width)
+                        },
+                        onResizeEnded: {
+                            hierarchyDragStart = nil
+                            UserDefaults.standard.set(preferredHierarchyWidth, forKey: "AdaEditor.SceneHierarchy.Width")
+                        #if os(Windows)
+                            // The native event loop does not flush Foundation preferences on exit.
+                            UserDefaults.standard.synchronize()
+                        #endif
+                        })
+                }
+                .frame(width: 8)
                 .frame(maxHeight: .infinity)
-                .accessibilityIdentifier("AdaEditor.SceneEditor.HierarchyPanel")
-            RectangleShape()
-                .fill(theme.editorColors.border.opacity(0.5))
-                .frame(width: 1)
-            EditorSceneViewportView(
-                document: document,
-                resourceRootURL: resourceRootURL,
-                uiCatalog: uiCatalog,
-                inspectorViewModel: inspectorViewModel,
-                playModeState: playModeState,
-                playRuntime: playRuntime,
-                onEntitySelected: onEntitySelected,
-                onPlay: onPlay,
-                onStop: onStop,
-                onDocumentChanged: { workbench.replaceSceneDocument($0) },
-                onTerrainToolSelected: onTerrainToolSelected,
-                annotationAgent: annotationAgent,
-                onAnnotationAdded: onAnnotationAdded
-            )
-            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-            .accessibilityIdentifier("AdaEditor.SceneEditor.ViewportPanel")
+                .accessibilityIdentifier("AdaEditor.SceneEditor.HierarchyResize")
+                EditorSceneViewportView(
+                    document: document,
+                    resourceRootURL: resourceRootURL,
+                    uiCatalog: uiCatalog,
+                    inspectorViewModel: inspectorViewModel,
+                    playModeState: playModeState,
+                    playRuntime: playRuntime,
+                    onEntitySelected: onEntitySelected,
+                    onPlay: onPlay,
+                    onStop: onStop,
+                    onDocumentChanged: { workbench.replaceSceneDocument($0) },
+                    onTerrainToolSelected: onTerrainToolSelected,
+                    annotationAgent: annotationAgent,
+                    onAnnotationAdded: onAnnotationAdded,
+                    isDocumentActive: isActive
+                )
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                .accessibilityIdentifier("AdaEditor.SceneEditor.ViewportPanel")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityIdentifier("AdaEditor.SceneEditor")
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityIdentifier("AdaEditor.SceneEditor")
     }
 
     private var sceneHierarchy: some View {
         EditorSceneHierarchySidebar(
-            document: document,
+            document: isActive ? document : nil,
             presentation: .embedded,
             onSelectEntity: { entityID in
                 if let annotationAgent, annotationAgent.sceneAnnotations.isSelecting,
@@ -80,6 +107,9 @@ struct EditorSceneDocumentEditor: View {
             },
             onAddEntity: { parentID in
                 workbench.presentEntityPicker(documentID: document.id, parentID: parentID)
+            },
+            onAddGroup: { parentID in
+                workbench.addSceneGroup(documentID: document.id, parentID: parentID)
             },
             onSetEntityEnabled: { entityID, isEnabled in
                 workbench.setSceneEntityEnabled(documentID: document.id, entityID: entityID, isEnabled: isEnabled)
@@ -103,5 +133,12 @@ struct EditorSceneDocumentEditor: View {
                 workbench.reparentSceneEntity(documentID: document.id, entityID: entityID, parentID: parentID)
             }
         )
+    }
+}
+
+enum EditorSceneHierarchyLayout {
+    static func width(_ preferred: Float, available: Float) -> Float {
+        let maximum = max(0, min(520, available - 248))
+        return min(max(preferred, min(180, maximum)), maximum)
     }
 }

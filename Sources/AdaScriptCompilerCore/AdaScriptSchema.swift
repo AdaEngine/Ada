@@ -1,3 +1,5 @@
+import Foundation
+
 extension Parser {
     mutating func parse() throws -> Output {
         var output = Output()
@@ -169,7 +171,7 @@ extension Parser {
             if depth == 1 {
                 let annotations = try parseAnnotations()
                 if annotations.contains(where: { $0.name == "export" }) {
-                    let field = try parseScriptableField(declarationName: name)
+                    let field = try parseScriptableField(declarationName: name, annotations: annotations)
                     guard fieldNames.insert(field.name).inserted else {
                         throw error("duplicate field '\(field.name)' in \(name)")
                     }
@@ -251,7 +253,7 @@ extension Parser {
         )
     }
 
-    private mutating func parseScriptableField(declarationName: String) throws -> AdaScriptSchemaField {
+    private mutating func parseScriptableField(declarationName: String, annotations: [Annotation]) throws -> AdaScriptSchemaField {
         guard match("var"), let fieldName = consumeIdentifier() else {
             throw error("@export in \(declarationName) must annotate a stored var")
         }
@@ -267,7 +269,18 @@ extension Parser {
         guard match(";") else {
             throw error("expected ';' after field '\(fieldName)'")
         }
-        return AdaScriptSchemaField(defaultValue: defaultValue, name: fieldName)
+        return AdaScriptSchemaField(defaultValue: defaultValue, name: fieldName, groupPath: try exportGroup(annotations))
+    }
+
+    private func exportGroup(_ annotations: [Annotation]) throws -> [String] {
+        guard let value = annotations.first(where: { $0.name == "export" })?.arguments["group"] else { return [] }
+        guard case let .string(path) = value else { throw error("@export group must be a string") }
+        let names = path.split(separator: "/", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard (1...4).contains(names.count), names.allSatisfy({ !$0.isEmpty }) else {
+            throw error("@export group requires one to four nonempty '/'-separated names")
+        }
+        return names
     }
 
     private static let deferredWorldMembers: Set<String> = ["commands", "spawn", "setTileOrientation"]
@@ -552,7 +565,7 @@ extension Parser {
             if let network, !networkTags.insert(network.tag).inserted {
                 throw error("duplicate network field tag \(network.tag) in \(declarationName)")
             }
-            fields.append(AdaScriptSchemaField(defaultValue: defaultValue, name: fieldName, network: network))
+            fields.append(AdaScriptSchemaField(defaultValue: defaultValue, name: fieldName, network: network, groupPath: try exportGroup(annotations)))
         }
         return fields
     }

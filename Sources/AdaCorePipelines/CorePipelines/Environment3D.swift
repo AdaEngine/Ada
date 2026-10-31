@@ -232,6 +232,15 @@ public struct Environment3D: Codable, Sendable {
         get { postProcess.colorGrading.contrast }
         set { postProcess.colorGrading.contrast = newValue }
     }
+    public var colorCorrectionMode: ColorCorrectionMode3D {
+        get { postProcess.colorGrading.correctionMode }
+        set { postProcess.colorGrading.correctionMode = newValue }
+    }
+    /// Blend strength shared by the curves and LUT modes.
+    public var colorCorrectionStrength: Float {
+        get { postProcess.colorGrading.lutIntensity }
+        set { postProcess.colorGrading.lutIntensity = newValue }
+    }
     public var depthOfFieldEnabled: Bool {
         get { postProcess.depthOfField.isEnabled }
         set { postProcess.depthOfField.isEnabled = newValue }

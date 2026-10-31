@@ -38,6 +38,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
     @Res<Bloom3DViews> private var bloomViews
     @Res<VolumetricFog3DViews> private var volumetricViews
     @Res<AutoExposure3DViews> private var autoExposureViews
+    @Res<ColorCorrection3DViews> private var colorCorrection
 
     public init(notifiesCompletion: Bool = true) {
         self.notifiesCompletion = notifiesCompletion
@@ -49,6 +50,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
         _bloomViews.update(from: world)
         _volumetricViews.update(from: world)
         _autoExposureViews.update(from: world)
+        _colorCorrection.update(from: world)
         query.update(from: world)
         _environments.update(from: world)
         _lighting.update(from: world)
@@ -82,7 +84,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
             let compositeTarget = target.temporalUpscalingActive ? (target.temporalInputTexture ?? mainTexture)
                 : (environment.antiAliasing == .none ? mainTexture : (target.antiAliasing3DInputTexture ?? mainTexture))
             let jitteredUniform = temporalViewUniform(viewUniform, target: target)
-            let gradingLUT = environment.postProcess.colorGrading.activeLUT
+            let gradingLUT = colorCorrection.resolve(environment.postProcess.colorGrading, view: source.entityId)
             let autoExposureTexture = environment.postProcess.autoExposure.isEnabled ? autoExposureViews.output(view: source.entityId) : nil
             let bloomTexture = environment.postProcess.bloom.isEnabled ? bloomViews.output(view: source.entityId) : nil
             let skybox = environment.skybox

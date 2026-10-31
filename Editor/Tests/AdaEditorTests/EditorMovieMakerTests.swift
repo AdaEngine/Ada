@@ -44,23 +44,21 @@ struct EditorMovieMakerTests {
         }
     }
 
-    @Test func toolbarOpensMovieSettings() async throws {
+    @Test func applicationMenuOpensMovieSettings() throws {
         prepareMovieEditorUI()
         let root = try movieEditorFixtureDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let model = EditorMovieMakerModel(projectURL: root)
-        let toolbar = EditorTopToolbar(
-            project: EditorProjectReference(name: "Movie", path: root.path), isProjectSwitcherPresented: false,
-            isRunDestinationMenuPresented: false, viewModel: EditorToolbarViewModel(), runDestination: .windows,
-            isRunEnabled: true, isStopEnabled: false, onToggleRunDestinationMenu: {}, onToggleProjectSwitcher: {},
-            onRun: {}, onStop: {}, movieMaker: model, onMovieMaker: { model.isPresented = true }
-        )
-        let container = UIContainerView(rootView: toolbar.theme(.adaEditor))
-        container.frame = Rect(x: 0, y: 0, width: 1200, height: 50)
-        container.bounds.size = container.frame.size
-        await settleMovieUI(container)
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Toolbar.MovieMaker"))
-        #expect(model.isPresented)
+        let editor = EditorViewModel(project: EditorProjectReference(name: "Movie", path: root.path))
+        EditorMenuCommandRouter.shared.install(owner: editor, handler: editor.handleMenuCommand)
+        defer { EditorMenuCommandRouter.shared.uninstall(owner: editor) }
+        let menu = try #require(EditorMenuBar.makeMenus().first { $0.placement == .application })
+        let item = try #require(menu.items.first { $0.title == L10n.text("Movie Maker") })
+        let action = try #require(item.action)
+        action()
+        #expect(editor.movieMaker.isPresented)
+        editor.movieMaker.isPresented = false
+        action()
+        #expect(editor.movieMaker.isPresented)
     }
 }
 

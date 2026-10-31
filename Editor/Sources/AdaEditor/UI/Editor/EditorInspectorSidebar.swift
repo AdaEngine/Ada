@@ -12,6 +12,7 @@ struct EditorInspectorSidebar: View {
     @State var sceneSearchText = ""
     @State var spineCatalog = EditorSpinePreviewModel()
     @State private var collapsedComponentTypeNames: Set<String> = []
+    @State var collapsedFieldGroups: [String: Set<String>] = [:]
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) var theme
@@ -130,6 +131,7 @@ struct EditorInspectorSidebar: View {
 
     private func componentEditor(_ component: EditorInspectorSidebarViewModel.ComponentSection) -> some View {
         let isCollapsed = collapsedComponentTypeNames.contains(component.typeName)
+        let fields = colorCorrectionVisibleFields(component)
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Button(action: { toggleComponentCollapsed(component.typeName) }) {
@@ -158,8 +160,13 @@ struct EditorInspectorSidebar: View {
             }
 
             if !isCollapsed {
-                ForEach(component.fields, id: \.field.id) { field in
-                    componentFieldRow(field)
+                ForEach(EditorInspectorFieldLayout.rows(fields: fields.map(\.field), collapsed: collapsedFieldGroups[component.typeName] ?? [])) { row in
+                    if let index = row.fieldIndex {
+                        componentFieldRow(fields[index])
+                            .padding(.leading, Float(row.level) * 10)
+                    } else {
+                        fieldGroupHeader(row, namespace: component.typeName)
+                    }
                 }
             }
 
@@ -182,6 +189,10 @@ struct EditorInspectorSidebar: View {
     private func componentFieldRow(_ field: EditorInspectorSidebarViewModel.ComponentField) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             fieldLabel(field.field.label, verbatim: field.field.key.hasPrefix("graphValue:") || field.field.key.hasPrefix("graphTexture:"))
+            if field.typeName == EditorBuiltInComponentType.environment3D, field.field.key == "postProcess.colorGrading.lut" {
+                Text(L10n.text("Use a horizontal strip LUT (256 × 16 or 1024 × 32). Import as Data / Linear."))
+                    .font(.system(size: 10)).foregroundColor(theme.editorColors.muted).lineLimit(3)
+            }
             if [EditorBuiltInComponentType.uiComponent, EditorBuiltInComponentType.companionPanel].contains(field.typeName), field.field.key == "path" {
                 Button(L10n.text("Choose UI source…")) { activeSceneFieldID = activeSceneFieldID == "ui-source" ? nil : "ui-source" }
                 if activeSceneFieldID == "ui-source" {
@@ -206,6 +217,9 @@ struct EditorInspectorSidebar: View {
                     is3D: field.typeName == EditorBuiltInComponentType.physicsBody3D
                 )
                 .id(viewModel.selectedEntity?.editorID)
+            } else if field.typeName == EditorBuiltInComponentType.environment3D, field.field.key == "postProcess.colorGrading.curves" {
+                EditorColorCurvesField(text: viewModel.componentFieldBinding(typeName: field.typeName, field: field.field))
+                    .id(viewModel.selectedEntity?.editorID)
             } else if field.field.coding == .shaderGraphPath {
                 shaderGraphReferenceField(field)
             } else if field.typeName == EditorBuiltInComponentType.spineSource, ["animation", "skin"].contains(field.field.key) {

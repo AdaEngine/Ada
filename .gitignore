@@ -3,6 +3,7 @@
 
 # Ignore Swift Package Manager build artifacts directory.
 .build/
+.builds/
 **/.build/
 .build-codex/
 .build-studio-core/

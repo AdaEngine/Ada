@@ -65,6 +65,7 @@ enum EditorScriptComponentCatalog {
             fields: schema.fields.map { field in
                 var editorField = EditorComponentField(key: field.name, label: field.name, kind: field.defaultValue.editorFieldKind)
                 editorField.defaultValue = field.defaultValue.editorSceneValue
+                editorField.groupPath = field.groupPath
                 return editorField
             },
             makeDefaultPayload: { defaults },

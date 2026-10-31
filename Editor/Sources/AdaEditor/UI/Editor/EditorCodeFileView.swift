@@ -601,7 +601,7 @@ enum EditorSourceHoverPresentation {
             palette: palette,
             keywordFont: keywordFont
         )
-        let lines = text.components(separatedBy: .newlines)
+        let lines = EditorSourceLines.split(text)
         var lineOffsets: [Int] = []
         var offset = 0
         for line in lines {
@@ -946,7 +946,7 @@ private enum EditorTreeSitterSwiftSyntaxHighlighter {
         }
 
         let cursor = query.execute(in: tree)
-        let lines = source.components(separatedBy: .newlines)
+        let lines = EditorSourceLines.split(source)
         return
             cursor
             .resolve(with: .init(string: source))
@@ -1054,7 +1054,7 @@ enum EditorSyntaxHighlighter {
     }
 
     static func tokens(for source: String, language: EditorSourceLanguage, palette: EditorCodeColorPalette) -> [EditorCodeToken] {
-        let lines = source.components(separatedBy: .newlines)
+        let lines = EditorSourceLines.split(source)
         return spans(for: source, language: language, palette: palette)
             .map { span in
                 let line = lines[safe: span.line] ?? ""
@@ -1120,7 +1120,7 @@ enum EditorSyntaxHighlighter {
                 }
         }
 
-        let lines = source.components(separatedBy: .newlines)
+        let lines = EditorSourceLines.split(source)
         var state = ScanState.normal
         var spans: [TextEditorTokenSpan] = []
 
@@ -1196,7 +1196,7 @@ enum EditorSyntaxHighlighter {
             return nil
         }
 
-        let lines = source.components(separatedBy: .newlines)
+        let lines = EditorSourceLines.split(source)
         var spans: [TextEditorTokenSpan] = []
 
         for highlightSpan in highlightSpans {

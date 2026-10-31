@@ -65,6 +65,7 @@ struct ProjectOpeningAvailabilityTests {
         #expect(model.selectedTemplate == .adaScriptWithSwift)
         model.projectTemplateBinding.wrappedValue = "AdaScript"
         #expect(model.selectedTemplate == .adaScript)
+        model.newProjectSourceControl = .git
         model.shouldCreateGitRepositoryBinding.wrappedValue.toggle()
         #expect(!model.shouldCreateGitRepository)
     }

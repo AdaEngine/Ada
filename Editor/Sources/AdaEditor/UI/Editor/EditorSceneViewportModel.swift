@@ -57,6 +57,7 @@ final class EditorSceneViewportModel {
     private var sceneResourceRootURL: URL?
     private var scriptableObjectCatalog: [EditorScriptableObjectDescriptor] = []
     var selectedEditorID: String?
+    var showsEntityMarkers = false
     let terrainEditing = EditorTerrainEditingState()
     private(set) var activeTool: EditorSceneViewportTool = .translate
     private(set) var isAnnotating = false
@@ -82,6 +83,8 @@ final class EditorSceneViewportModel {
     private var transformDrag: TransformDrag?
     private var transformInspectorUpdateTask: Task<Void, Never>?
     private var sceneLoadTask: Task<Void, Never>?
+    private var presentationPauseTask: Task<Void, Never>?
+    private var isPresentationActive = true
     private var sceneLoadGeneration = 0
     private var onSceneLoadingChanged: ((Bool) -> Void)?
     private var onSceneLoaded: ((EditorSceneRuntimeLoadResult) -> Void)?
@@ -161,6 +164,8 @@ final class EditorSceneViewportModel {
     }
 
     func disconnect() {
+        presentationPauseTask?.cancel()
+        presentationPauseTask = nil
         endTerrainStroke(cancelled: true)
         sceneLoadGeneration += 1
         sceneLoadTask?.cancel()
@@ -280,10 +285,42 @@ final class EditorSceneViewportModel {
     ) {
         self.world = world
         sceneApplication = application
+        updatePresentationPause()
         onSceneLoadingChanged = onLoadingChanged
         onSceneLoaded = onLoaded
         _ = reloadSceneRuntimeIfReady()
     }
+
+    /// Keep one prepared edit world while its pane shows code. A scoped hosted
+    /// suspension also survives native window deactivation/reactivation; explicit
+    /// scene installation serializes with it and resumes on return to the tab.
+    func setPresentationActive(_ active: Bool) {
+        guard active != isPresentationActive else { return }
+        isPresentationActive = active
+        if !active {
+            endTerrainStroke(cancelled: true)
+            endTransformDrag(cancelled: true)
+            pressedKeys.removeAll()
+            isTwoDPanning = false
+            isThreeDRotating = false
+            lastMousePosition = nil
+        }
+        updatePresentationPause()
+    }
+
+    private func updatePresentationPause() {
+        presentationPauseTask?.cancel()
+        presentationPauseTask = nil
+        guard !isPresentationActive, let application = sceneApplication else { return }
+        presentationPauseTask = Task { @MainActor [weak application] in
+            guard let application else { return }
+            try? await application.withHostedUpdatesSuspended {
+                while !Task.isCancelled { try await Task.sleep(for: .seconds(3_600)) }
+            }
+        }
+    }
+
+    deinit { presentationPauseTask?.cancel() }
 
     private func installSceneRuntime(_ model: EditorSceneModel, in world: World) -> EditorSceneRuntimeLoadResult {
 
@@ -510,24 +547,26 @@ final class EditorSceneViewportModel {
             return nil
         }
 
-        let selectedPoint = selectedEditorID.flatMap { gizmoWorldMatrix(for: $0) }
-            .flatMap { project($0.origin, viewProjection: viewProjection, size: size) }
-        for marker in markerPositions {
-            let isSelected = marker.id == selectedEditorID
-            guard
-                let point = isSelected ? selectedPoint : project(marker.position, viewProjection: viewProjection, size: size)
-            else {
-                continue
+        if showsEntityMarkers {
+            let selectedPoint = selectedEditorID.flatMap { gizmoWorldMatrix(for: $0) }
+                .flatMap { project($0.origin, viewProjection: viewProjection, size: size) }
+            for marker in markerPositions {
+                let isSelected = marker.id == selectedEditorID
+                guard
+                    let point = isSelected ? selectedPoint : project(marker.position, viewProjection: viewProjection, size: size)
+                else {
+                    continue
+                }
+                let radius: Float = isSelected ? 6 : 4
+                guard point.x >= -radius, point.x <= size.width + radius,
+                    point.y >= -radius, point.y <= size.height + radius else { continue }
+                drawViewportMarker(
+                    at: point,
+                    radius: radius,
+                    color: isSelected ? theme.editorColors.purple : theme.editorColors.blue.opacity(0.72),
+                    in: &context
+                )
             }
-            let radius: Float = isSelected ? 6 : 4
-            guard point.x >= -radius, point.x <= size.width + radius,
-                point.y >= -radius, point.y <= size.height + radius else { continue }
-            drawViewportMarker(
-                at: point,
-                radius: radius,
-                color: isSelected ? theme.editorColors.purple : theme.editorColors.blue.opacity(0.72),
-                in: &context
-            )
         }
         for id in annotationEntityIDs {
             guard let matrix = gizmoWorldMatrix(for: id), let point = project(matrix.origin, viewProjection: viewProjection, size: size) else { continue }
@@ -1389,7 +1428,8 @@ extension EditorSceneViewportModel {
             let fields: [EditorInspectorSidebarViewModel.ComponentField]
             if let descriptor {
                 fields = descriptor.fields.map { field in
-                    let editorField = EditorComponentField(key: field.name, label: field.name, kind: field.kind)
+                    var editorField = EditorComponentField(key: field.name, label: field.name, kind: field.kind, groupPath: field.groupPath)
+                    editorField.defaultValue = field.defaultValue
                     return EditorInspectorSidebarViewModel.ComponentField(
                         typeName: identifier,
                         field: editorField,

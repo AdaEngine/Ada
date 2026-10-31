@@ -121,10 +121,12 @@ struct EditorView: View {
                     isRunDestinationMenuPresented: isRunDestinationMenuPresented,
                     onToggleRunDestinationMenu: {
                         projectSwitcher.dismiss()
+                        viewModel.buildTargets.isMenuPresented = false
                         isRunDestinationMenuPresented.toggle()
                     },
                     onToggleProjectSwitcher: {
                         isRunDestinationMenuPresented = false
+                        viewModel.buildTargets.isMenuPresented = false
                         projectSwitcher.toggle()
                     }
                 )
@@ -214,6 +216,17 @@ struct EditorView: View {
                     onAndroidSettings: { viewModel.presentSettings(.buildExport, page: "ANDROID") }
                 )
             }
+            .overlay(anchor: .topTrailing) {
+                if viewModel.buildTargets.isMenuPresented {
+                    ZStack(anchor: .topTrailing) {
+                        Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .onTapGesture { viewModel.buildTargets.isMenuPresented = false }
+                        EditorBuildTargetMenu(viewModel: viewModel)
+                            .offset(x: -(metrics.toolbarRunControlsWidth + metrics.toolbarRunDestinationWidth + 40),
+                                    y: metrics.topToolbarHeight - 2)
+                    }.zIndex(31)
+                }
+            }
         }
         .padding(.all, 4)
         .background {
@@ -228,6 +241,11 @@ struct EditorView: View {
     var body: some View {
         // Keep the window presentation value small as editor overlays grow.
         AnyView(editorContent)
+            .fullScreenCover(isPresented: Binding(
+                get: { viewModel.buildTargets.isPresented }, set: { viewModel.buildTargets.isPresented = $0 }
+            )) {
+                EditorBuildTargetsDialog(viewModel: viewModel)
+            }
             .fullScreenCover(isPresented: viewModel.movieMakerPresentation) {
                 EditorMovieMakerDialog(
                     model: viewModel.movieMaker,
@@ -463,11 +481,12 @@ private struct EditorWorkspaceRegion: View {
     }
 }
 
-private struct EditorLeftSidebarContent: View {
+struct EditorLeftSidebarContent: View {
     let viewModel: EditorViewModel
+    var tool: String? = nil
 
     var body: some View {
-        if viewModel.toolStrip.activeLeftTopTool == "sourceControl" {
+        if (tool ?? viewModel.toolStrip.activeLeftTopTool) == "sourceControl" {
             EditorSourceControlSidebar(viewModel: viewModel)
         } else {
             EditorProjectSidebar(
@@ -508,7 +527,9 @@ private struct EditorLeftSidebarContent: View {
                 },
                 onDeleteItem: { item in
                     viewModel.presentDeleteProjectItemAlert(item)
-                }
+                },
+                onRevealActiveFile: { viewModel.revealActiveDocumentInProjectTree() },
+                isRevealActiveFileEnabled: viewModel.canRevealActiveDocumentInProjectTree
             )
         }
     }
@@ -565,6 +586,7 @@ struct EditorResizeHandle: View {
     let axis: Axis
     let onResize: (Size) -> Void
     let onResizeEnded: () -> Void
+    var showsGrip = false
 
     @State private var isHovered = false
     @State private var isDragging = false
@@ -573,11 +595,13 @@ struct EditorResizeHandle: View {
     init(
         axis: Axis,
         onResize: @escaping (Size) -> Void = { _ in },
-        onResizeEnded: @escaping () -> Void = {}
+        onResizeEnded: @escaping () -> Void = {},
+        showsGrip: Bool = false
     ) {
         self.axis = axis
         self.onResize = onResize
         self.onResizeEnded = onResizeEnded
+        self.showsGrip = showsGrip
     }
 
     @ViewBuilder
@@ -597,6 +621,15 @@ struct EditorResizeHandle: View {
     private var hitArea: some View {
         RectangleShape()
             .fill(Color.clear)
+            .overlay {
+                if showsGrip {
+                    RoundedRectangleShape(cornerRadius: 1.5)
+                        .fill(isHovered || isDragging ? theme.editorColors.blue : theme.editorColors.muted.opacity(0.6))
+                        .frame(width: axis == .horizontal ? 3 : 28, height: axis == .vertical ? 3 : 28)
+                        .allowsHitTesting(false)
+                        .accessibilityIdentifier("AdaEditor.ResizeHandle.Grip")
+                }
+            }
             .overlay {
                 if isHovered || isDragging {
                     RoundedRectangleShape(cornerRadius: 1.5)

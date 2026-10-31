@@ -48,24 +48,22 @@ struct EditorBuildExportSettingsView: View {
 
     private var toolSetup: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Button(model.scanningBuildPlatforms.contains(platform) ? L10n.text("Scanning…") : L10n.text("Rescan")) {
                     Task { await model.rescanBuildTools(for: platform) }
                 }
-                .frame(width: 110, height: 34)
                 .disabled(model.scanningBuildPlatforms.contains(platform))
                 .accessibilityIdentifier("AdaEditor.BuildExport.Rescan." + platform.rawValue)
                 if platform == .host || (platform == .android && EditorBuildPlatform.host != .windows) {
                     Button(L10n.text("Install Swift…")) { model.openBuildToolSetup(.swift) }
-                        .frame(width: 130, height: 34)
                         .accessibilityIdentifier("AdaEditor.BuildExport.InstallSwift." + platform.rawValue)
                 }
                 if platform == .android {
                     Button(L10n.text("Install Android SDK…")) { model.openBuildToolSetup(.android) }
-                        .frame(width: 175, height: 34)
                         .accessibilityIdentifier("AdaEditor.BuildExport.InstallAndroid")
                 }
             }
+            .buttonStyle(EditorBuildToolButtonStyle(theme: theme))
             .disabled(!EditorDistribution.current.supportsSwiftProjects)
             Text(L10n.text("Install opens the official setup page in your browser. Finish installation, then Rescan and Save Build Settings."))
                 .font(.system(size: 11))
@@ -100,8 +98,7 @@ struct EditorBuildExportSettingsView: View {
                 #if os(macOS) || os(Windows)
                 if field.kind != .identifier {
                     Button(L10n.text("Browse…")) { browse(field) }
-                        .font(.system(size: 12))
-                        .frame(width: 88, height: 34)
+                        .buttonStyle(EditorBuildToolButtonStyle(theme: theme, height: 34, width: 88))
                         .accessibilityIdentifier("AdaEditor.BuildExport.Browse." + platform.rawValue + "." + field.id)
                 }
                 #endif
@@ -148,6 +145,31 @@ struct EditorBuildExportSettingsView: View {
         }
     }
     #endif
+}
+
+private struct EditorBuildToolButtonStyle: ButtonStyle {
+    let theme: Theme
+    var height: Float = 30
+    var width: Float?
+
+    func makeBody(configuration: Configuration) -> some View {
+        let highlighted = configuration.state.isEnabled
+            && (configuration.isHighlighted || configuration.isPressed || configuration.state.contains(.focused))
+        let shape = RoundedRectangleShape(cornerRadius: 5)
+        return configuration.label
+            .font(.system(size: 12))
+            .foregroundColor(theme.editorColors.text)
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .frame(minWidth: 68)
+            .frame(width: width, height: height)
+            .background(shape.fill(theme.editorColors.surface))
+            .overlay {
+                shape.fill(highlighted ? theme.editorColors.text.opacity(0.10) : .clear)
+            }
+            .overlay { shape.stroke(theme.editorColors.border, lineWidth: 1) }
+            .opacity(configuration.state.isEnabled ? 1 : 0.45)
+    }
 }
 
 extension EditorSettingsWindowViewModel {

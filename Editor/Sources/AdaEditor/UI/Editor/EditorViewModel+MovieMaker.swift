@@ -10,11 +10,6 @@ extension EditorViewModel {
         projectURL != nil && !isProjectRunning && !playModeState.isPlaying && workspaceTask == nil && !movieMaker.isBusy
     }
 
-    func movieMakerToolbarAction() {
-        if movieMaker.isBusy { movieMaker.stop() }
-        else { movieMaker.isPresented = true }
-    }
-
     func startMovieRecording() {
         guard canStartMovie else { return }
         guard workbench.saveAllDocuments() else { movieMaker.report(EditorMovieMakerError.saveFailed); return }

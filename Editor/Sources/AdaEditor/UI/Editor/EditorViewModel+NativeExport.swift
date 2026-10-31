@@ -45,9 +45,11 @@ extension EditorViewModel {
                     swiftExecutable: web ? webSwift : toolchain.swiftExecutablePath,
                     buildEnvironment: buildSettings.environment(for: web ? .web : .macOS),
                     swiftSDK: ProcessInfo.processInfo.environment["ADA_WEB_SWIFT_SDK"]
-                        ?? buildSettings.values[EditorBuildPlatform.web.rawValue]?["ADA_WEB_SWIFT_SDK"] ?? "swift-6.3.2-RELEASE_wasm"
+                        ?? buildSettings.values[EditorBuildPlatform.web.rawValue]?["ADA_WEB_SWIFT_SDK"] ?? "swift-6.3.2-RELEASE_wasm",
+                    configuration: settings.build.configuration == "debug" ? .debug : .release
                 )
-                let output = projectURL.appendingPathComponent("Exports/\(web ? "Web" : "macOS")")
+                var output = projectURL.appendingPathComponent("Exports/\(web ? "Web" : "macOS")")
+                if let directory = settings.buildTargetExportSubdirectory { output.appendPathComponent(directory) }
                 let result = try await EditorAdaScriptNativeExporter(runner: runner).export(project: settings, at: projectURL, to: output, options: options) { [weak self] event in
                     await MainActor.run { self?.appendOutputBlock(event.text) }
                 }

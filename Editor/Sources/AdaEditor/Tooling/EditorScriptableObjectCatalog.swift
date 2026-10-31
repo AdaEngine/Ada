@@ -8,6 +8,7 @@ struct EditorScriptableObjectDescriptor: Equatable, Sendable {
         var name: String
         var defaultValue: EditorSceneValue
         var kind: EditorComponentFieldKind
+        var groupPath: [String] = []
     }
 
     var fields: [Field]
@@ -83,6 +84,7 @@ enum EditorScriptableObjectCatalogLoader {
         let sourceRoot = projectURL.appendingPathComponent(project.paths.sources ?? "Sources", isDirectory: true)
         let sources =
             try loadSources(at: sourceRoot, fileManager: fileManager)
+                .filter { project.includesSource(relativePath: $0.path) }
             + AdaScriptLibraryLock.load(at: projectURL).loadSources(at: projectURL)
         return try makeResult(project: project, sources: sources)
     }
@@ -139,7 +141,8 @@ enum EditorScriptableObjectCatalogLoader {
                 EditorScriptableObjectDescriptor.Field(
                     name: $0.name,
                     defaultValue: $0.defaultValue.editorSceneValue,
-                    kind: $0.defaultValue.editorFieldKind
+                    kind: $0.defaultValue.editorFieldKind,
+                    groupPath: $0.groupPath
                 )
             },
             identifier: schema.id,

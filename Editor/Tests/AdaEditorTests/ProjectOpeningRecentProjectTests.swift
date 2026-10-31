@@ -114,7 +114,7 @@ struct ProjectOpeningRecentProjectTests {
                 time: 0
             )
         )
-        let rename = try #require(menu?.items.first { $0.title == "Rename…" }?.action)
+        let rename = try #require(menu?.items.first { $0.title == L10n.text("Rename…") }?.action)
         #expect(model.projectToOpenInEditor == nil)
         rename()
         for _ in 0..<100 {
@@ -143,7 +143,7 @@ struct ProjectOpeningRecentProjectTests {
         missingRow.layoutIfNeeded()
         menu = nil
         missingRow.onMouseEvent(MouseEvent(window: RID(), button: .right, mousePosition: Point(100, 25), phase: .began, modifierKeys: [], time: 0))
-        let remove = try #require(menu?.items.first { $0.title == "Remove from Recent Projects" })
+        let remove = try #require(menu?.items.first { $0.title == L10n.text("Remove from Recent Projects") })
         #expect(remove.role == .destructive)
         remove.action?()
         #expect(try store.loadProjects().isEmpty)

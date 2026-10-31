@@ -555,14 +555,17 @@ struct EditorSceneEditingTests {
 
         let hierarchy = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneEditor.HierarchyPanel"))
         let viewport = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneEditor.ViewportPanel"))
+        let divider = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneEditor.HierarchyResize"))
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.SceneHierarchy"))
         #expect(hierarchy.absoluteFrame.minX == 0)
-        #expect(hierarchy.absoluteFrame.width == EditorSceneDocumentEditor.hierarchyWidth)
-        #expect(viewport.absoluteFrame.minX == EditorSceneDocumentEditor.hierarchyWidth + 1)
-        #expect(viewport.absoluteFrame.width == 1_100 - EditorSceneDocumentEditor.hierarchyWidth - 1)
+        #expect((180...520).contains(hierarchy.absoluteFrame.width))
+        #expect(divider.absoluteFrame.minX == hierarchy.absoluteFrame.maxX)
+        #expect(divider.absoluteFrame.width == 8)
+        #expect(viewport.absoluteFrame.minX == divider.absoluteFrame.maxX)
+        #expect(viewport.absoluteFrame.maxX == 1_100)
     }
 
-    @Test("2D viewport grid and default entity marker render as quads")
+    @Test("2D viewport grid renders as quads and entity markers are hidden until enabled")
     @MainActor
     func viewportGridAndMarkerRenderAsQuads() throws {
         let viewportModel = EditorSceneViewportModel()
@@ -583,6 +586,11 @@ struct EditorSceneEditingTests {
         )
 
         var gizmoContext = UIGraphicsContext()
+        viewportModel.setActiveTool(.select)
+        viewportModel.drawGizmos(in: &gizmoContext, size: Size(width: 320, height: 180), theme: .adaEditor)
+        #expect(gizmoContext.getDrawCommands().isEmpty)
+
+        viewportModel.showsEntityMarkers = true
         viewportModel.drawGizmos(in: &gizmoContext, size: Size(width: 320, height: 180), theme: .adaEditor)
 
         #expect(
@@ -594,6 +602,11 @@ struct EditorSceneEditingTests {
                     return false
                 }
         )
+
+        viewportModel.showsEntityMarkers = false
+        var hiddenContext = UIGraphicsContext()
+        viewportModel.drawGizmos(in: &hiddenContext, size: Size(width: 320, height: 180), theme: .adaEditor)
+        #expect(hiddenContext.getDrawCommands().isEmpty)
     }
 
     @Test("3D grid projection matches the render camera")

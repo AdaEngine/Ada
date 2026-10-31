@@ -12,6 +12,13 @@ version="${ADA_STUDIO_VERSION:-development-$(date +%Y%m%d-%H%M%S)}"
 export ADAENGINE_GRAVITY_PACKAGE_PATH="${ADAENGINE_GRAVITY_PACKAGE_PATH:-$root/Sources/gravity-lang}"
 export ADAENGINE_PACKAGE_PATH="$root"
 export ADAENGINE_SKIP_SWIFTLINT=1
+LORE_LINUX_SDK_PATH="$(python3 "$root/script/ensure_linux_lore.py")"
+export LORE_LINUX_SDK_PATH
+if [[ -z "${ADAEDITOR_LORE_PACKAGE_PATH:-}" ]]; then
+    ADAEDITOR_LORE_PACKAGE_PATH="$(python3 "$root/script/ensure_linux_lore.py" --package)"
+    export ADAEDITOR_LORE_PACKAGE_PATH
+fi
+export LD_LIBRARY_PATH="$LORE_LINUX_SDK_PATH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 if [[ -z "${ADA_MCP_LOCAL_PATH:-}" ]]; then
     ADA_MCP_LOCAL_PATH="$(python3 "$root/script/ensure_windows_mcp.py")"
     export ADA_MCP_LOCAL_PATH

@@ -13,7 +13,9 @@ one full-width toolbar, with the actions anchored on the right. **New Session**
 creates a persisted project conversation. **Add Project** uses Studio's existing
 project picker and opens the selected project in its own workspace window.
 **Agent Settings** opens the existing agent/provider catalog and configuration.
-The session tree represents the project belonging to the current window;
+The session list scrolls within its panel and displays a scrollbar when it overflows;
+its header and Agent Settings stay visible. The document panel has rounded, clipped
+corners matching the conversation. The session tree represents the project belonging to the current window;
 this version does not aggregate sessions from multiple projects in one tree.
 
 ## Documents and results
@@ -24,10 +26,18 @@ do not count as changes. This list describes reported agent changes across the
 session; it is not a Git working-tree diff or a rollback snapshot.
 
 Clicking a changed file opens its current project document through the same loader
-used by Editor. **Show Workspace** opens the existing document workbench beside
+used by Editor. The right activity strip opens **Files**, **Workspaces** or **Source Control**. Files reuses
+the project navigator; selecting a file opens its editor or asset preview. Workspaces lists
+open editors and previews, including unsaved-change markers, and selects their existing
+document models. Source Control uses the same Git/Lore changes and history panel as Editor;
+opening a diff reveals it in the document area. These navigation choices do not change
+the standard Editor mode's panel preferences.
+
+The activity strip's **Show Workspace** action opens the existing document workbench beside
 the conversation in wide windows. In smaller windows it occupies the central
 area; **Back to Chat** returns to the conversation. The result panel fills its
-allocated area directly, with an 8-point divider gap in the side-by-side layout;
+allocated area directly, with a visible, draggable 8-point divider in the side-by-side layout. Dragging
+changes the conversation/document proportions while keeping both panes usable;
 closing it restores the conversation to the full available width. Code, scenes, asset previews
 and scene Play use their existing implementations. **Editor** restores the full
 editor with its Inspector and tool panels. Existing selection-to-chat actions

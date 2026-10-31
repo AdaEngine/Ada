@@ -280,7 +280,7 @@
       },
       {
         "kind": "text",
-        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• visionOS Windowed Mode",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Movie Maker\n• visionOS Windowed Mode",
         "level": 0,
         "links": [
           {
@@ -298,6 +298,10 @@
           {
             "title": "Loading images and adding formats",
             "destination": "ImageDecoders"
+          },
+          {
+            "title": "Movie Maker",
+            "destination": "MovieMaker"
           },
           {
             "title": "visionOS Windowed Mode",
@@ -2727,6 +2731,184 @@
     ]
   },
   {
+    "id": "InspectorGroups",
+    "title": "Inspector groups and scene hierarchy",
+    "section": "Editor",
+    "source": "Editor/Documentation/InspectorGroups.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Export groups are explicit authoring metadata. Field-name prefixes and nested\nserialization paths do not automatically create inspector sections.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript components, resources and scriptable objects can declare a section:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@export(group: \"Auto Exposure\") var minimumEV = -4.0;\n@export(group: \"Auto Exposure\") var maximumEV = 2.0;\n@export(group: \"Camera/Auto Exposure\") var speedUp = 0.5;",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Swift components use the same path on the existing property wrapper:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@Component\nstruct CameraSettings: Codable, Sendable {\n    @Export(group: \"Camera/Auto Exposure\") var minimumEV: Float = -4\n    @Export(group: \"Camera/Auto Exposure\") var maximumEV: Float = 2\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Paths have one to four nonempty names separated by `/`. Deeper paths and empty\nnames are diagnosed by the component macro or AdaScript schema parser.\nInspector groups collapse independently and keep their first declaration order.\nEach header has a subtle tint derived from a stable hash of its component or\nscriptable-object ID and full group path. Colors survive restarts, folding and\nlanguage changes; the field text keeps the theme's normal contrast.\nSaved field names, payload structure and runtime bindings stay the same. Exported\ncustom structs are not implicitly expanded by this feature.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Native editor descriptors set `EditorComponentField.groupPath` explicitly.\nEnvironment 3D uses authored sections for Auto Exposure, Bloom, Depth of Field,\nSkybox/Starfield and other related settings.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The hierarchy search matches entity names without case sensitivity and includes\ntheir ancestors, even when those branches were collapsed. Clearing the search\nrestores the saved expansion state; searching does not modify the scene.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use the folder button or **Add Group** in the hierarchy background context menu\nto create an empty parent. **Add Child Group** creates one inside the selected\nentity. Rename groups to describe their purpose and drag related entities onto\nthem. These are ordinary parent entities with the usual transform inheritance,\nsave and undo behavior; check inherited transforms when moving existing objects.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Drag the divider between the hierarchy and viewport to change its width. The\nwidth is remembered on this computer and constrained to leave viewport space.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "BuildExport",
+    "title": "Build & Export settings",
+    "section": "Editor",
+    "source": "Editor/Documentation/BuildExport.md",
+    "blocks": [
+      {
+        "kind": "heading",
+        "text": "Named build targets",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The shared desktop toolbar shows a build-target picker next to the run platform.\nChoose **Edit Build Targets…** to create, duplicate, rename or delete targets.\nEach target stores its startup scene, Debug/Release configuration, run destination,\narguments, source inclusion/exclusion, resource roots and runtime/plugin settings.\nFor example, use a Debug target starting at a test scene and a Release target\nstarting at the game's main scene. Save selects the target open in the editor;\nCancel discards the entire draft. The last target cannot be deleted. Switching is\ndisabled during builds, running games, debugging, player deployment or recording.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Targets persist in `.ada/project.json` as `buildTargets` with `activeBuildTargetID`.\nExisting projects retain their settings and need no migration. Opening the target\neditor prepares a Main target from those settings; only Save writes it to disk.\nActivating a target projects its settings onto the ordinary `build`, `run`,\n`runtime`, `editor.startupScene` and `paths.resourceRoots` fields, so existing\nPlay/build/export/CLI consumers use the same active configuration. Ordinary\nProject Settings saves update the active target. Project identity, input actions,\nengine paths and AI settings remain shared. SwiftPM targets also remember the\nexecutable product and apply file/resource selection through the manifest editor.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaScript source inclusion/exclusion applies to project sources in local builds\nand native exports; library dependencies remain included. Paths are relative to\nthe project. This does not prune assets or scenes from the exported asset folder.\nNative macOS/Web/Android toolbar exports use a stable per-target subdirectory\nunder `Exports/<platform>/` so targets do not replace each other's output. Toolchain\nrequirements and supported export platforms are unchanged. The browser shell and\ndedicated phone screens do not yet expose the target editor.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Agent workflow",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Load the bundled `ada-build-run` skill for target configuration. Inspect the open\nproject with `editor.project.context`, then read its `.ada/project.json`. Named\ntargets are not platform destinations or SwiftPM executable products. To verify\nthe selected target use `editor.play.start` with `mode: \"product\"`; scene mode\ninstead runs the active scene document.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "There is no dedicated desktop MCP tool for creating or selecting named targets.\nUse the target editor, or available project file tools with the following rules:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• Preserve the schema version, unknown fields, unrelated targets and stable IDs.\n  When adding the first target, copy the existing effective project settings.\n• Before switching externally, capture the outgoing top-level settings in its\n  current target. Set the new `activeBuildTargetID` and project the selected\n  target's fields together: `build` → `build`, `run` → `run`, `runtime` → `runtime`,\n  `startupScene` → `editor.startupScene`, and `resourceRoots` → `paths.resourceRoots`.\n  Updating only an ID does not activate that target's scene or build settings.\n• When changing a scene entry, update both the target's `runtime.entry.scene`\n  and `startupScene`, plus the active projection. Keep `product` on its target;\n  it selects a SwiftPM executable product, not a new package target.\n• Target names must be nonempty and unique ignoring case; IDs must be nonempty\n  and unique. All targets use the project's build system. Configuration is\n  `debug` or `release`. Validation checks inactive targets too.\n• Include/exclude paths match files or directory prefixes relative to the project,\n  not wildcard patterns. Empty includes mean all project sources; exclusions win.\n  Include the project sources imported by the entry code.\n• Stop active project tasks and save dirty documents before external edits.\n  Reload the project afterwards so the toolbar and workspace agree with disk.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Run `adastudio validate --project <path> --format json` using the installed CLI,\nor build through the editor and read its diagnostics. The CLI `--target` flag is\nan export platform selector, not a named-target selector. Finally run the product\nand verify its startup scene; metadata/build validation alone is not runtime proof.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Host tools",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Open **Settings → Build & Export** to configure tools for the current computer.\nThese preferences apply across projects; paths are not written into `.adaproject`.\nUse **Browse…** for files/directories and **Save Build Settings** to persist edits.\nEmpty fields use automatic discovery. Path labels check availability, not compiler\nversions or successful game builds. External tools require standalone desktop Studio.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Each page has **Rescan** and scans once when first opened. Discovery fills empty\nor unavailable paths; working overrides and edits made during a scan are kept.\nUse **Save Build Settings** to apply the results. On Windows the scan rereads the\nuser and system environment from the registry, so tools installed after Studio\nstarted can be found without restarting it. It also checks standard versioned\nSwift installations, Android SDK locations, Android Studio's JDK, SDK build-tools\nand side-by-side NDKs, CMake, Ninja and Visual Studio build tools. A directory alone\ndoes not establish availability: Android SDK needs adb, JDK needs javac, and NDK\nneeds its installation metadata. Discovery does not validate compiler versions.\nSaving on Windows explicitly writes the preferences to disk, including Android\npaths, so closing Studio immediately after Save retains the configuration.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Install Swift…** on the host platform page opens the official Swift installation\ninstructions for this OS. **Install Android SDK…** on Android opens Google's\nAndroid Studio setup page. These are guided browser flows, not unattended\ninstallers. Finish installation there, then return to **Rescan** and save.\nIn Android Studio's SDK Manager, install Platform-Tools, Build-Tools, Emulator and\nNDK (Side by side) as needed. An Android emulator still needs an AVD created in\nAndroid Studio. Rescan does not download packages or accept license agreements.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Windows Web and Android builds run through WSL Ubuntu. Run\n`script/setup_windows_build_tools.ps1` once to install the managed Linux cross\ntoolchains. Keep Web's Swift override empty to use the matching managed compiler;\nan explicit override must be a Linux executable path. Android discovery and\ndeployment use the native Windows SDK, while the worker supplies Linux Swift,\nSDK/NDK, JDK and Dawn. Native host compiler settings continue to select Windows Swift.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Page | Tools and current use |\n| --- | --- |\n| Android | SDK, NDK, JDK, optional Gradle, build-tools version, emulator data, Swift Android SDK/toolchain and Swan/Dawn. Existing APK export and device/emulator Run consume these settings. |\n| iOS | Swift, Xcode Developer directory and iOS SDK. Profile storage and path checks are available; Studio does not yet export iOS games. |\n| Web | Swift WASM compiler, Swift SDK identifier and optional Tint. Web Run/Export consume these settings. |\n| Windows | Swift, CMake, Ninja, Windows SDK and MSVC tools. Native host build commands consume the profile on Windows. Packaging Windows games from macOS is not available. |\n| Linux | Swift, CMake, Ninja and C compiler. Native host build commands consume the profile on Linux. Packaging Linux games from macOS is not available. |\n| macOS | Swift, Xcode Developer directory, SDK, CMake and Ninja. Native SwiftPM builds/runs/tests and macOS AdaScript export consume these settings. |\n| VR / XR | Swift, Xcode Developer directory and visionOS SDK. Profile storage and path checks are available; XR export and other VR runtimes are not yet integrated. |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Android retains the existing `AdaStudio.Android.Tools` preference key. JDK home\naffects Java/signing tools; Gradle is optional because the built-in APK exporter\nuses Android tools directly. See [Android setup](Android.md).",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Changing a native Swift compiler also uses its sibling SourceKit-LSP when present\non subsequent toolchain discovery. Reopen the project to refresh an already-running\nlanguage server. Web and Android tools have separate profiles and do not override\nthe native project compiler.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
     "id": "ImageDecoders",
     "title": "Loading images and adding formats",
     "section": "AdaEngine",
@@ -2795,6 +2977,205 @@
       {
         "kind": "text",
         "text": "Use `Asset` and `AssetsManager.registerAssetType` for resources with a different\nruntime structure, such as an Aseprite animation containing frames, durations\nand tags. A custom asset type does not automatically extend the formats accepted\nby `Image`. GPU texture containers with mipmaps or compressed blocks should\npreserve those contents through a dedicated texture asset/loading path.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "MovieMaker",
+    "title": "Movie Maker",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/MovieMaker.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Record game footage at a fixed frame rate for trailers and editing.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Overview",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`MovieMaker` runs a fresh offscreen game world. It advances simulation by exactly\n`1 / framesPerSecond`, waits for all camera GPU work, reads the image, and saves it\nbefore starting the next frame. A slow render or disk never skips a movie frame.\nThe output resolution is independent of the desktop window and display scale.\nCapture uses the configured Metal or WebGPU renderer; the non-rendering headless\nbackend cannot produce movie pixels.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This follows Godot's Movie Maker workflow:\nlossless PNG frames and a synchronized WAV, ready for a video editor or FFmpeg.\nNo external encoder is required to record. MP4 encoding is a separate export step.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Godot's Movie Maker workflow",
+            "destination": "https://docs.godotengine.org/en/stable/tutorials/animation/creating_movies.html"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Record a take",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Reuse your gameplay plugins and authored cameras. The recorder supplies the main\nscheduler, event delivery, an offscreen render world marker, and a primary window ID; configure\nthe rendering and game plugins in `make`. Omit native application and window\nplugins. For example, this minimal scene records two seconds at 60 FPS:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\n\nlet maker = MovieMaker()\nlet configuration = MovieRecordingConfiguration(\n    outputURL: URL(fileURLWithPath: \"Movies/trailer.png\"),\n    framesPerSecond: 60,\n    width: 1920,\n    height: 1080,\n    frameCount: 120\n)\nlet take = try await maker.record(configuration: configuration, make: { app in\n    app.addPlugin(TransformPlugin())\n        .addPlugin(RenderWorldPlugin())\n        .addPlugin(CameraPlugin())\n        .addPlugin(Core2DPlugin())\n        .addPlugin(AudioPlugin())\n    app.spawn(\"Camera\", bundle: Camera2D())\n    // Install your gameplay, sprite, animation, physics, and scene plugins here.\n}, update: { world, frame in\n    // Script camera movement or feed input before this simulation frame.\n    // frame.index starts at 0; frame.time is movie time in seconds.\n}, progress: { savedFrames in\n    print(\"Saved \\(savedFrames) frames\")\n})",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use `PerspectiveCameraBundle` and `Core3DPlugin` for a 3D scene. Active cameras\nare retargeted after simulation, including cameras created at startup or replaced\nby a camera cut. Their projection and world transform are preserved. The game\nscene is recorded; host editor controls and desktop windows are excluded.\nGame UI must render through the scene's camera pipeline to appear in the take.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`make` runs before plugins are built; load GPU assets after renderer setup, for\nexample in your game's startup systems or in an awaited setup in `update`.\nAssets loaded for a take belong to its app-world asset scope. Load audio resources\ninside the recording task so they use the recording's mixer.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Files and sound",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For `Movies/trailer.png`, recording creates:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• `trailer00000000.png`, `trailer00000001.png`, and subsequent lossless frames.\n• `trailer.wav`: 48 kHz, stereo, 16-bit PCM, when `includesAudio` is true.\n• `trailer.movie.json`: resolution, FPS, actual saved frame count, filenames, and status.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Audio comes from the game's offline mixer, including spatial audio and master\ngain. Each video frame pulls exactly `48000 / FPS` audio samples per channel.\nFPS must divide 48000; common rates include 24, 25, 30, 48, 50, 60, 120 and 240.\nThe mixer is scoped to the recording task and does not replace the host's server.\nRecording does not use microphone capture or a playback device.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Existing takes are rejected instead of overwritten. Choose a new output name for\neach take. Memory is bounded to one frame and one audio block. WAV takes exceeding\nthe RIFF 4 GiB limit are rejected before recording; split these into shorter takes.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Call `maker.stop()` to finish after the current saved frame. Cancelling the task\nthrows `CancellationError`; completed frames and a finalized partial WAV remain,\nand the manifest records `cancelled`. Other failures record `failed` and rethrow\nthe original error. The WAV header is updated after every saved frame.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Warmup and repeatability",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`warmupFrameCount` renders and advances the mixer before frame zero without saving\nthe output. Warmup frames have negative `MovieFrame.index` and `MovieFrame.time`.\nUse warmup for temporal rendering effects and intentional preroll. Await asset\nloading explicitly; a fixed frame count cannot guarantee that an asynchronous load\nhas finished.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The fixed clock reaches nested schedulers, physics, animation, and shader graph\ntime. Explicit physics steps keep their own rate. Random seeds, network input,\nwall-clock reads, and asynchronous game code still need deterministic inputs for\nrepeatable takes. The recorder does not replace those sources of nondeterminism.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Command line and runnable example",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`MovieRecordingConfiguration/commandLine(_:relativeTo:)` reads Godot-style flags.\nIt returns `nil` when `--write-movie` is absent, so a game's entry point can choose\nbetween its normal launch and a recording. Parsing alone does not change app startup;\npass the configuration to `MovieMaker.record` with your game's setup.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Run the included animated sprite and audio example from the engine root:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "swift run MovieMakerDemo --write-movie Movies/demo.png --fixed-fps 60 --resolution 1280x720 --quit-after 180",
+        "language": "sh",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Additional flags are `--movie-warmup N` and `--movie-no-audio`. `--quit-after N`\ncounts saved frames, excluding warmup. Relative paths resolve against the directory\npassed to `commandLine`, which defaults to the working directory. Without capture\nflags, the demo records 180 frames at 640×360 in `Movies/demo.png`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Convert a take to MP4 using the same FPS as recording:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "ffmpeg -framerate 60 -start_number 0 -i Movies/demo%08d.png -i Movies/demo.wav -c:v libx264 -crf 15 -pix_fmt yuv420p -c:a aac -shortest Movies/demo.mp4",
+        "language": "sh",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For a take without audio, omit `-i Movies/demo.wav` and `-c:a aac`. For transparent\nfootage, set a transparent camera background and use a video format that supports\nalpha; H.264 MP4 does not preserve it.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Validate recording",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`swift test --filter MovieMaker` checks configuration, image and WAV writing,\nfailure metadata, and the simulation clock. GPU cases use the same serialized\n`Render3DGPUTests` parent as the engine's other rendering tests.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "On macOS, run `ADAENGINE_GOLDEN_METAL=1 swift test --filter MovieMaker`. For native\nWindows WebGPU validation in PowerShell:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "$env:ADAENGINE_GOLDEN_WEBGPU = \"1\"\nswift test --filter MovieMaker",
+        "language": "powershell",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "These cases record real camera pixels and a camera cut, game audio, warmup,\ngraceful stopping, task cancellation, and low-FPS physics advancement.",
         "level": 0,
         "links": []
       }

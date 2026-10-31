@@ -609,6 +609,8 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
         _ kind: SwiftPMCommandKind, projectURL: URL, toolchain: SwiftToolchain,
         buildSettings: EditorBuildExportConfiguration
     ) -> EditorProcessCommand {
+        let project = try? ProjectSystem.loadProject(at: projectURL)
+        let configuration = project?.build.configuration
         var arguments: [String] =
             switch kind {
             case .resolve:
@@ -618,7 +620,7 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
             case let .build(target, buildTests):
                 buildArguments(target: target, buildTests: buildTests)
             case let .run(target, arguments):
-                runArguments(target: target, runArguments: arguments)
+                runArguments(target: target, runArguments: arguments, configuration: configuration)
             case let .runWeb(target, outputPath, serve):
                 webRunArguments(target: target, outputPath: outputPath, serve: serve)
             case let .test(filter, eventStreamPath):
@@ -633,9 +635,18 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
                 ["package", "reset"]
             }
 
+        if let configuration, ["debug", "release"].contains(configuration) {
+            switch kind {
+            case .build, .test: arguments += ["-c", configuration]
+            case .runWeb: arguments += [configuration == "debug" ? "--debug" : "--release"]
+            default: break
+            }
+        }
+
         let platform: EditorBuildPlatform
         if case .runWeb = kind { platform = .web } else { platform = .host }
         var environment = buildSettings.environment(for: platform)
+        if case .run = kind { environment.merge(project?.run.environment ?? [:]) { _, value in value } }
         if case .runWeb = kind {
             environment["ADAENGINE_WEB_EXPORT"] = "1"
             environment["BUILD_WASM"] = "1"
@@ -650,7 +661,7 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
                 package: projectURL, output: output, product: target, engineRoot: root, gravityRoot: nil,
                 swift: buildSettings.swiftExecutable(for: .web) ?? "",
                 sdk: sdk.isEmpty ? "swift-6.3.2-RELEASE_wasm" : sdk,
-                configuration: "debug", serve: serve, environment: environment)
+                configuration: configuration ?? "debug", serve: serve, environment: environment)
         }
         #endif
         return EditorProcessCommand(
@@ -984,8 +995,9 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
         return arguments
     }
 
-    nonisolated private func runArguments(target: String?, runArguments: [String]) -> [String] {
+    nonisolated private func runArguments(target: String?, runArguments: [String], configuration: String? = nil) -> [String] {
         var arguments = ["run"]
+        if let configuration, ["debug", "release"].contains(configuration) { arguments += ["-c", configuration] }
         if let target, !target.isEmpty {
             arguments.append(target)
         }

@@ -60,6 +60,7 @@ final class EditorViewModel {
     var problems: [EditorDiagnostic]
     var symbolReferences: [EditorSourceReference]
     var selectedRunProduct: String?
+    let buildTargets = EditorBuildTargetsModel()
     var androidConfiguration = EditorAndroidConfiguration.load(engineRoot: EditorAndroidConfiguration.studioEngineRoot)
     var androidTargets: [EditorAndroidTarget] = []
     var androidStatus = "Refresh to find Android devices and emulators."
@@ -103,7 +104,7 @@ final class EditorViewModel {
     @ObservationIgnored
     let workspaceService: any SwiftPMWorkspaceServicing
     @ObservationIgnored
-    let sourceControlService: any GitRepositoryServicing
+    var sourceControlService: any GitRepositoryServicing
     @ObservationIgnored
     let fileManager: FileManager
     @ObservationIgnored
@@ -173,7 +174,7 @@ final class EditorViewModel {
         project: EditorProjectReference? = nil,
         fileManager: FileManager = .default,
         workspaceService: any SwiftPMWorkspaceServicing = SwiftPMWorkspaceService(),
-        sourceControlService: any GitRepositoryServicing = GitRepositoryService(),
+        sourceControlService: (any GitRepositoryServicing)? = nil,
         previewBuilder: EditorPreviewBuilder = EditorPreviewBuilder(),
         adaScriptPreviewBuilder: EditorAdaScriptPreviewBuilder = EditorAdaScriptPreviewBuilder(),
         externalURLOpener: @escaping @MainActor (URL) -> Bool = EditorPlatformFileActions.openInDefaultApplication,
@@ -228,7 +229,8 @@ final class EditorViewModel {
         self.movieMaker = EditorMovieMakerModel(projectURL: project.map { URL(fileURLWithPath: $0.path, isDirectory: true) })
         self.interface = interface ?? EditorInterfaceState(projectPath: project?.path)
         self.workspaceService = workspaceService
-        self.sourceControlService = sourceControlService
+        let sourceControlProvider = project.map { EditorSourceControlProvider.load(in: URL(fileURLWithPath: $0.path, isDirectory: true)) } ?? .git
+        self.sourceControlService = sourceControlService ?? sourceControlProvider.makeService()
         self.fileManager = fileManager
         self.previewBuilder = previewBuilder
         self.adaScriptPreviewBuilder = adaScriptPreviewBuilder
@@ -240,7 +242,8 @@ final class EditorViewModel {
             projectSidebar
             ?? EditorProjectSidebarViewModel(
                 items: Self.projectTreeItems(for: project, fileManager: fileManager),
-                sourceRootTarget: sourceRootTarget
+                sourceRootTarget: sourceRootTarget,
+                projectPath: project?.path
             )
         self.workbench = workbench ?? Self.defaultWorkbench(for: project)
         inspectorSidebar.scriptableObjectCatalog = scriptableObjectSupport?.descriptors ?? []
@@ -249,6 +252,7 @@ final class EditorViewModel {
         self.animationPanel = animationPanel
         self.agent = agent ?? EditorAgentViewModel(project: project, fileManager: fileManager)
         self.sourceControl = sourceControl
+        sourceControl.provider = sourceControlProvider
         self.activeOutputTab = activeOutputTab
         self.footer = footer
         self.workspaceStatus = workspaceStatus
@@ -257,7 +261,7 @@ final class EditorViewModel {
         self.buildActivity = buildActivity
         self.problems = problems
         self.symbolReferences = symbolReferences
-        self.selectedRunProduct = selectedRunProduct
+        self.selectedRunProduct = selectedRunProduct ?? savedProject?.activeBuildTarget?.product
         #if os(visionOS)
             self.selectedRunDestination = selectedRunDestination ?? .visionOS
         #elseif os(iOS)
@@ -282,6 +286,7 @@ final class EditorViewModel {
         self.scenePlayRuntime = scriptableObjectSupport?.playRuntime
         self.selectedTestFilter = selectedTestFilter
         self.playModeState = playModeState
+        if let savedProject { self.buildTargets.refresh(savedProject) }
         self.inspectorSidebar.textureAssets = Self.textureAssets(from: self.projectSidebar.items)
         self.inspectorSidebar.tileMapAssets = Self.tileMapAssets(from: self.projectSidebar.items)
         self.inspectorSidebar.modelAssets = Self.modelAssets(from: self.projectSidebar.items)

@@ -52,8 +52,9 @@ extension EditorViewModel {
         sourceControl.documents[document.id] = document
         document.isOpen = true
         document.isRunningCommand = sourceControl.isRunning
+        let provider = sourceControl.provider
         document.onStage = { [weak self] file in
-            guard let self, !self.sourceControl.isRunning else {
+            guard let self, !self.sourceControl.isRunning, self.sourceControl.provider == provider else {
                 return
             }
             if file.comparison == .staged {
@@ -75,6 +76,9 @@ extension EditorViewModel {
             document.message = sourceControl.statusMessage
         }
         workbench.open(.git(document))
+        if interface.mode == .agent {
+            interface.showsArtifact = true
+        }
         if let fileID {
             document.reveal(fileID)
         }
@@ -95,6 +99,9 @@ extension EditorViewModel {
     }
 
     func openGitWorkingFile(_ url: URL) {
+        if interface.mode == .agent {
+            interface.showsArtifact = true
+        }
         if let existing = workbench.openDocuments.first(where: { $0.absolutePath == url.path }) {
             workbench.selectDocument(id: existing.id)
             return

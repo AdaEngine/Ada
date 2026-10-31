@@ -103,6 +103,8 @@ struct EditorRealWorkspaceTests {
         let viewModel = EditorViewModel(project: project)
 
         #expect(!viewModel.projectSidebar.items.contains { $0.relativePath.hasPrefix(".build-codex") })
+        #expect(viewModel.projectSidebar.visibleItems.map(\.relativePath) == ["Assets", "Sources"])
+        viewModel.projectSidebar.expandAll()
         #expect(
             viewModel.projectSidebar.visibleItems.map(\.relativePath) == [
                 "Assets",
@@ -113,6 +115,47 @@ struct EditorRealWorkspaceTests {
             ]
         )
         #expect(viewModel.projectSidebar.visibleItems.first { $0.relativePath == "Sources" }?.title == "ArenaGame")
+    }
+
+    @Test("project files beyond 2000 entries remain browsable and build products stay hidden")
+    @MainActor
+    func projectTreeHasNoEntryLimitAndSkipsBuildProducts() throws {
+        let projectURL = try makeRealWorkspaceDirectory(named: "LargeProjectTree")
+        defer { removeRealWorkspaceDirectory(projectURL) }
+
+        for directory in ["Assets", "Sources", ".builds/Game/GameData"] {
+            try FileManager.default.createDirectory(
+                at: projectURL.appendingPathComponent(directory, isDirectory: true),
+                withIntermediateDirectories: true
+            )
+        }
+        for index in 0...2_000 {
+            try Data().write(to: projectURL.appendingPathComponent("Assets/Item-\(index).txt"))
+        }
+        let script = "@system class Player {}\n"
+        try script.write(to: projectURL.appendingPathComponent("Sources/Player.ada"), atomically: true, encoding: .utf8)
+        try "# Large project\n".write(to: projectURL.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+        try script.write(to: projectURL.appendingPathComponent(".builds/Game/GameData/Player.ada"), atomically: true, encoding: .utf8)
+        try ProjectSystem.saveProject(
+            ProjectSystem.defaultProject(projectName: "LargeProject", buildSystem: .adaScript), at: projectURL
+        )
+
+        let viewModel = EditorViewModel(project: EditorProjectReference(name: "LargeProject", path: projectURL.path))
+        let items = viewModel.projectSidebar.items
+        #expect(items.count == 2_005)
+        #expect(items.filter { $0.relativePath.hasPrefix("Assets/Item-") }.count == 2_001)
+        #expect(!items.contains { $0.relativePath == ".builds" || $0.relativePath.hasPrefix(".builds/") })
+        viewModel.projectSidebar.expandAll()
+        #expect(viewModel.projectSidebar.visibleItems.contains { $0.relativePath == "Sources/Player.ada" })
+        viewModel.projectSidebar.selectDisplayMode(.files)
+        #expect(viewModel.projectSidebar.visibleItems.contains { $0.relativePath == "README.md" })
+        let source = try #require(items.first { $0.relativePath == "Sources/Player.ada" })
+        viewModel.openProjectItem(source)
+        guard case let .text(document)? = viewModel.workbench.activeDocument else {
+            Issue.record("Expected the script beyond the former entry limit to open")
+            return
+        }
+        #expect(document.content == script)
     }
 
     @Test("empty real project stays empty")

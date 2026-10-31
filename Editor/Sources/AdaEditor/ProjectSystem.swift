@@ -146,6 +146,7 @@ public enum ProjectSystem {
     public static func saveProject(_ project: AdaProject, at projectURL: URL, fileManager: FileManager = .default) throws(ProjectSystemError) {
         var project = project
         project.schemaVersion = currentSchemaVersion
+        project.captureActiveBuildTarget()
         try validate(project)
 
         let metadataDirectory = projectURL.appendingPathComponent(metadataDirectoryName, isDirectory: true)
@@ -239,6 +240,7 @@ public enum ProjectSystem {
         try validatePathArray(project.build.targets, keyPath: "build.targets")
         try validatePathArray(project.build.includedFiles, keyPath: "build.includedFiles")
         try validatePathArray(project.build.excludedFiles, keyPath: "build.excludedFiles")
+        try validateBuildTargets(project)
         try validatePathArray(project.ai.mcp.allowedResourceRoots, keyPath: "ai.mcp.allowedResourceRoots")
         try validateRelativePath(project.ai.agent.target.cwd, keyPath: "ai.agent.target.cwd")
         try validatePathArray(project.ai.agent.skillsDirectories, keyPath: "ai.agent.skillsDirectories")
@@ -406,6 +408,8 @@ public struct AdaProject: Codable, Equatable, Sendable {
     public var runtime: AdaProjectRuntime
     public var editor: AdaProjectEditor
     public var ai: AdaProjectAI
+    public var buildTargets: [AdaProjectBuildTarget] = []
+    public var activeBuildTargetID: String?
 
     public init(
         schemaVersion: Int,
@@ -432,7 +436,7 @@ public struct AdaProject: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, project, engine, paths, build, run, runtime, editor, ai, inputActions
+        case schemaVersion, project, engine, paths, build, run, runtime, editor, ai, inputActions, buildTargets, activeBuildTargetID
         case legacyBuildSystem = "buildSystem"
     }
 
@@ -454,6 +458,8 @@ public struct AdaProject: Codable, Equatable, Sendable {
         runtime = try container.decodeIfPresent(AdaProjectRuntime.self, forKey: .runtime) ?? AdaProjectRuntime()
         editor = try container.decodeIfPresent(AdaProjectEditor.self, forKey: .editor) ?? AdaProjectEditor()
         ai = try container.decodeIfPresent(AdaProjectAI.self, forKey: .ai) ?? AdaProjectAI()
+        buildTargets = try container.decodeIfPresent([AdaProjectBuildTarget].self, forKey: .buildTargets) ?? []
+        activeBuildTargetID = try container.decodeIfPresent(String.self, forKey: .activeBuildTargetID)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -472,6 +478,10 @@ public struct AdaProject: Codable, Equatable, Sendable {
         }
         try container.encode(editor, forKey: .editor)
         try container.encode(ai, forKey: .ai)
+        if !buildTargets.isEmpty {
+            try container.encode(buildTargets, forKey: .buildTargets)
+            try container.encodeIfPresent(activeBuildTargetID, forKey: .activeBuildTargetID)
+        }
     }
 
     /// Compatibility accessor for project.json drafts that used a top-level `buildSystem` field.

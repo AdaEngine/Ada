@@ -146,6 +146,9 @@ struct AdaEditorApp: App {
                 ))
             }
         #endif
+        #if os(Windows)
+            .addPlugins(EditorSearchShortcutPlugin())
+        #endif
         #if !os(Android) && canImport(AdaMCPPlugin)
             .addPlugins(
                 MCPPlugin(

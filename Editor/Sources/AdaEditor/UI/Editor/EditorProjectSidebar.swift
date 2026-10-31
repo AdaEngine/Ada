@@ -4,6 +4,8 @@ import Foundation
 enum EditorProjectTreeIcon {
     static let chevronRight = "\u{E5CC}"
     static let expandMore = "\u{E5CF}"
+    static let unfoldLess = "\u{E5D6}"
+    static let unfoldMore = "\u{E5D7}"
     static let folder = "\u{E2C7}"
     static let folderOpen = "\u{E2C8}"
     static let description = "\u{E873}"
@@ -25,6 +27,8 @@ enum EditorProjectTreeIcon {
     static let allSymbols = [
         chevronRight,
         expandMore,
+        unfoldLess,
+        unfoldMore,
         folder,
         folderOpen,
         description,
@@ -60,6 +64,8 @@ struct EditorProjectSidebar: View {
     let onFindInProjectRoot: () -> Void
     let onCopyPath: (EditorProjectSidebarViewModel.Item, Bool) -> Void
     let onDeleteItem: (EditorProjectSidebarViewModel.Item) -> Void
+    var onRevealActiveFile: (() -> Void)?
+    var isRevealActiveFileEnabled = false
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
@@ -83,40 +89,68 @@ struct EditorProjectSidebar: View {
                     .buttonStyle(DefaultButtonStyle())
                     .accessibilityIdentifier("AdaEditor.ProjectTree.DisplayMode.Menu")
                     Spacer()
+                    Button(action: { onRevealActiveFile?() }) {
+                        EditorProjectTreeLocateIcon()
+                            .stroke(theme.editorColors.blue, lineWidth: 1.5)
+                            .frame(width: 17, height: 17)
+                            .frame(width: 26, height: 26)
+                            .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.14)))
+                    }
+                    .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
+                    .disabled(!isRevealActiveFileEnabled)
+                    .contextMenu {
+                        Button(L10n.text("Show Active File in Project")) { onRevealActiveFile?() }
+                    }
+                    .accessibilityIdentifier("AdaEditor.ProjectTree.RevealActiveFile")
+                    Button(action: { viewModel.toggleAllFolders() }) {
+                        Text(viewModel.hasExpandedFolders ? EditorProjectTreeIcon.unfoldLess : EditorProjectTreeIcon.unfoldMore)
+                            .font(AdaEditorMaterialSymbolFont.font(size: 17))
+                            .foregroundColor(theme.editorColors.blue)
+                            .frame(width: 26, height: 26)
+                            .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.14)))
+                    }
+                    .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
+                    .disabled(!viewModel.hasFolders)
+                    .accessibilityIdentifier("AdaEditor.ProjectTree.ToggleAllFolders")
                     Button(action: {
                         viewModel.isDisplayModeMenuPresented = false
                         onNewFile(nil)
                     }) {
-                        HStack(spacing: 5) {
-                            Text("\u{E145}")
-                                .font(AdaEditorMaterialSymbolFont.font(size: 14))
-                            Text(L10n.text("New"))
-                                .font(.system(size: 11))
-                        }
-                        .foregroundColor(theme.editorColors.blue)
-                        .padding(.horizontal, 7)
-                        .frame(height: 24)
+                        Text("\u{E145}")
+                            .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                            .foregroundColor(theme.editorColors.blue)
+                            .frame(width: 26, height: 26)
+                            .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.20)))
                     }
-                    .buttonStyle(DefaultButtonStyle())
+                    .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
                     .accessibilityIdentifier("AdaEditor.ProjectTree.NewFile")
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 34)
 
-                GeometryReader { geometry in
-                    ZStack(anchor: .topLeading) {
-                        projectTreeBackground(width: geometry.size.width, height: geometry.size.height)
+                ZStack(anchor: .topLeading) {
+                    projectTreeBackground
 
+                    ScrollViewReader { proxy in
                         ScrollView(showsIndicators: true) {
-                            LazyVStack(viewModel.visibleItems, id: \.id, alignment: .leading, spacing: 2, estimatedRowHeight: 26) { item in
-                                projectTreeRow(item)
+                            EditorProjectTreeRows(items: viewModel.visibleItems, order: viewModel.items.map(\.id), onSettled: {
+                                if let id = viewModel.revealedItemID { proxy.scrollTo(id, anchor: .center) }
+                            }) { item in
+                                AnyView(EditorProjectTreeSelectionRow(item: item, selection: viewModel.rowSelection(for: item)) { current in
+                                    projectTreeRow(current)
+                                })
                             }
-                            .frame(width: max(0, geometry.size.width - 16), alignment: .leading)
+                            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                             .padding(8)
                         }
-                        .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+                        .accessibilityIdentifier("AdaEditor.ProjectTree.ScrollView")
+                        .onChange(of: viewModel.revealRevision) { _, _ in
+                            if let id = viewModel.revealedItemID { proxy.scrollTo(id, anchor: .center) }
+                        }
                     }
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
                 }
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             }
 
             if viewModel.isDisplayModeMenuPresented {
@@ -163,24 +197,25 @@ struct EditorProjectSidebar: View {
 
     private func displayModeMenuItem(_ displayMode: EditorProjectSidebarViewModel.DisplayMode) -> some View {
         let isSelected = viewModel.displayMode == displayMode
-        return Button(displayMode.title) {
+        return Button {
             viewModel.selectDisplayMode(displayMode)
+        } label: {
+            Text(L10n.tr(displayMode.title))
+                .font(.system(size: 13))
+                .foregroundColor(isSelected ? theme.editorColors.text : theme.editorColors.muted)
+                .padding(.horizontal, 10)
+                .frame(width: 156, height: 30, alignment: .leading)
         }
-        .font(.system(size: 13))
-        .foregroundColor(isSelected ? theme.editorColors.text : theme.editorColors.muted)
-        .padding(.horizontal, 10)
-        .frame(width: 156, height: 30, alignment: .leading)
-        .background(
-            RoundedRectangleShape(cornerRadius: 5)
-                .fill(isSelected ? theme.editorColors.blue.opacity(0.34) : Color.clear)
-        )
-        .buttonStyle(DefaultButtonStyle())
+        .buttonStyle(EditorPickerRowButtonStyle(
+            theme: theme,
+            selectionColor: isSelected ? theme.editorColors.blue.opacity(0.34) : .clear
+        ))
         .accessibilityIdentifier("AdaEditor.ProjectTree.DisplayMode.\(displayMode.title)")
     }
 
-    private func projectTreeBackground(width: Float, height: Float) -> some View {
+    private var projectTreeBackground: some View {
         Color.clear
-            .frame(width: width, height: height)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             .contextMenu(onPresent: {
                 if let projectRootItem {
                     viewModel.select(projectRootItem)
@@ -225,10 +260,12 @@ struct EditorProjectSidebar: View {
     private func projectTreeRowContent(_ item: EditorProjectSidebarViewModel.Item, isHovered: Bool) -> some View {
         Button(action: { onOpenItem(item) }) {
             HStack(spacing: 6) {
-                Text(disclosureIcon(for: item))
-                    .font(AdaEditorMaterialSymbolFont.font(size: 16))
-                    .foregroundColor(theme.editorColors.muted)
+                EditorProjectTreeChevron(expansion: item.isFolder && !viewModel.isCollapsed(item) ? 1 : 0)
+                    .stroke(theme.editorColors.muted, lineWidth: 1.5)
                     .frame(width: 16, height: 18)
+                    .opacity(item.isFolder ? 1 : 0)
+                    .animation(.easeInOut(duration: Float(EditorProjectTreePresentation.duration)), value: viewModel.isCollapsed(item))
+                    .accessibilityIdentifier("AdaEditor.ProjectTree.Disclosure.\(item.relativePath)")
                 if let language = textLanguage(for: item), let image = EditorLanguageLogo.image(for: language) {
                     image
                         .resizable()
@@ -311,14 +348,6 @@ struct EditorProjectSidebar: View {
             return theme.editorColors.blue.opacity(0.12)
         }
         return .clear
-    }
-
-    private func disclosureIcon(for item: EditorProjectSidebarViewModel.Item) -> String {
-        guard item.isFolder else {
-            return ""
-        }
-
-        return viewModel.isCollapsed(item) ? EditorProjectTreeIcon.chevronRight : EditorProjectTreeIcon.expandMore
     }
 
     private func fileIcon(for item: EditorProjectSidebarViewModel.Item) -> String {

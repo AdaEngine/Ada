@@ -16,6 +16,7 @@ import AdaEngine
 enum EditorMenuCommand: CaseIterable {
     case checkForUpdates
     case showSettings
+    case showMovieMaker
     case debugOverlayOff, debugOverlayRedraw, debugOverlayLayoutBounds, debugOverlayHitTestTarget, debugOverlayFocusedNode
     case newFile, newProject, openProject, importAssets, save, saveAll, closeEditor
     case undo, redo, cut, copy, paste, selectAll, findInFile, findInProject
@@ -155,6 +156,7 @@ enum EditorMenuBar {
         if EditorDistribution.current == .standalone {
             menu.add(item("Check for Updates…", command: .checkForUpdates))
         }
+        menu.add(item("Movie Maker", command: .showMovieMaker))
         menu.add(MenuItem.separator)
         menu.add(item("Disable Debug Overlay", command: .debugOverlayOff))
         menu.add(item("Debug Overlay: Redraw", command: .debugOverlayRedraw))

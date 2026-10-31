@@ -1,0 +1,1750 @@
+diff --git a/.github/workflows/windows.yml b/.github/workflows/windows.yml
+new file mode 100644
+index 0000000..0e8c4e4
+--- /dev/null
++++ b/.github/workflows/windows.yml
+@@ -0,0 +1,17 @@
++name: Windows
++on: [push, pull_request, workflow_dispatch]
++jobs:
++  test:
++    runs-on: windows-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: compnerd/gha-setup-swift@main
++        with:
++          branch: swift-6.3-release
++          tag: 6.3.1-RELEASE
++      - name: Fetch verified native SDK
++        shell: pwsh
++        run: |
++          python Scripts/fetch-windows.py
++          "$pwd/Vendor/windows" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
++      - run: swift test --no-parallel --filter 'RepositoryTests|FileTests|RevisionTests|BranchTests|MetadataTests'
+diff --git a/.gitignore b/.gitignore
+index 3548be5..e02d8d8 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -8,3 +8,4 @@ DerivedData/
+ .netrc
+ /Vendor/
+ /.scratch/
++/Sources/CLore/include/lore.h
+diff --git a/Package.swift b/Package.swift
+index acac3d8..fa015d8 100644
+--- a/Package.swift
++++ b/Package.swift
+@@ -1,7 +1,37 @@
+ // swift-tools-version: 6.2
+ 
++import Foundation
+ import PackageDescription
+ 
++#if os(Windows)
++    // SwiftPM cannot consume an XCFramework on Windows. The official MSVC release
++    // supplies the same C API plus a DLL import library. Run Scripts/fetch-windows.py
++    // before building, or point LORE_WINDOWS_SDK_PATH at an already verified SDK.
++    let windowsSDK =
++        ProcessInfo.processInfo.environment["LORE_WINDOWS_SDK_PATH"]
++        ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Vendor/windows").path
++    let sdkPath = windowsSDK.replacingOccurrences(of: "\\", with: "/")
++    let nativeTargets: [Target] = []
++    let cDependencies: [Target.Dependency] = []
++    let cSettings: [CSetting] = [.unsafeFlags(["-I", sdkPath])]
++    let nativeLinkerSettings: [LinkerSetting] = [.unsafeFlags(["-L", sdkPath]), .linkedLibrary("lore.dll")]
++    let testPackages: [Package.Dependency] = [.package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0")]
++    let testDependencies: [Target.Dependency] = ["Lore", .product(name: "Crypto", package: "swift-crypto")]
++#else
++    let nativeTargets: [Target] = [
++        .binaryTarget(
++            name: "liblore",
++            url: "https://github.com/mattt/lore-swift/releases/download/liblore-0.12.0/liblore.xcframework.zip",
++            checksum: "1e2d9536e6e78c1634258162ab8764e41a8cca7aed72601056c7ae5f2e725fb6"
++        )
++    ]
++    let cDependencies: [Target.Dependency] = ["liblore"]
++    let cSettings: [CSetting] = []
++    let nativeLinkerSettings: [LinkerSetting] = []
++    let testPackages: [Package.Dependency] = []
++    let testDependencies: [Target.Dependency] = ["Lore"]
++#endif
++
+ let package = Package(
+     name: "lore-swift",
+     platforms: [
+@@ -10,16 +40,13 @@ let package = Package(
+     products: [
+         .library(name: "Lore", targets: ["Lore"])
+     ],
+-    targets: [
+-        .binaryTarget(
+-            name: "liblore",
+-            url:
+-                "https://github.com/mattt/lore-swift/releases/download/liblore-0.12.0/liblore.xcframework.zip",
+-            checksum: "1e2d9536e6e78c1634258162ab8764e41a8cca7aed72601056c7ae5f2e725fb6"
+-        ),
++    dependencies: testPackages,
++    targets: nativeTargets + [
+         .target(
+             name: "CLore",
+-            dependencies: ["liblore"]
++            dependencies: cDependencies,
++            cSettings: cSettings,
++            linkerSettings: nativeLinkerSettings
+         ),
+         .target(
+             name: "Lore",
+@@ -27,7 +54,7 @@ let package = Package(
+         ),
+         .testTarget(
+             name: "LoreTests",
+-            dependencies: ["Lore"]
++            dependencies: testDependencies
+         ),
+     ],
+     swiftLanguageModes: [.v6]
+diff --git a/README.md b/README.md
+index 70ac441..81a6ec8 100644
+--- a/README.md
++++ b/README.md
+@@ -6,11 +6,25 @@ Epic Games' version control system.
+ ## Requirements
+ 
+ - Swift 6.2+ / Xcode 26+
+-- macOS 15+ on Apple silicon
++- macOS 15+ on Apple silicon, or Windows x64 (MSVC)
+ - Lore 0.12.0
+ 
+ ## Installation
+ 
++This fork adds Windows support to [mattt/lore-swift](https://github.com/mattt/lore-swift).
++On Windows, first run `python Scripts/fetch-windows.py`. It verifies the official
++Lore 0.12.0 SDK archive's SHA-256 and extracts the headers, import library, DLL and
++license notices to `Vendor/windows`. `LORE_WINDOWS_SDK_PATH` selects another SDK
++directory. Put that directory on `PATH` when running tests, and ship `lore.dll`
++beside your executable. The runtime itself does not need a Lore CLI installation.
++
++Windows uses the native C SDK instead of an XCFramework. Pin this package by
++**commit revision** when consuming it: SwiftPM permits the native SDK search flags
++for revision-pinned dependencies. macOS keeps the original XCFramework path.
++
++The binding normalizes C enum signedness at API boundaries because Clang imports
++MSVC enums as `Int32` and Darwin enums as `UInt32`.
++
+ Add the package to your `Package.swift` file:
+ 
+ ```swift
+diff --git a/Scripts/fetch-windows.py b/Scripts/fetch-windows.py
+new file mode 100644
+index 0000000..e67ef84
+--- /dev/null
++++ b/Scripts/fetch-windows.py
+@@ -0,0 +1,40 @@
++#!/usr/bin/env python3
++"""Fetch the pinned official Windows x64 Lore SDK, checking its SHA-256."""
++import hashlib
++import os
++from pathlib import Path
++import shutil
++import tempfile
++import urllib.request
++import zipfile
++
++VERSION = "0.12.0"
++SHA256 = "0b9f00ec2d118969e6cb6acdc58dce5c246d3b8b16bdfc84797bf2f51c1e7a13"
++URL = f"https://github.com/EpicGames/lore/releases/download/v{VERSION}/liblore-v{VERSION}-x86_64-pc-windows-msvc.zip"
++DESTINATION = Path(os.environ.get("LORE_WINDOWS_SDK_PATH", Path(__file__).resolve().parents[1] / "Vendor/windows"))
++FILES = ("lore.h", "lore.dll.lib", "lore.dll", "LICENSE.txt", "THIRD-PARTY-NOTICES.txt")
++
++
++def main():
++    DESTINATION.mkdir(parents=True, exist_ok=True)
++    archive = DESTINATION / "liblore.zip"
++    if not archive.exists() or hashlib.sha256(archive.read_bytes()).hexdigest() != SHA256:
++        with tempfile.TemporaryDirectory(dir=DESTINATION) as temporary:
++            downloaded = Path(temporary) / "liblore.zip"
++            urllib.request.urlretrieve(URL, downloaded)
++            if hashlib.sha256(downloaded.read_bytes()).hexdigest() != SHA256:
++                raise RuntimeError("Lore SDK SHA-256 mismatch")
++            shutil.copyfile(downloaded, archive)
++    with zipfile.ZipFile(archive) as sdk:
++        for name in FILES:
++            # Extract only the known top-level files; never trust archive paths.
++            (DESTINATION / name).write_bytes(sdk.read(name))
++    # Swift consumers import CLore through its public include directory; they
++    # do not inherit the C target's SDK search flags.
++    public_header = Path(__file__).resolve().parents[1] / "Sources/CLore/include/lore.h"
++    public_header.write_bytes((DESTINATION / "lore.h").read_bytes())
++    print(DESTINATION.resolve())
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/Sources/Lore/Authentication.swift b/Sources/Lore/Authentication.swift
+index d4ab512..48daedf 100644
+--- a/Sources/Lore/Authentication.swift
++++ b/Sources/Lore/Authentication.swift
+@@ -297,7 +297,7 @@ extension Authentication {
+                 arguments.pointee.with_token = UInt8(includingTokens)
+             },
+             transform: { event -> Credential? in
+-                guard event.pointee.tag == LORE_EVENT_AUTH_IDENTITY.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_AUTH_IDENTITY.unsignedRawValue else {
+                     return nil
+                 }
+                 return Credential(event.pointee.auth_identity)
+@@ -613,10 +613,10 @@ private enum AuthenticationEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_AUTH_USER_INFO.rawValue:
++        case LORE_EVENT_AUTH_USER_INFO.unsignedRawValue:
+             let data = event.pointee.auth_user_info
+             self = .user(Authentication.User(id: String(data.id), name: String(data.name)))
+-        case LORE_EVENT_AUTH_USER_TOKEN.rawValue:
++        case LORE_EVENT_AUTH_USER_TOKEN.unsignedRawValue:
+             let data = event.pointee.auth_user_token
+             let preferredUsername = String(data.preferred_username)
+             self = .user(
+@@ -631,13 +631,13 @@ private enum AuthenticationEvent: Sendable {
+                     )
+                 )
+             )
+-        case LORE_EVENT_AUTH_IDENTITY.rawValue:
++        case LORE_EVENT_AUTH_IDENTITY.unsignedRawValue:
+             self = .credential(Authentication.Credential(event.pointee.auth_identity))
+-        case LORE_EVENT_AUTH_URL.rawValue:
++        case LORE_EVENT_AUTH_URL.unsignedRawValue:
+             let data = event.pointee.auth_url
+             let userCode = String(data.user_code)
+             self = .progress(.approvalRequested(url: String(data.url), userCode: userCode.isEmpty ? nil : userCode))
+-        case LORE_EVENT_AUTH_PENDING.rawValue:
++        case LORE_EVENT_AUTH_PENDING.unsignedRawValue:
+             let data = event.pointee.auth_pending
+             self = .progress(
+                 .pending(
+diff --git a/Sources/Lore/BackgroundService.swift b/Sources/Lore/BackgroundService.swift
+index 3e02a49..a7d7b45 100644
+--- a/Sources/Lore/BackgroundService.swift
++++ b/Sources/Lore/BackgroundService.swift
+@@ -195,7 +195,7 @@ private enum ServiceEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_SERVICE_STATUS.rawValue:
++        case LORE_EVENT_SERVICE_STATUS.unsignedRawValue:
+             let data = event.pointee.service_status
+             let executablePath = String(data.binary_path)
+             self = .status(
+@@ -208,11 +208,11 @@ private enum ServiceEvent: Sendable {
+                     messages: []
+                 )
+             )
+-        case LORE_EVENT_SERVICE_MESSAGE.rawValue:
++        case LORE_EVENT_SERVICE_MESSAGE.unsignedRawValue:
+             let data = event.pointee.service_message
+             self = .message(
+                 BackgroundService.Message(
+-                    level: Library.LogLevel(rawValue: Int(data.level.rawValue)) ?? .info,
++                    level: Library.LogLevel(rawValue: Int(data.level.unsignedRawValue)) ?? .info,
+                     text: String(data.message)
+                 )
+             )
+diff --git a/Sources/Lore/ContentStore.swift b/Sources/Lore/ContentStore.swift
+index 8d173a1..4ce94c5 100644
+--- a/Sources/Lore/ContentStore.swift
++++ b/Sources/Lore/ContentStore.swift
+@@ -299,7 +299,7 @@ extension ContentStore {
+                 }
+             },
+             transform: { event -> UInt64? in
+-                guard event.pointee.tag == LORE_EVENT_STORAGE_OPENED.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_STORAGE_OPENED.unsignedRawValue else {
+                     return nil
+                 }
+                 return event.pointee.storage_opened.handle_id
+@@ -404,7 +404,7 @@ extension ContentStore {
+         }
+ 
+         private init(_ type: lore_key_type_t) {
+-            self.rawValue = type.rawValue
++            self.rawValue = type.unsignedRawValue
+         }
+ 
+         /// A key without a specific kind.
+@@ -434,7 +434,7 @@ extension ContentStore {
+ 
+         /// The library value of the kind.
+         var libraryValue: lore_key_type_t {
+-            lore_key_type_t(rawValue: rawValue)
++            lore_key_type_t(rawValue: .init(truncatingIfNeeded: rawValue))
+         }
+     }
+ 
+@@ -694,7 +694,7 @@ extension ContentStore {
+                 arguments.pointee.items = lore_storage_get_metadata_item_array_t(ptr: item, count: 1)
+             },
+             transform: { event -> ItemEvent<StoredContent>? in
+-                guard event.pointee.tag == LORE_EVENT_STORAGE_GET_METADATA_ITEM_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_STORAGE_GET_METADATA_ITEM_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.storage_get_metadata_item_complete
+@@ -750,7 +750,7 @@ extension ContentStore {
+                 arguments.pointee.items = lore_storage_copy_item_array_t(ptr: item, count: 1)
+             },
+             transform: { event -> ItemEvent<ContentAddress>? in
+-                guard event.pointee.tag == LORE_EVENT_STORAGE_COPY_ITEM_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_STORAGE_COPY_ITEM_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.storage_copy_item_complete
+@@ -814,7 +814,7 @@ extension ContentStore {
+                 arguments.pointee.items = lore_storage_obliterate_item_array_t(ptr: item, count: 1)
+             },
+             transform: { event -> ItemEvent<ObliterationResult>? in
+-                guard event.pointee.tag == LORE_EVENT_STORAGE_OBLITERATE_ITEM_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_STORAGE_OBLITERATE_ITEM_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.storage_obliterate_item_complete
+@@ -860,7 +860,7 @@ extension ContentStore {
+                 arguments.pointee.items = lore_storage_upload_item_array_t(ptr: item, count: 1)
+             },
+             transform: { event -> ItemEvent<Bool>? in
+-                guard event.pointee.tag == LORE_EVENT_STORAGE_UPLOAD_ITEM_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_STORAGE_UPLOAD_ITEM_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.storage_upload_item_complete
+@@ -1104,7 +1104,7 @@ extension ContentStore {
+                 arguments.pointee.items = lore_storage_mutable_load_item_array_t(ptr: item, count: 1)
+             },
+             transform: { event -> ItemEvent<Hash?>? in
+-                guard event.pointee.tag == LORE_EVENT_STORAGE_MUTABLE_LOAD_ITEM_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_STORAGE_MUTABLE_LOAD_ITEM_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.storage_mutable_load_item_complete
+@@ -1146,7 +1146,7 @@ extension ContentStore {
+                 arguments.pointee.items = lore_storage_mutable_store_item_array_t(ptr: item, count: 1)
+             },
+             transform: { event -> ItemEvent<Void>? in
+-                guard event.pointee.tag == LORE_EVENT_STORAGE_MUTABLE_STORE_ITEM_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_STORAGE_MUTABLE_STORE_ITEM_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 return ItemEvent(error: event.pointee.storage_mutable_store_item_complete.error, value: ())
+@@ -1203,7 +1203,8 @@ extension ContentStore {
+                 arguments.pointee.items = lore_storage_mutable_compare_and_swap_item_array_t(ptr: item, count: 1)
+             },
+             transform: { event -> ItemEvent<Hash?>? in
+-                guard event.pointee.tag == LORE_EVENT_STORAGE_MUTABLE_COMPARE_AND_SWAP_ITEM_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_STORAGE_MUTABLE_COMPARE_AND_SWAP_ITEM_COMPLETE.unsignedRawValue
++                else {
+                     return nil
+                 }
+                 let data = event.pointee.storage_mutable_compare_and_swap_item_complete
+@@ -1399,7 +1400,7 @@ extension ContentStore {
+             function,
+             configure: configure,
+             transform: { event -> ItemEvent<PutResult>? in
+-                guard event.pointee.tag == LORE_EVENT_STORAGE_PUT_ITEM_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_STORAGE_PUT_ITEM_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.storage_put_item_complete
+@@ -1496,7 +1497,7 @@ private struct ItemEvent<Value: Sendable>: Sendable {
+ extension ItemEvent where Value == ContentAddress {
+     /// Converts the event that ends an item of a get call.
+     static func getComplete(_ event: UnsafePointer<lore_event_t>) -> Self? {
+-        guard event.pointee.tag == LORE_EVENT_STORAGE_GET_ITEM_COMPLETE.rawValue else {
++        guard event.pointee.tag == LORE_EVENT_STORAGE_GET_ITEM_COMPLETE.unsignedRawValue else {
+             return nil
+         }
+         let data = event.pointee.storage_get_item_complete
+@@ -1511,13 +1512,13 @@ private enum ListEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_STORAGE_MUTABLE_LIST_ENTRY.rawValue:
++        case LORE_EVENT_STORAGE_MUTABLE_LIST_ENTRY.unsignedRawValue:
+             let data = event.pointee.storage_mutable_list_entry
+             guard let key = ContentStore.Hash(data.key), let value = ContentStore.Hash(data.value) else {
+                 return nil
+             }
+             self = .entry(ContentStore.Entry(key: key, value: value))
+-        case LORE_EVENT_STORAGE_MUTABLE_LIST_ITEM_COMPLETE.rawValue:
++        case LORE_EVENT_STORAGE_MUTABLE_LIST_ITEM_COMPLETE.unsignedRawValue:
+             self = .complete(ItemEvent(error: event.pointee.storage_mutable_list_item_complete.error, value: ()))
+         default:
+             return nil
+@@ -1552,11 +1553,11 @@ private final class ContentBuffer: Sendable {
+     /// and converts the event that ends the item.
+     @Sendable func receive(_ event: UnsafePointer<lore_event_t>) -> ItemEvent<ContentAddress>? {
+         switch event.pointee.tag {
+-        case LORE_EVENT_STORAGE_GET_HEADER.rawValue:
++        case LORE_EVENT_STORAGE_GET_HEADER.unsignedRawValue:
+             let size = Int(clamping: event.pointee.storage_get_header.size_content)
+             storage.withLock { $0 = Data(count: size) }
+             return nil
+-        case LORE_EVENT_STORAGE_GET_DATA.rawValue:
++        case LORE_EVENT_STORAGE_GET_DATA.unsignedRawValue:
+             let data = event.pointee.storage_get_data
+             guard let pointer = data.bytes.ptr, data.bytes.len > 0 else {
+                 return nil
+diff --git a/Sources/Lore/Internal/Call.swift b/Sources/Lore/Internal/Call.swift
+index 35bc73b..8e3fc69 100644
+--- a/Sources/Lore/Internal/Call.swift
++++ b/Sources/Lore/Internal/Call.swift
+@@ -44,7 +44,7 @@ private final class EventReceiver: Sendable {
+     func receive(_ event: UnsafePointer<lore_event_t>) -> Bool {
+         _ = published.load(ordering: .acquiring)
+         switch event.pointee.tag {
+-        case LORE_EVENT_COMPLETE.rawValue:
++        case LORE_EVENT_COMPLETE.unsignedRawValue:
+             let complete = event.pointee.complete
+             var error: LoreError?
+             if complete.status != 0 {
+@@ -53,10 +53,10 @@ private final class EventReceiver: Sendable {
+             }
+             onComplete?(error)
+             return false
+-        case LORE_EVENT_END.rawValue:
++        case LORE_EVENT_END.unsignedRawValue:
+             onEnd(failure.withLock { $0 })
+             return true
+-        case LORE_EVENT_LOG.rawValue:
++        case LORE_EVENT_LOG.unsignedRawValue:
+             LogHandler.dispatch(event.pointee.log)
+             return false
+         default:
+diff --git a/Sources/Lore/Internal/Conversions.swift b/Sources/Lore/Internal/Conversions.swift
+index d85a7b5..ab50867 100644
+--- a/Sources/Lore/Internal/Conversions.swift
++++ b/Sources/Lore/Internal/Conversions.swift
+@@ -127,3 +127,9 @@ func decodeHexadecimal(_ string: some StringProtocol) -> [UInt8]? {
+     }
+     return result
+ }
++
++// Clang imports C enums as signed on MSVC and unsigned on Darwin.
++// Normalize their bit pattern at the Swift value/event boundary.
++extension RawRepresentable where RawValue: BinaryInteger {
++    var unsignedRawValue: UInt32 { UInt32(truncatingIfNeeded: rawValue) }
++}
+diff --git a/Sources/Lore/Library.swift b/Sources/Lore/Library.swift
+index 17d0194..2c429fd 100644
+--- a/Sources/Lore/Library.swift
++++ b/Sources/Lore/Library.swift
+@@ -62,17 +62,17 @@ extension Library {
+         /// the mode that the first server the process connects to prefers,
+         /// or Zstandard.
+         /// This is the default.
+-        public static let automatic = Self(rawValue: LORE_COMPRESSION_MODE_NOT_SPECIFIED.rawValue)
++        public static let automatic = Self(rawValue: LORE_COMPRESSION_MODE_NOT_SPECIFIED.unsignedRawValue)
+ 
+         /// No compression,
+         /// for content that's already compressed.
+-        public static let uncompressed = Self(rawValue: LORE_COMPRESSION_MODE_NO_COMPRESSION.rawValue)
++        public static let uncompressed = Self(rawValue: LORE_COMPRESSION_MODE_NO_COMPRESSION.unsignedRawValue)
+ 
+         /// LZ4, which takes less time than Zstandard and stores more bytes.
+-        public static let lz4 = Self(rawValue: LORE_COMPRESSION_MODE_LZ4.rawValue)
++        public static let lz4 = Self(rawValue: LORE_COMPRESSION_MODE_LZ4.unsignedRawValue)
+ 
+         /// Zstandard, at the level that ``Library/setCompressionLevel(_:)`` selects.
+-        public static let zstandard = Self(rawValue: LORE_COMPRESSION_MODE_ZSTD.rawValue)
++        public static let zstandard = Self(rawValue: LORE_COMPRESSION_MODE_ZSTD.unsignedRawValue)
+     }
+ 
+     /// Limits the number of threads that the library creates for its own work,
+@@ -176,7 +176,7 @@ extension Library {
+         }
+ 
+         var cValue: lore_log_level_t {
+-            lore_log_level_t(rawValue: UInt32(rawValue))
++            lore_log_level_t(rawValue: .init(truncatingIfNeeded: rawValue))
+         }
+     }
+ 
+@@ -237,7 +237,7 @@ struct LogHandler: Sendable {
+ 
+     static func dispatch(_ data: lore_log_event_data_t) {
+         guard let handler = current.withLock({ $0?.handle }),
+-            let level = Library.LogLevel(rawValue: Int(data.level.rawValue))
++            let level = Library.LogLevel(rawValue: Int(data.level.unsignedRawValue))
+         else {
+             return
+         }
+diff --git a/Sources/Lore/Repository+Administration.swift b/Sources/Lore/Repository+Administration.swift
+index a463655..b69a8c5 100644
+--- a/Sources/Lore/Repository+Administration.swift
++++ b/Sources/Lore/Repository+Administration.swift
+@@ -36,7 +36,7 @@ extension Repository {
+                 arguments.pointee.url = arena.string(remote)
+             },
+             transform: { event -> RemoteRepository? in
+-                guard event.pointee.tag == LORE_EVENT_REPOSITORY_LIST_ENTRY.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REPOSITORY_LIST_ENTRY.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.repository_list_entry
+diff --git a/Sources/Lore/Repository+Branches.swift b/Sources/Lore/Repository+Branches.swift
+index ba917c3..405e610 100644
+--- a/Sources/Lore/Repository+Branches.swift
++++ b/Sources/Lore/Repository+Branches.swift
+@@ -96,7 +96,7 @@ extension Repository {
+                 arguments.pointee.archived = UInt8(includingArchived)
+             },
+             transform: { event -> Branch? in
+-                guard event.pointee.tag == LORE_EVENT_BRANCH_LIST_ENTRY.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_BRANCH_LIST_ENTRY.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.branch_list_entry
+@@ -108,7 +108,7 @@ extension Repository {
+                     name: String(data.name),
+                     category: String(data.category),
+                     latestRevision: RevisionID(data.latest),
+-                    location: Branch.Location(rawValue: data.location.rawValue) ?? .local,
++                    location: Branch.Location(rawValue: data.location.unsignedRawValue) ?? .local,
+                     creator: String(data.creator),
+                     creationDate: Date(millisecondsSince1970: data.created),
+                     isCurrent: Bool(data.is_current),
+@@ -140,7 +140,7 @@ extension Repository {
+                 arguments.pointee.category = arena.string(category)
+             },
+             transform: { event -> RevisionID?? in
+-                guard event.pointee.tag == LORE_EVENT_BRANCH_CREATE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_BRANCH_CREATE.unsignedRawValue else {
+                     return nil
+                 }
+                 return .some(RevisionID(event.pointee.branch_create.latest))
+@@ -174,7 +174,7 @@ extension Repository {
+                 arguments.pointee.reset = UInt8(discardingLocalChanges)
+             },
+             transform: { event -> RevisionID?? in
+-                guard event.pointee.tag == LORE_EVENT_BRANCH_SWITCH_END.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_BRANCH_SWITCH_END.unsignedRawValue else {
+                     return nil
+                 }
+                 return .some(RevisionID(event.pointee.branch_switch_end.branch.revision))
+@@ -203,7 +203,7 @@ extension Repository {
+                 arguments.pointee.link = arena.string(link)
+             },
+             transform: { event -> BranchInfo? in
+-                guard event.pointee.tag == LORE_EVENT_BRANCH_INFO.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_BRANCH_INFO.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.branch_info
+@@ -329,7 +329,7 @@ extension Repository {
+                 arguments.pointee.revision = arena.string(revision.rawValue)
+             },
+             transform: { event -> RevisionID?? in
+-                guard event.pointee.tag == LORE_EVENT_BRANCH_RESET.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_BRANCH_RESET.unsignedRawValue else {
+                     return nil
+                 }
+                 return .some(RevisionID(event.pointee.branch_reset.revision))
+@@ -365,7 +365,7 @@ extension Repository {
+                 arguments.pointee.limit = UInt32(clamping: limit)
+             },
+             transform: { event -> RevisionID? in
+-                guard event.pointee.tag == LORE_EVENT_BRANCH_LATEST_LIST_ENTRY.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_BRANCH_LATEST_LIST_ENTRY.unsignedRawValue else {
+                     return nil
+                 }
+                 return RevisionID(event.pointee.branch_latest_list_entry.revision)
+diff --git a/Sources/Lore/Repository+Commit.swift b/Sources/Lore/Repository+Commit.swift
+index eefed16..a4b52bd 100644
+--- a/Sources/Lore/Repository+Commit.swift
++++ b/Sources/Lore/Repository+Commit.swift
+@@ -111,7 +111,7 @@ extension Repository {
+                 arguments.pointee.scan = UInt8(scanning)
+             },
+             transform: { event in
+-                guard event.pointee.tag == LORE_EVENT_FILE_STAGE_FILE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_FILE_STAGE_FILE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.file_stage_file
+@@ -119,7 +119,7 @@ extension Repository {
+                 return FileChange(
+                     path: String(data.path),
+                     previousPath: previousPath.isEmpty ? nil : previousPath,
+-                    action: FileAction(rawValue: data.action.rawValue)
++                    action: FileAction(rawValue: data.action.unsignedRawValue)
+                 )
+             }
+         )
+@@ -248,7 +248,7 @@ enum CommitEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_REVISION_COMMIT_REVISION.rawValue:
++        case LORE_EVENT_REVISION_COMMIT_REVISION.unsignedRawValue:
+             let data = event.pointee.revision_commit_revision
+             guard
+                 var revision = Revision(
+@@ -261,7 +261,7 @@ enum CommitEvent: Sendable {
+             }
+             revision.branchID = BranchID(data.branch)
+             self = .revision(revision, repositoryID: RepositoryID(data.repository))
+-        case LORE_EVENT_METADATA.rawValue:
++        case LORE_EVENT_METADATA.unsignedRawValue:
+             guard let entry = MetadataEntry(event) else {
+                 return nil
+             }
+diff --git a/Sources/Lore/Repository+Contents.swift b/Sources/Lore/Repository+Contents.swift
+index 62332c5..0857e4f 100644
+--- a/Sources/Lore/Repository+Contents.swift
++++ b/Sources/Lore/Repository+Contents.swift
+@@ -61,7 +61,7 @@ extension Repository {
+                 arguments.pointee.paths = arena.strings(paths)
+             },
+             transform: { event -> FileHash? in
+-                guard event.pointee.tag == LORE_EVENT_FILE_HASH.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_FILE_HASH.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.file_hash
+@@ -113,7 +113,7 @@ extension Repository {
+             lore_file_dump_async,
+             configure: configure,
+             transform: { event -> StoredContent?? in
+-                guard event.pointee.tag == LORE_EVENT_FILE_DUMP.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_FILE_DUMP.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.file_dump
+@@ -289,7 +289,7 @@ extension Repository {
+             lore_file_obliterate_async,
+             configure: configure,
+             transform: { event -> ObliterationResult? in
+-                guard event.pointee.tag == LORE_EVENT_FILE_OBLITERATE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_FILE_OBLITERATE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.file_obliterate
+diff --git a/Sources/Lore/Repository+Create.swift b/Sources/Lore/Repository+Create.swift
+index 5ef8f80..3a46879 100644
+--- a/Sources/Lore/Repository+Create.swift
++++ b/Sources/Lore/Repository+Create.swift
+@@ -120,9 +120,9 @@ extension Repository {
+             configure: cloneArguments(url: url, revision: revision, store: store),
+             transform: { event -> CloneProgress? in
+                 switch event.pointee.tag {
+-                case LORE_EVENT_REPOSITORY_CLONE_PROGRESS.rawValue:
++                case LORE_EVENT_REPOSITORY_CLONE_PROGRESS.unsignedRawValue:
+                     CloneProgress(event.pointee.repository_clone_progress.count)
+-                case LORE_EVENT_REPOSITORY_CLONE_END.rawValue:
++                case LORE_EVENT_REPOSITORY_CLONE_END.unsignedRawValue:
+                     CloneProgress(event.pointee.repository_clone_end.count)
+                 default:
+                     nil
+diff --git a/Sources/Lore/Repository+Dependencies.swift b/Sources/Lore/Repository+Dependencies.swift
+index de0715a..1672ca9 100644
+--- a/Sources/Lore/Repository+Dependencies.swift
++++ b/Sources/Lore/Repository+Dependencies.swift
+@@ -56,7 +56,7 @@ extension Repository {
+                 arguments.pointee.force = UInt8(allowingCycles)
+             },
+             transform: { event -> Int? in
+-                guard event.pointee.tag == LORE_EVENT_FILE_DEPENDENCY_ADD_END.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_FILE_DEPENDENCY_ADD_END.unsignedRawValue else {
+                     return nil
+                 }
+                 return Int(event.pointee.file_dependency_add_end.added_count)
+@@ -94,7 +94,7 @@ extension Repository {
+                 )
+             },
+             transform: { event -> Int? in
+-                guard event.pointee.tag == LORE_EVENT_FILE_DEPENDENCY_REMOVE_END.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_FILE_DEPENDENCY_REMOVE_END.unsignedRawValue else {
+                     return nil
+                 }
+                 return Int(clamping: event.pointee.file_dependency_remove_end.removed_count)
+@@ -227,9 +227,9 @@ private enum DependencyListEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_FILE_DEPENDENCY_LIST_FILE.rawValue:
++        case LORE_EVENT_FILE_DEPENDENCY_LIST_FILE.unsignedRawValue:
+             self = .file(String(event.pointee.file_dependency_list_file.path))
+-        case LORE_EVENT_FILE_DEPENDENCY_LIST_ENTRY.rawValue:
++        case LORE_EVENT_FILE_DEPENDENCY_LIST_ENTRY.unsignedRawValue:
+             let data = event.pointee.file_dependency_list_entry
+             self = .entry(String(data.path), tags: [String](data.tags), depth: Int(data.depth))
+         default:
+diff --git a/Sources/Lore/Repository+Files.swift b/Sources/Lore/Repository+Files.swift
+index 036a937..88b82c2 100644
+--- a/Sources/Lore/Repository+Files.swift
++++ b/Sources/Lore/Repository+Files.swift
+@@ -78,22 +78,24 @@ public struct LineAttribution: Sendable, Hashable {
+         }
+ 
+         /// The lines resolved to the revision that last changed them.
+-        public static let attributed = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_ATTRIBUTED.rawValue)
++        public static let attributed = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_ATTRIBUTED.unsignedRawValue)
+         /// The lines differ in the working directory from the revision that the audit read,
+         /// so no revision has them.
+-        public static let uncommitted = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_UNCOMMITTED.rawValue)
++        public static let uncommitted = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_UNCOMMITTED.unsignedRawValue)
+         /// The audit read as many revisions as its limit allows
+         /// before the lines resolved.
+-        public static let revisionLimitReached = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_BUDGET_EXHAUSTED.rawValue)
++        public static let revisionLimitReached = Self(
++            rawValue: LORE_FILE_AUDIT_OUTCOME_BUDGET_EXHAUSTED.unsignedRawValue
++        )
+         /// A version of the file that the audit had to compare
+         /// has no content, because it was obliterated.
+-        public static let obliterated = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_OBLITERATED.rawValue)
++        public static let obliterated = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_OBLITERATED.unsignedRawValue)
+         /// A version of the file that the audit had to compare
+         /// has binary content, which can't be compared line by line.
+-        public static let binaryInHistory = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_BINARY_IN_HISTORY.rawValue)
++        public static let binaryInHistory = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_BINARY_IN_HISTORY.unsignedRawValue)
+         /// The history continues in a linked repository
+         /// that the audit can't reach or isn't authorized to read.
+-        public static let linkUnavailable = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_LINK_UNAVAILABLE.rawValue)
++        public static let linkUnavailable = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_LINK_UNAVAILABLE.unsignedRawValue)
+         /// A version of the file that the audit had to compare
+         /// isn't in the local store,
+         /// and the audit reads only the local store.
+@@ -104,13 +106,15 @@ public struct LineAttribution: Sendable, Hashable {
+         /// an audit reports the lines whose attribution needs that version
+         /// with this outcome,
+         /// not with ``obliterated``.
+-        public static let contentUnavailable = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_CONTENT_UNAVAILABLE.rawValue)
++        public static let contentUnavailable = Self(
++            rawValue: LORE_FILE_AUDIT_OUTCOME_CONTENT_UNAVAILABLE.unsignedRawValue
++        )
+         /// An error ended the audit before it reached the lines.
+         ///
+         /// ``Repository/audit(_:revision:revisionLimit:ignoringTrailingWhitespace:ignoringWhitespaceChanges:)``
+         /// throws the error instead of returning the ranges,
+         /// so it never returns this outcome.
+-        public static let unresolved = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_UNRESOLVED.rawValue)
++        public static let unresolved = Self(rawValue: LORE_FILE_AUDIT_OUTCOME_UNRESOLVED.unsignedRawValue)
+     }
+ 
+     /// The lines, numbered from 1.
+@@ -191,7 +195,7 @@ extension Repository {
+                 arguments.pointee.ignore_space_change = UInt8(ignoringWhitespaceChanges)
+             },
+             transform: { event -> LineAttribution? in
+-                guard event.pointee.tag == LORE_EVENT_FILE_AUDIT.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_FILE_AUDIT.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.file_audit
+@@ -200,7 +204,7 @@ extension Repository {
+                     lines: first ... max(first, Int(data.line_last)),
+                     revision: RevisionID(data.revision),
+                     repositoryID: RepositoryID(data.repository),
+-                    outcome: LineAttribution.Outcome(rawValue: data.outcome.rawValue)
++                    outcome: LineAttribution.Outcome(rawValue: data.outcome.unsignedRawValue)
+                 )
+             }
+         )
+@@ -282,7 +286,7 @@ extension Repository {
+                 arguments.pointee.revision = arena.string(revision?.rawValue)
+             },
+             transform: { event -> FileInfo? in
+-                guard event.pointee.tag == LORE_EVENT_FILE_INFO.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_FILE_INFO.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.file_info
+@@ -336,13 +340,13 @@ extension Repository {
+                 arguments.pointee.ignore_whitespace_inline = UInt8(ignoringWhitespaceChanges)
+             },
+             transform: { event -> FileDiff? in
+-                guard event.pointee.tag == LORE_EVENT_FILE_DIFF.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_FILE_DIFF.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.file_diff
+                 return FileDiff(
+                     path: String(data.path),
+-                    action: FileAction(rawValue: data.action.rawValue),
++                    action: FileAction(rawValue: data.action.unsignedRawValue),
+                     patch: String(data.patch)
+                 )
+             }
+@@ -363,11 +367,11 @@ extension Repository {
+                 arguments.pointee.paths = arena.strings(paths)
+             },
+             transform: { event -> FileChange? in
+-                guard event.pointee.tag == LORE_EVENT_FILE_UNSTAGE_FILE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_FILE_UNSTAGE_FILE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.file_unstage_file
+-                return FileChange(path: String(data.path), action: FileAction(rawValue: data.action.rawValue))
++                return FileChange(path: String(data.path), action: FileAction(rawValue: data.action.unsignedRawValue))
+             }
+         )
+     }
+@@ -454,7 +458,7 @@ extension Repository {
+ 
+     /// Converts an event of a file reset.
+     @Sendable private static func resetChange(_ event: UnsafePointer<lore_event_t>) -> FileChange? {
+-        guard event.pointee.tag == LORE_EVENT_FILE_RESET_FILE.rawValue else {
++        guard event.pointee.tag == LORE_EVENT_FILE_RESET_FILE.unsignedRawValue else {
+             return nil
+         }
+         let data = event.pointee.file_reset_file
+@@ -462,7 +466,7 @@ extension Repository {
+         return FileChange(
+             path: String(data.path),
+             previousPath: previousPath.isEmpty ? nil : previousPath,
+-            action: FileAction(rawValue: data.action.rawValue)
++            action: FileAction(rawValue: data.action.unsignedRawValue)
+         )
+     }
+ }
+@@ -474,7 +478,7 @@ private enum FileHistoryEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_FILE_HISTORY.rawValue:
++        case LORE_EVENT_FILE_HISTORY.unsignedRawValue:
+             let data = event.pointee.file_history
+             guard let revision = Revision(data.revision, number: data.revision_number, parents: data.parent) else {
+                 return nil
+@@ -484,12 +488,12 @@ private enum FileHistoryEvent: Sendable {
+                 FileRevision(
+                     path: String(data.path),
+                     previousPath: previousPath.isEmpty ? nil : previousPath,
+-                    action: FileAction(rawValue: data.action.rawValue),
++                    action: FileAction(rawValue: data.action.unsignedRawValue),
+                     size: Int(clamping: data.size),
+                     revision: revision
+                 )
+             )
+-        case LORE_EVENT_METADATA.rawValue:
++        case LORE_EVENT_METADATA.unsignedRawValue:
+             guard let entry = MetadataEntry(event) else {
+                 return nil
+             }
+diff --git a/Sources/Lore/Repository+Info.swift b/Sources/Lore/Repository+Info.swift
+index dfef134..dc91895 100644
+--- a/Sources/Lore/Repository+Info.swift
++++ b/Sources/Lore/Repository+Info.swift
+@@ -38,7 +38,7 @@ extension Repository {
+         let repositories = try await perform(
+             lore_repository_info_async,
+             transform: { event -> RepositoryInfo? in
+-                guard event.pointee.tag == LORE_EVENT_REPOSITORY_DATA.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REPOSITORY_DATA.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.repository_data
+diff --git a/Sources/Lore/Repository+Layers.swift b/Sources/Lore/Repository+Layers.swift
+index 3cf1d8e..fe3ec56 100644
+--- a/Sources/Lore/Repository+Layers.swift
++++ b/Sources/Lore/Repository+Layers.swift
+@@ -76,7 +76,7 @@ extension Repository {
+                 arguments.pointee.metadata = arena.string(metadataKey)
+             },
+             transform: { event -> Layer? in
+-                guard event.pointee.tag == LORE_EVENT_LAYER_ADD.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_LAYER_ADD.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.layer_add
+@@ -143,7 +143,7 @@ extension Repository {
+             lore_layer_list_async,
+             configure: { (_: UnsafeMutablePointer<lore_layer_list_args_t>, _) in },
+             transform: { event -> Layer? in
+-                guard event.pointee.tag == LORE_EVENT_LAYER_ENTRY.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_LAYER_ENTRY.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.layer_entry
+diff --git a/Sources/Lore/Repository+Links.swift b/Sources/Lore/Repository+Links.swift
+index a579f5c..aed7a0c 100644
+--- a/Sources/Lore/Repository+Links.swift
++++ b/Sources/Lore/Repository+Links.swift
+@@ -217,7 +217,7 @@ extension Repository {
+             lore_link_list_async,
+             configure: { (_: UnsafeMutablePointer<lore_link_list_args_t>, _) in },
+             transform: { event -> Link? in
+-                guard event.pointee.tag == LORE_EVENT_LINK_ENTRY.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_LINK_ENTRY.unsignedRawValue else {
+                     return nil
+                 }
+                 return Link(event.pointee.link_entry)
+@@ -242,7 +242,7 @@ extension Repository {
+                 arguments.pointee.link_path = arena.string(path)
+             },
+             transform: { event -> LinkInfo? in
+-                guard event.pointee.tag == LORE_EVENT_LINK_INFO.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_LINK_INFO.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.link_info
+@@ -252,7 +252,7 @@ extension Repository {
+                 return LinkInfo(
+                     link: link,
+                     remoteRevision: RevisionID(data.remote_revision),
+-                    stagedChange: LinkInfo.StagedChange(rawValue: data.staged_state.rawValue),
++                    stagedChange: LinkInfo.StagedChange(rawValue: data.staged_state.unsignedRawValue),
+                     stagedFileCount: Int(clamping: data.staged_file_count)
+                 )
+             }
+@@ -274,7 +274,7 @@ extension Repository {
+             lore_link_list_staged_async,
+             configure: { (_: UnsafeMutablePointer<lore_link_list_staged_args_t>, _) in },
+             transform: { event -> StagedLink? in
+-                guard event.pointee.tag == LORE_EVENT_LINK_STAGED_ENTRY.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_LINK_STAGED_ENTRY.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.link_staged_entry
+@@ -320,7 +320,7 @@ private struct LinkChange: Sendable {
+     var revision: RevisionID?
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+-        guard event.pointee.tag == LORE_EVENT_LINK_CHANGE.rawValue else {
++        guard event.pointee.tag == LORE_EVENT_LINK_CHANGE.unsignedRawValue else {
+             return nil
+         }
+         revision = RevisionID(event.pointee.link_change.revision)
+diff --git a/Sources/Lore/Repository+Locks.swift b/Sources/Lore/Repository+Locks.swift
+index 53c83ff..c68876c 100644
+--- a/Sources/Lore/Repository+Locks.swift
++++ b/Sources/Lore/Repository+Locks.swift
+@@ -51,9 +51,9 @@ extension Repository {
+             },
+             transform: { event -> LockEvent? in
+                 switch event.pointee.tag {
+-                case LORE_EVENT_LOCK_FILE_ACQUIRE_BEGIN.rawValue:
++                case LORE_EVENT_LOCK_FILE_ACQUIRE_BEGIN.unsignedRawValue:
+                     .begin(alreadyOwned: Bool(event.pointee.lock_file_acquire_begin.ignored))
+-                case LORE_EVENT_LOCK_FILE_ACQUIRE.rawValue:
++                case LORE_EVENT_LOCK_FILE_ACQUIRE.unsignedRawValue:
+                     .path(String(event.pointee.lock_file_acquire.path))
+                 default:
+                     nil
+@@ -94,9 +94,9 @@ extension Repository {
+             },
+             transform: { event -> LockEvent? in
+                 switch event.pointee.tag {
+-                case LORE_EVENT_LOCK_FILE_RELEASE_BEGIN.rawValue:
++                case LORE_EVENT_LOCK_FILE_RELEASE_BEGIN.unsignedRawValue:
+                     .begin(alreadyOwned: Bool(event.pointee.lock_file_release_begin.not_found))
+-                case LORE_EVENT_LOCK_FILE_RELEASE.rawValue:
++                case LORE_EVENT_LOCK_FILE_RELEASE.unsignedRawValue:
+                     .path(String(event.pointee.lock_file_release.path))
+                 default:
+                     nil
+@@ -135,7 +135,7 @@ extension Repository {
+                 arguments.pointee.branch = arena.string(branch)
+             },
+             transform: { event -> FileLock? in
+-                guard event.pointee.tag == LORE_EVENT_LOCK_FILE_STATUS.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_LOCK_FILE_STATUS.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.lock_file_status
+@@ -170,7 +170,7 @@ extension Repository {
+                 arguments.pointee.path = arena.string(path)
+             },
+             transform: { event -> FileLock? in
+-                guard event.pointee.tag == LORE_EVENT_LOCK_FILE_QUERY.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_LOCK_FILE_QUERY.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.lock_file_query
+diff --git a/Sources/Lore/Repository+Maintenance.swift b/Sources/Lore/Repository+Maintenance.swift
+index 4c894ec..af89d95 100644
+--- a/Sources/Lore/Repository+Maintenance.swift
++++ b/Sources/Lore/Repository+Maintenance.swift
+@@ -44,7 +44,7 @@ extension Repository {
+                 arguments.pointee.key = arena.string(key.rawValue)
+             },
+             transform: { event -> String? in
+-                guard event.pointee.tag == LORE_EVENT_REPOSITORY_CONFIG_GET.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REPOSITORY_CONFIG_GET.unsignedRawValue else {
+                     return nil
+                 }
+                 return String(event.pointee.repository_config_get.value)
+@@ -198,12 +198,12 @@ private enum StateDumpEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_REPOSITORY_DUMP_BEGIN.rawValue:
++        case LORE_EVENT_REPOSITORY_DUMP_BEGIN.unsignedRawValue:
+             guard let id = RepositoryID(event.pointee.repository_dump_begin.repository) else {
+                 return nil
+             }
+             self = .begin(id)
+-        case LORE_EVENT_REPOSITORY_STATE_DUMP.rawValue:
++        case LORE_EVENT_REPOSITORY_STATE_DUMP.unsignedRawValue:
+             let data = event.pointee.repository_state_dump
+             self = .state(
+                 RevisionID(data.revision),
+@@ -211,7 +211,7 @@ private enum StateDumpEvent: Sendable {
+                 treeHash: tupleBytes(data.tree_hash.data),
+                 treeSize: Int(clamping: data.tree_size)
+             )
+-        case LORE_EVENT_REPOSITORY_STATE_DUMP_NODE.rawValue:
++        case LORE_EVENT_REPOSITORY_STATE_DUMP_NODE.unsignedRawValue:
+             let data = event.pointee.repository_state_dump_node
+             self = .node(
+                 StateDump.Node(
+@@ -310,7 +310,7 @@ extension Repository {
+                 arguments.pointee.recurse = UInt8(includingSubfragments)
+             },
+             transform: { event -> StoreEntry? in
+-                guard event.pointee.tag == LORE_EVENT_REPOSITORY_STORE_IMMUTABLE_QUERY.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REPOSITORY_STORE_IMMUTABLE_QUERY.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.repository_store_immutable_query
+@@ -357,7 +357,7 @@ extension Repository {
+                 arguments.pointee.heal = UInt8(healing)
+             },
+             transform: { event -> Bool? in
+-                guard event.pointee.tag == LORE_EVENT_REPOSITORY_VERIFY_STATE_END.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REPOSITORY_VERIFY_STATE_END.unsignedRawValue else {
+                     return nil
+                 }
+                 // A zero hash means that nothing was healed.
+@@ -535,7 +535,7 @@ extension Repository {
+ extension RepositoryInstance {
+     /// Copies an instance event.
+     fileprivate init?(_ event: UnsafePointer<lore_event_t>) {
+-        guard event.pointee.tag == LORE_EVENT_REPOSITORY_INSTANCE.rawValue else {
++        guard event.pointee.tag == LORE_EVENT_REPOSITORY_INSTANCE.unsignedRawValue else {
+             return nil
+         }
+         let data = event.pointee.repository_instance
+diff --git a/Sources/Lore/Repository+Merges.swift b/Sources/Lore/Repository+Merges.swift
+index c77ab5b..0cc487a 100644
+--- a/Sources/Lore/Repository+Merges.swift
++++ b/Sources/Lore/Repository+Merges.swift
+@@ -245,7 +245,7 @@ extension Repository {
+                 arguments.pointee.message = arena.string(message)
+             },
+             transform: { event -> RevisionID? in
+-                guard event.pointee.tag == LORE_EVENT_BRANCH_MERGE_INTO_REVISION.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_BRANCH_MERGE_INTO_REVISION.unsignedRawValue else {
+                     return nil
+                 }
+                 return RevisionID(event.pointee.branch_merge_into_revision.revision)
+@@ -519,7 +519,7 @@ extension Repository {
+                 arguments.pointee.revision_only = 1
+             },
+             transform: { event -> Bool? in
+-                guard event.pointee.tag == LORE_EVENT_REPOSITORY_STATUS_REVISION.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REPOSITORY_STATUS_REVISION.unsignedRawValue else {
+                     return nil
+                 }
+                 return RevisionID(event.pointee.repository_status_revision.revision_merged) != nil
+@@ -560,16 +560,16 @@ extension Repository {
+             configure: pathArguments(keyPath, paths),
+             transform: { event -> String? in
+                 switch event.pointee.tag {
+-                case LORE_EVENT_BRANCH_MERGE_RESOLVE_FILE.rawValue:
++                case LORE_EVENT_BRANCH_MERGE_RESOLVE_FILE.unsignedRawValue:
+                     String(event.pointee.branch_merge_resolve_file.path)
+-                case LORE_EVENT_BRANCH_MERGE_UNRESOLVE_FILE.rawValue:
++                case LORE_EVENT_BRANCH_MERGE_UNRESOLVE_FILE.unsignedRawValue:
+                     String(event.pointee.branch_merge_unresolve_file.path)
+-                case LORE_EVENT_REVERT_RESOLVE_FILE.rawValue:
++                case LORE_EVENT_REVERT_RESOLVE_FILE.unsignedRawValue:
+                     String(event.pointee.revert_resolve_file.path)
+-                case LORE_EVENT_REVERT_UNRESOLVE_FILE.rawValue:
++                case LORE_EVENT_REVERT_UNRESOLVE_FILE.unsignedRawValue:
+                     String(event.pointee.revert_unresolve_file.path)
+                 // Resolving with a side stages that version of each file.
+-                case LORE_EVENT_FILE_STAGE_FILE.rawValue:
++                case LORE_EVENT_FILE_STAGE_FILE.unsignedRawValue:
+                     String(event.pointee.file_stage_file.path)
+                 default:
+                     nil
+@@ -599,16 +599,16 @@ private enum BranchDiffEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_BRANCH_DIFF_BEGIN.rawValue:
++        case LORE_EVENT_BRANCH_DIFF_BEGIN.unsignedRawValue:
+             let data = event.pointee.branch_diff_begin
+             self = .begin(
+                 source: RevisionID(data.source_revision),
+                 target: RevisionID(data.target_revision),
+                 base: RevisionID(data.base_revision)
+             )
+-        case LORE_EVENT_BRANCH_DIFF_CHANGE.rawValue:
++        case LORE_EVENT_BRANCH_DIFF_CHANGE.unsignedRawValue:
+             self = .change(BranchDiff.Change(event.pointee.branch_diff_change.change))
+-        case LORE_EVENT_BRANCH_DIFF_CONFLICT.rawValue:
++        case LORE_EVENT_BRANCH_DIFF_CONFLICT.unsignedRawValue:
+             let data = event.pointee.branch_diff_conflict
+             self = .conflict(
+                 BranchDiff.Conflict(
+@@ -629,7 +629,7 @@ extension BranchDiff.Change {
+         self.init(
+             path: String(data.path),
+             previousPath: previousPath.isEmpty ? nil : previousPath,
+-            action: FileAction(rawValue: data.action.rawValue),
++            action: FileAction(rawValue: data.action.unsignedRawValue),
+             isAutomaticallyMerged: Bool(data.automerged)
+         )
+     }
+@@ -643,17 +643,17 @@ private enum MergeEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_BRANCH_MERGE_START_BEGIN.rawValue:
++        case LORE_EVENT_BRANCH_MERGE_START_BEGIN.unsignedRawValue:
+             self = .begin(RevisionID(event.pointee.branch_merge_start_begin.revision))
+-        case LORE_EVENT_REVERT_START_BEGIN.rawValue:
++        case LORE_EVENT_REVERT_START_BEGIN.unsignedRawValue:
+             self = .begin(RevisionID(event.pointee.revert_start_begin.revision))
+-        case LORE_EVENT_CHERRY_PICK_START_BEGIN.rawValue:
++        case LORE_EVENT_CHERRY_PICK_START_BEGIN.unsignedRawValue:
+             self = .begin(RevisionID(event.pointee.cherry_pick_start_begin.revision))
+-        case LORE_EVENT_BRANCH_MERGE_CONFLICT_FILE.rawValue:
++        case LORE_EVENT_BRANCH_MERGE_CONFLICT_FILE.unsignedRawValue:
+             self = .conflict(String(event.pointee.branch_merge_conflict_file.path))
+-        case LORE_EVENT_REVERT_CONFLICT_FILE.rawValue:
++        case LORE_EVENT_REVERT_CONFLICT_FILE.unsignedRawValue:
+             self = .conflict(String(event.pointee.revert_conflict_file.path))
+-        case LORE_EVENT_CHERRY_PICK_CONFLICT_FILE.rawValue:
++        case LORE_EVENT_CHERRY_PICK_CONFLICT_FILE.unsignedRawValue:
+             self = .conflict(String(event.pointee.cherry_pick_conflict_file.path))
+         default:
+             guard let commit = CommitEvent(event) else {
+diff --git a/Sources/Lore/Repository+Metadata.swift b/Sources/Lore/Repository+Metadata.swift
+index 1c36c64..2d00ab9 100644
+--- a/Sources/Lore/Repository+Metadata.swift
++++ b/Sources/Lore/Repository+Metadata.swift
+@@ -32,24 +32,24 @@ extension MetadataValue {
+     /// Copies a library metadata value.
+     init?(_ value: lore_metadata_t) {
+         switch value.tag {
+-        case LORE_METADATA_TYPE_STRING.rawValue:
++        case LORE_METADATA_TYPE_STRING.unsignedRawValue:
+             self = .string(String(value.string))
+-        case LORE_METADATA_TYPE_NUMERIC.rawValue:
++        case LORE_METADATA_TYPE_NUMERIC.unsignedRawValue:
+             self = .number(value.numeric)
+-        case LORE_METADATA_TYPE_BOOLEAN.rawValue:
++        case LORE_METADATA_TYPE_BOOLEAN.unsignedRawValue:
+             self = .boolean(Bool(value.boolean))
+-        case LORE_METADATA_TYPE_BINARY.rawValue:
++        case LORE_METADATA_TYPE_BINARY.unsignedRawValue:
+             let binary = value.binary
+             if let payload = binary.payload, binary.length > 0 {
+                 self = .binary(Array(UnsafeRawBufferPointer(start: payload, count: Int(binary.length))))
+             } else {
+                 self = .binary([])
+             }
+-        case LORE_METADATA_TYPE_HASH.rawValue:
++        case LORE_METADATA_TYPE_HASH.unsignedRawValue:
+             self = .hash(tupleBytes(value.hash.data))
+-        case LORE_METADATA_TYPE_CONTEXT.rawValue:
++        case LORE_METADATA_TYPE_CONTEXT.unsignedRawValue:
+             self = .context(tupleBytes(value.context.data))
+-        case LORE_METADATA_TYPE_ADDRESS.rawValue:
++        case LORE_METADATA_TYPE_ADDRESS.unsignedRawValue:
+             self = .address(ContentAddress(value.address))
+         default:
+             return nil
+@@ -91,30 +91,30 @@ extension MetadataValue {
+     func write(to value: UnsafeMutablePointer<lore_metadata_t>, in arena: Arena) {
+         switch self {
+         case .string(let string):
+-            value.pointee.tag = LORE_METADATA_TYPE_STRING.rawValue
++            value.pointee.tag = LORE_METADATA_TYPE_STRING.unsignedRawValue
+             value.pointee.string = arena.string(string)
+         case .number(let number):
+-            value.pointee.tag = LORE_METADATA_TYPE_NUMERIC.rawValue
++            value.pointee.tag = LORE_METADATA_TYPE_NUMERIC.unsignedRawValue
+             value.pointee.numeric = number
+         case .boolean(let boolean):
+-            value.pointee.tag = LORE_METADATA_TYPE_BOOLEAN.rawValue
++            value.pointee.tag = LORE_METADATA_TYPE_BOOLEAN.unsignedRawValue
+             value.pointee.boolean = UInt8(boolean)
+         case .binary(let bytes):
+-            value.pointee.tag = LORE_METADATA_TYPE_BINARY.rawValue
++            value.pointee.tag = LORE_METADATA_TYPE_BINARY.unsignedRawValue
+             let buffer = arena.array(bytes)
+             value.pointee.binary = lore_binary_t(payload: buffer.pointer, length: UInt(buffer.count))
+         case .hash(let bytes):
+-            value.pointee.tag = LORE_METADATA_TYPE_HASH.rawValue
++            value.pointee.tag = LORE_METADATA_TYPE_HASH.unsignedRawValue
+             var hash = lore_hash_t()
+             setTupleBytes(&hash.data, to: bytes)
+             value.pointee.hash = hash
+         case .context(let bytes):
+-            value.pointee.tag = LORE_METADATA_TYPE_CONTEXT.rawValue
++            value.pointee.tag = LORE_METADATA_TYPE_CONTEXT.unsignedRawValue
+             var context = lore_context_t()
+             setTupleBytes(&context.data, to: bytes)
+             value.pointee.context = context
+         case .address(let address):
+-            value.pointee.tag = LORE_METADATA_TYPE_ADDRESS.rawValue
++            value.pointee.tag = LORE_METADATA_TYPE_ADDRESS.unsignedRawValue
+             value.pointee.address = address.libraryValue
+         }
+     }
+@@ -179,7 +179,7 @@ struct MetadataEntry: Sendable {
+     var value: MetadataValue
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+-        guard event.pointee.tag == LORE_EVENT_METADATA.rawValue,
++        guard event.pointee.tag == LORE_EVENT_METADATA.unsignedRawValue,
+             let value = MetadataValue(event.pointee.metadata.value)
+         else {
+             return nil
+diff --git a/Sources/Lore/Repository+Notifications.swift b/Sources/Lore/Repository+Notifications.swift
+index c9902ec..d3c01e7 100644
+--- a/Sources/Lore/Repository+Notifications.swift
++++ b/Sources/Lore/Repository+Notifications.swift
+@@ -394,17 +394,17 @@ extension RepositoryNotification {
+     /// returning `nil` for other events and for events without the identifiers they need.
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_NOTIFICATION_BRANCH_CREATED.rawValue:
++        case LORE_EVENT_NOTIFICATION_BRANCH_CREATED.unsignedRawValue:
+             guard let branchID = BranchID(event.pointee.notification_branch_created.branch) else {
+                 return nil
+             }
+             self = .branchCreated(branchID: branchID)
+-        case LORE_EVENT_NOTIFICATION_BRANCH_DELETED.rawValue:
++        case LORE_EVENT_NOTIFICATION_BRANCH_DELETED.unsignedRawValue:
+             guard let branchID = BranchID(event.pointee.notification_branch_deleted.branch) else {
+                 return nil
+             }
+             self = .branchDeleted(branchID: branchID)
+-        case LORE_EVENT_NOTIFICATION_BRANCH_PUSHED.rawValue:
++        case LORE_EVENT_NOTIFICATION_BRANCH_PUSHED.unsignedRawValue:
+             let data = event.pointee.notification_branch_pushed
+             guard let branchID = BranchID(data.branch), let revision = RevisionID(data.revision) else {
+                 return nil
+@@ -415,14 +415,14 @@ extension RepositoryNotification {
+                 revisionNumber: Int(clamping: data.revision_number),
+                 userID: String(data.user_id)
+             )
+-        case LORE_EVENT_NOTIFICATION_RESOURCE_LOCKED.rawValue:
++        case LORE_EVENT_NOTIFICATION_RESOURCE_LOCKED.unsignedRawValue:
+             let data = event.pointee.notification_resource_locked
+             self = .filesLocked(
+                 paths: [String](data.paths),
+                 branchID: BranchID(data.branch),
+                 userID: String(data.user_id)
+             )
+-        case LORE_EVENT_NOTIFICATION_RESOURCE_UNLOCKED.rawValue:
++        case LORE_EVENT_NOTIFICATION_RESOURCE_UNLOCKED.unsignedRawValue:
+             let data = event.pointee.notification_resource_unlocked
+             self = .filesUnlocked(
+                 paths: [String](data.paths),
+diff --git a/Sources/Lore/Repository+Remote.swift b/Sources/Lore/Repository+Remote.swift
+index b9af73a..fed9ea0 100644
+--- a/Sources/Lore/Repository+Remote.swift
++++ b/Sources/Lore/Repository+Remote.swift
+@@ -211,7 +211,7 @@ private enum PushEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_BRANCH_PUSH.rawValue:
++        case LORE_EVENT_BRANCH_PUSH.unsignedRawValue:
+             let data = event.pointee.branch_push
+             // A linked repository or layer reports its own push event;
+             // the result describes the repository itself.
+@@ -225,7 +225,7 @@ private enum PushEvent: Sendable {
+                 wasAlreadyPushed: Bool(data.flag_already_pushed),
+                 repositoryID: RepositoryID(data.repository)
+             )
+-        case LORE_EVENT_BRANCH_PUSH_FRAGMENT_PROGRESS.rawValue:
++        case LORE_EVENT_BRANCH_PUSH_FRAGMENT_PROGRESS.unsignedRawValue:
+             let data = event.pointee.branch_push_fragment_progress
+             self = .progress(
+                 PushProgress(
+@@ -235,7 +235,7 @@ private enum PushEvent: Sendable {
+                     bytesToTransfer: Int(clamping: data.bytes_total)
+                 )
+             )
+-        case LORE_EVENT_BRANCH_PUSH_REVISION_PUSH_END.rawValue:
++        case LORE_EVENT_BRANCH_PUSH_REVISION_PUSH_END.unsignedRawValue:
+             let data = event.pointee.branch_push_revision_push_end
+             self = .revisionPushed(
+                 RevisionID(data.new_remote_revision),
+@@ -284,7 +284,7 @@ private enum SyncEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_REVISION_SYNC_TARGET.rawValue:
++        case LORE_EVENT_REVISION_SYNC_TARGET.unsignedRawValue:
+             let data = event.pointee.revision_sync_target
+             self = .target(
+                 SyncResult(
+@@ -294,7 +294,7 @@ private enum SyncEvent: Sendable {
+                     hasConflicts: false
+                 )
+             )
+-        case LORE_EVENT_REVISION_SYNC_PROGRESS.rawValue:
++        case LORE_EVENT_REVISION_SYNC_PROGRESS.unsignedRawValue:
+             let data = event.pointee.revision_sync_progress
+             self = .progress(
+                 SyncProgress(
+@@ -307,7 +307,7 @@ private enum SyncEvent: Sendable {
+                     isDiscoveryComplete: Bool(data.discovery_complete)
+                 )
+             )
+-        case LORE_EVENT_REVISION_SYNC_REVISION.rawValue:
++        case LORE_EVENT_REVISION_SYNC_REVISION.unsignedRawValue:
+             let data = event.pointee.revision_sync_revision
+             self = .revision(
+                 SyncResult(
+diff --git a/Sources/Lore/Repository+Revisions.swift b/Sources/Lore/Repository+Revisions.swift
+index 4c10385..3f6d169 100644
+--- a/Sources/Lore/Repository+Revisions.swift
++++ b/Sources/Lore/Repository+Revisions.swift
+@@ -130,7 +130,7 @@ extension Repository {
+                 arguments.pointee.paths = arena.strings(paths)
+             },
+             transform: { event -> FileChange? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_DIFF_FILE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_DIFF_FILE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.revision_diff_file
+@@ -138,7 +138,7 @@ extension Repository {
+                 return FileChange(
+                     path: String(data.path),
+                     previousPath: previousPath.isEmpty ? nil : previousPath,
+-                    action: FileAction(rawValue: data.action.rawValue),
++                    action: FileAction(rawValue: data.action.unsignedRawValue),
+                     kind: Bool(data.old_is_file) || Bool(data.new_is_file) ? .file : .directory
+                 )
+             }
+@@ -167,7 +167,7 @@ extension Repository {
+                 arguments.pointee.message = arena.string(message)
+             },
+             transform: { event -> RevisionID? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_RESTORE_REVISION.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_RESTORE_REVISION.unsignedRawValue else {
+                     return nil
+                 }
+                 return RevisionID(event.pointee.revision_restore_revision.revision)
+@@ -256,7 +256,7 @@ extension Repository {
+                 lore_revision_find_async,
+                 configure: configure,
+                 transform: { event -> RevisionID?? in
+-                    guard event.pointee.tag == LORE_EVENT_REVISION_FIND.rawValue else {
++                    guard event.pointee.tag == LORE_EVENT_REVISION_FIND.unsignedRawValue else {
+                         return nil
+                     }
+                     return .some(RevisionID(event.pointee.revision_find.signature))
+@@ -345,7 +345,7 @@ extension Repository {
+                 arguments.pointee.end = arena.string(end.rawValue)
+             },
+             transform: { event -> (start: Int, end: Int, isFinished: Bool)? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_BISECT.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_BISECT.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.revision_bisect
+@@ -460,30 +460,30 @@ private enum RevisionEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_REVISION_HISTORY_ENTRY.rawValue:
++        case LORE_EVENT_REVISION_HISTORY_ENTRY.unsignedRawValue:
+             let data = event.pointee.revision_history_entry
+             guard let revision = Revision(data.revision, number: data.revision_number, parents: data.parent) else {
+                 return nil
+             }
+             self = .revision(revision)
+-        case LORE_EVENT_REVISION_INFO.rawValue:
++        case LORE_EVENT_REVISION_INFO.unsignedRawValue:
+             let data = event.pointee.revision_info
+             guard let revision = Revision(data.revision, number: data.revision_number, parents: data.parent) else {
+                 return nil
+             }
+             self = .revision(revision)
+-        case LORE_EVENT_REVISION_INFO_DELTA.rawValue:
++        case LORE_EVENT_REVISION_INFO_DELTA.unsignedRawValue:
+             let data = event.pointee.revision_info_delta
+             let previousPath = String(data.from_path)
+             self = .change(
+                 FileChange(
+                     path: String(data.path),
+                     previousPath: previousPath.isEmpty ? nil : previousPath,
+-                    action: FileAction(rawValue: data.action.rawValue),
++                    action: FileAction(rawValue: data.action.unsignedRawValue),
+                     kind: Bool(data.flag_file) ? .file : .directory
+                 )
+             )
+-        case LORE_EVENT_METADATA.rawValue:
++        case LORE_EVENT_METADATA.unsignedRawValue:
+             guard let entry = MetadataEntry(event) else {
+                 return nil
+             }
+diff --git a/Sources/Lore/Repository+Status.swift b/Sources/Lore/Repository+Status.swift
+index fa2909f..e6aa2f4 100644
+--- a/Sources/Lore/Repository+Status.swift
++++ b/Sources/Lore/Repository+Status.swift
+@@ -15,15 +15,15 @@ public struct FileAction: RawRepresentable, Sendable, Hashable {
+     }
+ 
+     /// The file keeps its path.
+-    public static let keep = Self(rawValue: LORE_FILE_ACTION_KEEP.rawValue)
++    public static let keep = Self(rawValue: LORE_FILE_ACTION_KEEP.unsignedRawValue)
+     /// The file was added.
+-    public static let add = Self(rawValue: LORE_FILE_ACTION_ADD.rawValue)
++    public static let add = Self(rawValue: LORE_FILE_ACTION_ADD.unsignedRawValue)
+     /// The file was deleted.
+-    public static let delete = Self(rawValue: LORE_FILE_ACTION_DELETE.rawValue)
++    public static let delete = Self(rawValue: LORE_FILE_ACTION_DELETE.unsignedRawValue)
+     /// The file was moved to a new path.
+-    public static let move = Self(rawValue: LORE_FILE_ACTION_MOVE.rawValue)
++    public static let move = Self(rawValue: LORE_FILE_ACTION_MOVE.unsignedRawValue)
+     /// The file was copied from another path.
+-    public static let copy = Self(rawValue: LORE_FILE_ACTION_COPY.rawValue)
++    public static let copy = Self(rawValue: LORE_FILE_ACTION_COPY.unsignedRawValue)
+ }
+ 
+ extension FileAction: CustomStringConvertible {
+@@ -189,7 +189,7 @@ private enum StatusEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_REPOSITORY_STATUS_REVISION.rawValue:
++        case LORE_EVENT_REPOSITORY_STATUS_REVISION.unsignedRawValue:
+             let data = event.pointee.repository_status_revision
+             self = .revision(
+                 Status(
+@@ -204,7 +204,7 @@ private enum StatusEvent: Sendable {
+                     files: []
+                 )
+             )
+-        case LORE_EVENT_REPOSITORY_STATUS_FILE.rawValue:
++        case LORE_EVENT_REPOSITORY_STATUS_FILE.unsignedRawValue:
+             let data = event.pointee.repository_status_file
+             let previousPath = String(data.from_path)
+             self = .file(
+@@ -212,8 +212,8 @@ private enum StatusEvent: Sendable {
+                     path: String(data.path),
+                     previousPath: previousPath.isEmpty ? nil : previousPath,
+                     size: Int(clamping: data.size),
+-                    action: FileAction(rawValue: data.action.rawValue),
+-                    kind: NodeKind(rawValue: data.type.rawValue),
++                    action: FileAction(rawValue: data.action.unsignedRawValue),
++                    kind: NodeKind(rawValue: data.type.unsignedRawValue),
+                     isStaged: Bool(data.flag_staged),
+                     isDirty: Bool(data.flag_dirty),
+                     isMerged: Bool(data.flag_merged),
+@@ -278,13 +278,13 @@ extension Repository {
+             },
+             transform: { event -> RepositoryStateEvent? in
+                 switch event.pointee.tag {
+-                case LORE_EVENT_REPOSITORY_STATUS_REVISION.rawValue:
++                case LORE_EVENT_REPOSITORY_STATUS_REVISION.unsignedRawValue:
+                     let data = event.pointee.repository_status_revision
+                     guard let repositoryID = RepositoryID(data.repository) else {
+                         return nil
+                     }
+                     return .repository(repositoryID, mergedRevision: RevisionID(data.revision_merged))
+-                case LORE_EVENT_REPOSITORY_STATUS_FILE.rawValue:
++                case LORE_EVENT_REPOSITORY_STATUS_FILE.unsignedRawValue:
+                     let data = event.pointee.repository_status_file
+                     return Bool(data.flag_conflict_unresolved) ? .unresolved(String(data.path)) : nil
+                 default:
+diff --git a/Sources/Lore/RevisionTree.swift b/Sources/Lore/RevisionTree.swift
+index 606b34e..4142b6d 100644
+--- a/Sources/Lore/RevisionTree.swift
++++ b/Sources/Lore/RevisionTree.swift
+@@ -212,7 +212,7 @@ extension Repository {
+                 arguments.pointee.repository_path = arena.string(directory)
+             },
+             transform: { event -> UInt64? in
+-                guard event.pointee.tag == LORE_EVENT_STORAGE_OPENED.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_STORAGE_OPENED.unsignedRawValue else {
+                     return nil
+                 }
+                 return event.pointee.storage_opened.handle_id
+@@ -259,7 +259,7 @@ extension Repository {
+                 }
+             },
+             transform: { event -> UInt64? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_LOADED.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_LOADED.unsignedRawValue else {
+                     return nil
+                 }
+                 return event.pointee.revision_tree_loaded.handle_id
+@@ -315,17 +315,17 @@ extension RevisionTree {
+         }
+ 
+         /// The node is unchanged.
+-        public static let unchanged = Self(rawValue: LORE_NODE_STAGED_ACTION_NONE.rawValue)
++        public static let unchanged = Self(rawValue: LORE_NODE_STAGED_ACTION_NONE.unsignedRawValue)
+         /// The node was added.
+-        public static let add = Self(rawValue: LORE_NODE_STAGED_ACTION_ADD.rawValue)
++        public static let add = Self(rawValue: LORE_NODE_STAGED_ACTION_ADD.unsignedRawValue)
+         /// The content of the node was modified.
+-        public static let modify = Self(rawValue: LORE_NODE_STAGED_ACTION_MODIFY.rawValue)
++        public static let modify = Self(rawValue: LORE_NODE_STAGED_ACTION_MODIFY.unsignedRawValue)
+         /// The node was deleted.
+-        public static let delete = Self(rawValue: LORE_NODE_STAGED_ACTION_DELETE.rawValue)
++        public static let delete = Self(rawValue: LORE_NODE_STAGED_ACTION_DELETE.unsignedRawValue)
+         /// The node was moved or renamed.
+-        public static let move = Self(rawValue: LORE_NODE_STAGED_ACTION_MOVE.rawValue)
++        public static let move = Self(rawValue: LORE_NODE_STAGED_ACTION_MOVE.unsignedRawValue)
+         /// The node was copied from another node.
+-        public static let copy = Self(rawValue: LORE_NODE_STAGED_ACTION_COPY.rawValue)
++        public static let copy = Self(rawValue: LORE_NODE_STAGED_ACTION_COPY.unsignedRawValue)
+     }
+ 
+     /// A file, directory, or link in a revision tree.
+@@ -441,7 +441,7 @@ extension RevisionTree {
+                 arguments.pointee.handle = handle
+             },
+             transform: { event -> Info? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_INFO.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_INFO.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.revision_tree_info
+@@ -478,7 +478,7 @@ extension RevisionTree {
+                 arguments.pointee.path = arena.string(path)
+             },
+             transform: { event -> ResolvedPath? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_RESOLVE_PATH_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_RESOLVE_PATH_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.revision_tree_resolve_path_complete
+@@ -541,7 +541,7 @@ extension RevisionTree {
+                 arguments.pointee.node_id = id.rawValue
+             },
+             transform: { event -> Node? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_NODE_INFO.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_NODE_INFO.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.revision_tree_node_info
+@@ -580,7 +580,7 @@ extension RevisionTree {
+                 arguments.pointee.node_id = id.rawValue
+             },
+             transform: { event -> String? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_NODE_PATH.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_NODE_PATH.unsignedRawValue else {
+                     return nil
+                 }
+                 return String(event.pointee.revision_tree_node_path.path)
+@@ -609,10 +609,10 @@ private enum ChildEvent: Sendable {
+ 
+     init?(_ event: UnsafePointer<lore_event_t>) {
+         switch event.pointee.tag {
+-        case LORE_EVENT_REVISION_TREE_LIST_CHILDREN_BEGIN.rawValue:
++        case LORE_EVENT_REVISION_TREE_LIST_CHILDREN_BEGIN.unsignedRawValue:
+             let data = event.pointee.revision_tree_list_children_begin
+             self = .begin(RepositoryID(data.repository), RevisionID(data.revision))
+-        case LORE_EVENT_REVISION_TREE_CHILD.rawValue:
++        case LORE_EVENT_REVISION_TREE_CHILD.unsignedRawValue:
+             let data = event.pointee.revision_tree_child
+             self = .child(
+                 RevisionTree.Node(
+@@ -813,7 +813,7 @@ extension RevisionTree {
+                 )
+             },
+             transform: { event -> (entry: UInt64, node: NodeID)? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_ADD_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_ADD_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.revision_tree_add_complete
+@@ -866,7 +866,7 @@ extension RevisionTree {
+                 )
+             },
+             transform: { event -> Int? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_DELETE_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_DELETE_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 return Int(clamping: event.pointee.revision_tree_delete_complete.node_count)
+@@ -1044,7 +1044,7 @@ extension RevisionTree {
+                 )
+             },
+             transform: { event -> UInt64? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_METADATA_CLEAR_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_METADATA_CLEAR_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.revision_tree_metadata_clear_complete
+@@ -1082,7 +1082,7 @@ extension RevisionTree {
+                 )
+             },
+             transform: { event -> (key: String, value: MetadataValue?, code: Int32)? in
+-                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_METADATA_GET_COMPLETE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_REVISION_TREE_METADATA_GET_COMPLETE.unsignedRawValue else {
+                     return nil
+                 }
+                 let data = event.pointee.revision_tree_metadata_get_complete
+diff --git a/Sources/Lore/SharedStore.swift b/Sources/Lore/SharedStore.swift
+index 6d675cf..843298d 100644
+--- a/Sources/Lore/SharedStore.swift
++++ b/Sources/Lore/SharedStore.swift
+@@ -140,7 +140,7 @@ extension SharedStore {
+                 arguments.pointee.make_default = UInt8(makingDefault)
+             },
+             transform: { event -> String? in
+-                guard event.pointee.tag == LORE_EVENT_SHARED_STORE_CREATE.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_SHARED_STORE_CREATE.unsignedRawValue else {
+                     return nil
+                 }
+                 return String(event.pointee.shared_store_create.path)
+@@ -168,7 +168,7 @@ extension SharedStore {
+                 arguments.pointee.include_instances = UInt8(includingInstances)
+             },
+             transform: { event -> [SharedStore]? in
+-                guard event.pointee.tag == LORE_EVENT_SHARED_STORE_LIST.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_SHARED_STORE_LIST.unsignedRawValue else {
+                     return nil
+                 }
+                 let stores = event.pointee.shared_store_list.stores
+@@ -193,7 +193,7 @@ extension SharedStore {
+             lore_shared_store_info_async,
+             configure: { (_: UnsafeMutablePointer<lore_shared_store_info_args_t>, _) in },
+             transform: { event -> Configuration? in
+-                guard event.pointee.tag == LORE_EVENT_SHARED_STORE_INFO.rawValue else {
++                guard event.pointee.tag == LORE_EVENT_SHARED_STORE_INFO.unsignedRawValue else {
+                     return nil
+                 }
+                 return Configuration(event.pointee.shared_store_info)
+diff --git a/Tests/LoreTests/AuthenticationTests.swift b/Tests/LoreTests/AuthenticationTests.swift
+index 63b2c80..1575c57 100644
+--- a/Tests/LoreTests/AuthenticationTests.swift
++++ b/Tests/LoreTests/AuthenticationTests.swift
+@@ -1,5 +1,12 @@
+-import CryptoKit
++#if canImport(CryptoKit)
++    import CryptoKit
++#else
++    import Crypto
++#endif
+ import Foundation
++#if canImport(FoundationNetworking)
++    import FoundationNetworking
++#endif
+ import Testing
+ 
+ @testable import Lore
+diff --git a/Tests/LoreTests/ContentStoreTests.swift b/Tests/LoreTests/ContentStoreTests.swift
+index 4b87a8d..81b2202 100644
+--- a/Tests/LoreTests/ContentStoreTests.swift
++++ b/Tests/LoreTests/ContentStoreTests.swift
+@@ -706,11 +706,11 @@ import Testing
+         (LORE_KEY_TYPE_RESOLVE, .published),
+     ])
+     func keyTypesHaveTheRawValuesThatTheHeaderDefines(type: lore_key_type_t, keyType: ContentStore.KeyType) {
+-        #expect(ContentStore.KeyType(rawValue: type.rawValue) == keyType)
+-        #expect(keyType.rawValue == type.rawValue)
++        #expect(ContentStore.KeyType(rawValue: type.unsignedRawValue) == keyType)
++        #expect(keyType.rawValue == type.unsignedRawValue)
+     }
+ 
+-    @Test(arguments: [LORE_KEY_TYPE_RESOLVE.rawValue + 1, 100, .max])
++    @Test(arguments: [LORE_KEY_TYPE_RESOLVE.unsignedRawValue + 1, 100, .max])
+     func keyTypesRejectOtherRawValues(rawValue: UInt32) {
+         #expect(ContentStore.KeyType(rawValue: rawValue) == nil)
+     }
+diff --git a/Tests/LoreTests/FileTests.swift b/Tests/LoreTests/FileTests.swift
+index d5086b9..7f753a5 100644
+--- a/Tests/LoreTests/FileTests.swift
++++ b/Tests/LoreTests/FileTests.swift
+@@ -53,7 +53,7 @@ import Testing
+                 arguments.pointee.path = arena.string("a.txt")
+                 arguments.pointee.length = 1
+             },
+-            transform: { event in event.pointee.tag == LORE_EVENT_FILE_HISTORY.rawValue ? true : nil }
++            transform: { event in event.pointee.tag == LORE_EVENT_FILE_HISTORY.unsignedRawValue ? true : nil }
+         )
+         #expect(entries.count == 2)
+     }
+diff --git a/Tests/LoreTests/NotificationTests.swift b/Tests/LoreTests/NotificationTests.swift
+index 9d4f675..5e50c05 100644
+--- a/Tests/LoreTests/NotificationTests.swift
++++ b/Tests/LoreTests/NotificationTests.swift
+@@ -81,14 +81,14 @@ private final class SyntheticCall: @unchecked Sendable {
+     /// Delivers a `COMPLETE` event with a status.
+     func complete(status: Int32 = 0) {
+         send { event in
+-            event.tag = LORE_EVENT_COMPLETE.rawValue
++            event.tag = LORE_EVENT_COMPLETE.unsignedRawValue
+             event.complete.status = status
+         }
+     }
+ 
+     /// Delivers the `END` event, which carries no error.
+     func end() {
+-        send { $0.tag = LORE_EVENT_END.rawValue }
++        send { $0.tag = LORE_EVENT_END.unsignedRawValue }
+     }
+ }
+ 
+@@ -108,7 +108,7 @@ private final class SyntheticCall: @unchecked Sendable {
+             }
+         )
+         #expect(ends.errors.isEmpty)
+-        call.send { $0.tag = LORE_EVENT_NOTIFICATION_BRANCH_CREATED.rawValue }
++        call.send { $0.tag = LORE_EVENT_NOTIFICATION_BRANCH_CREATED.unsignedRawValue }
+         #expect(events.withLock { $0 } == 1)
+         call.end()
+         #expect(ends.errors == [nil])
+@@ -344,7 +344,7 @@ private final class SyntheticCall: @unchecked Sendable {
+         let notifications = try await withTimeLimit {
+             let stream = try await subscriptions.join(repository, repositoryID: repositoryID)
+             call.send { event in
+-                event.tag = LORE_EVENT_NOTIFICATION_BRANCH_CREATED.rawValue
++                event.tag = LORE_EVENT_NOTIFICATION_BRANCH_CREATED.unsignedRawValue
+                 setTupleBytes(&event.notification_branch_created.branch.data, to: branchID.bytes)
+             }
+             // The library ends an established subscription with `END` alone.
+diff --git a/Tests/LoreTests/Support.swift b/Tests/LoreTests/Support.swift
+index d8bfdd0..6c426f9 100644
+--- a/Tests/LoreTests/Support.swift
++++ b/Tests/LoreTests/Support.swift
+@@ -1,6 +1,19 @@
+ import Foundation
+ import Synchronization
+ import Testing
++#if os(Windows)
++    import ucrt
++
++    @discardableResult
++    func setenv(_ name: String, _ value: String, _ overwrite: Int32) -> Int32 {
++        _putenv_s(name, value)
++    }
++
++    @discardableResult
++    func unsetenv(_ name: String) -> Int32 {
++        _putenv_s(name, "")
++    }
++#endif
+ 
+ @testable import Lore
+ 
+@@ -29,7 +42,13 @@ let isolatedHome: String = {
+     setenv("HOME", home, 1)
+     setenv("LORE_AUTH_STORE", "fallback", 1)
+     setenv("LORE_AUTH_PATH", "\(home)/auth", 1)
++    #if os(Windows)
++    // Windows does not use HOME for its per-user data directory. Keep the
++    // library's configuration and stores inside this test-owned directory too.
++    setenv("LORE_GLOBAL_PATH", home, 1)
++    #else
+     unsetenv("LORE_GLOBAL_PATH")
++    #endif
+     setenv("LORE_SERVICE_SOCKET", "lore_service_swift_tests", 1)
+     unsetenv("LORE_USE_SERVICE")
+     unsetenv("LORE_SERVICE_EXECUTABLE")

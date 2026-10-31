@@ -152,8 +152,13 @@ struct ProjectOpeningLayoutTests {
         let projectType = try container.uiNode(matching: .accessibilityIdentifier(ProjectOpeningAccessibility.projectType))
         let actions = try container.uiNode(matching: .accessibilityIdentifier(ProjectOpeningAccessibility.createActions))
 
-        #expect(viewModel.shouldCreateGitRepository)
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier(ProjectOpeningAccessibility.gitToggle))
+        #expect(viewModel.newProjectSourceControl == .defaultForNewProjects)
+        if EditorSourceControlProvider.lore.isAvailable {
+            let loreLink = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.ProjectOpening.Lore.LearnMore"))
+            #expect(loreLink.absoluteFrame.maxY <= ProjectOpeningLayout.windowHeight)
+            #expect(loreLink.absoluteFrame.minY >= 0)
+        }
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.ProjectOpening.SourceControl.none"))
         #expect(!viewModel.shouldCreateGitRepository)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier(ProjectOpeningAccessibility.gitToggle))
         #expect(viewModel.shouldCreateGitRepository)

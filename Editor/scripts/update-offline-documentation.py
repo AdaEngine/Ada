@@ -12,7 +12,7 @@ OUTPUT = EDITOR / 'Sources/AdaEditor/Assets/Documentation/catalog.json'
 
 def articles():
     sources = [(EDITOR / f'Documentation/{name}.md', 'Editor')
-               for name in ['EditorGuide', 'Agent3DWorkflow', 'A2UI', 'AdaScriptGameplayRecipes']]
+               for name in ['EditorGuide', 'Agent3DWorkflow', 'A2UI', 'AdaScriptGameplayRecipes', 'InspectorGroups', 'BuildExport']]
     for module, section in [('AdaEngine', 'AdaEngine'), ('AdaScripting', 'AdaScript')]:
         catalog = ROOT / f'Sources/{module}/{module}.docc'
         sources += [(path, section) for path in sorted(catalog.rglob('*.md'))

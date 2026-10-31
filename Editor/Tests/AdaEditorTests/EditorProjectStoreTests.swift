@@ -241,7 +241,7 @@ struct EditorProjectStoreTests {
 
     @Test("create blank template creates project and requests editor handoff")
     @MainActor
-    func projectOpeningViewModelCreatesProjectForEditorHandoff() throws {
+    func projectOpeningViewModelCreatesProjectForEditorHandoff() async throws {
         let rootURL = try makeEditorStoreTemporaryDirectory(named: "EditorProjectViewModelCreateHandoff")
         defer { removeEditorStoreTemporaryDirectory(rootURL) }
 
@@ -252,6 +252,7 @@ struct EditorProjectStoreTests {
         viewModel.setProjectLocation(rootURL)
 
         viewModel.createBlankTemplateProject()
+        await viewModel.repositoryCreationTask?.value
 
         let projectURL = rootURL.appendingPathComponent(EditorProjectStore.defaultUsesProjectPackage ? "Editor-Flow.adaproject" : "Editor-Flow", isDirectory: true)
         #expect(viewModel.detailProject?.path == projectURL.standardizedFileURL.path)

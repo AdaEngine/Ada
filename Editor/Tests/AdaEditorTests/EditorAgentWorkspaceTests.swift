@@ -122,7 +122,8 @@ struct EditorAgentWorkspaceTests {
             await settle(container)
             let artifact = try #require(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Artifact")).first).absoluteFrame
             let chat = container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Agent.Header")).first
-            if width >= 1000 {
+            let leading: Float = width >= 680 ? min(310, max(220, width * 0.25)) + 8 : 0
+            if width - leading - 44 >= 640 {
                 let chatFrame = try #require(chat).absoluteFrame
                 #expect(abs(artifact.minX - chatFrame.maxX - 8) < 1)
                 #expect(chatFrame.width > 200)
@@ -131,11 +132,11 @@ struct EditorAgentWorkspaceTests {
                 let leading: Float = width >= 680 ? min(310, max(220, width * 0.25)) + 8 : 0
                 #expect(abs(artifact.minX - leading) < 1)
             }
-            #expect(abs(artifact.maxX - width) < 1)
+            #expect(abs(artifact.maxX - (width - 44)) < 1)
             _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.CloseArtifact"))
             await settle(container)
             let closedChat = try #require(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Agent.Header")).first).absoluteFrame
-            #expect(abs(closedChat.maxX - width) < 1)
+            #expect(abs(closedChat.maxX - (width - 44)) < 1)
             #expect(!model.interface.showsArtifact)
             #expect(model.agent.prompt == "Keep this panel draft")
             #expect(model.workbench.activeDocument?.id == documentID)
@@ -304,6 +305,158 @@ struct EditorAgentWorkspaceTests {
 
     private func settle<Content: View>(_ container: UIContainerView<Content>) async {
         for _ in 0..<5 { await Task.yield(); container.layoutIfNeeded(); container.update(1 / 60) }
+    }
+}
+
+extension EditorAgentWorkspaceTests {
+    @Test("Agent navigation opens real editors and previews while preserving edits and panel preferences", arguments: [Float(768), 1400])
+    func navigatorRouting(width: Float) async throws {
+        let root = try makeProject()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let imageURL = root.appendingPathComponent("preview.png")
+        let png = try #require(Data(base64Encoded:
+            "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAw0lEQVR4nO3QMQ1CURTA0OcOVThAE3JwwAwO/nZzLqFDxyZNz+P5/lxxu78u+XX/6ADtN0AH" +
+            "aL8BOkD7DdAB2j/bA6f9BugA7TdAB2i/ATpA+w3YHjjtN0AHaL8BOkD7DdAB2m/A9sBpvwE6QPsN0AHab4AO0H4DtgdO+w3QAdpvgA7QfgN0gPYbsD1w2m+A" +
+            "DtB+A3SA9hugA7TfgO2B034DdID2G6ADtN8AHaD9BmwPnPYboAO03wAdoP0G6ADt//2AL6IBOsLaSzBFAAAAAElFTkSuQmCC"
+        ))
+        try png.write(to: imageURL)
+        let model = try makeModel(root)
+        await model.agent.loadSessions()
+        model.interface.mode = .agent
+        model.toolStrip.activeLeftTopTool = "sourceControl"
+        model.showLeftPanel = false
+        model.agent.prompt = "Keep my draft"
+        let container = UIContainerView(rootView: EditorAgentWorkspace(viewModel: model).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: width, height: 800)
+        container.bounds.size = container.frame.size
+        await settle(container)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.ToolStrip.agent.files"))
+        await settle(container)
+        model.projectSidebar.expandAll()
+        await settle(container)
+        try await Task.sleep(for: .milliseconds(240))
+        await settle(container)
+        let viewport = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.ProjectTree.ScrollView")).absoluteFrame
+        #expect(viewport.height > 500)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.ProjectTree.Main.ada"))
+        await settle(container)
+        let document = try #require(activeText(model))
+        #expect(document.relativePath == "Sources/Main.ada")
+        #expect(model.interface.showsArtifact)
+        model.workbench.updateTextDocument(id: document.id) { $0.content = "unsaved"; $0.isDirty = true }
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.ProjectTree.preview.png"))
+        await settle(container)
+        if case let .asset(asset) = model.workbench.activeDocument {
+            #expect(asset.kind == .image)
+        } else {
+            Issue.record("The image should open in its asset preview")
+        }
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Navigator.Tab.workspaces"))
+        await settle(container)
+        let workspaces = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Workspaces"))
+        #expect(workspaces.absoluteFrame.width > 100)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Workspace.\(document.id)"))
+        await settle(container)
+        #expect(activeText(model)?.content == "unsaved")
+        #expect(activeText(model)?.id == document.id)
+        // Ordinary document navigation saves the outgoing buffer.
+        #expect(try String(contentsOf: root.appendingPathComponent("Sources/Main.ada"), encoding: .utf8) == "unsaved")
+        #expect(model.agent.prompt == "Keep my draft")
+        #expect(model.workbench.openDocuments.count == 2)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.ToolStrip.agent.sourceControl"))
+        await settle(container)
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Git.Sidebar"))
+        model.interface.showsArtifact = false
+        await settle(container)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Git.View Diff"))
+        await settle(container)
+        #expect(model.interface.showsArtifact)
+        if case .git = model.workbench.activeDocument {
+            // The review uses the existing document workbench.
+        } else {
+            Issue.record("Source Control should open a diff editor")
+        }
+        #expect(model.toolStrip.activeLeftTopTool == "sourceControl")
+        #expect(!model.showLeftPanel)
+    }
+
+    @Test("The mounted navigator switches languages and keeps its tabs within the sidebar")
+    func navigatorLocalization() async throws {
+        let root = try makeProject()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let previous = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previous }
+        let model = try makeModel(root)
+        await model.agent.loadSessions()
+        let container = UIContainerView(rootView: EditorAgentWorkspace(viewModel: model).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 1024, height: 800)
+        container.bounds.size = container.frame.size
+        await settle(container)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.ToolStrip.agent.files"))
+        for language in [EditorLanguage.english, .russian] {
+            EditorLocalization.shared.preference = language
+            await settle(container)
+            let files = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Navigator.Tab.files")).absoluteFrame
+            let workspaces = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Navigator.Tab.workspaces")).absoluteFrame
+            let close = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Navigator.Close")).absoluteFrame
+            let sidebar = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Navigator")).absoluteFrame
+            #expect(files.maxX <= workspaces.minX)
+            #expect(workspaces.maxX <= close.minX)
+            #expect(close.maxX <= sidebar.maxX)
+            #expect(L10n.tr("Workspaces") == (language == .russian ? "Рабочие области" : "Workspaces"))
+        }
+    }
+
+    @Test("The visible conversation divider resizes both panes without losing the draft")
+    func resizeArtifact() async throws {
+        let root = try makeProject()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = try makeModel(root)
+        await model.agent.loadSessions()
+        model.openAgentChangedFile("Sources/Main.ada")
+        model.agent.prompt = "Draft during resize"
+        let container = UIContainerView(rootView: EditorAgentWorkspace(viewModel: model).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 1600, height: 800)
+        container.bounds.size = container.frame.size
+        await settle(container)
+        let artifact = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Artifact")).absoluteFrame
+        let handle = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.ResizeArtifact")).absoluteFrame
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.ResizeHandle.Grip"))
+        for (phase, offset) in [(MouseEvent.Phase.began, Float(0)), (.changed, 100), (.ended, 100)] {
+            container.onMouseEvent(MouseEvent(window: RID(), button: .left, mousePosition: Point(handle.midX + offset, handle.midY), phase: phase, modifierKeys: [], time: 0))
+            await settle(container)
+        }
+        let resized = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Artifact")).absoluteFrame
+        #expect(resized.width < artifact.width - 80)
+        #expect(abs(resized.maxX - artifact.maxX) < 1)
+        #expect(model.agent.prompt == "Draft during resize")
+    }
+
+    @Test("A long session list scrolls within its panel and keeps Settings visible")
+    func sessionScrolling() async throws {
+        let root = try makeProject()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = try makeModel(root)
+        let store = EditorAgentSessionStore(projectURL: root)
+        for index in 0..<40 {
+            let date = Date(timeIntervalSince1970: 2000 - Double(index))
+            try await store.saveSession(.init(id: "scroll-\(index)", title: "Session \(index)", createdAt: date, updatedAt: date), makeActive: false)
+        }
+        await model.agent.loadSessions()
+        let container = UIContainerView(rootView: EditorAgentWorkspace(viewModel: model).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 1400, height: 500)
+        container.bounds.size = container.frame.size
+        await settle(container)
+        let lastID = "AdaEditor.AgentWorkspace.Session.scroll-39"
+        _ = try container.uiScrollToNode(matching: .accessibilityIdentifier(lastID))
+        await settle(container)
+        let last = try container.uiNode(matching: .accessibilityIdentifier(lastID)).absoluteFrame
+        let scroll = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Sessions.ScrollView")).absoluteFrame
+        let settings = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Settings")).absoluteFrame
+        #expect(last.minY >= scroll.minY)
+        #expect(last.maxY <= scroll.maxY + 1)
+        #expect(settings.minY >= scroll.maxY)
+        #expect(settings.maxY <= 500)
     }
 }
 

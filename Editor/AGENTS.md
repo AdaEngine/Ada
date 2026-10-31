@@ -25,6 +25,7 @@ and assess gaps before proposing new features.
   builds/tests must use that override too. Native project/asset file pickers,
   RGB color selection (inspector alpha), HTTPS downloads, local Run and D3D12
   readback are implemented. Windows also has a menu row, native Settings window,
+  a theme-coloured Settings caption using the shared Windows window controls,
   contextual cursors, Cloud browser PKCE sign-in with Credential Manager, and
   WinSock/DNS-SD AdaPlayer pairing (including manual host:port). Apple in-app
   purchases remain Apple-only. WebAssembly and Android compilation use the WSL
@@ -41,6 +42,7 @@ and assess gaps before proposing new features.
 - Build & Export scans host tools on page entry and provides Rescan plus official
   Swift/Android setup links. Discovery fills missing/broken paths in the settings
   draft, preserves valid overrides, and requires Save Build Settings to persist.
+  Rescan, setup and Browse use compact themed buttons with borders and hover feedback.
   Windows discovery rereads registry environment and standard install locations;
   native Windows tools must not fill WSL Web compiler/Tint fields. Setup links
   open browser guides; they do not perform unattended installation.
@@ -58,6 +60,36 @@ and assess gaps before proposing new features.
   production workspace directly for native UI validation.
 - Public scripting terminology is **AdaScript**. `Gravity*` names are internal
   compiler, VM, and language-tooling implementation names.
+- Inspector subgroups use explicit export metadata (`group: "Camera/Auto Exposure"`,
+  at most four levels) or descriptor `groupPath`; never infer groups from names.
+  Scene hierarchy supports ancestor-preserving name search, empty parent groups,
+  and persisted divider width. Its vertical scroll indicator appears when rows
+  overflow the viewport. Keep related authored entities under meaningful
+  parent groups and account for inherited transforms. See
+  [InspectorGroups.md](Documentation/InspectorGroups.md).
+- The project file tree starts collapsed and persists expanded relative folder
+  paths per project. Its header has icon buttons for New File and recursive
+  expand/collapse, plus a crosshair to reveal the active tab, open its ancestors
+  and scroll to its selected row. Disclosure animates row height/opacity and the
+  chevron; interrupted transitions retain their current presentation. Targets
+  must not list descendants of an existing root as additional roots with duplicate IDs.
+  Refreshes preserve existing expansion and close new folders.
+  Visibility filtering indexes collapsed relative paths once and checks each
+  item's ancestors. Do not search the entire item array for every collapsed
+  folder per file: that stalls unrelated tab changes in large asset trees.
+  Selection updates per-row observable handles; tree topology has its own
+  revision. Keep `selectedItem` and `items` snapshots accurate without notifying
+  the whole tree for a tab selection. Let the scroll view constrain row width;
+  a surrounding GeometryReader rebuilt the row menus during unrelated layout.
+  Imports expand the destination's ancestors so the copied files are visible.
+  Coverage: `EditorProjectTreeStateTests` and `EditorFileDropTests`.
+- Source highlighting and semantic position conversion use `EditorSourceLines`
+  so Windows CRLF counts as one newline, matching TextEditor's normalized text.
+- Double Shift focuses project file search. Windows observes parsed AdaInput
+  before focused UI controls; macOS uses its local event monitor. Keep repeats,
+  modifier chords, intervening clicks/keys and window changes out of the gesture.
+  Install its system through `EditorSearchShortcutPlugin`: scheduler creation
+  during app startup replaces systems registered early in `transformAppWorlds`.
 
 ## Localization (required for every UI change)
 
@@ -150,6 +182,9 @@ AdaScript and standalone SwiftPM project paths. Project navigator, new-file
 templates, asset import/file drop, deletion, file search, Save and Save All.
 Project settings cover runtime entry, plugins, input actions and resource roots;
 standalone SwiftPM tooling includes dependencies, products, targets and tasks.
+The project navigator lists all project entries without a count cap. `.builds/`
+is reserved for local build products and excluded from the navigator, project
+text search and filesystem-triggered refreshes.
 
 Entry points: [ProjectSystem.swift](Sources/AdaEditor/ProjectSystem.swift),
 [EditorProjectStore.swift](Sources/AdaEditor/EditorProjectStore.swift),
@@ -170,10 +205,17 @@ Coverage: [EditorExampleCatalogTests.swift](Tests/AdaEditorTests/EditorExampleCa
 Document tabs, tab reordering, Back/Forward navigation, restoration, resizable
 panels, and two independently selected document panes with Split/Merge/move
 actions. Code and scene documents can remain visible together.
+Opening a file that already has an ordinary tab selects its existing document;
+it preserves unsaved edits, prepared scene data and external-write conflict checks.
+Raw and source-control review tabs remain distinct. Hierarchy panels request
+label-only rows: do not scan numeric mesh/collider payloads for unused resource links
+while mounting, searching or updating the scene hierarchy.
 Text editing, syntax highlighting for Swift/AdaScript/YAML/GLSL, completion,
 snippet placeholders, hover, definition navigation and diagnostics. Swift uses
 SourceKit-LSP; AdaScript uses the embedded language core / language server.
 Find in File and Find in Project include case and whole-word controls.
+Indentation guides, tab markers and space dots default to off. Explicit saved
+display preferences, including the legacy combined toggle, are preserved.
 
 Entry points: [EditorCenterWorkbench.swift](Sources/AdaEditor/UI/Editor/EditorCenterWorkbench.swift),
 [EditorWorkbenchViewModel+Split.swift](Sources/AdaEditor/UI/Editor/EditorWorkbenchViewModel+Split.swift),
@@ -183,6 +225,12 @@ Coverage: [EditorWorkbenchSplitTests.swift](Tests/AdaEditorTests/EditorWorkbench
 [EditorTextSearchTests.swift](Tests/AdaEditorTests/EditorTextSearchTests.swift).
 
 ### Entity scenes and viewport
+
+The scene header uses compact icons for object points, Annotate and Terrain, with
+localized hover tooltips and active-state highlights. The Show/Hide object points
+button controls the transform-origin
+cross markers in both 2D and 3D. They are hidden by default per viewport; transform
+handles, camera/light/audio gizmos and annotation markers remain independent.
 
 `.ascn` scene documents, YAML/model serialization, entity hierarchy and selection,
 entity templates, rename/delete/duplicate/copy/paste/reparent operations.
@@ -207,6 +255,13 @@ Coverage: [EditorSpritePickingTests.swift](Tests/AdaEditorTests/EditorSpritePick
 Selection reuses the parsed scene model and retains preview entities for editor-only
 state changes. Large terrain payloads use bulk YAML node construction; regression
 coverage: [EditorSceneSelectionRegressionTests.swift](Tests/AdaEditorTests/EditorSceneSelectionRegressionTests.swift).
+Each workbench pane keeps only its last scene preview mounted while displaying code.
+The hidden preview disables input and suspends hosted world updates, including after
+native window activation. Returning to the scene reuses its prepared world; closing
+or replacing the retained scene releases it. Hidden hierarchies do not prepare rows.
+Preserve the one-scene-per-pane bound and code input ownership when changing tabs.
+Lifecycle coverage: `EditorWorkbenchSplitTests.retainedScenePresentation` and
+`EditorScenePerformanceRegressionTests.retainedScenePausesHostedFrames`.
 Large scene documents decode off the UI actor; previews prepare model/LOD/Spine
 assets asynchronously and install entities in batches while hosted frames are
 suspended. They retain shared handles per preview world, cancel stale loads and reuse unchanged imports. JSON
@@ -216,6 +271,9 @@ matching texture contents without retaining unused GPU textures in the index.
 Guide: [SceneLoading.md](Documentation/SceneLoading.md). Coverage:
 [EditorSceneAssetCacheTests.swift](Tests/AdaEditorTests/EditorSceneAssetCacheTests.swift).
 The hierarchy and project tree own hover state and drawing caches per mounted row.
+Project-switcher and Targets/Files picker rows use `EditorPickerRowButtonStyle`
+with full-row hit areas and hover feedback layered over the saved selection color.
+Pointer enter/leave, padding clicks and selection coverage: `EditorPickerHoverTests`.
 Pointer-motion and neighboring-row cache coverage:
 [EditorSidebarHoverTests.swift](Tests/AdaEditorTests/EditorSidebarHoverTests.swift).
 Window dispatch coalesces consecutive hover moves while preserving the raw scene
@@ -255,11 +313,19 @@ Coverage: [EditorSceneEditingTests.swift](Tests/AdaEditorTests/EditorSceneEditin
 
 ### Inspector and components
 
+Inspector subgroup headers use a stable FNV-1a hash of the component/scriptable
+ID and full group path for their tint. Keep colors independent of translated
+titles, foldout state and Swift's per-process randomized Hasher.
+
 Add/remove components, typed property controls, asset/entity references,
 attachable scripts and exported script fields. Built-in and reflected component
 descriptors share the inspector catalog. Specialized editing exists for 2D/3D
 physics shapes, mesh primitives/material parameters, cameras, lights, 3D
 environment, tile maps and UI components. Live Play inspection has its own model.
+Environment 3D's Color Correction group supports smooth master/R/G/B curves and
+horizontal-strip texture LUTs with a shared strength and an off mode. Curve drags
+commit one history edit. See [../Documentation/ColorCorrection.md](../Documentation/ColorCorrection.md).
+Coverage: `EditorColorCorrectionTests` and engine `ColorCurves3DTests`.
 The reflected `ParticleEmitter3D` component authors world-space smoke/dust settings;
 runtime emission uses instanced soft billboards. See `../Documentation/Particles3D.md`
 for behavior and rendering boundaries.
@@ -378,6 +444,19 @@ Coverage: [EditorTextureAtlasTests.swift](Tests/AdaEditorTests/EditorTextureAtla
 
 ### Build, Play, preview and export
 
+The shared desktop toolbar has named build targets and an Edit Build Targets
+dialog (create/duplicate/rename/delete, scene, Debug/Release, destination, arguments
+and file/resource selection). `.ada/project.json` stores `buildTargets` and
+`activeBuildTargetID`. Activation projects settings onto the ordinary project
+fields; `ProjectSystem.saveProject` captures subsequent Project Settings edits
+into the active target. Preserve this projection when adding consumers. Target
+editing is a disposable draft until Save. Legacy projects gain no targets until
+the user saves the editor. AdaScript project-source membership applies to the
+builder and scriptable-object/export catalog; dependencies stay included. Desktop
+native exports use per-target output subdirectories. Browser/phone target editing
+is not exposed. See [BuildExport.md](Documentation/BuildExport.md) and
+`EditorBuildTargetsTests`.
+
 The shared desktop toolbar includes Movie Maker capture settings: project/current
 scene, FPS, resolution, duration, output path and audio. Preferences persist per
 project in `.ada/workspace/movie-maker.json`. Recording uses the engine's fixed-step
@@ -486,7 +565,13 @@ Coverage: [EditorStudioToolsTests.swift](Tests/AdaEditorTests/EditorStudioToolsT
 
 Desktop and visionOS Studio offer an **Editor / Agent** interface switch in the top
 bar. Agent Interface uses a project session tree, conversation tabs, the existing
-agent transcript/composer and a document workspace opened on demand. Conversation
+agent transcript/composer and a document workspace opened on demand. Its right
+activity strip exposes Files, Workspaces (existing open editors/previews) and
+Source Control without changing the standard editor panel preferences. File and
+diff selection reveal the document workspace. The conversation/document divider
+has a visible grip and supports dragging; the rounded document panel clips its
+contents. The session list shows an overflow scrollbar and keeps its header and
+Settings fixed. Conversation
 content uses a centered column up to 800 points wide; Retry/New Session stay at
 the right edge of the full-width tab toolbar. Completed
 agent diff events expose changed files; opening one uses the production document
@@ -509,8 +594,20 @@ navigation remains available. Play, model previews and individual rendered UI
 widgets are outside this path. Coverage: `EditorSceneAnnotationTests` and the
 mounted annotation editor check in `EditorLocalizationTests`.
 
-Desktop Git status, staging, commit, stash, pull/push, branch creation/checkout,
-history and diff review. Agent Chat includes transcript/session persistence,
+Desktop Source Control offers Git and Lore, including at project creation
+(None / Git / Lore). New projects preselect Lore where it is supported, with Git
+as the fallback. The Lore selection includes an introduction and official documentation link.
+The choice persists per project. Both providers support
+status, staging, commit, pull/push, branches, history and diff review; Stash is
+Git-only. Lore uses native bindings on macOS Apple silicon, Windows x64 and Linux
+x86_64/ARM64. Windows and Linux preparation include the pinned C SDK; packaging
+bundles `lore.dll` or `liblore.so` with license notices. The Linux launcher selects
+the prepared library through `LD_LIBRARY_PATH`. See
+[SourceControl.md](Documentation/SourceControl.md) and `../Tools/Lore/README.md`.
+Core Windows repository lifecycle, binary diff and preference tests are present;
+these do not establish packaged Studio UI validation. Linux SDK staging and ELF
+linking are checked; the bindings' runtime and Studio UI still need a Linux run.
+Agent Chat includes transcript/session persistence,
 attachments, context selection, permissions, skills and agent settings.
 The shared sidebar/workspace composer offers a debounced, full-draft completion
 while typing and up to three next-message suggestions after a successful saved

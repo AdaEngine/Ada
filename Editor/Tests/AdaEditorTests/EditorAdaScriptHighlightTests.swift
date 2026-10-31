@@ -7,6 +7,30 @@ import Testing
 
 @MainActor @Suite(.serialized)
 struct EditorAdaScriptHighlightTests {
+    @Test("Windows line endings keep every annotation and keyword colored", arguments: [false, true])
+    func windowsLineEndings(semantic: Bool) throws {
+        let source = "@component(id: \"test\")\r\nstruct Commands {\r\n    @export var first = false;\r\n    @export var second = true;\r\n    @export var title = \"Склад 🧰\";\r\n}"
+        let palette = EditorCodeColorPalette.dark
+        let model = EditorWorkbenchViewModel()
+        var document = EditorTextDocument(id: "crlf", title: "Commands.ada", relativePath: "Commands.ada", language: .ada, content: source, errorMessage: nil)
+        if semantic { document.semanticTokens = EditorGravityLanguageService.semanticTokens(text: source) }
+        model.open(.text(document))
+        let container = UIContainerView(rootView: makeView(document: document, model: model, palette: palette).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 900, height: 400)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        let node = try #require(editorNode(in: container.viewTree.rootNode))
+        for line in 2...4 {
+            for column in 4..<11 {
+                #expect(node.tokenSpans.contains {
+                    $0.line == line && $0.startColumn <= column && column < $0.startColumn + $0.length && $0.color == palette.annotationColor
+                })
+            }
+            #expect(node.tokenSpans.contains { $0.line == line && $0.startColumn == 12 && $0.length == 3 && $0.color == palette.keyword })
+        }
+        #expect(EditorGravityLanguageService.semanticTokens(text: source) == EditorGravityLanguageService.semanticTokens(text: source.replacingOccurrences(of: "\r\n", with: "\n")))
+        #expect(EditorGravityLanguageService.editorLocation(lspLine: 4, utf16Character: 34, text: source).character == 33)
+    }
     init() {
         if unsafe RenderEngine.shared == nil {
             unsafe RenderEngine.configurations.preferredBackend = .headless
@@ -112,8 +136,18 @@ struct EditorAdaScriptHighlightTests {
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
         let node = try #require(editorNode(in: container.viewTree.rootNode))
-        #expect(node.showsIndentationMarkers)
+        #expect(!node.showsIndentationMarkers)
+        #expect(!node.showsIndentationGuides)
+        #expect(!node.showsTabMarkers)
+        #expect(!node.showsSpaceMarkers)
         #expect(node.foldingStyle == .braces)
+        settings.showsIndentationMarkers = true
+        for _ in 0..<10 {
+            await Task.yield()
+            container.update(1 / 60)
+            container.layoutIfNeeded()
+        }
+        #expect(node.showsIndentationMarkers)
         settings.showsSpaceMarkers = false
         for _ in 0..<10 {
             await Task.yield()

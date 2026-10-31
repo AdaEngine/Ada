@@ -243,7 +243,7 @@ extension EditorViewModel {
 
         do {
             try newFileKind.initialContent(fileName: fileName).write(to: destinationURL, atomically: true, encoding: .utf8)
-            projectSidebar.items = Self.projectTreeItems(for: project, fileManager: fileManager)
+            projectSidebar.replaceItems(Self.projectTreeItems(for: project, fileManager: fileManager))
             toolbar.searchableItems = projectSidebar.items
             syncInspectorTextureAssets()
             refreshSourceControl()
@@ -394,9 +394,9 @@ extension EditorViewModel {
             settings.run.arguments = Self.lineList(from: projectRunArgumentsText)
             if let runtime {
                 settings.runtime = runtime
-                if settings.build.system.isAdaScript {
-                    settings.runtime.entry.scene = settings.editor.startupScene
-                }
+            }
+            if settings.build.system.isAdaScript {
+                settings.runtime.entry.scene = settings.editor.startupScene
             }
             try EditorProjectStore(fileManager: fileManager).saveProjectSettings(settings, at: projectURL, targetName: targetName)
             projectSettingsStatusMessage =

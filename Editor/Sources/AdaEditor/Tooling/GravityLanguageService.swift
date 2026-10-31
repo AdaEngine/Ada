@@ -220,7 +220,7 @@ struct EditorGravityLanguageService: Sendable {
     }
 
     private static func lspPosition(from position: EditorSourceLocation, in text: String) -> GravitySourcePosition {
-        let lines = text.components(separatedBy: .newlines)
+        let lines = EditorSourceLines.split(text)
         guard lines.indices.contains(position.line) else {
             return GravitySourcePosition(line: position.line, utf16Column: position.character)
         }
@@ -238,7 +238,7 @@ struct EditorGravityLanguageService: Sendable {
     }
 
     private static func editorPosition(from position: GravitySourcePosition, in text: String) -> EditorSourceLocation {
-        let lines = text.components(separatedBy: .newlines)
+        let lines = EditorSourceLines.split(text)
         guard lines.indices.contains(position.line) else {
             return EditorSourceLocation(line: position.line, character: position.utf16Column)
         }

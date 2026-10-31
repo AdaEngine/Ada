@@ -96,6 +96,7 @@ struct EditorAdaScriptProjectBuilder {
         let sourceRoot = project.paths.sources ?? "Sources"
         let sources =
             try loadSources(at: projectURL.appendingPathComponent(sourceRoot, isDirectory: true), toolsRoot: projectURL.appendingPathComponent("Tools"))
+                .filter { project.includesSource(relativePath: $0.path) }
                 .map { source in
                     let projectPath = sourceRoot + "/" + source.path
                     return AdaScriptSource(path: source.path, source: sourceOverrides[projectPath] ?? source.source)

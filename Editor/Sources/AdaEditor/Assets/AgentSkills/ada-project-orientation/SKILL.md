@@ -10,6 +10,7 @@ Start from the project rather than assumptions.
 
 - Use `editor.project.context` to identify the open project and active document. Use `editor.scene.list_open` to find scene documents already open in the editor.
 - Read `.ada/project.json` first. Treat `build.system`, declared source and resource roots, runtime entry, plugins, and run destination as authoritative.
+- If `buildTargets` exists, identify the entry selected by `activeBuildTargetID` and check its projection into top-level build/run/runtime settings. Read `ada-build-run` before creating or switching targets. Keep a test-scene target separate from the main game; an open scene tab does not select the product entry. Projects without targets retain their legacy settings.
 - Use the term AdaScript in user-facing text. `adascript` is the canonical build-system value; `gravity` is legacy compatibility only.
 - Read a nearby `AGENTS.md`, project README, and relevant AdaEngine DocC before choosing an API or file format.
 - Keep every file operation inside the opened project or an explicitly allowed resource root.

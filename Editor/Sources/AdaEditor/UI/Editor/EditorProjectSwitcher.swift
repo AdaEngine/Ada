@@ -126,7 +126,7 @@ struct EditorProjectSwitcherPanel: View {
                 .padding(.horizontal, 12)
                 .frame(height: 36)
             }
-            .buttonStyle(DefaultButtonStyle())
+            .buttonStyle(EditorPickerRowButtonStyle(theme: theme))
             .accessibilityIdentifier("AdaEditor.ProjectSwitcher.OpenLocalProject")
         }
         .frame(width: EditorProjectSwitcherLayout.width, height: EditorProjectSwitcherLayout.height, alignment: .topLeading)
@@ -239,12 +239,12 @@ struct EditorProjectSwitcherPanel: View {
             }
             .padding(.horizontal, 10)
             .frame(width: EditorProjectSwitcherLayout.rowWidth, height: EditorProjectSwitcherLayout.rowHeight, alignment: .leading)
-            .background(
-                RoundedRectangleShape(cornerRadius: 6)
-                    .fill(isCurrent ? theme.editorColors.surface.opacity(0.72) : .clear)
-            )
         }
-        .buttonStyle(DefaultButtonStyle())
+        .buttonStyle(EditorPickerRowButtonStyle(
+            theme: theme,
+            selectionColor: isCurrent ? theme.editorColors.surface.opacity(0.72) : .clear,
+            cornerRadius: 6
+        ))
         .padding(.horizontal, 6)
         .accessibilityIdentifier("AdaEditor.ProjectSwitcher.Project.\(project.id)")
     }

@@ -11,6 +11,8 @@ import subprocess
 import tarfile
 import tempfile
 
+from ensure_linux_lore import ensure as ensure_lore
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -42,6 +44,12 @@ def package(binary_directory, compiler, tint, swan, dawn, output, version):
         shutil.copy2(tint, directory / "AdaEngine_AdaRender.resources/tint")
         runtime = directory / "lib"
         runtime.mkdir()
+        lore_sdk = ensure_lore()
+        shutil.copy2(lore_sdk / "liblore.so", runtime / "liblore.so")
+        lore_notices = directory / "ThirdPartyNotices/Lore"
+        lore_notices.mkdir(parents=True, exist_ok=True)
+        for notice in ("LICENSE.txt", "THIRD-PARTY-NOTICES.txt"):
+            shutil.copy2(lore_sdk / notice, lore_notices / notice)
         for path in metadata["paths"]["runtimeLibraryPaths"]:
             for library in Path(path).glob("*.so*"):
                 if not (runtime / library.name).exists():
@@ -83,7 +91,7 @@ exec "$root/AdaEditor" "$@"
         # Resolve every executable with the bundled runtime, detecting missing host dependencies.
         environment = os.environ | {"LD_LIBRARY_PATH": str(runtime)}
         for executable in (directory / "AdaEditor", directory / "gravity-lsp", directory / "AdaPackageTool",
-                           directory / "BuildSDK/AdaScript/gravity", directory / "AdaEngine_AdaRender.resources/tint"):
+                           directory / "BuildSDK/AdaScript/gravity", directory / "AdaEngine_AdaRender.resources/tint", runtime / "liblore.so"):
             result = subprocess.run(["ldd", str(executable)], env=environment, text=True, capture_output=True)
             if "not found" in result.stdout or result.returncode not in (0, 1):
                 raise RuntimeError("Unresolved Linux dependencies: " + result.stdout + result.stderr)

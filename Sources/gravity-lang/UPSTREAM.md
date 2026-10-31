@@ -26,6 +26,9 @@ Byte counts matter for both non-ASCII text and CRLF: Swift counts a CRLF pair as
 one Character, while the C lexer consumes two bytes. The previous count truncated
 Windows source files and Cyrillic text.
 
+Local CMake build settings require C11 for the VM's atomic GC callbacks and
+enable `/experimental:c11atomics` when compiling with MSVC.
+
 `ADAENGINE_GRAVITY_PACKAGE_PATH` still selects an external development checkout.
 Changes here must preserve the pinned ABI and be verified through the real AdaScript
 VM, AOT fixtures and engine integration tests.

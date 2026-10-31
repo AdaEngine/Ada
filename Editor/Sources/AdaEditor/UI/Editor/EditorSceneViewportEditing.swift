@@ -3,6 +3,8 @@ import Foundation
 
 extension EditorSceneViewportView {
     func configureViewportModel() {
+        let span = AdaTrace.startSpan("AdaEditor.SceneViewport.configureModel")
+        defer { span.end() }
         let viewportModel = viewportModel
         let inspectorViewModel = inspectorViewModel
         let document = document

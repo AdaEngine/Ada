@@ -1,3 +1,4 @@
+import AdaUtils
 import Foundation
 
 private struct EditorDocumentSession: Codable {
@@ -24,6 +25,8 @@ extension EditorViewModel {
             return
         }
         do {
+            let span = AdaTrace.startSpan("AdaEditor.DocumentSession.persist")
+            defer { span.end() }
             let data = try JSONEncoder().encode(EditorDocumentSession(relativePath: path))
             try fileManager.createDirectory(at: sessionURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try data.write(to: sessionURL, options: .atomic)

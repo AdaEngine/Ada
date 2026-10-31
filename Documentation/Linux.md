@@ -137,6 +137,14 @@ requires the host Swift toolchain and development packages. Override
 `ADA_STUDIO_SCRATCH_PATH`, `ADA_STUDIO_CONFIGURATION`, `ADA_STUDIO_VERSION` or
 `ADAENGINE_SWIFT_JOBS` when needed. Use an ext4 scratch directory under WSL.
 
+Studio offers Git or Lore during project creation and in Source Control. The
+launcher prepares the pinned Lore SDK for Linux x86_64 or ARM64 through
+`script/ensure_linux_lore.py`, and the distribution bundles `liblore.so` and its
+license notices. Manual builds/tests must also export `LORE_LINUX_SDK_PATH`,
+`ADAEDITOR_LORE_PACKAGE_PATH` and the SDK directory in `LD_LIBRARY_PATH`; see
+[Source control](../Editor/Documentation/SourceControl.md). SDK staging and ELF
+linking have been checked separately; a Linux Studio runtime check is still needed.
+
 To run catalog games with the current engine without changing their upstream
 checkout:
 

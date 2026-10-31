@@ -333,6 +333,12 @@ extension EditorWorkbenchViewModel {
         }
     }
 
+    func addSceneGroup(documentID: String, parentID: String?) {
+        updateSceneModelDocument(id: documentID, status: L10n.text("Group added")) { model in
+            _ = model.addEntity(name: L10n.text("Group"), parentID: parentID)
+        }
+    }
+
     func presentEntityPicker(documentID: String, parentID: String?) {
         guard sceneDocument(id: documentID)?.isReadOnly == false else {
             return

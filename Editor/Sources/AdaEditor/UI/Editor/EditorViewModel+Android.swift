@@ -101,10 +101,12 @@ extension EditorViewModel {
             serial = nil
             abi = "arm64-v8a"
           }
-          let output = projectURL.appendingPathComponent("Exports/Android")
+          var output = projectURL.appendingPathComponent("Exports/Android")
+          if let directory = project.buildTargetExportSubdirectory { output.appendPathComponent(directory) }
           let result = try await EditorAndroidProjectExporter(runner: runner).export(
             project: project, at: projectURL, to: output,
-            sdk: sdk, configuration: configuration, abi: abi, product: product, log: log)
+            sdk: sdk, configuration: configuration, abi: abi, product: product,
+            buildConfiguration: project.build.configuration ?? "debug", log: log)
           let apk = try EditorAndroidProjectExporter.apk(in: result)
           appendOutput("Android APK ready: \(apk.path)")
           if let serial {

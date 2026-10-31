@@ -30,46 +30,101 @@ struct EditorAgentWorkspace: View {
     let viewModel: EditorViewModel
     @Environment(\.theme) private var theme
 
+    @State private var splitState = EditorWorkbenchResizeState()
+    @State private var navigator: EditorAgentNavigatorTab?
+
     var body: some View {
         GeometryReader { geometry in
             let sidebarWidth = min(310, max(220, geometry.size.width * 0.25))
-            let showsSidebar = geometry.size.width >= 680
-            let inlineArtifact = geometry.size.width >= 1000
-            HStack(spacing: showsSidebar ? 8 : 0) {
+            let showsSidebar = geometry.size.width >= 680 && (navigator == nil || geometry.size.width >= 1200)
+            HStack(spacing: 0) {
                 if showsSidebar {
-                    sessions
-                        .frame(width: sidebarWidth)
+                    sessions.frame(width: sidebarWidth).padding(.trailing, 8)
                 }
-                VStack(spacing: 0) {
-                    workspaceTools
-                    HStack(spacing: viewModel.interface.showsArtifact && inlineArtifact ? 8 : 0) {
-                        if !viewModel.interface.showsArtifact || inlineArtifact {
-                            EditorAgentSidebar(
-                                viewModel: viewModel.agent,
-                                onOpenCatalog: { viewModel.presentSettings(.agent) },
-                                presentation: .workspace,
-                                onOpenChangedFile: viewModel.openAgentChangedFile
-                            )
-                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                        }
-                        if viewModel.interface.showsArtifact {
-                            artifact
-                                .frame(width: inlineArtifact ? geometry.size.width * 0.40 : nil)
-                                .frame(
-                                    minWidth: inlineArtifact ? nil : 0,
-                                    maxWidth: inlineArtifact ? nil : .infinity,
-                                    minHeight: 0,
-                                    maxHeight: .infinity
-                                )
-                        }
-                    }
+                conversationAndArtifact
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                if let navigator {
+                    EditorAgentNavigator(viewModel: viewModel, tab: navigator, onSelectTab: selectNavigator)
+                        .frame(width: min(300, geometry.size.width * 0.3))
+                        .padding(.leading, 8)
                 }
-                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                navigationStrip.padding(.leading, 8)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .accessibilityIdentifier("AdaEditor.AgentWorkspace")
+    }
+
+    private var conversationAndArtifact: some View {
+        GeometryReader { geometry in
+            let inlineArtifact = geometry.size.width >= 640
+            if viewModel.interface.showsArtifact && inlineArtifact {
+                EditorWorkbenchPanelsLayout(state: splitState) {
+                    conversation
+                    EditorResizeHandle(
+                        axis: .horizontal,
+                        onResize: { splitState.resize(translation: $0.width, availableWidth: geometry.size.width) },
+                        onResizeEnded: { splitState.endDrag() },
+                        showsGrip: true
+                    )
+                    .accessibilityIdentifier("AdaEditor.AgentWorkspace.ResizeArtifact")
+                    artifact
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height)
+            } else if viewModel.interface.showsArtifact {
+                artifact
+            } else {
+                conversation
+            }
+        }
+    }
+
+    private var conversation: some View {
+        EditorAgentSidebar(
+            viewModel: viewModel.agent,
+            onOpenCatalog: { viewModel.presentSettings(.agent) },
+            presentation: .workspace,
+            onOpenChangedFile: viewModel.openAgentChangedFile
+        )
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+    }
+
+    private var navigationStrip: some View {
+        VStack(spacing: 8) {
+            adaEditorStripButton(
+                .init(
+                    identifier: "agent.artifact",
+                    title: viewModel.interface.showsArtifact ? L10n.text("Back to Chat") : L10n.text("Show Workspace"),
+                    icon: "\u{E8F1}"
+                ),
+                active: viewModel.interface.showsArtifact,
+                theme: theme,
+                tooltipEdge: .right,
+                action: { viewModel.interface.showsArtifact.toggle() }
+            )
+            .accessibilityIdentifier("AdaEditor.AgentWorkspace.ToggleArtifact")
+            Divider()
+            ForEach(EditorAgentNavigatorTab.allCases, id: \.self) { tab in
+                adaEditorStripButton(
+                    .init(identifier: "agent.\(tab.rawValue)", title: L10n.tr(tab.title), icon: tab.icon),
+                    active: navigator == tab,
+                    theme: theme,
+                    tooltipEdge: .right,
+                    action: { selectNavigator(navigator == tab ? nil : tab) }
+                )
+            }
+            Spacer()
+        }
+        .padding(.vertical, 8)
+        .frame(width: 36)
+        .accessibilityIdentifier("AdaEditor.AgentWorkspace.Navigation")
+    }
+
+    private func selectNavigator(_ tab: EditorAgentNavigatorTab?) {
+        navigator = tab
+        if tab == .files {
+            viewModel.projectSidebar.selectDisplayMode(.files)
+        }
     }
 
     private var sessions: some View {
@@ -96,7 +151,7 @@ struct EditorAgentWorkspace: View {
             }
             .padding(.horizontal, 14)
             .frame(height: 32)
-            ScrollView {
+            ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(viewModel.agent.sessions, id: \.id) { session in
                         sessionRow(session)
@@ -107,7 +162,8 @@ struct EditorAgentWorkspace: View {
                 }
                 .padding(.horizontal, 8)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            .accessibilityIdentifier("AdaEditor.AgentWorkspace.Sessions.ScrollView")
             Button(action: { viewModel.presentSettings(.agent) }) {
                 HStack(spacing: 8) {
                     Text("\u{E8B8}").font(AdaEditorMaterialSymbolFont.font(size: 17))
@@ -122,6 +178,7 @@ struct EditorAgentWorkspace: View {
         }
         .background(RoundedRectangleShape(cornerRadius: 9).fill(theme.editorColors.surface))
         .overlay { adaEditorPanelBorder(theme: theme, cornerRadius: 9) }
+        .mask(RoundedRectangleShape(cornerRadius: 9))
         .accessibilityIdentifier("AdaEditor.AgentWorkspace.Sessions")
     }
 
@@ -172,24 +229,6 @@ struct EditorAgentWorkspace: View {
         }
     }
 
-    private var workspaceTools: some View {
-        HStack(spacing: 8) {
-            Text(viewModel.agent.projectName).font(.system(size: 11)).foregroundColor(theme.editorColors.muted).lineLimit(1)
-            Spacer()
-            Button(action: { viewModel.interface.showsArtifact.toggle() }) {
-                HStack(spacing: 5) {
-                    Text("\u{E8F1}").font(AdaEditorMaterialSymbolFont.font(size: 15))
-                    Text(viewModel.interface.showsArtifact ? "Back to Chat" : "Show Workspace").font(.system(size: 11))
-                }
-                .foregroundColor(theme.editorColors.blue)
-            }
-            .buttonStyle(DefaultButtonStyle())
-            .accessibilityIdentifier("AdaEditor.AgentWorkspace.ToggleArtifact")
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 30)
-    }
-
     private var artifact: some View {
         VStack(spacing: 0) {
             HStack {
@@ -207,7 +246,9 @@ struct EditorAgentWorkspace: View {
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }
         .foregroundColor(theme.editorColors.text)
-        .background(theme.editorColors.surface)
+        .background(RoundedRectangleShape(cornerRadius: 9).fill(theme.editorColors.surface))
+        .mask(RoundedRectangleShape(cornerRadius: 9))
+        .overlay { adaEditorPanelBorder(theme: theme, cornerRadius: 9) }
         .accessibilityIdentifier("AdaEditor.AgentWorkspace.Artifact")
     }
 

@@ -90,12 +90,14 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
     var coding: EditorComponentFieldCoding = .standard
     var defaultValue: EditorSceneValue?
     var minimumValue: Double?
+    var groupPath: [String] = []
 
-    init(key: String, label: String, kind: EditorComponentFieldKind, isEditable: Bool = true) {
+    init(key: String, label: String, kind: EditorComponentFieldKind, isEditable: Bool = true, groupPath: [String] = []) {
         self.key = key
         self.label = label
         self.kind = kind
         self.isEditable = isEditable
+        self.groupPath = Array(groupPath.prefix(4))
     }
 
     func displayValue(in payload: EditorComponentPayload) -> String {
@@ -427,7 +429,8 @@ enum EditorComponentRegistry {
                     key: $0.key,
                     label: $0.label,
                     kind: EditorComponentFieldKind(reflectedKind: $0.kind),
-                    isEditable: $0.isWritable
+                    isEditable: $0.isWritable,
+                    groupPath: $0.groupPath
                 )
             },
             makeDefaultPayload: { [:] },

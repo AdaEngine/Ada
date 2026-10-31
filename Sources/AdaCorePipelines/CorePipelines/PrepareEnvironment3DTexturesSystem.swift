@@ -18,10 +18,12 @@ public struct PrepareEnvironment3DTexturesSystem {
 
     @Res<ExtractedEnvironment3D> private var environments
     @Res<RenderDeviceHandler> private var device
+    @ResMut<ColorCorrection3DViews> private var colorCorrection
 
     public init(world _: World) {}
 
     public func update(context _: UpdateContext) {
+        var activeViews: Set<Entity.ID> = []
         cameras.forEach { _, camera, renderGraph, target, source in
             guard
                 renderGraph.subgraphLabel == .main3D,
@@ -72,6 +74,8 @@ public struct PrepareEnvironment3DTexturesSystem {
                 target.indirectLighting3DTexture = RenderTexture(size: size, scaleFactor: scale, format: .rgba_16f, debugLabel: "3D Opaque Indirect Light")
             }
             let environment = environments.environments[source.entityId] ?? Environment3D()
+            activeViews.insert(source.entityId)
+            colorCorrection.prepare(environment.postProcess.colorGrading, view: source.entityId)
             let hybrid = environment.imageBasedLighting?.asset.asset != nil && environment.screenSpaceReflection.isEnabled
                 && environment.debugView == .none && device.renderDevice.supportsHybridReflections
             if hybrid && target.reflectionResponse3DTexture?.size != size {
@@ -97,6 +101,9 @@ public struct PrepareEnvironment3DTexturesSystem {
                 target.antiAliasing3DInputTexture = RenderTexture(size: size, scaleFactor: scale, format: .bgra8, debugLabel: "3D Pre AA Color")
             }
             target.rendering3DUsesEnvironmentTargets = true
+        }
+        if colorCorrection.entries.keys.contains(where: { !activeViews.contains($0) }) {
+            colorCorrection.entries = colorCorrection.entries.filter { activeViews.contains($0.key) }
         }
     }
 }

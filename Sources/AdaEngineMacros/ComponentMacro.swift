@@ -5,6 +5,7 @@
 //  Created by v.prusakov on 2/14/24.
 //
 
+import Foundation
 import SwiftDiagnostics
 import SwiftOperators
 import SwiftSyntax
@@ -59,6 +60,26 @@ public struct ComponentMacro: ExtensionMacro {
 }
 
 extension ComponentMacro {
+    private static func inspectorGroup(in declaration: VariableDeclSyntax) throws -> String {
+        for element in declaration.attributes {
+            guard let attribute = element.as(AttributeSyntax.self),
+                  attribute.attributeName.trimmedDescription.split(separator: ".").last == "Export",
+                  let arguments = attribute.arguments?.as(LabeledExprListSyntax.self),
+                  let group = arguments.first(where: { $0.label?.text == "group" }) else { continue }
+            guard let literal = group.expression.as(StringLiteralExprSyntax.self),
+                  literal.segments.allSatisfy({ $0.is(StringSegmentSyntax.self) }) else {
+                throw MacroError.macroUsage("Export group must be a string literal with one to four '/'-separated names.")
+            }
+            let names = literal.segments.compactMap { $0.as(StringSegmentSyntax.self)?.content.text }
+                .joined().split(separator: "/", omittingEmptySubsequences: false)
+            guard (1...4).contains(names.count), names.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+                throw MacroError.macroUsage("Export group must contain one to four nonempty '/'-separated names.")
+            }
+            return group.expression.trimmedDescription
+        }
+        return "nil"
+    }
+
     private struct ExplicitRuntimeConstructor {
         let body: String
         let parameters: [String]
@@ -112,7 +133,7 @@ extension ComponentMacro {
         requiredComponents: [String]
     ) throws -> [SwiftSyntax.ExtensionDeclSyntax] {
         let isPublic = structDecl.modifiers.contains { ["public", "package"].contains($0.name.text) }
-        let properties = structDecl.memberBlock.members.compactMap { member -> (String, TypeSyntax, String, Bool)? in
+        let properties = try structDecl.memberBlock.members.compactMap { member -> (String, TypeSyntax, String, Bool, String)? in
             guard let declaration = member.decl.as(VariableDeclSyntax.self),
                 !declaration.modifiers.contains(where: { ["static", "class"].contains($0.name.text) }),
                 !declaration.attributes.contains(where: { element in
@@ -134,14 +155,15 @@ extension ComponentMacro {
                         !list.contains(where: { $0.accessorSpecifier.text == "set" }) { writable = false }
                 }
             }
-            return (identifier, type, access, writable)
+            let group = try inspectorGroup(in: declaration)
+            return (identifier, type, access, writable, group)
         }
         // Private implementation state is not a script capability. Public components expose their public API.
-        let exposed = properties.filter { _, _, access, _ in
+        let exposed = properties.filter { _, _, access, _, _ in
             access != "private" && access != "fileprivate" && (!isPublic || access == "public")
         }
 
-        let functions = properties.filter { $0.3 }.map { propertyName, propertyType, accessModifier, _ in
+        let functions = properties.filter { $0.3 }.map { propertyName, propertyType, accessModifier, _, _ in
             """
             \(accessModifier) func set\(propertyName.capitalizingFirstLetter())(_ value: \(propertyType)) -> Self {
                 var newValue = self
@@ -151,7 +173,7 @@ extension ComponentMacro {
             """
         }
 
-        let reflectedFields = exposed.map { propertyName, propertyType, _, writable in
+        let reflectedFields = exposed.map { propertyName, propertyType, _, writable, group in
             let writeBody = writable ? """
                 guard var typedComponent = component as? Self else { return nil }
                 guard AdaECS.ComponentReflection.write(fieldValue, to: &typedComponent.\(propertyName)) else { return nil }
@@ -169,6 +191,7 @@ extension ComponentMacro {
                 label: "\(propertyName.reflectedFieldLabel)",
                 kind: AdaECS.ComponentReflection.kind(for: \(propertyType).self),
                 isWritable: \(writable) && AdaECS.ComponentReflection.isWritable(\(propertyType).self),
+                group: \(group),
                 accepts: { fieldValue in
                     AdaECS.ComponentReflection.accepts(fieldValue, for: \(propertyType).self)
                 },
@@ -190,7 +213,7 @@ extension ComponentMacro {
             """
         }
 
-        let runtimeConstructorParameters = exposed.filter { $0.3 }.map { propertyName, propertyType, _, _ in
+        let runtimeConstructorParameters = exposed.filter { $0.3 }.map { propertyName, propertyType, _, _, _ in
             """
             AdaECS.RuntimeComponentConstructorParameter(
                 name: "\(propertyName)",
@@ -198,7 +221,7 @@ extension ComponentMacro {
             )
             """
         }
-        let runtimeConstructorAssignments = exposed.filter { $0.3 }.map { propertyName, propertyType, _, _ in
+        let runtimeConstructorAssignments = exposed.filter { $0.3 }.map { propertyName, propertyType, _, _, _ in
             """
             if AdaECS.ComponentReflection.isWritable(\(propertyType).self) {
                 if let fieldValue = arguments[argumentIndex],

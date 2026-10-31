@@ -22,6 +22,7 @@ ada_validation_package="$("$ada_validation_python" script/webgpu_validation_pack
 # The GPU suites share one process-wide renderer, so the validation package runs its tests one at a time.
 ada_validation_filter='PluginLoadingTests|TintToolchainTests|TintShaderCompilerTests|WGSLReflectionTests|ShaderGraph|SpriteGraphs|SpriteMetalRenderingTests/rendersLayoutsAndPickingWithWebGPU|SpriteMetalRenderingTests/rendersTileOcclusionWithWebGPU|BoundedResourceCacheTests|RenderGraphDiagnosticsTests|WindowFrameRequestsTests|WGPUBindingStateTests|WGPUVisibilityProcessorTests|MaterialUploadReuseTests|OptionalResourceTests|ShaderIncluderTests|ShaderCacheKeyTests|RenderUpscalingTests|Render3D|GoldenFrameComparisonTests|GoldenBackendAgreementTests|VisibleMesh3DListsEquivalenceTests'
 ada_validation_filter="$ada_validation_filter|Particle3DTests"
+ada_validation_filter="$ada_validation_filter|ColorCurves3DTests"
 ada_validation_filter="${ADAENGINE_WEBGPU_TEST_FILTER:-$ada_validation_filter}"
 if [[ "${OS:-}" == "Windows_NT" ]]; then
   export ADAENGINE_SHADER_SOURCE_ROOT="$(cygpath -m "$ada_validation_root")"

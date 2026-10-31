@@ -12,7 +12,10 @@ extension EditorSceneModel {
     }
 
     func isRootEntity(_ entityID: String) -> Bool {
-        rootEntityID == entityID
+        // Imported scenes may have many top-level entities. The first one is
+        // not a special root and must remain movable into a new parent group.
+        let roots = entities.filter { $0.parent == nil }
+        return roots.count == 1 && roots.first?.id == entityID
     }
 
     mutating func renameEntity(_ entityID: String, to rawName: String) -> Bool {

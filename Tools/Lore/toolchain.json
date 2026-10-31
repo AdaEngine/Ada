@@ -1,0 +1,19 @@
+{
+  "version": "0.12.0",
+  "windows_x86_64": {
+    "url": "https://github.com/EpicGames/lore/releases/download/v0.12.0/liblore-v0.12.0-x86_64-pc-windows-msvc.zip",
+    "sha256": "0b9f00ec2d118969e6cb6acdc58dce5c246d3b8b16bdfc84797bf2f51c1e7a13"
+  },
+  "swift_repository": "https://github.com/AdaEngine/lore-swift.git",
+  "swift_revision": "dfafa19b40a5c3f04478e2ba1ffe49adc3c90f64",
+  "swift_patch_version": "native-v1",
+  "linux_x86_64": {
+    "url": "https://github.com/EpicGames/lore/releases/download/v0.12.0/liblore-v0.12.0-x86_64-unknown-linux-gnu.tar.gz",
+    "sha256": "6f5ef04bd85428eaefe67e95ae7a00c4accdeb3fcda55c4b58a6663a692301ab"
+  },
+  "linux_aarch64": {
+    "url": "https://github.com/EpicGames/lore/releases/download/v0.12.0/liblore-v0.12.0-aarch64-unknown-linux-gnu.tar.gz",
+    "sha256": "b0072a5dced01f518762c86fba1f5459393d1f713867353065d5cf92d2d2a108"
+  },
+  "swift_patch_file": "native-support.patch"
+}

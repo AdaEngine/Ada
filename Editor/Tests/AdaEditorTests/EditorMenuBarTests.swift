@@ -3,9 +3,13 @@ import Testing
 @testable import AdaEditor
 
 @MainActor
+@Suite(.serialized)
 struct EditorMenuBarTests {
     @Test
     func menuBarContainsEditorWorkflowMenus() {
+        let previousLanguage = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previousLanguage }
+        EditorLocalization.shared.preference = .english
         let menus = EditorMenuBar.makeMenus()
 
         #if os(Windows) || os(Linux)
@@ -24,6 +28,9 @@ struct EditorMenuBarTests {
 
     @Test
     func workflowMenusExposeExpectedActionsAndShortcuts() throws {
+        let previousLanguage = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previousLanguage }
+        EditorLocalization.shared.preference = .english
         let menus = EditorMenuBar.makeMenus()
         let edit = try #require(menus.first { $0.title == "Edit" })
         #expect(edit.items.first { $0.title == "Undo" }?.keyEquivalent == .z)
@@ -45,6 +52,7 @@ struct EditorMenuBarTests {
         let systemTitles = system.items.filter { !$0.isSeparator }.map(\.title)
         let expectedPrefix = EditorDistribution.current == .standalone ? ["Settings...", "Check for Updates…"] : ["Settings..."]
         #expect(systemTitles.starts(with: expectedPrefix))
+        #expect(systemTitles.contains("Movie Maker"))
         #expect(Array(systemTitles.suffix(5)) == [
             "Disable Debug Overlay",
             "Debug Overlay: Redraw",

@@ -34,7 +34,7 @@ struct EditorTextSearchTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let file = root.appendingPathComponent("a.txt")
         try "disk".write(to: file, atomically: true, encoding: .utf8)
-        for folder in [".build", ".git", "node_modules"] {
+        for folder in [".build", ".builds", ".git", "node_modules"] {
             let directory = root.appendingPathComponent(folder)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try "a.b".write(to: directory.appendingPathComponent("ignored.txt"), atomically: true, encoding: .utf8)

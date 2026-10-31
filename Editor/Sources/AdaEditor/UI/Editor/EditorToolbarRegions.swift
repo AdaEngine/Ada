@@ -23,8 +23,8 @@ struct EditorTopToolbarRegion: View {
             onDebug: debugAction,
             onOpenCloud: { viewModel.presentSettings(.general) },
             interface: viewModel.interface,
-            movieMaker: viewModel.movieMaker,
-            onMovieMaker: viewModel.movieMakerToolbarAction
+            buildTargets: viewModel.project == nil ? nil : viewModel.buildTargets,
+            canChangeBuildTarget: viewModel.canChangeBuildTarget
         )
     }
     private var canRun: Bool {

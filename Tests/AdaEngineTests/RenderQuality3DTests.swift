@@ -61,6 +61,8 @@ struct RenderQuality3DIntegrationTests {
         var environments = ExtractedEnvironment3D()
         environments.environments[cameraSource] = Environment3D(ambientOcclusion: .init(isEnabled: true), antiAliasing: .fxaa)
         world.insertResource(environments)
+        world.insertResource(ColorCorrection3DViews())
+        world.insertResource(RenderDeviceHandler(renderDevice: unsafe RenderEngine.shared.renderDevice))
         let scheduler: SchedulerName = "Quality Prepare Test"
         let prepare = PrepareEnvironment3DTexturesSystem(world: world)
         var target = RenderViewTarget()

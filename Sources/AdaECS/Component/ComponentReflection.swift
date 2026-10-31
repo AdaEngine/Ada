@@ -42,6 +42,8 @@ public struct ReflectedComponentField: @unchecked Sendable {
     public var label: String
     public var kind: ReflectedFieldKind
     public var isWritable: Bool
+    /// Explicit inspector subgroup names, from outermost to innermost (maximum four).
+    public var groupPath: [String]
     /// Returns whether the reflected Swift field can represent a value without trapping or losing finiteness.
     public var accepts: @Sendable (ReflectedFieldValue) -> Bool
     public var read: @Sendable (any Component) -> ReflectedFieldValue?
@@ -56,6 +58,7 @@ public struct ReflectedComponentField: @unchecked Sendable {
         label: String,
         kind: ReflectedFieldKind,
         isWritable: Bool,
+        group: String? = nil,
         accepts: @escaping @Sendable (ReflectedFieldValue) -> Bool = { _ in true },
         read: @escaping @Sendable (any Component) -> ReflectedFieldValue?,
         write: @escaping @Sendable (any Component, ReflectedFieldValue) -> (any Component)?
@@ -64,6 +67,7 @@ public struct ReflectedComponentField: @unchecked Sendable {
         self.label = label
         self.kind = kind
         self.isWritable = isWritable
+        self.groupPath = Self.groups(group)
         self.accepts = accepts
         self.read = read
         self.write = write
@@ -77,6 +81,7 @@ public struct ReflectedComponentField: @unchecked Sendable {
         label: String,
         kind: ReflectedFieldKind,
         isWritable: Bool,
+        group: String? = nil,
         accepts: @escaping @Sendable (ReflectedFieldValue) -> Bool = { _ in true },
         read: @escaping @Sendable (any Component) -> ReflectedFieldValue?,
         write: @escaping @Sendable (any Component, ReflectedFieldValue) -> (any Component)?,
@@ -87,11 +92,17 @@ public struct ReflectedComponentField: @unchecked Sendable {
         self.label = label
         self.kind = kind
         self.isWritable = isWritable
+        self.groupPath = Self.groups(group)
         self.accepts = accepts
         self.read = read
         self.write = write
         unsafe self.readPointer = readPointer
         unsafe self.writePointer = writePointer
+    }
+
+    private static func groups(_ group: String?) -> [String] {
+        (group?.split(separator: "/").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } ?? [])
+            .filter { !$0.isEmpty }.prefix(4).map { $0 }
     }
 }
 

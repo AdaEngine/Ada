@@ -84,6 +84,7 @@ struct GitBranch: Equatable, Sendable, Identifiable {
 }
 
 struct GitRepositorySnapshot: Equatable, Sendable {
+    var provider: EditorSourceControlProvider = .git
     var rootURL: URL?
     var diffFiles: [GitDiffFile] = []
     var branchName: String?
@@ -135,7 +136,7 @@ struct GitRepositorySnapshot: Equatable, Sendable {
             return nil
         }
         let title = isDetached ? "Detached HEAD" : branchTitle
-        return "Git: \(title)\(hasChanges ? "*" : "")"
+        return "\(provider.title): \(title)\(hasChanges ? "*" : "")"
     }
 
     var trackingTitle: String {

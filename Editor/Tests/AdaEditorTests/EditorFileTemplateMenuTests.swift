@@ -286,6 +286,7 @@ struct EditorFileTemplateMenuTests {
     }
 
     private func makeSidebar(_ model: EditorViewModel) -> UIContainerView<some View> {
+        model.projectSidebar.expandAll()
         let container = UIContainerView(
             rootView: EditorProjectSidebar(
                 viewModel: model.projectSidebar,

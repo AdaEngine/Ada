@@ -15,7 +15,7 @@ final class EditorFooterViewModel {
     }
 
     func setSourceControlFooterTitle(_ title: String?) {
-        var items = rightItems.filter { !$0.hasPrefix("Git:") }
+        var items = rightItems.filter { !$0.hasPrefix("Git:") && !$0.hasPrefix("Lore:") }
         if let title {
             items.append(title)
         }
@@ -32,6 +32,7 @@ final class EditorFooterViewModel {
 @Observable
 @MainActor
 final class EditorSourceControlViewModel {
+    var provider: EditorSourceControlProvider = .git
     var showsHistory = false
     var showsRepositoryActions = false
     var commits: [GitCommit] = []
@@ -105,8 +106,16 @@ extension EditorViewModel {
         guard let projectURL, !sourceControl.isRunning else {
             return
         }
-        let title = await GitRepositoryService.currentBranchFooter(projectURL: projectURL)
-        guard !Task.isCancelled, self.projectURL == projectURL else {
+        let provider = sourceControl.provider
+        let title: String?
+        if provider == .git {
+            title = await GitRepositoryService.currentBranchFooter(projectURL: projectURL)
+        } else if let lore = sourceControlService as? LoreRepositoryService {
+            title = await lore.currentBranchFooter(projectURL: projectURL)
+        } else {
+            title = await sourceControlService.snapshot(projectURL: projectURL).snapshot.footerTitle
+        }
+        guard !Task.isCancelled, self.projectURL == projectURL, sourceControl.provider == provider else {
             return
         }
         footer.setSourceControlFooterTitle(title)

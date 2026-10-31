@@ -95,17 +95,21 @@ public struct AdaScriptSchemaField: Equatable, Sendable {
     }
 
     public let defaultValue: Value
+    /// Explicit inspector sections, from outermost to innermost, at most four levels.
+    public let groupPath: [String]
     public let network: AdaScriptNetworkFieldSchema?
     public let name: String
 
     public init(
         defaultValue: Value,
         name: String,
-        network: AdaScriptNetworkFieldSchema? = nil
+        network: AdaScriptNetworkFieldSchema? = nil,
+        groupPath: [String] = []
     ) {
         self.defaultValue = defaultValue
         self.name = name
         self.network = network
+        self.groupPath = groupPath
     }
 }
 

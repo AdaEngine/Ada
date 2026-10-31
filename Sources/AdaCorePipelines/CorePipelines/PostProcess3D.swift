@@ -197,7 +197,7 @@ public struct Vignette3D: Codable, Sendable, Equatable {
 }
 
 /// Artistic color controls. `saturation` and `contrast` act on linear HDR before tone mapping; the optional
-/// `lut` is applied to the display-referred color after tone mapping, so it can restyle the final look.
+/// `lut` or `curves` is applied to the display-referred color after tone mapping according to `correctionMode`.
 ///
 /// The LUT is a strip texture of `N` tiles side by side, each `N` by `N` pixels, so it is `N*N` wide and `N`
 /// tall (for example 256 by 16 for `N = 16`). Red grows along x inside a tile, green grows down the rows
@@ -210,17 +210,25 @@ public struct ColorGrading3D: Codable, Sendable, Equatable {
     public var contrast: Float
     /// Optional color lookup table in the strip layout above.
     public var lut: AssetHandle<Texture2D>?
-    /// Blend between the graded and ungraded display color: `0` ignores the LUT, `1` applies it fully.
+    /// Blend strength for both correction modes: `0` preserves the display color, `1` applies correction fully.
     public var lutIntensity: Float
+    /// Selects curves or an imported LUT. Defaults to LUT for compatibility with existing scenes.
+    public var correctionMode: ColorCorrectionMode3D
+    public var curves: ColorCurves3D
 
-    public init(saturation: Float = 1, contrast: Float = 1, lut: AssetHandle<Texture2D>? = nil, lutIntensity: Float = 1) {
+    public init(
+        saturation: Float = 1, contrast: Float = 1, lut: AssetHandle<Texture2D>? = nil, lutIntensity: Float = 1,
+        correctionMode: ColorCorrectionMode3D = .lut, curves: ColorCurves3D = ColorCurves3D()
+    ) {
         self.saturation = saturation
         self.contrast = contrast
         self.lut = lut
         self.lutIntensity = lutIntensity
+        self.correctionMode = correctionMode
+        self.curves = curves
     }
 
-    private enum CodingKeys: CodingKey { case saturation, contrast, lut, lutIntensity }
+    private enum CodingKeys: CodingKey { case saturation, contrast, lut, lutIntensity, correctionMode, curves }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -229,27 +237,32 @@ public struct ColorGrading3D: Codable, Sendable, Equatable {
         contrast = try container.decodeIfPresent(Float.self, forKey: .contrast) ?? defaults.contrast
         lut = try container.decodeIfPresent(AssetHandle<Texture2D>.self, forKey: .lut)
         lutIntensity = try container.decodeIfPresent(Float.self, forKey: .lutIntensity) ?? defaults.lutIntensity
+        correctionMode = try container.decodeIfPresent(ColorCorrectionMode3D.self, forKey: .correctionMode) ?? defaults.correctionMode
+        curves = try container.decodeIfPresent(ColorCurves3D.self, forKey: .curves) ?? defaults.curves
     }
 
     /// Handles are compared by identity: two settings match when they share the same loaded handle.
     public static func == (lhs: ColorGrading3D, rhs: ColorGrading3D) -> Bool {
         lhs.saturation == rhs.saturation && lhs.contrast == rhs.contrast && lhs.lut === rhs.lut && lhs.lutIntensity == rhs.lutIntensity
+            && lhs.correctionMode == rhs.correctionMode && lhs.curves == rhs.curves
     }
 
     var sanitized: ColorGrading3D {
-        let defaults = ColorGrading3D()
-        return ColorGrading3D(
-            saturation: finiteRenderValue(saturation, fallback: defaults.saturation, range: 0...3),
-            contrast: finiteRenderValue(contrast, fallback: defaults.contrast, range: 0.1...3),
+        ColorGrading3D(
+            saturation: finiteRenderValue(saturation, fallback: 1, range: 0...3),
+            contrast: finiteRenderValue(contrast, fallback: 1, range: 0.1...3),
             lut: lut,
-            lutIntensity: finiteRenderValue(lutIntensity, fallback: defaults.lutIntensity, range: 0...1)
+            lutIntensity: finiteRenderValue(lutIntensity, fallback: 1, range: 0...1),
+            correctionMode: correctionMode,
+            curves: curves
         )
     }
 
     /// The LUT texture to bind and the intensity to apply, or no LUT while the asset is missing or unloaded.
     var activeLUT: (texture: Texture2D, intensity: Float)? {
         let settings = sanitized
-        guard settings.lutIntensity > 0, let texture = settings.lut?.asset else {
+        guard settings.correctionMode == .lut, settings.lutIntensity > 0, let texture = settings.lut?.asset,
+            texture.height >= 2, texture.height <= 256, texture.width == texture.height * texture.height else {
             return nil
         }
         return (texture, settings.lutIntensity)

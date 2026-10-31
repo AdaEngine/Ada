@@ -50,6 +50,7 @@ struct MobileEditorSceneEditor: View {
                     onSelectEntity: { workbench.selectSceneEntity(documentID: document.id, entityID: $0) },
                     onToggleEntityExpanded: { workbench.toggleSceneEntityExpanded(documentID: document.id, entityID: $0) },
                     onAddEntity: { workbench.addSceneEntity(documentID: document.id, parentID: $0) },
+                    onAddGroup: { workbench.addSceneGroup(documentID: document.id, parentID: $0) },
                     onSetEntityEnabled: { workbench.setSceneEntityEnabled(documentID: document.id, entityID: $0, isEnabled: $1) },
                     onRenameEntity: { workbench.renameSceneEntity(documentID: document.id, entityID: $0, name: $1) },
                     onDeleteEntity: { workbench.deleteSceneEntity(documentID: document.id, entityID: $0) },

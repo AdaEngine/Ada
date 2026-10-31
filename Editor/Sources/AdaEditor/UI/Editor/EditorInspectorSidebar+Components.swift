@@ -58,19 +58,25 @@ extension EditorInspectorSidebar {
                             .frame(width: 24, height: 24)
                     }
                 )
-                .buttonStyle(DefaultButtonStyle())
+.buttonStyle(DefaultButtonStyle())
             }
-            ForEach(object.fields, id: \.field.id) { field in
-                VStack(alignment: .leading, spacing: 6) {
-                    fieldLabel(field.field.label)
-                    fieldControl(
-                        fieldID: "\(object.identifier).\(field.field.key)",
-                        value: field.value,
-                        kind: field.field.kind,
-                        isEditable: field.field.isEditable,
-                        scalarBinding: viewModel.scriptableObjectFieldBinding(identifier: object.identifier, field: field.field),
-                        axisBinding: { _ in viewModel.scriptableObjectFieldBinding(identifier: object.identifier, field: field.field) }
-                    )
+            ForEach(EditorInspectorFieldLayout.rows(fields: object.fields.map(\.field), collapsed: collapsedFieldGroups[object.identifier] ?? [])) { row in
+                if let index = row.fieldIndex {
+                    let field = object.fields[index]
+                    VStack(alignment: .leading, spacing: 6) {
+                        fieldLabel(field.field.label)
+                        fieldControl(
+                            fieldID: "\(object.identifier).\(field.field.key)",
+                            value: field.value,
+                            kind: field.field.kind,
+                            isEditable: field.field.isEditable,
+                            scalarBinding: viewModel.scriptableObjectFieldBinding(identifier: object.identifier, field: field.field),
+                            axisBinding: { _ in viewModel.scriptableObjectFieldBinding(identifier: object.identifier, field: field.field) }
+                        )
+                    }
+                    .padding(.leading, Float(row.level) * 10)
+                } else {
+                    fieldGroupHeader(row, namespace: object.identifier)
                 }
             }
         }

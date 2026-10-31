@@ -1,6 +1,6 @@
 @_spi(AdaEngine) import AdaEngine
 import AdaInput
-@_spi(Internal) import AdaUI
+@_spi(Internal) @testable import AdaUI
 import Foundation
 import Math
 import Testing
@@ -186,6 +186,58 @@ struct EditorWorkbenchSplitTests {
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Tab.Select.\(scene.id)"))
         #expect(workbench.activeSceneDocument?.id == scene.id)
         #expect(workbench.selectedDocument(in: .primary)?.id == code.id)
+    }
+
+    @Test("Returning from code retains one scene viewport per pane without intercepting code input")
+    func retainedScenePresentation() async throws {
+        func scene(_ title: String) throws -> EditorWorkbenchDocument {
+            let model = EditorSceneModel.default(projectName: title)
+            return .scene(EditorSceneDocument(
+                id: "scene:\(title)", title: "\(title).ascn", relativePath: "\(title).ascn", absolutePath: nil,
+                content: try model.encodedYAML(), sceneModel: model, isDirty: false,
+                loadSummary: .init(entityCount: model.entities.count, warnings: [])
+            ))
+        }
+        let first = try scene("First")
+        let second = try scene("Second")
+        let code = makeDocuments()[0]
+        let workbench = EditorWorkbenchViewModel(openDocuments: [first, second, code], activeDocumentID: first.id)
+        let container = makeContainer(workbench)
+        container.frame = Rect(x: 0, y: 0, width: 1000, height: 600)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        await settle(container)
+        func viewportIDs(_ title: String) -> [ObjectIdentifier] {
+            container.viewTree.rootNode.uiCollectNodes {
+                $0.accessibilityIdentifier == "AdaEditor.SceneViewport.\(title).ascn"
+            }.map { ObjectIdentifier($0) }
+        }
+        let firstID = try #require(viewportIDs("First").first)
+        workbench.selectDocument(id: code.id)
+        await settle(container)
+        #expect(viewportIDs("First") == [firstID])
+        let codeFrame = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.CodeFile.First.swift")).absoluteFrame
+        click(Point(codeFrame.minX + 130, codeFrame.minY + 110), in: container)
+        container.onKeyEvent(KeyEvent(window: RID(), keyCode: .enter, modifiers: [], status: .down, time: 0, isRepeated: false))
+        #expect(workbench.textDocument(id: code.id)?.content.contains("\n") == true)
+        workbench.selectDocument(id: first.id)
+        await settle(container)
+        #expect(viewportIDs("First") == [firstID])
+        workbench.selectDocument(id: second.id)
+        await settle(container)
+        #expect(viewportIDs("First").isEmpty)
+        let secondID = try #require(viewportIDs("Second").first)
+        workbench.selectDocument(id: code.id)
+        await settle(container)
+        #expect(viewportIDs("Second") == [secondID])
+        #expect(workbench.retainedSceneDocument(in: .primary)?.id == second.id)
+        workbench.closeDocument(id: second.id)
+        await settle(container)
+        #expect(viewportIDs("Second").isEmpty)
+        workbench.splitDocument(id: first.id)
+        await settle(container)
+        #expect(workbench.retainedSceneDocument(in: .primary) == nil)
+        #expect(workbench.retainedSceneDocument(in: .secondary)?.id == first.id)
     }
 
     private func makeDocuments() -> [EditorWorkbenchDocument] {

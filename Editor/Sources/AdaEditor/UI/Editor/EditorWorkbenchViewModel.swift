@@ -23,6 +23,7 @@ final class EditorWorkbenchViewModel {
     var secondarySelectedDocumentID: String?
     var focusedPane: EditorWorkbenchPane = .primary
     var filesBrowserPanes: Set<EditorWorkbenchPane> = []
+    var retainedSceneDocumentIDs: [EditorWorkbenchPane: String] = [:]
     var codeColorPalette: EditorCodeColorPalette
     var codeFontSize: Double {
         didSet {
@@ -110,6 +111,7 @@ final class EditorWorkbenchViewModel {
         for case let .scene(document) in openDocuments where document.isLoading {
             prepareSceneDocument(id: document.id)
         }
+        rememberScenePresentation(in: .primary)
     }
 
     var aiPromptBinding: Binding<String> {
@@ -190,6 +192,9 @@ final class EditorWorkbenchViewModel {
             return
         }
 
+        rememberScenePresentation(in: .primary)
+        rememberScenePresentation(in: .secondary)
+
         if activeDocumentID != document.id {
             onActiveDocumentWillChange?()
             if recordsNavigation {
@@ -205,6 +210,7 @@ final class EditorWorkbenchViewModel {
         } else {
             secondarySelectedDocumentID = document.id
         }
+        rememberScenePresentation(in: pane(for: document.id))
         onActiveDocumentChanged?()
     }
 

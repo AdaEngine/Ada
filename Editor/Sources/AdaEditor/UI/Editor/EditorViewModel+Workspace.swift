@@ -63,10 +63,8 @@ extension EditorViewModel {
     func refreshProjectFiles(logsRefresh: Bool = true) {
         studioTools.scheduleReload()
         let selectedID = projectSidebar.selectedItem?.id
-        let collapsedIDs = projectSidebar.collapsedFolderIDs
         let items = Self.projectTreeItems(for: project, fileManager: fileManager)
-        projectSidebar.items = items
-        projectSidebar.collapsedFolderIDs = collapsedIDs.intersection(Set(items.lazy.filter(\.isFolder).map(\.id)))
+        projectSidebar.replaceItems(items)
         if let selected = items.first(where: { $0.id == selectedID }) {
             projectSidebar.select(selected)
         }

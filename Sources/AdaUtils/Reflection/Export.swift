@@ -45,6 +45,13 @@ public struct Export<T: Codable>: Codable, @unchecked Sendable {
         self.storage = .init(value: wrappedValue)
     }
 
+    /// Places this field in an explicitly named inspector subgroup in a `@Component`.
+    /// Separate nested group names with `/`; at most four levels are supported.
+    public init(wrappedValue: T, group: String) {
+        self.init(wrappedValue: wrappedValue)
+        self.storage.editorInfo = EditorInfo(group: group)
+    }
+
     //    public init(wrappedValue: T) where T: Asset {
     //        self.storage = .init(value: wrappedValue)
     //        self.storage.editorInfo = EditorInfo(modifiers: .resource)
@@ -69,7 +76,9 @@ public struct Export<T: Codable>: Codable, @unchecked Sendable {
             var container = encoder.container(keyedBy: CodingName.self)
             try container.encode(self.wrappedValue, forKey: .value)
             try container.encode(self.storage.editorInfo, forKey: .editor)
-        } else if self.storage.hasChanges {
+        } else {
+            // Ordinary Codable must encode defaults and decoded values too. Sparse class
+            // exports are handled separately by _ExportCodable.encode(to:propertyName:userInfo:).
             var container = encoder.singleValueContainer()
             try container.encode(self.wrappedValue)
         }
@@ -100,10 +109,10 @@ extension Export: _ExportCodable {
 }
 
 extension Export {
-    public init(wrappedValue: T, range: ClosedRange<Float>? = nil, stride: Float? = nil) where T: FloatingPoint {
+    public init(wrappedValue: T, range: ClosedRange<Float>? = nil, stride: Float? = nil, group: String? = nil) where T: FloatingPoint {
         self.init(wrappedValue: wrappedValue)
         self.storage.editorInfo = EditorInfo(
-            modifiers: .float(FloatingPointModifier(range: range, stride: stride))
+            modifiers: .float(FloatingPointModifier(range: range, stride: stride)), group: group
         )
     }
 
@@ -131,6 +140,7 @@ extension Export {
 
     struct EditorInfo: Codable {
         var modifiers: Modifiers?
+        var group: String?
     }
 }
 

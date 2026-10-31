@@ -177,6 +177,30 @@ extension Render3DGPUTests {
         }
 
         @Test(.enabled(if: Render3DDebugViewGPUTests.enabled), arguments: Render3DPostProcessGPUTests.Path.supported)
+        func curvesAreAppliedAfterToneMapping(path: Render3DPostProcessGPUTests.Path) async throws {
+            let scene = try await Render3DDebugViewGPUTests.makeScene(
+                antiAliasing: path == .fxaa ? .fxaa : .none,
+                temporalRenderScale: path == .temporal ? 1 : nil
+            )
+            let frames = path == .temporal ? 16 : 4
+            let plain = try await scene.render(.none, frames: frames)
+            let inverse = ColorCurves3D(master: ColorCurve3D(points: [.init(0, 1), .init(1, 0)]))
+            try scene.configure { $0.postProcess.colorGrading = ColorGrading3D(correctionMode: .curves, curves: inverse) }
+            let corrected = try await scene.render(.none, frames: frames)
+            try scene.configure { $0.colorCorrectionStrength = 0.5 }
+            let blended = try await scene.render(.none, frames: frames)
+            for (x, y) in Self.probes {
+                let base = Self.channels(plain.getPixel(x: x, y: y))
+                for (index, value) in Self.channels(corrected.getPixel(x: x, y: y)).enumerated() {
+                    #expect(Self.steps(value, 1 - base[index]) <= 8, "\(path): curves must invert the display color.")
+                }
+                for value in Self.channels(blended.getPixel(x: x, y: y)) {
+                    #expect(Self.steps(value, 0.5) <= 8, "\(path): half-strength inversion must give gray.")
+                }
+            }
+        }
+
+        @Test(.enabled(if: Render3DDebugViewGPUTests.enabled), arguments: Render3DPostProcessGPUTests.Path.supported)
         func lutIsAppliedAfterToneMappingOnEveryPath(path: Render3DPostProcessGPUTests.Path) async throws {
             let scene = try await Render3DDebugViewGPUTests.makeScene(
                 antiAliasing: path == .fxaa ? .fxaa : .none,

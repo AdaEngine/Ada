@@ -1410,15 +1410,54 @@ struct AdaEngineStyleUITests {
         #expect(viewModel.requestedSettingsSection == nil)
     }
 
-    @Test("settings window reserves a draggable title bar")
+    @Test("settings window configures a draggable title bar for its platform")
     @MainActor
     func settingsWindowReservesDraggableTitleBar() {
         let configuration = EditorSettingsWindowController.windowConfiguration
 
         #expect(configuration.titleBar.background == .transparent)
-        #expect(configuration.titleBar.reservesSafeArea)
+        #if os(Windows)
+            #expect(!configuration.titleBar.reservesSafeArea)
+            #expect(configuration.titleBar.dragRegionHeight == 32)
+        #else
+            #expect(configuration.titleBar.reservesSafeArea)
+        #endif
         #expect(configuration.titleBar.dragRegionHeight == EditorSettingsWindowController.titleBarDragRegionHeight)
     }
+
+    #if os(Windows)
+    @Test("standalone settings caption has window controls and leaves empty space draggable")
+    @MainActor
+    func settingsWindowCaptionControlsAndDrag() throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "SettingsCaptionTests")))
+        }
+        let configuration = EditorSettingsWindowController.windowConfiguration
+        let manager = UIWindowManager()
+        let window = UIWindow(frame: configuration.frame, configuration: configuration, windowManager: manager)
+        let model = EditorSettingsWindowViewModel(editorViewModel: nil, selectedSection: .general)
+        let container = UIContainerView(rootView: EditorSettingsWindowView(viewModel: model, showsWindowTitleBar: true))
+        container.frame = window.frame
+        container.bounds.size = window.frame.size
+        window.addSubview(container)
+        container.layoutIfNeeded()
+
+        let titleBar = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.TitleBar"))
+        let close = try container.uiNode(matching: .accessibilityIdentifier("AdaUI.Caption.Close"))
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaUI.Caption.Minimize"))
+        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaUI.Caption.Maximize"))
+        #expect(titleBar.absoluteFrame.minY == 0)
+        #expect(titleBar.absoluteFrame.height == 32)
+        #expect(close.absoluteFrame.width == 46)
+        #expect(close.absoluteFrame.minY == 0)
+        #expect(close.absoluteFrame.maxX == window.frame.width)
+        let dragPoint = Point(x: 400, y: 16)
+        let event = MouseEvent(window: window.id, button: .left, mousePosition: dragPoint, phase: .began, modifierKeys: [], time: 0)
+        #expect(container.uiAllowsWindowDrag(at: dragPoint, with: event))
+        #expect(!container.uiAllowsWindowDrag(at: Point(x: close.absoluteFrame.midX, y: 16), with: event))
+    }
+    #endif
 
     @Test("modal settings close button invokes dismiss")
     @MainActor
@@ -1798,6 +1837,7 @@ struct AdaEngineStyleUITests {
         let sourcesItem = try #require(viewModel.projectSidebar.items.first { $0.relativePath == "Sources" })
         viewModel.projectSidebar.selectDisplayMode(.files)
 
+        viewModel.projectSidebar.expandAll()
         #expect(viewModel.projectSidebar.visibleItems.contains { $0.relativePath == "Sources/Game/main.swift" })
         viewModel.openProjectItem(sourcesItem)
         #expect(viewModel.projectSidebar.isCollapsed(sourcesItem))
@@ -1828,6 +1868,8 @@ struct AdaEngineStyleUITests {
         let viewModel = EditorViewModel(project: EditorProjectReference(name: "EditorProjectSidebarTargets", path: rootURL.path))
 
         #expect(viewModel.projectSidebar.displayMode == .targets)
+        #expect(viewModel.projectSidebar.visibleItems.map(\.relativePath) == ["Assets", "Sources/Game", "Sources/Tools"])
+        viewModel.projectSidebar.expandAll()
         #expect(
             viewModel.projectSidebar.visibleItems.map(\.relativePath) == [
                 "Assets",
@@ -1879,6 +1921,8 @@ struct AdaEngineStyleUITests {
         )
 
         #expect(viewModel.projectSidebar.displayMode == .targets)
+        #expect(viewModel.projectSidebar.visibleItems.map(\.relativePath) == ["Sources"])
+        viewModel.projectSidebar.expandAll()
         #expect(
             viewModel.projectSidebar.visibleItems.map(\.relativePath) == [
                 "Sources",

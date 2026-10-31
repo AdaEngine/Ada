@@ -21,7 +21,7 @@ enum EditorShaderSyntaxHighlighter {
     static func tokens(for source: String, language: Language) -> [Token] {
         var scanner = Scanner(language: language)
         // Match the line splitting used by EditorSyntaxHighlighter and its token extraction helper.
-        for (lineIndex, line) in source.components(separatedBy: .newlines).enumerated() {
+        for (lineIndex, line) in EditorSourceLines.split(source).enumerated() {
             scanner.scan(Array(line), line: lineIndex)
         }
         return scanner.tokens

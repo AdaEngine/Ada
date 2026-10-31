@@ -11,6 +11,7 @@ struct EditorVRHierarchyPanel: View {
             onSelectEntity: workspace.select,
             onToggleEntityExpanded: { id in perform { document in workspace.workbench.toggleSceneEntityExpanded(documentID: document.id, entityID: id) } },
             onAddEntity: { parent in perform { document in workspace.workbench.addSceneEntity(documentID: document.id, parentID: parent, template: .model3D) } },
+            onAddGroup: { parent in perform { document in workspace.workbench.addSceneGroup(documentID: document.id, parentID: parent) } },
             onSetEntityEnabled: { id, enabled in perform { document in workspace.workbench.setSceneEntityEnabled(documentID: document.id, entityID: id, isEnabled: enabled) } },
             onRenameEntity: { id, name in perform { document in workspace.workbench.renameSceneEntity(documentID: document.id, entityID: id, name: name) } },
             onDeleteEntity: { id in perform { document in workspace.workbench.deleteSceneEntity(documentID: document.id, entityID: id) } },

@@ -26,6 +26,7 @@ extension EditorViewModel {
         }
 
         if let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager) {
+            buildTargets.refresh(settings)
             if settings.build.system == .adaScript {
                 buildAdaScriptProject(settings, at: projectURL, statusTitle: "Prepare AdaScript Workspace")
                 return
@@ -200,7 +201,7 @@ extension EditorViewModel {
     }
 
     func createSourceControlRepository() {
-        executeSourceControlCommand(.initializeRepository, statusTitle: "Create .git")
+        executeSourceControlCommand(.initializeRepository, statusTitle: sourceControl.provider.initializationTitle)
     }
 
     func buildAll() {
@@ -718,6 +719,9 @@ extension EditorViewModel {
             EditorUpdateCenter.shared.checkForUpdates()
         case .showSettings:
             presentSettings(.general)
+        case .showMovieMaker:
+            guard projectURL != nil else { return false }
+            movieMaker.isPresented = true
         case .debugOverlayOff:
             showsDebugOverlay = nil
         case .debugOverlayRedraw:

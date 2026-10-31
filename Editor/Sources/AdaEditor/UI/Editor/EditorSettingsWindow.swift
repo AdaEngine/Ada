@@ -345,7 +345,13 @@ enum EditorSettingsWindowController {
     static let windowTitle = "AdaEditor Settings"
     static let windowWidth: Float = 980
     static let windowHeight: Float = 680
-    static let titleBarDragRegionHeight: Float = 52
+    #if os(Windows)
+        static let titleBarDragRegionHeight: Float = 32
+        static let reservesSystemSafeArea = false
+    #else
+        static let titleBarDragRegionHeight: Float = 52
+        static let reservesSystemSafeArea = true
+    #endif
 
     static var windowConfiguration: UIWindow.Configuration {
         UIWindow.Configuration(
@@ -356,7 +362,7 @@ enum EditorSettingsWindowController {
             chrome: .standard,
             titleBar: .init(
                 background: .transparent,
-                reservesSafeArea: true,
+                reservesSafeArea: reservesSystemSafeArea,
                 dragRegionHeight: titleBarDragRegionHeight
             ),
             background: .opaque(EditorThemeColors.dark.background),
@@ -410,7 +416,7 @@ enum EditorSettingsWindowController {
                 selectedPage: selectedPage
             )
             let window = windowManager.spawnWindow(configuration: windowConfiguration) {
-                EditorSettingsWindowView(viewModel: viewModel)
+                EditorSettingsWindowView(viewModel: viewModel, showsWindowTitleBar: true)
                     .theme(.adaEditor)
             }
             settingsViewModel = viewModel
@@ -427,22 +433,45 @@ struct EditorSettingsWindowView: View {
 
     let viewModel: EditorSettingsWindowViewModel
     let showsCloseButton: Bool
+    let showsWindowTitleBar: Bool
 
     @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
 
-    init(viewModel: EditorSettingsWindowViewModel, showsCloseButton: Bool = false) {
+    init(
+        viewModel: EditorSettingsWindowViewModel,
+        showsCloseButton: Bool = false,
+        showsWindowTitleBar: Bool = false
+    ) {
         self.viewModel = viewModel
         self.showsCloseButton = showsCloseButton
+        self.showsWindowTitleBar = showsWindowTitleBar
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-            theme.editorColors.border
-                .frame(width: 1)
-                .frame(maxHeight: .infinity)
-            content
+        VStack(spacing: 0) {
+            #if os(Windows)
+                if showsWindowTitleBar {
+                    HStack(spacing: 0) {
+                        Text(L10n.text("Settings"))
+                            .font(.system(size: 12))
+                            .padding(.horizontal, 12)
+                        Spacer(minLength: 0)
+                        WindowCaptionControls()
+                    }
+                    .frame(height: EditorSettingsWindowController.titleBarDragRegionHeight)
+                    .background(theme.editorColors.surface)
+                    .accessibilityIdentifier("AdaEditor.Settings.TitleBar")
+                }
+            #endif
+            HStack(spacing: 0) {
+                sidebar
+                theme.editorColors.border
+                    .frame(width: 1)
+                    .frame(maxHeight: .infinity)
+                content
+            }
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .background(theme.editorColors.background)

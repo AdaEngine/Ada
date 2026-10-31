@@ -60,7 +60,13 @@ final class ProjectOpeningViewModel {
     var projectToOpenInEditor: EditorProjectReference?
     var projectToOpenInEditorToken = 0
     var isOpeningLastProject = false
-    var shouldCreateGitRepository = true
+    var newProjectSourceControl: EditorSourceControlProvider? = .defaultForNewProjects
+    var isCreatingRepository = false
+    @ObservationIgnored var repositoryCreationTask: Task<Void, Never>?
+    var shouldCreateGitRepository: Bool {
+        get { newProjectSourceControl == .git }
+        set { newProjectSourceControl = newValue ? .git : nil }
+    }
     var shouldCreateProjectPackage = EditorProjectStore.defaultUsesProjectPackage
     var projectBeingRenamed: EditorProjectReference?
     var renamedProjectName = ""
@@ -182,7 +188,7 @@ final class ProjectOpeningViewModel {
     }
 
     var canCreateProject: Bool {
-        hasValidProjectName && !projectLocation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !isCreatingRepository && hasValidProjectName && !projectLocation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var projectLocationDisplayText: String {
@@ -202,7 +208,7 @@ final class ProjectOpeningViewModel {
 
     init(store: EditorProjectStore = EditorProjectStore()) {
         self.store = store
-        self.shouldCreateGitRepository = store.distribution.supportsSwiftProjects
+        self.newProjectSourceControl = store.distribution.supportsSwiftProjects ? .defaultForNewProjects : nil
         reloadRecentProjects()
     }
 
@@ -348,6 +354,23 @@ final class ProjectOpeningViewModel {
                 template: selectedTemplate,
                 asPackage: shouldCreateProjectPackage
             )
+            if newProjectSourceControl == .lore && supportsSwiftProjects {
+                let url = URL(fileURLWithPath: createdProject.path, isDirectory: true)
+                try EditorSourceControlProvider.lore.save(in: url)
+                isCreatingRepository = true
+                statusMessage = L10n.text("Creating Lore repository…")
+                repositoryCreationTask = Task { [weak self] in
+                    let result = await LoreRepositoryService().execute(.initializeRepository, projectURL: url)
+                    guard let self else { return }
+                    self.isCreatingRepository = false
+                    self.statusMessage = result.succeeded
+                        ? L10n.text("Created project: \(createdProject.path)")
+                        : L10n.text("The project was created, but Lore setup failed: \(result.combinedOutput)")
+                    self.finishCreatingProject(createdProject, openInEditor: openInEditor)
+                    self.repositoryCreationTask = nil
+                }
+                return
+            }
             if shouldCreateGitRepository && supportsSwiftProjects {
                 let gitResult = initializeGitRepositoryIfNeeded(at: createdProject.path)
                 if let gitResult {
@@ -358,17 +381,21 @@ final class ProjectOpeningViewModel {
             } else {
                 statusMessage = "Created project: \(createdProject.path)"
             }
-            EditorAchievementBootstrap.center?.record([.firstProject: 1])
-            isCreatingNewProject = false
-            selectedProject = createdProject
-            clearValidationDiagnostics()
-            reloadRecentProjects()
-            if openInEditor {
-                projectToOpenInEditor = createdProject
-                projectToOpenInEditorToken += 1
-            }
+            finishCreatingProject(createdProject, openInEditor: openInEditor)
         } catch {
             setFailureStatus(prefix: "Failed to create project", error: error)
+        }
+    }
+
+    private func finishCreatingProject(_ createdProject: EditorProjectReference, openInEditor: Bool) {
+        EditorAchievementBootstrap.center?.record([.firstProject: 1])
+        isCreatingNewProject = false
+        selectedProject = createdProject
+        clearValidationDiagnostics()
+        reloadRecentProjects()
+        if openInEditor {
+            projectToOpenInEditor = createdProject
+            projectToOpenInEditorToken += 1
         }
     }
 
@@ -400,7 +427,7 @@ final class ProjectOpeningViewModel {
     ) {
         selectedProject = nil
         shouldCreateProjectPackage = EditorProjectStore.defaultUsesProjectPackage
-        shouldCreateGitRepository = supportsSwiftProjects
+        newProjectSourceControl = supportsSwiftProjects ? .defaultForNewProjects : nil
         if let template, availableTemplates.contains(template) {
             selectedTemplate = template
         }

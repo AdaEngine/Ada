@@ -34,6 +34,7 @@ struct EditorBuildExportSettingsTests {
             #expect(page.absoluteFrame.width > 300)
             let rescan = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.BuildExport.Rescan." + platform.rawValue))
             #expect(rescan.absoluteFrame.height > 20)
+            #expect(rescan.absoluteFrame.height <= 34)
             if platform == .host {
                 _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.BuildExport.InstallSwift." + platform.rawValue))
             }
@@ -41,7 +42,11 @@ struct EditorBuildExportSettingsTests {
             let input = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.BuildExport." + platform.rawValue + "." + field.id))
             #expect(input.absoluteFrame.height > 20)
             if platform == .android {
-                _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.BuildExport.InstallAndroid"))
+                let install = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.BuildExport.InstallAndroid"))
+                #expect(install.absoluteFrame.height == rescan.absoluteFrame.height)
+                #expect(install.absoluteFrame.minY == rescan.absoluteFrame.minY)
+                #expect(install.absoluteFrame.minX >= rescan.absoluteFrame.maxX + 6)
+                #expect(install.absoluteFrame.maxX <= page.absoluteFrame.maxX)
                 let ndk = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.BuildExport.ANDROID.ANDROID_NDK_HOME"))
                 let jdk = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.BuildExport.ANDROID.JAVA_HOME"))
                 #expect(abs(input.absoluteFrame.width - ndk.absoluteFrame.width) < 1)

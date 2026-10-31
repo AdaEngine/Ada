@@ -165,10 +165,6 @@ extension EditorViewModel {
         fileManager: FileManager,
         items: inout [EditorProjectSidebarViewModel.Item]
     ) {
-        guard items.count < 2_000 else {
-            return
-        }
-
         let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
         let isDirectory = resourceValues?.isDirectory == true
         let isSymbolicLink = resourceValues?.isSymbolicLink == true
@@ -479,7 +475,7 @@ extension EditorViewModel {
 
     static func shouldSkipProjectTreeURL(_ url: URL) -> Bool {
         let name = url.lastPathComponent
-        let skippedNames: Set<String> = [".ada", ".DS_Store", ".git", ".swiftpm", "DerivedData"]
+        let skippedNames: Set<String> = [".ada", ".builds", ".DS_Store", ".git", ".lore", ".swiftpm", "DerivedData"]
         return skippedNames.contains(name) || name == ".build" || name.hasPrefix(".build-")
     }
 

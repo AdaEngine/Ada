@@ -78,7 +78,7 @@ final class EditorProjectFileWatcher {
     }
 
     private func enqueue(_ paths: [AbsolutePath]) {
-        let ignored: Set<String> = [".git", ".build", ".swiftpm", ".ada", "DerivedData", ".DS_Store"]
+        let ignored: Set<String> = [".git", ".lore", ".build", ".builds", ".swiftpm", ".ada", "DerivedData", ".DS_Store"]
         let relativePaths = paths.compactMap { path -> String? in
             guard let relative = relativePath(for: path) else {
                 return nil

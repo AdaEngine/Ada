@@ -57,6 +57,7 @@ for relative in [
     "Tests/AdaEngineTests/Render3DFogTests.swift",
     "Tests/AdaEngineTests/Render3DPostProcessTests.swift",
     "Tests/AdaEngineTests/Render3DColorGradingTests.swift",
+    "Tests/AdaEngineTests/ColorCurves3DTests.swift",
     "Tests/AdaEngineTests/Render3DAutoExposureTests.swift",
     "Tests/AdaEngineTests/Render3DDepthOfFieldTests.swift",
     "Tests/AdaEngineTests/Render3DCameraEffectsTests.swift",

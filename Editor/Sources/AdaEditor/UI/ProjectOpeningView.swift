@@ -635,7 +635,12 @@ struct ProjectOpeningView: View {
 
                 if viewModel.supportsSwiftProjects {
                     createFormField(title: "Version control") {
-                        gitRepositoryToggle
+                        VStack(alignment: .leading, spacing: 9) {
+                            sourceControlChoices
+                            if viewModel.newProjectSourceControl == .lore {
+                                EditorLoreIntroduction().theme(.adaEditor)
+                            }
+                        }
                     }
                 }
             }
@@ -646,12 +651,25 @@ struct ProjectOpeningView: View {
 
     private var createProjectFormFooter: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(viewModel.statusMessage)
-                .font(.system(size: 12))
-                .foregroundColor(LauncherColor.muted)
-                .lineLimit(2)
-                .frame(height: 34, alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 12) {
+                Text(viewModel.statusMessage)
+                    .font(.system(size: 12))
+                    .foregroundColor(LauncherColor.muted)
+                    .lineLimit(2)
+                    .frame(height: 34, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if viewModel.newProjectSourceControl == .lore {
+                    Button(L10n.text("What is Lore?")) {
+                        if let url = URL(string: EditorLoreInformation.documentationURL) {
+                            _ = EditorPlatformFileActions.openInDefaultApplication(url)
+                        }
+                    }
+                    .font(.system(size: 12))
+                    .foregroundColor(LauncherColor.accentViolet)
+                    .buttonStyle(DefaultButtonStyle())
+                    .accessibilityIdentifier("AdaEditor.ProjectOpening.Lore.LearnMore")
+                }
+            }
 
             HStack(alignment: .center, spacing: 12) {
                 Button {
@@ -697,24 +715,28 @@ struct ProjectOpeningView: View {
         .accessibilityIdentifier(ProjectOpeningAccessibility.packageToggle)
     }
 
-    private var gitRepositoryToggle: some View {
-        Button {
-            viewModel.shouldCreateGitRepositoryBinding.wrappedValue.toggle()
-        } label: {
-            HStack(spacing: 8) {
-                CircleShape()
-                    .fill(Color.white)
-                    .frame(width: 16, height: 16)
-                    .frame(width: 32, height: 20, alignment: viewModel.shouldCreateGitRepository ? .trailing : .leading)
-                    .padding(.horizontal, 2)
-                    .background(CapsuleShape().fill(viewModel.shouldCreateGitRepository ? LauncherColor.accentViolet : LauncherColor.muted.opacity(0.35)))
-                Text(L10n.text("Create GIT repository"))
-                    .font(.system(size: 13))
-                    .foregroundColor(.white)
-            }
+    private var sourceControlChoices: some View {
+        HStack(spacing: 8) {
+            sourceControlChoice(nil, title: "None", identifier: "AdaEditor.ProjectOpening.SourceControl.none")
+            sourceControlChoice(.git, title: "Git", identifier: ProjectOpeningAccessibility.gitToggle)
+            sourceControlChoice(.lore, title: "Lore", identifier: "AdaEditor.ProjectOpening.SourceControl.lore")
         }
+    }
+
+    private func sourceControlChoice(_ provider: EditorSourceControlProvider?, title: String, identifier: String) -> some View {
+        Button {
+            viewModel.newProjectSourceControl = provider
+        } label: {
+            Text(L10n.tr(title))
+                .font(.system(size: 13)).foregroundColor(.white)
+                .padding(.horizontal, 14).frame(height: 30)
+                .background(RoundedRectangleShape(cornerRadius: 6).fill(
+                    viewModel.newProjectSourceControl == provider ? LauncherColor.accentViolet : LauncherColor.muted.opacity(0.20)
+                ))
+        }
+        .disabled(viewModel.isCreatingRepository || !(provider?.isAvailable ?? true))
         .buttonStyle(LauncherInlineButtonStyle())
-        .accessibilityIdentifier(ProjectOpeningAccessibility.gitToggle)
+        .accessibilityIdentifier(identifier)
     }
 
     private var statusAndDiagnostics: some View {

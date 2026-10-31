@@ -19,12 +19,14 @@ struct EditorSceneViewportView: View {
     var onEditWorldReady: ((World) -> Void)?
     var annotationAgent: EditorAgentViewModel?
     var onAnnotationAdded: (() -> Void)?
+    var isDocumentActive = true
 
     @State private var performanceSession = EditorGamePerformanceSession()
     @State var viewportPresentation = EditorViewportPresentation()
     @State var runtimeWarnings: [String] = []
     @State private var isLoadingScene = false
     @State private var showsBones = false
+    @State private var showsEntityMarkers = false
     @State private var displayMode: EditorSceneViewportDisplayMode = .twoD
     @State private var activeTool: EditorSceneViewportTool = .translate
     @State var viewportModel = EditorSceneViewportModel()
@@ -59,6 +61,9 @@ struct EditorSceneViewportView: View {
             viewportModel.disconnect()
             inspectorViewModel.clearSceneViewportActions(owner: viewportModel)
         }
+        .onChange(of: isDocumentActive) { _, active in
+            if !active { inspectorViewModel.clearSceneViewportActions(owner: viewportModel) }
+        }
     }
 
     private var isPlayingThisDocument: Bool {
@@ -70,6 +75,8 @@ struct EditorSceneViewportView: View {
     }
 
     private func configureReadyViewport() {
+        viewportModel.setPresentationActive(isDocumentActive)
+        guard isDocumentActive else { return }
         guard !document.isLoading, document.errorMessage == nil else { return }
         if isPlayingThisDocument { preparePlayModeViewport() }
         else { configureViewportModel() }
@@ -83,10 +90,11 @@ struct EditorSceneViewportView: View {
 
     private var editViewport: some View {
         VStack(spacing: 0) {
-            toolbar
+            Color.clear.frame(height: 34)
             GeometryReader { geometry in
                 ZStack(anchor: .bottomLeading) {
                     SceneView(
+                        isInteractive: isDocumentActive,
                         updatesWhenWindowInactive: false,
                         make: { app in
                             if isAssetPreview {
@@ -158,6 +166,10 @@ struct EditorSceneViewportView: View {
                 .mask(RectangleShape())
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+        }
+        .overlay(anchor: .top) {
+            toolbar
+                .frame(maxWidth: .infinity)
         }
     }
 
@@ -254,6 +266,8 @@ struct EditorSceneViewportView: View {
     }
 
     private func configureSceneViewApp(_ app: inout AppWorlds) -> Bool {
+        let span = AdaTrace.startSpan("AdaEditor.SceneViewport.configureApp")
+        defer { span.end() }
         app.runtimeLogSource = isPlayingThisDocument ? "Game" : "Editor"
         if let resourceRootURL {
             let runtime = UIComponentRuntime(resourceRoot: resourceRootURL, catalog: uiCatalog)
@@ -337,35 +351,33 @@ struct EditorSceneViewportView: View {
             #endif
             Spacer()
             if !isAssetPreview {
+                entityMarkerVisibilityButton
                 if let agent = annotationAgent {
-                    Button(action: {
+                    EditorSceneToolbarButton(
+                        title: "Annotate",
+                        symbol: "\u{E3C9}",
+                        identifier: "AdaEditor.SceneViewport.Annotate",
+                        isSelected: agent.sceneAnnotations.isSelecting,
+                        isEnabled: agent.activeSession != nil && !agent.isSending
+                    ) {
                         agent.sceneAnnotations.toggleSelection()
                         viewportModel.setAnnotationMode(agent.sceneAnnotations.isSelecting)
                         redrawViewport()
-                    }) {
-                        Text(L10n.text("Annotate"))
-                            .font(.system(size: 11))
-                            .foregroundColor(agent.sceneAnnotations.isSelecting ? theme.editorColors.blue : theme.editorColors.text)
-                            .fixedSize(horizontal: true, vertical: false)
                     }
-                    .buttonStyle(DefaultButtonStyle())
-                    .disabled(agent.activeSession == nil || agent.isSending)
-                    .accessibilityIdentifier("AdaEditor.SceneViewport.Annotate")
                 }
-                Button(action: {
+                EditorSceneToolbarButton(
+                    title: "Terrain",
+                    symbol: "\u{E564}",
+                    identifier: "AdaEditor.SceneViewport.Terrain",
+                    isSelected: viewportModel.terrainEditing.isEnabled
+                ) {
                     annotationAgent?.sceneAnnotations.stopSelecting()
                     let enabled = !viewportModel.terrainEditing.isEnabled
                     if enabled { selectViewportMode(.threeD) }
                     viewportModel.setTerrainEditing(enabled)
                     if enabled { (onTerrainToolSelected ?? onEntitySelected)?() }
                     redrawViewport()
-                }) {
-                    Text(L10n.text("Terrain"))
-                        .font(.system(size: 11))
-                        .foregroundColor(viewportModel.terrainEditing.isEnabled ? theme.editorColors.blue : theme.editorColors.text)
                 }
-                .buttonStyle(DefaultButtonStyle())
-                .accessibilityIdentifier("AdaEditor.SceneViewport.Terrain")
             }
             if displayMode == .threeD {
                 skeletonVisibilityButton
@@ -377,6 +389,19 @@ struct EditorSceneViewportView: View {
         .padding(.horizontal, 12)
         .frame(height: 34)
         .background(theme.editorColors.surface)
+    }
+
+    private var entityMarkerVisibilityButton: some View {
+        EditorSceneToolbarButton(
+            title: showsEntityMarkers ? "Hide object points" : "Show object points",
+            symbol: "\u{E3B4}",
+            identifier: "AdaEditor.SceneViewport.EntityMarkers",
+            isSelected: showsEntityMarkers
+        ) {
+            showsEntityMarkers.toggle()
+            viewportModel.showsEntityMarkers = showsEntityMarkers
+            redrawViewport()
+        }
     }
 
     private var skeletonVisibilityButton: some View {

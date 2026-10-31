@@ -11,7 +11,25 @@ extension EditorViewModel {
             return
         }
 
+        if interface.mode == .agent {
+            interface.showsArtifact = true
+        }
+
         projectSidebar.select(item)
+        let absolutePath = Self.absoluteFilePath(from: item.id)
+        if let existing = workbench.openDocuments.first(where: { document in
+            guard document.relativePath == item.relativePath, document.absolutePath == absolutePath else { return false }
+            return Self.canReuseOpenDocument(document, for: item)
+        }) {
+            // Selecting a file is navigation. Keep its edits, prepared scene and
+            // tooling state; external reloads have their own conflict checks.
+            selectWorkbenchDocument(id: existing.id)
+            if case .scene = existing {
+                toolbar.sceneName = URL(fileURLWithPath: item.title).deletingPathExtension().lastPathComponent
+            }
+            if case .ui = existing { refreshUIExports() }
+            return
+        }
         let document = Self.document(for: item)
         workbench.open(document)
         if case let .asset(asset) = document, asset.kind == .tileSource {
@@ -25,6 +43,24 @@ extension EditorViewModel {
 
         if case .scene = document {
             toolbar.sceneName = URL(fileURLWithPath: item.title).deletingPathExtension().lastPathComponent
+        }
+    }
+
+    private static func canReuseOpenDocument(_ document: EditorWorkbenchDocument, for item: EditorProjectSidebarViewModel.Item) -> Bool {
+        switch document {
+        case let .scene(scene):
+            if scene.isDirty { return true }
+            guard scene.errorMessage == nil else { return false }
+            let disk = sceneFileContent(for: item)
+            return disk.errorMessage == nil && disk.value == scene.content
+        case let .text(text), let .ui(text):
+            guard !text.id.hasPrefix("raw:") else { return false }
+            if text.isDirty { return true }
+            guard text.errorMessage == nil else { return false }
+            let disk = textFileContent(for: item)
+            return disk.errorMessage == nil && disk.value == text.content
+        case .asset, .git:
+            return false
         }
     }
 
@@ -146,7 +182,7 @@ extension EditorViewModel {
             if !sourceURLs.isEmpty {
                 workbench.achievements?.record([.firstImport: 1])
             }
-            projectSidebar.items = Self.projectTreeItems(for: project, fileManager: fileManager)
+            projectSidebar.replaceItems(Self.projectTreeItems(for: project, fileManager: fileManager))
             toolbar.searchableItems = projectSidebar.items
             syncInspectorTextureAssets()
             refreshSourceControl()

@@ -19,8 +19,8 @@ struct EditorTopToolbar: View {
     var onDebug: (() -> Void)?
     var onOpenCloud: (() -> Void)?
     var interface: EditorInterfaceState?
-    var movieMaker: EditorMovieMakerModel?
-    var onMovieMaker: (() -> Void)?
+    var buildTargets: EditorBuildTargetsModel?
+    var canChangeBuildTarget = true
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
@@ -47,24 +47,8 @@ struct EditorTopToolbar: View {
             HStack(spacing: 12) {
                 EditorAICreditsBadge(compact: true, onOpen: onOpenCloud)
                 EditorUpdateButton()
-                if let movieMaker, let onMovieMaker {
-                    Button(action: onMovieMaker) {
-                        HStack(spacing: 4) {
-                            Text(movieMaker.isBusy ? "\u{E047}" : "\u{E061}")
-                                .font(AdaEditorMaterialSymbolFont.font(size: 20))
-                            if movieMaker.isBusy {
-                                Text("\(Int(movieMaker.progress * 100))%")
-                                    .font(.system(size: 11))
-                            } else {
-                                Text(L10n.text("Movie Maker")).font(.system(size: 11))
-                            }
-                        }
-                        .frame(minWidth: 30, minHeight: 30)
-                    }
-                    .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
-                    .foregroundColor(Color(red: 232 / 255, green: 96 / 255, blue: 96 / 255))
-                    .disabled(project == nil || (!movieMaker.isBusy && !isRunEnabled))
-                    .accessibilityIdentifier("AdaEditor.Toolbar.MovieMaker")
+                if let buildTargets {
+                    EditorBuildTargetButton(model: buildTargets, enabled: canChangeBuildTarget)
                 }
                 runDestinationControls
                 runStopControls

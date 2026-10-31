@@ -93,6 +93,19 @@ enum EditorSceneFileLoader {
         typeName: String, payload: EditorComponentPayload, sourceURL: URL?, resourceRootURL: URL?
     ) throws -> EditorComponentPayload {
         var resolvedPayload = payload
+        if typeName == EditorBuiltInComponentType.environment3D {
+            let lutPath = ["postProcess", "colorGrading", "lut"]
+            var root = EditorSceneValue.object(resolvedPayload)
+            if case let .string(reference)? = root.value(at: lutPath[...]), !reference.isEmpty {
+                let fileExtension = URL(fileURLWithPath: reference).pathExtension
+                guard ["png", "tga", "jpg", "jpeg", "hdr", "tex"].contains(fileExtension.lowercased()),
+                    let url = resolveTileMapReference(reference, relativeTo: sourceURL, resourceRootURL: resourceRootURL, fileExtension: fileExtension) else {
+                    throw AssetError.message(L10n.text("LUT must be a texture inside project assets."))
+                }
+                root.setValue(.string(url.path), at: lutPath[...])
+                if case let .object(updated) = root { resolvedPayload = updated }
+            }
+        }
         if typeName == EditorBuiltInComponentType.spineSource, let reference = payload["source"]?.stringValue, !reference.isEmpty {
             resolvedPayload["source"] = .string(try EditorSpineResource.resolve(reference, sourceURL: sourceURL, resourceRootURL: resourceRootURL).path)
         }

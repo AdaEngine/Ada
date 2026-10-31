@@ -232,6 +232,44 @@ struct EditorScenePerformanceRegressionTests {
         #expect(selection.id == last.id)
     }
 
+    @Test("A retained scene stops hosted updates and resumes the same world on return")
+    func retainedScenePausesHostedFrames() async throws {
+        let host = AppWorlds(main: World(name: "RetainedSceneHost"))
+        MainSchedulerPlugin().setup(in: host)
+        host.insertResource(PreviewFrameCount())
+        host.addSystem(CountPreviewFramesSystem.self)
+        let preview = AppWorlds(main: World(name: "RetainedScene"))
+        MainSchedulerPlugin().setup(in: preview)
+        preview.insertResource(PreviewFrameCount())
+        preview.addSystem(CountPreviewFramesSystem.self)
+        let name = AppWorldName(rawValue: "RetainedScene")
+        host.addSubworld(preview, by: name)
+        try await host.build()
+        let viewport = EditorSceneViewportModel()
+        viewport.loadSceneWorld(preview.main, application: preview, onLoadingChanged: { _ in }, onLoaded: { _ in })
+        defer { viewport.disconnect() }
+        try await host.update()
+        #expect(preview.main.getResource(PreviewFrameCount.self)?.count == 1)
+        viewport.setPresentationActive(false)
+        for _ in 0..<10 { await Task.yield() }
+        // A native window becoming active must not wake a hidden document.
+        preview.isHostedUpdateSuspended = false
+        for _ in 0..<3 { try await host.update() }
+        #expect(host.main.getResource(PreviewFrameCount.self)?.count == 4)
+        #expect(preview.main.getResource(PreviewFrameCount.self)?.count == 1)
+        #expect(host.getSubworldBuilder(by: name) === preview)
+        viewport.setPresentationActive(true)
+        for _ in 0..<10 { await Task.yield() }
+        try await host.update()
+        #expect(preview.main.getResource(PreviewFrameCount.self)?.count == 2)
+        viewport.setPresentationActive(false)
+        for _ in 0..<10 { await Task.yield() }
+        viewport.disconnect()
+        for _ in 0..<10 { await Task.yield() }
+        try await host.update()
+        #expect(preview.main.getResource(PreviewFrameCount.self)?.count == 3)
+    }
+
     @Test("A fully started game keeps the footer static while unfinished work still animates", arguments: [true, false])
     func completedProgressDoesNotRedrawWorkspace(completed: Bool) async throws {
         let container = UIContainerView(rootView: EditorFooter(

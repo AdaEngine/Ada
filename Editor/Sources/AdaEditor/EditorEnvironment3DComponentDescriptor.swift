@@ -1,4 +1,5 @@
 @_spi(AdaEngine) import AdaEngine
+import Foundation
 
 extension EditorComponentRegistry {
     static let environment3DDescriptor = EditorComponentDescriptor(
@@ -8,50 +9,54 @@ extension EditorComponentRegistry {
         description: "Configures the sky, star field, and screen-space reflections for a 3D camera.",
         requiredComponentTypeNames: [EditorBuiltInComponentType.camera],
         fields: [
-            environmentField("localShadows.isEnabled", "Local Shadows Enabled", .bool),
-            environmentField("localShadows.maximumLights", "Local Shadow Light Budget (0–4)", .int, minimumValue: 0),
-            environmentField("skybox.texture", "Skybox Texture", .assetReference),
-            environmentField("skybox.isEnabled", "Skybox Enabled", .bool),
-            environmentField("skybox.intensity", "Skybox Intensity", .float, minimumValue: 0),
-            environmentField("skybox.zenithColor", "Zenith Color", .color),
-            environmentField("skybox.horizonColor", "Horizon Color", .color),
-            environmentField("skybox.groundColor", "Ground Color", .color),
-            environmentField("skybox.starfield.isEnabled", "Starfield Enabled", .bool),
-            environmentField("skybox.starfield.density", "Star Density", .float, minimumValue: 0),
-            environmentField("skybox.starfield.intensity", "Star Intensity", .float, minimumValue: 0),
-            environmentField("skybox.starfield.size", "Star Size", .float, minimumValue: 0),
-            environmentField("skybox.starfield.seed", "Star Seed", .float),
-            environmentField("screenSpaceReflection.isEnabled", "Reflections Enabled", .bool),
-            environmentField("screenSpaceReflection.maxDistance", "Reflection Distance", .float, minimumValue: 0),
-            environmentField("screenSpaceReflection.stride", "Reflection Stride", .float, minimumValue: 0),
-            environmentField("screenSpaceReflection.thickness", "Reflection Thickness", .float, minimumValue: 0),
-            environmentField("screenSpaceReflection.maxSteps", "Reflection Steps", .int, minimumValue: 1),
-            environmentField("screenSpaceReflection.intensity", "Reflection Intensity", .float, minimumValue: 0),
-            environmentField("screenSpaceReflection.edgeFade", "Reflection Edge Fade", .float, minimumValue: 0),
+            environmentField("localShadows.isEnabled", "Local Shadows Enabled", .bool, group: "Local Shadows"),
+            environmentField("localShadows.maximumLights", "Local Shadow Light Budget (0–4)", .int, minimumValue: 0, group: "Local Shadows"),
+            environmentField("skybox.texture", "Skybox Texture", .assetReference, group: "Skybox"),
+            environmentField("skybox.isEnabled", "Skybox Enabled", .bool, group: "Skybox"),
+            environmentField("skybox.intensity", "Skybox Intensity", .float, minimumValue: 0, group: "Skybox"),
+            environmentField("skybox.zenithColor", "Zenith Color", .color, group: "Skybox"),
+            environmentField("skybox.horizonColor", "Horizon Color", .color, group: "Skybox"),
+            environmentField("skybox.groundColor", "Ground Color", .color, group: "Skybox"),
+            environmentField("skybox.starfield.isEnabled", "Starfield Enabled", .bool, group: "Skybox/Starfield"),
+            environmentField("skybox.starfield.density", "Star Density", .float, minimumValue: 0, group: "Skybox/Starfield"),
+            environmentField("skybox.starfield.intensity", "Star Intensity", .float, minimumValue: 0, group: "Skybox/Starfield"),
+            environmentField("skybox.starfield.size", "Star Size", .float, minimumValue: 0, group: "Skybox/Starfield"),
+            environmentField("skybox.starfield.seed", "Star Seed", .float, group: "Skybox/Starfield"),
+            environmentField("screenSpaceReflection.isEnabled", "Reflections Enabled", .bool, group: "Reflections"),
+            environmentField("screenSpaceReflection.maxDistance", "Reflection Distance", .float, minimumValue: 0, group: "Reflections"),
+            environmentField("screenSpaceReflection.stride", "Reflection Stride", .float, minimumValue: 0, group: "Reflections"),
+            environmentField("screenSpaceReflection.thickness", "Reflection Thickness", .float, minimumValue: 0, group: "Reflections"),
+            environmentField("screenSpaceReflection.maxSteps", "Reflection Steps", .int, minimumValue: 1, group: "Reflections"),
+            environmentField("screenSpaceReflection.intensity", "Reflection Intensity", .float, minimumValue: 0, group: "Reflections"),
+            environmentField("screenSpaceReflection.edgeFade", "Reflection Edge Fade", .float, minimumValue: 0, group: "Reflections"),
             environmentField("debugView", "Debug View", .enumeration(DebugView3D.allCases.map(\.rawValue))),
             environmentField("postProcess.exposureEV", "Exposure (EV)", .float),
             environmentField("postProcess.toneMapper", "Tone Mapper", .enumeration(ToneMapper3D.allCases.map(\.rawValue))),
-            environmentField("postProcess.autoExposure.isEnabled", "Auto Exposure Enabled", .bool),
-            environmentField("postProcess.autoExposure.minimumEV", "Auto Exposure Minimum (EV)", .float),
-            environmentField("postProcess.autoExposure.maximumEV", "Auto Exposure Maximum (EV)", .float),
-            environmentField("postProcess.autoExposure.speedUp", "Auto Exposure Speed Up", .float, minimumValue: 0),
-            environmentField("postProcess.autoExposure.speedDown", "Auto Exposure Speed Down", .float, minimumValue: 0),
-            environmentField("postProcess.bloom.isEnabled", "Bloom Enabled", .bool),
-            environmentField("postProcess.bloom.intensity", "Bloom Intensity", .float, minimumValue: 0),
-            environmentField("postProcess.bloom.threshold", "Bloom Threshold", .float, minimumValue: 0),
-            environmentField("postProcess.bloom.softKnee", "Bloom Soft Knee", .float, minimumValue: 0),
-            environmentField("postProcess.bloom.scatter", "Bloom Scatter", .float, minimumValue: 0),
-            environmentField("postProcess.depthOfField.isEnabled", "Depth of Field Enabled", .bool),
-            environmentField("postProcess.lens.rainAmount", "Rain on Lens", .float, minimumValue: 0),
-            environmentField("postProcess.lens.rainTime", "Rain Animation Time", .float, minimumValue: 0),
-            environmentField("postProcess.depthOfField.focusDistance", "Focus Distance", .float, minimumValue: 0),
-            environmentField("postProcess.depthOfField.aperture", "Aperture", .float, minimumValue: 0),
-            environmentField("postProcess.depthOfField.maximumBlurRadius", "Maximum Blur Radius (px)", .float, minimumValue: 0),
-            environmentField("postProcess.colorGrading.saturation", "Saturation", .float, minimumValue: 0),
-            environmentField("postProcess.colorGrading.contrast", "Contrast", .float, minimumValue: 0),
-            environmentField("postProcess.vignette.intensity", "Vignette Intensity", .float, minimumValue: 0),
-            environmentField("postProcess.vignette.radius", "Vignette Radius", .float, minimumValue: 0),
-            environmentField("postProcess.vignette.smoothness", "Vignette Smoothness", .float, minimumValue: 0),
+            environmentField("postProcess.autoExposure.isEnabled", "Auto Exposure Enabled", .bool, group: "Auto Exposure"),
+            environmentField("postProcess.autoExposure.minimumEV", "Auto Exposure Minimum (EV)", .float, group: "Auto Exposure"),
+            environmentField("postProcess.autoExposure.maximumEV", "Auto Exposure Maximum (EV)", .float, group: "Auto Exposure"),
+            environmentField("postProcess.autoExposure.speedUp", "Auto Exposure Speed Up", .float, minimumValue: 0, group: "Auto Exposure"),
+            environmentField("postProcess.autoExposure.speedDown", "Auto Exposure Speed Down", .float, minimumValue: 0, group: "Auto Exposure"),
+            environmentField("postProcess.bloom.isEnabled", "Bloom Enabled", .bool, group: "Bloom"),
+            environmentField("postProcess.bloom.intensity", "Bloom Intensity", .float, minimumValue: 0, group: "Bloom"),
+            environmentField("postProcess.bloom.threshold", "Bloom Threshold", .float, minimumValue: 0, group: "Bloom"),
+            environmentField("postProcess.bloom.softKnee", "Bloom Soft Knee", .float, minimumValue: 0, group: "Bloom"),
+            environmentField("postProcess.bloom.scatter", "Bloom Scatter", .float, minimumValue: 0, group: "Bloom"),
+            environmentField("postProcess.depthOfField.isEnabled", "Depth of Field Enabled", .bool, group: "Depth of Field"),
+            environmentField("postProcess.lens.rainAmount", "Rain on Lens", .float, minimumValue: 0, group: "Lens"),
+            environmentField("postProcess.lens.rainTime", "Rain Animation Time", .float, minimumValue: 0, group: "Lens"),
+            environmentField("postProcess.depthOfField.focusDistance", "Focus Distance", .float, minimumValue: 0, group: "Depth of Field"),
+            environmentField("postProcess.depthOfField.aperture", "Aperture", .float, minimumValue: 0, group: "Depth of Field"),
+            environmentField("postProcess.depthOfField.maximumBlurRadius", "Maximum Blur Radius (px)", .float, minimumValue: 0, group: "Depth of Field"),
+            environmentField("postProcess.colorGrading.saturation", "Saturation", .float, minimumValue: 0, group: "Color Grading"),
+            environmentField("postProcess.colorGrading.contrast", "Contrast", .float, minimumValue: 0, group: "Color Grading"),
+            environmentField("postProcess.colorGrading.correctionMode", "Correction Mode", .enumeration(ColorCorrectionMode3D.allCases.map(\.rawValue)), group: "Color Correction"),
+            environmentField("postProcess.colorGrading.lutIntensity", "Correction Strength (0–1)", .float, minimumValue: 0, group: "Color Correction"),
+            environmentField("postProcess.colorGrading.curves", "Color Curves", .string, group: "Color Correction"),
+            environmentField("postProcess.colorGrading.lut", "LUT Texture", .assetReference, group: "Color Correction"),
+            environmentField("postProcess.vignette.intensity", "Vignette Intensity", .float, minimumValue: 0, group: "Vignette"),
+            environmentField("postProcess.vignette.radius", "Vignette Radius", .float, minimumValue: 0, group: "Vignette"),
+            environmentField("postProcess.vignette.smoothness", "Vignette Smoothness", .float, minimumValue: 0, group: "Vignette"),
         ],
         makeDefaultPayload: makeDefaultEnvironment3DPayload,
         decode: decodeEnvironment3D
@@ -61,11 +66,15 @@ extension EditorComponentRegistry {
         _ key: String,
         _ label: String,
         _ kind: EditorComponentFieldKind,
-        minimumValue: Double? = nil
+        minimumValue: Double? = nil,
+        group: String? = nil
     ) -> EditorComponentField {
         var field = EditorComponentField(key: key, label: label, kind: kind)
         field.valuePath = key.split(separator: ".").map(String.init)
         field.minimumValue = minimumValue
+        field.groupPath = group?.split(separator: "/").map(String.init) ?? []
+        if key == "postProcess.colorGrading.curves" { field.coding = .json }
+        field.defaultValue = EditorSceneValue.object(makeDefaultEnvironment3DPayload()).value(at: field.valuePath[...])
         return field
     }
 
@@ -131,6 +140,9 @@ extension EditorComponentRegistry {
                 "saturation": number(settings.colorGrading.saturation),
                 "contrast": number(settings.colorGrading.contrast),
                 "lutIntensity": number(settings.colorGrading.lutIntensity),
+                "correctionMode": .string(settings.colorGrading.correctionMode.rawValue),
+                "lut": .null,
+                "curves": (try? JSONDecoder().decode(EditorSceneValue.self, from: JSONEncoder().encode(settings.colorGrading.curves))) ?? .object([:]),
             ]),
             "vignette": .object([
                 "intensity": number(settings.vignette.intensity),
@@ -177,10 +189,21 @@ extension EditorComponentRegistry {
         var serialized = payload
         serialized.removeValue(forKey: "skybox")
         serialized.removeValue(forKey: "screenSpaceReflection")
+        // Inspector references are portable paths; AssetHandle's Codable payload is a different format.
+        let lutPath = ["postProcess", "colorGrading", "lut"]
+        let lutReference: String? = if case let .string(reference)? = root.value(at: lutPath[...]) { reference } else { nil }
+        if lutReference != nil {
+            var portable = EditorSceneValue.object(serialized)
+            portable.setValue(.null, at: lutPath[...])
+            if case let .object(updated) = portable { serialized = updated }
+        }
         // Decode the remaining portable quality and IBL settings rather than silently dropping them.
         var result = try EditorComponentPayloadDecoder.decode(Environment3D.self, payload: serialized) as! Environment3D
         result.skybox = skybox
         result.screenSpaceReflection = reflection
+        if let lutReference, !lutReference.isEmpty {
+            result.postProcess.colorGrading.lut = try? AssetsManager.loadSync(Texture2D.self, at: lutReference)
+        }
         if let reference = payload["imageBasedLightingSource"]?.stringValue, !reference.isEmpty {
             let asset = try AssetsManager.loadSync(ImageBasedLighting3D.self, at: reference)
             result.imageBasedLighting = ImageBasedLightingSettings(asset: asset, intensity: Float(payload["imageBasedLightingIntensity"]?.doubleValue ?? 1))

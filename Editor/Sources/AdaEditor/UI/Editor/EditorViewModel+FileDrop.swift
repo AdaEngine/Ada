@@ -72,7 +72,8 @@ extension EditorViewModel {
         }
         updateResourcesAfterFileDrop(into: destination, projectURL: projectURL)
         for item in projectSidebar.items where item.isFolder {
-            if fileURL(for: item)?.resolvingSymlinksInPath().standardizedFileURL.path == destinationPath {
+            guard let folderPath = fileURL(for: item)?.resolvingSymlinksInPath().standardizedFileURL.path else { continue }
+            if folderPath == destinationPath || destinationPath.hasPrefix(folderPath + "/") {
                 projectSidebar.collapsedFolderIDs.remove(item.id)
             }
         }

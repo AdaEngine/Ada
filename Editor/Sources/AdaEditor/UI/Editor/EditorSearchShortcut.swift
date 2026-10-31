@@ -8,6 +8,25 @@ struct EditorDoubleShiftDetector {
     static let maximumInterval: Float = 0.5
 
     private(set) var lastPressTime: Float?
+    private var isShiftPressed = false
+
+    mutating func register(_ event: KeyEvent) -> Bool {
+        guard event.keyCode == .shift else {
+            lastPressTime = nil
+            return false
+        }
+        guard event.status == .down else {
+            isShiftPressed = event.modifiers.contains(.shift)
+            return false
+        }
+        guard !event.isRepeated, !isShiftPressed else { return false }
+        isShiftPressed = true
+        guard event.modifiers.subtracting([.shift, .capsLock]).isEmpty else {
+            lastPressTime = nil
+            return false
+        }
+        return registerPress(at: event.time)
+    }
 
     mutating func registerPress(at time: Float, isRepeated: Bool = false) -> Bool {
         guard !isRepeated else {
@@ -31,6 +50,7 @@ struct EditorDoubleShiftDetector {
 
     mutating func cancel() {
         lastPressTime = nil
+        isShiftPressed = false
     }
 }
 
@@ -40,6 +60,7 @@ final class EditorSearchShortcutMonitor {
 
     private var subscriberCount = 0
     private var detector = EditorDoubleShiftDetector()
+    private var inputWindowID: UIWindow.ID?
 
     #if canImport(AppKit)
         private var eventMonitor: Any?
@@ -74,6 +95,7 @@ final class EditorSearchShortcutMonitor {
         }
 
         detector.cancel()
+        inputWindowID = nil
 
         #if canImport(AppKit)
             pressedShiftKeyCodes.removeAll(keepingCapacity: true)
@@ -107,6 +129,30 @@ final class EditorSearchShortcutMonitor {
         }
     #endif
 
+    /// Observe the parsed input before focused controls receive the frame's events.
+    func processInput(_ input: Input, in window: UIWindow?) {
+        guard subscriberCount > 0, let window else {
+            detector.cancel()
+            inputWindowID = nil
+            return
+        }
+        if inputWindowID != window.id {
+            detector.cancel()
+            inputWindowID = window.id
+        }
+        for event in input.getInputEvents() where event.window == window.id {
+            if let key = event as? KeyEvent {
+                if detector.register(key) {
+                    _ = focusSearchField(in: window.uiInspectableContainers())
+                }
+            } else if let mouse = event as? MouseEvent, mouse.phase == .began, mouse.button != .none {
+                detector.cancel()
+            } else if let touch = event as? TouchEvent, touch.phase == .began {
+                detector.cancel()
+            }
+        }
+    }
+
     @discardableResult
     func focusSearchField(identifier: String = EditorTopToolbar.searchAccessibilityIdentifier) -> Bool {
         guard let window = UIWindowManager.shared?.activeWindow else {
@@ -138,6 +184,27 @@ final class EditorSearchShortcutMonitor {
         }
 
         return false
+    }
+}
+
+/// Install after application scheduler setup so startup cannot replace the system.
+struct EditorSearchShortcutPlugin: Plugin {
+    func setup(in app: AppWorlds) {
+        app.addSystem(EditorSearchShortcutInputSystem.self, on: .preUpdate)
+    }
+}
+
+/// Windows delivers modifier keys through AdaInput instead of NSEvent.
+@PlainSystem(dependencies: [.after(InputEventParseSystem.self), .before(UpdateWindowManagerSystem.self)])
+struct EditorSearchShortcutInputSystem {
+    @Res<Input> private var input
+    @Res<WindowManagerResource> private var windows
+
+    init(world _: World) {}
+
+    @MainActor
+    func update(context _: UpdateContext) {
+        EditorSearchShortcutMonitor.shared.processInput(input, in: windows.windowManager.activeWindow)
     }
 }
 

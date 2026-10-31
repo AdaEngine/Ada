@@ -14,6 +14,7 @@ struct EditorSceneHierarchySidebar: View {
     let onSelectEntity: (String) -> Void
     let onToggleEntityExpanded: (String) -> Void
     let onAddEntity: (String?) -> Void
+    let onAddGroup: ((String?) -> Void)?
     let onSetEntityEnabled: (String, Bool) -> Void
     let onRenameEntity: (String, String) -> Void
     let onDeleteEntity: (String) -> Void
@@ -28,6 +29,7 @@ struct EditorSceneHierarchySidebar: View {
     @State private var renameDraft = ""
     @State private var draggedEntityID: String?
     @State private var dropTargetEntityID: String?
+    @State private var searchText = ""
 
     init(
         document: EditorSceneDocument?,
@@ -37,6 +39,7 @@ struct EditorSceneHierarchySidebar: View {
         onSelectEntity: @escaping (String) -> Void,
         onToggleEntityExpanded: @escaping (String) -> Void,
         onAddEntity: @escaping (String?) -> Void = { _ in },
+        onAddGroup: ((String?) -> Void)? = nil,
         onSetEntityEnabled: @escaping (String, Bool) -> Void = { _, _ in },
         onRenameEntity: @escaping (String, String) -> Void = { _, _ in },
         onDeleteEntity: @escaping (String) -> Void = { _ in },
@@ -52,6 +55,7 @@ struct EditorSceneHierarchySidebar: View {
         self.onSelectEntity = onSelectEntity
         self.onToggleEntityExpanded = onToggleEntityExpanded
         self.onAddEntity = onAddEntity
+        self.onAddGroup = onAddGroup
         self.onSetEntityEnabled = onSetEntityEnabled
         self.onRenameEntity = onRenameEntity
         self.onDeleteEntity = onDeleteEntity
@@ -64,19 +68,27 @@ struct EditorSceneHierarchySidebar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if showsHeader { hierarchyHeader }
+            searchField
 
             if let document, let sceneModel = document.sceneModel {
-                let items = EditorSceneHierarchyModel.visibleItems(for: sceneModel)
+                let items = EditorSceneHierarchyModel.visibleItems(for: sceneModel, query: searchText, includesResources: false)
                 GeometryReader { geometry in
                     ZStack(anchor: .topLeading) {
                         hierarchyBackground(sceneModel: sceneModel, size: geometry.size)
 
-                        ScrollView {
+                        ScrollView(showsIndicators: true) {
                             LazyVStack(items, id: \.id, alignment: .leading, spacing: 0, estimatedRowHeight: 34) { item in
                                 hierarchyRow(item, items: items, sceneModel: sceneModel)
                             }
                             .padding(.horizontal, 8)
                             .padding(.bottom, 8)
+                            if items.isEmpty && !searchText.isEmpty {
+                                Text(L10n.text("No matching entities"))
+                                    .font(.system(size: 11))
+                                    .foregroundColor(theme.editorColors.muted)
+                                    .padding(12)
+                                    .accessibilityIdentifier("AdaEditor.SceneHierarchy.NoResults")
+                            }
                         }
                         .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
                     }
@@ -109,6 +121,16 @@ struct EditorSceneHierarchySidebar: View {
                     .font(.system(size: 10))
                     .foregroundColor(theme.editorColors.muted)
                     .lineLimit(1)
+                if let onAddGroup {
+                    Button(action: { onAddGroup(nil) }) {
+                        Text("\u{E2CC}")
+                            .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                            .foregroundColor(theme.editorColors.blue)
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(DefaultButtonStyle())
+                    .accessibilityIdentifier("AdaEditor.SceneHierarchy.AddGroup")
+                }
                 Button(action: { onAddEntity(defaultParentID) }) {
                     HStack(spacing: 0) {
                         #if os(iOS)
@@ -132,6 +154,34 @@ struct EditorSceneHierarchySidebar: View {
                 .fill(theme.editorColors.border.opacity(0.45))
                 .frame(height: 1)
         }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Text("\u{E8B6}")
+                .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                .foregroundColor(theme.editorColors.muted)
+            TextField(L10n.text("Search entities…"), text: $searchText)
+                .textFieldStyle(PlainTextFieldStyle())
+                .font(.system(size: 11))
+                .foregroundColor(theme.editorColors.text)
+                .frame(minWidth: 0, maxWidth: .infinity)
+                .accessibilityIdentifier("AdaEditor.SceneHierarchy.Search")
+            if !searchText.isEmpty {
+                Button(action: { searchText = "" }) {
+                    Text("\u{E5CD}")
+                        .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                        .foregroundColor(theme.editorColors.muted)
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(DefaultButtonStyle())
+                .accessibilityIdentifier("AdaEditor.SceneHierarchy.ClearSearch")
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 30)
+        .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.background))
+        .padding(8)
     }
 
     private var panelBackground: some View {
@@ -188,6 +238,9 @@ struct EditorSceneHierarchySidebar: View {
         Color.clear
             .frame(width: size.width, height: size.height)
             .contextMenu {
+                if let onAddGroup {
+                    Button(L10n.text("Add Group")) { onAddGroup(nil) }
+                }
                 Button(L10n.text("Add")) {
                     onAddEntity(sceneModel.rootEntityID)
                 }
@@ -327,6 +380,9 @@ struct EditorSceneHierarchySidebar: View {
                 .accessibilityIdentifier("AdaEditor.SceneHierarchy.Separator.\(item.id)")
         }
         .contextMenu(onPresent: { onSelectEntity(item.id) }) {
+            if let onAddGroup {
+                Button(L10n.text("Add Child Group")) { onAddGroup(item.id) }
+            }
             Button(L10n.text("Add Child")) {
                 onAddEntity(item.id)
             }

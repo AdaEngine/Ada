@@ -136,7 +136,8 @@ def package(binary_directory, compiler, tint, output, version, smoke_test=True, 
             if not source.is_file():
                 raise RuntimeError(f"Dawn runtime is missing: {name_dll}")
             shutil.copy2(source, directory)
-        search = [binary_directory] + runtime + [Path(path) for path in os.environ.get("PATH", "").split(os.pathsep) if path]
+        lore_sdk = Path(run("python", ROOT / "script/ensure_windows_lore.py"))
+        search = [binary_directory, lore_sdk] + runtime + [Path(path) for path in os.environ.get("PATH", "").split(os.pathsep) if path]
         binaries = list(directory.glob("*.dll")) + [directory / "AdaEditor.exe", directory / "adastudio.exe", directory / "BuildSDK/AdaScript/gravity.exe",
                                                   directory / "AdaEngine_AdaRender.resources/tint.exe"]
         bundle_dependencies(directory, binaries, search)
@@ -144,6 +145,10 @@ def package(binary_directory, compiler, tint, output, version, smoke_test=True, 
             bundle_dependencies(helper.parent, [helper], [directory] + search)
 
         notices = directory / "ThirdPartyNotices"
+        lore_notices = notices / "Lore"
+        lore_notices.mkdir(parents=True, exist_ok=True)
+        for notice in ["LICENSE.txt", "THIRD-PARTY-NOTICES.txt"]:
+            shutil.copy2(lore_sdk / notice, lore_notices / notice)
         tint_pin = json.loads((ROOT / "Tools/Tint/toolchain.json").read_text())
         dependencies = list((binary_directory.parent.parent / "checkouts").iterdir()) + [compiler,
             tint.parent.parent.parent / tint_pin["revision"] / "source"]

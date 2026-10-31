@@ -149,7 +149,7 @@
         for source in try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey]) {
           let name = source.lastPathComponent
           if name.hasPrefix(".build")
-            || [".git", ".ada", ".swiftpm", ".codegraph", "Exports"].contains(name)
+            || [".git", ".lore", ".ada", ".swiftpm", ".codegraph", "Exports"].contains(name)
             || source.standardizedFileURL == output || source.standardizedFileURL == stage
           {
             continue

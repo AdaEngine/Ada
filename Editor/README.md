@@ -37,6 +37,11 @@ does not establish parity for every desktop service or export target.
 
 ### Windows
 
+Inspector fields support [explicit subgroups](Documentation/InspectorGroups.md)
+with up to four levels through `@export(group: "Camera/Auto Exposure")` in AdaScript
+or `@Export(group: "Camera/Auto Exposure")` in Swift components. Scene hierarchy
+includes name search, empty parent groups and a resizable, remembered width.
+
 Use Swift 6.3 or newer for the Swan/WebGPU dependency, Visual Studio C++ Build
 Tools, Python 3, CMake and Ninja. From the engine root, run:
 
@@ -188,3 +193,7 @@ See [build tool settings and platform availability](Documentation/BuildExport.md
 
 Official games and feature examples are available from the HUB Samples section.
 See [Examples.md](Documentation/Examples.md) for downloading editable projects and local catalog development.
+
+Desktop projects can use **Git** or **Lore**, selected during project creation
+and in the Source Control panel. See [Source control](Documentation/SourceControl.md)
+for supported platforms, repository behavior and Windows build preparation.

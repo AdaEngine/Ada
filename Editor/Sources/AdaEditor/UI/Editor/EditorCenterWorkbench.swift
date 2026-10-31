@@ -63,6 +63,9 @@ struct EditorCenterWorkbench: View {
                     filesBrowserPanes.remove(viewModel.pane(for: id))
                 }
             }
+            .onChange(of: playModeState) { _, state in
+                if state != .editing { viewModel.clearRetainedScenePresentations() }
+            }
     }
 }
 
@@ -429,30 +432,49 @@ extension EditorCenterWorkbench {
 
     @ViewBuilder
     private func activeDocumentView(in pane: EditorWorkbenchPane) -> some View {
-        if filesBrowserPanes.contains(pane) {
-            EditorFilesBrowserTab(items: projectItems) { item in
-                filesBrowserPanes.remove(pane)
-                onOpenProjectItem?(item)
+        let document = viewModel.selectedDocument(in: pane)
+        let scene = sceneForPresentation(in: pane)
+        let isSceneActive = scene != nil && !filesBrowserPanes.contains(pane) && scene?.id == document?.id
+        ZStack {
+            if let scene {
+                sceneDocumentEditor(document: scene, isActive: isSceneActive)
+                    .opacity(isSceneActive ? 1 : 0)
+                    .allowsHitTesting(isSceneActive)
+                    .disabled(!isSceneActive)
             }
-        } else {
-            switch viewModel.selectedDocument(in: pane) {
-            case .git(let document):
-                EditorGitDiffView(document: document, workbench: viewModel)
-            case .scene(let document):
-                sceneDocumentEditor(document: document)
-            case .ui(let document):
-                EditorUISceneEditor(
-                    model: viewModel.uiSceneModel(for: document, resourceRoot: sceneResourceRootURL, bindingCatalog: inspectorViewModel.scriptableObjectCatalog),
-                    colorPalette: viewModel.codeColorPalette
-                )
-            case .text(let document):
-                textDocumentEditor(document: document)
-            case .asset(let document):
-                assetPreview(document: document)
-            case nil:
-                emptyWorkbench
+            if filesBrowserPanes.contains(pane) {
+                EditorFilesBrowserTab(items: projectItems) { item in
+                    filesBrowserPanes.remove(pane)
+                    onOpenProjectItem?(item)
+                }
+            } else if !isSceneActive {
+                switch document {
+                case .git(let document):
+                    EditorGitDiffView(document: document, workbench: viewModel)
+                case .scene:
+                    EmptyView()
+                case .ui(let document):
+                    EditorUISceneEditor(
+                        model: viewModel.uiSceneModel(for: document, resourceRoot: sceneResourceRootURL, bindingCatalog: inspectorViewModel.scriptableObjectCatalog),
+                        colorPalette: viewModel.codeColorPalette
+                    )
+                case .text(let document):
+                    textDocumentEditor(document: document)
+                case .asset(let document):
+                    assetPreview(document: document)
+                case nil:
+                    emptyWorkbench
+                }
             }
         }
+    }
+
+    private func sceneForPresentation(in pane: EditorWorkbenchPane) -> EditorSceneDocument? {
+        if !filesBrowserPanes.contains(pane), case let .scene(scene)? = viewModel.selectedDocument(in: pane) {
+            return scene
+        }
+        guard playModeState == .editing else { return nil }
+        return viewModel.retainedSceneDocument(in: pane)
     }
 
     @ViewBuilder
@@ -656,7 +678,7 @@ extension EditorCenterWorkbench {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func sceneDocumentEditor(document: EditorSceneDocument) -> some View {
+    private func sceneDocumentEditor(document: EditorSceneDocument, isActive: Bool = true) -> some View {
         EditorSceneDocumentEditor(
             document: document,
             workbench: viewModel,
@@ -670,7 +692,8 @@ extension EditorCenterWorkbench {
             onPlay: onPlayScene,
             onStop: onStopScene,
             annotationAgent: annotationAgent,
-            onAnnotationAdded: onAnnotationAdded
+            onAnnotationAdded: onAnnotationAdded,
+            isActive: isActive
         )
         .id("\(document.id).tilemap-\(viewModel.tileMapResourceRevision)")
         .accessibilityIdentifier("AdaEditor.SceneDocument.\(document.title)")

@@ -50,7 +50,7 @@ final class EditorAppearanceSettings {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         agentActivityGlowEnabled = defaults.object(forKey: Self.glowKey) as? Bool ?? true
-        let legacyMarkers = defaults.object(forKey: Self.indentationMarkersKey) as? Bool ?? true
+        let legacyMarkers = defaults.object(forKey: Self.indentationMarkersKey) as? Bool ?? false
         showsIndentationGuides = defaults.object(forKey: Self.indentationGuidesKey) as? Bool ?? legacyMarkers
         showsTabMarkers = defaults.object(forKey: Self.tabMarkersKey) as? Bool ?? legacyMarkers
         showsSpaceMarkers = defaults.object(forKey: Self.spaceMarkersKey) as? Bool ?? legacyMarkers

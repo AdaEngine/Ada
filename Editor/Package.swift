@@ -9,6 +9,25 @@ let adaMCPURL = ProcessInfo.processInfo.environment["ADA_MCP_LOCAL_PATH"].map {
     URL(fileURLWithPath: $0, relativeTo: editorPackageURL).standardizedFileURL
 } ?? (FileManager.default.fileExists(atPath: adjacentAdaMCP.appendingPathComponent("Package.swift").path) ? adjacentAdaMCP : nil)
 let isAndroidStudio = ProcessInfo.processInfo.environment["ADAEDITOR_ANDROID"] == "1"
+#if (os(macOS) && arch(arm64)) || (os(Windows) && arch(x86_64)) || (os(Linux) && (arch(x86_64) || arch(arm64)))
+#if os(Windows) || os(Linux)
+// Prepared by the host's ensure_*_lore.py --package helper. The shared native
+// port is retained in Tools/Lore until it can be published to the fork.
+let defaultLorePackage: Package.Dependency = .package(
+    name: "lore-swift", path: editorPackageURL.appendingPathComponent("../.build-tools/lore-swift-native-v1").standardizedFileURL.path
+)
+#else
+let defaultLorePackage: Package.Dependency = .package(url: "https://github.com/AdaEngine/lore-swift.git", revision: "dfafa19b40a5c3f04478e2ba1ffe49adc3c90f64")
+#endif
+let lorePackage: [Package.Dependency] = [
+    ProcessInfo.processInfo.environment["ADAEDITOR_LORE_PACKAGE_PATH"].map { .package(name: "lore-swift", path: $0) }
+        ?? defaultLorePackage
+]
+let loreTarget: [Target.Dependency] = [.product(name: "Lore", package: "lore-swift", condition: .when(platforms: [.macOS, .windows, .linux]))]
+#else
+let lorePackage: [Package.Dependency] = []
+let loreTarget: [Target.Dependency] = []
+#endif
 let sloppyRuntimeLocalPath = ProcessInfo.processInfo.environment["SLOPPY_RUNTIME_LOCAL_PATH"] ?? "../../Sloppy/Packages/SloppyRuntime"
 let sloppyRuntimeURL = URL(fileURLWithPath: sloppyRuntimeLocalPath, relativeTo: URL(fileURLWithPath: #filePath).deletingLastPathComponent()).standardizedFileURL
 // Desktop Windows has no SloppyRuntime target dependency. Resolving the mobile-only
@@ -77,7 +96,7 @@ let package = Package(
         .package(url: "https://github.com/swiftlang/swift-syntax", "602.0.0"..<"604.0.0"),
         .package(url: "https://github.com/tree-sitter/swift-tree-sitter", from: "0.9.0"),
         .package(url: "https://github.com/alex-pinkus/tree-sitter-swift", branch: "with-generated-files"),
-    ] + sloppyRuntimePackage + gravityAOTPackage,
+    ] + sloppyRuntimePackage + gravityAOTPackage + lorePackage,
     targets: [
         .target(name: "CEditorTerminal", linkerSettings: [.linkedLibrary("util", .when(platforms: [.linux]))]),
         .target(name: "CAndroidStudio", dependencies: [
@@ -142,7 +161,7 @@ let package = Package(
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
                 "GravityLanguageCore",
                 .target(name: "CAndroidStudio", condition: .when(platforms: [.android])),
-            ] + sloppyRuntimeTarget + gravityAOTTarget,
+            ] + sloppyRuntimeTarget + gravityAOTTarget + loreTarget,
             exclude: [
                 "Platforms/iOS/Info.plist",
                 "Platforms/macOS/Info.plist",

@@ -23,6 +23,30 @@ extension EnvironmentValues {
 
 @MainActor
 struct LazyVStackTests {
+    @Test("Known animated heights include offscreen and zero-height rows in scroll geometry")
+    func knownHeightsDriveOffscreenScrollTargets() throws {
+        let state = LazyVStackDynamicHeightState()
+        state.expandedHeight = 0
+        let tester = ViewTester {
+            ScrollView(.vertical) {
+                LazyVStack(Array(0..<500), id: \.self, spacing: 0, estimatedRowHeight: 20,
+                    rowHeight: { $0 == 0 ? state.expandedHeight : 20 }
+                ) { item in
+                    EmptyView().frame(width: 120, height: item == 0 ? state.expandedHeight : 20)
+                        .accessibilityIdentifier("known-\(item)")
+                }
+            }
+        }.setSize(Size(width: 120, height: 140)).performLayout()
+        let scroll = try #require(firstScrollView(in: tester.containerView.viewTree.rootNode))
+        scroll.scrollToViewNodeIfFoundIt(300, anchor: .top)
+        #expect(scroll.contentOffset.y == 5_980)
+        #expect(tester.findNodeByAccessibilityIdentifier("known-300") != nil)
+        state.expandedHeight = 100
+        tester.invalidateContent().performLayout()
+        scroll.scrollToViewNodeIfFoundIt(300, anchor: .top)
+        #expect(scroll.contentOffset.y == 6_080)
+    }
+
     init() async throws {
         try Application.prepareForTest()
     }

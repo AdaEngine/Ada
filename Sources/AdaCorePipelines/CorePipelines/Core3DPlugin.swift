@@ -135,6 +135,7 @@ public struct Core3DPlugin: Plugin {
             .insertResource(ActiveMotion3DPass())
             .insertResource(RenderPipelines(configurator: Motion3DPipeline()))
             .insertResource(ExtractedEnvironment3D())
+            .insertResource(ColorCorrection3DViews())
             .insertResource(ExtractedParticles3D())
             .insertResource(Particles3DResources())
             .insertResource(ExtractedLighting3D())

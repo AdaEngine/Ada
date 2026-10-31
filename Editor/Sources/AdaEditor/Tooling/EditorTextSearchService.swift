@@ -16,7 +16,7 @@ struct EditorTextSearchResults: Sendable {
 
 /// Disk traversal runs on this actor, never on the editor's main actor.
 actor EditorTextSearchService {
-    static let ignoredDirectories: Set<String> = [".ada", ".build", ".git", ".swiftpm", "DerivedData", "node_modules"]
+    static let ignoredDirectories: Set<String> = [".ada", ".build", ".builds", ".git", ".lore", ".swiftpm", "DerivedData", "node_modules"]
     static let maximumFileSize = 4 * 1024 * 1024
 
     func search(

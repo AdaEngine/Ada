@@ -17,6 +17,15 @@ if (-not $IsWindows -and $PSVersionTable.PSEdition -eq 'Core') {
 $env:ADAENGINE_HEADLESS = '0'
 $env:ADAENGINE_DISABLE_SWAN = '0'
 $env:ADAENGINE_PACKAGE_PATH = $studioRoot
+$studioLore = & python (Join-Path $studioRoot 'script/ensure_windows_lore.py')
+if ($LASTEXITCODE -ne 0) { throw 'Windows Lore SDK preparation failed.' }
+$env:LORE_WINDOWS_SDK_PATH = ($studioLore | Select-Object -Last 1).Trim()
+if (-not $env:ADAEDITOR_LORE_PACKAGE_PATH) {
+    $studioLorePackage = & python (Join-Path $studioRoot 'script/ensure_windows_lore.py') --package
+    if ($LASTEXITCODE -ne 0) { throw 'Windows Lore Swift package preparation failed.' }
+    $env:ADAEDITOR_LORE_PACKAGE_PATH = ($studioLorePackage | Select-Object -Last 1).Trim()
+}
+$env:Path = "$env:LORE_WINDOWS_SDK_PATH;$env:Path"
 if (-not $env:ADAEDITOR_SWIFTTERM_PACKAGE_PATH) {
     $studioSwiftTerm = & python (Join-Path $studioRoot 'script/ensure_windows_swiftterm.py')
     if ($LASTEXITCODE -ne 0) { throw 'Windows SwiftTerm preparation failed.' }
@@ -71,4 +80,5 @@ $studioBinaryArguments = @('build', '--package-path', $studioEditor, '--configur
 if ($ScratchPath) { $studioBinaryArguments += @('--scratch-path', $ScratchPath) }
 $studioBin = (& swift @studioBinaryArguments | Select-Object -Last 1).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Could not locate the built Studio executable.' }
+Copy-Item -LiteralPath (Join-Path $env:LORE_WINDOWS_SDK_PATH 'lore.dll') -Destination $studioBin -Force
 Write-Output $studioBin

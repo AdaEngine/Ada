@@ -40,15 +40,15 @@ struct EditorAppearanceSettingsTests {
         container.frame = Rect(x: 0, y: 0, width: 500, height: 220)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
+        #expect(!settings.showsSpaceMarkers)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Settings.SpaceMarkers"))
         #expect(settings.showsSpaceMarkers)
+        #expect(!settings.showsIndentationGuides)
+        #expect(!settings.showsTabMarkers)
+        #expect(EditorAppearanceSettings(defaults: defaults).showsSpaceMarkers)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Settings.SpaceMarkers"))
         #expect(!settings.showsSpaceMarkers)
-        #expect(settings.showsIndentationGuides)
-        #expect(settings.showsTabMarkers)
         #expect(!EditorAppearanceSettings(defaults: defaults).showsSpaceMarkers)
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Settings.SpaceMarkers"))
-        #expect(settings.showsSpaceMarkers)
-        #expect(EditorAppearanceSettings(defaults: defaults).showsSpaceMarkers)
     }
 
     @Test("Indentation marks can be turned off and the choice survives reloading")
@@ -57,11 +57,14 @@ struct EditorAppearanceSettingsTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = EditorAppearanceSettings(defaults: defaults)
-        #expect(settings.showsIndentationMarkers)
+        #expect(!settings.showsIndentationMarkers)
         let container = UIContainerView(rootView: EditorCodeDisplaySettings(settings: settings).theme(.adaEditor))
         container.frame = Rect(x: 0, y: 0, width: 500, height: 100)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Settings.IndentationMarkers"))
+        #expect(settings.showsIndentationMarkers)
+        #expect(EditorAppearanceSettings(defaults: defaults).showsIndentationMarkers)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Settings.IndentationMarkers"))
         #expect(!settings.showsIndentationMarkers)
         #expect(!EditorAppearanceSettings(defaults: defaults).showsIndentationMarkers)

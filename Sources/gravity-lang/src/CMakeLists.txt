@@ -42,6 +42,11 @@ if(MSVC)
     # warning C4068: unknown pragma
     list(APPEND GRAVITY_PRIVATE_COMPILE_OPTIONS "/wd4068")
 
+    if(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+        # MSVC requires explicit opt-in for the VM's C11 atomic callbacks.
+        list(APPEND GRAVITY_PRIVATE_COMPILE_OPTIONS "/experimental:c11atomics")
+    endif()
+
     if (WINDOWS_LOCAL_INSTALL)
     # make Windows installs local
     set(GRAVITY_INSTALL_RUNTIME_PATH "${CMAKE_CURRENT_SOURCE_DIR}/bin")
