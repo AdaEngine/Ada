@@ -28,8 +28,7 @@ struct EditorSceneDocumentEditor: View {
 
     var body: some View {
         if document.isLoading {
-            Text(L10n.text("Loading scene resources…"))
-                .foregroundColor(theme.editorColors.text)
+            EditorSceneLoadingProgressView(progress: .init(phase: .document))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier("AdaEditor.SceneDocument.Loading")
         } else {

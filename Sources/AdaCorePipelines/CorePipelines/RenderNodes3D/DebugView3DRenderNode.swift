@@ -55,7 +55,8 @@ public struct DebugView3DRenderNode: RenderNode {
                 colorAttachments: [.init(texture: output, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .black)],
                 depthStencilAttachment: nil
             ))
-            pass.setViewport(camera.viewport.rect)
+            pass.setViewport(target.temporalUpscalingActive
+                ? Rect(x: 0, y: 0, width: Float(output.size.width), height: Float(output.size.height)) : camera.viewport.rect)
             pass.setRenderPipelineState(pipelines.pipeline(device: device.renderDevice))
             pass.setFragmentBuffer(constants, offset: 0, slot: 5)
             pass.setResourceSet(RenderResourceSet(bindings: [

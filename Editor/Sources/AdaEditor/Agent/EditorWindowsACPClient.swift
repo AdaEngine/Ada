@@ -43,11 +43,8 @@ actor Client {
             directory: workingDirectory.map { URL(fileURLWithPath: $0) }, environment: environment)
         process = child
         writer = EditorWindowsACPWriter(child.input)
-        let overflow: @Sendable () -> Void = { [weak self] in
-            Task { await self?.failed(ClientError.transportError("Agent output exceeded the ACP input buffer.")) }
-        }
-        let outputChunks = EditorWindowsACPTransport.chunks(child.output, onOverflow: overflow)
-        let errorChunks = EditorWindowsACPTransport.chunks(child.error, onOverflow: overflow)
+        let outputChunks = EditorWindowsACPTransport.chunks(child.output)
+        let errorChunks = EditorWindowsACPTransport.chunks(child.error)
         // These owned tasks are joined after process termination so trailing updates
         // cannot be lost when a short-lived adapter exits immediately after replying.
         supervisor = Task {
@@ -156,32 +153,40 @@ actor Client {
         try await writer.write(data + Data([10]))
     }
 
-    private func consume(_ chunks: AsyncStream<Data>) async {
-        for await data in chunks {
-            buffer.append(data)
-            while let newline = buffer.firstIndex(of: 10) {
-                let line = Data(buffer[..<newline])
-                buffer.removeSubrange(...newline)
-                if line.isEmpty { continue }
-                guard line.count <= EditorWindowsACPTransport.maximumMessageBytes,
-                    let message = try? JSONDecoder().decode(ACPModel.Message.self, from: line) else {
-                    await failed(ClientError.transportError("Agent stdout contained an invalid or oversized ACP message."))
+    private func consume(_ chunks: AsyncThrowingStream<Data, any Error>) async {
+        do {
+            for try await data in chunks {
+                buffer.append(data)
+                while let newline = buffer.firstIndex(of: 10) {
+                    let line = Data(buffer[..<newline])
+                    buffer.removeSubrange(...newline)
+                    if line.isEmpty { continue }
+                    guard line.count <= EditorWindowsACPTransport.maximumMessageBytes,
+                        let message = try? JSONDecoder().decode(ACPModel.Message.self, from: line) else {
+                        await failed(ClientError.transportError("Agent stdout contained an invalid or oversized ACP message."))
+                        return
+                    }
+                    debugPair?.continuation.yield(DebugMessage(direction: .incoming, rawData: line))
+                    receive(message)
+                }
+                if buffer.count > EditorWindowsACPTransport.maximumMessageBytes {
+                    await failed(ClientError.transportError("ACP message exceeds 16 MiB."))
                     return
                 }
-                debugPair?.continuation.yield(DebugMessage(direction: .incoming, rawData: line))
-                receive(message)
             }
-            if buffer.count > EditorWindowsACPTransport.maximumMessageBytes {
-                await failed(ClientError.transportError("ACP message exceeds 16 MiB."))
-                return
-            }
+        } catch {
+            await failed(error)
         }
     }
 
-    private func consumeDiagnostics(_ chunks: AsyncStream<Data>) async {
-        for await data in chunks {
-            diagnostics.append(data)
-            if diagnostics.count > 4096 { diagnostics.removeFirst(diagnostics.count - 4096) }
+    private func consumeDiagnostics(_ chunks: AsyncThrowingStream<Data, any Error>) async {
+        do {
+            for try await data in chunks {
+                diagnostics.append(data)
+                if diagnostics.count > 4096 { diagnostics.removeFirst(diagnostics.count - 4096) }
+            }
+        } catch {
+            await failed(error)
         }
     }
 

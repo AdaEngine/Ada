@@ -52,6 +52,24 @@ transient view state such as scroll positions is not guaranteed to be retained.
 
 ## Sessions and execution
 
+Assistant Markdown uses native block layout: headings and inline styles, lists,
+selectable code blocks with horizontal scrolling, quotes, tables with wrapped
+cells, separators and clickable HTTP(S)/mail links. User prompts remain literal.
+Parsing is cached per mounted message and reuses unchanged document blocks while
+the reply grows. Text deltas and full-text snapshots coalesce for up to 33 ms; control events flush pending
+text before permissions, tool updates, errors or completion. Individual transcript
+rows and A2UI display text own their observation state, so a growing reply does not
+invalidate older messages or the composer. Bottom following preserves the reading
+position when the user scrolls into history.
+
+After a successfully saved reply, **What next?** shows up to three concrete next
+messages authored by the connected agent using that turn's task, project context
+and tool results. The agent returns them in a hidden `ada-next` JSON fence during
+the ordinary reply; this requires no second model request. Missing or invalid
+suggestions leave the area empty. Clicking a suggestion only fills the editable
+draft. Suggestions remain attached to the latest completed turn after reopening
+the chat; a new user turn clears them.
+
 Both modes use the same project-scoped session store and agent service. Switching
 chats keeps each session's unsent text, attachments, scene annotations, selected-code context and
 chat mode in memory. Unsent drafts are not persisted across app restarts.

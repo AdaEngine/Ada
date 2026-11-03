@@ -59,7 +59,10 @@ jobs:
           path: AdaEngine/.build-tools/tint
           key: tint-windows-x64-${{ hashFiles('AdaEngine/Tools/Tint/toolchain.json', 'AdaEngine/script/ensure_tint.py') }}
       - name: Test portable dependency packaging
-        run: python script/test_package_studio_windows.py
+        run: |
+          python script/test_build_studio_windows.py
+          python script/test_package_studio_windows.py
+          python script/test_install_studio_windows.py
       - name: Build Release Studio
         id: build
         run: |

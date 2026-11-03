@@ -172,6 +172,7 @@ final class EditorViewModel {
 
     init(
         project: EditorProjectReference? = nil,
+        startupData: EditorProjectStartupData? = nil,
         fileManager: FileManager = .default,
         workspaceService: any SwiftPMWorkspaceServicing = SwiftPMWorkspaceService(),
         sourceControlService: (any GitRepositoryServicing)? = nil,
@@ -201,10 +202,11 @@ final class EditorViewModel {
         playModeState: EditorPlayModeState = .editing,
         autosaveDelay: Duration = .milliseconds(350)
     ) {
-        let savedProject = project.flatMap {
+        let savedProject = startupData?.metadata ?? project.flatMap {
             try? ProjectSystem.loadProject(at: URL(fileURLWithPath: $0.path, isDirectory: true), fileManager: fileManager)
         }
         let scriptableObjectSupport: EditorScriptableObjectCatalogLoader.Result? = project.flatMap { reference in
+            if let startupData { return startupData.scriptSupport }
             guard let savedProject, savedProject.build.system.isAdaScript else {
                 return nil
             }
@@ -241,7 +243,7 @@ final class EditorViewModel {
         self.projectSidebar =
             projectSidebar
             ?? EditorProjectSidebarViewModel(
-                items: Self.projectTreeItems(for: project, fileManager: fileManager),
+                items: startupData?.items ?? Self.projectTreeItems(for: project, fileManager: fileManager),
                 sourceRootTarget: sourceRootTarget,
                 projectPath: project?.path
             )
@@ -349,7 +351,14 @@ final class EditorViewModel {
         libraries.load(for: self)
         configureDebugger()
         if workbench == nil {
-            restoreProjectDocument()
+            if let startupData {
+                lastRememberedProjectFile = startupData.savedDocumentPath
+                if let item = startupData.restoredItem, let document = startupData.restoredDocument {
+                    openProjectItem(item, preparedDocument: document)
+                }
+            } else {
+                restoreProjectDocument()
+            }
         }
         synchronizeAgentSceneContext()
     }

@@ -206,6 +206,16 @@ open class UIWindow: UIView {
         responder.onEvent(event)
     }
 
+    func coalescesTextSelection(for event: MouseEvent) -> Bool {
+        guard event.button == .left,
+            let responder = capturedMouseResponders[.left]?.value,
+            ownsResponder(responder), responder.canRespondToAction(event),
+            let container = responder as? any TextSelectionInputContainer else {
+            return false
+        }
+        return container.isSelectingTextWithMouse
+    }
+
     /// Uses the same hit testing and pointer capture as dispatch. The window itself is the scene fallback.
     func blocksScenePicking(for event: any InputEvent) -> Bool {
         guard canRespondToAction(event) else {

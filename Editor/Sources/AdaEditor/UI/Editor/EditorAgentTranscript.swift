@@ -1,7 +1,8 @@
 @_spi(AdaEngine) import AdaEngine
 import Math
+import Observation
 
-enum EditorAgentTranscriptEntry: Identifiable {
+enum EditorAgentTranscriptEntry: Identifiable, Equatable {
     case event(EditorAgentEvent)
     case actions(id: String, events: [EditorAgentEvent])
 
@@ -71,6 +72,70 @@ enum EditorAgentTranscriptEntry: Identifiable {
     }
 }
 
+@MainActor @Observable
+final class EditorAgentTranscriptRow: Identifiable {
+    let id: String
+    var entry: EditorAgentTranscriptEntry
+
+    init(_ entry: EditorAgentTranscriptEntry) {
+        id = entry.id
+        self.entry = entry
+    }
+}
+
+/// Topology changes rebuild the list; streamed content updates only its owning row.
+@MainActor @Observable
+final class EditorAgentTranscriptState {
+    private(set) var rows: [EditorAgentTranscriptRow] = []
+    private(set) var revision: UInt64 = 0
+    private(set) var sessionID: String?
+    private(set) var userID: String?
+
+    func update(events: [EditorAgentEvent], sessionID: String?) {
+        let entries = EditorAgentTranscriptEntry.grouped(events)
+        let sameSession = self.sessionID == sessionID
+        let existing = sameSession ? Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) }) : [:]
+        let updated = entries.map { entry in
+            if let row = existing[entry.id] {
+                if row.entry != entry { row.entry = entry }
+                return row
+            }
+            return EditorAgentTranscriptRow(entry)
+        }
+        if !sameSession || rows.map(\.id) != updated.map(\.id) { rows = updated }
+        self.sessionID = sessionID
+        userID = events.last { $0.message?.role == .user }?.id
+        revision &+= 1
+    }
+}
+
+private struct EditorAgentTranscriptRows: View {
+    let state: EditorAgentTranscriptState
+    let viewModel: EditorAgentViewModel?
+    let a2uiPresentation: EditorAgentA2UIPresentation?
+
+    var body: some View {
+        ForEach(state.rows) { row in
+            EditorAgentTranscriptRowView(row: row, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
+        }
+    }
+}
+
+private struct EditorAgentTranscriptRowView: View {
+    let row: EditorAgentTranscriptRow
+    let viewModel: EditorAgentViewModel?
+    let a2uiPresentation: EditorAgentA2UIPresentation?
+
+    var body: some View {
+        switch row.entry {
+        case let .event(event):
+            EditorAgentEventCard(event: event, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
+        case let .actions(id, events):
+            EditorAgentActionsDisclosure(id: id, events: events, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
+        }
+    }
+}
+
 struct EditorAgentActionsDisclosure: View {
     let id: String
     let events: [EditorAgentEvent]
@@ -117,6 +182,7 @@ struct EditorAgentTranscript: View {
     let standaloneEvents: [EditorAgentEvent]?
     let standaloneSessionID: String?
     @State private var follower = EditorAgentTranscriptFollower()
+    @State private var standaloneState = EditorAgentTranscriptState()
     static let bottomID = "AdaEditor.Agent.Transcript.Bottom"
 
     init(viewModel: EditorAgentViewModel) {
@@ -129,6 +195,7 @@ struct EditorAgentTranscript: View {
         self.viewModel = nil
         self.standaloneEvents = events
         self.standaloneSessionID = sessionID
+        standaloneState.update(events: events, sessionID: sessionID)
     }
 
     var a2uiPresentation: EditorAgentA2UIPresentation?
@@ -137,15 +204,8 @@ struct EditorAgentTranscript: View {
     var scrollRespectsSafeArea = true
     var scrollExtendsUnderNavigationBar = false
 
-    private var events: [EditorAgentEvent] {
-        standaloneEvents ?? viewModel?.activeSession?.events ?? []
-    }
-
-    private var sessionID: String? {
-        standaloneSessionID ?? viewModel?.activeSession?.id
-    }
-
     var body: some View {
+        let state = viewModel?.transcript ?? standaloneState
         GeometryReader { geometry in
             ScrollViewReader { proxy in
                 ScrollView(
@@ -156,29 +216,35 @@ struct EditorAgentTranscript: View {
                     extendsUnderNavigationBar: scrollExtendsUnderNavigationBar
                 ) {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(EditorAgentTranscriptEntry.grouped(events)) { entry in
-                            switch entry {
-                            case let .event(event):
-                                EditorAgentEventCard(event: event, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
-                            case let .actions(id, events):
-                                EditorAgentActionsDisclosure(id: id, events: events, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
-                            }
-                        }
+                        EditorAgentTranscriptRows(state: state, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
                         Color.clear.frame(height: contentInsets.bottom + 1)
                             .id(Self.bottomID)
                             .accessibilityIdentifier(Self.bottomID)
                     }
                     .frame(width: max(0, geometry.size.width - contentInsets.leading - contentInsets.trailing), alignment: .leading)
                     .padding(EdgeInsets(top: contentInsets.top, leading: contentInsets.leading, bottom: 0, trailing: contentInsets.trailing))
+                    .background {
+                        GeometryReader { contentGeometry in
+                            Color.clear.onChange(of: contentGeometry.size) { _, _ in
+                                // A row can finish reconciling after the model revision was sampled.
+                                // Follow again when its actual laid-out size becomes available.
+                                follower.request(proxy, force: false)
+                            }
+                        }
+                        .allowsHitTesting(false)
+                    }
                 }
                 .accessibilityIdentifier("AdaEditor.Agent.Transcript")
-                .background { EditorAgentTranscriptScrollDriver(follower: follower).allowsHitTesting(false) }
-                .onAppear { follower.appear(proxy) }
-                .onChange(of: sessionID) { _, _ in follower.request(proxy, force: true) }
-                .onChange(of: events) { old, new in
-                    let oldUser = old.last { $0.message?.role == .user }?.id
-                    let newUser = new.last { $0.message?.role == .user }?.id
-                    follower.request(proxy, force: oldUser != newUser)
+                .background { EditorAgentTranscriptScrollDriver(follower: follower, state: state, proxy: proxy).allowsHitTesting(false) }
+                .onAppear {
+                    if let standaloneEvents { state.update(events: standaloneEvents, sessionID: standaloneSessionID) }
+                    follower.appear(proxy)
+                }
+                .onChange(of: standaloneEvents) { _, events in
+                    if let events { state.update(events: events, sessionID: standaloneSessionID) }
+                }
+                .onChange(of: standaloneSessionID) { _, sessionID in
+                    if let standaloneEvents { state.update(events: standaloneEvents, sessionID: sessionID) }
                 }
             }
         }
@@ -221,9 +287,13 @@ private final class EditorAgentTranscriptFollower {
 
 private struct EditorAgentTranscriptScrollDriver: UIViewRepresentable {
     let follower: EditorAgentTranscriptFollower
+    let state: EditorAgentTranscriptState
+    let proxy: ScrollViewProxy
     func makeUIView(in _: Context) -> EditorAgentTranscriptScrollView { EditorAgentTranscriptScrollView() }
     func updateUIView(_ view: EditorAgentTranscriptScrollView, in _: Context) {
         view.follower = follower
+        view.state = state
+        view.proxy = proxy
         view.backgroundColor = .clear
         view.isInteractionEnabled = false
     }
@@ -234,5 +304,18 @@ private struct EditorAgentTranscriptScrollDriver: UIViewRepresentable {
 
 private final class EditorAgentTranscriptScrollView: UIView {
     var follower: EditorAgentTranscriptFollower?
-    override func update(_: Float) { follower?.flush() }
+    var state: EditorAgentTranscriptState?
+    var proxy: ScrollViewProxy?
+    var revision: UInt64?
+    var sessionID: String?
+    var userID: String?
+    override func update(_: Float) {
+        if let state, let proxy, revision != state.revision {
+            follower?.request(proxy, force: sessionID != state.sessionID || userID != state.userID)
+            revision = state.revision
+            sessionID = state.sessionID
+            userID = state.userID
+        }
+        follower?.flush()
+    }
 }

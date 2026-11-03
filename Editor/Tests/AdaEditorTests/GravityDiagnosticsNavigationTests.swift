@@ -187,7 +187,12 @@ struct GravityDiagnosticsNavigationTests {
             "params": [
                 "textDocument": [
                     "uri": uri, "languageId": "adascript", "version": 1,
-                    "text": "class Main { var speed = 0; var speed = 1 }",
+                    "text": """
+                        class Main {
+                            var speed = 0;
+                            var speed = 1;
+                        }
+                        """,
                 ]
             ],
         ])

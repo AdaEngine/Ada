@@ -22,6 +22,10 @@ public protocol DrawPass<Item>: Resource {
     ) throws
 }
 
+/// Explicit opt-in for static source vertex coverage and main-pass ``MeshletDrawOverride`` consumption.
+/// Unknown/custom vertex deformation passes retain the ordinary geometry path unless they adopt this contract.
+public protocol MeshletGeometryDrawPass: DrawPass where Item == Opaque3DRenderItem {}
+
 /// Type-erased draw pass.
 public struct AnyDrawPass<T: RenderItem>: DrawPass {
     @usableFromInline

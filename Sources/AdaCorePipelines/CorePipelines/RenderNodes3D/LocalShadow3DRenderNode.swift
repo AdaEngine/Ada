@@ -73,8 +73,16 @@ public struct LocalShadow3DRenderNode: RenderNode {
         _device.update(from: world)
         _clear.update(from: world)
         _metrics.update(from: world)
-        var active: [Entity.ID] = []
-        cameras.forEach { _, _, _, source in active.append(source.entityId) }
+        let active: [Entity.ID]
+        if let targets = world.getResource(ExtractedCameraRenderViewTargets.self) {
+            // Proxy entities and their uniforms may be absent while the source camera is backpressured.
+            // Only authoritative camera removal should retire its atlas and reusable face contents.
+            active = Array(targets.activeCameraIDs)
+        } else {
+            var extracted: [Entity.ID] = []
+            cameras.forEach { _, _, _, source in extracted.append(source.entityId) }
+            active = extracted
+        }
         for id in views.entries.keys where !active.contains(id) { views.entries.removeValue(forKey: id) }
         scratch.cache.retainViews(active)
         statistics.retainViews(active)
@@ -92,6 +100,12 @@ public struct LocalShadow3DRenderNode: RenderNode {
                 return
             }
             var entry = views.entries.removeValue(forKey: source.entityId) ?? LocalShadow3DViews.Entry()
+            let viewStart = PerformanceStallProbe.begin()
+            defer {
+                if let viewStart {
+                    PerformanceStallProbe.end("LocalShadow.View.reused\(entry.reusedFaces)", since: viewStart, count: entry.renderedFaces)
+                }
+            }
             let environment = environments.environments[source.entityId] ?? Environment3D()
             let cameraPosition = uniform.viewMatrix.inverse.origin
             let probes = environment.irradianceProbes
@@ -102,11 +116,13 @@ public struct LocalShadow3DRenderNode: RenderNode {
                 // A light may illuminate a bounce wall outside the receiver grid itself.
                 bounds = transport?.surfaceBounds
             }
+            let selectStart = PerformanceStallProbe.begin()
             entry.lights = LocalLighting3DMath.select(lighting.localLights, viewProjection: uniform.viewProjectionMatrix,
                 cameraPosition: cameraPosition, irradianceBounds: bounds)
             let settings = environment.localShadows
             let budget = settings.isEnabled ? min(max(settings.maximumLights, 0), LocalLighting3DMath.maximumShadowLights) : 0
             entry.allocator.select(entry.lights, cameraPosition: cameraPosition, budget: budget)
+            PerformanceStallProbe.end("LocalShadow.Select", since: selectStart, count: entry.allocator.slots.count)
             for index in entry.matrices.indices { entry.matrices[index] = .identity }
             guard !entry.allocator.slots.isEmpty, !candidates.meshes.isEmpty else {
                 // A light without shadow resources still contributes full unshadowed PBR lighting.
@@ -115,9 +131,11 @@ public struct LocalShadow3DRenderNode: RenderNode {
                 views.entries[source.entityId] = entry
                 return
             }
-            let resolution = LocalLighting3DMath.shadowResolution
+            let resolution = settings.sanitizedResolution
             let size = SizeInt(width: resolution * 6, height: resolution * budget)
             if entry.color?.size != size {
+                let atlasStart = PerformanceStallProbe.begin()
+                defer { PerformanceStallProbe.end("LocalShadow.AtlasAllocate", since: atlasStart, bytes: size.width * size.height * 12, count: resolution) }
                 entry.color = RenderTexture(
                     size: size,
                     scaleFactor: 1,
@@ -147,10 +165,14 @@ public struct LocalShadow3DRenderNode: RenderNode {
             var matrixDigests: [Int: UInt64] = [:]
             // With the casters unchanged since the faces were last prepared, a face whose matrix is also unchanged
             // draws what it drew before, so its list needs no rebuilding at all.
+            let digestStart = PerformanceStallProbe.begin()
             let sceneDigest = settings.reusesStaticFaces
                 ? ShadowSceneDigest3D.compute(sources: candidates.meshes, usesLOD: environment.meshVisibility.lod)
                 : nil
+            PerformanceStallProbe.end("LocalShadow.SceneDigest", since: digestStart, count: candidates.meshes.count)
             let sceneUnchanged = sceneDigest != nil && sceneDigest == entry.sceneDigest
+            let prepareStart = PerformanceStallProbe.begin()
+            var preparedFaceCount = 0
             for light in entry.lights {
                 guard let slot = entry.allocator.slots[light.entity] else { continue }
                 let matrices = LocalLighting3DMath.shadowProjections(light)
@@ -167,6 +189,7 @@ public struct LocalShadow3DRenderNode: RenderNode {
                         continue
                     }
                     // Light-volume culling is independent of the main camera list and its distance cuts.
+                    let listStart = PerformanceStallProbe.begin()
                     lists.prepare(
                         sources: candidates.meshes,
                         view: source.entityId,
@@ -178,6 +201,11 @@ public struct LocalShadow3DRenderNode: RenderNode {
                         device: device.renderDevice,
                         materials: &_materials.wrappedValue
                     )
+                    preparedFaceCount += 1
+                    if let listStart {
+                        PerformanceStallProbe.end("LocalShadow.ListsPrepare.face\(index)", since: listStart,
+                            count: lists.count(view: source.entityId, pass: 100 + index).drawCalls)
+                    }
                     var digest: UInt64?
                     if settings.reusesStaticFaces, let content = lists.shadowDigest(view: source.entityId, pass: 100 + index) {
                         var combined = FrameDigest3D()
@@ -189,6 +217,7 @@ public struct LocalShadow3DRenderNode: RenderNode {
                     faces.append(Face(index: index, tile: tile, isClean: digest != nil && entry.faceDigests[index] == digest))
                 }
             }
+            PerformanceStallProbe.end("LocalShadow.PrepareFaces", since: prepareStart, count: preparedFaceCount)
             entry.sceneDigest = sceneDigest
             entry.faceMatrixDigests = matrixDigests
             entry.faceDigests = digests
@@ -204,6 +233,7 @@ public struct LocalShadow3DRenderNode: RenderNode {
             let keepsContents = entry.reusedFaces > 0
             let command = renderContext.commandQueue.makeCommandBuffer()
             command.label = "Local Shadows 3D"
+            let beginPassStart = PerformanceStallProbe.begin()
             let pass = command.beginRenderPass(
                 .init(
                     label: "Local Shadows 3D",
@@ -215,6 +245,9 @@ public struct LocalShadow3DRenderNode: RenderNode {
                     )
                 )
             )
+            PerformanceStallProbe.end("LocalShadow.BeginPass", since: beginPassStart, count: entry.renderedFaces)
+            let encodeStart = PerformanceStallProbe.begin()
+            var encodedDrawCount = 0
             for face in faces where !face.isClean {
                 let index = face.index
                 let tile = face.tile
@@ -261,9 +294,11 @@ public struct LocalShadow3DRenderNode: RenderNode {
                     )
                     pass.setIndexBuffer(part.indexBuffer, offset: 0)
                     pass.drawIndexed(indexCount: part.indexCount, indexBufferOffset: 0, instanceCount: Int(range.count))
+                    encodedDrawCount += 1
                 }
             }
             pass.endRenderPass()
+            PerformanceStallProbe.end("LocalShadow.EncodeDraws", since: encodeStart, count: encodedDrawCount)
             if let metrics { command.addCompletedTimingHandler { metrics.record(pass: "local-shadows", seconds: $0) } }
             submitted = command
             statistics.record(view: source.entityId, scene: _lighting.wrappedValue, entry: entry)

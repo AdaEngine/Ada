@@ -39,6 +39,11 @@ and assess gaps before proposing new features.
   bundles Swift/Dawn runtime DLLs, resources, Tint and a relocatable `BuildSDK`
   beside the executable. It checks PE imports and launches the tools with a clean
   PATH. Windows signing and external host/export toolchains remain separate.
+- Desktop installation uses `../script/install_studio_windows.ps1` and
+  `../script/install_studio_macos.sh`: build Release or copy a complete supplied
+  distribution to the current user's Windows Programs folder or `/Applications`.
+  macOS source builds use the explicit `AdaEditor-Standalone` scheme and local
+  ad-hoc signing. Native macOS installation tests run in macOS CI.
 - Build & Export scans host tools on page entry and provides Rescan plus official
   Swift/Android setup links. Discovery fills missing/broken paths in the settings
   draft, preserves valid overrides, and requires Save Build Settings to persist.
@@ -56,8 +61,9 @@ and assess gaps before proposing new features.
   not establish remote AdaPlayer, ACP, debugger, Cloud or cross-export parity.
 - Use an isolated scratch/module cache when necessary; never delete the shared
   `.build`. Preserve unrelated engine, demo, and editor changes.
-- Debug macOS builds accept `--editor-project=<absolute-path>` to open the
-  production workspace directly for native UI validation.
+- Desktop builds accept `--editor-project=<absolute-path>` to open the
+  production workspace directly. `adastudio <directory>` resolves the caller's
+  path, validates the project and launches a new workspace window.
 - Public scripting terminology is **AdaScript**. `Gravity*` names are internal
   compiler, VM, and language-tooling implementation names.
 - Inspector subgroups use explicit export metadata (`group: "Camera/Auto Exposure"`,
@@ -85,6 +91,12 @@ and assess gaps before proposing new features.
   Coverage: `EditorProjectTreeStateTests` and `EditorFileDropTests`.
 - Source highlighting and semantic position conversion use `EditorSourceLines`
   so Windows CRLF counts as one newline, matching TextEditor's normalized text.
+  Live text selections are kept outside the observed document array; command
+  snapshots merge them through `textDocument(id:)` and pane/active accessors.
+  Caret geometry is observed by the completion overlay, not the whole code view.
+  Consecutive captured text-selection moves coalesce within a UI input batch;
+  other drags and the raw scene input stream retain every event. Coverage:
+  `EditorTextInteractionPerformanceTests` and `EditorWindowHoverInputTests`.
 - Double Shift focuses project file search. Windows observes parsed AdaInput
   before focused UI controls; macOS uses its local event monitor. Keep repeats,
   modifier chords, intervening clicks/keys and window changes out of the gesture.
@@ -177,6 +189,14 @@ existing coverage, not a test run performed for this documentation change.
 
 ### Projects and files
 
+Desktop project windows display staged loading while metadata, the complete file
+index, script catalogs and the restored document are prepared off the UI actor.
+The workspace reuses that snapshot; file sorting snapshots directory/link metadata
+once per entry. Scene loading reports decoding, resource discovery, completed/total
+distinct model/skeleton imports and object creation. Closing a load discards its
+result. Coverage: `EditorProjectLoadingTests`, `EditorProjectStartupTests` and
+`EditorSceneAssetCacheTests`; see [SceneLoading.md](Documentation/SceneLoading.md).
+
 Project creation/opening, recent projects, project persistence and recovery;
 AdaScript and standalone SwiftPM project paths. Project navigator, new-file
 templates, asset import/file drop, deletion, file search, Save and Save All.
@@ -213,6 +233,14 @@ while mounting, searching or updating the scene hierarchy.
 Text editing, syntax highlighting for Swift/AdaScript/YAML/GLSL, completion,
 snippet placeholders, hover, definition navigation and diagnostics. Swift uses
 SourceKit-LSP; AdaScript uses the embedded language core / language server.
+AdaScript workspace diagnostics also run the shared `AdaScriptLinter`: operator,
+comma/colon and control-keyword spacing, separate statement lines, and blank
+lines between type/function declarations. They publish warning diagnostics with
+source `adascript-lint` and stable rule codes. Desktop `adastudio validate --lint strict`
+checks saved authored sources and tests and returns exit code 3 for style
+violations; the default `warning` mode preserves successful validation. See
+[AdaScriptLint.md](Documentation/AdaScriptLint.md). Coverage: `AdaScriptLintTests`,
+`GravityLintTests` and `EditorAdaScriptLintTests`.
 Find in File and Find in Project include case and whole-word controls.
 Indentation guides, tab markers and space dots default to off. Explicit saved
 display preferences, including the legacy combined toggle, are preserved.
@@ -401,6 +429,11 @@ Generic assets retain metadata previews. Coverage: `EditorAudioAssetPreviewTests
 Scene keyframe clips have timeline/curve modes, tracks, keyframe values/timing,
 interpolation and repeat modes. This is distinct from skeletal-animation tooling.
 
+Model previews support orbit, middle-drag pan and right-drag look with WASD/QE
+flight and Shift acceleration. Frame Model restores the view. Two opposing,
+shadow-free lights and the bundled baked studio IBL keep all sides visible.
+Navigation does not modify imported nodes. Coverage: `EditorModelPreviewNavigationTests`.
+
 GLB/glTF models have a dedicated 3D preview with fitted framing, imported
 mesh/material/skin counts, named clip selection and Play/Pause. Add to Scene
 places a portable `Model3DSource` reference in an open scene, retaining the
@@ -496,7 +529,12 @@ export copy; private types and explicit target source lists are supported.
 
 Standalone macOS Studio includes `Contents/MacOS/adastudio`; Windows distributions
 include a console `adastudio.exe` beside `AdaEditor.exe` and an adjacent source
-build SDK. The CLI dispatches before app/UI startup and reuses project inspection,
+build SDK. Linux stages an `adastudio` launcher through `ada-studio` and supports
+headless inspection/validation, but not CLI app export. The standalone application
+menu installs the command in the current user's PATH on all three desktop platforms
+(macOS/Linux shell profiles and `~/.local/bin`; Windows user environment registry).
+Coverage: `EditorCommandLineTests` and `EditorMenuBarTests`.
+The CLI dispatches before app/UI startup and reuses project inspection,
 AdaScript validation and native build/export services, with JSON diagnostics and
 stable exit codes. CLI/SDK staging is excluded from iOS and App Store wrappers.
 Windows inspect/validate run without external compilers; Web/Android export uses
@@ -609,14 +647,32 @@ these do not establish packaged Studio UI validation. Linux SDK staging and ELF
 linking are checked; the bindings' runtime and Studio UI still need a Linux run.
 Agent Chat includes transcript/session persistence,
 attachments, context selection, permissions, skills and agent settings.
+Shared native transcripts render Markdown code blocks, quotes and tables with
+native block layout, selectable text and clickable links. Parsing is cached per
+mounted message. Text deltas and snapshots coalesce for up to 33 ms and flush before control or
+terminal events; transcript rows and A2UI display text use per-message observation.
+Keep session chrome independent of the observed event array. Coverage:
+`EditorAgentTranscriptTests`, `EditorAgentEventBatcherTests` and `TextMarkdownBlockTests`.
 The shared sidebar/workspace composer offers a debounced, full-draft completion
 while typing and up to three next-message suggestions after a successful saved
 reply. Chips fill an editable draft without sending; Enter retains ordinary
 submission and slash/@ completion behavior. Suggestions can be dismissed and
-refresh with the app language. Generation uses the local Foundation Models model
-only on supported, available Apple systems, with contextual/history suggestions
-as a fallback; it does not make a separate ACP or hosted-model request.
+refresh with context changes. Next-message hints come from a hidden `ada-next`
+JSON fence authored by the active agent in the normal reply, using its conversation,
+project context and tool results. Raw reply events persist the hints for reopen;
+only the latest successful saved turn enables them. Missing/invalid hints leave
+this area empty, without canned follow-ups or a second model request. Draft
+completion still uses Foundation Models on supported Apple systems and a local
+history/intent fallback.
 Coverage: [EditorAgentSuggestionUITests.swift](Tests/AdaEditorTests/EditorAgentSuggestionUITests.swift).
+Suggestion rows highlight across their full width on pointer hover and keyboard
+focus, restoring their normal background on leave without changing the draft.
+Windows text uses cached system-font fallback atlases for symbols absent from
+Open Sans, including arrows in regular and bold replies. Coverage:
+`WindowsFontFallbackTests` in the engine text target.
+The shared prompt editor wraps drafts at the available composer width and scrolls
+vertically. Reflow on resize preserves the draft and selection, including words
+without spaces and Unicode. Coverage: `EditorAgentChatSizingTests`.
 macOS/Windows ACP and iPhone SloppyRuntime replies stream native A2UI cards. Ordinary
 submissions return to the owning session; reserved local actions apply scene tools
 without a new model turn. NPC subtree spawning, color-field editing, structured
@@ -635,9 +691,15 @@ SloppyRuntime path when available. Windows reuses ACPModel and the shared editor
 with native stdio JSON-RPC, suspended process/job startup, explicit inherited handles,
 literal argv, file/terminal callbacks and MCP stdio bridging. Native Windows registry
 binaries are preferred; npm launchers resolve to Node.js without a command shell.
-Node.js/uv remain prerequisites for their package distributions. Windows process-backed
-coverage includes session/model state, streaming, cancellation, permissions, files,
+Node.js/uv remain prerequisites for their package distributions. Windows agent
+discovery rereads persisted PATH and Codex Desktop's versioned executable
+folders on Refresh; adapter launches supplement stale saved paths with current
+host tools. Empty Codex version folders left by updates are ignored.
+Windows process-backed coverage includes session/model state, streaming, cancellation, permissions, files,
 terminals, MCP and A2UI. Provider account authentication requires the agent's own setup.
+Windows ACP pipes read on demand in chunks of at most 64 KiB, letting the kernel
+apply backpressure without dropping messages during output bursts. Keep stdout and
+stderr draining independently. Coverage: `EditorWindowsACPTransportTests`.
 The macOS catalog shows bundled ACP Registry logos
 and Sloppy branding for installed, discovered and registry agents. New registry logos
 load from HTTPS metadata with a shared cache and a generic fallback; icon URLs persist

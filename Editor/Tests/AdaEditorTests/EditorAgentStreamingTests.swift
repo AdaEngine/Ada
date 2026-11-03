@@ -6,6 +6,38 @@ import Testing
 #if os(macOS) || os(Windows)
     @Suite("Editor agent ACP streaming", .serialized)
     struct EditorAgentStreamingTests {
+        @Test("A burst flushes the complete Unicode response before terminal persistence")
+        @MainActor
+        func burstPersistence() async throws {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("AgentBurst-\(UUID())")
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let script = root.appendingPathComponent("agent.py")
+            try Self.agentScript
+                .replacingOccurrences(of: "for text in [\"Hello\", \" world\"]:", with: "for text in [\"Привет 👋 \"] * 250:")
+                .replacingOccurrences(of: "time.sleep(0.2)", with: "pass")
+                .write(to: script, atomically: true, encoding: .utf8)
+            var project = ProjectSystem.defaultProject(projectName: "Burst")
+            project.ai.agent.enabled = true
+            project.ai.agent.target = .init(command: EditorHostTools.executable("python3", windowsName: "python.exe"), arguments: [script.path])
+            try ProjectSystem.saveProject(project, at: root)
+            let service = EditorACPAgentService()
+            let model = EditorAgentViewModel(
+                project: .init(name: "Burst", path: root.path), settings: EditorAgentSettingsStore(),
+                service: service, notifications: EditorNotificationCenter()
+            )
+            await model.loadSessions()
+            let sessionID = try #require(model.activeSessionID)
+            model.prompt = "Burst"
+            await model.sendPromptAsync()
+            let saved = try await EditorAgentSessionStore(projectURL: root).loadSession(id: sessionID)
+            let reply = saved.events.compactMap(\.message).first { $0.role == .assistant }
+            #expect(reply?.segments.first?.text == String(repeating: "Привет 👋 ", count: 250))
+            #expect(saved.events.last?.title == "Done")
+            #expect(!model.isSending)
+            await service.shutdown()
+        }
+
         @Test("connected session keeps model selection and delivers deltas before prompt completion")
         func streamingProcess() async throws {
             let root = FileManager.default.temporaryDirectory.appendingPathComponent("AgentStream-\(UUID().uuidString)")

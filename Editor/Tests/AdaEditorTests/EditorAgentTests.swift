@@ -294,7 +294,8 @@ struct EditorAgentTests {
             a2uiEnabled: true
         )
         let prompt = EditorAgentPromptContext.text(for: request)
-        #expect(prompt.utf8.count < 6_000)
+        #expect(prompt.utf8.count < 6_000 + EditorAgentNextSteps.instructions.utf8.count)
+        #expect(prompt.contains(EditorAgentNextSteps.instructions))
         #expect(prompt.contains("ada-chat-ui"))
         #expect(!prompt.contains("createSurface"))
         #expect(!prompt.contains("updateComponents"))

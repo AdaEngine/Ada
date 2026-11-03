@@ -7,11 +7,14 @@
 
 #if WEBGPU_ENABLED && canImport(WebGPU)
     import AdaUtils
+    import Foundation
     import Math
     import Synchronization
     @unsafe @preconcurrency import WebGPU
 
     final class WGPUCommandEncoder: CommandBuffer {
+        // Diagnostic control for comparing stored native references with the old delivery path.
+        private static let legacyCompletion = ProcessInfo.processInfo.environment["ADAENGINE_WEBGPU_LEGACY_COMPLETION"] == "1"
         var label: String? {
             didSet {
                 commandEncoder.setLabel(label: label ?? "")
@@ -33,11 +36,16 @@
         }
 
         func commit() {
+            let submitStart = PerformanceStallProbe.begin()
+            defer { PerformanceStallProbe.end("WGPU.SubmitCPU", since: submitStart) }
             let commandBuffer: WebGPU.GPUCommandBuffer = webGPUDeviceLock.withLock { _ in
                 commandEncoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
             }
-            let handlers = completedHandlers
+            var handlers = completedHandlers
             completedHandlers.removeAll()
+            if let submitted = PerformanceStallProbe.begin() {
+                handlers.append { PerformanceStallProbe.end("WGPU.CompletionLatency", since: submitted) }
+            }
             #if WASM
             webGPUDeviceLock.withLock { _ in
                 device.queue.submit(commands: [commandBuffer])
@@ -49,7 +57,9 @@
                 device.queue.submit(commands: [commandBuffer])
                 if let completion {
                     let info = WebGPU.GPUQueueWorkDoneCallbackInfo(
-                        mode: instance == nil ? .allowSpontaneous : .allowProcessEvents,
+                        // Native Dawn delivers queue fences directly. Polling ProcessEvents
+                        // with Task.sleep puts frame publication behind the OS timer quantum.
+                        mode: Self.legacyCompletion && instance != nil ? .allowProcessEvents : .allowSpontaneous,
                         callback: { _, _ in completion.complete() }
                     )
                     // Swan's generated one-shot callback wrapper retains its Swift closure
@@ -64,7 +74,7 @@
                     }
                 }
             }
-            completion?.pumpEvents()
+            completion?.pumpEvents(legacy: Self.legacyCompletion)
             #endif
         }
 

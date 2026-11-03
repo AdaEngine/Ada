@@ -15,6 +15,7 @@ import AdaEngine
 @MainActor
 enum EditorMenuCommand: CaseIterable {
     case checkForUpdates
+    case installCLI
     case showSettings
     case showMovieMaker
     case debugOverlayOff, debugOverlayRedraw, debugOverlayLayoutBounds, debugOverlayHitTestTarget, debugOverlayFocusedNode
@@ -51,6 +52,12 @@ final class EditorMenuCommandRouter {
 
     @discardableResult
     func perform(_ command: EditorMenuCommand) -> Bool {
+        #if os(macOS) || os(Windows) || os(Linux)
+        if command == .installCLI, EditorDistribution.current == .standalone {
+            EditorCLIInstallationPresentation.install()
+            return true
+        }
+        #endif
         if command == .checkForUpdates {
             EditorUpdateCenter.shared.checkForUpdates()
             return true
@@ -155,6 +162,9 @@ enum EditorMenuBar {
         menu.add(item("Settings...", command: .showSettings, key: .comma))
         if EditorDistribution.current == .standalone {
             menu.add(item("Check for Updates…", command: .checkForUpdates))
+            #if os(macOS) || os(Windows) || os(Linux)
+            menu.add(item("Install adastudio Command in PATH…", command: .installCLI))
+            #endif
         }
         menu.add(item("Movie Maker", command: .showMovieMaker))
         menu.add(MenuItem.separator)

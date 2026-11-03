@@ -61,7 +61,8 @@ struct EditorAgentPromptEditor: View {
                 text: text,
                 sourceInteraction: sourceInteraction,
                 showsLineNumbers: false,
-                showsScrollIndicators: viewModel != nil
+                showsScrollIndicators: viewModel != nil,
+                wrapsLines: true
             )
             .font(.system(size: 14))
             .foregroundColor(theme.editorColors.text)

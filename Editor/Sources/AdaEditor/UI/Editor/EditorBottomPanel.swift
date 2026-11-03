@@ -153,7 +153,7 @@ struct EditorBottomPanel: View {
             reuseRowsWithStableIDs: true
         ) { problem in
             outputLine(
-                "\(problem.severity.rawValue.uppercased()) \(problem.filePath):\(problem.range.start.line + 1):\(problem.range.start.character + 1) \(problem.message)",
+                "\(problem.severity.rawValue.uppercased()) \(problem.filePath):\(problem.range.start.line + 1):\(problem.range.start.character + 1) \(problem.displayMessage)",
                 color: diagnosticColor(for: problem.severity)
             )
         }

@@ -1,0 +1,34 @@
+◊ Test run started.
+→ Testing Library Version: 6.3.1 (937120cbc281cf2)
+→ Target Platform: x86_64-unknown-windows-msvc
+◊ Suite "3D GPU rendering" started.
+◊ Suite "3D auto exposure on GPU" started.
+◊ Test autoExposureEvensOutSceneBrightness() started.
+2026-11-02T22:59:22+0300 info org.adaengine.webgpu: [AdaRender] Selected WebGPU adapter: backend=4 vendor=nvidia device=NVIDIA GeForce RTX 4070 description=D3D12 driver version 32.0.16.1088
+× Test autoExposureEvensOutSceneBrightness() recorded an issue at Render3DAutoExposureTests.swift:75:29: Issue recorded
+→ pbr-spheres-dim-autoexposure differs in 4623 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-golden/pbr-spheres-dim-autoexposure-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-golden/pbr-spheres-dim-autoexposure-difference.png
+× Test autoExposureEvensOutSceneBrightness() recorded an issue at Render3DAutoExposureTests.swift:75:29: Issue recorded
+→ pbr-spheres-dim-manual differs in 3241 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-golden/pbr-spheres-dim-manual-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-golden/pbr-spheres-dim-manual-difference.png
+× Test autoExposureEvensOutSceneBrightness() failed after 2.341 seconds with 2 issues.
+× Suite "3D auto exposure on GPU" failed after 2.342 seconds with 2 issues.
+→ /// Renders automatic exposure through the real Metal pipeline.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DAutoExposureGPUTests`.
+◊ Suite "3D color grading on GPU" started.
+◊ Test vignetteDarkensCornersAndLeavesTheCenterAlone() started.
+× Test vignetteDarkensCornersAndLeavesTheCenterAlone() recorded an issue at Render3DColorGradingTests.swift:117:29: Issue recorded
+→ pbr-spheres-vignette differs in 3664 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-golden/pbr-spheres-vignette-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-golden/pbr-spheres-vignette-difference.png
+× Test vignetteDarkensCornersAndLeavesTheCenterAlone() failed after 1.499 seconds with 1 issue.
+◊ Test contrastSpreadsBrightAndDarkAwayFromMidGray() started.
+× Test contrastSpreadsBrightAndDarkAwayFromMidGray() recorded an issue at Render3DColorGradingTests.swift:117:29: Issue recorded
+→ pbr-spheres-contrast differs in 4695 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-golden/pbr-spheres-contrast-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-golden/pbr-spheres-contrast-difference.png
+× Test contrastSpreadsBrightAndDarkAwayFromMidGray() failed after 1.517 seconds with 1 issue.
+× Suite "3D color grading on GPU" failed after 3.017 seconds with 2 issues.
+→ /// Renders vignette, saturation, contrast and LUT grading through the real Metal pipeline.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DColorGradingGPUTests`.
+× Suite "3D GPU rendering" failed after 5.360 seconds with 4 issues.
+→ /// Parent of every GPU rendering suite. The engine owns one process-wide renderer and tests on the main actor
+→ /// interleave at each `await`, so these suites must run one test at a time; `.serialized` on a parent suite
+→ /// applies to its nested suites, which is the only way to serialize across suites.
+× Test run with 3 tests in 3 suites failed after 5.360 seconds with 4 issues.

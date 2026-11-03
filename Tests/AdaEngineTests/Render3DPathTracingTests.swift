@@ -28,6 +28,7 @@ struct Render3DPathTracingSettingsTests {
         #expect(try JSONDecoder().decode(Environment3D.self,from:Data("{}".utf8)).pathTracing.isEnabled == false)
         var environment = Environment3D()
         environment.pathTracing = .init(isEnabled:true,samplesPerPixel:4,maximumBounces:6,resolutionScale:0.75,historyLimit:64)
+        environment.pathTracing.textureTileSize = 512
         #expect(try JSONDecoder().decode(Environment3D.self,from:JSONEncoder().encode(environment)).pathTracing == environment.pathTracing)
         #expect(try JSONDecoder().decode(PathTracing3D.self,from:Data("{\"isEnabled\":true}".utf8)).maximumBounces == 3)
         var invalid = PathTracing3D(isEnabled:true,samplesPerPixel:0,maximumBounces:100,resolutionScale:.nan,historyLimit:-1)
@@ -35,6 +36,10 @@ struct Render3DPathTracingSettingsTests {
         #expect(invalid.sanitized.samplesPerPixel == 1 && invalid.sanitized.maximumBounces == 8)
         #expect(invalid.sanitized.resolutionScale == 0.5 && invalid.sanitized.historyLimit == 1)
         #expect(invalid.sanitized.rayBias.isFinite && invalid.sanitized.maximumDistance.isFinite)
+        invalid.textureTileSize = -1
+        #expect(invalid.sanitized.textureTileSize == 128)
+        invalid.textureTileSize = 100000
+        #expect(invalid.sanitized.textureTileSize == 512)
     }
 
     @Test func stacklessBVHCoversEveryTriangleAndHasValidEscapes() {
@@ -94,6 +99,67 @@ extension Render3DGPUTests {
             return sum/900
         }
 
+        @Test(.enabled(if: GoldenFrame.activeBackend != nil))
+        func deferredCameraProxiesKeepLiveCameraHistory() async throws {
+            let scene = try await Self.scene()
+            _ = Self.receiver(scene)
+            _ = try await scene.render(.none, frames: 3)
+            let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+            let extracted = try #require(world.getEntities().first { $0.components[ExtractedCameraSource.self]?.entityId == scene.camera.id })
+            let statistics = try Self.stats(scene)
+            let key = String(scene.camera.id)
+            let before = try #require(statistics.snapshots[key])
+            let targets = try #require(world.getResource(PathTracing3DViews.self)?.entries[scene.camera.id]?.targets)
+            let output = try #require(extracted.components[RenderViewTarget.self])
+            let camera = try #require(extracted.components[Camera.self])
+            let source = try #require(extracted.components[ExtractedCameraSource.self])
+            extracted.components[RenderViewTarget.self] = nil
+            extracted.components[Camera.self] = nil
+            extracted.components[ExtractedCameraSource.self] = nil
+            let node = PathTracing3DRenderNode()
+            node.update(from: world)
+            #expect(statistics.snapshots[key]?.encodedFrames == before.encodedFrames)
+            let retained = try #require(world.getResource(PathTracing3DViews.self)?.entries[scene.camera.id]?.targets)
+            #expect(targets.map(ObjectIdentifier.init) == retained.map(ObjectIdentifier.init))
+            extracted.components[RenderViewTarget.self] = output
+            extracted.components[Camera.self] = camera
+            extracted.components[ExtractedCameraSource.self] = source
+            _ = try await scene.render(.none, frames: 1)
+            #expect(try #require(statistics.snapshots[key]).encodedFrames > before.encodedFrames)
+            scene.camera.components[Camera.self] = nil
+            try await scene.app.update()
+            node.update(from: world)
+            #expect(statistics.snapshots[key] == nil)
+            #expect(world.getResource(PathTracing3DViews.self)?.entries[scene.camera.id] == nil)
+        }
+
+        @Test(.enabled(if: GoldenFrame.activeBackend != nil))
+        func offscreenDisplayBackpressureKeepsCameraTargetsAndHistory() async throws {
+            let scene = try await Self.scene()
+            _ = Self.receiver(scene)
+            _ = try await scene.render(.none, frames: 3)
+            let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+            try #require(world.getResource(WindowSurfaces.self)?.allowsWindowRendering == false)
+            let statistics = try Self.stats(scene)
+            let key = String(scene.camera.id)
+            let before = try #require(statistics.snapshots[key])
+            let history = try #require(world.getResource(PathTracing3DViews.self)?.entries[scene.camera.id]?.targets)
+            let target = try #require(world.getResource(ExtractedCameraRenderViewTargets.self)?.targets[scene.camera.id]?.sceneColor3DTexture)
+            let original = try #require(scene.camera.components[Camera.self])
+            var suspended = original
+            suspended.renderTarget = .window(.primary)
+            scene.camera.components[Camera.self] = suspended
+            // This is the same temporary retarget used by SceneView's full display ring.
+            try await scene.app.update()
+            #expect(statistics.snapshots[key]?.encodedFrames == before.encodedFrames)
+            #expect(world.getResource(ExtractedCameraRenderViewTargets.self)?.targets[scene.camera.id]?.sceneColor3DTexture === target)
+            let retained = try #require(world.getResource(PathTracing3DViews.self)?.entries[scene.camera.id]?.targets)
+            #expect(history.map(ObjectIdentifier.init) == retained.map(ObjectIdentifier.init))
+            scene.camera.components[Camera.self] = original
+            _ = try await scene.render(.none, frames: 1)
+            #expect(try #require(statistics.snapshots[key]).encodedFrames > before.encodedFrames)
+        }
+
         @Test(.enabled(if:GoldenFrame.activeBackend != nil))
         func realOffscreenBlockerShadowsWithoutAnyShadowMapsAndLightOffClearsHistory() async throws {
             let s = try await Self.scene(); _ = Self.receiver(s)
@@ -140,6 +206,32 @@ extension Render3DGPUTests {
             #expect(pixel.red>pixel.green+0.1 && pixel.red>0.2,"A mirror must reflect offscreen emissive triangles")
             try bounce.writePNG(to:GoldenFrame.outputDirectory.appendingPathComponent("path-hidden-bounce.png"))
             try reflection.writePNG(to:GoldenFrame.outputDirectory.appendingPathComponent("path-hidden-reflection.png"))
+        }
+
+        @Test(.enabled(if:GoldenFrame.activeBackend != nil))
+        func atlasQualityChangeRetainsFineTextureDetailAndResetsHistory() async throws {
+            let s = try await Self.scene()
+            let pbr = Self.receiver(s)
+            var pixels = [UInt8](repeating: 255, count: 512*512*4)
+            for y in 0..<512 { for x in 0..<512 {
+                let i = (y*512+x)*4
+                pixels[i] = x%4<2 ? 255 : 0
+                pixels[i+1] = 0
+                pixels[i+2] = x%4<2 ? 0 : 255
+            } }
+            pbr.baseColorTexture = Texture2D(image: Image(width:512,height:512,data:Data(pixels)))
+            _ = try await s.render(.none,frames:3)
+            let world = try #require(s.app.getSubworldBuilder(by:.renderWorld))
+            let low = try #require(world.getResource(PathTracing3DViews.self)?.scene.atlas)
+            #expect(low.width == 2048)
+            try s.configure { $0.pathTracing.textureTileSize = 512 }
+            _ = try await s.render(.none,frames:1)
+            let high = try #require(world.getResource(PathTracing3DViews.self)?.scene.atlas)
+            #expect(high.width == 8192 && high !== low)
+            let image = try #require(try await s.device.readImage(from:high))
+            #expect(image.getPixel(x:0,y:0).red > 0.9)
+            #expect(image.getPixel(x:2,y:0).blue > 0.9, "Fine blue stripes must survive the high-quality atlas.")
+            #expect(try Self.stats(s).snapshots.values.allSatisfy { $0.accumulatedFrames == 1 && $0.failure == nil })
         }
 
         @Test(.enabled(if:GoldenFrame.activeBackend != nil))

@@ -71,6 +71,9 @@ public protocol RenderDevice: AnyObject, Sendable {
     /// Creates a per-camera GPU occlusion processor, or nil for the CPU visibility fallback.
     func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)?
 
+    /// Creates independent per-view meshlet frustum/compaction resources, or nil on unsupported backends.
+    func createMeshletVisibilityProcessor() -> (any MeshletVisibilityProcessor)?
+
     // MARK: - Buffers
 
     /// Create a new GPU buffer with specific length and options.
@@ -137,6 +140,7 @@ extension RenderDevice {
     }
 
     public func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? { nil }
+    public func createMeshletVisibilityProcessor() -> (any MeshletVisibilityProcessor)? { nil }
     public var supportsSpatialUpscaling: Bool { false }
     public var supportsTemporalUpscaling: Bool { false }
     public var supportsHybridReflections: Bool { false }

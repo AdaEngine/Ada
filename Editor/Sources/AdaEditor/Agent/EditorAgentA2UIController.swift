@@ -4,12 +4,18 @@ import Foundation
 import Observation
 
 @MainActor @Observable
+private final class EditorAgentA2UIDisplayText {
+    var text: String?
+}
+
+@MainActor @Observable
 final class EditorAgentA2UISession {
     let id: String
     let client = A2UIClient()
     private(set) var records: [String: EditorAgentA2UISurfaceRecord] = [:]
     private(set) var eventErrors: [String: String] = [:]
     private(set) var displayTexts: [String: String] = [:]
+    @ObservationIgnored private var displayTextStates: [String: EditorAgentA2UIDisplayText] = [:]
     @ObservationIgnored private var streams: [String: EditorAgentA2UIStream] = [:]
     @ObservationIgnored private var sourceTexts: [String: String] = [:]
     @ObservationIgnored private var touched = Set<String>()
@@ -46,7 +52,7 @@ final class EditorAgentA2UISession {
             let frames = stream.append(text) + stream.finish()
             streams[event.id] = stream
             sourceTexts[event.id] = text
-            displayTexts[event.id] = stream.displayText
+            setDisplayText(stream.displayText, for: event.id)
             if session.a2uiSurfaces == nil {
                 currentEventID = event.id
                 restoring = false
@@ -63,6 +69,24 @@ final class EditorAgentA2UISession {
     }
 
     var didPresentUIInCurrentRun: Bool { !touched.isEmpty }
+
+    func displayText(for eventID: String) -> String? {
+        displayTextState(for: eventID).text
+    }
+
+    private func displayTextState(for eventID: String) -> EditorAgentA2UIDisplayText {
+        if let state = displayTextStates[eventID] { return state }
+        let state = EditorAgentA2UIDisplayText()
+        displayTextStates[eventID] = state
+        return state
+    }
+
+    private func setDisplayText(_ text: String, for eventID: String) {
+        let state = displayTextState(for: eventID)
+        guard state.text != text else { return }
+        state.text = text
+        displayTexts[eventID] = text
+    }
 
     var persistedRecords: [EditorAgentA2UISurfaceRecord] { records.values.sorted { $0.id < $1.id } }
 
@@ -92,7 +116,7 @@ final class EditorAgentA2UISession {
         consume(stream.append(suffix))
         streams[event.id] = stream
         sourceTexts[event.id] = text
-        displayTexts[event.id] = stream.displayText
+        setDisplayText(stream.displayText, for: event.id)
         currentEventID = ""
     }
 
@@ -102,7 +126,7 @@ final class EditorAgentA2UISession {
             if var stream = streams[eventID] {
                 consume(stream.finish())
                 streams[eventID] = stream
-                displayTexts[eventID] = stream.displayText
+                setDisplayText(stream.displayText, for: eventID)
             }
         }
         for surfaceID in touched {
@@ -162,7 +186,7 @@ final class EditorAgentA2UISession {
             }
             streams[event.id] = stream
             sourceTexts[event.id] = text
-            displayTexts[event.id] = stream.displayText
+            setDisplayText(stream.displayText, for: event.id)
         }
         publish()
     }

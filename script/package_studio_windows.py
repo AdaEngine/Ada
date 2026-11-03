@@ -168,11 +168,15 @@ def package(binary_directory, compiler, tint, output, version, smoke_test=True, 
         with urllib.request.urlopen(f"https://raw.githubusercontent.com/swiftlang/swift/{swift_tag}/LICENSE.txt", timeout=30) as response:
             (swift_notice / "LICENSE.txt").write_bytes(response.read())
         shutil.copy2(ROOT / "LICENSE", directory)
+        for installer in ["install_studio_windows.ps1", "install_studio_windows.cmd"]:
+            shutil.copy2(ROOT / "script" / installer, directory)
         shutil.copy2(ROOT / "Tools/Tint/toolchain.json", directory / "tint-toolchain.json")
         (directory / "release.json").write_text(json.dumps({"version": version, "distribution": "standalone", "commit": run("git", "-C", ROOT, "rev-parse", "HEAD"),
                                                            "swift": metadata["compilerVersion"], "target": metadata["target"]["triple"]}, indent=2) + "\n")
         (directory / "README.txt").write_text(
-            "Ada Studio for Windows x64\n\nExtract the entire ZIP, then open AdaEditor.exe.\n"
+            "Ada Studio for Windows x64\n\nExtract the entire ZIP, then run install_studio_windows.cmd.\n"
+            "Installs to %LOCALAPPDATA%\\Programs\\Ada Studio with a Start menu shortcut; no administrator rights required.\n"
+            "For portable use, open AdaEditor.exe directly.\n"
             "AdaPlayer: AdaEditor.exe --ada-player\n\n"
             "CLI: adastudio.exe --help\n"
             "     adastudio.exe validate --project D:\\Games\\MyGame --format json\n\n"

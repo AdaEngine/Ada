@@ -49,7 +49,7 @@ public enum TextMarkdownPlugin {
     }
 }
 
-private struct MarkdownAttributedTextRenderer: MarkupVisitor {
+struct MarkdownAttributedTextRenderer: MarkupVisitor {
     typealias Result = Void
 
     private(set) var result: AttributedText = ""

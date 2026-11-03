@@ -14,6 +14,9 @@ public struct Temporal3DRenderNode: RenderNode {
     @ResMut<View3DGPUScratch> private var viewUniforms
     @Res<Render3DTemporalStatistics> private var statistics
     @Res<RenderDeviceHandler> private var device
+    @ResMut<Meshlet3DState> private var meshlets
+    @Res<Render3DMeshletStatistics?> private var meshletStatistics
+    @Res<ExtractedCameraRenderViewTargets?> private var cameraTargets
     @Res<Render3DPerformanceMetrics?> private var metrics
     /// Optional so a temporal-only world without environments keeps the default ACES curve.
     @Res<ExtractedEnvironment3D?> private var environments
@@ -30,11 +33,15 @@ public struct Temporal3DRenderNode: RenderNode {
         _viewUniforms.update(from: world)
         _statistics.update(from: world)
         _device.update(from: world)
+        _meshlets.update(from: world)
+        _meshletStatistics.update(from: world)
+        _cameraTargets.update(from: world)
         _metrics.update(from: world)
         _environments.update(from: world)
         _colorCorrection.update(from: world)
         var active: [Entity.ID] = []
         cameras.forEach { _, _, _, _, source in active.append(source.entityId) }
+        if let cameraTargets { active = Array(cameraTargets.temporalCameraIDs) }
         pipelines.uniform.retainViews(active)
         statistics.retainViews(active)
     }
@@ -97,7 +104,15 @@ public struct Temporal3DRenderNode: RenderNode {
             motionPass.isEnabled = true
             do {
                 defer { motionPass.isEnabled = false }
-                try RenderItems<Opaque3DRenderItem>(items: lists.items(view: source.entityId, pass: -1)).render(with: mesh, world: context.world, view: view)
+                var items = lists.items(view: source.entityId, pass: -1)
+                let environment = environments?.environments[source.entityId] ?? .init()
+                if context.world.getResource(Meshlet3DState.self) != nil, !environment.pathTracing.isEnabled || environment.debugView == .meshlets {
+                    let guides = meshlets.prepareMotion(items: &items, view: source.entityId, settings: environment.meshVisibility,
+                        projection: uniform.viewProjectionMatrix, viewport: output.size, device: device.renderDevice,
+                        map: environment.debugView == .meshlets)
+                    meshletStatistics?.recordMotion(items: guides.items, triangles: guides.triangles, view: source.entityId)
+                }
+                try RenderItems<Opaque3DRenderItem>(items: items).render(with: mesh, world: context.world, view: view)
             }
             mesh.endRenderPass()
 

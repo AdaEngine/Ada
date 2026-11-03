@@ -23,9 +23,15 @@ struct EditorDiagnostic: Equatable, Hashable, Sendable {
     var severity: EditorDiagnosticSeverity
     var message: String
     var source: String
+    var code: String? = nil
 
     var isLanguageServiceDiagnostic: Bool {
-        source == "sourcekit-lsp" || source == "adascript-lsp"
+        source == "sourcekit-lsp" || source == "adascript-lsp" || source == "adascript-lint"
+    }
+
+    @MainActor
+    var displayMessage: String {
+        source == "adascript-lint" ? L10n.tr(message) : message
     }
 
     static func diagnostics(from result: EditorProcessResult, projectURL: URL) -> [Self] {

@@ -1,0 +1,47 @@
+◊ Test run started.
+→ Testing Library Version: 6.3.1 (937120cbc281cf2)
+→ Target Platform: x86_64-unknown-windows-msvc
+◊ Suite "3D GPU rendering" started.
+◊ Suite "Meshlet preparation baseline" started.
+◊ Test recordsProductionBaseline() started.
+2026-11-02T14:39:55+0300 info org.adaengine.webgpu: [AdaRender] Selected WebGPU adapter: backend=4 vendor=nvidia device=NVIDIA GeForce RTX 4070 description=D3D12 driver version 32.0.16.1088
+MESHLET BASELINE partial round=0 hiz=false wall-ms=0.9185055555555555 batches=["1": 1]
+MESHLET BASELINE partial round=0 hiz=true wall-ms=1.1732099999999999 batches=["1": 1]
+MESHLET BASELINE partial round=1 hiz=true wall-ms=1.2449544444444445 batches=["1": 1]
+MESHLET BASELINE partial round=1 hiz=false wall-ms=2.76112 batches=["1": 1]
+MESHLET BASELINE partial round=2 hiz=false wall-ms=1.0579888888888889 batches=["1": 1]
+MESHLET BASELINE partial round=2 hiz=true wall-ms=3.607823333333333 batches=["1": 1]
+MESHLET BASELINE occluded round=0 hiz=false wall-ms=3.274465555555556 batches=["1": 2]
+MESHLET BASELINE occluded round=0 hiz=true wall-ms=1.213568888888889 batches=["1": 2]
+MESHLET BASELINE occluded round=1 hiz=true wall-ms=1.2397977777777778 batches=["1": 2]
+MESHLET BASELINE occluded round=1 hiz=false wall-ms=1.0463077777777778 batches=["1": 2]
+MESHLET BASELINE occluded round=2 hiz=false wall-ms=1.0533 batches=["1": 2]
+MESHLET BASELINE occluded round=2 hiz=true wall-ms=4.004307777777778 batches=["1": 2]
+MESHLET BASELINE allVisible round=0 hiz=false wall-ms=1.3880977777777777 batches=["1": 1]
+MESHLET BASELINE allVisible round=0 hiz=true wall-ms=1.5707966666666666 batches=["1": 1]
+MESHLET BASELINE allVisible round=1 hiz=true wall-ms=1.0451633333333334 batches=["1": 1]
+MESHLET BASELINE allVisible round=1 hiz=false wall-ms=0.9488833333333334 batches=["1": 1]
+MESHLET BASELINE allVisible round=2 hiz=false wall-ms=1.0577033333333332 batches=["1": 1]
+MESHLET BASELINE allVisible round=2 hiz=true wall-ms=3.952487777777778 batches=["1": 1]
+MESHLET BASELINE instances round=0 hiz=false wall-ms=2.2764455555555556 batches=["1600": 1]
+MESHLET BASELINE instances round=0 hiz=true wall-ms=2.405211111111111 batches=["1600": 1]
+MESHLET BASELINE instances round=1 hiz=true wall-ms=5.0792311111111115 batches=["1600": 1]
+MESHLET BASELINE instances round=1 hiz=false wall-ms=2.27709 batches=["1600": 1]
+MESHLET BASELINE instances round=2 hiz=false wall-ms=2.2649044444444444 batches=["1600": 1]
+MESHLET BASELINE instances round=2 hiz=true wall-ms=4.080807777777777 batches=["1600": 1]
+MESHLET BASELINE smallParts round=0 hiz=false wall-ms=2.106891111111111 batches=["1": 256]
+MESHLET BASELINE smallParts round=0 hiz=true wall-ms=2.837158888888889 batches=["1": 256]
+MESHLET BASELINE smallParts round=1 hiz=true wall-ms=2.8054366666666666 batches=["1": 256]
+MESHLET BASELINE smallParts round=1 hiz=false wall-ms=4.9098122222222225 batches=["1": 256]
+MESHLET BASELINE smallParts round=2 hiz=false wall-ms=2.2895333333333334 batches=["1": 256]
+MESHLET BASELINE smallParts round=2 hiz=true wall-ms=2.6446844444444446 batches=["1": 256]
+MESHLET BASELINE garden round=0 hiz=false wall-ms=1.066651111111111 batches=["1": 14]
+MESHLET BASELINE garden round=0 hiz=true wall-ms=3.979888888888889 batches=["1": 14]
+MESHLET BASELINE garden round=1 hiz=true wall-ms=3.9964655555555555 batches=["1": 14]
+MESHLET BASELINE garden round=1 hiz=false wall-ms=1.211621111111111 batches=["1": 14]
+MESHLET BASELINE garden round=2 hiz=false wall-ms=1.2019966666666666 batches=["1": 14]
+MESHLE√ Test recordsProductionBaseline() passed after 57.664 seconds.
+√ Suite "Meshlet preparation baseline" passed after 57.665 seconds.
+√ Suite "3D GPU rendering" passed after 57.665 seconds.
+√ Test run with 1 test in 2 suites passed after 57.665 seconds.
+T BASELINE garden round=2 hiz=true wall-ms=1.402608888888889 batches=["1": 14]

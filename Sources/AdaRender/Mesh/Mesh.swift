@@ -72,6 +72,26 @@ extension Mesh {
         /// Morph targets of this part, if it has any. Weights are applied by the vertex shader before skinning.
         public var morphTargets: MorphTargetSet?
 
+        /// Validated derived clusters belonging to this immutable source geometry generation.
+        /// Replacing a source buffer/count opts out. In-place geometry edits require rebuilding the part generation.
+        public var meshlets: MeshletGeometry? {
+            guard let preparedMeshlets, let meshletSource,
+                meshletSource.vertex == ObjectIdentifier(vertexBuffer), meshletSource.index == ObjectIdentifier(indexBuffer),
+                meshletSource.count == indexCount else { return nil }
+            return preparedMeshlets
+        }
+        private let preparedMeshlets: MeshletGeometry?
+        private let meshletSource: (vertex: ObjectIdentifier, index: ObjectIdentifier, count: Int)?
+        /// Prepared adaptive hierarchy; replacement of source buffers/count opts out safely.
+        public var meshletLOD: MeshletLODGeometry? {
+            guard let preparedMeshletLOD, let meshletLODSource,
+                meshletLODSource.vertex == ObjectIdentifier(vertexBuffer), meshletLODSource.index == ObjectIdentifier(indexBuffer),
+                meshletLODSource.count == indexCount else { return nil }
+            return preparedMeshletLOD
+        }
+        private let preparedMeshletLOD: MeshletLODGeometry?
+        private let meshletLODSource: (vertex: ObjectIdentifier, index: ObjectIdentifier, count: Int)?
+
         @_spi(Internal)
         public init(
             id: Int,
@@ -82,7 +102,9 @@ extension Mesh {
             vertexDescriptor: VertexDescriptor,
             indexBuffer: IndexBuffer,
             indexCount: Int,
-            vertexBuffer: VertexBuffer
+            vertexBuffer: VertexBuffer,
+            meshlets: MeshletGeometry? = nil,
+            meshletLOD: MeshletLODGeometry? = nil
         ) {
             self.id = id
             self.materialIndex = materialIndex
@@ -93,6 +115,16 @@ extension Mesh {
             self.indexBuffer = indexBuffer
             self.indexCount = indexCount
             self.vertexBuffer = vertexBuffer
+            let prepared = meshlets ?? meshDescriptor.meshlets
+            let validated = primitiveTopology == .triangleList && indexCount == meshDescriptor.indicies.count
+                && prepared?.matches(positions: meshDescriptor.positions.elements, indices: meshDescriptor.indicies) == true ? prepared : nil
+            self.preparedMeshlets = validated
+            self.meshletSource = validated == nil ? nil : (ObjectIdentifier(vertexBuffer), ObjectIdentifier(indexBuffer), indexCount)
+            let hierarchy = meshletLOD ?? meshDescriptor.meshletLOD
+            let validatedLOD = primitiveTopology == .triangleList && indexCount == meshDescriptor.indicies.count
+                && hierarchy?.matches(positions: meshDescriptor.positions.elements, indices: meshDescriptor.indicies) == true ? hierarchy : nil
+            self.preparedMeshletLOD = validatedLOD
+            self.meshletLODSource = validatedLOD == nil ? nil : (ObjectIdentifier(vertexBuffer), ObjectIdentifier(indexBuffer), indexCount)
         }
     }
 

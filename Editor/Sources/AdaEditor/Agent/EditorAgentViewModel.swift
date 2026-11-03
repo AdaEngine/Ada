@@ -9,11 +9,21 @@ final class EditorAgentViewModel {
     var sessions: [EditorAgentSessionSummary] = []
     var activeSession: EditorAgentSession? {
         didSet {
+            if activeSessionID != activeSession?.id { activeSessionID = activeSession?.id }
+            if activeSessionTitle != activeSession?.title { activeSessionTitle = activeSession?.title }
+            let hasEvents = activeSession?.events.isEmpty == false
+            if hasActiveSessionEvents != hasEvents { hasActiveSessionEvents = hasEvents }
+            transcript.update(events: activeSession?.events ?? [], sessionID: activeSession?.id)
             sceneAnnotations.selectSession(activeSession?.id)
             if let activeSession { a2ui.restoreIfNeeded(activeSession) }
             refreshPromptSuggestions()
         }
     }
+    private(set) var activeSessionID: String?
+    private(set) var activeSessionTitle: String?
+    private(set) var hasActiveSessionEvents = false
+    let transcript = EditorAgentTranscriptState()
+    @ObservationIgnored private var runEventBatcher: EditorAgentEventBatcher?
     let a2ui = EditorAgentA2UIController()
     let sceneAnnotations = EditorAgentSceneAnnotations()
     let promptSuggestions: EditorAgentPromptSuggestions
@@ -947,6 +957,9 @@ final class EditorAgentViewModel {
         )
         runningActivityID = activityID
         lastActivityID = activityID
+        runEventBatcher = EditorAgentEventBatcher { [weak self] event in
+            self?.applyRunEvent(event, sessionID: sessionID, activityID: activityID)
+        }
 
         do {
             connectionState = .running
@@ -1018,6 +1031,7 @@ final class EditorAgentViewModel {
             } catch { statusMessage = error.localizedDescription }
         }
         runningSession = nil
+        runEventBatcher = nil
         runningSessionID = nil
         runningActivityID = nil
         permissionActivityIDs = permissionActivityIDs.filter { $0.value != activityID }
@@ -1026,6 +1040,11 @@ final class EditorAgentViewModel {
     }
 
     private func receiveRunEvent(_ event: EditorAgentEvent, sessionID: String, activityID: String) {
+        guard runningSession?.id == sessionID, runningActivityID == activityID else { return }
+        runEventBatcher?.receive(event)
+    }
+
+    private func applyRunEvent(_ event: EditorAgentEvent, sessionID: String, activityID: String) {
         guard runningSession?.id == sessionID, runningActivityID == activityID else {
             return
         }
@@ -1161,7 +1180,7 @@ final class EditorAgentViewModel {
         EditorAgentEventReducer.upsert(event, into: &session.events)
 
         session.updatedAt = Date()
-        if let userText = session.events.compactMap(\.message).first(where: { $0.role == .user })?.segments.first?.text {
+        if let userText = session.events.first(where: { $0.message?.role == .user })?.message?.segments.first?.text {
             session.title = String(userText.prefix(48)).nilIfEmpty ?? session.title
         }
         activeSession = session

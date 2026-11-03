@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "id": "intel-sponza-2022",
+  "selectedOn": "2026-11-02",
+  "purpose": "Pinned external renderer/meshlet benchmark; production renderer baseline",
+  "publisherPage": "https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-research/samples.html",
+  "profiles": [
+    {
+      "id": "sponza-base",
+      "archives": [
+        "base"
+      ],
+      "triangles": 3747018,
+      "primitives": 405
+    },
+    {
+      "id": "sponza-ivy",
+      "archives": [
+        "base",
+        "ivy"
+      ],
+      "triangles": 8812576,
+      "primitives": 407
+    }
+  ],
+  "archives": [
+    {
+      "id": "base",
+      "url": "https://cdrdv2.intel.com/v1/dl/getContent/830833",
+      "downloadName": "main_sponza.zip",
+      "archiveBytes": 3987608266,
+      "archiveSHA256": "b8bb853884ab1566b3beb35666bd09882a4e0dc16661e4684e103792cf0229b9",
+      "entry": "main_sponza/NewSponza_Main_glTF_003.gltf",
+      "entrySHA256": "e04c4c540c74bdddcbd3f590a85c14119bfd5839702246a23b3a737c0cce2400",
+      "geometryBuffer": "main_sponza/NewSponza_Main_glTF_003.bin",
+      "geometryBytes": 139973456,
+      "geometrySHA256": "903d443b46b51c8397c25b65286d9f9e111121f12a3e0e303f19019982568d6b",
+      "credits": "main_sponza/credits_license.txt",
+      "pbrCorrections": [
+        {
+          "path": "materials/12/emissiveFactor/2",
+          "from": 1.00000012,
+          "to": 1.0,
+          "reason": "Exporter rounding overshoots glTF emissiveFactor maximum 1"
+        }
+      ]
+    },
+    {
+      "id": "ivy",
+      "url": "https://cdrdv2.intel.com/v1/dl/getContent/726656",
+      "downloadName": "pkg_b_ivy1.zip",
+      "archiveBytes": 1383921436,
+      "archiveSHA256": "e1e2dfacf3db023e8674092fbe81f0d47e361d4ecf1d798802b23ed5d8d4c052",
+      "entry": "pkg_b_ivy/NewSponza_IvyGrowth_glTF.gltf",
+      "entrySHA256": "22039080d6de24569f377210b8ebbe59194b5d44de777679d9d87b69ffda2c1e",
+      "geometryBuffer": "pkg_b_ivy/NewSponza_IvyGrowth_glTF.bin",
+      "geometryBytes": 269978952,
+      "geometrySHA256": "4e2d5ac1b3d63f269e2ea030860bc40f222a6e81b86aef0055a0cb37446268ad",
+      "credits": "pkg_b_ivy/credits_license.txt",
+      "pbrCorrections": []
+    }
+  ],
+  "format": {
+    "topology": "triangleList",
+    "geometryCompressionRequired": false,
+    "images": "PNG",
+    "optionalExtensions": [
+      "KHR_lights_punctual"
+    ],
+    "engineIgnoresOptionalImportedLights": true
+  },
+  "verification": {
+    "archives": "Complete archives downloaded; SHA256 pinned; selected glTF dependencies extracted with ZIP CRC validation",
+    "geometryAndTexturesDownloaded": true,
+    "engineImporterTested": true,
+    "enginePixelsTested": true,
+    "geometryBoundConfirmed": false,
+    "nativeBaseline": "Evidence/Meshlets/Sponza-2026-11-02/native-720p.json"
+  },
+  "licenseNotes": "Publisher page identifies Creative Commons Attribution. Each archive credits_license.txt includes CC-BY-4.0 text and an additional introductory usage notice. Preserve full notices; this manifest does not relicense third-party assets. Assets remain separately fetched external benchmark data.",
+  "cameraProtocol": {
+    "routes": [
+      "atrium",
+      "ground-floor-corridor",
+      "upper-gallery"
+    ],
+    "samplesPerRoute": 600,
+    "routeFile": "Tools/3DAssets/BenchmarkScenes/intel-sponza-routes.json",
+    "status": "Versioned deterministic interpolation of source camera keyframes; 600 poses per route",
+    "routeSHA256": "454d70b128683e04ba9a95be31ce6a9a5da32b93251809866705c46078f37f05",
+    "runtimeProtocol": "same-frame-root-world-pose-v1"
+  },
+  "comparisonModes": [
+    "legacy-cpu-visibility",
+    "legacy-gpu-hiz",
+    "meshlet-frustum-future",
+    "meshlet-hiz-future"
+  ],
+  "qualityProfiles": [
+    "geometry-opaque-fixed-material",
+    "pbr-fixed-lighting-and-shadows"
+  ],
+  "baseCensus": {
+    "entry": "main_sponza/NewSponza_Main_glTF_003.gltf",
+    "gltfSHA256": "e04c4c540c74bdddcbd3f590a85c14119bfd5839702246a23b3a737c0cce2400",
+    "meshes": 115,
+    "primitives": 405,
+    "uniqueTriangles": 3747018,
+    "opaqueTriangles": 3738878,
+    "largestPartTriangles": 84602,
+    "opaquePartsOver100k": 0,
+    "opaquePartsOver10k": 83,
+    "meshNodes": 115,
+    "maxMeshNodeReuse": 1,
+    "sceneTriangleInstances": 3747018,
+    "extensionsUsed": [
+      "KHR_lights_punctual"
+    ],
+    "extensionsRequired": [],
+    "imageSuffixes": {
+      ".png": 72
+    },
+    "cameraCount": 6,
+    "lights": 24,
+    "licenseSHA256": "c83c3ccce2789a059c826ca738234b9da8454b0226e5357cd6838e23f8b59d62",
+    "archiveBytes": 3987608266
+  },
+  "ivyCensus": {
+    "entry": "pkg_b_ivy/NewSponza_IvyGrowth_glTF.gltf",
+    "gltfSHA256": "22039080d6de24569f377210b8ebbe59194b5d44de777679d9d87b69ffda2c1e",
+    "meshes": 2,
+    "nodes": 2,
+    "primitives": 2,
+    "trianglesUnique": 5065558,
+    "sceneTriangleInstances": 5065558,
+    "largestPartTriangles": 4905636,
+    "partsOver100k": 2,
+    "partsOver10k": 2,
+    "materialModes": {
+      "OPAQUE": 2
+    },
+    "extensionsUsed": [],
+    "extensionsRequired": [],
+    "buffers": [
+      {
+        "uri": "NewSponza_IvyGrowth_glTF.bin",
+        "byteLength": 269978952
+      }
+    ]
+  },
+  "profileGenerator": 2
+}

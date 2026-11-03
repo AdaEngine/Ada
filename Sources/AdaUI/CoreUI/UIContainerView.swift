@@ -15,6 +15,11 @@ protocol FocusedInputContainer: AnyObject {
 }
 
 @MainActor
+protocol TextSelectionInputContainer: AnyObject {
+    var isSelectingTextWithMouse: Bool { get }
+}
+
+@MainActor
 protocol UIInspectionOverlayStateProviding: AnyObject {
     var inspectionFocusedNode: ViewNode? { get }
     var inspectionHitTestNode: ViewNode? { get }
@@ -165,6 +170,10 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner {
     private weak var lastOnMouseEventNode: ViewNode?
     /// Mouse-down capture target. Subsequent changed/ended events are routed here.
     private weak var activeMouseEventNode: ViewNode?
+
+    var isSelectingTextWithMouse: Bool {
+        (activeMouseEventNode as? TextEditorViewNode)?.isSelectingWithMouse == true
+    }
     /// Touch-began capture target. Subsequent moved/ended/cancelled events are routed here.
     private var activeTouchEventNodes: [RID: WeakBox<ViewNode>] = [:]
     /// Pinch-began capture target, retained through the end of the gesture.
@@ -591,6 +600,8 @@ extension UIContainerView: UIInspectionOverlayStateProviding {
         self.inspectionLastHitTestNode
     }
 }
+
+extension UIContainerView: TextSelectionInputContainer {}
 
 extension UIContainerView: UIMousePassthroughEventReceiving {
     @_spi(Internal)

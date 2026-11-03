@@ -147,10 +147,12 @@ public struct RenderGraphExecutor: Sendable {
                         ]
                     )
                     do {
+                        let stall = PerformanceStallProbe.begin()
                         defer {
                             nodeSpan.end()
                         }
                         let outputs = try await currentNode.node.execute(context: &context, renderContext: renderContext)
+                        if stall != nil { PerformanceStallProbe.end("RenderNode.\(currentNode.name.rawValue)", since: stall) }
                         if let nodeStartedAt {
                             let subgraphLabels = context.pendingSubgraphs.map { $0.graph.label?.rawValue ?? "RenderGraph" }
                             pendingSubgraphLabels.append(contentsOf: subgraphLabels)

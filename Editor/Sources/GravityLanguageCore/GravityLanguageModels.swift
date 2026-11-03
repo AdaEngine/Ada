@@ -191,11 +191,14 @@ public enum GravityDiagnosticSeverity: Int, Equatable, Hashable, Sendable {
 }
 
 public struct GravityDiagnostic: Equatable, Hashable, Sendable {
+    /// Stable rule identifier for style diagnostics; compiler diagnostics may omit it.
+    public var code: String?
     public var message: String
     public var range: GravitySourceRange
     public var severity: GravityDiagnosticSeverity
 
-    public init(message: String, range: GravitySourceRange, severity: GravityDiagnosticSeverity = .error) {
+    public init(message: String, range: GravitySourceRange, severity: GravityDiagnosticSeverity = .error, code: String? = nil) {
+        self.code = code
         self.message = message
         self.range = range
         self.severity = severity

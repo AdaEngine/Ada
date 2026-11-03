@@ -1,12 +1,42 @@
 # Ada Studio CLI
 
 The standalone macOS application includes `Contents/MacOS/adastudio`; the Windows
-distribution includes a console `adastudio.exe` beside `AdaEditor.exe`. These are
+distribution includes a console `adastudio.exe` beside `AdaEditor.exe`. Linux
+includes an `adastudio` launcher beside `ada-studio`. These are
 entries into the same native implementation: it dispatches before `AppRuntime` starts
 and uses the editor's project validator, AdaScript builder and native exporter.
 No window, recent-project update or agent connection is required. The iOS entry
 point, embedded runtime and mobile agent tools retain their existing behavior;
-CLI implementation and SDK staging are available on macOS and Windows.
+CLI implementation and SDK staging are available on macOS, Linux and Windows.
+
+## Install the command and open projects
+
+In the standalone desktop app, choose **Install adastudio Command in PATH…**
+from the application menu (Ada Studio on macOS, Studio on Linux/Windows).
+Restart your terminal after installation, then open a project from its folder:
+
+```sh
+adastudio .
+adastudio "../My Game"
+adastudio -- ./build
+```
+
+A directory argument opens the existing project in a new Studio window and
+returns to the terminal. Relative paths resolve against the terminal's current
+directory. Use `--` or `./` for directory names that match a CLI command.
+Invalid projects report an error before launching a window.
+
+Installation needs no administrator rights. macOS/Linux install a launcher in
+`~/.local/bin` and add that directory to bash, zsh and fish startup files,
+preserving existing settings. Windows adds the distribution folder to the current
+user's persistent PATH. Repeating installation does not duplicate PATH entries;
+an unrelated `~/.local/bin/adastudio` is never overwritten. Keep the installed
+Studio folder in place; repeat installation after moving it. This menu action is
+unavailable in App Store and mobile editions.
+
+Linux supports help/version, `project inspect`, `validate`, `doctor` and
+`agent-resources`. CLI app export is unavailable on Linux; use the Studio
+workbench for local Build/Run.
 
 ```powershell
 .\adastudio.exe --help
@@ -53,6 +83,9 @@ bundle and never falls back to the developer's checkout. `--sdk` or
   builder. This does not import every asset, execute gameplay or compile Swift.
   SwiftPM projects receive metadata/layout validation only; the JSON report
   states `validationScope` explicitly.
+  Style warnings are included by default. Add `--lint strict` to return exit
+  code 3 for style violations in authored sources and tests, or `--lint off` to
+  skip those checks. See [AdaScriptLint.md](AdaScriptLint.md) for the rules.
 - `doctor`: locate the build SDK, Swift, Clang and Python 3. Web builds additionally
   need a matching installed Swift WebAssembly SDK.
 - `build`: build and package an AdaScript macOS `.app`.

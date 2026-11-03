@@ -1039,7 +1039,7 @@ void flat3d_fragment()
 #endif
     if (u_ShadowAtlas.w > 0.5) {
         vec3 debugColor = u_ShadowAtlas.w < 1.5 ? adaLinearToSrgb(baseColor.rgb)
-            : (u_ShadowAtlas.w < 2.5 ? cascadeTint(normalLight) : heatRamp(reachingLightCount() / 8.0));
+            : (u_ShadowAtlas.w < 2.5 ? cascadeTint(normalLight) : (u_ShadowAtlas.w < 3.5 ? heatRamp(reachingLightCount() / 8.0) : vec3(0.3)));
         color = vec4(debugColor, opacity);
     }
     // Transparent surfaces attenuate the opaque indirect buffer but do not contribute to it.

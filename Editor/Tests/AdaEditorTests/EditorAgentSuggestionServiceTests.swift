@@ -44,17 +44,16 @@ struct EditorAgentSuggestionServiceTests {
         #expect(EditorAgentSuggestionService.fallback(for: request(draft: "Explain how", languageCode: "ru")) == ["Explain how this code works."])
     }
 
-    @Test("Follow-ups follow the conversation language and respond to the latest assistant context")
-    func contextualFollowUps() {
-        let messages: [EditorAgentSuggestionMessage] = [
-            .init(role: .user, text: "Объясни ошибку сборки"),
-            .init(role: .assistant, text: "Build failed with a compiler error."),
-        ]
-        let results = EditorAgentSuggestionService.fallback(for: request(purpose: .followUps, messages: messages))
-        #expect(results.count == 3)
-        #expect(results.first == "Помоги разобраться в описанной проблеме.")
-        #expect(!results.contains { $0.contains("тесты прошли") })
-        #expect(EditorAgentSuggestionService.fallback(for: request(purpose: .followUps, messages: [.init(role: .user, text: "Hello")])).isEmpty)
+    @Test("Follow-ups use the active agent output without local inference or canned fallbacks")
+    func contextualFollowUps() async {
+        let service = EditorAgentSuggestionService(generator: { _ in
+            Issue.record("Follow-ups must not request a second inference")
+            return []
+        })
+        var input = request(purpose: .followUps, messages: [.init(role: .assistant, text: "Game scene is ready")])
+        #expect(await service.suggestions(for: input).isEmpty)
+        input.followUps = ["Add jumping to the fox", "Add jumping to the fox", "Which checks should I run?"]
+        #expect(await service.suggestions(for: input) == ["Add jumping to the fox", "Which checks should I run?"])
     }
 
     @Test("Follow-up validation removes duplicates, multiline output, approval and success assertions")

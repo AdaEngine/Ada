@@ -25,6 +25,10 @@ swift build
 swift test
 ```
 
+To build and install the desktop application in its normal application folder, use
+the [installation scripts](../README.md#ada-studio) from the repository root.
+They also accept an existing Windows release directory or macOS `.app` bundle.
+
 ### Linux
 
 Studio Standalone can be built for X11/XWayland, including WSLg, with Swift 6.3.2

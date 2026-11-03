@@ -32,6 +32,8 @@ public enum DebugView3D: String, Codable, Sendable, CaseIterable {
     case cascades
     /// Number of lights reaching each pixel as a blue-to-red ramp (eight or more lights is red).
     case lightCount
+    /// Stable colors of the prepared triangle clusters. Unsupported surfaces are gray.
+    case meshlets
 
     /// Shader selector; ``none`` and ``wireframe`` never reach the debug pass.
     var shaderMode: Float {
@@ -43,7 +45,7 @@ public enum DebugView3D: String, Codable, Sendable, CaseIterable {
         case .metallic: 4
         case .ambientOcclusion: 5
         case .indirectLighting: 6
-        case .albedo, .cascades, .lightCount: 7
+        case .albedo, .cascades, .lightCount, .meshlets: 7
         }
     }
 
@@ -54,6 +56,7 @@ public enum DebugView3D: String, Codable, Sendable, CaseIterable {
         case .albedo: 1
         case .cascades: 2
         case .lightCount: 3
+        case .meshlets: 4
         default: 0
         }
     }

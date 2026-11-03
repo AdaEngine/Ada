@@ -1,0 +1,10 @@
+{
+  "Sources/AdaRender/Backends/WebGPU/Misc/WGPUCommandEncoder.swift": "001dd7c423c9dfa198ed7eaa6cb6d292617d89b1d3b46540262fdbc609ac61b2",
+  "Sources/AdaRender/Backends/WebGPU/Misc/WGPUCommandCompletion.swift": "d64b884564bbe22f3f68571c1fb5b73c4c1234024a2ae8852769d5075989ecaa",
+  "Sources/AdaRender/Backends/WebGPU/WebGPURenderBackend.swift": "37450b045e231c3729309485812913d84a4b1af77e4a4bcd0ca640c12702bb16",
+  "Demos/Sponza/Camera/SponzaFlyCamera.swift": "6b538d6bd2bdcbd4d7da5da87f01f02e939fed20998f169cfed913309264cd1d",
+  "Demos/Sponza/SponzaDemo.swift": "abf910e14695d23da3b84d4302f9005d624d23940b8898e2f49d0fe85399c0dc",
+  "Demos/Sponza/SponzaDemoProfiler.swift": "3db417a8951df2cda5baff8c64311373a790d845b9134f2fc264b1aa0b138e56",
+  "Demos/Sponza/Tests/SponzaCameraTests.swift": "59c1704c0e6272d94555250d5a61ce024f60136fed273266e48d75531731fbef",
+  "Tests/AdaRenderTests/WGPUCommandCompletionTests.swift": "2755bb3246b3dd1604020432763d03de2093b23a25aa6a6172b1337c42ed266a"
+}

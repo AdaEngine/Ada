@@ -1,0 +1,13 @@
+{
+  "version": "1.3",
+  "revision": "9e1f07b159d3cb777f1c67ed31fc11fd117986f4",
+  "source": "https://github.com/zeux/meshoptimizer",
+  "license": "MIT",
+  "sourceSHA256": {
+    "src/meshoptimizer.h": "e3688ef553f603391747895a5c221ef1528574cc7f8173782417a96cb531f61b",
+    "src/clusterizer.cpp": "a2775edf77d86a9a5f0ca82f4635ce6ce741bbda79fd9a652ffc8c5dd61d3b0e",
+    "src/allocator.cpp": "d2cc48691fe2f4c6d097bf7a766389cfb7f83ca14a5f747e3944332656d02254",
+    "LICENSE.md": "f03037ca7bad1e3eb7f4a63fa6084a8baabd5ba30d3c239a9a7f35705d873e26"
+  },
+  "toolSHA256": "e7d9fd597620c5393bf409c85dd9e3861453486c364ef3dcaa457559eecdffc1"
+}

@@ -24,5 +24,8 @@ jobs:
         - name: Swift Version
           run: swift -version
 
+        - name: Test Studio installation
+          run: python3 script/test_install_studio_macos.py
+
         - name: Test
           run: swift test --parallel

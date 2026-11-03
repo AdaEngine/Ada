@@ -8,6 +8,8 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
     /// Number of surface interactions, including the directly visible surface.
     public var maximumBounces: Int = 3
     public var resolutionScale: Float = 0.5
+    /// Material atlas tile size, bounded to 128...512 pixels. Higher values retain more texture detail.
+    public var textureTileSize: Int = 128
     public var maximumDistance: Float = 200
     public var maximumRadiance: Float = 64
     /// Static views accumulate samples; changes to camera, geometry, materials or lights reset history.
@@ -26,6 +28,7 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
     var sanitized: Self {
         var result = self
         result.samplesPerPixel = min(max(samplesPerPixel, 1), 8)
+        result.textureTileSize = textureTileSize >= 512 ? 512 : (textureTileSize >= 256 ? 256 : 128)
         result.maximumBounces = min(max(maximumBounces, 1), 8)
         result.resolutionScale = finiteRenderValue(resolutionScale, fallback: 0.5, range: 0.125...1)
         result.maximumDistance = finiteRenderValue(maximumDistance, fallback: 200, range: 1...10000)
@@ -36,7 +39,7 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: CodingKey {
-        case isEnabled, samplesPerPixel, maximumBounces, resolutionScale, maximumDistance, maximumRadiance, historyLimit, rayBias
+        case isEnabled, samplesPerPixel, maximumBounces, resolutionScale, textureTileSize, maximumDistance, maximumRadiance, historyLimit, rayBias
     }
 
     public init(from decoder: Decoder) throws {
@@ -45,6 +48,7 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
         samplesPerPixel = try c.decodeIfPresent(Int.self, forKey: .samplesPerPixel) ?? 1
         maximumBounces = try c.decodeIfPresent(Int.self, forKey: .maximumBounces) ?? 3
         resolutionScale = try c.decodeIfPresent(Float.self, forKey: .resolutionScale) ?? 0.5
+        textureTileSize = try c.decodeIfPresent(Int.self, forKey: .textureTileSize) ?? 128
         maximumDistance = try c.decodeIfPresent(Float.self, forKey: .maximumDistance) ?? 200
         maximumRadiance = try c.decodeIfPresent(Float.self, forKey: .maximumRadiance) ?? 64
         historyLimit = try c.decodeIfPresent(Int.self, forKey: .historyLimit) ?? 32

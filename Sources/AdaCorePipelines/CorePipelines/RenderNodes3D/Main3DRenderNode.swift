@@ -33,6 +33,10 @@ public struct Main3DRenderNode: RenderNode {
     @ResMut<Active3DInstanceBuffers> private var activeInstances
     @ResMut<PBR3DUniforms> private var materials
     @Res<Render3DVisibilityStatistics> private var statistics
+    @ResMut<Meshlet3DState> private var meshlets
+    @Res<Render3DMeshletStatistics> private var meshletStatistics
+    @ResMut<MeshletMap3DResources> private var meshletMap
+    @Res<ExtractedCameraRenderViewTargets> private var cameraTargets
 
     @Res<ExtractedLighting3D>
     private var lighting
@@ -73,6 +77,10 @@ public struct Main3DRenderNode: RenderNode {
         _activeInstances.update(from: world)
         _materials.update(from: world)
         _statistics.update(from: world)
+        _meshlets.update(from: world)
+        _meshletStatistics.update(from: world)
+        _meshletMap.update(from: world)
+        _cameraTargets.update(from: world)
         _lightingScratch.update(from: world)
         _viewUniforms.update(from: world)
         _localUniforms.update(from: world)
@@ -81,8 +89,7 @@ public struct Main3DRenderNode: RenderNode {
         _ibl.update(from: world)
         _surfaceLighting.update(from: world)
         _renderDevice.update(from: world)
-        var activeViews: [Entity.ID] = []
-        query.forEach { _, _, _, _, source in activeViews.append(source.entityId) }
+        let activeViews = Array(cameraTargets.activeCameraIDs)
         lightingScratch.cache.retainViews(activeViews)
         viewUniforms.cache.retainViews(activeViews)
         ibl.cache.retainViews(activeViews)
@@ -91,6 +98,9 @@ public struct Main3DRenderNode: RenderNode {
         lightTiles.retainViews(activeViews)
         lists.retainViews(activeViews)
         gpuVisibility.retainViews(activeViews)
+        meshlets.retain(activeViews)
+        meshletMap.retainViews(activeViews)
+        meshletStatistics.retain(activeViews)
     }
 
     public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
@@ -113,6 +123,7 @@ public struct Main3DRenderNode: RenderNode {
                 return
             }
             let tracingRequested = environments.environments[source.entityId]?.pathTracing.isEnabled == true
+                && environments.environments[source.entityId]?.debugView != .meshlets
             if pathTracingOverlaysOnly && !tracingRequested { return }
             let uniformPass = pathTracingOverlaysOnly ? 1 : 0
             let localPass = pathTracingOverlaysOnly ? 1000 : 0
@@ -150,7 +161,8 @@ public struct Main3DRenderNode: RenderNode {
             if !pathTracingOverlaysOnly { statistics.record(lists.count(view: source.entityId, pass: -1), view: source.entityId, pass: -1) }
 
             let drawUniform = temporalViewUniform(uniform, target: target)
-            if !pathTracingOverlaysOnly && !tracingRequested && environments.environments[source.entityId]?.meshVisibility.gpuOcclusion == true {
+            if !pathTracingOverlaysOnly && !tracingRequested && environments.environments[source.entityId]?.meshVisibility.gpuOcclusion == true
+                && environments.environments[source.entityId]?.debugView != .meshlets {
                 visibilityCommand = gpuVisibility.encode(
                     view: source.entityId,
                     size: sceneColor.size,
@@ -235,6 +247,14 @@ public struct Main3DRenderNode: RenderNode {
             let tileMaskBuffer = lightTiles.write(view: source.entityId, masks: tileMasks, device: renderDevice.renderDevice)
 
             let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
+            if !pathTracingOverlaysOnly && !tracingRequested {
+                let count = meshlets.prepare(items: &visibleItems, view: source.entityId, projection: drawUniform.viewProjectionMatrix,
+                    settings: environments.environments[source.entityId]?.meshVisibility ?? .init(), command: commandBuffer, device: renderDevice.renderDevice,
+                    map: environments.environments[source.entityId]?.debugView == .meshlets,
+                    viewport: target.outputTexture?.size ?? sceneColor.size, lodProjection: uniform.viewProjectionMatrix,
+                    requiresMotionGuides: target.temporalUpscalingActive)
+                meshletStatistics.record(count, view: source.entityId)
+            }
             commandBuffer.label = "Main 3d Render Pass"
 
             let environmentSettings = environments.environments[source.entityId] ?? Environment3D()
@@ -402,6 +422,11 @@ public struct Main3DRenderNode: RenderNode {
                 .init(binding: 48, shaderStages: .fragment, resource: .texture(dynamic ?? Texture2D.whiteTexture))
             ]), index: 0)
             renderPass.setViewport(camera.viewport.rect)
+            meshletMap.isEnabled = environments.environments[source.entityId]?.debugView == .meshlets && !pathTracingOverlaysOnly
+            meshletMap.configureLOD(projection: uniform.viewProjectionMatrix, viewport: target.outputTexture?.size ?? sceneColor.size,
+                pixelError: environments.environments[source.entityId]?.meshVisibility.meshletLODPixelError ?? 0,
+                requiresMotionGuides: target.temporalUpscalingActive, motionLODIDs: meshlets.preparedMotionLODIDs, view: source.entityId)
+            defer { meshletMap.isEnabled = false }
             if environments.environments[source.entityId]?.debugView == .wireframe {
                 renderPass.setTriangleFillMode(.lines)
             }
@@ -431,6 +456,7 @@ public struct Main3DRenderNode: RenderNode {
                 }
             }
 
+            if meshletMap.isEnabled { meshlets.recordMapCut(meshletMap.acceptedCut(for: source.entityId), view: source.entityId) }
             renderPass.endRenderPass()
             try foveatedPass?.resolve()
             if let metrics {

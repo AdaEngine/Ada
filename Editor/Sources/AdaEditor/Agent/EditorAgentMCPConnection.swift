@@ -54,7 +54,7 @@ import FoundationNetworking
             do {
                 #if os(Windows)
                 var buffer = Data()
-                for await chunk in EditorWindowsACPTransport.chunks(FileHandle.standardInput) {
+                for try await chunk in EditorWindowsACPTransport.chunks(FileHandle.standardInput) {
                     buffer.append(chunk)
                     while let newline = buffer.firstIndex(of: 10) {
                         let line = Data(buffer[..<newline])

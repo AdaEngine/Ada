@@ -1,0 +1,691 @@
+{
+  "source": "meshlet-lod-benchmark.json",
+  "resolution": [
+    1680,
+    600
+  ],
+  "cases": 18,
+  "shadowCascadeResolution": 2048,
+  "localShadowResolution": 1024,
+  "shadowDistance": 80,
+  "summary": [
+    {
+      "view": "gallery",
+      "pixelError": 0,
+      "fpsMedian": 101.77302394701705,
+      "meanMsMedian": 9.825786453201971,
+      "p95MsMedian": 12.1949,
+      "cpuMedianMs": 4.384040832519531,
+      "runs": [
+        {
+          "round": 0,
+          "fps": 101.55410548855166,
+          "meanMs": 9.846967733990148,
+          "p95Ms": 12.4199,
+          "mainCPUEncodeMedianMs": 4.7550201416015625,
+          "gpuIndexCount": 1993251,
+          "state": {
+            "candidateMeshlets": 93005,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 208,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 427225,
+            "fullyVisibleItems": 74,
+            "gpuDraws": 134,
+            "lodFallbackItems": 0,
+            "lodFallbackReasons": {},
+            "lodGPUItems": 0,
+            "lodNodes": 0,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 6871619
+          }
+        },
+        {
+          "round": 1,
+          "fps": 102.51446735420535,
+          "meanMs": 9.754720731707318,
+          "p95Ms": 11.9912,
+          "mainCPUEncodeMedianMs": 4.384040832519531,
+          "gpuIndexCount": 1956600,
+          "state": {
+            "candidateMeshlets": 93005,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 208,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 426865,
+            "fullyVisibleItems": 73,
+            "gpuDraws": 135,
+            "lodFallbackItems": 0,
+            "lodFallbackReasons": {},
+            "lodGPUItems": 0,
+            "lodNodes": 0,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 6871619
+          }
+        },
+        {
+          "round": 2,
+          "fps": 101.77302394701705,
+          "meanMs": 9.825786453201971,
+          "p95Ms": 12.1949,
+          "mainCPUEncodeMedianMs": 4.382133483886719,
+          "gpuIndexCount": 1932105,
+          "state": {
+            "candidateMeshlets": 93005,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 208,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 426865,
+            "fullyVisibleItems": 73,
+            "gpuDraws": 135,
+            "lodFallbackItems": 0,
+            "lodFallbackReasons": {},
+            "lodGPUItems": 0,
+            "lodNodes": 0,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 6871619
+          }
+        }
+      ]
+    },
+    {
+      "view": "gallery",
+      "pixelError": 2,
+      "fpsMedian": 103.06055322804914,
+      "meanMsMedian": 9.70303349514563,
+      "p95MsMedian": 12.4334,
+      "cpuMedianMs": 4.553794860839844,
+      "runs": [
+        {
+          "round": 0,
+          "fps": 100.76266054631259,
+          "meanMs": 9.924311194029851,
+          "p95Ms": 12.4334,
+          "mainCPUEncodeMedianMs": 4.50897216796875,
+          "gpuIndexCount": 2237364,
+          "state": {
+            "candidateMeshlets": 121348,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 208,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 51714,
+            "fullyVisibleItems": 54,
+            "gpuDraws": 154,
+            "lodFallbackItems": 143,
+            "lodFallbackReasons": {
+              "noLODReduction": 143
+            },
+            "lodGPUItems": 65,
+            "lodNodes": 24277,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 6871619
+          }
+        },
+        {
+          "round": 1,
+          "fps": 103.07385499394954,
+          "meanMs": 9.701781310679612,
+          "p95Ms": 12.2559,
+          "mainCPUEncodeMedianMs": 4.553794860839844,
+          "gpuIndexCount": 2259618,
+          "state": {
+            "candidateMeshlets": 121348,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 208,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 52074,
+            "fullyVisibleItems": 55,
+            "gpuDraws": 153,
+            "lodFallbackItems": 143,
+            "lodFallbackReasons": {
+              "noLODReduction": 143
+            },
+            "lodGPUItems": 65,
+            "lodNodes": 24277,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 6871619
+          }
+        },
+        {
+          "round": 2,
+          "fps": 103.06055322804914,
+          "meanMs": 9.70303349514563,
+          "p95Ms": 12.4988,
+          "mainCPUEncodeMedianMs": 4.654884338378906,
+          "gpuIndexCount": 2259477,
+          "state": {
+            "candidateMeshlets": 121348,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 208,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 52074,
+            "fullyVisibleItems": 55,
+            "gpuDraws": 153,
+            "lodFallbackItems": 143,
+            "lodFallbackReasons": {
+              "noLODReduction": 143
+            },
+            "lodGPUItems": 65,
+            "lodNodes": 24277,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 6871619
+          }
+        }
+      ]
+    },
+    {
+      "view": "gallery",
+      "pixelError": 8,
+      "fpsMedian": 101.7945732987832,
+      "meanMsMedian": 9.823706388206388,
+      "p95MsMedian": 12.2047,
+      "cpuMedianMs": 4.572868347167969,
+      "runs": [
+        {
+          "round": 0,
+          "fps": 101.7945732987832,
+          "meanMs": 9.823706388206388,
+          "p95Ms": 12.2047,
+          "mainCPUEncodeMedianMs": 4.505157470703125,
+          "gpuIndexCount": 2031357,
+          "state": {
+            "candidateMeshlets": 121348,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 208,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 51714,
+            "fullyVisibleItems": 54,
+            "gpuDraws": 154,
+            "lodFallbackItems": 143,
+            "lodFallbackReasons": {
+              "noLODReduction": 143
+            },
+            "lodGPUItems": 65,
+            "lodNodes": 24277,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 6871619
+          }
+        },
+        {
+          "round": 1,
+          "fps": 102.18413069430461,
+          "meanMs": 9.786255392156862,
+          "p95Ms": 12.1569,
+          "mainCPUEncodeMedianMs": 4.618644714355469,
+          "gpuIndexCount": 2083833,
+          "state": {
+            "candidateMeshlets": 121348,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 208,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 52074,
+            "fullyVisibleItems": 55,
+            "gpuDraws": 153,
+            "lodFallbackItems": 143,
+            "lodFallbackReasons": {
+              "noLODReduction": 143
+            },
+            "lodGPUItems": 65,
+            "lodNodes": 24277,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 6871619
+          }
+        },
+        {
+          "round": 2,
+          "fps": 101.63459978222158,
+          "meanMs": 9.839168965517242,
+          "p95Ms": 12.6137,
+          "mainCPUEncodeMedianMs": 4.572868347167969,
+          "gpuIndexCount": 2068503,
+          "state": {
+            "candidateMeshlets": 121348,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 208,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 52074,
+            "fullyVisibleItems": 55,
+            "gpuDraws": 153,
+            "lodFallbackItems": 143,
+            "lodFallbackReasons": {
+              "noLODReduction": 143
+            },
+            "lodGPUItems": 65,
+            "lodNodes": 24277,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 6871619
+          }
+        }
+      ]
+    },
+    {
+      "view": "outside",
+      "pixelError": 0,
+      "fpsMedian": 84.86849763982961,
+      "meanMsMedian": 11.782935103244839,
+      "p95MsMedian": 13.5227,
+      "cpuMedianMs": 5.74493408203125,
+      "runs": [
+        {
+          "round": 0,
+          "fps": 87.31060884189283,
+          "meanMs": 11.453361891117478,
+          "p95Ms": 12.7039,
+          "mainCPUEncodeMedianMs": 5.7277679443359375,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 122688,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 8804436,
+            "fullyVisibleItems": 403,
+            "gpuDraws": 0,
+            "lodFallbackItems": 0,
+            "lodFallbackReasons": {},
+            "lodGPUItems": 0,
+            "lodNodes": 0,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 8812576
+          }
+        },
+        {
+          "round": 1,
+          "fps": 83.8826205201078,
+          "meanMs": 11.921420597014926,
+          "p95Ms": 13.5227,
+          "mainCPUEncodeMedianMs": 5.970001220703125,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 122688,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 8804436,
+            "fullyVisibleItems": 403,
+            "gpuDraws": 0,
+            "lodFallbackItems": 0,
+            "lodFallbackReasons": {},
+            "lodGPUItems": 0,
+            "lodNodes": 0,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 8812576
+          }
+        },
+        {
+          "round": 2,
+          "fps": 84.86849763982961,
+          "meanMs": 11.782935103244839,
+          "p95Ms": 13.5293,
+          "mainCPUEncodeMedianMs": 5.74493408203125,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 122688,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 8804436,
+            "fullyVisibleItems": 403,
+            "gpuDraws": 0,
+            "lodFallbackItems": 0,
+            "lodFallbackReasons": {},
+            "lodGPUItems": 0,
+            "lodNodes": 0,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 8812576
+          }
+        }
+      ]
+    },
+    {
+      "view": "outside",
+      "pixelError": 2,
+      "fpsMedian": 74.23094173861655,
+      "meanMsMedian": 13.471471283783783,
+      "p95MsMedian": 15.488,
+      "cpuMedianMs": 7.493019104003906,
+      "runs": [
+        {
+          "round": 0,
+          "fps": 74.96556911641193,
+          "meanMs": 13.339457190635452,
+          "p95Ms": 14.7541,
+          "mainCPUEncodeMedianMs": 7.457733154296875,
+          "gpuIndexCount": 18463677,
+          "state": {
+            "candidateMeshlets": 173441,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 542473,
+            "fullyVisibleItems": 274,
+            "gpuDraws": 129,
+            "lodFallbackItems": 274,
+            "lodFallbackReasons": {
+              "noLODReduction": 274
+            },
+            "lodGPUItems": 129,
+            "lodNodes": 32262,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 8812576
+          }
+        },
+        {
+          "round": 1,
+          "fps": 74.23094173861655,
+          "meanMs": 13.471471283783783,
+          "p95Ms": 15.488,
+          "mainCPUEncodeMedianMs": 7.493019104003906,
+          "gpuIndexCount": 18463677,
+          "state": {
+            "candidateMeshlets": 173441,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 542473,
+            "fullyVisibleItems": 274,
+            "gpuDraws": 129,
+            "lodFallbackItems": 274,
+            "lodFallbackReasons": {
+              "noLODReduction": 274
+            },
+            "lodGPUItems": 129,
+            "lodNodes": 32262,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 8812576
+          }
+        },
+        {
+          "round": 2,
+          "fps": 72.9774195324891,
+          "meanMs": 13.702868728522336,
+          "p95Ms": 15.6007,
+          "mainCPUEncodeMedianMs": 7.6618194580078125,
+          "gpuIndexCount": 18463677,
+          "state": {
+            "candidateMeshlets": 173441,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 542473,
+            "fullyVisibleItems": 274,
+            "gpuDraws": 129,
+            "lodFallbackItems": 274,
+            "lodFallbackReasons": {
+              "noLODReduction": 274
+            },
+            "lodGPUItems": 129,
+            "lodNodes": 32262,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 8812576
+          }
+        }
+      ]
+    },
+    {
+      "view": "outside",
+      "pixelError": 8,
+      "fpsMedian": 72.96251243778912,
+      "meanMsMedian": 13.705668384879726,
+      "p95MsMedian": 15.6596,
+      "cpuMedianMs": 7.572174072265625,
+      "runs": [
+        {
+          "round": 0,
+          "fps": 74.22118655806167,
+          "meanMs": 13.473241891891892,
+          "p95Ms": 15.0862,
+          "mainCPUEncodeMedianMs": 7.4310302734375,
+          "gpuIndexCount": 18259257,
+          "state": {
+            "candidateMeshlets": 173441,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 542473,
+            "fullyVisibleItems": 274,
+            "gpuDraws": 129,
+            "lodFallbackItems": 274,
+            "lodFallbackReasons": {
+              "noLODReduction": 274
+            },
+            "lodGPUItems": 129,
+            "lodNodes": 32262,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 8812576
+          }
+        },
+        {
+          "round": 1,
+          "fps": 72.10711150879074,
+          "meanMs": 13.868257638888888,
+          "p95Ms": 15.6704,
+          "mainCPUEncodeMedianMs": 8.395195007324219,
+          "gpuIndexCount": 18259257,
+          "state": {
+            "candidateMeshlets": 173441,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 542473,
+            "fullyVisibleItems": 274,
+            "gpuDraws": 129,
+            "lodFallbackItems": 274,
+            "lodFallbackReasons": {
+              "noLODReduction": 274
+            },
+            "lodGPUItems": 129,
+            "lodNodes": 32262,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 8812576
+          }
+        },
+        {
+          "round": 2,
+          "fps": 72.96251243778912,
+          "meanMs": 13.705668384879726,
+          "p95Ms": 15.6596,
+          "mainCPUEncodeMedianMs": 7.572174072265625,
+          "gpuIndexCount": 18259257,
+          "state": {
+            "candidateMeshlets": 173441,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 542473,
+            "fullyVisibleItems": 274,
+            "gpuDraws": 129,
+            "lodFallbackItems": 274,
+            "lodFallbackReasons": {
+              "noLODReduction": 274
+            },
+            "lodGPUItems": 129,
+            "lodNodes": 32262,
+            "lodSelectedTriangles": 0,
+            "mode": "gpu",
+            "motionLODItems": 0,
+            "motionLODTriangles": 0,
+            "selectedLODLevels": {},
+            "selectedLODNodes": 0,
+            "sourceTriangles": 8812576
+          }
+        }
+      ]
+    }
+  ]
+}

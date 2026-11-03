@@ -1,0 +1,14 @@
+{
+  "Demos/Sponza/Camera/SponzaCameraMotion.swift": "2f1dea58e3bb99324a8aa34e044ed19357c62f7a7961ca271b7df2ffc1b9f7e0",
+  "Demos/Sponza/Camera/SponzaFlyCamera.swift": "6b538d6bd2bdcbd4d7da5da87f01f02e939fed20998f169cfed913309264cd1d",
+  "Demos/Sponza/Package.swift": "a073bf97070016abe40378278ea4a03baf4bbd0e037487ca260b70de58a05141",
+  "Demos/Sponza/SponzaDemo.swift": "1ac54c9d8675b17320dda0aa16fb0faacc22f589cc2b72d503ef2addc05f65af",
+  "Demos/Sponza/SponzaDemoProfiler.swift": "98db1a04c85443fcdadd6a387f57d8ddb8679d7f1fe94a261945cd98948e22bd",
+  "Demos/Sponza/SponzaLighting.swift": "ea5885e84f8a897a255b0b7e994bc2fd1f63c0196ca8d5ec2f16f0c4cae3dd9a",
+  "Demos/Sponza/Tests/SponzaCameraTests.swift": "6d6af9773867136da1c4692630df7cb9f2aa85b01af882f9730699c2344ae507",
+  "Sources/AdaCorePipelines/CorePipelines/RenderNodes3D/PathTracing3DRenderNode.swift": "4d2bac11e2cb387dfd281b77c8094266efa960fef11f1b2b1ef2add2edd02dcd",
+  "Sources/AdaRender/Camera/CameraPlugin.swift": "8b46f531969ab4bc9532321caba39fd627a4a8869e6baef3a50df8051559a3fd",
+  "Tests/AdaEngineTests/Render3DPathTracingTests.swift": "27f60dc112d61382fd21f5e875281df739a906391b5e3b17945d33e1ec5a9fd9",
+  "script/prepare_sponza_path_tracing.py": "40962a10e06e89726de8ec1e978b987ee1f6256ddd108ab224a47e5fd7599b12",
+  "script/webgpu_validation_package.py": "1223e6f271a63d5785ed3d8e0ad92530b3b8909a34d73005f50d827152e6ab3c"
+}

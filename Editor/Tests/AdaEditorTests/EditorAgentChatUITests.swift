@@ -178,7 +178,7 @@ struct EditorAgentChatUITests {
     }
 
     @Test("Shared transcript renders persisted mobile messages without ACP state")
-    func standaloneTranscript() throws {
+    func standaloneTranscript() async throws {
         _ = makeContainer(EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService()))
         let event = EditorAgentEvent(
             id: "mobile-turn",
@@ -191,7 +191,11 @@ struct EditorAgentChatUITests {
         let container = UIContainerView(rootView: EditorAgentTranscript(events: [event], sessionID: "mobile-project"))
         container.frame = Rect(x: 0, y: 0, width: 360, height: 480)
         container.bounds.size = container.frame.size
-        container.layoutIfNeeded()
+        for _ in 0..<4 {
+            await Task.yield()
+            container.layoutIfNeeded()
+            container.update(1 / 60)
+        }
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Event.mobile-turn"))
     }
 

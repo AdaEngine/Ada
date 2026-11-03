@@ -186,7 +186,7 @@
                     requiredFeatures: features,
                     requiredLimits: requiredLimits,
                     defaultQueue: WebGPU.GPUQueueDescriptor(),
-                    deviceLostCallbackInfo: WebGPU.GPUDeviceLostCallbackInfo(mode: .allowProcessEvents) { _, deviceLostReason, message in
+                    deviceLostCallbackInfo: WebGPU.GPUDeviceLostCallbackInfo(mode: .allowSpontaneous) { _, deviceLostReason, message in
                         logger.info("Device lost: \(deviceLostReason.rawValue): \(message)")
                     },
                     // Swan's generated uncaptured-error callback wrapper releases its userdata

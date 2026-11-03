@@ -74,6 +74,7 @@ struct PathTracing3DViews: Resource {
 public struct PathTracing3DRenderNode: RenderNode {
     public static let name: RenderNodeLabel = "Main3D.PathTracing"
     @Query<Entity, RenderViewTarget, GlobalViewUniform, ExtractedCameraSource> private var views
+    @Res<ExtractedCameraRenderViewTargets> private var cameraTargets
     @Res<ExtractedEnvironment3D> private var environments
     @Res<ExtractedLighting3D> private var lighting
     @ResMut<PathTracing3DViews> private var resources
@@ -83,10 +84,11 @@ public struct PathTracing3DRenderNode: RenderNode {
     public init() {}
 
     public func update(from world: World) {
-        views.update(from:world); _environments.update(from:world); _lighting.update(from:world)
+        views.update(from:world); _cameraTargets.update(from:world); _environments.update(from:world); _lighting.update(from:world)
         _resources.update(from:world); _statistics.update(from:world); _device.update(from:world); _metrics.update(from:world)
-        var active: [Entity.ID] = []
-        views.forEach { _,_,_,source in active.append(source.entityId) }
+        // Extracted proxies themselves can still be deferred during graph update. Use the
+        // camera identities collected from the source world, not those transient entities.
+        let active = Array(cameraTargets.activeCameraIDs)
         for id in resources.entries.keys where !active.contains(id) { resources.entries.removeValue(forKey:id); statistics.discard(id) }
         resources.uniforms.retainViews(active)
     }
@@ -98,7 +100,7 @@ public struct PathTracing3DRenderNode: RenderNode {
         guard let (target,uniform,id) = selected else { return [] }
         let environment = environments.environments[id] ?? .init()
         let settings = environment.pathTracing.sanitized
-        guard settings.isEnabled, let color = target.sceneColor3DTexture,
+        guard settings.isEnabled, environment.debugView != .meshlets, let color = target.sceneColor3DTexture,
             let normal = target.normalRoughness3DTexture, let position = target.viewPositionMetallic3DTexture else {
             resources.entries.removeValue(forKey:id); statistics.discard(id)
             if resources.entries.isEmpty { resources.scene = PathTracing3DScene() }
@@ -106,7 +108,8 @@ public struct PathTracing3DRenderNode: RenderNode {
         }
         let sources = context.world.getResource(ExtractedMesh3DSources.self)?.meshes ?? []
         var scene = resources.scene
-        do { try await scene.prepare(sources,skinning:context.world.getResource(Skinning3DUniforms.self),device:device.renderDevice) }
+        do { try await scene.prepare(sources,skinning:context.world.getResource(Skinning3DUniforms.self),device:device.renderDevice,
+                                    textureTileSize:settings.textureTileSize) }
         catch {
             let reason = String(describing:error)
             var status = PathTracing3DStatus(); status.failure = reason
@@ -163,7 +166,7 @@ public struct PathTracing3DRenderNode: RenderNode {
         var constants = PathTracing3DUniform(inverseProjection:jittered.projectionMatrix.inverse,inverseView:uniform.viewMatrix.inverse,
             counts:Vector4(Float(scene.nodeCount),Float(lights.count/4),Float(settings.samplesPerPixel),Float(settings.maximumBounces)),
             trace:Vector4(settings.maximumDistance,settings.rayBias,settings.maximumRadiance,Float(min(entry.status.accumulatedFrames,settings.historyLimit-1))),
-            frame:Vector4(Float(entry.status.encodedFrames%1000000),0,Float(atlas.height/PathTracing3DScene.tileSize),linearEnvironment ? 1 : 0),
+            frame:Vector4(Float(entry.status.encodedFrames%1000000),0,Float(atlas.height/scene.tileSize),linearEnvironment ? 1 : 0),
             zenith:sky.zenithColor.asVector,horizon:sky.horizonColor.asVector,ground:sky.groundColor.asVector,sky:skyParameters)
         let command = renderContext.commandQueue.makeCommandBuffer(); command.label = "World-space path tracing"
         for passIndex in 0..<3 {

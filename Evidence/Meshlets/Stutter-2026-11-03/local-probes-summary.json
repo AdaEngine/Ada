@@ -1,0 +1,7834 @@
+{
+  "phases": [
+    {
+      "name": "stationary",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 98,
+      "fps": 16.361532434484168,
+      "p50": 19.9688,
+      "p95": 40.8659,
+      "p99": 198.3284,
+      "maximum": 3490.8641,
+      "over50": 5,
+      "over100": 4,
+      "over200": 1,
+      "slowOperations": [
+        {
+          "name": "SceneView.PublishGap",
+          "count": 97,
+          "maximum": 3490.8645,
+          "over100": 4
+        },
+        {
+          "name": "App.Update.MainWorld",
+          "count": 103,
+          "maximum": 3434.5243,
+          "over100": 3
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 97,
+          "maximum": 3417.6211,
+          "over100": 3
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 82,
+          "maximum": 3411.1298,
+          "over100": 3
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 81,
+          "maximum": 3411.0992,
+          "over100": 3
+        },
+        {
+          "name": "RenderNode.Main3DRenderNode",
+          "count": 3,
+          "maximum": 2689.249,
+          "over100": 1
+        },
+        {
+          "name": "RenderNode.Main3D.TemporalResolve",
+          "count": 1,
+          "maximum": 416.41,
+          "over100": 1
+        },
+        {
+          "name": "WGPU.CreateRenderPipeline.Flat 3D Pipeline",
+          "count": 7,
+          "maximum": 382.019,
+          "over100": 7
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 197,
+          "maximum": 359.9916,
+          "over100": 31
+        },
+        {
+          "name": "RenderNode.Main3D.LocalShadows",
+          "count": 3,
+          "maximum": 151.0929,
+          "over100": 2
+        },
+        {
+          "name": "LocalShadow.View.reused0",
+          "count": 3,
+          "maximum": 148.9728,
+          "over100": 2
+        },
+        {
+          "name": "LocalShadow.AtlasAllocate",
+          "count": 3,
+          "maximum": 146.635,
+          "over100": 1
+        },
+        {
+          "name": "RenderNode.DirectionalShadow3DRenderNode",
+          "count": 1,
+          "maximum": 137.647,
+          "over100": 1
+        },
+        {
+          "name": "LocalShadow.EncodeDraws",
+          "count": 1,
+          "maximum": 82.4699,
+          "over100": 0
+        },
+        {
+          "name": "Meshlets.EncodeCPU",
+          "count": 3,
+          "maximum": 61.8147,
+          "over100": 0
+        },
+        {
+          "name": "Meshlets.CreateProcessorCPU",
+          "count": 1,
+          "maximum": 42.2536,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.CreateRenderPipeline.Motion 3D",
+          "count": 7,
+          "maximum": 40.2671,
+          "over100": 0
+        },
+        {
+          "name": "Meshlets.OutputFrameGrow",
+          "count": 1,
+          "maximum": 39.5309,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.CreateRenderPipeline.Local Shadow 3D",
+          "count": 3,
+          "maximum": 27.3873,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.CreateRenderPipeline.Directional Shadow 3D Pipeline",
+          "count": 4,
+          "maximum": 27.0227,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.CreateRenderPipeline.Temporal HDR Tone Map",
+          "count": 1,
+          "maximum": 21.5358,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.SceneView",
+          "count": 2,
+          "maximum": 19.8569,
+          "over100": 0
+        },
+        {
+          "name": "Meshlets.MotionIndexUpload",
+          "count": 1,
+          "maximum": 17.1895,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 2689.4969940185547
+        },
+        {
+          "name": "Main3D.TemporalResolve",
+          "ms": 416.8052673339844
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 151.1096954345703
+        },
+        {
+          "name": "DirectionalShadow3DRenderNode",
+          "ms": 137.6800537109375
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 118.73054504394531
+        }
+      ]
+    },
+    {
+      "name": "rotation-first",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 684,
+      "fps": 57.094492812967786,
+      "p50": 13.125350000000001,
+      "p95": 29.701,
+      "p99": 165.1433,
+      "maximum": 227.8787,
+      "over50": 15,
+      "over100": 13,
+      "over200": 2,
+      "slowOperations": [
+        {
+          "name": "SceneView.PublishGap",
+          "count": 238,
+          "maximum": 227.8791,
+          "over100": 13
+        },
+        {
+          "name": "App.Update.MainWorld",
+          "count": 229,
+          "maximum": 214.3939,
+          "over100": 12
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 110,
+          "maximum": 212.3132,
+          "over100": 12
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 62,
+          "maximum": 211.502,
+          "over100": 12
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 61,
+          "maximum": 211.4695,
+          "over100": 12
+        },
+        {
+          "name": "RenderNode.Main3D.LocalShadows",
+          "count": 14,
+          "maximum": 198.6413,
+          "over100": 12
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 329,
+          "maximum": 186.2527,
+          "over100": 35
+        },
+        {
+          "name": "LocalShadow.View.reused0",
+          "count": 14,
+          "maximum": 173.2941,
+          "over100": 12
+        },
+        {
+          "name": "LocalShadow.AtlasAllocate",
+          "count": 14,
+          "maximum": 170.3487,
+          "over100": 11
+        },
+        {
+          "name": "WGPU.SubmitCPU",
+          "count": 3,
+          "maximum": 81.9621,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3DRenderNode",
+          "count": 2,
+          "maximum": 26.4632,
+          "over100": 0
+        },
+        {
+          "name": "LocalShadow.EncodeDraws",
+          "count": 1,
+          "maximum": 25.3733,
+          "over100": 0
+        },
+        {
+          "name": "Meshlets.EncodeCPU",
+          "count": 1,
+          "maximum": 15.1076,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 198.6541748046875
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 178.59649658203125
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 174.77035522460938
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 160.21347045898438
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 154.0985107421875
+        }
+      ]
+    },
+    {
+      "name": "rotation-repeat",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 672,
+      "fps": 56.05582880269604,
+      "p50": 13.125,
+      "p95": 32.4456,
+      "p99": 135.5938,
+      "maximum": 273.8324,
+      "over50": 21,
+      "over100": 12,
+      "over200": 3,
+      "slowOperations": [
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 408,
+          "maximum": 302.6964,
+          "over100": 117
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 235,
+          "maximum": 273.8326,
+          "over100": 12
+        },
+        {
+          "name": "App.Update.MainWorld",
+          "count": 233,
+          "maximum": 270.4344,
+          "over100": 7
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 90,
+          "maximum": 269.2332,
+          "over100": 5
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 45,
+          "maximum": 268.5515,
+          "over100": 5
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 44,
+          "maximum": 268.5245,
+          "over100": 5
+        },
+        {
+          "name": "RenderNode.Main3D.LocalShadows",
+          "count": 17,
+          "maximum": 249.8324,
+          "over100": 4
+        },
+        {
+          "name": "LocalShadow.View.reused0",
+          "count": 17,
+          "maximum": 205.4762,
+          "over100": 4
+        },
+        {
+          "name": "LocalShadow.AtlasAllocate",
+          "count": 17,
+          "maximum": 202.9589,
+          "over100": 4
+        },
+        {
+          "name": "WGPU.SubmitCPU",
+          "count": 6,
+          "maximum": 44.2871,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.UpscaleNode",
+          "count": 2,
+          "maximum": 38.5787,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3D.TemporalResolve",
+          "count": 4,
+          "maximum": 33.1888,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3D.ScreenSpaceReflection",
+          "count": 1,
+          "maximum": 32.716,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 249.84359741210938
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 195.44029235839844
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 165.33660888671875
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 143.26095581054688
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 95.62110900878906
+        }
+      ]
+    },
+    {
+      "name": "translation",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 684,
+      "fps": 57.013766924253304,
+      "p50": 16.976100000000002,
+      "p95": 20.39,
+      "p99": 32.6066,
+      "maximum": 36.1043,
+      "over50": 0,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "SceneView.PublishGap",
+          "count": 684,
+          "maximum": 36.1045,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.MainWorld",
+          "count": 686,
+          "maximum": 32.3963,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 214,
+          "maximum": 30.0398,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 110,
+          "maximum": 26.005,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 63,
+          "maximum": 22.2517,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 62,
+          "maximum": 22.1775,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.859085083007812
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.60540771484375
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.298324584960938
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.149551391601562
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.91876220703125
+        }
+      ]
+    },
+    {
+      "name": "LOD-off",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 85,
+      "fps": 14.44737949096579,
+      "p50": 62.0084,
+      "p95": 145.6736,
+      "p99": 278.7132,
+      "maximum": 302.8529,
+      "over50": 46,
+      "over100": 18,
+      "over200": 3,
+      "slowOperations": [
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 554,
+          "maximum": 390.4281,
+          "over100": 390
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 78,
+          "maximum": 302.8531,
+          "over100": 18
+        },
+        {
+          "name": "App.Update.MainWorld",
+          "count": 101,
+          "maximum": 136.8161,
+          "over100": 6
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 59,
+          "maximum": 110.9746,
+          "over100": 1
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 80,
+          "maximum": 110.3132,
+          "over100": 1
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 80,
+          "maximum": 110.2845,
+          "over100": 1
+        },
+        {
+          "name": "RenderNode.Main3D.LocalShadows",
+          "count": 33,
+          "maximum": 94.479,
+          "over100": 0
+        },
+        {
+          "name": "LocalShadow.View.reused0",
+          "count": 33,
+          "maximum": 94.1045,
+          "over100": 0
+        },
+        {
+          "name": "LocalShadow.AtlasAllocate",
+          "count": 33,
+          "maximum": 92.9543,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3DRenderNode",
+          "count": 5,
+          "maximum": 48.6658,
+          "over100": 0
+        },
+        {
+          "name": "Meshlets.EncodeCPU",
+          "count": 2,
+          "maximum": 43.06,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.UpscaleNode",
+          "count": 9,
+          "maximum": 39.2085,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.SubmitCPU",
+          "count": 17,
+          "maximum": 39.1499,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.UIRenderNode",
+          "count": 2,
+          "maximum": 38.8712,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3D.TemporalResolve",
+          "count": 9,
+          "maximum": 25.929,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main2DRenderNode",
+          "count": 1,
+          "maximum": 15.1383,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 94.4976806640625
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 75.72555541992188
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 70.25337219238281
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 65.06156921386719
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 53.569793701171875
+        }
+      ]
+    },
+    {
+      "name": "LOD-on",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 123,
+      "fps": 20.53541332027081,
+      "p50": 18.0421,
+      "p95": 148.932,
+      "p99": 206.8489,
+      "maximum": 224.2868,
+      "over50": 40,
+      "over100": 20,
+      "over200": 4,
+      "slowOperations": [
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 489,
+          "maximum": 418.921,
+          "over100": 295
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 92,
+          "maximum": 224.2871,
+          "over100": 20
+        },
+        {
+          "name": "App.Update.MainWorld",
+          "count": 101,
+          "maximum": 205.9879,
+          "over100": 9
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 69,
+          "maximum": 167.9806,
+          "over100": 4
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 69,
+          "maximum": 167.9489,
+          "over100": 4
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 60,
+          "maximum": 121.9987,
+          "over100": 3
+        },
+        {
+          "name": "RenderNode.Main3D.LocalShadows",
+          "count": 32,
+          "maximum": 78.2535,
+          "over100": 0
+        },
+        {
+          "name": "LocalShadow.View.reused0",
+          "count": 32,
+          "maximum": 77.8524,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.UIRenderNode",
+          "count": 2,
+          "maximum": 76.455,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.SubmitCPU",
+          "count": 13,
+          "maximum": 76.305,
+          "over100": 0
+        },
+        {
+          "name": "LocalShadow.AtlasAllocate",
+          "count": 32,
+          "maximum": 76.1975,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3DRenderNode",
+          "count": 6,
+          "maximum": 62.7341,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.UpscaleNode",
+          "count": 5,
+          "maximum": 44.891,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3D.TemporalResolve",
+          "count": 7,
+          "maximum": 31.9318,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 78.27186584472656
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 76.4312744140625
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 65.3228759765625
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 62.75177001953125
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 61.59210205078125
+        }
+      ]
+    },
+    {
+      "name": "DLSS-off",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 248,
+      "fps": 41.43643754906479,
+      "p50": 10.92425,
+      "p95": 20.2822,
+      "p99": 73.6203,
+      "maximum": 2707.8193,
+      "over50": 4,
+      "over100": 2,
+      "over200": 1,
+      "slowOperations": [
+        {
+          "name": "SceneView.PublishGap",
+          "count": 27,
+          "maximum": 2707.8196,
+          "over100": 2
+        },
+        {
+          "name": "App.Update.MainWorld",
+          "count": 22,
+          "maximum": 2601.3385,
+          "over100": 1
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 11,
+          "maximum": 2590.2959,
+          "over100": 1
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 8,
+          "maximum": 2589.4002,
+          "over100": 1
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 8,
+          "maximum": 2589.3711,
+          "over100": 1
+        },
+        {
+          "name": "RenderNode.Main3DRenderNode",
+          "count": 1,
+          "maximum": 2544.9838,
+          "over100": 1
+        },
+        {
+          "name": "WGPU.CreateRenderPipeline.Flat 3D Pipeline",
+          "count": 7,
+          "maximum": 387.6745,
+          "over100": 7
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 118,
+          "maximum": 378.5825,
+          "over100": 25
+        },
+        {
+          "name": "RenderNode.Main3D.LocalShadows",
+          "count": 3,
+          "maximum": 29.621,
+          "over100": 0
+        },
+        {
+          "name": "LocalShadow.View.reused0",
+          "count": 3,
+          "maximum": 20.2863,
+          "over100": 0
+        },
+        {
+          "name": "LocalShadow.AtlasAllocate",
+          "count": 3,
+          "maximum": 19.2014,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.DirectionalShadow3DRenderNode",
+          "count": 1,
+          "maximum": 15.1644,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 2544.9485778808594
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 29.645919799804688
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 22.348403930664062
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 19.990921020507812
+        },
+        {
+          "name": "DirectionalShadow3DRenderNode",
+          "ms": 15.188217163085938
+        }
+      ]
+    },
+    {
+      "name": "DLSS-on",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 188,
+      "fps": 32.72309176682834,
+      "p50": 16.02445,
+      "p95": 115.7219,
+      "p99": 211.9167,
+      "maximum": 296.6547,
+      "over50": 26,
+      "over100": 12,
+      "over200": 5,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 110,
+          "maximum": 441.7995,
+          "over100": 10
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 335,
+          "maximum": 425.9114,
+          "over100": 246
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 101,
+          "maximum": 296.6549,
+          "over100": 12
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 55,
+          "maximum": 168.8037,
+          "over100": 7
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 49,
+          "maximum": 168.1245,
+          "over100": 7
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 49,
+          "maximum": 168.0964,
+          "over100": 7
+        },
+        {
+          "name": "RenderNode.Main3D.LocalShadows",
+          "count": 20,
+          "maximum": 129.694,
+          "over100": 3
+        },
+        {
+          "name": "LocalShadow.View.reused0",
+          "count": 20,
+          "maximum": 129.1478,
+          "over100": 3
+        },
+        {
+          "name": "LocalShadow.AtlasAllocate",
+          "count": 20,
+          "maximum": 127.3644,
+          "over100": 3
+        },
+        {
+          "name": "RenderNode.DirectionalShadow3DRenderNode",
+          "count": 2,
+          "maximum": 107.9848,
+          "over100": 1
+        },
+        {
+          "name": "WGPU.SubmitCPU",
+          "count": 13,
+          "maximum": 103.4777,
+          "over100": 1
+        },
+        {
+          "name": "RenderNode.Main3DRenderNode",
+          "count": 7,
+          "maximum": 65.2751,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.UpscaleNode",
+          "count": 2,
+          "maximum": 38.6368,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3D.TemporalResolve",
+          "count": 7,
+          "maximum": 30.687,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.SceneView",
+          "count": 2,
+          "maximum": 16.3653,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 129.7149658203125
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 122.97439575195312
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 116.22047424316406
+        },
+        {
+          "name": "DirectionalShadow3DRenderNode",
+          "ms": 108.00552368164062
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 71.89559936523438
+        }
+      ]
+    },
+    {
+      "name": "shadows-baseline",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 96,
+      "fps": 24.08564373198218,
+      "p50": 17.9541,
+      "p95": 123.9497,
+      "p99": 306.4387,
+      "maximum": 376.1608,
+      "over50": 21,
+      "over100": 9,
+      "over200": 3,
+      "slowOperations": [
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 216,
+          "maximum": 481.1102,
+          "over100": 165
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 96,
+          "maximum": 376.1611,
+          "over100": 9
+        },
+        {
+          "name": "App.Update.MainWorld",
+          "count": 110,
+          "maximum": 121.1355,
+          "over100": 3
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 49,
+          "maximum": 107.0921,
+          "over100": 1
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 49,
+          "maximum": 106.9876,
+          "over100": 1
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 78,
+          "maximum": 57.6049,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.UpscaleNode",
+          "count": 3,
+          "maximum": 45.0131,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.SubmitCPU",
+          "count": 4,
+          "maximum": 44.9651,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.UIRenderNode",
+          "count": 1,
+          "maximum": 38.6298,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3D.TemporalResolve",
+          "count": 6,
+          "maximum": 30.8945,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3D.LocalShadows",
+          "count": 2,
+          "maximum": 17.0916,
+          "over100": 0
+        },
+        {
+          "name": "LocalShadow.View.reused0",
+          "count": 2,
+          "maximum": 16.7069,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3DRenderNode",
+          "count": 1,
+          "maximum": 15.0874,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3D.TemporalResolve",
+          "ms": 30.933380126953125
+        },
+        {
+          "name": "Main3D.TemporalResolve",
+          "ms": 24.251937866210938
+        },
+        {
+          "name": "Main3D.TemporalResolve",
+          "ms": 23.157119750976562
+        },
+        {
+          "name": "Main3D.TemporalResolve",
+          "ms": 22.317886352539062
+        },
+        {
+          "name": "Main3D.TemporalResolve",
+          "ms": 21.52252197265625
+        }
+      ]
+    },
+    {
+      "name": "shadows-high",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 226,
+      "fps": 52.652346828091,
+      "p50": 17.81245,
+      "p95": 21.6966,
+      "p99": 32.9475,
+      "maximum": 123.6185,
+      "over50": 1,
+      "over100": 1,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "SceneView.PublishGap",
+          "count": 226,
+          "maximum": 123.6188,
+          "over100": 1
+        },
+        {
+          "name": "App.Update.MainWorld",
+          "count": 228,
+          "maximum": 104.5967,
+          "over100": 1
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 169,
+          "maximum": 94.8214,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 69,
+          "maximum": 82.8435,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 67,
+          "maximum": 82.8096,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 51,
+          "maximum": 49.041,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.DirectionalShadow3DRenderNode",
+          "count": 1,
+          "maximum": 36.1512,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3D.LocalShadows",
+          "count": 1,
+          "maximum": 33.4251,
+          "over100": 0
+        },
+        {
+          "name": "LocalShadow.View.reused0",
+          "count": 1,
+          "maximum": 30.5462,
+          "over100": 0
+        },
+        {
+          "name": "LocalShadow.AtlasAllocate",
+          "count": 1,
+          "maximum": 28.5297,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "DirectionalShadow3DRenderNode",
+          "ms": 36.182403564453125
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 33.44917297363281
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 10.240554809570312
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.759902954101562
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.702682495117188
+        }
+      ]
+    },
+    {
+      "name": "lights-off",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 218,
+      "fps": 54.6506677923033,
+      "p50": 17.47585,
+      "p95": 21.7219,
+      "p99": 31.7879,
+      "maximum": 40.3544,
+      "over50": 0,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "SceneView.PublishGap",
+          "count": 218,
+          "maximum": 40.3547,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.MainWorld",
+          "count": 220,
+          "maximum": 33.0212,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 108,
+          "maximum": 30.4066,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 22,
+          "maximum": 21.4903,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 46,
+          "maximum": 20.777,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 46,
+          "maximum": 20.7262,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 10.587692260742188
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.752273559570312
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.708404541015625
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.68170166015625
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.51385498046875
+        }
+      ]
+    },
+    {
+      "name": "lights-on",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 218,
+      "fps": 54.667072139195,
+      "p50": 17.5839,
+      "p95": 20.6255,
+      "p99": 31.6244,
+      "maximum": 54.6576,
+      "over50": 1,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "SceneView.PublishGap",
+          "count": 218,
+          "maximum": 54.6578,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.MainWorld",
+          "count": 220,
+          "maximum": 40.3255,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 138,
+          "maximum": 28.1177,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 41,
+          "maximum": 25.1066,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 46,
+          "maximum": 17.9327,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 44,
+          "maximum": 17.8766,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.855819702148438
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.794784545898438
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.760452270507812
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.710861206054688
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.657455444335938
+        }
+      ]
+    }
+  ],
+  "slowLocalShadowStages": [
+    {
+      "start": 83653.8937,
+      "ms": 32.8691,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 83687.4438,
+      "ms": 82.4699,
+      "name": "LocalShadow.EncodeDraws",
+      "bytes": 0,
+      "count": 307
+    },
+    {
+      "start": 83653.8805,
+      "ms": 116.0585,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 87122.8083,
+      "ms": 93.7609,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 87122.7952,
+      "ms": 97.4639,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 87268.9972,
+      "ms": 146.635,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 87268.9873,
+      "ms": 148.9728,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 92467.6205,
+      "ms": 59.4723,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 92467.6133,
+      "ms": 60.5035,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 92654.5148,
+      "ms": 99.5537,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 92654.5085,
+      "ms": 100.8387,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 92860.8152,
+      "ms": 136.8824,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 92860.8053,
+      "ms": 138.0852,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 93313.0313,
+      "ms": 170.3487,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 93313.0238,
+      "ms": 171.9463,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 93637.2711,
+      "ms": 144.7871,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 93637.2642,
+      "ms": 146.6358,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 93905.9484,
+      "ms": 147.4145,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 94053.8163,
+      "ms": 25.3733,
+      "name": "LocalShadow.EncodeDraws",
+      "bytes": 0,
+      "count": 307
+    },
+    {
+      "start": 93905.9381,
+      "ms": 173.2941,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 95481.2972,
+      "ms": 132.184,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 95481.2888,
+      "ms": 133.8298,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 95656.1934,
+      "ms": 151.692,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 95656.1862,
+      "ms": 153.7088,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 96720.6066,
+      "ms": 71.8554,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 96720.5997,
+      "ms": 73.8659,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 96925.8713,
+      "ms": 114.8756,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 96925.8638,
+      "ms": 116.6102,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 97328.9978,
+      "ms": 126.1669,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 97328.9905,
+      "ms": 127.2361,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 97715.1373,
+      "ms": 125.9985,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 97715.131,
+      "ms": 127.2329,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 98385.5526,
+      "ms": 151.3609,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 98385.5458,
+      "ms": 152.4893,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 98635.56,
+      "ms": 140.3484,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 98635.5534,
+      "ms": 141.4745,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 102350.388,
+      "ms": 75.5942,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 102350.3809,
+      "ms": 77.7948,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 102518.607,
+      "ms": 162.6343,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 102518.5997,
+      "ms": 164.9125,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 102846.5237,
+      "ms": 202.9589,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 102846.5161,
+      "ms": 205.4762,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 103434.8978,
+      "ms": 93.8064,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 103434.8912,
+      "ms": 95.1887,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 103654.4351,
+      "ms": 26.7833,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 103654.4282,
+      "ms": 28.0494,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 103852.716,
+      "ms": 68.2874,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 103852.7066,
+      "ms": 69.6284,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 103949.9793,
+      "ms": 21.7255,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 103949.9698,
+      "ms": 23.0187,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 104093.9324,
+      "ms": 28.5978,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 104093.9226,
+      "ms": 29.8109,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 104404.8774,
+      "ms": 26.2524,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 104404.8702,
+      "ms": 27.4325,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 104447.6413,
+      "ms": 25.163,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 104447.6346,
+      "ms": 26.4215,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 104573.0726,
+      "ms": 23.7095,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 104573.0659,
+      "ms": 24.8279,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 104729.3283,
+      "ms": 24.2732,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 104729.3219,
+      "ms": 25.3902,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 104868.3425,
+      "ms": 33.2917,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 104868.336,
+      "ms": 34.3555,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 105245.936,
+      "ms": 24.7336,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 105245.9289,
+      "ms": 25.95,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 105393.0869,
+      "ms": 46.9033,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 105393.0792,
+      "ms": 48.3101,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 106799.9006,
+      "ms": 193.1071,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 106799.8932,
+      "ms": 195.0275,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 110205.9664,
+      "ms": 141.2362,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 110205.959,
+      "ms": 142.6158,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 126737.072,
+      "ms": 70.4247,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 126737.0645,
+      "ms": 72.6505,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 126935.6803,
+      "ms": 27.6032,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 126935.67,
+      "ms": 29.6153,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 127243.0754,
+      "ms": 23.4224,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 127243.0636,
+      "ms": 24.9323,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 127314.9304,
+      "ms": 16.0398,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 127314.923,
+      "ms": 17.926,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 127426.3602,
+      "ms": 15.789,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 127426.3518,
+      "ms": 17.0299,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 127534.0616,
+      "ms": 39.3622,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 127534.0519,
+      "ms": 41.0378,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 127741.8438,
+      "ms": 21.7935,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 127741.835,
+      "ms": 23.1522,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 127839.2777,
+      "ms": 25.2502,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 127839.2682,
+      "ms": 26.68,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 127961.3291,
+      "ms": 22.801,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 127961.3201,
+      "ms": 24.097,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 128159.7171,
+      "ms": 24.2107,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 128159.7032,
+      "ms": 25.1648,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 128276.7865,
+      "ms": 24.7556,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 128276.7795,
+      "ms": 25.7358,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 128394.3993,
+      "ms": 27.6456,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 128394.3915,
+      "ms": 28.91,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 128519.5102,
+      "ms": 23.2357,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 128519.503,
+      "ms": 24.8012,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 128761.4564,
+      "ms": 18.8669,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 128761.4494,
+      "ms": 19.7871,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 128879.45910000001,
+      "ms": 18.8156,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 128879.4523,
+      "ms": 19.851,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 129206.4539,
+      "ms": 25.167,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 129206.4467,
+      "ms": 26.3667,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 129266.1599,
+      "ms": 20.2222,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 129266.1535,
+      "ms": 21.0582,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 129421.4832,
+      "ms": 22.2842,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 129421.4764,
+      "ms": 23.5911,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 129515.6362,
+      "ms": 92.9543,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 129515.629,
+      "ms": 94.1045,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 129688.13,
+      "ms": 40.917,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 129688.1233,
+      "ms": 42.7466,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 129820.6288,
+      "ms": 24.286,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 129820.6213,
+      "ms": 25.825,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 130215.6445,
+      "ms": 22.7092,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 130215.6345,
+      "ms": 24.5806,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 130410.3161,
+      "ms": 22.4066,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 130410.3054,
+      "ms": 23.9972,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 130519.1779,
+      "ms": 51.2091,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 130519.168,
+      "ms": 53.0789,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 130611.719,
+      "ms": 48.8188,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 130611.7109,
+      "ms": 50.9691,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 130815.8001,
+      "ms": 27.138,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 130815.7919,
+      "ms": 28.8234,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 130938.5122,
+      "ms": 41.379,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 130938.5015,
+      "ms": 43.414,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 131049.9205,
+      "ms": 23.8519,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 131049.9055,
+      "ms": 26.2737,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 131270.1478,
+      "ms": 20.9149,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 131270.139,
+      "ms": 22.3702,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 131342.045,
+      "ms": 20.9834,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 131342.0371,
+      "ms": 22.8252,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 131460.6571,
+      "ms": 23.9196,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 131460.6481,
+      "ms": 25.4327,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 131655.0585,
+      "ms": 62.4614,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 131655.0506,
+      "ms": 64.5089,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 131786.8267,
+      "ms": 27.0961,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 131786.8178,
+      "ms": 31.4735,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 132539.4772,
+      "ms": 21.9353,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 132539.4689,
+      "ms": 23.553,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 132976.5639,
+      "ms": 17.9402,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 132976.5561,
+      "ms": 19.4533,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 133018.3025,
+      "ms": 22.9114,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 133018.294,
+      "ms": 24.3963,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 133121.6868,
+      "ms": 22.2351,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 133121.677,
+      "ms": 24.357,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 133246.8549,
+      "ms": 40.659,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 133246.846,
+      "ms": 42.501,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 133482.833,
+      "ms": 24.242,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 133482.8255,
+      "ms": 25.7617,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 133582.0839,
+      "ms": 23.7842,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 133582.0755,
+      "ms": 25.4333,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 133716.7834,
+      "ms": 23.417,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 133716.7707,
+      "ms": 25.16,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 134007.7085,
+      "ms": 21.5875,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 134007.6993,
+      "ms": 22.9931,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 134051.602,
+      "ms": 25.5872,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 134051.595,
+      "ms": 27.1071,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 134292.7057,
+      "ms": 22.2437,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 134292.6988,
+      "ms": 23.2512,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 134385.9359,
+      "ms": 63.6872,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 134385.9292,
+      "ms": 64.9496,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 134558.4259,
+      "ms": 32.7791,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 134558.4183,
+      "ms": 35.6938,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 134812.2561,
+      "ms": 21.531,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 134812.2487,
+      "ms": 23.0983,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 134919.5839,
+      "ms": 22.8099,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 134919.576,
+      "ms": 24.196,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 135026.1658,
+      "ms": 24.9783,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 135026.1582,
+      "ms": 25.9855,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 135149.604,
+      "ms": 17.3785,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 135149.5961,
+      "ms": 18.6614,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 135407.9773,
+      "ms": 26.839,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 135407.9703,
+      "ms": 28.0919,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 135520.4132,
+      "ms": 15.6131,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 135520.407,
+      "ms": 16.5705,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 135631.1747,
+      "ms": 16.4594,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 135631.1683,
+      "ms": 17.5121,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 135833.6292,
+      "ms": 75.0279,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 135833.6226,
+      "ms": 76.0762,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 136243.7765,
+      "ms": 26.2218,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 136243.7687,
+      "ms": 27.9304,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 136430.7876,
+      "ms": 41.0891,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 136430.7804,
+      "ms": 42.6083,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 136587.4749,
+      "ms": 22.2816,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 136587.4666,
+      "ms": 24.1138,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 136714.9589,
+      "ms": 76.1975,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 136714.9489,
+      "ms": 77.8524,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 136825.1727,
+      "ms": 22.7762,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 136825.1638,
+      "ms": 24.2511,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 136957.1416,
+      "ms": 17.5178,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 136957.133,
+      "ms": 19.5078,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 137221.5374,
+      "ms": 27.7211,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 137221.5292,
+      "ms": 29.4185,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 137286.3755,
+      "ms": 30.4558,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 137286.3678,
+      "ms": 33.1773,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 137426.8845,
+      "ms": 23.8627,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 137426.8762,
+      "ms": 25.6403,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 137591.8558,
+      "ms": 58.1025,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 137591.8478,
+      "ms": 61.0988,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 137743.4517,
+      "ms": 27.9294,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 137743.444,
+      "ms": 29.653,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 141762.4993,
+      "ms": 19.2014,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 141762.4936,
+      "ms": 20.2863,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 143424.2955,
+      "ms": 17.995,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 143424.2883,
+      "ms": 19.8612,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 144831.4473,
+      "ms": 17.4584,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 144831.4401,
+      "ms": 19.4699,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 146623.906,
+      "ms": 114.0507,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 146623.8986,
+      "ms": 115.8562,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 147744.6292,
+      "ms": 28.0346,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 147744.6222,
+      "ms": 29.02,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 147904.674,
+      "ms": 19.6275,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 147904.6644,
+      "ms": 20.9139,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 148028.3112,
+      "ms": 36.5762,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 148028.3038,
+      "ms": 37.982,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 148313.058,
+      "ms": 21.795,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 148313.0512,
+      "ms": 22.9457,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 148499.5028,
+      "ms": 30.1445,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 148499.4954,
+      "ms": 31.3288,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 148640.3383,
+      "ms": 22.6675,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 148640.3302,
+      "ms": 23.6994,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 148682.4147,
+      "ms": 67.3286,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 148682.4083,
+      "ms": 68.4434,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 148855.7632,
+      "ms": 127.3644,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 148855.7564,
+      "ms": 129.1478,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 149256.1753,
+      "ms": 24.7801,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 149256.161,
+      "ms": 26.5769,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 149418.1019,
+      "ms": 24.6325,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 149418.0946,
+      "ms": 26.2414,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 149517.437,
+      "ms": 23.4861,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 149517.4255,
+      "ms": 25.5426,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 149606.9667,
+      "ms": 22.8739,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 149606.9585,
+      "ms": 25.423,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 149702.9289,
+      "ms": 23.5246,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 149702.9219,
+      "ms": 25.3129,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 149842.9247,
+      "ms": 69.1734,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 149842.9161,
+      "ms": 71.3229,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 149983.0361,
+      "ms": 120.424,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 149983.0281,
+      "ms": 122.3553,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 150270.8687,
+      "ms": 20.0744,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 150270.8448,
+      "ms": 21.9628,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 150451.8701,
+      "ms": 41.8245,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 150451.8624,
+      "ms": 44.0181,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 150632.5627,
+      "ms": 36.553,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 150632.5503,
+      "ms": 38.4759,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 150801.3627,
+      "ms": 24.4265,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 150801.3539,
+      "ms": 26.2201,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 153395.4583,
+      "ms": 16.7069,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 153938.4182,
+      "ms": 15.2337,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 156063.7182,
+      "ms": 28.5297,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 156063.7015,
+      "ms": 30.5462,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 201491.7251,
+      "ms": 44.7676,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 201491.7175,
+      "ms": 46.5813,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 211486.4019,
+      "ms": 45.92,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 211486.3947,
+      "ms": 47.6636,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 211616.4403,
+      "ms": 74.469,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 211616.4321,
+      "ms": 76.3195,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 277545.7894,
+      "ms": 20.0748,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 277545.7761,
+      "ms": 22.0424,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 277680.0783,
+      "ms": 19.1659,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 277680.0661,
+      "ms": 20.9095,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 277850.3785,
+      "ms": 32.0874,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 277850.3702,
+      "ms": 33.8713,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 278016.3046,
+      "ms": 24.7867,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 278016.2926,
+      "ms": 26.5866,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 278210.7764,
+      "ms": 78.5678,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 278210.7672,
+      "ms": 80.8175,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 278345.9703,
+      "ms": 24.2111,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 278345.9622,
+      "ms": 25.858,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 278468.5638,
+      "ms": 29.5048,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 278468.5561,
+      "ms": 31.9124,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 278701.0548,
+      "ms": 51.0478,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 278701.0444,
+      "ms": 53.1705,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 278819.137,
+      "ms": 23.8528,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 278819.128,
+      "ms": 25.6892,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 279223.9894,
+      "ms": 23.1885,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 279223.9801,
+      "ms": 25.1622,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 279292.0837,
+      "ms": 17.6493,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 279292.0758,
+      "ms": 19.6785,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 279402.5095,
+      "ms": 23.4924,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 279402.5009,
+      "ms": 25.4975,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 279513.7046,
+      "ms": 45.2932,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 279513.6949,
+      "ms": 47.0548,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 279671.1939,
+      "ms": 24.993,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 279671.1852,
+      "ms": 26.7506,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 279923.9637,
+      "ms": 21.7973,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 279923.9551,
+      "ms": 24.1919,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 280000.2078,
+      "ms": 21.3924,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 280000.1997,
+      "ms": 23.4876,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 280123.3946,
+      "ms": 24.5921,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 280123.3862,
+      "ms": 26.3378,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 280316.9464,
+      "ms": 60.7684,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 280316.9347,
+      "ms": 62.6567,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 280426.5405,
+      "ms": 22.7785,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 280426.532,
+      "ms": 24.7913,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 280562.9909,
+      "ms": 21.3142,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 280562.9818,
+      "ms": 23.2015,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 280688.9171,
+      "ms": 51.0439,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 280688.9083,
+      "ms": 52.9379,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 280970.9475,
+      "ms": 22.6834,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 280970.9399,
+      "ms": 24.3661,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 281268.8397,
+      "ms": 55.7165,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 281268.8317,
+      "ms": 57.7022,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 281390.7148,
+      "ms": 24.5052,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 281390.7066,
+      "ms": 26.6127,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 281506.8368,
+      "ms": 24.2629,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 281506.8274,
+      "ms": 26.4068,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 281697.4903,
+      "ms": 55.1709,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 281697.4815,
+      "ms": 56.9355,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 281827.0769,
+      "ms": 25.3051,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 281827.0684,
+      "ms": 27.013,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 282230.9079,
+      "ms": 22.2911,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 282230.8993,
+      "ms": 24.9536,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 282302.2537,
+      "ms": 18.0858,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 282302.2459,
+      "ms": 19.6112,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 282648.7357,
+      "ms": 60.5572,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 282648.7269,
+      "ms": 62.3742,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 282782.3,
+      "ms": 26.1995,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 282782.2908,
+      "ms": 28.1004,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 283195.0342,
+      "ms": 24.7137,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 283195.0258,
+      "ms": 26.6056,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 283270.079,
+      "ms": 43.4043,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 283270.0709,
+      "ms": 45.3636,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 283396.7225,
+      "ms": 15.075,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 283396.713,
+      "ms": 16.6363,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 283519.6886,
+      "ms": 56.0684,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 283519.6799,
+      "ms": 58.0243,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 283718.4199,
+      "ms": 24.573,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 283718.4112,
+      "ms": 26.2157,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 283829.7329,
+      "ms": 24.5184,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 283829.7249,
+      "ms": 29.2021,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 284031.933,
+      "ms": 54.089,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 284031.9237,
+      "ms": 56.3679,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 284156.4161,
+      "ms": 23.9899,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 284156.4066,
+      "ms": 26.3282,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 284286.2747,
+      "ms": 20.0536,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 284412.2642,
+      "ms": 34.9542,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 284412.2545,
+      "ms": 41.2347,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 284690.5922,
+      "ms": 22.7678,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 284690.583,
+      "ms": 24.5912,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 284837.4997,
+      "ms": 18.883,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 284837.4911,
+      "ms": 20.8561,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 284932.5496,
+      "ms": 47.9572,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 284932.5384,
+      "ms": 50.1541,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 285098.5258,
+      "ms": 39.2266,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 285098.5163,
+      "ms": 41.575,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 285312.9391,
+      "ms": 25.7898,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 285312.9312,
+      "ms": 27.6839,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 285405.6269,
+      "ms": 50.0884,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 285405.6192,
+      "ms": 52.0658,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 285516.6981,
+      "ms": 60.7656,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 285516.6894,
+      "ms": 63.1044,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 285669.4292,
+      "ms": 25.3347,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 285669.4196,
+      "ms": 27.349,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 285798.5007,
+      "ms": 16.1446,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 285969.8559,
+      "ms": 32.9593,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 285969.8454,
+      "ms": 35.1498,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 286114.4062,
+      "ms": 27.0561,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 286114.3967,
+      "ms": 29.2546,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 286292.7595,
+      "ms": 18.2676,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 286292.7502,
+      "ms": 20.016,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 286366.1396,
+      "ms": 56.2561,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 286366.1312,
+      "ms": 58.206,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 286472.7859,
+      "ms": 25.7541,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 286472.778,
+      "ms": 27.9511,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 286694.6234,
+      "ms": 59.2687,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 286694.6154,
+      "ms": 64.9163,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 286872.2049,
+      "ms": 25.6875,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 286872.1958,
+      "ms": 27.4907,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 287117.311,
+      "ms": 40.1017,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 287117.3011,
+      "ms": 42.0044,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 287293.5769,
+      "ms": 24.6342,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 287293.5684,
+      "ms": 26.5706,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 287413.9584,
+      "ms": 18.9802,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 287413.9504,
+      "ms": 20.6621,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 287540.0,
+      "ms": 45.0196,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 287539.991,
+      "ms": 47.1481,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 287636.693,
+      "ms": 27.5329,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 287636.6823,
+      "ms": 29.9937,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 287868.1506,
+      "ms": 54.8297,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 287868.1425,
+      "ms": 56.7414,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 288045.9244,
+      "ms": 24.3783,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 288045.9139,
+      "ms": 26.769,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 288191.7982,
+      "ms": 15.0584,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 288191.7885,
+      "ms": 17.2231,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 288347.5149,
+      "ms": 56.5332,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 288347.5021,
+      "ms": 58.6019,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 288446.3566,
+      "ms": 22.9422,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 288446.3473,
+      "ms": 27.7882,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 288571.5685,
+      "ms": 24.7468,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 288571.5589,
+      "ms": 26.9307,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 288768.9285,
+      "ms": 59.7708,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 288768.9185,
+      "ms": 61.61,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 288884.4718,
+      "ms": 24.9636,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 288884.4614,
+      "ms": 27.6833,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 289010.8433,
+      "ms": 24.0434,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 289010.8346,
+      "ms": 25.7383,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 289224.2068,
+      "ms": 64.1393,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 289224.1982,
+      "ms": 66.0499,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 289363.9298,
+      "ms": 26.3764,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 289363.9207,
+      "ms": 28.1611,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 289495.0871,
+      "ms": 15.4128,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 289495.0748,
+      "ms": 17.0808,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 289620.8182,
+      "ms": 55.9087,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 289620.8084,
+      "ms": 57.9864,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 289779.5985,
+      "ms": 24.4354,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 289779.5881,
+      "ms": 26.963,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 290106.4382,
+      "ms": 21.7751,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 290106.4267,
+      "ms": 23.6626,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 290255.2233,
+      "ms": 23.1893,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 290255.2117,
+      "ms": 25.0485,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 290427.9268,
+      "ms": 28.6008,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 290427.9163,
+      "ms": 30.9967,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 290562.4524,
+      "ms": 17.2942,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 290562.4442,
+      "ms": 19.3551,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 290687.7693,
+      "ms": 39.2788,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 290687.7592,
+      "ms": 41.1294,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 290788.022,
+      "ms": 28.7085,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 290788.0081,
+      "ms": 30.8114,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 290970.7273,
+      "ms": 59.1772,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 290970.7192,
+      "ms": 61.2655,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 291319.8154,
+      "ms": 22.7463,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 291319.8062,
+      "ms": 24.497,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 291401.4915,
+      "ms": 34.1575,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 291401.4835,
+      "ms": 35.9479,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 291518.9611,
+      "ms": 26.4144,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 291518.9513,
+      "ms": 28.3517,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 291737.4868,
+      "ms": 55.3034,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 291737.4785,
+      "ms": 57.0897,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 291873.0103,
+      "ms": 25.0842,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 291873.0027,
+      "ms": 26.8748,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 292022.7804,
+      "ms": 24.7078,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 292022.7716,
+      "ms": 26.3731,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 292220.2831,
+      "ms": 58.3693,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 292220.2732,
+      "ms": 60.3722,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 292360.945,
+      "ms": 24.5361,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 292360.9363,
+      "ms": 26.433,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 292486.5267,
+      "ms": 26.3451,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 292486.5145,
+      "ms": 28.5709,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 292643.1564,
+      "ms": 41.6838,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 292643.1481,
+      "ms": 43.61,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 292831.9823,
+      "ms": 22.3611,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 292831.9743,
+      "ms": 24.3823,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 293254.821,
+      "ms": 24.35,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 293254.8128,
+      "ms": 26.3239,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 293328.4477,
+      "ms": 22.0681,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 293328.4393,
+      "ms": 26.4617,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 318839.3127,
+      "ms": 51.0697,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 318839.3056,
+      "ms": 52.6323,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 319590.3915,
+      "ms": 23.9179,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 319590.3841,
+      "ms": 25.4867,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 320037.5786,
+      "ms": 17.5772,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 320037.5706,
+      "ms": 19.6098,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 324845.9129,
+      "ms": 23.6021,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 324845.9051,
+      "ms": 25.0711,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 325284.6099,
+      "ms": 29.2347,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 325284.5996,
+      "ms": 31.523,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 325441.148,
+      "ms": 16.9433,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 325441.1389,
+      "ms": 19.6603,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 325617.0564,
+      "ms": 77.1458,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 325617.0475,
+      "ms": 79.1888,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 325768.7875,
+      "ms": 23.6796,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 325768.7789,
+      "ms": 25.2999,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 325893.28,
+      "ms": 16.9081,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 325893.2709,
+      "ms": 18.5496,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 326071.6863,
+      "ms": 76.9813,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 326071.6778,
+      "ms": 78.8799,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 326202.4076,
+      "ms": 28.0151,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 326202.4002,
+      "ms": 29.723,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 326319.051,
+      "ms": 25.7773,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 326319.0423,
+      "ms": 28.3612,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 326475.4349,
+      "ms": 34.3783,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 326475.4269,
+      "ms": 36.4652,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 326633.5289,
+      "ms": 36.1621,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 326633.5192,
+      "ms": 38.1319,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 326938.9187,
+      "ms": 15.325,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 326938.91,
+      "ms": 17.0889,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 327023.034,
+      "ms": 15.4587,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 327023.0257,
+      "ms": 16.9618,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 327107.8003,
+      "ms": 55.5813,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 327107.7917,
+      "ms": 57.3414,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 327212.7753,
+      "ms": 68.6874,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 327212.7675,
+      "ms": 70.37,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 327301.8915,
+      "ms": 59.2713,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 327301.8846,
+      "ms": 61.1513,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 327445.301,
+      "ms": 57.6582,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 327445.2908,
+      "ms": 59.52,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 327553.4007,
+      "ms": 19.5878,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 327553.3915,
+      "ms": 20.9276,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 327700.4695,
+      "ms": 24.3614,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 327700.4597,
+      "ms": 26.1641,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 327781.0838,
+      "ms": 21.0836,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 327781.0737,
+      "ms": 22.7591,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 328018.3242,
+      "ms": 20.9568,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 328018.3149,
+      "ms": 23.1369,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 328092.4473,
+      "ms": 24.9245,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 328092.4369,
+      "ms": 27.0585,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 328213.1355,
+      "ms": 24.9186,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 328213.1269,
+      "ms": 26.9259,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 328417.2394,
+      "ms": 29.6653,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 328417.2253,
+      "ms": 31.5881,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 328548.2674,
+      "ms": 24.8367,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 328548.2562,
+      "ms": 26.5628,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 328666.3191,
+      "ms": 24.2787,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 328666.3079,
+      "ms": 26.0733,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 328894.4339,
+      "ms": 19.3347,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 328894.4248,
+      "ms": 21.5458,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 329026.8104,
+      "ms": 27.6381,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 329026.8024,
+      "ms": 29.5489,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 329166.7455,
+      "ms": 16.332,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 329166.7353,
+      "ms": 18.0294,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 329331.7989,
+      "ms": 55.9791,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 329331.7901,
+      "ms": 58.0387,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 329435.707,
+      "ms": 26.0652,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 329435.6969,
+      "ms": 29.6157,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 329557.3312,
+      "ms": 22.9974,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 329557.3224,
+      "ms": 25.516,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 329769.3679,
+      "ms": 59.6685,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 329769.359,
+      "ms": 61.5326,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 329895.2888,
+      "ms": 29.7272,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 329895.2804,
+      "ms": 31.9824,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 330090.1459,
+      "ms": 20.1824,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 330090.1357,
+      "ms": 21.9015,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 330152.11,
+      "ms": 47.4839,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 330152.1006,
+      "ms": 49.7875,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 330230.8285,
+      "ms": 32.9338,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 330230.8206,
+      "ms": 35.2948,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 330571.2535,
+      "ms": 23.9558,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 330571.2455,
+      "ms": 25.4577,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 330650.4638,
+      "ms": 74.8725,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 330725.7892,
+      "ms": 16.2033,
+      "name": "LocalShadow.EncodeDraws",
+      "bytes": 0,
+      "count": 233
+    },
+    {
+      "start": 330650.4554,
+      "ms": 91.578,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 330788.1263,
+      "ms": 53.0284,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 330788.1162,
+      "ms": 54.9289,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 330933.3164,
+      "ms": 51.4243,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 330933.3065,
+      "ms": 60.981,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 331156.9611,
+      "ms": 19.624,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 331156.9538,
+      "ms": 21.1344,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 331320.9814,
+      "ms": 44.3391,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 331320.9746,
+      "ms": 46.1176,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 331465.679,
+      "ms": 42.9988,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 331465.6705,
+      "ms": 44.6802,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 331778.7778,
+      "ms": 33.3194,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 331778.7702,
+      "ms": 34.7084,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 331884.8081,
+      "ms": 31.7541,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 331884.8013,
+      "ms": 35.1774,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 332288.6957,
+      "ms": 20.8578,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 332288.6884,
+      "ms": 22.1986,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 333335.3801,
+      "ms": 28.3049,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 333335.3737,
+      "ms": 29.7566,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 333489.8724,
+      "ms": 20.9483,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 333489.865,
+      "ms": 22.3741,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 333612.2339,
+      "ms": 20.694,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 333612.227,
+      "ms": 22.1442,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 333721.8791,
+      "ms": 19.7245,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 333721.8725,
+      "ms": 21.0876,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 333840.0719,
+      "ms": 20.4927,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 333840.0628,
+      "ms": 21.8545,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 334236.9997,
+      "ms": 24.4251,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 334236.9915,
+      "ms": 25.9768,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 334288.0347,
+      "ms": 29.9846,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 334288.021,
+      "ms": 31.6882,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 334428.8711,
+      "ms": 17.2542,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 334428.8598,
+      "ms": 18.6622,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 334519.5709,
+      "ms": 41.8454,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 334561.8426,
+      "ms": 27.2243,
+      "name": "LocalShadow.EncodeDraws",
+      "bytes": 0,
+      "count": 233
+    },
+    {
+      "start": 334519.5635,
+      "ms": 69.5418,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 334816.9513,
+      "ms": 25.1253,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 334816.9431,
+      "ms": 27.1241,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 334939.4528,
+      "ms": 20.9834,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 334939.4421,
+      "ms": 22.6383,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 335245.0608,
+      "ms": 22.7064,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 335245.0527,
+      "ms": 24.0498,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 335291.4828,
+      "ms": 23.1305,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 335291.4749,
+      "ms": 24.6104,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 335406.0292,
+      "ms": 16.2963,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 335406.0216,
+      "ms": 18.4983,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 335500.8164,
+      "ms": 24.592,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 335500.8087,
+      "ms": 26.1137,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 335577.0905,
+      "ms": 42.0203,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 335577.0829,
+      "ms": 43.7546,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 335920.7628,
+      "ms": 22.6289,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 335920.7543,
+      "ms": 24.1979,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 336266.7245,
+      "ms": 26.6129,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 336266.7164,
+      "ms": 28.0708,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 336400.7409,
+      "ms": 26.2421,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 336400.7341,
+      "ms": 27.6677,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 336545.7503,
+      "ms": 35.4312,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 336545.7413,
+      "ms": 37.0545,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 336673.2409,
+      "ms": 21.8281,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 336673.2335,
+      "ms": 23.1607,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 340654.2808,
+      "ms": 67.121,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 340654.2721,
+      "ms": 69.1521,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 343913.2599,
+      "ms": 72.0326,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 343913.2534,
+      "ms": 73.1758,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 352877.1434,
+      "ms": 27.4528,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 352904.9573,
+      "ms": 17.933,
+      "name": "LocalShadow.EncodeDraws",
+      "bytes": 0,
+      "count": 233
+    },
+    {
+      "start": 352877.136,
+      "ms": 45.8004,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 354429.0752,
+      "ms": 37.253,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 354429.0674,
+      "ms": 39.3488,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 361780.2846,
+      "ms": 36.6294,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 361780.2773,
+      "ms": 38.6062,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 361969.2656,
+      "ms": 32.5202,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 361969.2576,
+      "ms": 34.6925,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 362124.3052,
+      "ms": 21.8019,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 362124.2961,
+      "ms": 24.367,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 362205.7035,
+      "ms": 56.9254,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 362205.6938,
+      "ms": 59.0372,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 362449.0877,
+      "ms": 25.0458,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 362449.0781,
+      "ms": 26.8683,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 362626.1768,
+      "ms": 34.7073,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 362626.1687,
+      "ms": 37.1059,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 362738.0467,
+      "ms": 57.8802,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 362738.0378,
+      "ms": 60.146,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 362959.013,
+      "ms": 32.6988,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 362959.003,
+      "ms": 35.0813,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 363339.7951,
+      "ms": 23.6334,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 363339.7868,
+      "ms": 25.5488,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 363410.3142,
+      "ms": 16.2766,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 363410.3063,
+      "ms": 18.4781,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 363600.0231,
+      "ms": 21.1486,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 363600.0143,
+      "ms": 23.2502,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 363660.0088,
+      "ms": 62.2379,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 363660.0008,
+      "ms": 64.4532,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 363833.6863,
+      "ms": 112.2275,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 363833.6779,
+      "ms": 114.5694,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 364330.9303,
+      "ms": 22.4969,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 364330.9195,
+      "ms": 25.3436,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 364486.7596,
+      "ms": 21.339,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 364486.7511,
+      "ms": 23.4329,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 364625.7544,
+      "ms": 20.7457,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 364625.7465,
+      "ms": 22.7087,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 364741.1124,
+      "ms": 24.6329,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 364741.1031,
+      "ms": 26.6021,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 364895.9091,
+      "ms": 62.7175,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 364895.9001,
+      "ms": 67.0808,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 364990.2097,
+      "ms": 29.5938,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 364990.201,
+      "ms": 32.0102,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 365315.3328,
+      "ms": 22.835,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 365315.3235,
+      "ms": 24.6906,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 365377.2433,
+      "ms": 21.4073,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 365521.787,
+      "ms": 22.7279,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 365521.777,
+      "ms": 24.4605,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 365642.6783,
+      "ms": 27.3644,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 365642.67,
+      "ms": 29.4063,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 365770.2943,
+      "ms": 38.1207,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 365770.2867,
+      "ms": 40.5435,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 365959.5594,
+      "ms": 54.9613,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 365959.5509,
+      "ms": 56.9893,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 366070.1004,
+      "ms": 54.7817,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 366070.0905,
+      "ms": 57.1353,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 366224.5854,
+      "ms": 28.1254,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 366224.5764,
+      "ms": 29.9146,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 366315.7132,
+      "ms": 46.7223,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 366315.7021,
+      "ms": 48.9847,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 366433.7333,
+      "ms": 24.346,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 366433.7238,
+      "ms": 26.642,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 366566.8686,
+      "ms": 21.5653,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 366566.8602,
+      "ms": 23.2895,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 366674.1877,
+      "ms": 30.9113,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 366674.1789,
+      "ms": 33.1348,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 366768.6903,
+      "ms": 31.0383,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 366768.6815,
+      "ms": 33.0468,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 366895.9969,
+      "ms": 19.5242,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 366895.989,
+      "ms": 21.2108,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 367030.7738,
+      "ms": 60.5706,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 367030.7642,
+      "ms": 62.6381,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 367144.6203,
+      "ms": 27.3875,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 367144.6126,
+      "ms": 29.0955,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 367272.1768,
+      "ms": 22.7916,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 367272.1694,
+      "ms": 27.3767,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 367380.9688,
+      "ms": 78.1278,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 367380.961,
+      "ms": 79.6458,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 367491.2601,
+      "ms": 31.5482,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 367491.2516,
+      "ms": 33.1998,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 367678.0109,
+      "ms": 31.291,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 367678.0022,
+      "ms": 33.4492,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 367970.8386,
+      "ms": 29.321,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 367970.831,
+      "ms": 31.2705,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 377807.599,
+      "ms": 74.351,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 377807.5921,
+      "ms": 76.6557,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 379809.9419,
+      "ms": 27.1771,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 379809.9354,
+      "ms": 28.8442,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 379953.1741,
+      "ms": 17.0222,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 379953.1652,
+      "ms": 18.0303,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 380046.7841,
+      "ms": 35.9593,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 380046.7768,
+      "ms": 37.2113,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 380210.8354,
+      "ms": 23.352,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 380210.8281,
+      "ms": 24.4094,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 380281.0884,
+      "ms": 22.1727,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 380281.0813,
+      "ms": 23.1952,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 380436.8701,
+      "ms": 24.1631,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 380436.8626,
+      "ms": 25.7182,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 380498.7755,
+      "ms": 30.3904,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 380498.7673,
+      "ms": 31.5519,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 380560.9401,
+      "ms": 27.3322,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 380560.9321,
+      "ms": 28.5616,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 380713.5352,
+      "ms": 22.6041,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 380713.5279,
+      "ms": 23.6386,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 380831.8672,
+      "ms": 23.2995,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 380831.8594,
+      "ms": 24.7059,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 380956.6387,
+      "ms": 22.9974,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 380956.632,
+      "ms": 24.2422,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 381281.5631,
+      "ms": 23.4478,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 381281.5563,
+      "ms": 24.8593,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 381413.0827,
+      "ms": 24.3215,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 381413.0752,
+      "ms": 25.4101,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 381504.6781,
+      "ms": 23.5265,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 381504.6711,
+      "ms": 24.6368,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 381640.8861,
+      "ms": 24.8464,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 381640.8788,
+      "ms": 25.9571,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 381795.5759,
+      "ms": 20.7512,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 381795.5685,
+      "ms": 21.7418,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 381888.2138,
+      "ms": 25.4043,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 381888.2067,
+      "ms": 26.4175,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 2
+    },
+    {
+      "start": 382250.4248,
+      "ms": 23.7957,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 382250.4184,
+      "ms": 24.8449,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 382309.151,
+      "ms": 24.613,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 382309.1451,
+      "ms": 25.4729,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 382433.7045,
+      "ms": 21.475,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 382433.6978,
+      "ms": 22.1307,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 382591.0254,
+      "ms": 26.7217,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 382591.0188,
+      "ms": 27.5655,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 382672.5225,
+      "ms": 23.3345,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 382672.5149,
+      "ms": 24.0014,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 382743.4952,
+      "ms": 23.9643,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 382743.4894,
+      "ms": 24.6071,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 382854.6365,
+      "ms": 26.8086,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 382854.6297,
+      "ms": 27.4852,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 382941.4573,
+      "ms": 21.3914,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 382941.4497,
+      "ms": 22.2196,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 382975.8393,
+      "ms": 17.0719,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 382975.8331,
+      "ms": 17.7626,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 383087.9323,
+      "ms": 20.2822,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 383087.9262,
+      "ms": 20.8933,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 383122.2232,
+      "ms": 23.2719,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 383122.216,
+      "ms": 23.9507,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 383243.793,
+      "ms": 26.5424,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 383243.7867,
+      "ms": 27.2155,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 383330.7965,
+      "ms": 22.1241,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 383330.7897,
+      "ms": 22.814,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 383444.0069,
+      "ms": 23.6335,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 383444.0004,
+      "ms": 24.3075,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 383543.5531,
+      "ms": 24.1706,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 383543.5448,
+      "ms": 25.0219,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 383607.6375,
+      "ms": 23.5361,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 383607.6312,
+      "ms": 24.488,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 383774.7464,
+      "ms": 21.54,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 383774.7396,
+      "ms": 22.2085,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 383824.2214,
+      "ms": 21.571,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 383824.2152,
+      "ms": 22.3664,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 383942.5237,
+      "ms": 23.163,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 383942.5173,
+      "ms": 24.1595,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 384036.1839,
+      "ms": 23.4778,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 384036.1771,
+      "ms": 24.189,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 384100.5205,
+      "ms": 23.2609,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 384100.5141,
+      "ms": 24.1791,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 384313.1489,
+      "ms": 24.3336,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 384313.1418,
+      "ms": 25.1476,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 384378.2377,
+      "ms": 22.9907,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 384378.231,
+      "ms": 23.7684,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 384492.4931,
+      "ms": 22.2953,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 384492.4872,
+      "ms": 23.1634,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 384597.4539,
+      "ms": 31.4277,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 384597.4464,
+      "ms": 32.1369,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 384718.6071,
+      "ms": 26.777,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 384718.6012,
+      "ms": 27.4876,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 384819.6877,
+      "ms": 23.1985,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 384819.6813,
+      "ms": 23.9578,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 384885.3165,
+      "ms": 17.6209,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 384885.3094,
+      "ms": 18.2903,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 384976.6803,
+      "ms": 22.5277,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 384976.6719,
+      "ms": 23.3718,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 385291.4548,
+      "ms": 23.3555,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 385291.4486,
+      "ms": 24.2703,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 385416.429,
+      "ms": 24.7734,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 385416.4214,
+      "ms": 25.5509,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 385458.3033,
+      "ms": 20.9406,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 385458.2964,
+      "ms": 21.9669,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 385595.2944,
+      "ms": 28.6456,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 385595.287,
+      "ms": 29.4928,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 385808.7824,
+      "ms": 19.8977,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 385808.7757,
+      "ms": 20.6453,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 385881.1967,
+      "ms": 22.4782,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 385881.1905,
+      "ms": 23.35,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 385926.0196,
+      "ms": 24.1159,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 385926.014,
+      "ms": 25.0145,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 386056.2535,
+      "ms": 22.3905,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 386056.247,
+      "ms": 23.2745,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 386138.6106,
+      "ms": 22.3282,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 386138.6039,
+      "ms": 23.1252,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 386277.2719,
+      "ms": 16.9975,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 386277.2661,
+      "ms": 17.9877,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 386353.6871,
+      "ms": 22.149,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 386353.6808,
+      "ms": 22.9258,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 386493.6625,
+      "ms": 16.5309,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 386493.656,
+      "ms": 17.5075,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 386568.7632,
+      "ms": 22.7434,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 386568.7558,
+      "ms": 23.7031,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 1
+    },
+    {
+      "start": 386727.0266,
+      "ms": 22.6848,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 386727.0185,
+      "ms": 24.2674,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 386788.9736,
+      "ms": 23.1742,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 386788.9652,
+      "ms": 24.531,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 3
+    },
+    {
+      "start": 386915.2145,
+      "ms": 19.7285,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 386915.2039,
+      "ms": 21.9598,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 387270.6494,
+      "ms": 24.5666,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 387270.6415,
+      "ms": 26.8635,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 387433.0479,
+      "ms": 22.4075,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 387433.033,
+      "ms": 25.833,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 387569.9122,
+      "ms": 44.8986,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 387569.9032,
+      "ms": 46.8828,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 387738.2418,
+      "ms": 22.9806,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 387738.2332,
+      "ms": 24.6887,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 388248.1235,
+      "ms": 22.5123,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 388248.1155,
+      "ms": 24.4621,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 388470.4959,
+      "ms": 15.3441,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 388656.9455,
+      "ms": 92.3807,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 388656.9367,
+      "ms": 97.3952,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 388827.1958,
+      "ms": 21.8168,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 388827.1886,
+      "ms": 23.6609,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 389219.7054,
+      "ms": 22.7996,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 389219.6944,
+      "ms": 24.6371,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 389283.025,
+      "ms": 27.1896,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 389283.0166,
+      "ms": 29.0845,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 389428.6949,
+      "ms": 17.0729,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 389428.6846,
+      "ms": 19.2895,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 389518.477,
+      "ms": 55.5415,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 389518.4683,
+      "ms": 58.0176,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 389690.1756,
+      "ms": 88.3813,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 389690.1651,
+      "ms": 93.7833,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 389977.182,
+      "ms": 36.2182,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 389977.1727,
+      "ms": 46.1246,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 390323.3251,
+      "ms": 69.5356,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 390323.3134,
+      "ms": 71.6321,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 390439.5688,
+      "ms": 30.7029,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 390439.5589,
+      "ms": 32.9,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 390707.3768,
+      "ms": 18.5016,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 390707.3681,
+      "ms": 22.8143,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 390831.8265,
+      "ms": 43.6955,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 390831.8183,
+      "ms": 45.9682,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 391068.2184,
+      "ms": 43.4349,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 391068.2036,
+      "ms": 45.9113,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 391358.9783,
+      "ms": 20.5553,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 391358.9698,
+      "ms": 22.7128,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 391502.8391,
+      "ms": 43.5109,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 391502.8315,
+      "ms": 45.464,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 391664.7431,
+      "ms": 27.8115,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 391664.7337,
+      "ms": 29.8979,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 391825.0847,
+      "ms": 24.9561,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 391825.076,
+      "ms": 26.8085,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 392276.1511,
+      "ms": 22.6857,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 392276.1427,
+      "ms": 24.8302,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 392349.9232,
+      "ms": 26.8822,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 392349.9138,
+      "ms": 29.3112,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 392522.9146,
+      "ms": 42.7604,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 392522.9056,
+      "ms": 45.0676,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 392713.0957,
+      "ms": 71.6451,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 392713.0873,
+      "ms": 73.6813,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 392869.8595,
+      "ms": 18.2628,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 392869.8514,
+      "ms": 19.9837,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 393095.6981,
+      "ms": 54.6058,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 393095.6901,
+      "ms": 62.9755,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 393385.925,
+      "ms": 18.8067,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 393385.916,
+      "ms": 20.6742,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 393535.0413,
+      "ms": 33.606,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 393535.0331,
+      "ms": 35.4917,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 393709.7148,
+      "ms": 51.7722,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 393709.706,
+      "ms": 54.0799,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 393891.4094,
+      "ms": 20.2311,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 393891.3999,
+      "ms": 22.0048,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 394073.1477,
+      "ms": 40.9174,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 394073.1393,
+      "ms": 46.5521,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 394174.8723,
+      "ms": 52.5682,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 394174.8633,
+      "ms": 55.556,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 394444.991,
+      "ms": 27.7711,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 394473.1784,
+      "ms": 21.7901,
+      "name": "LocalShadow.EncodeDraws",
+      "bytes": 0,
+      "count": 307
+    },
+    {
+      "start": 394444.9821,
+      "ms": 50.0187,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 394588.9899,
+      "ms": 91.9484,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 394588.981,
+      "ms": 94.4207,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 394878.7013,
+      "ms": 28.8557,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 394908.0394,
+      "ms": 28.183,
+      "name": "LocalShadow.EncodeDraws",
+      "bytes": 0,
+      "count": 307
+    },
+    {
+      "start": 394878.6927,
+      "ms": 57.5752,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 395117.0011,
+      "ms": 46.1592,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 395116.9907,
+      "ms": 48.8452,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 395399.7024,
+      "ms": 31.9743,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 395399.6938,
+      "ms": 34.5015,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 395474.0793,
+      "ms": 46.4659,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 395521.0353,
+      "ms": 25.6847,
+      "name": "LocalShadow.EncodeDraws",
+      "bytes": 0,
+      "count": 307
+    },
+    {
+      "start": 395474.0703,
+      "ms": 72.691,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 395630.197,
+      "ms": 71.8254,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 395630.1887,
+      "ms": 77.4072,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 395853.4389,
+      "ms": 49.7959,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 395853.4291,
+      "ms": 52.1869,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 396349.2844,
+      "ms": 23.0856,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 396349.2739,
+      "ms": 25.1378,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 396408.7419,
+      "ms": 24.2898,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 396408.7321,
+      "ms": 26.4511,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 396521.7383,
+      "ms": 46.9067,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 396521.7293,
+      "ms": 49.2801,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 396646.8995,
+      "ms": 19.6143,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 396646.8912,
+      "ms": 21.637,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 396789.9551,
+      "ms": 38.5701,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 396789.9441,
+      "ms": 40.9342,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 396950.1406,
+      "ms": 60.9904,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 396950.1316,
+      "ms": 62.9428,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 397156.9354,
+      "ms": 23.6309,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 397156.9237,
+      "ms": 25.4411,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 397277.4385,
+      "ms": 33.8783,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 397277.4291,
+      "ms": 36.202,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 397502.1987,
+      "ms": 20.8449,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 397502.1901,
+      "ms": 23.3328,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 397701.003,
+      "ms": 33.2964,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 397700.9931,
+      "ms": 35.3452,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 397921.8617,
+      "ms": 37.4644,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 397921.8529,
+      "ms": 39.421,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 398045.5332,
+      "ms": 24.0781,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 398045.5232,
+      "ms": 26.2389,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 398212.3296,
+      "ms": 38.9173,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 398212.3219,
+      "ms": 41.1571,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 398338.0463,
+      "ms": 43.4077,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 398338.0382,
+      "ms": 45.628,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 398570.4921,
+      "ms": 49.8999,
+      "name": "LocalShadow.AtlasAllocate",
+      "bytes": 301989888,
+      "count": 1024
+    },
+    {
+      "start": 398570.4842,
+      "ms": 51.7662,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    }
+  ]
+}

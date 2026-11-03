@@ -46,9 +46,11 @@ vec4 light(int index) { return texelFetch(sampler2D(u_Lights,u_Nearest),ivec2(in
 vec4 atlas(float tile,vec2 uv) {
     if(tile<0.0) return vec4(1.0);
     // Half texel inset prevents adjacent materials bleeding into a repeated tile.
-    vec2 pixel=clamp(fract(uv)*128.0,vec2(0.5),vec2(127.5));
-    vec2 origin=vec2(mod(tile,16.0),floor(tile/16.0))*128.0;
-    return textureLod(sampler2D(u_Atlas,u_Linear),(origin+pixel)/vec2(2048.0,u_Frame.z*128.0),0.0);
+    vec2 size=vec2(textureSize(sampler2D(u_Atlas,u_Linear),0));
+    float tileSize=size.x/16.0;
+    vec2 pixel=clamp(fract(uv)*tileSize,vec2(0.5),vec2(tileSize-0.5));
+    vec2 origin=vec2(mod(tile,16.0),floor(tile/16.0))*tileSize;
+    return textureLod(sampler2D(u_Atlas,u_Linear),(origin+pixel)/size,0.0);
 }
 vec3 srgb(vec3 color) {
     return mix(color/12.92,pow((color+0.055)/1.055,vec3(2.4)),greaterThan(color,vec3(0.04045)));

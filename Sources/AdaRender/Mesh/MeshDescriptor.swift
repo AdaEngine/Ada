@@ -36,6 +36,11 @@ public struct MeshDescriptor: Sendable {
     /// The indices of the mesh.
     public var indicies: [UInt32] = []
 
+    /// Explicitly prepared clusters; absence keeps procedural geometry on the original draw path.
+    public var meshlets: MeshletGeometry?
+    /// Explicitly prepared adaptive hierarchy. Missing data preserves exact v1 meshlets/source geometry.
+    public var meshletLOD: MeshletLODGeometry?
+
     /// Create an empty mesh descriptor.
     @_spi(Internal)
     public init(name: String) {

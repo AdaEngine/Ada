@@ -717,6 +717,8 @@ extension EditorViewModel {
         switch command {
         case .checkForUpdates:
             EditorUpdateCenter.shared.checkForUpdates()
+        case .installCLI:
+            return false // The application router handles installation without a project owner.
         case .showSettings:
             presentSettings(.general)
         case .showMovieMaker:

@@ -13,7 +13,7 @@ extension EditorWorkbenchViewModel {
     }
 
     func documents(in pane: EditorWorkbenchPane) -> [EditorWorkbenchDocument] {
-        openDocuments.filter { self.pane(for: $0.id) == pane }
+        openDocuments.filter { self.pane(for: $0.id) == pane }.map(applyingTextSelection)
     }
 
     func selectedDocument(in pane: EditorWorkbenchPane) -> EditorWorkbenchDocument? {

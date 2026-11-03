@@ -250,7 +250,8 @@ final class EditorMobileAgentToolService {
                 contentsOf: items.map {
                     [
                         "path": relativePath(url), "severity": $0.severity == .error ? "error" : "warning", "message": $0.message,
-                        "source": "adascript-lsp", "range": range($0.range),
+                        "source": $0.code == nil ? "adascript-lsp" : "adascript-lint", "range": range($0.range),
+                        "code": $0.code as Any? ?? NSNull(),
                     ]
                 }
             )

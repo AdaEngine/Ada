@@ -99,8 +99,15 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
         _scratch.update(from: world)
         _pipelines.update(from: world)
         _renderDevice.update(from: world)
-        var activeViews: [Entity.ID] = []
-        query.forEach { _, _, _, source in activeViews.append(source.entityId) }
+        let activeViews: [Entity.ID]
+        if let targets = world.getResource(ExtractedCameraRenderViewTargets.self) {
+            // Keep per-view buffers through transient extraction gaps; a deleted source camera is still retired.
+            activeViews = Array(targets.activeCameraIDs)
+        } else {
+            var extracted: [Entity.ID] = []
+            query.forEach { _, _, _, source in extracted.append(source.entityId) }
+            activeViews = extracted
+        }
         scratch.cache.retainViews(activeViews)
     }
 

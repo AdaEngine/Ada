@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "dataset": "intel-sponza-2022",
+  "samples": 600,
+  "fieldOfViewDegrees": 60,
+  "near": 0.05,
+  "far": 200,
+  "interpolation": "linear-position-shortest-nlerp-v1",
+  "rotationConvention": "AdaEngine +Z camera; source glTF rotation multiplied by local Y pi",
+  "routes": [
+    {
+      "id": "atrium",
+      "start": {
+        "sourceCamera": "PhysCamera001",
+        "position": [
+          -8.80743,
+          1.59221947,
+          -0.85825783
+        ],
+        "rotation": [
+          -0.07516095149438418,
+          0.6351054436274549,
+          0.062298597138649006,
+          0.7662315522345637
+        ]
+      },
+      "end": {
+        "sourceCamera": "PhysCamera003",
+        "position": [
+          2.70301843,
+          1.35489559,
+          2.11138153
+        ],
+        "rotation": [
+          0.024976103325682304,
+          0.8155856936530769,
+          0.03530248834015994,
+          -0.577018114869964
+        ]
+      }
+    },
+    {
+      "id": "ground-floor-corridor",
+      "start": {
+        "sourceCamera": "PhysCamera005",
+        "position": [
+          -2.23714,
+          0.7440546,
+          2.3608017
+        ],
+        "rotation": [
+          -0.0645746858853836,
+          0.8437104882398467,
+          0.10425182535720703,
+          0.522603366700382
+        ]
+      },
+      "end": {
+        "sourceCamera": "PhysCamera001",
+        "position": [
+          -8.80743,
+          1.59221947,
+          -0.85825783
+        ],
+        "rotation": [
+          -0.07516095149438418,
+          0.6351054436274549,
+          0.062298597138649006,
+          0.7662315522345637
+        ]
+      }
+    },
+    {
+      "id": "upper-gallery",
+      "start": {
+        "sourceCamera": "PhysCamera004",
+        "position": [
+          -9.594356,
+          6.921101,
+          5.35278
+        ],
+        "rotation": [
+          0.005818486075351097,
+          0.817546556587467,
+          -0.008261681106991187,
+          0.5757738424564397
+        ]
+      },
+      "end": {
+        "sourceCamera": "PhysCamera002",
+        "position": [
+          10.5311031,
+          7.352985,
+          1.52825129
+        ],
+        "rotation": [
+          0.007428735261073167,
+          0.7500144768872583,
+          0.008424937740373797,
+          -0.6613260306203164
+        ]
+      }
+    }
+  ]
+}

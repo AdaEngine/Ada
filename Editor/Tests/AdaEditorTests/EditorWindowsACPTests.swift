@@ -131,10 +131,45 @@ struct EditorWindowsACPTests {
         #expect(!paths.contains("."))
         #expect(paths.contains(fixture.root.appendingPathComponent("AppData/Roaming/npm").path))
         #expect(EditorAgentDiscovery.discover(paths: paths).first { $0.id == "codex-acp" }?.target?.command == shim.path)
-        let environment = EditorWindowsAgentCommand.environment(["PATH": "new", "KEY": "literal & %"], inheriting: ["Path": "old", "SystemRoot": "C:/Windows"])
+        let environment = EditorWindowsAgentCommand.environment(["PATH": fixture.root.path, "KEY": "literal & %"], inheriting: ["Path": "old", "SystemRoot": "C:/Windows"])
         #expect(environment.filter { $0.key.lowercased() == "path" }.count == 1)
-        #expect(environment["PATH"] == "new" && environment["SystemRoot"] == "C:/Windows")
+        #expect(environment["PATH"]?.components(separatedBy: ";").first == fixture.root.path)
+        #expect(environment["SystemRoot"] == "C:/Windows" && environment["KEY"] == "literal & %")
         #expect(EditorRegistryAgent.platform.hasPrefix("windows-"))
+    }
+
+    @Test("Desktop Codex installs are discovered again after installation and version rotation")
+    func desktopCodexDiscovery() async throws {
+        let fixture = try Fixture(mode: "cancel")
+        defer { fixture.remove() }
+        let local = fixture.root.appendingPathComponent("AppData/Local")
+        let environment = ["Path": fixture.root.path, "LOCALAPPDATA": local.path]
+        let catalog = EditorAgentCatalogService(root: fixture.root.appendingPathComponent("catalog"), home: fixture.root, environment: { environment })
+        #expect(await catalog.discover().contains { $0.id == "codex-acp" } == false)
+
+        let versions = local.appendingPathComponent("OpenAI/Codex/bin")
+        let old = versions.appendingPathComponent("old-hash/codex.exe")
+        let current = versions.appendingPathComponent("current-hash/codex.exe")
+        for binary in [old, current] {
+            try FileManager.default.createDirectory(at: binary.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.copyItem(atPath: EditorHostTools.executable("python3", windowsName: "python.exe"), toPath: binary.path)
+        }
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1)], ofItemAtPath: old.path)
+        try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: current.path)
+        var found = try #require(await catalog.discover().first { $0.id == "codex-acp" })
+        #expect(found.path == current.path)
+        #expect(found.target == nil)
+
+        try FileManager.default.removeItem(at: current)
+        found = try #require(await catalog.discover().first { $0.id == "codex-acp" })
+        #expect(found.path == old.path)
+        let stale = versions.appendingPathComponent("deleted-hash").path
+        let launched = EditorWindowsAgentCommand.environment(["PATH": stale, "LITERAL": "value & %"], inheriting: environment)
+        let paths = EditorAgentDiscovery.searchPaths(environment: launched, home: fixture.root)
+        #expect(EditorAgentDiscovery.executable("codex", paths: paths) == old.path)
+        #expect(launched["LITERAL"] == "value & %")
+        #expect(launched.filter { $0.key.lowercased() == "path" }.count == 1)
+        #expect(paths.contains(local.appendingPathComponent("Sloppy/bin").path))
     }
 
     @Test("Npm launchers resolve to Node argv without interpreting shell metacharacters", .enabled(if: ProcessInfo.processInfo.environment["ADAEDITOR_TEST_NODE"] != nil))
@@ -152,13 +187,13 @@ struct EditorWindowsACPTests {
         let environment = ["Path": URL(fileURLWithPath: node).deletingLastPathComponent().path]
         let arguments = ["Игра & путь", "%PATH%", "a\"b", "", "x^|y"]
         let invocation = try EditorWindowsAgentCommand.resolve(shim.path, arguments: arguments, environment: environment)
-        #expect(invocation.executable.path == node)
+        #expect(invocation.executable.path == URL(fileURLWithPath: node).path)
         let process = try EditorWindowsProcess(executable: invocation.executable, arguments: invocation.arguments,
             directory: fixture.root, environment: EditorHostTools.mergedEnvironment(["NODE_NO_WARNINGS": "1"]))
         try process.input.close()
         let chunks = EditorWindowsACPTransport.chunks(process.output)
         var data = Data()
-        for await chunk in chunks { data.append(chunk) }
+        for try await chunk in chunks { data.append(chunk) }
         var code: Int32 = -1
         for await status in process.exit { code = status }
         #expect(code == 0)
@@ -177,6 +212,34 @@ struct EditorWindowsACPTests {
         #expect(throws: EditorAgentCatalogError.self) {
             try EditorAgentCatalogService.validateArchive(names: "agent.exe\r\n../escape\r\n", details: "-rw-r--r--\r\n-rw-r--r--\r\n", command: "agent.exe")
         }
+    }
+
+    @Test("Installed desktop Codex is found without its executable directory in PATH",
+          .enabled(if: ProcessInfo.processInfo.environment["ADAEDITOR_DESKTOP_AGENTS_LIVE_TEST"] == "1"))
+    func liveDesktopCodexDiscovery() async throws {
+        let catalog = EditorAgentCatalogService(environment: {
+            EditorHostTools.mergedEnvironment(["PATH": "C:/Windows/System32"], inheriting: ProcessInfo.processInfo.environment)
+        })
+        let codex = try #require(await catalog.discover().first { $0.id == "codex-acp" })
+        #expect(codex.path.lowercased().hasSuffix("codex.exe"))
+        #expect(FileManager.default.isExecutableFile(atPath: codex.path))
+    }
+
+    @Test("Installed Sloppy initializes and creates a session through the Studio agent service",
+          .enabled(if: ProcessInfo.processInfo.environment["ADAEDITOR_DESKTOP_AGENTS_LIVE_TEST"] == "1"))
+    func liveSloppyConnection() async throws {
+        let catalog = EditorAgentCatalogService()
+        let sloppy = try #require(await catalog.discover().first { $0.id == "sloppy-acp" })
+        var fixture = try Fixture(mode: "cancel")
+        defer { fixture.remove() }
+        fixture.request.project.ai.agent.target = try #require(sloppy.target)
+        fixture.request.project.ai.mcp.enabled = false
+        let service = EditorACPAgentService()
+        do {
+            let configuration = try await service.connect(fixture.request, onEvent: { _ in }, onProjectFileChanged: { _ in })
+            #expect(configuration.agentName == "Sloppy")
+        } catch { await service.shutdown(); throw error }
+        await service.shutdown()
     }
 
     @Test("Official registry npm and Windows binary distributions install and initialize",

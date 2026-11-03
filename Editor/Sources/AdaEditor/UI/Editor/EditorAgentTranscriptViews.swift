@@ -116,11 +116,11 @@ struct EditorAgentEventCard: View {
     }
 
     private var a2uiSession: EditorAgentA2UISession? {
-        a2uiPresentation?.session ?? viewModel?.activeSession.flatMap { viewModel?.a2ui.sessions[$0.id] }
+        a2uiPresentation?.session ?? viewModel?.activeSessionID.flatMap { viewModel?.a2ui.sessions[$0] }
     }
 
     private func displaySegments(_ message: EditorAgentMessage) -> [EditorAgentMessageSegment] {
-        guard message.role == .assistant, let text = a2uiSession?.displayTexts[event.id]
+        guard message.role == .assistant, let text = a2uiSession?.displayText(for: event.id)
         else { return message.segments }
         var insertedText = false
         return message.segments.compactMap { segment in
@@ -146,16 +146,10 @@ struct EditorAgentEventCard: View {
                     .font(.system(size: 14))
                     .foregroundColor(.red)
             } else {
-                Text(markdown: segment.text ?? "")
-                    .font(.system(size: 14))
-                    .foregroundColor(theme.editorColors.text)
-                    .lineLimit(nil)
-                    .fixedSize(horizontal: false, vertical: true)
+                EditorAgentMarkdown(source: segment.text ?? "")
             }
         case .thinking:
-            Text(markdown: segment.text ?? "")
-                .font(.system(size: 12))
-                .foregroundColor(theme.editorColors.muted)
+            EditorAgentMarkdown(source: segment.text ?? "", fontSize: 12)
         case .attachment:
             if let attachment = segment.attachment {
                 EditorAgentAttachmentCard(attachment: attachment)

@@ -334,6 +334,7 @@ public struct VisibleMesh3DLists: Resource {
                         morphBuffer: sources[sourceIndex].morphBuffers[Mesh3DRenderSource.morphKey(model: Int(record.model), part: Int(record.part))]
                     )
                 )
+                entry.items[entry.items.count - 1].forceVisible = sources[sourceIndex].forceVisible
             }
             if pass < 0 && settings.gpuOcclusion, let item = entry.items.last, let range = item.batchRange {
                 entry.candidates.append(

@@ -1,0 +1,38 @@
+[
+  {
+    "maximumVertices": 64,
+    "maximumTriangles": 64,
+    "sourceTriangles": 121242,
+    "meshlets": 2049,
+    "sidecarBytes": 66736,
+    "meanVertexUtilization": 0.8244799292337726,
+    "meanTriangleUtilization": 0.9245516105417276,
+    "duplicatedVertexReferences": 12562,
+    "endToEndPreparationSeconds": 0.8912899999999999,
+    "referenceBoundariesMatch": true
+  },
+  {
+    "maximumVertices": 64,
+    "maximumTriangles": 96,
+    "sourceTriangles": 121242,
+    "meshlets": 1684,
+    "sidecarBytes": 55056,
+    "meanVertexUtilization": 0.9767109560570071,
+    "meanTriangleUtilization": 0.7499628859857482,
+    "duplicatedVertexReferences": 9709,
+    "endToEndPreparationSeconds": 0.8915639,
+    "referenceBoundariesMatch": true
+  },
+  {
+    "maximumVertices": 64,
+    "maximumTriangles": 126,
+    "sourceTriangles": 121242,
+    "meshlets": 1667,
+    "sidecarBytes": 54512,
+    "meanVertexUtilization": 0.984262522495501,
+    "meanTriangleUtilization": 0.577227411660525,
+    "duplicatedVertexReferences": 9452,
+    "endToEndPreparationSeconds": 0.8746186999999999,
+    "referenceBoundariesMatch": true
+  }
+]

@@ -115,7 +115,7 @@ func ExtractModel3D(
     )
 }
 
-public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
+public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable {
     private static let flatNormalTexture = Texture2D(
         image: Image(width: 1, height: 1, color: Color(red: 0.5, green: 0.5, blue: 1))
     )
@@ -139,6 +139,11 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
 
         let isMotion = world.getResource(ActiveMotion3DPass.self)?.isEnabled == true
         let isContact = world.getResource(ActiveContactDepth3DPass.self)?.isEnabled == true
+        if !isMotion && !isContact, world.getResource(MeshletMap3DResources.self)?.isEnabled == true,
+            let target = view.components[RenderViewTarget.self], let instances = world.getResource(Active3DInstanceBuffers.self)?.instances {
+            let map = world.getRefResource(MeshletMap3DResources.self)
+            if try map.wrappedValue.draw(item: item, encoder: renderEncoder, device: renderDevice, target: target, instances: instances) { return }
+        }
         let morphed = item.morphBuffer != nil && part.morphTargets != nil
         let hasLightmapUV = part.vertexDescriptor.attributes.containsAttribute(by: MeshDescriptor.textureCoordinates1.id.name)
         let shadingFeatures = (item.material as? PBRMaterial)?.shaderFeatures ?? []
@@ -261,6 +266,19 @@ public final class Model3DDrawPass: DrawPass, @unchecked Sendable {
         )
         renderEncoder.setVertexBuffer(defaultVertexData, offset: 0, slot: 4)
         renderEncoder.setIndexBuffer(part.indexBuffer, offset: 0)
+        if !isContact, let clusters = item.meshletOverride, !isMotion || clusters.arguments == nil {
+            renderEncoder.setIndexBuffer(clusters.indices, offset: 0)
+            if let arguments = clusters.arguments {
+                if renderEncoder.drawIndexedIndirect(arguments: arguments, offset: clusters.argumentOffset) { return }
+                // Restore the complete original geometry atomically when indirect encoding is unavailable.
+                renderEncoder.setIndexBuffer(part.indexBuffer, offset: 0)
+            } else {
+                for range in clusters.ranges {
+                    renderEncoder.drawIndexed(indexCount: range.count, indexBufferOffset: range.lowerBound * (clusters.indices.indexFormat == .uInt32 ? 4 : 2), instanceCount: 1)
+                }
+                return
+            }
+        }
         if !isMotion && !isContact, let offset = item.indirectArgumentOffset, let arguments = active?.indirectArguments,
            renderEncoder.drawIndexedIndirect(arguments: arguments, offset: offset) { return }
         renderEncoder.drawIndexed(

@@ -91,9 +91,10 @@ enum EditorScriptableObjectCatalogLoader {
 
     static func makeResult(project: AdaProject, sources: [AdaScriptSource]) throws -> Result {
         let schemas = try AdaScriptSchemaParser.parseScriptables(sources: sources)
+        let componentDescriptors = EditorComponentRegistry.descriptors
         return Result(
             dataComponents: EditorScriptComponentCatalog.makeComponents(from: try AdaScriptSchemaParser.parse(sources: sources)),
-            descriptors: schemas.map(makeEditorDescriptor).sorted { $0.name < $1.name },
+            descriptors: schemas.map { makeEditorDescriptor($0, componentDescriptors: componentDescriptors) }.sorted { $0.name < $1.name },
             playRuntime: EditorScenePlayRuntime(
                 moduleName: project.runtime.moduleName,
                 schemas: schemas.map(makeRuntimeSchema),
@@ -135,7 +136,7 @@ enum EditorScriptableObjectCatalogLoader {
         return sources.sorted { $0.path < $1.path }
     }
 
-    private static func makeEditorDescriptor(_ schema: AdaScriptableSchema) -> EditorScriptableObjectDescriptor {
+    private static func makeEditorDescriptor(_ schema: AdaScriptableSchema, componentDescriptors: [EditorComponentDescriptor]) -> EditorScriptableObjectDescriptor {
         EditorScriptableObjectDescriptor(
             fields: schema.fields.map {
                 EditorScriptableObjectDescriptor.Field(
@@ -149,7 +150,7 @@ enum EditorScriptableObjectCatalogLoader {
             name: schema.name,
             requiredComponentTypeNames: schema.bindings.compactMap { binding in
                 if case .component(required: true) = binding.kind {
-                    return EditorComponentRegistry.descriptors.first { descriptor in
+                    return componentDescriptors.first { descriptor in
                         descriptor.typeName == binding.typeName
                             || descriptor.displayName == binding.typeName
                             || descriptor.typeName.hasSuffix(".\(binding.typeName)")

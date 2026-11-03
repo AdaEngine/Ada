@@ -361,12 +361,17 @@ public final class GravityLanguageServerSession {
     }
 
     private static func diagnostic(from diagnostic: GravityDiagnostic) -> [String: Any] {
-        [
+        var result: [String: Any] = [
             "message": diagnostic.message,
             "range": lspRange(from: diagnostic.range),
             "severity": diagnostic.severity.rawValue,
             "source": "gravity-lsp",
         ]
+        if let code = diagnostic.code {
+            result["code"] = code
+            result["source"] = "adascript-lint"
+        }
+        return result
     }
 
     private static func documentSymbol(from symbol: GravitySymbol) -> [String: Any] {

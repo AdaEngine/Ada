@@ -34,6 +34,51 @@ for metric definitions.
 
 ## Windows timing
 
+### Text selection
+
+Code selections no longer publish changes to the observed document array or run
+the active-document callback. Commands obtain the current range and selected text
+through the workbench's document snapshots. Caret geometry lives in a separate
+observable object read by the completion overlay; moving it does not rebuild the
+code view and recompute syntax spans.
+
+Window dispatch coalesces consecutive left-button moves only while a text editor
+owns an active selection drag. Press/release, modifiers, keys and window boundaries
+remain ordered. Other drags retain every point, as does the raw input stream and
+its scene-picking blocks.
+
+`EditorTextInteractionPerformanceTests` mounts the production code view and checks
+that changing the selection performs zero view rebuilds, preserves current command
+snapshots and does not edit the document. It also exercises captured selection
+through `UIWindow`, including input boundaries. The 26 focused Windows tests in
+this suite, hover input, selection hints, file search, completion layout, scroll
+indicators and split panes pass. This is UI work-count validation, not a displayed
+FPS claim. Logs and capture experiments are in `.build-tools/text-interaction-perf`.
+
+For displayed selection FPS, distribute mouse positions over time or capture
+native input. A burst ending at the same position each frame becomes one visible
+selection update after coalescing, so its present rate cannot establish smoothness
+or be compared with the former intermediate redraws. Discard captures interrupted
+by manual input, inactive windows, screenshots, startup or a crashed process.
+
+On 2026-10-31, a foreground Release comparison used Last Autumn, a maximized
+2560x1392 client, collapsed project tree and the same code font. A repeated
+34-position selection scenario with 1 ms waits measured 20.89 displayed FPS before
+and 52.10 after. Median display interval fell from 34.75 to 6.95 ms; p95 fell from
+41.71 to 13.89 ms. These averages include gaps between automation requests.
+A separate single continuous gesture with 480 positions recorded 340 frames over
+2.55 seconds: 132.64 displayed FPS, 6.97 ms p95 and 13.88 ms p99. One 180.56 ms
+interval remained, so this does not establish a steady 140 FPS guarantee.
+
+Scrolling HordeSystem.ada with the same timed wheel scenario measured 27.41 FPS
+before and 28.39 after, with p95 near 62.51 ms in both captures. These changes do
+not resolve the scrolling bottleneck. The native Windows checks also verified
+selection, wheel scrolling and Find prefilling `medkit` after a double click.
+The text context menu opened and dismissed in both builds without a crash in this
+run; the earlier native-window creation crash remains an unreproduced issue.
+Captures, summaries and replayable scenarios are under
+`.build-tools/text-interaction-perf/native-validation`.
+
 ### Camera navigation and annotation presentation
 
 SceneView queues completed GPU frames; its annotations must describe the displayed

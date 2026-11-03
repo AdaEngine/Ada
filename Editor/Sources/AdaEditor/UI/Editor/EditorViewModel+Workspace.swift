@@ -14,10 +14,7 @@ extension EditorViewModel {
     }
 
     func handleTextSelection(document: EditorTextDocument, range: EditorSourceRange?, text: String?) {
-        workbench.updateTextDocument(id: document.id) { updatedDocument in
-            updatedDocument.selectionRange = range
-            updatedDocument.selectedText = text?.isEmpty == false ? text : nil
-        }
+        workbench.updateTextSelection(documentID: document.id, range: range, text: text)
     }
 
     func chatAboutTextSelection(document: EditorTextDocument, range: EditorSourceRange, text: String) {

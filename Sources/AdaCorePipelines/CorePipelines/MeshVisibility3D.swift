@@ -3,6 +3,13 @@ import AdaRender
 import Math
 import Synchronization
 
+/// Cluster rendering is opt-in; old scenes retain their existing draw path.
+public enum MeshletVisibilityMode3D: String, Codable, Sendable, CaseIterable {
+    case disabled
+    case cpuReference
+    case gpu
+}
+
 /// Per-camera performance/debug controls. Camera culling never controls the shadow caster list.
 public struct MeshVisibilitySettings3D: Codable, Sendable {
     public var frustumCulling: Bool
@@ -10,6 +17,9 @@ public struct MeshVisibilitySettings3D: Codable, Sendable {
     public var distanceCulling: Bool
     /// Opt-in current-frame GPU Hi-Z/indirect rendering; unsupported devices keep CPU visibility.
     public var gpuOcclusion: Bool = false
+    public var meshlets: MeshletVisibilityMode3D = .disabled
+    /// Maximum conservative hierarchy error in output pixels; zero preserves the original meshlet partition.
+    public var meshletLODPixelError: Float = 0
 
     public init(frustumCulling: Bool = true, lod: Bool = true, distanceCulling: Bool = true) {
         self.init(frustumCulling: frustumCulling, lod: lod, distanceCulling: distanceCulling, gpuOcclusion: false)
@@ -21,13 +31,15 @@ public struct MeshVisibilitySettings3D: Codable, Sendable {
         self.distanceCulling = distanceCulling
         self.gpuOcclusion = gpuOcclusion
     }
-    private enum CodingKeys: String, CodingKey { case frustumCulling, lod, distanceCulling, gpuOcclusion }
+    private enum CodingKeys: String, CodingKey { case frustumCulling, lod, distanceCulling, gpuOcclusion, meshlets, meshletLODPixelError }
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         frustumCulling = try values.decodeIfPresent(Bool.self, forKey: .frustumCulling) ?? true
         lod = try values.decodeIfPresent(Bool.self, forKey: .lod) ?? true
         distanceCulling = try values.decodeIfPresent(Bool.self, forKey: .distanceCulling) ?? true
         gpuOcclusion = try values.decodeIfPresent(Bool.self, forKey: .gpuOcclusion) ?? false
+        meshlets = try values.decodeIfPresent(MeshletVisibilityMode3D.self, forKey: .meshlets) ?? .disabled
+        meshletLODPixelError = try values.decodeIfPresent(Float.self, forKey: .meshletLODPixelError) ?? 0
     }
 }
 
@@ -194,6 +206,16 @@ public struct MeshVisibilityFrustum3D: Sendable {
             if plane.xyz.dot(bounds.center) + plane.w + radius < -0.0001 {
                 return false
             }
+        }
+        return true
+    }
+
+    /// A fully contained part needs no cluster classification or index copy; draw its original geometry.
+    public func fullyContains(_ bounds: AABB) -> Bool {
+        for plane in planes {
+            let radius = abs(plane.x) * bounds.halfExtents.x + abs(plane.y) * bounds.halfExtents.y + abs(plane.z) * bounds.halfExtents.z
+            let distance = plane.xyz.dot(bounds.center) + plane.w
+            if !distance.isFinite || !radius.isFinite || distance - radius < 0.0001 { return false }
         }
         return true
     }

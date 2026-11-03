@@ -1,0 +1,1084 @@
+◊ Test run started.
+→ Testing Library Version: 6.3.1 (937120cbc281cf2)
+→ Target Platform: x86_64-unknown-windows-msvc
+◊ Suite BoundedResourceCacheTests started.
+◊ Test bindingsReuseValuesRetainOwnersAndRespectTheCapacity() started.
+√ Test bindingsReuseValuesRetainOwnersAndRespectTheCapacity() passed after 0.001 seconds.
+◊ Test failedCreationCanBeRetried() started.
+√ Test failedCreationCanBeRetried() passed after 0.001 seconds.
+◊ Test failedCreationDoesNotEvictExistingBindings() started.
+√ Test failedCreationDoesNotEvictExistingBindings() passed after 0.001 seconds.
+◊ Test ringWraparoundRetainsExactlyTheNewestBindings() started.
+√ Test ringWraparoundRetainsExactlyTheNewestBindings() passed after 0.001 seconds.
+◊ Test copiedCacheEvictsIndependently() started.
+√ Test copiedCacheEvictsIndependently() passed after 0.001 seconds.
+◊ Test gardenSizedCascadeWorkingSetStaysWarmAfterInitialFrames() started.
+√ Test gardenSizedCascadeWorkingSetStaysWarmAfterInitialFrames() passed after 0.002 seconds.
+√ Suite BoundedResourceCacheTests passed after 0.004 seconds.
+◊ Suite "Color correction curves" started.
+◊ Test neutralCurveAndInversion() started.
+√ Test neutralCurveAndInversion() passed after 0.001 seconds.
+◊ Test smoothCurvePassesThroughPointsWithoutOvershoot() started.
+√ Test smoothCurvePassesThroughPointsWithoutOvershoot() passed after 0.001 seconds.
+◊ Test malformedCurvesBecomeFiniteAndOrdered() started.
+√ Test malformedCurvesBecomeFiniteAndOrdered() passed after 0.001 seconds.
+◊ Test newSettingsRoundTripAndOldLUTSettingsKeepTheirMode() started.
+√ Test newSettingsRoundTripAndOldLUTSettingsKeepTheirMode() passed after 0.002 seconds.
+◊ Test bakedStripUsesMasterThenIndividualChannels() started.
+√ Test bakedStripUsesMasterThenIndividualChannels() passed after 0.001 seconds.
+√ Suite "Color correction curves" passed after 0.003 seconds.
+➜ Suite "Color correction texture ownership" skipped.
+➜ Test textureIsReusedUntilTheCurveChangesAndReleasedWhenDisabled() skipped.
+➜ Test malformedStripAndDisabledLUTAreIgnored() skipped.
+◊ Suite "Golden frame backend agreement" started.
+◊ Test everySharedReferenceAgreesAcrossBackends() started.
+BACKEND-AGREEMENT
+emissive-bloom: 0 px differ, largest step 0
+emissive-bloom-exposure-minus1: 0 px differ, largest step 0
+emissive-exposure-plus1: 0 px differ, largest step 0
+emissive-plain: 0 px differ, largest step 0
+emissive-tonemap-neutral: 0 px differ, largest step 0
+emissive-tonemap-none: 0 px differ, largest step 0
+pbr-sphere-anisotropy: 0 px differ, largest step 0
+pbr-sphere-clearcoat: 2 px differ, largest step 43
+pbr-sphere-sheen: 0 px differ, largest step 1
+pbr-spheres-albedo: 0 px differ, largest step 0
+pbr-spheres-ambientOcclusion: 0 px differ, largest step 0
+pbr-spheres-cascades: 0 px differ, largest step 0
+pbr-spheres-cascades3: 0 px differ, largest step 0
+pbr-spheres-contrast: 0 px differ, largest step 0
+pbr-spheres-debugdraw: 0 px differ, largest step 0
+pbr-spheres-depth: 0 px differ, largest step 0
+pbr-spheres-dim-autoexposure: 0 px differ, largest step 0
+pbr-spheres-dim-manual: 0 px differ, largest step 0
+pbr-spheres-dof-far-focus: 0 px differ, largest step 0
+pbr-spheres-dof-near-focus: 0 px differ, largest step 0
+pbr-spheres-fog: 113 px differ, largest step 65
+pbr-spheres-indirectLighting: 0 px differ, largest step 0
+pbr-spheres-light-shafts: 4 px differ, largest step 43
+pbr-spheres-lightCount: 0 px differ, largest step 0
+pbr-spheres-lightcount-local: 0 px differ, largest step 0
+pbr-spheres-lut-inverted: 0 px differ, largest step 0
+pbr-spheres-metallic: 0 px differ, largest step 0
+pbr-spheres-none: 0 px differ, largest step 0
+pbr-spheres-normals: 0 px differ, largest step 0
+pbr-spheres-roughn√ Test everySharedReferenceAgreesAcrossBackends() passed after 0.893 seconds.
+◊ Test backendsHaveTheSameReferenceNames() started.
+√ Test backendsHaveTheSameReferenceNames() passed after 0.001 seconds.
+√ Suite "Golden frame backend agreement" passed after 0.895 seconds.
+◊ Suite "3D GPU rendering" started.
+◊ Suite "3D auto exposure on GPU" started.
+◊ Test aPinnedRangeMatchesManualExposureOnEveryPath(path:) started.
+◊ Test case passing 1 argument path → direct to aPinnedRangeMatchesManualExposureOnEveryPath(path:) started.
+2026-11-02T22:52:02+0300 info org.adaengine.webgpu: [AdaRender] Selected WebGPU adapter: backend=4 vendor=nvidia device=NVIDIA GeForce RTX 4070 description=D3D12 driver version 32.0.16.1088
+◊ Test case passing 1 argument path → fxaa to aPinnedRangeMatchesManualExposureOnEveryPath(path:) started.
+√ Test aPinnedRangeMatchesManualExposureOnEveryPath(path:) with 2 test cases passed after 3.700 seconds.
+◊ Test autoExposureEvensOutSceneBrightness() started.
+× Test autoExposureEvensOutSceneBrightness() recorded an issue at Render3DAutoExposureTests.swift:75:29: Issue recorded
+→ pbr-spheres-dim-autoexposure differs in 4623 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-dim-autoexposure-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-dim-autoexposure-difference.png
+× Test autoExposureEvensOutSceneBrightness() recorded an issue at Render3DAutoExposureTests.swift:75:29: Issue recorded
+→ pbr-spheres-dim-manual differs in 3241 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-dim-manual-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-dim-manual-difference.png
+× Test autoExposureEvensOutSceneBrightness() failed after 2.486 seconds with 2 issues.
+◊ Test adaptationSpeedControlsHowFastExposureFollowsTheScene() started.
+√ Test adaptationSpeedControlsHowFastExposureFollowsTheScene() passed after 3.272 seconds.
+◊ Test disabledAutoExposureChangesNothingAndHoldsNoState() started.
+√ Test disabledAutoExposureChangesNothingAndHoldsNoState() passed after 1.939 seconds.
+◊ Test aFrameWithoutGeometryHoldsTheLastExposure() started.
+√ Test aFrameWithoutGeometryHoldsTheLastExposure() passed after 1.732 seconds.
+◊ Test leavingDarknessOverexposesThenSettlesAndTheReturnIsSlower() started.
+√ Test leavingDarknessOverexposesThenSettlesAndTheReturnIsSlower() passed after 3.324 seconds.
+◊ Test dimSurfacesAreMeteredAndSlowAdaptationDoesNotStallAt140FPS() started.
+√ Test dimSurfacesAreMeteredAndSlowAdaptationDoesNotStallAt140FPS() passed after 2.430 seconds.
+× Suite "3D auto exposure on GPU" failed after 18.887 seconds with 2 issues.
+→ /// Renders automatic exposure through the real Metal pipeline.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DAutoExposureGPUTests`.
+◊ Suite "Baked diffuse lighting" started.
+◊ Test lightmapUsesUV1ReplacesDiffuseIBLAndPreservesDirectAndSpecular() started.
+2026-11-02T22:52:22+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:52:22+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:52:23+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:52:23+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:52:24+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:52:24+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:52:24+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:52:24+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test lightmapUsesUV1ReplacesDiffuseIBLAndPreservesDirectAndSpecular() passed after 4.625 seconds.
+◊ Test movingReceiverInterpolatesAndOccludedProbesCannotLeakGlobalAmbient() started.
+2026-11-02T22:52:27+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:52:27+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:52:27+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:52:27+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test movingReceiverInterpolatesAndOccludedProbesCannotLeakGlobalAmbient() passed after 2.348 seconds.
+◊ Test missingUV1DoesNotSampleAnArbitraryLightmapCorner() started.
+√ Test missingUV1DoesNotSampleAnArbitraryLightmapCorner() passed after 1.692 seconds.
+➜ Test importsTheRealBakedModelAndKeepsSharedMaterialsUntouched() skipped.
+◊ Test malformedBakedAssetsFailBeforeUploadingTextures() started.
+√ Test malformedBakedAssetsFailBeforeUploadingTextures() passed after 1.197 seconds.
+√ Suite "Baked diffuse lighting" passed after 9.865 seconds.
+◊ Suite "3D camera optics on GPU" started.
+◊ Test offAndStationaryMotionAreIdentityAndReleaseResources() started.
+√ Test offAndStationaryMotionAreIdentityAndReleaseResources() passed after 2.859 seconds.
+◊ Test lensChangesSceneAndDebugViewsBypassIt() started.
+√ Test lensChangesSceneAndDebugViewsBypassIt() passed after 2.347 seconds.
+◊ Test rainBeadsRefractTheSceneAndFreezeAtTheAuthoredTime() started.
+√ Test rainBeadsRefractTheSceneAndFreezeAtTheAuthoredTime() passed after 2.029 seconds.
+◊ Test frameSubmissionAndReadbackCanOverlap() started.
+√ Test frameSubmissionAndReadbackCanOverlap() passed after 1.928 seconds.
+◊ Test motionBindGroupsStopGrowingAfterTheFrameRingWarmsUp() started.
+√ Test motionBindGroupsStopGrowingAfterTheFrameRingWarmsUp() passed after 2.001 seconds.
+◊ Test multipleCamerasKeepTheirOwnInstanceBuffers() started.
+√ Test multipleCamerasKeepTheirOwnInstanceBuffers() passed after 1.840 seconds.
+◊ Test motionUsesCameraAndObjectHistoryAndResetsAfterCuts() started.
+√ Test motionUsesCameraAndObjectHistoryAndResetsAfterCuts() passed after 2.080 seconds.
+√ Suite "3D camera optics on GPU" passed after 15.088 seconds.
+◊ Suite "3D color grading on GPU" started.
+◊ Test vignetteDarkensCornersAndLeavesTheCenterAlone() started.
+× Test vignetteDarkensCornersAndLeavesTheCenterAlone() recorded an issue at Render3DColorGradingTests.swift:117:29: Issue recorded
+→ pbr-spheres-vignette differs in 3664 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-vignette-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-vignette-difference.png
+× Test vignetteDarkensCornersAndLeavesTheCenterAlone() failed after 1.991 seconds with 1 issue.
+◊ Test saturationScalesColorfulnessAndZeroGivesGray() started.
+√ Test saturationScalesColorfulnessAndZeroGivesGray() passed after 1.738 seconds.
+◊ Test contrastSpreadsBrightAndDarkAwayFromMidGray() started.
+× Test contrastSpreadsBrightAndDarkAwayFromMidGray() recorded an issue at Render3DColorGradingTests.swift:117:29: Issue recorded
+→ pbr-spheres-contrast differs in 4695 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-contrast-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-contrast-difference.png
+× Test contrastSpreadsBrightAndDarkAwayFromMidGray() failed after 2.179 seconds with 1 issue.
+◊ Test curvesAreAppliedAfterToneMapping(path:) started.
+◊ Test case passing 1 argument path → direct to curvesAreAppliedAfterToneMapping(path:) started.
+◊ Test case passing 1 argument path → fxaa to curvesAreAppliedAfterToneMapping(path:) started.
+√ Test curvesAreAppliedAfterToneMapping(path:) with 2 test cases passed after 3.565 seconds.
+◊ Test lutIsAppliedAfterToneMappingOnEveryPath(path:) started.
+◊ Test case passing 1 argument path → direct to lutIsAppliedAfterToneMappingOnEveryPath(path:) started.
+× Test lutIsAppliedAfterToneMappingOnEveryPath(path:) recorded an issue with 1 argument path → direct at Render3DColorGradingTests.swift:117:29: Issue recorded
+→ pbr-spheres-lut-inverted differs in 3646 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-lut-inverted-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-lut-inverted-difference.png
+◊ Test case passing 1 argument path → fxaa to lutIsAppliedAfterToneMappingOnEveryPath(path:) started.
+× Test lutIsAppliedAfterToneMappingOnEveryPath(path:) with 2 test cases failed after 5.000 seconds with 1 issue.
+× Suite "3D color grading on GPU" failed after 14.477 seconds with 3 issues.
+→ /// Renders vignette, saturation, contrast and LUT grading through the real Metal pipeline.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DColorGradingGPUTests`.
+➜ Suite "DLSS Super Resolution through Dawn" skipped.
+➜ Test reconstructsMovingSceneResizesResetsAndReturnsToNative() skipped.
+◊ Suite "3D debug views on GPU" started.
+◊ Test roughnessAndMetallicViewsReportMaterialValues() started.
+√ Test roughnessAndMetallicViewsReportMaterialValues() passed after 1.906 seconds.
+◊ Test everyViewMatchesItsGoldenFrame() started.
+× Test everyViewMatchesItsGoldenFrame() recorded an issue at Render3DDebugViewTests.swift:444:33: Issue recorded
+→ pbr-spheres-none differs in 3672 pixels (largest step 101). Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-none-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-none-difference.png
+× Test everyViewMatchesItsGoldenFrame() recorded an issue at Render3DDebugViewTests.swift:444:33: Issue recorded
+→ pbr-spheres-ambientOcclusion differs in 19272 pixels (largest step 208). Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-ambientOcclusion-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-ambientOcclusion-difference.png
+× Test everyViewMatchesItsGoldenFrame() recorded an issue at Render3DDebugViewTests.swift:444:33: Issue recorded
+→ pbr-spheres-wireframe differs in 3672 pixels (largest step 101). Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-wireframe-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-wireframe-difference.png
+× Test everyViewMatchesItsGoldenFrame() failed after 3.012 seconds with 3 issues.
+◊ Test debugDrawIsDepthTestedExpiresAndMatchesItsGoldenFrame() started.
+× Test debugDrawIsDepthTestedExpiresAndMatchesItsGoldenFrame() recorded an issue at Render3DDebugViewTests.swift:504:29: Issue recorded
+→ Debug draw differs in 3665 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-debugdraw-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-debugdraw-difference.png
+× Test debugDrawIsDepthTestedExpiresAndMatchesItsGoldenFrame() failed after 2.000 seconds with 1 issue.
+◊ Test oneFrameShapesAppearForExactlyOneRenderedFrame() started.
+√ Test oneFrameShapesAppearForExactlyOneRenderedFrame() passed after 1.738 seconds.
+◊ Test albedoViewShowsBaseColorWhateverTheLighting() started.
+√ Test albedoViewShowsBaseColorWhateverTheLighting() passed after 1.898 seconds.
+◊ Test cascadeViewTintsGroundByDistance() started.
+√ Test cascadeViewTintsGroundByDistance() passed after 1.925 seconds.
+◊ Test lightCountViewRampsFromBlueTowardRedAsLightsAreAdded() started.
+√ Test lightCountViewRampsFromBlueTowardRedAsLightsAreAdded() passed after 1.588 seconds.
+◊ Test noneViewIsStableAcrossViewSwitches() started.
+√ Test noneViewIsStableAcrossViewSwitches() passed after 1.714 seconds.
+× Suite "3D debug views on GPU" failed after 15.785 seconds with 4 issues.
+→ /// Renders a lit PBR scene through the real Metal pipeline for each debug view and checks the frames
+→ /// against golden references.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DDebugViewGPUTests`.
+→ /// Record references with `ADAENGINE_GOLDEN_RECORD=1`; set `ADAENGINE_GOLDEN_OUTPUT` to keep actual frames.
+→ /// Other integration suites initialize the process-wide engine as headless.
+◊ Suite "3D depth of field on GPU" started.
+◊ Test disabledDepthOfFieldChangesNothingAndHoldsNoScratch() started.
+√ Test disabledDepthOfFieldChangesNothingAndHoldsNoScratch() passed after 1.873 seconds.
+◊ Test theFocusPlaneStaysSharpWhileOtherDistancesBlur(path:) started.
+◊ Test case passing 1 argument path → direct to theFocusPlaneStaysSharpWhileOtherDistancesBlur(path:) started.
+◊ Test case passing 1 argument path → fxaa to theFocusPlaneStaysSharpWhileOtherDistancesBlur(path:) started.
+√ Test theFocusPlaneStaysSharpWhileOtherDistancesBlur(path:) with 2 test cases passed after 3.966 seconds.
+◊ Test aWiderApertureBlursMore() started.
+√ Test aWiderApertureBlursMore() passed after 1.636 seconds.
+◊ Test aFullScreenDebugViewSkipsDepthOfFieldAndMatchesGoldenFrames() started.
+× Test aFullScreenDebugViewSkipsDepthOfFieldAndMatchesGoldenFrames() recorded an issue at Render3DDepthOfFieldTests.swift:98:29: Issue recorded
+→ pbr-spheres-dof-near-focus differs in 2835 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-dof-near-focus-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-dof-near-focus-difference.png
+× Test aFullScreenDebugViewSkipsDepthOfFieldAndMatchesGoldenFrames() failed after 2.072 seconds with 1 issue.
+× Suite "3D depth of field on GPU" failed after 9.549 seconds with 1 issue.
+→ /// Renders depth of field through the real pipeline.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/DepthOfField`.
+◊ Suite "Display quantization dithering" started.
+◊ Test warmShadowRoundingPreservesMeanAndBlack() started.
+2026-11-02T22:53:27+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:27+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:27+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:27+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test warmShadowRoundingPreservesMeanAndBlack() passed after 1.390 seconds.
+√ Suite "Display quantization dithering" passed after 1.390 seconds.
+◊ Suite "World distance fields" started.
+◊ Test anOccluderBehindTheCameraShadowsTheRealReceiverAndRespectsFlags() started.
+√ Test anOccluderBehindTheCameraShadowsTheRealReceiverAndRespectsFlags() passed after 2.199 seconds.
+◊ Test tiledAtlasInterpolationPreservesSignedValuesAcrossSliceBoundaries() started.
+2026-11-02T22:53:30+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:30+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:30+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:30+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:30+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:30+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:31+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:31+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test tiledAtlasInterpolationPreservesSignedValuesAcrossSliceBoundaries() passed after 1.558 seconds.
+◊ Test sphereTracingHandlesEntryInsideClearRaysAndConservativeExhaustion() started.
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:32+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:33+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:33+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:33+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:33+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test sphereTracingHandlesEntryInsideClearRaysAndConservativeExhaustion() passed after 2.219 seconds.
+◊ Test legacyEnvironmentAndMalformedFieldsHaveDefinedBehavior() started.
+√ Test legacyEnvironmentAndMalformedFieldsHaveDefinedBehavior() passed after 1.207 seconds.
+√ Suite "World distance fields" passed after 7.186 seconds.
+◊ Suite "Dynamic world irradiance" started.
+◊ Test hiddenPointLightRelightsLightmappedReceiverMovesAndClears() started.
+2026-11-02T22:53:35+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:35+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:35+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:35+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test hiddenPointLightRelightsLightmappedReceiverMovesAndClears() passed after 2.804 seconds.
+◊ Test hiddenSpotConeAndShadowOccluderControlBounce() started.
+2026-11-02T22:53:38+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:38+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:38+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:38+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test hiddenSpotConeAndShadowOccluderControlBounce() passed after 2.261 seconds.
+◊ Test oldLightsOptOutAndInvalidTransportLayoutsFail() started.
+√ Test oldLightsOptOutAndInvalidTransportLayoutsFail() passed after 0.001 seconds.
+√ Suite "Dynamic world irradiance" passed after 5.067 seconds.
+◊ Suite "3D fog on GPU" started.
+◊ Test fogOutOfReachChangesNothing() started.
+√ Test fogOutOfReachChangesNothing() passed after 2.164 seconds.
+◊ Test denserFogPullsSurfacesTowardTheFogColor() started.
+√ Test denserFogPullsSurfacesTowardTheFogColor() passed after 1.779 seconds.
+◊ Test heightFogThinsAboveItsBaseHeight() started.
+√ Test heightFogThinsAboveItsBaseHeight() passed after 1.791 seconds.
+◊ Test fogMatchesGoldenFrames() started.
+√ Test fogMatchesGoldenFrames() passed after 1.690 seconds.
+◊ Test lightShaftsAddSunLightAndReleaseTheirTexture() started.
+√ Test lightShaftsAddSunLightAndReleaseTheirTexture() passed after 1.671 seconds.
+◊ Test shadowsCarveTheLightShafts() started.
+√ Test shadowsCarveTheLightShafts() passed after 1.768 seconds.
+◊ Test lightShaftsMatchGoldenFrames() started.
+× Test lightShaftsMatchGoldenFrames() recorded an issue at Render3DFogTests.swift:224:29: Issue recorded
+→ pbr-spheres-light-shafts differs in 1207 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-light-shafts-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-light-shafts-difference.png
+× Test lightShaftsMatchGoldenFrames() failed after 2.089 seconds with 1 issue.
+◊ Test skyInfluenceControlsFogOverTheSky() started.
+√ Test skyInfluenceControlsFogOverTheSky() passed after 1.898 seconds.
+× Suite "3D fog on GPU" failed after 14.855 seconds with 1 issue.
+→ /// Renders fog through the real composite pass.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/Fog`.
+◊ Suite "Hybrid IBL and SSR" started.
+◊ Test screenHitsReplaceProbeAndMissesPreserveIt() started.
+2026-11-02T22:53:56+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:56+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:53:56+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:53:56+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test screenHitsReplaceProbeAndMissesPreserveIt() passed after 3.401 seconds.
+√ Suite "Hybrid IBL and SSR" passed after 3.401 seconds.
+◊ Suite "Lighting foundation" started.
+◊ Test localFogWorksWithoutSunAndFollowsTheSpotlight() started.
+√ Test localFogWorksWithoutSunAndFollowsTheSpotlight() passed after 2.318 seconds.
+◊ Test portableTemporalReconstructsMotionAndResetsWithoutVendorSDK() started.
+√ Test portableTemporalReconstructsMotionAndResetsWithoutVendorSDK() passed after 3.891 seconds.
+◊ Test contactAndPCSSShadowsRenderAndDisableCleanly() started.
+√ Test contactAndPCSSShadowsRenderAndDisableCleanly() passed after 2.296 seconds.
+◊ Test diffuseTransportUsesVisibleRadianceAndDisablingRestoresTheFrame() started.
+2026-11-02T22:54:08+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:08+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:08+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:08+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test diffuseTransportUsesVisibleRadianceAndDisablingRestoresTheFrame() passed after 3.254 seconds.
+√ Suite "Lighting foundation" passed after 11.761 seconds.
+◊ Suite "Local shadow depth precision" started.
+◊ Test aThinCasterNearTheLightRangeKeepsItsShadow() started.
+√ Test aThinCasterNearTheLightRangeKeepsItsShadow() passed after 1.745 seconds.
+√ Suite "Local shadow depth precision" passed after 1.745 seconds.
+◊ Suite "3D material extensions on GPU" started.
+◊ Test textureTransformsMoveScaleAndRotateTheTexture() started.
+√ Test textureTransformsMoveScaleAndRotateTheTexture() passed after 1.788 seconds.
+◊ Test aHigherIORBrightensTheHighlightAndZeroSpecularRemovesIt() started.
+× Test aHigherIORBrightensTheHighlightAndZeroSpecularRemovesIt() recorded an issue at Render3DMaterialExtensionTests.swift:238:13: Expectation failed: (total(strong) → 3.0) > (total(standard) → 3.0)
+→ An IOR of 3 reflects more than 1.5 (\(total(strong)) vs \(total(standard))).
+× Test aHigherIORBrightensTheHighlightAndZeroSpecularRemovesIt() failed after 1.629 seconds with 1 issue.
+◊ Test specularColorTintsTheHighlight() started.
+√ Test specularColorTintsTheHighlight() passed after 1.512 seconds.
+◊ Test clearcoatAddsASharpHighlightToARoughSurface() started.
+2026-11-02T22:54:17+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:18+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:18+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:18+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test clearcoatAddsASharpHighlightToARoughSurface() passed after 2.738 seconds.
+◊ Test clearcoatStrengthScalesTheCoatMonotonically() started.
+2026-11-02T22:54:20+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:20+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:20+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:20+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test clearcoatStrengthScalesTheCoatMonotonically() passed after 2.818 seconds.
+◊ Test sheenAddsSoftLightThatGrowsWithItsColorAndTurnsOff() started.
+2026-11-02T22:54:23+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:23+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:23+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:23+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test sheenAddsSoftLightThatGrowsWithItsColorAndTurnsOff() passed after 2.864 seconds.
+◊ Test sheenColorTintsTheAddedLight() started.
+2026-11-02T22:54:26+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:26+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:26+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:26+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test sheenColorTintsTheAddedLight() passed after 2.598 seconds.
+◊ Test anisotropyStretchesTheHighlightAndRotationTurnsIt() started.
+2026-11-02T22:54:29+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:29+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:29+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:29+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test anisotropyStretchesTheHighlightAndRotationTurnsIt() passed after 3.163 seconds.
+◊ Test layerTexturesSelectShaderFeaturesAndReachTheUniform() started.
+√ Test layerTexturesSelectShaderFeaturesAndReachTheUniform() passed after 0.981 seconds.
+◊ Test aClearcoatTextureMasksTheCoat() started.
+2026-11-02T22:54:33+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:33+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:33+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:33+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:34+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:34+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:34+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:34+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test aClearcoatTextureMasksTheCoat() passed after 3.701 seconds.
+◊ Test aClearcoatRoughnessTextureSetsTheCoatRoughness() started.
+2026-11-02T22:54:36+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:36+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:36+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:36+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:37+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:37+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:37+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:37+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test aClearcoatRoughnessTextureSetsTheCoatRoughness() passed after 3.367 seconds.
+◊ Test aClearcoatNormalTextureBendsTheCoatOnly() started.
+2026-11-02T22:54:40+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:40+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:40+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:40+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:40+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:40+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:41+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:41+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test aClearcoatNormalTextureBendsTheCoatOnly() passed after 3.443 seconds.
+◊ Test sheenTexturesScaleTheirFactors() started.
+2026-11-02T22:54:43+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:43+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:44+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:44+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:44+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:44+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:45+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:45+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:46+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:46+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:46+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:46+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test sheenTexturesScaleTheirFactors() passed after 5.334 seconds.
+◊ Test anAnisotropyTextureSuppliesStrengthAndDirection() started.
+2026-11-02T22:54:49+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:49+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:49+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:49+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:50+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:50+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:50+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:50+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test anAnisotropyTextureSuppliesStrengthAndDirection() passed after 3.942 seconds.
+◊ Test specularTexturesScaleTheDielectricReflection() started.
+2026-11-02T22:54:53+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:53+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:53+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:53+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:54+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:54+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:54+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:54+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test specularTexturesScaleTheDielectricReflection() passed after 3.977 seconds.
+◊ Test aLayerTextureReadsThroughItsOwnTransform() started.
+2026-11-02T22:54:57+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:57+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:54:57+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:54:57+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test aLayerTextureReadsThroughItsOwnTransform() passed after 2.787 seconds.
+◊ Test importedLayerTexturesReachTheMaterial() started.
+√ Test importedLayerTexturesReachTheMaterial() passed after 1.013 seconds.
+◊ Test clearcoatMatchesItsGoldenFrame() started.
+2026-11-02T22:55:00+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:00+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:55:00+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:01+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+× Test clearcoatMatchesItsGoldenFrame() recorded an issue at Render3DMaterialExtensionTests.swift:538:29: Issue recorded
+→ pbr-sphere-clearcoat differs in 7089 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-sphere-clearcoat-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-sphere-clearcoat-difference.png
+× Test clearcoatMatchesItsGoldenFrame() failed after 2.933 seconds with 1 issue.
+◊ Test sheenAndAnisotropyMatchTheirGoldenFrames() started.
+2026-11-02T22:55:03+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:04+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:55:04+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:04+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+× Test sheenAndAnisotropyMatchTheirGoldenFrames() recorded an issue at Render3DMaterialExtensionTests.swift:549:29: Issue recorded
+→ pbr-sphere-sheen differs in 6988 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-sphere-sheen-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-sphere-sheen-difference.png
+2026-11-02T22:55:07+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:07+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:55:07+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:07+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+× Test sheenAndAnisotropyMatchTheirGoldenFrames() recorded an issue at Render3DMaterialExtensionTests.swift:549:29: Issue recorded
+→ pbr-sphere-anisotropy differs in 8448 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-sphere-anisotropy-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-sphere-anisotropy-difference.png
+× Test sheenAndAnisotropyMatchTheirGoldenFrames() failed after 6.137 seconds with 2 issues.
+◊ Test defaultExtensionValuesChangeNothing() started.
+√ Test defaultExtensionValuesChangeNothing() passed after 1.846 seconds.
+× Suite "3D material extensions on GPU" failed after 58.584 seconds with 4 issues.
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/MaterialExtensions`.
+◊ Suite "Meshlet preparation baseline" started.
+➜ Test recordsProductionBaseline() skipped.
+√ Suite "Meshlet preparation baseline" passed after 0.001 seconds.
+◊ Suite "3D soft particles on GPU" started.
+◊ Test layeredSmokeRespondsToLocalLightAndItsOpaqueOccluders() started.
+2026-11-02T22:55:11+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:11+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:55:11+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:11+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test layeredSmokeRespondsToLocalLightAndItsOpaqueOccluders() passed after 2.302 seconds.
+◊ Test smokeIsVisibleInFrontAndOccludedBehindOpaqueGeometry() started.
+2026-11-02T22:55:14+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:14+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:55:14+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:14+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test smokeIsVisibleInFrontAndOccludedBehindOpaqueGeometry() passed after 2.296 seconds.
+√ Suite "3D soft particles on GPU" passed after 4.599 seconds.
+◊ Suite "World path tracing" started.
+◊ Test realOffscreenBlockerShadowsWithoutAnyShadowMapsAndLightOffClearsHistory() started.
+√ Test realOffscreenBlockerShadowsWithoutAnyShadowMapsAndLightOffClearsHistory() passed after 2.335 seconds.
+◊ Test hiddenWallBouncesLightAndMetalReflectsGeometryBehindCamera() started.
+√ Test hiddenWallBouncesLightAndMetalReflectsGeometryBehindCamera() passed after 1.651 seconds.
+◊ Test spotConeTextureAtlasAndResizeWork() started.
+√ Test spotConeTextureAtlasAndResizeWork() passed after 1.422 seconds.
+◊ Test cosmeticGraphsCompositeAfterTracingAndRespectOpaqueDepth(blended:) started.
+◊ Test case passing 1 argument blended → false to cosmeticGraphsCompositeAfterTracingAndRespectOpaqueDepth(blended:) started.
+2026-11-02T22:55:21+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:21+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+◊ Test case passing 1 argument blended → true to cosmeticGraphsCompositeAfterTracingAndRespectOpaqueDepth(blended:) started.
+2026-11-02T22:55:24+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:24+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test cosmeticGraphsCompositeAfterTracingAndRespectOpaqueDepth(blended:) with 2 test cases passed after 4.850 seconds.
+√ Suite "World path tracing" passed after 10.259 seconds.
+◊ Suite "3D performance benchmarks" started.
+➜ Test effectCostsOnAHeavyScene() skipped.
+√ Suite "3D performance benchmarks" passed after 0.001 seconds.
+◊ Suite "3D post-process on GPU" started.
+◊ Test bloomGlowsAroundEmissiveGeometryAndFadesWithDistance() started.
+√ Test bloomGlowsAroundEmissiveGeometryAndFadesWithDistance() passed after 1.640 seconds.
+◊ Test bloomIntensityIsMonotonic() started.
+√ Test bloomIntensityIsMonotonic() passed after 1.879 seconds.
+◊ Test disabledOrZeroIntensityBloomLeavesTheFrameIdentical() started.
+√ Test disabledOrZeroIntensityBloomLeavesTheFrameIdentical() passed after 1.823 seconds.
+◊ Test exposureScalesBrightnessInBothDirections() started.
+√ Test exposureScalesBrightnessInBothDirections() passed after 1.667 seconds.
+➜ Test operatorsAgreeBetweenCompositeAndTemporalShaders(mapper:) skipped.
+◊ Test operatorsShapeTheImageAsDocumented() started.
+√ Test operatorsShapeTheImageAsDocumented() passed after 3.503 seconds.
+◊ Test toneMappersMatchGoldenFrames() started.
+× Test toneMappersMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:279:33: Issue recorded
+→ emissive-tonemap-neutral differs in 2707 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-tonemap-neutral-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-tonemap-neutral-difference.png
+× Test toneMappersMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:279:33: Issue recorded
+→ emissive-tonemap-none differs in 2675 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-tonemap-none-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-tonemap-none-difference.png
+× Test toneMappersMatchGoldenFrames() failed after 2.339 seconds with 2 issues.
+◊ Test chainIsAllocatedOnlyWhileBloomIsEnabled() started.
+√ Test chainIsAllocatedOnlyWhileBloomIsEnabled() passed after 1.728 seconds.
+◊ Test bloomAndExposureWorkOnEveryPresentationPath(path:) started.
+◊ Test case passing 1 argument path → direct to bloomAndExposureWorkOnEveryPresentationPath(path:) started.
+◊ Test case passing 1 argument path → fxaa to bloomAndExposureWorkOnEveryPresentationPath(path:) started.
+√ Test bloomAndExposureWorkOnEveryPresentationPath(path:) with 2 test cases passed after 3.581 seconds.
+◊ Test bloomAndExposureMatchGoldenFrames() started.
+× Test bloomAndExposureMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:364:33: Issue recorded
+→ emissive-plain differs in 3672 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-plain-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-plain-difference.png
+× Test bloomAndExposureMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:364:33: Issue recorded
+→ emissive-bloom differs in 135207 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-bloom-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-bloom-difference.png
+× Test bloomAndExposureMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:364:33: Issue recorded
+→ emissive-bloom-exposure-minus1 differs in 141347 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-bloom-exposure-minus1-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-bloom-exposure-minus1-difference.png
+× Test bloomAndExposureMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:364:33: Issue recorded
+→ emissive-exposure-plus1 differs in 4099 pixels. Actual: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-exposure-plus1-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/emissive-exposure-plus1-difference.png
+× Test bloomAndExposureMatchGoldenFrames() failed after 3.258 seconds with 4 issues.
+× Suite "3D post-process on GPU" failed after 21.422 seconds with 6 issues.
+→ /// Renders an emissive sphere through the real Metal pipeline to check exposure and bloom.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DPostProcessGPUTests`.
+◊ Suite "3D reflections on GPU" started.
+◊ Test reflectionsMatchTheirGoldenFrames() started.
+× Test reflectionsMatchTheirGoldenFrames() recorded an issue at Render3DReflectionTests.swift:30:29: Issue recorded
+→ pbr-spheres-ssr differs in 3857 pixels (largest step 90). Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-ssr-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-ssr-difference.png
+× Test reflectionsMatchTheirGoldenFrames() recorded an issue at Render3DReflectionTests.swift:30:29: Issue recorded
+→ pbr-spheres-ssr-skybox differs in 2659 pixels (largest step 100). Actual: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-ssr-skybox-actual.png, difference: C:/Users/VLADIS~1/AppData/Local/Temp/pbr-spheres-ssr-skybox-difference.png
+× Test reflectionsMatchTheirGoldenFrames() failed after 2.278 seconds with 2 issues.
+◊ Test disablingReflectionsRemovesThemAndTheMetalSpheresKeepTheirLook() started.
+√ Test disablingReflectionsRemovesThemAndTheMetalSpheresKeepTheirLook() passed after 1.821 seconds.
+× Suite "3D reflections on GPU" failed after 4.100 seconds with 2 issues.
+→ /// Screen-space reflections through the real pipeline. These frames guard performance work on the reflection
+→ /// pass: a faster trace must not visibly change what it draws.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/Reflections`.
+◊ Suite "Shader Graph GPU rendering" started.
+➜ Test bakedTextureVariantsMatchLiveLayersAndMorphDefines() skipped.
+➜ Test hostBakedWGSLRendersThroughTheProductionSurfacePipeline() skipped.
+➜ Test alphaMaskRunsThroughActualTemporalMotionRendering() skipped.
+◊ Test animatedAlphaMaskMatchesRemovingGeometryAndItsShadows(localShadows:) started.
+◊ Test case passing 1 argument localShadows → false to animatedAlphaMaskMatchesRemovingGeometryAndItsShadows(localShadows:) started.
+2026-11-02T22:55:51+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:51+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:55:52+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:52+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+◊ Test case passing 1 argument localShadows → true to animatedAlphaMaskMatchesRemovingGeometryAndItsShadows(localShadows:) started.
+2026-11-02T22:55:54+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:54+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:55:54+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:54+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:55:55+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:55+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test animatedAlphaMaskMatchesRemovingGeometryAndItsShadows(localShadows:) with 2 test cases passed after 5.568 seconds.
+◊ Test pbrGraphValuesReachTheProductionGBuffer() started.
+2026-11-02T22:55:57+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:57+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test pbrGraphValuesReachTheProductionGBuffer() passed after 2.683 seconds.
+√ Suite "Shader Graph GPU rendering" passed after 8.252 seconds.
+◊ Suite "Continuous directional shadow filtering" started.
+◊ Test subTexelMotionProducesContinuousVisibility() started.
+2026-11-02T22:55:59+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:59+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:55:59+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:55:59+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test subTexelMotionProducesContinuousVisibility() passed after 1.229 seconds.
+◊ Test filterFootprintCannotReadTheAdjacentCascade() started.
+2026-11-02T22:56:00+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:56:00+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:56:01+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:56:01+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test filterFootprintCannotReadTheAdjacentCascade() passed after 1.284 seconds.
+◊ Test pcssPenumbraGrowsWithBlockerSeparation() started.
+2026-11-02T22:56:02+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:56:02+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T22:56:02+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:56:02+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test pcssPenumbraGrowsWithBlockerSeparation() passed after 1.457 seconds.
+√ Suite "Continuous directional shadow filtering" passed after 3.972 seconds.
+◊ Suite "Exact skinned instance batching" started.
+◊ Test oldShadowSettingsDecodeWithoutChangingQuality() started.
+√ Test oldShadowSettingsDecodeWithoutChangingQuality() passed after 0.001 seconds.
+◊ Test shadowAtlasTracksResolutionAndCascadeCount() started.
+√ Test shadowAtlasTracksResolutionAndCascadeCount() passed after 1.285 seconds.
+◊ Test packedBuffersKeepExactPosesHistoryAndOverflow() started.
+√ Test packedBuffersKeepExactPosesHistoryAndOverflow() passed after 0.848 seconds.
+◊ Test batchedSkinPosesMatchStaticGeometryAndShadows() started.
+√ Test batchedSkinPosesMatchStaticGeometryAndShadows() passed after 1.747 seconds.
+√ Suite "Exact skinned instance batching" passed after 3.882 seconds.
+◊ Suite "Sponza renderer benchmark" started.
+➜ Test runsFixedCameraPathsThroughProductionRenderer() skipped.
+√ Suite "Sponza renderer benchmark" passed after 0.001 seconds.
+◊ Suite "Volumetric sampling quality" started.
+◊ Test aPlanarShadowDoesNotFormCoherentMarchSlices() started.
+√ Test aPlanarShadowDoesNotFormCoherentMarchSlices() passed after 1.017 seconds.
+√ Suite "Volumetric sampling quality" passed after 1.017 seconds.
+◊ Suite "Sprite Shader Graph pixels" started.
+◊ Test identityGraphPreservesAtlasLayoutAlphaAndPainterOrder(mode:) started.
+◊ Test case passing 1 argument mode → .batched to identityGraphPreservesAtlasLayoutAlphaAndPainterOrder(mode:) started.
+2026-11-02T22:56:07+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:56:07+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+◊ Test case passing 1 argument mode → .automatic to identityGraphPreservesAtlasLayoutAlphaAndPainterOrder(mode:) started.
+2026-11-02T22:56:08+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T22:56:08+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+√ Test identityGraphPreservesAtlasLayoutAlphaAndPainterOrder(mode:) with 2 test cases passed after 1.015 seconds.
+√ Suite "Sprite Shader Graph pixels" passed after 1.015 seconds.
+◊ Suite "WebGPU Hi-Z 3D scene" started.
+◊ Test matchesCPUFramesAcrossCameraMotionOccluderRemovalEffectsAndResize() started.
+√ Test matchesCPUFramesAcrossCameraMotionOccluderRemovalEffectsAndResize() passed after 1.867 seconds.
+√ Suite "WebGPU Hi-Z 3D scene" passed after 1.867 seconds.
+× Suite "3D GPU rendering" failed after 248.040 seconds with 23 issues.
+→ /// Parent of every GPU rendering suite. The engine owns one process-wide renderer and tests on the main actor
+→ /// interleave at each `await`, so these suites must run one test at a time; `.serialized` on a parent suite
+→ /// applies to its nested suites, which is the only way to serialize across suites.
+◊ Suite MaterialUploadReuseTests started.
+◊ Test "Cross-frame material caching observes edits and releases unused owners" started.
+√ Test "Cross-frame material caching observes edits and releases unused owners" passed after 0.001 seconds.
+◊ Test everySharedUniformFieldInvalidatesTheMaterialSnapshot() started.
+√ Test everySharedUniformFieldInvalidatesTheMaterialSnapshot() passed after 0.001 seconds.
+◊ Test staticInstancesReuseEachInFlightUploadAndRefreshAfterEditsAndGrowth() started.
+√ Test staticInstancesReuseEachInFlightUploadAndRefreshAfterEditsAndGrowth() passed after 0.001 seconds.
+◊ Test unchangedMaterialAvoidsUploadsAndMutationPreservesInFlightBuffer() started.
+√ Test unchangedMaterialAvoidsUploadsAndMutationPreservesInFlightBuffer() passed after 0.001 seconds.
+√ Suite MaterialUploadReuseTests passed after 0.001 seconds.
+◊ Suite OptionalResourceTests started.
+◊ Test "Optional resource construction accepts an absent resource" started.
+√ Test "Optional resource construction accepts an absent resource" passed after 0.001 seconds.
+◊ Test "Optional resource construction and updates use the wrapped resource" started.
+√ Test "Optional resource construction and updates use the wrapped resource" passed after 0.001 seconds.
+√ Suite OptionalResourceTests passed after 0.001 seconds.
+◊ Suite "3D particle simulation" started.
+◊ Test layeredSmokeRetainsItsStyleAndVariesPuffSizesWithoutChangingWeather() started.
+√ Test layeredSmokeRetainsItsStyleAndVariesPuffSizesWithoutChangingWeather() passed after 0.001 seconds.
+◊ Test boxPrecipitationFillsTheEyeNeighborhoodWithoutAHollowShell() started.
+√ Test boxPrecipitationFillsTheEyeNeighborhoodWithoutAHollowShell() passed after 0.001 seconds.
+◊ Test rainFallsInWorldYAndStopsAtTheGround() started.
+√ Test rainFallsInWorldYAndStopsAtTheGround() passed after 0.001 seconds.
+◊ Test deterministicAcrossFrameRatesAndBounded() started.
+√ Test deterministicAcrossFrameRatesAndBounded() passed after 0.001 seconds.
+◊ Test smokeExpandsFadesDriftsAndExpiresAfterEmissionStops() started.
+√ Test smokeExpandsFadesDriftsAndExpiresAfterEmissionStops() passed after 0.001 seconds.
+◊ Test partialScenesRoundTripAndInvalidSettingsStayFinite() started.
+√ Test partialScenesRoundTripAndInvalidSettingsStayFinite() passed after 0.001 seconds.
+◊ Test repeatedBurstsPreservePreviousSmoke() started.
+√ Test repeatedBurstsPreservePreviousSmoke() passed after 0.001 seconds.
+√ Suite "3D particle simulation" passed after 0.003 seconds.
+◊ Suite "Asynchronous plugin loading" started.
+◊ Test readinessAllowsTheNextPluginToStart() started.
+√ Test readinessAllowsTheNextPluginToStart() passed after 0.023 seconds.
+◊ Test cancellationStopsWaitingForAnUnfinishedPlugin() started.
+√ Test cancellationStopsWaitingForAnUnfinishedPlugin() passed after 0.016 seconds.
+√ Suite "Asynchronous plugin loading" passed after 0.039 seconds.
+◊ Suite "3D auto exposure settings" started.
+◊ Test defaultsAreOffWithAThreeStopRange() started.
+√ Test defaultsAreOffWithAThreeStopRange() passed after 0.001 seconds.
+◊ Test olderPayloadsDecodeWithoutAutoExposure() started.
+√ Test olderPayloadsDecodeWithoutAutoExposure() passed after 0.001 seconds.
+◊ Test settingsRoundTripAndFlatAccessor() started.
+√ Test settingsRoundTripAndFlatAccessor() passed after 0.001 seconds.
+◊ Test limitsAreOrderedClampedAndSpeedsFinite() started.
+√ Test limitsAreOrderedClampedAndSpeedsFinite() passed after 0.001 seconds.
+√ Suite "3D auto exposure settings" passed after 0.001 seconds.
+◊ Suite "3D camera optics settings" started.
+◊ Test weatherLensIsIndependentPauseSafeAndBackwardsCompatible() started.
+√ Test weatherLensIsIndependentPauseSafeAndBackwardsCompatible() passed after 0.001 seconds.
+◊ Test legacyScenesKeepTheirImage() started.
+√ Test legacyScenesKeepTheirImage() passed after 0.001 seconds.
+◊ Test flatControlsRoundTripWithoutLosingOtherSettings() started.
+√ Test flatControlsRoundTripWithoutLosingOtherSettings() passed after 0.001 seconds.
+◊ Test invalidParametersCannotReachTheShader() started.
+√ Test invalidParametersCannotReachTheShader() passed after 0.001 seconds.
+√ Suite "3D camera optics settings" passed after 0.001 seconds.
+◊ Suite "3D color grading settings" started.
+◊ Test defaultsAreNeutral() started.
+√ Test defaultsAreNeutral() passed after 0.001 seconds.
+◊ Test olderPayloadsDecodeToNeutralGrading() started.
+√ Test olderPayloadsDecodeToNeutralGrading() passed after 0.001 seconds.
+◊ Test partialPayloadsFillTheRestWithDefaults() started.
+√ Test partialPayloadsFillTheRestWithDefaults() passed after 0.001 seconds.
+◊ Test settingsRoundTripThroughTheEnvironment() started.
+√ Test settingsRoundTripThroughTheEnvironment() passed after 0.001 seconds.
+◊ Test flatAccessorsEditTheNestedSettings() started.
+√ Test flatAccessorsEditTheNestedSettings() passed after 0.001 seconds.
+◊ Test wildValuesAreClampedBeforeReachingTheShader() started.
+√ Test wildValuesAreClampedBeforeReachingTheShader() passed after 0.001 seconds.
+√ Suite "3D color grading settings" passed after 0.001 seconds.
+◊ Suite "3D debug view settings" started.
+◊ Test environmentDefaultsToNormalRendering() started.
+√ Test environmentDefaultsToNormalRendering() passed after 0.001 seconds.
+◊ Test legacyEnvironmentPayloadDecodesWithoutDebugView() started.
+√ Test legacyEnvironmentPayloadDecodesWithoutDebugView() passed after 0.001 seconds.
+◊ Test debugViewRoundTrips(view:) started.
+◊ Test case passing 1 argument view → .none to debugViewRoundTrips(view:) started.
+◊ Test case passing 1 argument view → .normals to debugViewRoundTrips(view:) started.
+◊ Test case passing 1 argument view → .depth to debugViewRoundTrips(view:) started.
+◊ Test case passing 1 argument view → .roughness to debugViewRoundTrips(view:) started.
+◊ Test case passing 1 argument view → .metallic to debugViewRoundTrips(view:) started.
+◊ Test case passing 1 argument view → .ambientOcclusion to debugViewRoundTrips(view:) started.
+◊ Test case passing 1 argument view → .indirectLighting to debugViewRoundTrips(view:) started.
+◊ Test case passing 1 argument view → .wireframe to debugViewRoundTrips(view:) started.
+◊ Test case passing 1 argument view → .albedo to debugViewRoundTrips(view:) started.
+◊ Test case passing 1 argument view → .cascades to debugViewRoundTrips(view:) started.
+◊ Test case passing 1 argument view → .lightCount to debugViewRoundTrips(view:) started.
+√ Test debugViewRoundTrips(view:) with 11 test cases passed after 0.005 seconds.
+◊ Test onlyFullscreenViewsReplaceTheFinalImage() started.
+√ Test onlyFullscreenViewsReplaceTheFinalImage() passed after 0.001 seconds.
+√ Suite "3D debug view settings" passed after 0.007 seconds.
+◊ Suite "3D debug draw queue" started.
+◊ Test shapesLiveForTheirDurationThenExpire() started.
+√ Test shapesLiveForTheirDurationThenExpire() passed after 0.001 seconds.
+◊ Test nonPositiveDurationStillDrawsOnce() started.
+√ Test nonPositiveDurationStillDrawsOnce() passed after 0.001 seconds.
+◊ Test shapeBuildersEmitExpectedSegmentCounts() started.
+√ Test shapeBuildersEmitExpectedSegmentCounts() passed after 0.001 seconds.
+◊ Test frustumOfAnIdentityViewIsABox() started.
+√ Test frustumOfAnIdentityViewIsABox() passed after 0.001 seconds.
+◊ Test boxEdgesFollowTheTransform() started.
+√ Test boxEdgesFollowTheTransform() passed after 0.001 seconds.
+◊ Test invalidInputIsRejected() started.
+√ Test invalidInputIsRejected() passed after 0.001 seconds.
+◊ Test queueIsBoundedAndCountsDroppedLines() started.
+√ Test queueIsBoundedAndCountsDroppedLines() passed after 0.001 seconds.
+◊ Test extractionAgesTheQueueOncePerRenderedFrame() started.
+√ Test extractionAgesTheQueueOncePerRenderedFrame() passed after 0.001 seconds.
+√ Suite "3D debug draw queue" passed after 0.001 seconds.
+◊ Suite "Golden frame comparison" started.
+◊ Test identicalImagesMatch() started.
+√ Test identicalImagesMatch() passed after 0.001 seconds.
+◊ Test differencesWithinChannelToleranceAreIgnored() started.
+√ Test differencesWithinChannelToleranceAreIgnored() passed after 0.001 seconds.
+◊ Test differencesBeyondToleranceFail() started.
+√ Test differencesBeyondToleranceFail() passed after 0.001 seconds.
+◊ Test sizeMismatchAlwaysFails() started.
+√ Test sizeMismatchAlwaysFails() passed after 0.001 seconds.
+√ Suite "Golden frame comparison" passed after 0.001 seconds.
+◊ Suite "3D depth of field settings" started.
+◊ Test defaultsAreOff() started.
+√ Test defaultsAreOff() passed after 0.001 seconds.
+◊ Test olderPayloadsDecodeWithoutDepthOfField() started.
+√ Test olderPayloadsDecodeWithoutDepthOfField() passed after 0.001 seconds.
+◊ Test settingsRoundTripAndFlatAccessors() started.
+√ Test settingsRoundTripAndFlatAccessors() passed after 0.001 seconds.
+◊ Test wildValuesAreClamped() started.
+√ Test wildValuesAreClamped() passed after 0.001 seconds.
+◊ Test settingsThatCannotBlurAreNotCountedAsAnEffect() started.
+√ Test settingsThatCannotBlurAreNotCountedAsAnEffect() passed after 0.001 seconds.
+◊ Test laterPassesFlagCoversDebugViewsAndDepthOfField() started.
+√ Test laterPassesFlagCoversDebugViewsAndDepthOfField() passed after 0.001 seconds.
+√ Suite "3D depth of field settings" passed after 0.001 seconds.
+◊ Suite "3D fog settings" started.
+◊ Test defaultsAreOff() started.
+√ Test defaultsAreOff() passed after 0.001 seconds.
+◊ Test olderPayloadsDecodeWithoutFog() started.
+√ Test olderPayloadsDecodeWithoutFog() passed after 0.001 seconds.
+◊ Test settingsRoundTripAndFlatAccessors() started.
+√ Test settingsRoundTripAndFlatAccessors() passed after 0.001 seconds.
+◊ Test wildValuesAreClamped() started.
+√ Test wildValuesAreClamped() passed after 0.001 seconds.
+◊ Test volumetricDefaultsAreOffAndOlderPayloadsDecode() started.
+√ Test volumetricDefaultsAreOffAndOlderPayloadsDecode() passed after 0.001 seconds.
+◊ Test volumetricRequiresFogAndClampsValues() started.
+√ Test volumetricRequiresFogAndClampsValues() passed after 0.001 seconds.
+◊ Test settingsThatCannotChangeTheImageAreNotCountedAsAnEffect() started.
+√ Test settingsThatCannotChangeTheImageAreNotCountedAsAnEffect() passed after 0.001 seconds.
+√ Suite "3D fog settings" passed after 0.001 seconds.
+◊ Suite LightingFoundationSettingsTests started.
+◊ Test olderSettingsDecodeDisabledAndUnsafeValuesAreBounded() started.
+√ Test olderSettingsDecodeDisabledAndUnsafeValuesAreBounded() passed after 0.001 seconds.
+√ Suite LightingFoundationSettingsTests passed after 0.001 seconds.
+◊ Suite "3D material extension constants" started.
+◊ Test defaultsGiveTheFourPercentReflectanceAndIdentityTransforms() started.
+√ Test defaultsGiveTheFourPercentReflectanceAndIdentityTransforms() passed after 0.001 seconds.
+◊ Test iorAndSpecularScaleTheDielectricReflectance() started.
+√ Test iorAndSpecularScaleTheDielectricReflectance() passed after 0.001 seconds.
+◊ Test clearcoatDefaultsToOffAndClampsToTheUnitRange() started.
+√ Test clearcoatDefaultsToOffAndClampsToTheUnitRange() passed after 0.001 seconds.
+◊ Test sheenAndAnisotropyDefaultToOffAndClamp() started.
+√ Test sheenAndAnisotropyDefaultToOffAndClamp() passed after 0.001 seconds.
+◊ Test shaderFeaturesFollowTheLayersInUse() started.
+√ Test shaderFeaturesFollowTheLayersInUse() passed after 0.001 seconds.
+◊ Test pipelineKeysSplitByFeaturesAndDefaultToThePlainShader() started.
+√ Test pipelineKeysSplitByFeaturesAndDefaultToThePlainShader() passed after 0.001 seconds.
+◊ Test nonFiniteValuesFallBackToDefaults() started.
+√ Test nonFiniteValuesFallBackToDefaults() passed after 0.001 seconds.
+◊ Test textureTransformFollowsTheGlTFMatrix() started.
+√ Test textureTransformFollowsTheGlTFMatrix() passed after 0.001 seconds.
+◊ Test materialEditsChangeTheRevisionAndTheSharedBuffer() started.
+√ Test materialEditsChangeTheRevisionAndTheSharedBuffer() passed after 0.001 seconds.
+√ Suite "3D material extension constants" passed after 0.001 seconds.
+◊ Suite "3D GPU pass timing report" started.
+◊ Test emptyMetricsSayNothingWasMeasured() started.
+√ Test emptyMetricsSayNothingWasMeasured() passed after 0.001 seconds.
+◊ Test reportListsPassesSlowestFirstWithATotal() started.
+√ Test reportListsPassesSlowestFirstWithATotal() passed after 0.001 seconds.
+◊ Test columnsAlignAcrossRows() started.
+√ Test columnsAlignAcrossRows() passed after 0.001 seconds.
+◊ Test warmupSamplesAreExcludedAndFailedTimingsIgnored() started.
+√ Test warmupSamplesAreExcludedAndFailedTimingsIgnored() passed after 0.001 seconds.
+√ Suite "3D GPU pass timing report" passed after 0.001 seconds.
+◊ Suite "Path tracing settings and BVH" started.
+◊ Test pathShadersCompileFreshWithoutAGPU() started.
+× Test pathShadersCompileFreshWithoutAGPU() recorded an issue at Render3DPathTracingTests.swift:15:6: Caught error: .failedToRead("D:/Development/AdaEngine/.build-codex/meshlets-p0/validation-package/Sources/AdaCorePipelines/Assets/Shaders/path_tracing_3d.glsl")
+× Test pathShadersCompileFreshWithoutAGPU() failed after 0.001 seconds with 1 issue.
+◊ Test oldScenesStayOptedOutAndSettingsRoundTrip() started.
+√ Test oldScenesStayOptedOutAndSettingsRoundTrip() passed after 0.001 seconds.
+◊ Test stacklessBVHCoversEveryTriangleAndHasValidEscapes() started.
+√ Test stacklessBVHCoversEveryTriangleAndHasValidEscapes() passed after 0.001 seconds.
+× Suite "Path tracing settings and BVH" failed after 0.001 seconds with 1 issue.
+◊ Suite "3D post-process settings" started.
+◊ Test defaultsLeaveTheImageUnchanged() started.
+√ Test defaultsLeaveTheImageUnchanged() passed after 0.001 seconds.
+◊ Test legacyEnvironmentPayloadDecodesWithoutPostProcess() started.
+√ Test legacyEnvironmentPayloadDecodesWithoutPostProcess() passed after 0.001 seconds.
+◊ Test partialPostProcessPayloadFillsDefaults() started.
+√ Test partialPostProcessPayloadFillsDefaults() passed after 0.001 seconds.
+◊ Test settingsRoundTripThroughTheEnvironment() started.
+√ Test settingsRoundTripThroughTheEnvironment() passed after 0.001 seconds.
+◊ Test flatAccessorsEditTheNestedSettings() started.
+√ Test flatAccessorsEditTheNestedSettings() passed after 0.001 seconds.
+◊ Test toneMapperDefaultsToAcesAndOldPayloadsKeepIt() started.
+√ Test toneMapperDefaultsToAcesAndOldPayloadsKeepIt() passed after 0.001 seconds.
+◊ Test toneMapperRoundTrips(mapper:) started.
+◊ Test case passing 1 argument mapper → .aces to toneMapperRoundTrips(mapper:) started.
+◊ Test case passing 1 argument mapper → .neutral to toneMapperRoundTrips(mapper:) started.
+◊ Test case passing 1 argument mapper → .none to toneMapperRoundTrips(mapper:) started.
+√ Test toneMapperRoundTrips(mapper:) with 3 test cases passed after 0.001 seconds.
+◊ Test toneMapperRawValuesAndShaderSelectorsAreStable() started.
+√ Test toneMapperRawValuesAndShaderSelectorsAreStable() passed after 0.001 seconds.
+◊ Test unknownToneMapperNameFailsInsteadOfSilentlyFallingBack() started.
+√ Test unknownToneMapperNameFailsInsteadOfSilentlyFallingBack() passed after 0.002 seconds.
+◊ Test exposureScaleIsPowerOfTwoLimitedToTenStops() started.
+√ Test exposureScaleIsPowerOfTwoLimitedToTenStops() passed after 0.001 seconds.
+◊ Test bloomSettingsAreSanitizedBeforeReachingTheShader() started.
+√ Test bloomSettingsAreSanitizedBeforeReachingTheShader() passed after 0.001 seconds.
+◊ Test chainStartsAtHalfResolutionAndStopsAtSixLevelsOrTinyTargets() started.
+√ Test chainStartsAtHalfResolutionAndStopsAtSixLevelsOrTinyTargets() passed after 0.001 seconds.
+√ Suite "3D post-process settings" passed after 0.007 seconds.
+◊ Suite "Render graph diagnostics" started.
+◊ Test "Snapshot describes nodes edges slots and subgraphs" started.
+√ Test "Snapshot describes nodes edges slots and subgraphs" passed after 0.001 seconds.
+◊ Test "Snapshot reports missing subgraph references" started.
+√ Test "Snapshot reports missing subgraph references" passed after 0.001 seconds.
+◊ Test "Executor records node timings subgraphs and respects capacity" started.
+√ Test "Executor records node timings subgraphs and respects capacity" passed after 0.001 seconds.
+◊ Test "Executor records node errors before rethrowing" started.
+√ Test "Executor records node errors before rethrowing" passed after 0.001 seconds.
+◊ Test "Disabled diagnostics execute nodes without inspecting their resources" started.
+√ Test "Disabled diagnostics execute nodes without inspecting their resources" passed after 0.001 seconds.
+√ Suite "Render graph diagnostics" passed after 0.003 seconds.
+◊ Suite "Render Upscaling" started.
+◊ Test "Spatial upscaling reduces both render dimensions" started.
+√ Test "Spatial upscaling reduces both render dimensions" passed after 0.001 seconds.
+◊ Test "Unsupported backends keep native resolution" started.
+√ Test "Unsupported backends keep native resolution" passed after 0.001 seconds.
+◊ Test "Disabled upscaling keeps native resolution" started.
+√ Test "Disabled upscaling keeps native resolution" passed after 0.001 seconds.
+◊ Test "Render scale is clamped to a safe range" started.
+◊ Test case passing 1 argument argument → (0.1, Math.SizeInt(width: 500, height: 250)) to "Render scale is clamped to a safe range" started.
+◊ Test case passing 1 argument argument → (2.0, Math.SizeInt(width: 1000, height: 500)) to "Render scale is clamped to a safe range" started.
+√ Test "Render scale is clamped to a safe range" with 2 test cases passed after 0.001 seconds.
+◊ Test "Non-finite render scales keep native resolution" started.
+◊ Test case passing 1 argument renderScale → nan to "Non-finite render scales keep native resolution" started.
+◊ Test case passing 1 argument renderScale → inf to "Non-finite render scales keep native resolution" started.
+√ Test "Non-finite render scales keep native resolution" with 2 test cases passed after 0.001 seconds.
+◊ Test "Fractional render sizes round up" started.
+√ Test "Fractional render sizes round up" passed after 0.001 seconds.
+√ Suite "Render Upscaling" passed after 0.001 seconds.
+◊ Suite "Shader cache keys" started.
+◊ Test stageParserAcceptsWindowsLineEndings() started.
+√ Test stageParserAcceptsWindowsLineEndings() passed after 0.001 seconds.
+◊ Test editingAnIncludedFileChangesTheSourceHash() started.
+√ Test editingAnIncludedFileChangesTheSourceHash() passed after 0.014 seconds.
+◊ Test unresolvedIncludesFallBackToTheRawTextHash() started.
+√ Test unresolvedIncludesFallBackToTheRawTextHash() passed after 0.001 seconds.
+◊ Test sourcesWithoutIncludesKeepTheirOldHash() started.
+√ Test sourcesWithoutIncludesKeepTheirOldHash() passed after 0.001 seconds.
+√ Suite "Shader cache keys" passed after 0.014 seconds.
+◊ Suite "Baked Shader Graph resources" started.
+◊ Test archivesRoundTripAndResolveOnlyExactVariants() started.
+√ Test archivesRoundTripAndResolveOnlyExactVariants() passed after 0.001 seconds.
+◊ Test invalidArchivesDoNotInstall() started.
+√ Test invalidArchivesDoNotInstall() passed after 0.001 seconds.
+√ Suite "Baked Shader Graph resources" passed after 0.001 seconds.
+◊ Suite "Shader Graph effects" started.
+◊ Test mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .subtract to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .divide to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .power to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .minimum to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .maximum to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .clamp to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .saturate to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .oneMinus to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .sine to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .cosine to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .absolute to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .fraction to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .floor to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .step to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+◊ Test case passing 1 argument operation → .smoothstep to mathNodesCompileWithScalarAndVectorInputs(_:) started.
+√ Test mathNodesCompileWithScalarAndVectorInputs(_:) with 15 test cases passed after 4.336 seconds.
+◊ Test animatedMaterialsAdvanceOnceAndManualTransportOwnsItsClock() started.
+√ Test animatedMaterialsAdvanceOnceAndManualTransportOwnsItsClock() passed after 0.001 seconds.
+◊ Test proceduralNoiseAndExplicitVectorChannelsCompile() started.
+√ Test proceduralNoiseAndExplicitVectorChannelsCompile() passed after 0.056 seconds.
+√ Suite "Shader Graph effects" passed after 4.392 seconds.
+◊ Suite "Shader graph instances" started.
+◊ Test aNewMaterialReadsTheSavedGraphRatherThanAnOlderAsset() started.
+√ Test aNewMaterialReadsTheSavedGraphRatherThanAnOlderAsset() passed after 0.015 seconds.
+◊ Test graphRenderSettingsAreEffectiveWithoutChangingLegacyMaterialState() started.
+√ Test graphRenderSettingsAreEffectiveWithoutChangingLegacyMaterialState() passed after 0.001 seconds.
+◊ Test instancesHaveIndependentValuesAndRoundTrip() started.
+√ Test instancesHaveIndependentValuesAndRoundTrip() passed after 0.001 seconds.
+◊ Test changedValuesPreservePreviouslyPreparedGPUBytes() started.
+√ Test changedValuesPreservePreviouslyPreparedGPUBytes() passed after 0.001 seconds.
+√ Suite "Shader graph instances" passed after 0.017 seconds.
+◊ Suite "Generated shader graph functions" started.
+◊ Test validationRetainsNodeAndPortLocations() started.
+√ Test validationRetainsNodeAndPortLocations() passed after 0.055 seconds.
+◊ Test resourcesAndDefaultsDoNotChangeCompiledCode() started.
+√ Test resourcesAndDefaultsDoNotChangeCompiledCode() passed after 0.001 seconds.
+◊ Test realCompilerAcceptsGeneratedFunctions(target:) started.
+◊ Test case passing 1 argument target → .sprite to realCompilerAcceptsGeneratedFunctions(target:) started.
+2026-11-02T22:56:14+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+◊ Test case passing 1 argument target → .pbrSurface to realCompilerAcceptsGeneratedFunctions(target:) started.
+2026-11-02T22:56:14+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+√ Test realCompilerAcceptsGeneratedFunctions(target:) with 2 test cases passed after 0.114 seconds.
+√ Suite "Generated shader graph functions" passed after 0.171 seconds.
+◊ Suite "Typed shader graphs" started.
+◊ Test graphFileRoundTrip() started.
+√ Test graphFileRoundTrip() passed after 0.007 seconds.
+◊ Test loweringIgnoresOrderingLayoutAndUnusedComputations() started.
+√ Test loweringIgnoresOrderingLayoutAndUnusedComputations() passed after 0.001 seconds.
+◊ Test assetManagerPreservesMetadataAndGraphContents() started.
+√ Test assetManagerPreservesMetadataAndGraphContents() passed after 0.017 seconds.
+◊ Test scalarBroadcastIsExplicit() started.
+√ Test scalarBroadcastIsExplicit() passed after 0.001 seconds.
+◊ Test unreachableDependentsCannotReorderTheProgram() started.
+√ Test unreachableDependentsCannotReorderTheProgram() passed after 0.001 seconds.
+◊ Test texturePortsAndPBRSurfaceAreTyped() started.
+√ Test texturePortsAndPBRSurfaceAreTyped() passed after 0.001 seconds.
+◊ Test futureVersionsAreRejectedBeforeDecodingTheirSchema() started.
+√ Test futureVersionsAreRejectedBeforeDecodingTheirSchema() passed after 0.001 seconds.
+◊ Test unknownOperationsKeepTheirNodeIdentity() started.
+√ Test unknownOperationsKeepTheirNodeIdentity() passed after 0.001 seconds.
+◊ Test malformedLinksAreAttributedToTheirDestination() started.
+√ Test malformedLinksAreAttributedToTheirDestination() passed after 0.001 seconds.
+◊ Test mismatchedVectorAndColorTypesAreRejected() started.
+√ Test mismatchedVectorAndColorTypesAreRejected() passed after 0.001 seconds.
+◊ Test invalidLiteralShapesAndNonfiniteValuesAreRejected() started.
+√ Test invalidLiteralShapesAndNonfiniteValuesAreRejected() passed after 0.001 seconds.
+◊ Test duplicateNodesAndMissingOutputsAreRejected() started.
+√ Test duplicateNodesAndMissingOutputsAreRejected() passed after 0.001 seconds.
+◊ Test unusedCyclesAreStillRejected() started.
+√ Test unusedCyclesAreStillRejected() passed after 0.001 seconds.
+◊ Test missingRequiredInputsAreRejected() started.
+√ Test missingRequiredInputsAreRejected() passed after 0.001 seconds.
+◊ Test deepSharedGraphsDoNotRecurseOrDuplicateInstructions() started.
+√ Test deepSharedGraphsDoNotRecurseOrDuplicateInstructions() passed after 0.012 seconds.
+◊ Test parameterDefaultsAndReferencesAreChecked() started.
+√ Test parameterDefaultsAndReferencesAreChecked() passed after 0.001 seconds.
+◊ Test unconnectedOutputsLeaveDefaultsToTheTarget(target:) started.
+◊ Test case passing 1 argument target → .sprite to unconnectedOutputsLeaveDefaultsToTheTarget(target:) started.
+◊ Test case passing 1 argument target → .pbrSurface to unconnectedOutputsLeaveDefaultsToTheTarget(target:) started.
+√ Test unconnectedOutputsLeaveDefaultsToTheTarget(target:) with 2 test cases passed after 0.001 seconds.
+◊ Test textureParametersCanFeedSamplingNodes() started.
+√ Test textureParametersCanFeedSamplingNodes() passed after 0.001 seconds.
+◊ Test sharedParametersMustAgreeOnTypeAndDefault() started.
+√ Test sharedParametersMustAgreeOnTypeAndDefault() passed after 0.001 seconds.
+√ Suite "Typed shader graphs" passed after 0.042 seconds.
+◊ Suite "Shader module includes" started.
+◊ Test singleModuleIncludeIsInlined() started.
+√ Test singleModuleIncludeIsInlined() passed after 0.008 seconds.
+◊ Test adjacentModuleIncludesAreInlinedSeparately() started.
+√ Test adjacentModuleIncludesAreInlinedSeparately() passed after 0.009 seconds.
+◊ Test aLaterLineEndingInAnAngleBracketIsNotSwallowed() started.
+√ Test aLaterLineEndingInAnAngleBracketIsNotSwallowed() passed after 0.004 seconds.
+◊ Test windowsLineEndingsAreAccepted() started.
+√ Test windowsLineEndingsAreAccepted() passed after 0.007 seconds.
+◊ Test missingModuleIncludeStillThrows() started.
+√ Test missingModuleIncludeStillThrows() passed after 0.001 seconds.
+√ Suite "Shader module includes" passed after 0.032 seconds.
+◊ Suite "Sprite layout GPU rendering" started.
+◊ Test rendersLayoutsAndPickingWithWebGPU() started.
+× Test rendersLayoutsAndPickingWithWebGPU() recorded an issue at SpriteMetalRenderingTests.swift:56:9: Expectation failed: try await device.readImage(from: samplingOnly) == nil
+× Test rendersLayoutsAndPickingWithWebGPU() failed after 1.025 seconds with 1 issue.
+◊ Test rendersTileOcclusionWithWebGPU() started.
+√ Test rendersTileOcclusionWithWebGPU() passed after 0.174 seconds.
+× Suite "Sprite layout GPU rendering" failed after 1.200 seconds with 1 issue.
+→ /// Run one backend alone so the process does not share a previously initialized renderer.
+◊ Suite "Real Tint SPIR-V to WGSL" started.
+◊ Test compilesFreshReflectedMeshPasses(shader:) started.
+◊ Test case passing 1 argument shader → "flat3d.glsl" to compilesFreshReflectedMeshPasses(shader:) started.
+◊ Test case passing 1 argument shader → "directional_shadow_3d.glsl" to compilesFreshReflectedMeshPasses(shader:) started.
+◊ Test case passing 1 argument shader → "motion_3d.glsl" to compilesFreshReflectedMeshPasses(shader:) started.
+√ Test compilesFreshReflectedMeshPasses(shader:) with 3 test cases passed after 0.651 seconds.
+◊ Test compilesFreshGlassBlur(shader:) started.
+◊ Test case passing 1 argument shader → "glass.glsl" to compilesFreshGlassBlur(shader:) started.
+◊ Test case passing 1 argument shader → "gradient.glsl" to compilesFreshGlassBlur(shader:) started.
+2026-11-02T22:56:17+0300 warning org.adaengine.wgsl: [AdaRender] Tint: warning: code is unreachable
+
+√ Test compilesFreshGlassBlur(shader:) with 2 test cases passed after 0.366 seconds.
+◊ Test compilesFreshShader() started.
+√ Test compilesFreshShader() passed after 0.099 seconds.
+√ Suite "Real Tint SPIR-V to WGSL" passed after 1.117 seconds.
+◊ Suite "Tint host tool discovery" started.
+◊ Test overrideAndCachePriority() started.
+√ Test overrideAndCachePriority() passed after 0.407 seconds.
+√ Suite "Tint host tool discovery" passed after 0.407 seconds.
+◊ Suite "Visible mesh list equivalence" started.
+◊ Test listsAreIdenticalToTheRecordedBehavior() started.
+√ Test listsAreIdenticalToTheRecordedBehavior() passed after 0.003 seconds.
+◊ Test digestIsStableAcrossRuns() started.
+√ Test digestIsStableAcrossRuns() passed after 0.002 seconds.
+➜ Test prepareCost() skipped.
+√ Suite "Visible mesh list equivalence" passed after 0.006 seconds.
+◊ Suite "WebGPU retained binding state" started.
+◊ Test changesTrackIdentityRangeTextureAndSampler() started.
+√ Test changesTrackIdentityRangeTextureAndSampler() passed after 0.001 seconds.
+◊ Test rendersChangedBindingsOffsetsAndPipelineSwitches() started.
+√ Test rendersChangedBindingsOffsetsAndPipelineSwitches() passed after 0.404 seconds.
+◊ Test transientRenderAttachmentsAreNotRetainedByBindings() started.
+√ Test transientRenderAttachmentsAreNotRetainedByBindings() passed after 0.309 seconds.
+√ Suite "WebGPU retained binding state" passed after 0.715 seconds.
+◊ Suite "Native WebGPU command completion" started.
+◊ Test deliversOnceAndAllowsHandlersToSubmitMoreWork() started.
+2026-11-02T22:56:18+0300 info org.adaengine.webgpu: [AdaRender] Selected WebGPU adapter: backend=4 vendor=nvidia device=NVIDIA GeForce RTX 4070 description=D3D12 driver version 32.0.16.1088
+√ Test deliversOnceAndAllowsHandlersToSubmitMoreWork() passed after 0.125 seconds.
+√ Suite "Native WebGPU command completion" passed after 0.125 seconds.
+◊ Suite "WebGPU Hi-Z visibility" started.
+◊ Test rejectsInvalidAndOverlappingOutputSegments() started.
+√ Test rejectsInvalidAndOverlappingOutputSegments() passed after 0.001 seconds.
+◊ Test compactsDepthAndRecoversAfterCameraMotionRemovalResizeAndFrameReuse() started.
+2026-11-02T22:56:18+0300 info org.adaengine.webgpu: [AdaRender] Selected WebGPU adapter: backend=4 vendor=nvidia device=NVIDIA GeForce RTX 4070 description=D3D12 driver version 32.0.16.1088
+√ Test compactsDepthAndRecoversAfterCameraMotionRemovalResizeAndFrameReuse() passed after 0.626 seconds.
+◊ Test rendersCompactedInstancesAndZeroCountIndexedIndirectDraws() started.
+2026-11-02T22:56:19+0300 info org.adaengine.webgpu: [AdaRender] Selected WebGPU adapter: backend=4 vendor=nvidia device=NVIDIA GeForce RTX 4070 description=D3D12 driver version 32.0.16.1088
+√ Test rendersCompactedInstancesAndZeroCountIndexedIndirectDraws() passed after 0.168 seconds.
+√ Suite "WebGPU Hi-Z visibility" passed after 0.795 seconds.
+◊ Suite "Generated WGSL bindings" started.
+◊ Test autoLayoutFollowsOnlyEntryPointReachableHelpers() started.
+√ Test autoLayoutFollowsOnlyEntryPointReachableHelpers() passed after 0.001 seconds.
+◊ Test recognizesTintUnsignedBindings(group:) started.
+◊ Test case passing 1 argument group → "0" to recognizesTintUnsignedBindings(group:) started.
+◊ Test case passing 1 argument group → "0u" to recognizesTintUnsignedBindings(group:) started.
+◊ Test case passing 1 argument group → " 0u " to recognizesTintUnsignedBindings(group:) started.
+√ Test recognizesTintUnsignedBindings(group:) with 3 test cases passed after 0.001 seconds.
+◊ Test mergesSharedStageBindingsAndSparseSets() started.
+√ Test mergesSharedStageBindingsAndSparseSets() passed after 0.001 seconds.
+√ Suite "Generated WGSL bindings" passed after 0.001 seconds.
+◊ Suite "Window frame demand" started.
+◊ Test "Extract initializes optional demand from both UI and standalone render worlds" started.
+√ Test "Extract initializes optional demand from both UI and standalone render worlds" passed after 0.001 seconds.
+◊ Test "A skipped drawable retries until acquisition succeeds, including resize skips" started.
+√ Test "A skipped drawable retries until acquisition succeeds, including resize skips" passed after 0.001 seconds.
+◊ Test "Closing a window removes its retry without discarding another pending update" started.
+√ Test "Closing a window removes its retry without discarding another pending update" passed after 0.001 seconds.
+◊ Test "An unchanged UI camera skips presentation and uses idle frame pacing" started.
+√ Test "An unchanged UI camera skips presentation and uses idle frame pacing" passed after 0.001 seconds.
+◊ Test "A new viewport frame requests presentation without affecting another window" started.
+√ Test "A new viewport frame requests presentation without affecting another window" passed after 0.001 seconds.
+◊ Test "A regular scene camera keeps a shared UI window rendering" started.
+◊ Test case passing 1 argument uiCameraFirst → true to "A regular scene camera keeps a shared UI window rendering" started.
+◊ Test case passing 1 argument uiCameraFirst → false to "A regular scene camera keeps a shared UI window rendering" started.
+√ Test "A regular scene camera keeps a shared UI window rendering" with 2 test cases passed after 0.001 seconds.
+◊ Test "Frame reset removes old requests and camera policies" started.
+√ Test "Frame reset removes old requests and camera policies" passed after 0.001 seconds.
+◊ Test "An unresolved primary window and legacy cameras retain ordinary pacing" started.
+√ Test "An unresolved primary window and legacy cameras retain ordinary pacing" passed after 0.001 seconds.
+√ Suite "Window frame demand" passed after 0.001 seconds.
+× Test run with 295 tests in 68 suites failed after 258.066 seconds with 25 issues.
+ess: 0 px differ, largest step 0
+pbr-spheres-ssr: 0 px differ, largest step 0
+pbr-spheres-ssr-skybox: 0 px differ, largest step 0
+pbr-spheres-vignette: 0 px differ, largest step 0
+DIGEST 5de09fd1016c21b6

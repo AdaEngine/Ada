@@ -25,6 +25,7 @@ struct EditorSceneViewportView: View {
     @State var viewportPresentation = EditorViewportPresentation()
     @State var runtimeWarnings: [String] = []
     @State private var isLoadingScene = false
+    @State private var loadingProgress = EditorSceneLoadingProgress()
     @State private var showsBones = false
     @State private var showsEntityMarkers = false
     @State private var displayMode: EditorSceneViewportDisplayMode = .twoD
@@ -104,7 +105,8 @@ struct EditorSceneViewportView: View {
                             }
                             guard configureSceneViewApp(&app) else { return }
                             let world = app.main
-                            viewportModel.loadSceneWorld(world, application: app, onLoadingChanged: { isLoadingScene = $0 }, onLoaded: { result in
+                            viewportModel.loadSceneWorld(world, application: app, onLoadingChanged: { isLoadingScene = $0 },
+                                                        onLoadingProgress: { loadingProgress = $0 }, onLoaded: { result in
                                 if runtimeWarnings != result.warnings { runtimeWarnings = result.warnings }
                                 redrawViewport()
                                 onEditWorldReady?(world)
@@ -152,14 +154,9 @@ struct EditorSceneViewportView: View {
                         .padding(.trailing, 12)
                     }
                     if isLoadingScene {
-                        Text(L10n.text("Loading scene resources…"))
-                            .font(.system(size: 13))
-                            .foregroundColor(theme.editorColors.text)
-                            .padding(12)
-                            .background(theme.editorColors.surface)
+                        EditorSceneLoadingProgressView(progress: loadingProgress)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                             .allowsHitTesting(false)
-                            .accessibilityIdentifier("AdaEditor.SceneViewport.Loading")
                     }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
@@ -358,7 +355,7 @@ struct EditorSceneViewportView: View {
                         symbol: "\u{E3C9}",
                         identifier: "AdaEditor.SceneViewport.Annotate",
                         isSelected: agent.sceneAnnotations.isSelecting,
-                        isEnabled: agent.activeSession != nil && !agent.isSending
+                        isEnabled: agent.activeSessionID != nil && !agent.isSending
                     ) {
                         agent.sceneAnnotations.toggleSelection()
                         viewportModel.setAnnotationMode(agent.sceneAnnotations.isSelecting)

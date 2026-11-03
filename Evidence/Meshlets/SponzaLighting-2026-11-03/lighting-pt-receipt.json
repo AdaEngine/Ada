@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "profile": "sponza-lighting-pt-lod",
+  "tool": "gltfpack 1.3",
+  "toolSHA256": "a082a0db2332908133100332caeeddaa304afcf5e8094adc755ebdea8c720984",
+  "ratio": 0.015,
+  "triangleBudget": 131072,
+  "models": [
+    {
+      "folder": "main_sponza",
+      "triangles": 54159,
+      "sourceSHA256": "f93e88cfce48b1f044fbc6a6aa56b81b167f1d59050d02cb6f127025e17ef821",
+      "options": [
+        "-si",
+        "0.015",
+        "-sp",
+        "-sv",
+        "-se",
+        "1",
+        "-noq",
+        "-tr"
+      ],
+      "files": {
+        "lighting-pt.gltf": "167549a98a90ecc407ea4061fa129c973f43140559a2b3d74ee51dc090405ec6",
+        "lighting-pt.bin": "e6a80db09f75368d9b4a2f030932ab49872e41b2f7acadba841308b28eb3f1e5"
+      }
+    },
+    {
+      "folder": "pkg_b_ivy",
+      "triangles": 60297,
+      "sourceSHA256": "303392e9dfc49c1fc8f2067d8c889994ccd398ff31643221e3f3e0b773299516",
+      "options": [
+        "-si",
+        "0.015",
+        "-sp",
+        "-sv",
+        "-se",
+        "1",
+        "-noq",
+        "-tr"
+      ],
+      "files": {
+        "lighting-pt.gltf": "f02a4473f867220a0052668939ab3b0540671436dc696fc722f84db9f8256d94",
+        "lighting-pt.bin": "099076f58d3f0f0746c5d27031fa3ac67033932ebee21d8d6bfdd7c9c47cb277"
+      }
+    }
+  ],
+  "triangles": 114456
+}

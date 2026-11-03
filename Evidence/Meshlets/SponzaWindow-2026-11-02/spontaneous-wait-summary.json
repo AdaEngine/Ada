@@ -1,0 +1,200 @@
+[
+  {
+    "view": "atrium",
+    "shadows": true,
+    "round": 0,
+    "width": 1890,
+    "height": 1030,
+    "frames": 59,
+    "fps": 31.941309413948435,
+    "medianMilliseconds": 31.4128,
+    "p95Milliseconds": 32.0907
+  },
+  {
+    "view": "atrium",
+    "shadows": false,
+    "round": 0,
+    "width": 1890,
+    "height": 1030,
+    "frames": 64,
+    "fps": 32.06642238733312,
+    "medianMilliseconds": 31.167050000000003,
+    "p95Milliseconds": 31.9473
+  },
+  {
+    "view": "atrium",
+    "shadows": false,
+    "round": 1,
+    "width": 1890,
+    "height": 1030,
+    "frames": 64,
+    "fps": 32.01481165261108,
+    "medianMilliseconds": 31.18215,
+    "p95Milliseconds": 31.9129
+  },
+  {
+    "view": "atrium",
+    "shadows": true,
+    "round": 1,
+    "width": 1890,
+    "height": 1030,
+    "frames": 63,
+    "fps": 31.92734431086652,
+    "medianMilliseconds": 31.405,
+    "p95Milliseconds": 31.9931
+  },
+  {
+    "view": "atrium",
+    "shadows": true,
+    "round": 2,
+    "width": 1890,
+    "height": 1030,
+    "frames": 49,
+    "fps": 24.68255091242072,
+    "medianMilliseconds": 31.404,
+    "p95Milliseconds": 46.2351
+  },
+  {
+    "view": "atrium",
+    "shadows": false,
+    "round": 2,
+    "width": 3810,
+    "height": 1883,
+    "frames": 53,
+    "fps": 26.60326589723329,
+    "medianMilliseconds": 31.1267,
+    "p95Milliseconds": 34.5659
+  },
+  {
+    "view": "gallery",
+    "shadows": true,
+    "round": 0,
+    "width": 3810,
+    "height": 1883,
+    "frames": 103,
+    "fps": 52.148352646197274,
+    "medianMilliseconds": 12.7478,
+    "p95Milliseconds": 35.8035
+  },
+  {
+    "view": "gallery",
+    "shadows": false,
+    "round": 0,
+    "width": 3810,
+    "height": 1883,
+    "frames": 57,
+    "fps": 28.71059219374109,
+    "medianMilliseconds": 31.2395,
+    "p95Milliseconds": 33.0237
+  },
+  {
+    "view": "gallery",
+    "shadows": false,
+    "round": 1,
+    "width": 3810,
+    "height": 1883,
+    "frames": 64,
+    "fps": 32.044904524710475,
+    "medianMilliseconds": 31.1653,
+    "p95Milliseconds": 32.0004
+  },
+  {
+    "view": "gallery",
+    "shadows": true,
+    "round": 1,
+    "width": 3810,
+    "height": 1883,
+    "frames": 76,
+    "fps": 38.061366340951515,
+    "medianMilliseconds": 23.936700000000002,
+    "p95Milliseconds": 47.2278
+  },
+  {
+    "view": "gallery",
+    "shadows": true,
+    "round": 2,
+    "width": 3810,
+    "height": 1883,
+    "frames": 76,
+    "fps": 38.269283728419204,
+    "medianMilliseconds": 30.31725,
+    "p95Milliseconds": 47.26
+  },
+  {
+    "view": "gallery",
+    "shadows": false,
+    "round": 2,
+    "width": 3810,
+    "height": 1883,
+    "frames": 56,
+    "fps": 28.26693741008527,
+    "medianMilliseconds": 31.159100000000002,
+    "p95Milliseconds": 32.3531
+  },
+  {
+    "view": "outside",
+    "shadows": true,
+    "round": 0,
+    "width": 3810,
+    "height": 1883,
+    "frames": 57,
+    "fps": 28.90418895226118,
+    "medianMilliseconds": 31.3001,
+    "p95Milliseconds": 32.115
+  },
+  {
+    "view": "outside",
+    "shadows": false,
+    "round": 0,
+    "width": 3810,
+    "height": 1883,
+    "frames": 63,
+    "fps": 31.99935473047223,
+    "medianMilliseconds": 31.2084,
+    "p95Milliseconds": 32.0501
+  },
+  {
+    "view": "outside",
+    "shadows": false,
+    "round": 1,
+    "width": 3810,
+    "height": 1883,
+    "frames": 49,
+    "fps": 24.896015946457105,
+    "medianMilliseconds": 31.2894,
+    "p95Milliseconds": 41.4992
+  },
+  {
+    "view": "outside",
+    "shadows": true,
+    "round": 1,
+    "width": 3810,
+    "height": 1883,
+    "frames": 57,
+    "fps": 28.566056148237184,
+    "medianMilliseconds": 31.2679,
+    "p95Milliseconds": 33.73
+  },
+  {
+    "view": "outside",
+    "shadows": true,
+    "round": 2,
+    "width": 3810,
+    "height": 1883,
+    "frames": 64,
+    "fps": 32.12147538955445,
+    "medianMilliseconds": 31.071550000000002,
+    "p95Milliseconds": 31.9173
+  },
+  {
+    "view": "outside",
+    "shadows": false,
+    "round": 2,
+    "width": 3810,
+    "height": 1883,
+    "frames": 63,
+    "fps": 31.96021754457664,
+    "medianMilliseconds": 31.2638,
+    "p95Milliseconds": 32.024
+  }
+]

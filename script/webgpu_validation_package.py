@@ -8,10 +8,13 @@ import shutil
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("destination", type=Path)
+parser.add_argument("--include-sponza-demo", action="store_true", help="Build the Sponza demo and camera tests with the same renderer objects")
 args = parser.parse_args()
 destination = args.destination.resolve()
 sources = destination / "Tests/RenderingValidationTests"
 sources.mkdir(parents=True, exist_ok=True)
+if not args.include_sponza_demo:
+    (sources / "SponzaCameraTests.swift").unlink(missing_ok=True)
 for relative in [
     "Tests/AdaUtilsTests/TintToolchainTests.swift",
     "Tests/AdaRenderTests/TintShaderCompilerTests.swift",
@@ -25,6 +28,11 @@ for relative in [
     "Tests/AdaRenderTests/BoundedResourceCacheTests.swift",
     "Tests/AdaRenderTests/RenderGraphDiagnosticsTests.swift",
     "Tests/AdaRenderTests/RenderUpscalingTests.swift",
+    "Tests/AdaRenderTests/MeshletGeometryTests.swift",
+    "Tests/AdaRenderTests/MeshletLODGeometryTests.swift",
+    "Tests/AdaEngineTests/Render3DMeshletTests.swift",
+    "Tests/AdaEngineTests/Render3DMeshletLODTests.swift",
+    "Tests/AdaEngineTests/Render3DMeshletLODTemporalTests.swift",
     "Tests/AdaEngineTests/Render3DFSRTests.swift",
     "Tests/AdaEngineTests/Render3DDLSSTests.swift",
     "Tests/AdaEngineTests/Render3DLightingFoundationTests.swift",
@@ -35,6 +43,7 @@ for relative in [
     "Tests/AdaEngineTests/Render3DSkinningBatchTests.swift",
     "Tests/AdaRenderTests/WindowFrameRequestsTests.swift",
     "Tests/AdaRenderTests/WGPUBindingStateTests.swift",
+    "Tests/AdaRenderTests/WGPUCommandCompletionTests.swift",
     "Tests/AdaRenderTests/WGPUVisibilityProcessorTests.swift",
     "Tests/AdaEngineTests/MaterialUploadReuseTests.swift",
     "Tests/AdaECSTests/OptionalResourceTests.swift",
@@ -48,6 +57,7 @@ for relative in [
     "Tests/AdaEngineTests/Render3DDebugViewTests.swift",
     "Tests/AdaEngineTests/Render3DShadowFilteringTests.swift",
     "Tests/AdaEngineTests/Render3DLocalShadowPrecisionTests.swift",
+    "Tests/AdaEngineTests/Render3DShadowCacheLifetimeTests.swift",
     "Tests/AdaEngineTests/Render3DDisplayDitherTests.swift",
     "Tests/AdaEngineTests/Render3DVolumetricQualityTests.swift",
     "Tests/AdaEngineTests/Render3DDistanceFieldTests.swift",
@@ -68,6 +78,10 @@ for relative in [
     "Tests/AdaSceneTests/Particle3DTests.swift",
     "Tests/AdaEngineTests/Render3DReflectionTests.swift",
     "Tests/AdaEngineTests/Render3DPerformanceBenchmarkTests.swift",
+    "Tests/AdaEngineTests/MeshletBaselineFixtures.swift",
+    "Tests/AdaEngineTests/Render3DMeshletBaselineTests.swift",
+    "Tests/AdaEngineTests/SponzaBenchmarkSupport.swift",
+    "Tests/AdaEngineTests/Render3DSponzaBenchmarkTests.swift",
     "Tests/AdaEngineTests/VisibleMesh3DListsEquivalenceTests.swift",
     "Tests/AdaEngineTests/Render3DMetricsReportTests.swift",
     "Tests/AdaEngineTests/GoldenBackendAgreementTests.swift",
@@ -78,13 +92,41 @@ for relative in [
 golden_frames = root / "Tests/AdaEngineTests/GoldenFrames"
 if golden_frames.is_dir():
     shutil.copytree(golden_frames, sources / "GoldenFrames", dirs_exist_ok=True)
+# Source-relative fresh compiler tests resolve this path from the staged package.
+shutil.copytree(
+    root / "Sources/AdaCorePipelines/Assets/Shaders",
+    destination / "Sources/AdaCorePipelines/Assets/Shaders",
+    dirs_exist_ok=True,
+)
+# Meshlet P0 uses original static garden props through the production glTF loader.
+garden_fixtures = root / "Tests/AdaEngineTests/Fixtures/SkeletalGardenAssets"
+for name in ["Courtyard", "Bench", "Lantern", "Pedestal"]:
+    fixture_destination = sources / "Fixtures/SkeletalGardenAssets"
+    fixture_destination.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(garden_fixtures / (name + ".glb"), fixture_destination / (name + ".glb"))
 # AdaAssets has no package product; AdaScene re-exports it.
 modules = ["AdaAnimation", "AdaApp", "AdaCorePipelines", "AdaECS", "AdaRender", "AdaScene", "AdaSprite", "AdaTilemap", "AdaTransform", "AdaUtils", "Math"]
 dependencies = ',\n'.join('.product(name: ' + json.dumps(module) + ', package: "AdaEngine")' for module in modules)
+extra_targets = ""
+if args.include_sponza_demo:
+    demo = destination / "Demos/Sponza"
+    camera = destination / "Demos/SponzaCamera"
+    demo.mkdir(parents=True, exist_ok=True)
+    camera.mkdir(parents=True, exist_ok=True)
+    for name in ["SponzaDemo.swift", "SponzaDemoProfiler.swift", "SponzaLighting.swift", "SponzaStutterProfiler.swift", "SponzaWarmup.swift"]:
+        shutil.copy2(root / "Demos/Sponza" / name, demo / name)
+    for source in (root / "Demos/Sponza/Camera").glob("*.swift"):
+        shutil.copy2(source, camera / source.name)
+    shutil.copy2(root / "Demos/Sponza/Tests/SponzaCameraTests.swift", sources / "SponzaCameraTests.swift")
+    dependencies += ',\n"SponzaCamera"'
+    extra_targets = ''', .target(name: "SponzaCamera", dependencies: [
+        .product(name: "AdaTransform", package: "AdaEngine"), .product(name: "Math", package: "AdaEngine")], path: "Demos/SponzaCamera"),
+    .executableTarget(name: "SponzaDemo", dependencies: ["SponzaCamera", .product(name: "AdaEngine", package: "AdaEngine"),
+        .product(name: "Math", package: "AdaEngine")], path: "Demos/Sponza")'''
 (destination / "Package.swift").write_text('''// swift-tools-version: 6.2
 import PackageDescription
 let package = Package(name: "RenderingValidation", platforms: [.macOS(.v15)], dependencies: [
     .package(name: "AdaEngine", path: ''' + json.dumps(str(root)) + ''')
 ], targets: [.testTarget(name: "RenderingValidationTests", dependencies: [
-''' + dependencies + '\n])])\n')
+''' + dependencies + '\n])' + extra_targets + '])\n')
 print(destination)

@@ -110,6 +110,10 @@ struct RetiredFrameTexture: Sendable {
 
 public struct ExtractedCameraRenderViewTargets: Resource {
     var targets: [Entity.ID: RenderViewTarget] = [:]
+    /// Authoritative source cameras, available even while extracted proxy entities are deferred.
+    package var activeCameraIDs: Set<Entity.ID> = []
+    /// Source cameras that still request temporal reconstruction, including suspended offscreen views.
+    package var temporalCameraIDs: Set<Entity.ID> = []
 }
 
 @Component
@@ -395,15 +399,20 @@ public func ExtractCamera(
     >
 ) {
     var activeCameraIds = Set<Entity.ID>()
+    var temporalCameraIds = Set<Entity.ID>()
 
     query.wrappedValue.forEach { entity, camera, transform, visibleEntities, uniform, graph in
+        // A SceneView may temporarily target its window when the display ring is full.
+        // The source camera is still alive: keep its render targets and temporal history.
+        activeCameraIds.insert(entity.id)
+        if camera.isActive, camera.temporalUpscaling != nil, camera.rasterizationRateMap == nil {
+            temporalCameraIds.insert(entity.id)
+        }
         // Embedded scenes render into textures. Authored window cameras belong
         // to the game and have no native surface in this render world.
         if case .window = camera.renderTarget, !surfaces.allowsWindowRendering {
             return
         }
-        activeCameraIds.insert(entity.id)
-
         let renderViewTarget = cachedViewTargets.targets[entity.id]?.cacheableCopy ?? RenderViewTarget()
         commands.spawn("ExtractedCameraEntity") {
             camera
@@ -417,6 +426,8 @@ public func ExtractCamera(
     }
 
     cachedViewTargets.targets = cachedViewTargets.targets.filter { activeCameraIds.contains($0.key) }
+    cachedViewTargets.activeCameraIDs = activeCameraIds
+    cachedViewTargets.temporalCameraIDs = temporalCameraIds
 }
 
 // Preserve targets after the 3D preparation systems have allocated their geometry buffers.

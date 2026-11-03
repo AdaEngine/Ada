@@ -4,8 +4,16 @@ import Foundation
 /// Resolves native executables and npm shims without interpreting agent arguments
 /// as cmd.exe source. Spaces, Unicode and shell metacharacters remain literal argv.
 enum EditorWindowsAgentCommand {
-    static func environment(_ overrides: [String: String], inheriting base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
-        EditorHostTools.mergedEnvironment(overrides, inheriting: base)
+    static func environment(_ overrides: [String: String], inheriting base: [String: String] = EditorBuildToolDiscovery.currentEnvironment()) -> [String: String] {
+        let merged = EditorHostTools.mergedEnvironment(overrides, inheriting: base)
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        // Saved adapter PATHs can contain deleted Codex Desktop versions. Keep
+        // explicit entries first, and include current host tools and app installs.
+        let paths = EditorAgentDiscovery.searchPaths(environment: merged, home: home)
+            + EditorAgentDiscovery.searchPaths(environment: base, home: home)
+        var seen = Set<String>()
+        let path = paths.filter { seen.insert($0.lowercased()).inserted }.joined(separator: ";")
+        return EditorHostTools.mergedEnvironment(["PATH": path], inheriting: merged)
     }
 
     static func resolve(_ command: String, arguments: [String], environment: [String: String]) throws -> (executable: URL, arguments: [String]) {

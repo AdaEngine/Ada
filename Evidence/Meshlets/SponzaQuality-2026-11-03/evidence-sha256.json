@@ -1,0 +1,14 @@
+{
+  "build-dlss-demo-ready.log.gz": "6322f67e2f46e1bba67fdd0c012cab78b55532699975f412081d2a13aef4c26f",
+  "build-dlss-geometry-quality.log.gz": "cac580e7fa79cbe1cec94e73e36869a94bac9cbf64b0986b99bf6d55921d2bf3",
+  "build-dlss-history.log.gz": "304f60b7f285f3230ccc255ce20a25a62fd1a5fd2f5d83ed8d4e52b2ab55936b",
+  "lighting-pt-receipt.json": "1034301bd7c1b80896ee096f7690474f3651c649a46cccad55de4d74e04c7248",
+  "quality-demo.stderr.log.gz": "0624a1a5d5c6c69e7618c7b1d9c5c277aef1293819f7cb270139d5494ea89a4d",
+  "quality-demo.stdout.log.gz": "be1bad163d8ac451fc1330af942d8f828c60d0e70df79a9031a6322b812fdaa6",
+  "quality-final.stderr.log.gz": "7243c00d09f2f7f5ea06ec8608555caca14136ba187779964307236955607871",
+  "quality-final.stdout.log.gz": "be1bad163d8ac451fc1330af942d8f828c60d0e70df79a9031a6322b812fdaa6",
+  "source-sha256.json": "bdedb9585f6dcb95e20d47de431d85d7b6ab7ed21809e1e63e54a63abbc0c2be",
+  "test-dlss-geometry-quality.log.gz": "e55073bfb4b7b113771be0475795938b580c21be4c1a8110eb65f1b2a5a14e68",
+  "test-dlss-history.log.gz": "e45e0413f68ec517822d49736d81385b959f24065b0233088eb068b9481cf672",
+  "validate-dlss-quality.log.gz": "3fd4e2e5c572a49239892239cc1018346e62c31404c9b8b2d10e3aadc615415b"
+}

@@ -10,12 +10,13 @@ extension UIWindow {
             if blocksScenePicking(for: event) {
                 input.blockScenePicking(for: event)
             }
-            // Only the last position in a consecutive hover burst can be presented.
-            // Keep presses, drags, scrolling, modifier changes and other input in order.
-            if coalescesHover, let mouse = event as? MouseEvent, mouse.phase == .changed, mouse.button == .none,
+            // Only the last position in a consecutive hover or text-selection
+            // burst can be presented. Other drags still receive every point.
+            if let mouse = event as? MouseEvent, mouse.phase == .changed,
+                (coalescesHover && mouse.button == .none) || coalescesTextSelection(for: mouse),
                 index + 1 < events.count,
                 let next = events[index + 1] as? MouseEvent,
-                next.window == mouse.window, next.phase == .changed, next.button == .none,
+                next.window == mouse.window, next.phase == .changed, next.button == mouse.button,
                 next.modifierKeys == mouse.modifierKeys {
                 continue
             }

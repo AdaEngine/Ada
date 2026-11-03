@@ -18,6 +18,7 @@
     import Tracing
 
     final class MetalRenderDevice: RenderDevice, @unchecked Sendable {
+        private let meshletGeometryCache = MetalMeshletGeometryCache()
         var supportsInstancedVertexInputs: Bool { true }
         var supportsHybridReflections: Bool { true }
         var supportsLightingSurfaceBuffer: Bool { true }
@@ -100,6 +101,10 @@
 
         func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? {
             try? MetalVisibilityProcessor(device: device)
+        }
+
+        func createMeshletVisibilityProcessor() -> (any MeshletVisibilityProcessor)? {
+            try? MetalMeshletProcessor(device: device, cache: meshletGeometryCache)
         }
 
         func createBuffer(label: String?, length: Int, options: ResourceOptions) -> Buffer {

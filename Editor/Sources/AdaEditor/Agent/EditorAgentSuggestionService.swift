@@ -14,13 +14,14 @@ struct EditorAgentSuggestionRequest: Equatable, Sendable {
     var draft: String
     var messages: [EditorAgentSuggestionMessage]
     var languageCode: String
+    var followUps: [String] = []
 }
 
 protocol EditorAgentSuggestionServing: Sendable {
     func suggestions(for request: EditorAgentSuggestionRequest) async -> [String]
 }
 
-/// Produces editable user messages locally, without an agent session or tool access.
+/// Validates agent-authored next steps and completes drafts locally without extra agent turns.
 struct EditorAgentSuggestionService: EditorAgentSuggestionServing {
     typealias Generator = @Sendable (EditorAgentSuggestionRequest) async throws -> [String]
     private let generator: Generator
@@ -33,6 +34,7 @@ struct EditorAgentSuggestionService: EditorAgentSuggestionServing {
 
     func suggestions(for request: EditorAgentSuggestionRequest) async -> [String] {
         guard let bounded = Self.boundedRequest(request), !Task.isCancelled else { return [] }
+        if bounded.purpose == .followUps { return Self.validated(bounded.followUps, for: bounded) }
         do {
             let candidates = try await generator(bounded)
             guard !Task.isCancelled else { return [] }
@@ -113,19 +115,7 @@ struct EditorAgentSuggestionService: EditorAgentSuggestionServing {
             }
             return validated(candidates, for: request)
         case .followUps:
-            guard let latest = request.messages.last, latest.role == .assistant,
-                !latest.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
-            let context = latest.text.lowercased()
-            var keys: [String] = []
-            if ["error", "failed", "failure", "blocker", "ошиб", "не удалось", "блокер"].contains(where: context.contains) {
-                keys.append("Help me investigate the reported problem.")
-            } else if ["scene", "viewport", "game", "сцен", "игр"].contains(where: context.contains) {
-                keys.append("How can I verify this in Play?")
-            } else {
-                keys.append("Which checks would best verify this change?")
-            }
-            keys += ["Explain the reasoning behind this reply.", "What is the next useful step for this project?"]
-            return validated(keys.map(text), for: request)
+            return validated(request.followUps, for: request)
         }
     }
 

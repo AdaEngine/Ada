@@ -14,21 +14,31 @@ actor EditorAgentCatalogService {
     static let shared = EditorAgentCatalogService()
     static let registryAddress = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json"
     let root: URL
-    let paths: [String]
+    // Recompute on every scan/install: desktop apps can update their versioned
+    // executable directories while Studio stays open.
+    var paths: [String] {
+        searchPathOverride ?? EditorAgentDiscovery.searchPaths(environment: environment(), home: homeDirectory)
+    }
+    private let searchPathOverride: [String]?
+    private let homeDirectory: URL
+    private let environment: @Sendable () -> [String: String]
     private let runner: any EditorProcessRunning
     private let session: URLSession
 
-    init(root: URL? = nil, paths: [String]? = nil, runner: any EditorProcessRunning = EditorProcessRunner(), session: URLSession = .shared) {
-        let homeDirectory = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+    init(
+        root: URL? = nil,
+        paths: [String]? = nil,
+        runner: any EditorProcessRunning = EditorProcessRunner(),
+        session: URLSession = .shared,
+        home: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true),
+        environment: @escaping @Sendable () -> [String: String] = { EditorBuildToolDiscovery.currentEnvironment() }
+    ) {
+        self.homeDirectory = home
         self.root =
             root
-            ?? Self.defaultRoot(home: homeDirectory)
-        self.paths =
-            paths
-            ?? EditorAgentDiscovery.searchPaths(
-                environment: ProcessInfo.processInfo.environment,
-                home: homeDirectory
-            )
+            ?? Self.defaultRoot(home: home)
+        self.searchPathOverride = paths
+        self.environment = environment
         self.runner = runner
         self.session = session
     }

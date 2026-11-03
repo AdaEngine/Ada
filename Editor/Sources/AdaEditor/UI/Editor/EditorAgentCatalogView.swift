@@ -97,8 +97,14 @@ struct EditorAgentCatalogView: View {
         ForEach(catalog.installed.filter { catalog.query.isEmpty || $0.name.localizedCaseInsensitiveContains(catalog.query) }) { entry in
             HStack {
                 agentIcon(id: entry.id, url: entry.icon ?? catalog.agents.first { $0.id == entry.id }?.icon)
-                Text("\(entry.name) · \(entry.version)").font(.system(size: 12))
-                    .accessibilityIdentifier("AdaEditor.Agents.Name.\(entry.id)")
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(entry.name) · \(entry.version)").font(.system(size: 12))
+                        .accessibilityIdentifier("AdaEditor.Agents.Name.\(entry.id)")
+                    if let local = catalog.discovered.first(where: { $0.id == entry.id }) {
+                        Text(local.path).font(.system(size: 10)).foregroundColor(theme.editorColors.muted).lineLimit(2)
+                            .accessibilityIdentifier("AdaEditor.Agents.LocalPath.\(entry.id)")
+                    }
+                }
                 Spacer()
                 if agent.isCatalogAgentSelected(entry) {
                     Text(L10n.text("Selected for all projects"))

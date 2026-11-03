@@ -10,6 +10,65 @@ import Testing
 @Suite("Editor agent suggestion UI", .serialized)
 @MainActor
 struct EditorAgentSuggestionUITests {
+    init() {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "AgentSuggestionUI")))
+        }
+    }
+
+    @Test("Suggestions highlight across the full row on hover and restore on leave", arguments: [false, true])
+    func suggestionHover(completion: Bool) async throws {
+        let service = FakeEditorAgentService()
+        let model = makeModel(service: service)
+        model.activeSession = completion ? EditorAgentSession(title: "Completion") : completedSession()
+        model.prompt = completion ? "Explain" : ""
+        model.panelDidAppear()
+        defer { model.panelDidDisappear() }
+        model.refreshPromptSuggestions()
+        let container = UIContainerView(rootView: EditorAgentSuggestionsView(viewModel: model).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 320, height: 400)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        try await waitForSuggestions(model, container: container)
+        let original = model.prompt
+        let suggestion = try #require(model.promptSuggestions.suggestions.first)
+        let highlight = Theme.adaEditor.editorColors.text.opacity(0.10)
+        func fillCount() -> Int {
+            let context = UIGraphicsContext()
+            container.draw(in: container.bounds, with: context)
+            return context.getDrawCommands().filter { command in
+                switch command {
+                case let .drawPath(_, _, .fill(color)), let .drawQuad(_, _, color): color == highlight
+                default: false
+                }
+            }.count
+        }
+        func move(to point: Point) async {
+            container.onMouseEvent(MouseEvent(
+                window: .empty, button: .none, mousePosition: point, phase: .changed, modifierKeys: [], time: 0
+            ))
+            await refresh(container)
+        }
+        await move(to: Point(2, 2))
+        let normalCount = fillCount()
+        let count = completion ? 1 : 3
+        for index in 0..<count {
+            let selector = UINodeSelector.accessibilityIdentifier("AdaEditor.Agent.PromptSuggestion.\(index)")
+            let frame = try container.uiNode(matching: selector).absoluteFrame
+            await move(to: Point(frame.maxX - 2, frame.midY))
+            #expect(fillCount() == normalCount + 1)
+            #expect(try container.uiNode(matching: selector).absoluteFrame == frame)
+            #expect(model.prompt == original)
+            await move(to: Point(2, 2))
+            #expect(fillCount() == normalCount)
+        }
+        #expect(await service.recordedRequest() == nil)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.PromptSuggestion.0"))
+        #expect(model.prompt == suggestion)
+        #expect(await service.recordedRequest() == nil)
+    }
+
     @Test("Typing shows a suggestion; tapping fills an editable draft without sending")
     func completionInsertion() async throws {
         let root = try temporaryProject()
@@ -190,10 +249,6 @@ struct EditorAgentSuggestionUITests {
         width: Float = 560,
         presentation: EditorAgentChatPresentation = .sidebar
     ) -> UIContainerView<EditorAgentSidebar> {
-        if unsafe RenderEngine.shared == nil {
-            unsafe RenderEngine.configurations.preferredBackend = .headless
-            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "AgentSuggestionUI")))
-        }
         let container = UIContainerView(rootView: EditorAgentSidebar(viewModel: model, presentation: presentation))
         container.frame = Rect(x: 0, y: 0, width: width, height: 820)
         container.bounds.size = container.frame.size
@@ -210,7 +265,7 @@ struct EditorAgentSuggestionUITests {
         }
     }
 
-    private func refresh(_ container: UIContainerView<EditorAgentSidebar>) async {
+    private func refresh<Content: View>(_ container: UIContainerView<Content>) async {
         for _ in 0..<10 {
             await Task.yield()
             container.update(1 / 60)
@@ -218,7 +273,7 @@ struct EditorAgentSuggestionUITests {
         }
     }
 
-    private func waitForSuggestions(_ model: EditorAgentViewModel, container: UIContainerView<EditorAgentSidebar>) async throws {
+    private func waitForSuggestions<Content: View>(_ model: EditorAgentViewModel, container: UIContainerView<Content>) async throws {
         for _ in 0..<200 {
             if !model.promptSuggestions.suggestions.isEmpty { break }
             try await Task.sleep(for: .milliseconds(10))

@@ -1,0 +1,16 @@
+◊ Test run started.
+→ Testing Library Version: 6.3.1 (937120cbc281cf2)
+→ Target Platform: x86_64-unknown-windows-msvc
+◊ Suite "3D GPU rendering" started.
+◊ Suite "3D auto exposure on GPU" started.
+◊ Test leavingDarknessOverexposesThenSettlesAndTheReturnIsSlower() started.
+2026-11-02T22:51:11+0300 info org.adaengine.webgpu: [AdaRender] Selected WebGPU adapter: backend=4 vendor=nvidia device=NVIDIA GeForce RTX 4070 description=D3D12 driver version 32.0.16.1088
+√ Test leavingDarknessOverexposesThenSettlesAndTheReturnIsSlower() passed after 3.174 seconds.
+√ Suite "3D auto exposure on GPU" passed after 3.175 seconds.
+√ Suite "3D GPU rendering" passed after 3.175 seconds.
+◊ Suite "Native WebGPU command completion" started.
+◊ Test deliversOnceAndAllowsHandlersToSubmitMoreWork() started.
+2026-11-02T22:51:13+0300 info org.adaengine.webgpu: [AdaRender] Selected WebGPU adapter: backend=4 vendor=nvidia device=NVIDIA GeForce RTX 4070 description=D3D12 driver version 32.0.16.1088
+√ Test deliversOnceAndAllowsHandlersToSubmitMoreWork() passed after 0.210 seconds.
+√ Suite "Native WebGPU command completion" passed after 0.210 seconds.
+√ Test run with 2 tests in 3 suites passed after 3.386 seconds.

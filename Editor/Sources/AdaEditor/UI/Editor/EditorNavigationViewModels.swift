@@ -140,7 +140,7 @@ final class EditorProjectSidebarViewModel {
         }
     }
 
-    struct Item: Equatable {
+    struct Item: Equatable, Sendable {
         var id: String
         var disclosure: String
         var icon: String

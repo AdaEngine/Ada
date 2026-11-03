@@ -1,5 +1,5 @@
 @_spi(AdaEngine) import AdaEngine
-@_spi(Internal) import AdaUI
+@_spi(Internal) @testable import AdaUI
 import Math
 import Testing
 
@@ -53,6 +53,63 @@ struct EditorAgentChatSizingTests {
         await settle(container)
         let context = try frame("AdaEditor.Agent.ContextSearch", in: container)
         #expect(context.minX >= column.minX && context.maxX <= column.maxX)
+    }
+
+    @Test("Long drafts wrap inside the composer without horizontal scrolling", arguments: [Float(320), 800, 2000])
+    func promptWrapsToComposerWidth(width: Float) async throws {
+        let model = makeModel()
+        let original = String(repeating: "Составим с тобой основное геймплейное ядро игры и дизайн документ, чтобы по нему двигаться. ", count: 10)
+        model.prompt = original
+        let container = makeContainer(model, width: width)
+        await settle(container)
+        let node = try #require(editorNode(in: container.viewTree.rootNode))
+        let scroll = try #require(node.nearestScrollView())
+        let composer = try frame("AdaEditor.Agent.Composer", in: container)
+        #expect(scroll.axis == [.vertical])
+        #expect(scroll.frame.width <= composer.width)
+        #expect(node.wrappedRows().count > 2)
+        #expect(node.wrappedRows().map(\.line.text).joined() == original)
+        node.setSelection(to: original.count)
+        node.ensureCaretVisibleIfNeeded()
+        #expect(scroll.contentOffset.x == 0)
+        #expect(scroll.contentOffset.y > 0)
+        #expect(node.caretRect().maxX <= scroll.frame.width + 1)
+        #expect(node.caretViewportRect().maxY <= scroll.frame.height + 1)
+        #expect(model.prompt == original)
+    }
+
+    @Test("Resizing reflows unbroken Unicode drafts and preserves selection")
+    func promptReflowsWithoutChangingDraft() async throws {
+        let model = makeModel()
+        let original = String(repeating: "ДлинныйТекст👩🏽‍💻世界", count: 100)
+        model.prompt = original
+        let container = makeContainer(model, width: 360)
+        await settle(container)
+        let node = try #require(editorNode(in: container.viewTree.rootNode))
+        let scroll = try #require(node.nearestScrollView())
+        let narrowRowCount = node.wrappedRows().count
+        #expect(narrowRowCount > 2)
+        node.selectionAnchor = 5
+        node.selectionHead = 40
+        let selectedText = node.selectedText()
+        container.frame.size.width = 1000
+        container.bounds.size = container.frame.size
+        await settle(container)
+        #expect(editorNode(in: container.viewTree.rootNode) === node)
+        #expect(node.wrappedRows().count < narrowRowCount)
+        #expect(node.wrappedRows().map(\.line.text).joined() == original)
+        #expect(node.selectionRange == 5..<40)
+        #expect(node.selectedText() == selectedText)
+        #expect(scroll.contentOffset.x == 0)
+        #expect(model.prompt == original)
+    }
+
+    private func editorNode(in node: ViewNode) -> TextEditorViewNode? {
+        if let editor = node as? TextEditorViewNode { return editor }
+        for child in node.transientEnvironmentChildren {
+            if let editor = editorNode(in: child) { return editor }
+        }
+        return nil
     }
 
     private func makeModel() -> EditorAgentViewModel {

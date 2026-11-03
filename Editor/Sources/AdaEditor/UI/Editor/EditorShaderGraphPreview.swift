@@ -180,7 +180,7 @@ struct EditorShaderGraphViewport: View {
         }
         if model.material?.program.target == .pbrSurface {
             if let input = world.getResource(Input.self) { for event in input.getInputEvents() { camera.handleInput(event) } }
-            camera.update()
+            camera.update(deltaTime: deltaTime)
         }
     }
 }

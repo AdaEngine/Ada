@@ -11,7 +11,7 @@ final class EditorAgentGravityMCPTools {
         [
             Tool(
                 name: "editor.gravity.diagnostics",
-                description: "Run the editor's Gravity LSP analysis on an open .ada/.gravity document or project source file. Positions in results are zero-based UTF-16 LSP positions.",
+                description: "Run AdaScript language analysis and style lint checks on an open .ada/.gravity document or project source file. Fix adascript-lint warnings as well as compiler errors. Positions are zero-based UTF-16 LSP positions.",
                 inputSchema: objectSchema(properties: ["path": pathProperty()]),
                 annotations: .init(readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false)
             ),
@@ -62,6 +62,7 @@ final class EditorAgentGravityMCPTools {
                 "severity": diagnostic.severity.rawValue,
                 "message": diagnostic.message,
                 "source": diagnostic.source,
+                "code": diagnostic.code as Any? ?? NSNull(),
                 "range": lspRange(diagnostic.range, text: text)
             ] as [String: Any]
         }

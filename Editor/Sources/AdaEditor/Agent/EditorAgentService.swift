@@ -858,6 +858,7 @@ enum EditorAgentPromptContext {
         }
 
         if request.a2uiEnabled { text += "\n\n\(EditorAgentA2UIProtocol.capabilityContext())" }
+        text += "\n\n\(EditorAgentNextSteps.instructions)"
         text += "\n\n\(request.prompt)"
         if !request.a2uiFeedback.isEmpty {
             text += "\n\n[A2UI validation feedback]\n" + request.a2uiFeedback.joined(separator: "\n")

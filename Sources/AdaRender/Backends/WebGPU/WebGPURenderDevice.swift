@@ -19,6 +19,9 @@
         public let context: WGPUContext
         public let supportsHybridReflections: Bool
         public let supportsLightingSurfaceBuffer: Bool
+        #if !WASM
+        private let meshletGeometryCache = WGPUMeshletGeometryCache()
+        #endif
 
         public var supportsTemporalUpscaling: Bool {
             #if os(Windows) && canImport(CWebGPUDLSS)
@@ -53,6 +56,14 @@
 
         public func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? {
             WGPUVisibilityProcessor(context: context)
+        }
+
+        public func createMeshletVisibilityProcessor() -> (any MeshletVisibilityProcessor)? {
+            #if WASM
+            nil // Browser acceptance is separate from native Dawn validation.
+            #else
+            WGPUMeshletProcessor(context: context, cache: meshletGeometryCache)
+            #endif
         }
 
         public func createUniformBuffer(length: Int, binding: Int) -> any UniformBuffer {
@@ -140,7 +151,9 @@
         }
 
         public func createRenderPipeline(from descriptor: RenderPipelineDescriptor) -> any RenderPipeline {
-            WGPURenderPipeline(
+            let pipelineStart = PerformanceStallProbe.begin()
+            defer { PerformanceStallProbe.end("WGPU.CreateRenderPipeline.\(descriptor.debugName)", since: pipelineStart) }
+            return WGPURenderPipeline(
                 descriptor: descriptor,
                 device: context.device
             )

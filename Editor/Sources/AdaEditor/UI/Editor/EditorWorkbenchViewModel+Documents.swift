@@ -455,7 +455,7 @@ extension EditorWorkbenchViewModel {
     }
 
     func textDocument(id documentID: String) -> EditorTextDocument? {
-        switch openDocuments.first(where: { $0.id == documentID }) {
+        switch openDocuments.first(where: { $0.id == documentID }).map(applyingTextSelection) {
         case let .text(document),
             let .ui(document):
             return document
@@ -555,6 +555,7 @@ extension EditorWorkbenchViewModel {
         if document.content != previousContent {
             document.semanticTokens = []
         }
+        textSelections[documentID] = EditorTextSelection(range: document.selectionRange, text: document.selectedText)
         openDocuments[index] = isUI ? .ui(document) : .text(document)
         notifyActiveDocumentChangedIfNeeded(documentID: documentID)
         if document.isDirty, document.content != previousContent || !wasDirty {

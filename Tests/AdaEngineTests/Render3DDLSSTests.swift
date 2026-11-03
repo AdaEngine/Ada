@@ -1,5 +1,5 @@
 #if os(Windows)
-import AdaCorePipelines
+@testable import AdaCorePipelines
 import AdaECS
 @_spi(Internal) import AdaRender
 import AdaTransform
@@ -12,6 +12,35 @@ extension Render3DGPUTests {
     @MainActor
     @Suite("DLSS Super Resolution through Dawn", .enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_DLSS_TESTS"] == "1"))
     struct DLSS {
+        @Test
+        func offscreenBackpressureRetainsNGXFeatureAndCountersUntilDisabled() async throws {
+            let scene = try await DebugViews.makeScene(temporalRenderScale: 2.0 / 3.0)
+            try #require(scene.device.supportsTemporalUpscaling)
+            _ = try await scene.render(.none, frames: 3)
+            let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+            let stats = try #require(world.getResource(Render3DTemporalStatistics.self))
+            let key = String(scene.camera.id)
+            let count = try #require(stats.snapshots[key]).encodedFrames
+            let feature = try #require(world.getResource(Temporal3DViews.self)?.entries[scene.camera.id]?.scaler)
+            var camera = try #require(scene.camera.components[Camera.self])
+            let originalTarget = camera.renderTarget
+            camera.renderTarget = .window(.primary)
+            scene.camera.components[Camera.self] = camera
+            try await scene.app.update()
+            #expect(stats.snapshots[key]?.encodedFrames == count)
+            let retained = try #require(world.getResource(Temporal3DViews.self)?.entries[scene.camera.id]?.scaler)
+            #expect(feature === retained, "Backpressure must not destroy and recreate the native DLSS feature.")
+            camera.renderTarget = originalTarget
+            scene.camera.components[Camera.self] = camera
+            _ = try await scene.render(.none, frames: 2)
+            #expect(try #require(stats.snapshots[key]).encodedFrames > count)
+            camera.temporalUpscaling = nil
+            scene.camera.components[Camera.self] = camera
+            _ = try await scene.render(.none, frames: 1)
+            #expect(world.getResource(Temporal3DViews.self)?.entries[scene.camera.id] == nil)
+            #expect(stats.snapshots[key] == nil)
+        }
+
         @Test
         func reconstructsMovingSceneResizesResetsAndReturnsToNative() async throws {
             let scene = try await DebugViews.makeScene(temporalRenderScale: 2.0 / 3.0)

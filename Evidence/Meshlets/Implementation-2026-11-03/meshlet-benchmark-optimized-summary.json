@@ -1,0 +1,526 @@
+{
+  "source": "meshlet-benchmark-optimized.json",
+  "resolution": [
+    1890,
+    843
+  ],
+  "cases": 18,
+  "summary": [
+    {
+      "view": "gallery",
+      "mode": "disabled",
+      "fpsMedian": 122.78918509869463,
+      "meanMsMedian": 8.144039714867617,
+      "p95MsMedian": 10.2063,
+      "mainCPUEncodeMedianMs": 2.4595260620117188,
+      "runs": [
+        {
+          "round": 0,
+          "samples": 491,
+          "fps": 122.78918509869463,
+          "meanMs": 8.144039714867617,
+          "medianMs": 7.9801,
+          "p95Ms": 10.1571,
+          "mainCPUEncodeMedianMs": 2.4595260620117188,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 0,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 0,
+            "fallbackItems": 0,
+            "fallbackReasons": {},
+            "fallbackTriangles": 0,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "disabled",
+            "sourceTriangles": 0
+          }
+        },
+        {
+          "round": 1,
+          "samples": 491,
+          "fps": 123.0811930282601,
+          "meanMs": 8.124718126272912,
+          "medianMs": 7.908,
+          "p95Ms": 10.2063,
+          "mainCPUEncodeMedianMs": 2.3889541625976562,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 0,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 0,
+            "fallbackItems": 0,
+            "fallbackReasons": {},
+            "fallbackTriangles": 0,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "disabled",
+            "sourceTriangles": 0
+          }
+        },
+        {
+          "round": 2,
+          "samples": 483,
+          "fps": 120.88534020475976,
+          "meanMs": 8.2723016563147,
+          "medianMs": 8.0962,
+          "p95Ms": 10.4529,
+          "mainCPUEncodeMedianMs": 2.490997314453125,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 0,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 0,
+            "fallbackItems": 0,
+            "fallbackReasons": {},
+            "fallbackTriangles": 0,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "disabled",
+            "sourceTriangles": 0
+          }
+        }
+      ]
+    },
+    {
+      "view": "gallery",
+      "mode": "cpuReference",
+      "fpsMedian": 116.1745231774433,
+      "meanMsMedian": 8.607739224137932,
+      "p95MsMedian": 10.9426,
+      "mainCPUEncodeMedianMs": 2.4671554565429688,
+      "runs": [
+        {
+          "round": 0,
+          "samples": 464,
+          "fps": 116.1745231774433,
+          "meanMs": 8.607739224137932,
+          "medianMs": 8.22475,
+          "p95Ms": 10.8461,
+          "mainCPUEncodeMedianMs": 2.6655197143554688,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 91205,
+            "cpuSubmittedTriangles": 838985,
+            "cpuVisibleMeshlets": 13555,
+            "eligibleItems": 196,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "cpuReference",
+            "sourceTriangles": 6755953
+          }
+        },
+        {
+          "round": 1,
+          "samples": 465,
+          "fps": 116.42072517242912,
+          "meanMs": 8.589535913978494,
+          "medianMs": 8.2022,
+          "p95Ms": 10.9426,
+          "mainCPUEncodeMedianMs": 2.4671554565429688,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 90430,
+            "cpuSubmittedTriangles": 835801,
+            "cpuVisibleMeshlets": 13501,
+            "eligibleItems": 194,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "cpuReference",
+            "sourceTriangles": 6705204
+          }
+        },
+        {
+          "round": 2,
+          "samples": 398,
+          "fps": 99.99986432179213,
+          "meanMs": 10.000013567839195,
+          "medianMs": 8.4108,
+          "p95Ms": 11.9285,
+          "mainCPUEncodeMedianMs": 2.4280548095703125,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 90392,
+            "cpuSubmittedTriangles": 807576,
+            "cpuVisibleMeshlets": 13039,
+            "eligibleItems": 191,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "cpuReference",
+            "sourceTriangles": 6703580
+          }
+        }
+      ]
+    },
+    {
+      "view": "gallery",
+      "mode": "gpu",
+      "fpsMedian": 102.75257095704096,
+      "meanMsMedian": 9.732116585365853,
+      "p95MsMedian": 11.8369,
+      "mainCPUEncodeMedianMs": 3.7479400634765625,
+      "runs": [
+        {
+          "round": 0,
+          "samples": 410,
+          "fps": 102.75257095704096,
+          "meanMs": 9.732116585365853,
+          "medianMs": 8.6485,
+          "p95Ms": 11.8369,
+          "mainCPUEncodeMedianMs": 3.7479400634765625,
+          "gpuIndexCount": 1592766,
+          "state": {
+            "candidateMeshlets": 90430,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 194,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 304879,
+            "fullyVisibleItems": 58,
+            "gpuDraws": 136,
+            "mode": "gpu",
+            "sourceTriangles": 6705204
+          }
+        },
+        {
+          "round": 1,
+          "samples": 399,
+          "fps": 99.94222888303364,
+          "meanMs": 10.00578045112782,
+          "medianMs": 8.7052,
+          "p95Ms": 11.6349,
+          "mainCPUEncodeMedianMs": 3.9615631103515625,
+          "gpuIndexCount": 1546164,
+          "state": {
+            "candidateMeshlets": 90392,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 191,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 298561,
+            "fullyVisibleItems": 56,
+            "gpuDraws": 135,
+            "mode": "gpu",
+            "sourceTriangles": 6703580
+          }
+        },
+        {
+          "round": 2,
+          "samples": 432,
+          "fps": 108.27532791759525,
+          "meanMs": 9.235714351851852,
+          "medianMs": 8.436350000000001,
+          "p95Ms": 12.3085,
+          "mainCPUEncodeMedianMs": 3.7174224853515625,
+          "gpuIndexCount": 1579701,
+          "state": {
+            "candidateMeshlets": 90392,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 191,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 299598,
+            "fullyVisibleItems": 57,
+            "gpuDraws": 134,
+            "mode": "gpu",
+            "sourceTriangles": 6703580
+          }
+        }
+      ]
+    },
+    {
+      "view": "outside",
+      "mode": "disabled",
+      "fpsMedian": 56.334204143288076,
+      "meanMsMedian": 17.75120488888889,
+      "p95MsMedian": 35.7643,
+      "mainCPUEncodeMedianMs": 5.6400299072265625,
+      "runs": [
+        {
+          "round": 0,
+          "samples": 225,
+          "fps": 56.334204143288076,
+          "meanMs": 17.75120488888889,
+          "medianMs": 10.7654,
+          "p95Ms": 35.7643,
+          "mainCPUEncodeMedianMs": 5.534172058105469,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 0,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 0,
+            "fallbackItems": 0,
+            "fallbackReasons": {},
+            "fallbackTriangles": 0,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "disabled",
+            "sourceTriangles": 0
+          }
+        },
+        {
+          "round": 1,
+          "samples": 216,
+          "fps": 54.12873165606103,
+          "meanMs": 18.47447685185185,
+          "medianMs": 11.0414,
+          "p95Ms": 37.5961,
+          "mainCPUEncodeMedianMs": 5.686759948730469,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 0,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 0,
+            "fallbackItems": 0,
+            "fallbackReasons": {},
+            "fallbackTriangles": 0,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "disabled",
+            "sourceTriangles": 0
+          }
+        },
+        {
+          "round": 2,
+          "samples": 239,
+          "fps": 60.01769693363308,
+          "meanMs": 16.66175230125523,
+          "medianMs": 10.7729,
+          "p95Ms": 34.8747,
+          "mainCPUEncodeMedianMs": 5.6400299072265625,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 0,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 0,
+            "fallbackItems": 0,
+            "fallbackReasons": {},
+            "fallbackTriangles": 0,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "disabled",
+            "sourceTriangles": 0
+          }
+        }
+      ]
+    },
+    {
+      "view": "outside",
+      "mode": "cpuReference",
+      "fpsMedian": 52.53421650759954,
+      "meanMsMedian": 19.03521298076923,
+      "p95MsMedian": 38.5577,
+      "mainCPUEncodeMedianMs": 7.382392883300781,
+      "runs": [
+        {
+          "round": 0,
+          "samples": 235,
+          "fps": 58.88525501437389,
+          "meanMs": 16.98218,
+          "medianMs": 12.7099,
+          "p95Ms": 38.5013,
+          "mainCPUEncodeMedianMs": 7.3604583740234375,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 122688,
+            "cpuSubmittedTriangles": 8804436,
+            "cpuVisibleMeshlets": 122688,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "cpuReference",
+            "sourceTriangles": 8812576
+          }
+        },
+        {
+          "round": 1,
+          "samples": 208,
+          "fps": 52.53421650759954,
+          "meanMs": 19.03521298076923,
+          "medianMs": 13.60135,
+          "p95Ms": 38.5577,
+          "mainCPUEncodeMedianMs": 7.5283050537109375,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 122688,
+            "cpuSubmittedTriangles": 8804436,
+            "cpuVisibleMeshlets": 122688,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "cpuReference",
+            "sourceTriangles": 8812576
+          }
+        },
+        {
+          "round": 2,
+          "samples": 209,
+          "fps": 52.38554103924643,
+          "meanMs": 19.08923684210526,
+          "medianMs": 12.8348,
+          "p95Ms": 41.3313,
+          "mainCPUEncodeMedianMs": 7.382392883300781,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 122688,
+            "cpuSubmittedTriangles": 8804436,
+            "cpuVisibleMeshlets": 122688,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 0,
+            "fullyVisibleItems": 0,
+            "gpuDraws": 0,
+            "mode": "cpuReference",
+            "sourceTriangles": 8812576
+          }
+        }
+      ]
+    },
+    {
+      "view": "outside",
+      "mode": "gpu",
+      "fpsMedian": 64.08890252335783,
+      "meanMsMedian": 15.603325390625,
+      "p95MsMedian": 35.4067,
+      "mainCPUEncodeMedianMs": 5.604743957519531,
+      "runs": [
+        {
+          "round": 0,
+          "samples": 255,
+          "fps": 64.05675820653737,
+          "meanMs": 15.611155294117648,
+          "medianMs": 10.9831,
+          "p95Ms": 38.6356,
+          "mainCPUEncodeMedianMs": 5.717277526855469,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 122688,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 8804436,
+            "fullyVisibleItems": 403,
+            "gpuDraws": 0,
+            "mode": "gpu",
+            "sourceTriangles": 8812576
+          }
+        },
+        {
+          "round": 1,
+          "samples": 275,
+          "fps": 68.775340274124,
+          "meanMs": 14.540095272727273,
+          "medianMs": 10.8895,
+          "p95Ms": 35.3302,
+          "mainCPUEncodeMedianMs": 5.560874938964844,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 122688,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 8804436,
+            "fullyVisibleItems": 403,
+            "gpuDraws": 0,
+            "mode": "gpu",
+            "sourceTriangles": 8812576
+          }
+        },
+        {
+          "round": 2,
+          "samples": 256,
+          "fps": 64.08890252335783,
+          "meanMs": 15.603325390625,
+          "medianMs": 11.004449999999999,
+          "p95Ms": 35.4067,
+          "mainCPUEncodeMedianMs": 5.604743957519531,
+          "gpuIndexCount": null,
+          "state": {
+            "candidateMeshlets": 122688,
+            "cpuSubmittedTriangles": 0,
+            "cpuVisibleMeshlets": 0,
+            "eligibleItems": 403,
+            "fallbackItems": 4,
+            "fallbackReasons": {
+              "alphaCoverage": 4
+            },
+            "fallbackTriangles": 8140,
+            "fastPathTriangles": 8804436,
+            "fullyVisibleItems": 403,
+            "gpuDraws": 0,
+            "mode": "gpu",
+            "sourceTriangles": 8812576
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 #if os(Windows)
 import Dispatch
 import Foundation
+import WinSDK
 
 /// All writes and close operations share one serial queue. A full stdin pipe never
 /// blocks the ACP actor, so it can keep draining stdout and processing cancellation.
@@ -36,23 +37,44 @@ actor EditorWindowsACPWriter {
 enum EditorWindowsACPTransport {
     static let maximumMessageBytes = 16 * 1024 * 1024
 
-    static func chunks(_ handle: FileHandle, onOverflow: @escaping @Sendable () -> Void = {}) -> AsyncStream<Data> {
-        AsyncStream(bufferingPolicy: .bufferingOldest(256)) { continuation in
-            handle.readabilityHandler = { readable in
-                let data = readable.availableData
-                if data.isEmpty {
-                    readable.readabilityHandler = nil
-                    continuation.finish()
-                } else {
-                    if case .dropped = continuation.yield(data) {
-                        readable.readabilityHandler = nil
-                        onOverflow()
-                        continuation.finish()
-                    }
+    static let maximumChunkBytes = 64 * 1024
+
+    /// Read only when the consumer requests another chunk. The OS pipe provides
+    /// backpressure while parsing is busy, without dropping protocol bytes or
+    /// growing an in-memory queue. Blocking pipe I/O stays off Swift's executor.
+    static func chunks(_ handle: FileHandle) -> AsyncThrowingStream<Data, any Error> {
+        let queue = DispatchQueue(label: "org.adaengine.acp.stdout")
+        return AsyncThrowingStream(unfolding: {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                queue.async {
+                    do {
+                        continuation.resume(returning: try readChunk(handle))
+                    } catch { continuation.resume(throwing: error) }
                 }
             }
-            continuation.onTermination = { _ in handle.readabilityHandler = nil }
+        })
+    }
+
+    private static func readChunk(_ handle: FileHandle) throws -> Data? {
+        // Foundation's read(upToCount:) waits to fill the requested length on
+        // Windows. One ReadFile returns as soon as a byte-stream pipe has data,
+        // so short JSON-RPC requests do not wait for another message or EOF.
+        var data = Data(count: maximumChunkBytes)
+        var count: DWORD = 0
+        var failure: DWORD = 0
+        let succeeded = data.withUnsafeMutableBytes { bytes in
+            let result = ReadFile(handle._handle, bytes.baseAddress, DWORD(bytes.count), &count, nil)
+            if !result { failure = GetLastError() }
+            return result
         }
+        guard succeeded else {
+            if failure == ERROR_BROKEN_PIPE || failure == ERROR_NO_DATA { return nil }
+            throw NSError(domain: "org.adaengine.acp.pipe", code: Int(failure))
+        }
+        guard count > 0 else { return nil }
+        data.count = Int(count)
+        return data
     }
 }
 #endif

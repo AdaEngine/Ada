@@ -155,7 +155,7 @@ struct EditorAgentWorkspace: View {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(viewModel.agent.sessions, id: \.id) { session in
                         sessionRow(session)
-                        if viewModel.agent.activeSession?.id == session.id {
+                        if viewModel.agent.activeSessionID == session.id {
                             changedFiles
                         }
                     }
@@ -183,7 +183,7 @@ struct EditorAgentWorkspace: View {
     }
 
     private func sessionRow(_ session: EditorAgentSessionSummary) -> some View {
-        let active = session.id == viewModel.agent.activeSession?.id
+        let active = session.id == viewModel.agent.activeSessionID
         return Button(action: { viewModel.agent.selectSession(session) }) {
             HStack(spacing: 7) {
                 Text(active ? "\u{E5CF}" : "\u{E5CC}").font(AdaEditorMaterialSymbolFont.font(size: 14))
@@ -210,23 +210,7 @@ struct EditorAgentWorkspace: View {
     }
 
     private var changedFiles: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(EditorAgentSessionChanges.files(in: viewModel.agent.activeSession?.events ?? [])) { file in
-                Button(action: { viewModel.openAgentChangedFile(file.path) }) {
-                    HStack(spacing: 8) {
-                        Text("\u{E24D}").font(AdaEditorMaterialSymbolFont.font(size: 14))
-                        Text(L10n.tr(file.title)).font(.system(size: 12)).lineLimit(1)
-                        Spacer()
-                    }
-                    .foregroundColor(theme.editorColors.blue)
-                    .padding(.leading, 32)
-                    .padding(.trailing, 8)
-                    .frame(height: 28)
-                }
-                .buttonStyle(DefaultButtonStyle())
-                .accessibilityIdentifier("AdaEditor.AgentWorkspace.File.\(file.path)")
-            }
-        }
+        EditorAgentWorkspaceChangedFiles(viewModel: viewModel)
     }
 
     private var artifact: some View {

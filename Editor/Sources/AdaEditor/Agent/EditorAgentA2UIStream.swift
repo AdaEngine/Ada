@@ -2,11 +2,15 @@ import AdaA2UI
 import Foundation
 
 /// ACP text binding: one JSON envelope per line in a fenced `a2ui` block.
+/// Agent-authored draft hints travel in a hidden `ada-next` JSON array fence.
 /// Other Markdown and ordinary code fences remain ordinary assistant content.
 struct EditorAgentA2UIStream {
     private var pending = ""
     private var visible = ""
     private var inA2UI = false
+    private var inNextSteps = false
+    private var nextStepsJSON = ""
+    private(set) var nextSteps: [String] = []
     private var codeFenceLength = 0
     private var inCode: Bool { codeFenceLength > 0 }
     private var droppingLine = false
@@ -14,11 +18,11 @@ struct EditorAgentA2UIStream {
     private let maximumLineBytes = 1_048_576
 
     var displayText: String {
-        guard !inA2UI else {
+        guard !inA2UI, !inNextSteps else {
             return visible
         }
         let trimmed = pending.trimmingCharacters(in: .whitespaces)
-        if !inCode, !trimmed.isEmpty, "```a2ui".hasPrefix(trimmed) {
+        if !inCode, !trimmed.isEmpty, ["```a2ui", "```ada-next"].contains(where: { $0.hasPrefix(trimmed) }) {
             return visible
         }
         return visible + pending
@@ -35,8 +39,9 @@ struct EditorAgentA2UIStream {
             }
             if !droppingLine {
                 pending += piece.element
-                if inA2UI, pending.utf8.count > maximumLineBytes {
-                    frames.append(.failure(.init(message: "A2UI envelope exceeds the byte limit.")))
+                if inA2UI || inNextSteps, pending.utf8.count > maximumLineBytes {
+                    if inA2UI { frames.append(.failure(.init(message: "A2UI envelope exceeds the byte limit."))) }
+                    if inNextSteps { nextStepsJSON = String(repeating: "!", count: 8193) }
                     pending = ""
                     droppingLine = true
                 }
@@ -57,6 +62,25 @@ struct EditorAgentA2UIStream {
             return []
         }
         let line = pending.trimmingCharacters(in: .whitespacesAndNewlines)
+        if inNextSteps {
+            if line == "```" {
+                inNextSteps = false
+                if nextStepsJSON.utf8.count <= 8192,
+                   let values = try? JSONDecoder().decode([String].self, from: Data(nextStepsJSON.utf8)) {
+                    nextSteps = values
+                }
+                nextStepsJSON = ""
+            } else if nextStepsJSON.utf8.count <= 8192 {
+                nextStepsJSON += line + "\n"
+            }
+            return []
+        }
+        if !inCode, !inA2UI, line == "```ada-next" {
+            inNextSteps = true
+            nextSteps = []
+            nextStepsJSON = ""
+            return []
+        }
         if inA2UI {
             if line == "```" {
                 inA2UI = false

@@ -427,7 +427,9 @@ extension Render3DGPUTests {
         func everyViewMatchesItsGoldenFrame() async throws {
             let scene = try await Self.makeScene()
             let beauty = try await scene.render(.none)
-            for view in DebugView3D.allCases {
+            // Meshlet coloring needs prepared cluster data; its actual cluster coverage/colors are
+            // exercised by Render3DGPUTests.Meshlets rather than these legacy sphere golden frames.
+            for view in DebugView3D.allCases where view != .meshlets {
                 let image = view == .none ? beauty : try await scene.render(view)
                 // The WebGPU encoder has no polygon fill mode, so wireframe renders solid there.
                 let isNoOp = view == .none || (view == .wireframe && GoldenFrame.activeBackend == .webgpu)

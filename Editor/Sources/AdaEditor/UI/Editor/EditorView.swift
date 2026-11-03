@@ -96,7 +96,7 @@ enum AdaEngineStyleContent {
     static let logLines: [String] = []
 }
 
-struct EditorView: View {
+struct EditorWindowContentView: View {
     let project: EditorProjectReference?
     let usesNativeOrnaments: Bool
     @State private var viewModel: EditorViewModel

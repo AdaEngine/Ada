@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "profile": "sponza-lighting-pt-lod",
+  "tool": "gltfpack 1.3",
+  "toolSHA256": "a082a0db2332908133100332caeeddaa304afcf5e8094adc755ebdea8c720984",
+  "maximumRelativeError": 0.01,
+  "triangleBudget": 131072,
+  "models": [
+    {
+      "folder": "main_sponza",
+      "triangles": 114042,
+      "materialTriangles": {
+        "arch_stone_wall_01": 1630,
+        "stone_trims_01": 17833,
+        "metal_door": 21438,
+        "brickwall_02": 978,
+        "stones_2ndfloor": 4134,
+        "stone_trims_02": 229,
+        "ceiling_plaster_02": 903,
+        "window_frame_01": 1308,
+        "stones_01_tile": 994,
+        "column_1stfloor": 903,
+        "column_head_1stfloor": 2928,
+        "lamp_glass_01": 2,
+        "light_bulb": 196,
+        "door_stoneframe_02": 2539,
+        "glass": 51,
+        "door_stoneframe_01": 1772,
+        "brickwall_01": 691,
+        "wood_door_01": 2479,
+        "wood_01": 5958,
+        "floor_01": 350,
+        "ornament_lion": 2367,
+        "dirt_decal": 923,
+        "column_head_2ndfloor_02": 14108,
+        "column_brickwall_01": 1528,
+        "column_head_2ndfloor_03": 11627,
+        "ceiling_plaster_01": 788,
+        "roof_tiles_01": 13382,
+        "ornament_01": 2003
+      },
+      "sourceSHA256": "f93e88cfce48b1f044fbc6a6aa56b81b167f1d59050d02cb6f127025e17ef821",
+      "options": [
+        "-si",
+        "0.028",
+        "-sp",
+        "-sv",
+        "-se",
+        "0.01",
+        "-noq",
+        "-tr"
+      ],
+      "files": {
+        "lighting-pt.gltf": "f7029e917b82b90f1aa4ade72ad24fc18ac315ea901e23aa03afff0628e2a1a3",
+        "lighting-pt.bin": "d3eb15a4d2f9c1aaa503c8319d325ad9440bb86ed5337d505cd3049c18cdcd40"
+      }
+    },
+    {
+      "folder": "pkg_b_ivy",
+      "triangles": 8244,
+      "materialTriangles": {
+        "IvyLeaf": 7778,
+        "Lianas": 466
+      },
+      "sourceSHA256": "303392e9dfc49c1fc8f2067d8c889994ccd398ff31643221e3f3e0b773299516",
+      "options": [
+        "-si",
+        "0.003",
+        "-sp",
+        "-sv",
+        "-se",
+        "0.01",
+        "-noq",
+        "-tr"
+      ],
+      "files": {
+        "lighting-pt.gltf": "efe329dca5a88dca7d2b195ada1b21b0581e50e4f78cbf72e52453048ed802db",
+        "lighting-pt.bin": "349bc7a1af754c1253aff07ed1ae22384cca9d4e5cc53b5107c25e8cfeeeca13"
+      }
+    }
+  ],
+  "triangles": 122286
+}

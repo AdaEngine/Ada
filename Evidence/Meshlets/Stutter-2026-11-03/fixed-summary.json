@@ -1,0 +1,994 @@
+{
+  "phases": [
+    {
+      "name": "stationary",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 325,
+      "fps": 54.660535537353766,
+      "p50": 17.5298,
+      "p95": 21.3915,
+      "p99": 34.166,
+      "maximum": 38.1937,
+      "over50": 0,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 326,
+          "maximum": 65.1846,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 178,
+          "maximum": 38.8046,
+          "over100": 0
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 325,
+          "maximum": 38.194,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 78,
+          "maximum": 30.4039,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 95,
+          "maximum": 22.2723,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 93,
+          "maximum": 22.2126,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.SceneView",
+          "count": 2,
+          "maximum": 20.3324,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 10.457992553710938
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.983062744140625
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.958267211914062
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.94873046875
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.744644165039062
+        }
+      ]
+    },
+    {
+      "name": "rotation-first",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 906,
+      "fps": 74.42128334360993,
+      "p50": 12.14795,
+      "p95": 18.9929,
+      "p99": 30.2574,
+      "maximum": 55.7223,
+      "over50": 1,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 273,
+          "maximum": 176.2571,
+          "over100": 1
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 152,
+          "maximum": 114.6247,
+          "over100": 1
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 275,
+          "maximum": 55.7225,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 87,
+          "maximum": 30.541,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 50,
+          "maximum": 19.3028,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 50,
+          "maximum": 19.2689,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.SceneView",
+          "count": 1,
+          "maximum": 15.7781,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 10.789871215820312
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.922576904296875
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.855819702148438
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.779525756835938
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.676528930664062
+        }
+      ]
+    },
+    {
+      "name": "rotation-repeat",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 907,
+      "fps": 75.6519919290418,
+      "p50": 11.7326,
+      "p95": 18.3368,
+      "p99": 28.8279,
+      "maximum": 45.1072,
+      "over50": 0,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 230,
+          "maximum": 288.1676,
+          "over100": 1
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 157,
+          "maximum": 111.659,
+          "over100": 1
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 234,
+          "maximum": 45.1074,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 69,
+          "maximum": 27.8226,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 22,
+          "maximum": 17.9654,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 21,
+          "maximum": 17.9231,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.082794189453125
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.4228515625
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.390426635742188
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.241653442382812
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.123397827148438
+        }
+      ]
+    },
+    {
+      "name": "translation",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 683,
+      "fps": 56.92749569953611,
+      "p50": 17.1056,
+      "p95": 19.9463,
+      "p99": 31.3968,
+      "maximum": 39.4409,
+      "over50": 0,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 685,
+          "maximum": 381.7736,
+          "over100": 1
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 683,
+          "maximum": 39.4413,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 253,
+          "maximum": 27.1156,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 100,
+          "maximum": 23.8947,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 92,
+          "maximum": 18.6419,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 92,
+          "maximum": 18.5827,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.852005004882812
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.84246826171875
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.380889892578125
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.3770751953125
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.327484130859375
+        }
+      ]
+    },
+    {
+      "name": "LOD-off",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 435,
+      "fps": 70.64048346022096,
+      "p50": 11.5099,
+      "p95": 29.1662,
+      "p99": 40.7675,
+      "maximum": 231.209,
+      "over50": 2,
+      "over100": 1,
+      "over200": 1,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 86,
+          "maximum": 430.3105,
+          "over100": 1
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 102,
+          "maximum": 231.2092,
+          "over100": 1
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 383,
+          "maximum": 222.8618,
+          "over100": 5
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 14,
+          "maximum": 32.574,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 4,
+          "maximum": 31.5095,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 4,
+          "maximum": 31.4732,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3DRenderNode",
+          "count": 1,
+          "maximum": 24.361,
+          "over100": 0
+        },
+        {
+          "name": "Meshlets.EncodeCPU",
+          "count": 1,
+          "maximum": 17.1506,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 24.379730224609375
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 10.019302368164062
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.004592895507812
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.5550079345703125
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.2727203369140625
+        }
+      ]
+    },
+    {
+      "name": "LOD-on",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 457,
+      "fps": 76.33548003625084,
+      "p50": 11.7726,
+      "p95": 17.7345,
+      "p99": 30.7848,
+      "maximum": 55.2648,
+      "over50": 1,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 110,
+          "maximum": 487.9168,
+          "over100": 1
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 112,
+          "maximum": 55.2651,
+          "over100": 0
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 108,
+          "maximum": 37.275,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 22,
+          "maximum": 26.7303,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 2,
+          "maximum": 15.579,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 2,
+          "maximum": 15.5307,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.4920654296875
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.2269439697265625
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.114410400390625
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.106781005859375
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.0743560791015625
+        }
+      ]
+    },
+    {
+      "name": "DLSS-off",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 487,
+      "fps": 81.41047203463359,
+      "p50": 9.7366,
+      "p95": 19.5046,
+      "p99": 40.7684,
+      "maximum": 282.9429,
+      "over50": 3,
+      "over100": 2,
+      "over200": 1,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 22,
+          "maximum": 559.7863,
+          "over100": 1
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 42,
+          "maximum": 282.9431,
+          "over100": 2
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 318,
+          "maximum": 273.6565,
+          "over100": 13
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 3,
+          "maximum": 90.2746,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 1,
+          "maximum": 83.9581,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 1,
+          "maximum": 83.9244,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 11.384963989257812
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.30078125
+        },
+        {
+          "name": "DirectionalShadow3DRenderNode",
+          "ms": 7.6847076416015625
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.289886474609375
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.2650909423828125
+        }
+      ]
+    },
+    {
+      "name": "DLSS-on",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 437,
+      "fps": 73.1357888258824,
+      "p50": 12.1725,
+      "p95": 18.803,
+      "p99": 30.136,
+      "maximum": 100.2212,
+      "over50": 1,
+      "over100": 1,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 111,
+          "maximum": 600.1258,
+          "over100": 2
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 22,
+          "maximum": 584.1565,
+          "over100": 1
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 21,
+          "maximum": 584.1127,
+          "over100": 1
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 113,
+          "maximum": 111.4205,
+          "over100": 5
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 116,
+          "maximum": 100.2215,
+          "over100": 1
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 48,
+          "maximum": 94.916,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.Main3D.TemporalResolve",
+          "count": 1,
+          "maximum": 30.8766,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3D.TemporalResolve",
+          "ms": 30.893325805664062
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.768081665039062
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.823944091796875
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.7533721923828125
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 7.7419281005859375
+        }
+      ]
+    },
+    {
+      "name": "shadows-baseline",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 214,
+      "fps": 53.686572920377216,
+      "p50": 17.654449999999997,
+      "p95": 21.7057,
+      "p99": 32.1239,
+      "maximum": 54.9792,
+      "over50": 1,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 216,
+          "maximum": 644.098,
+          "over100": 1
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 52,
+          "maximum": 115.1595,
+          "over100": 1
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 214,
+          "maximum": 54.9796,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 138,
+          "maximum": 45.0627,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 75,
+          "maximum": 32.9784,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 75,
+          "maximum": 32.9406,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 13.006210327148438
+        },
+        {
+          "name": "DirectionalShadow3DRenderNode",
+          "ms": 10.251998901367188
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 10.194778442382812
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.859085083007812
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.641647338867188
+        }
+      ]
+    },
+    {
+      "name": "shadows-high",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 213,
+      "fps": 53.43111947301163,
+      "p50": 17.6663,
+      "p95": 20.9522,
+      "p99": 34.9741,
+      "maximum": 80.4345,
+      "over50": 1,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 215,
+          "maximum": 663.2285,
+          "over100": 1
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 44,
+          "maximum": 103.8521,
+          "over100": 1
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 213,
+          "maximum": 80.4347,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 156,
+          "maximum": 52.3346,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 69,
+          "maximum": 40.3309,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 69,
+          "maximum": 40.2997,
+          "over100": 0
+        },
+        {
+          "name": "RenderNode.DirectionalShadow3DRenderNode",
+          "count": 1,
+          "maximum": 16.6313,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "DirectionalShadow3DRenderNode",
+          "ms": 16.79229736328125
+        },
+        {
+          "name": "Main3D.LocalShadows",
+          "ms": 11.178970336914062
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.98687744140625
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.78851318359375
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.943557739257812
+        }
+      ]
+    },
+    {
+      "name": "lights-off",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 214,
+      "fps": 53.82110884511947,
+      "p50": 17.80245,
+      "p95": 21.4096,
+      "p99": 31.9161,
+      "maximum": 55.4164,
+      "over50": 1,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 217,
+          "maximum": 677.0777,
+          "over100": 1
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 71,
+          "maximum": 661.5423,
+          "over100": 1
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 71,
+          "maximum": 661.4967,
+          "over100": 1
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 31,
+          "maximum": 111.0961,
+          "over100": 5
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 214,
+          "maximum": 55.4169,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 137,
+          "maximum": 27.4733,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.84954833984375
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.693145751953125
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.68988037109375
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.632659912109375
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 8.29315185546875
+        }
+      ]
+    },
+    {
+      "name": "lights-on",
+      "resolution": [
+        3810,
+        1684
+      ],
+      "sizeChanged": false,
+      "samples": 214,
+      "fps": 53.72191718158957,
+      "p50": 17.71085,
+      "p95": 21.2553,
+      "p99": 34.1457,
+      "maximum": 58.2571,
+      "over50": 1,
+      "over100": 0,
+      "over200": 0,
+      "slowOperations": [
+        {
+          "name": "App.Update.MainWorld",
+          "count": 216,
+          "maximum": 732.958,
+          "over100": 1
+        },
+        {
+          "name": "WGPU.CompletionLatency",
+          "count": 63,
+          "maximum": 104.9159,
+          "over100": 1
+        },
+        {
+          "name": "SceneView.PublishGap",
+          "count": 214,
+          "maximum": 58.2574,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.SceneView",
+          "count": 149,
+          "maximum": 29.2301,
+          "over100": 0
+        },
+        {
+          "name": "App.Update.RenderWorld",
+          "count": 77,
+          "maximum": 18.9742,
+          "over100": 0
+        },
+        {
+          "name": "App.Scheduler.RenderWorld",
+          "count": 74,
+          "maximum": 18.9166,
+          "over100": 0
+        }
+      ],
+      "worstNodes": [
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.954452514648438
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.950637817382812
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.517669677734375
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.502410888671875
+        },
+        {
+          "name": "Main3DRenderNode",
+          "ms": 9.418487548828125
+        }
+      ]
+    }
+  ],
+  "slowLocalShadowStages": [
+    {
+      "start": 82268.4354,
+      "ms": 79.9798,
+      "name": "LocalShadow.EncodeDraws",
+      "bytes": 0,
+      "count": 307
+    },
+    {
+      "start": 82257.7589,
+      "ms": 90.6852,
+      "name": "LocalShadow.View.reused0",
+      "bytes": 0,
+      "count": 4
+    },
+    {
+      "start": 88761.9595,
+      "ms": 28.8733,
+      "name": "LocalShadow.EncodeDraws",
+      "bytes": 0,
+      "count": 636
+    },
+    {
+      "start": 88761.256,
+      "ms": 29.5967,
+      "name": "LocalShadow.View.reused3",
+      "bytes": 0,
+      "count": 6
+    }
+  ]
+}

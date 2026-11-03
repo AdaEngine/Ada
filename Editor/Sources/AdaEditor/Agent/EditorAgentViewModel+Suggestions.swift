@@ -21,6 +21,7 @@ extension EditorAgentViewModel {
             if messages.count == 6 { break }
         }
         messages.reverse()
+        let completedReplyID = !prompt.isEmpty || unpersistedSuggestionSessions.contains(session.id) ? nil : Self.completedSuggestionReply(in: session)
         let context = EditorAgentPromptSuggestions.Context(
             sessionID: session.id,
             draft: prompt,
@@ -28,7 +29,8 @@ extension EditorAgentViewModel {
             mode: mode.rawValue,
             languageCode: EditorLocalization.shared.language.rawValue,
             messages: messages,
-            completedReplyID: !prompt.isEmpty || unpersistedSuggestionSessions.contains(session.id) ? nil : Self.completedSuggestionReply(in: session)
+            followUps: completedReplyID == nil ? [] : EditorAgentNextSteps.candidates(in: session),
+            completedReplyID: completedReplyID
         )
         promptSuggestions.update(.init(
             context: context,

@@ -74,6 +74,12 @@ export TINT_EXECUTABLE="$root/AdaEngine_AdaRender.resources/tint"
 exec "$root/AdaEditor" "$@"
 ''', encoding="utf-8")
         (directory / "ada-studio").chmod(0o755)
+        (directory / "adastudio").write_text('''#!/usr/bin/env bash
+set -euo pipefail
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+exec "$root/ada-studio" --ada-studio-cli "$@"
+''', encoding="utf-8")
+        (directory / "adastudio").chmod(0o755)
         shutil.copy2(ROOT / "LICENSE", directory / "LICENSE-AdaEngine")
         # Swiftly's `swift` is a launcher, so derive the actual toolchain from compiler metadata.
         toolchain = Path(metadata["paths"]["runtimeResourcePath"]).parent.parent

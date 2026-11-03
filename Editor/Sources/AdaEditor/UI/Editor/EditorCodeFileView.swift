@@ -1,5 +1,6 @@
 @_spi(AdaEngine) import AdaEngine
 import Foundation
+import Observation
 import SwiftTreeSitter
 import Synchronization
 import TreeSitterSwift
@@ -31,7 +32,7 @@ struct EditorCodeFileView: View {
     var debugger: EditorDebugger?
     var appearanceSettings: EditorAppearanceSettings = .shared
 
-    @State private var caretViewportRect: Rect?
+    @State private var caret = EditorCodeCaretState()
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -259,7 +260,7 @@ extension EditorCodeFileView {
         GeometryReader { geometry in
             let popupFrame = EditorCompletionPopupLayout.frame(
                 viewportSize: geometry.size,
-                caretRect: caretViewportRect,
+                caretRect: caret.rect,
                 itemCount: document.completionItems.count
             )
 
@@ -329,7 +330,9 @@ extension EditorCodeFileView {
                 onGoToDefinition?(document, EditorSourceLocation(textEditorPosition: position))
             },
             onCaretViewportRectChange: { _, rect in
-                caretViewportRect = rect
+                if caret.rect != rect {
+                    caret.rect = rect
+                }
             },
             onCaretChange: { position, currentText in
                 guard supportsLanguageTooling else {

@@ -459,6 +459,13 @@ targets:
           /usr/bin/ditto "${source_ui_resources}" "${destination_ui_resources}"
           /usr/bin/ditto "${source_a2ui_resources}" "${destination_a2ui_resources}"
 schemes:
+  AdaEditor-Standalone:
+    build:
+      targets:
+        AdaEditor-Standalone: all
+    run:
+      config: Release
+      executable: AdaEditor-Standalone
   AdaEditor-macOS:
     build:
       targets:

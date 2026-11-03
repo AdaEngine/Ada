@@ -87,6 +87,7 @@ final class EditorSceneViewportModel {
     private var isPresentationActive = true
     private var sceneLoadGeneration = 0
     private var onSceneLoadingChanged: ((Bool) -> Void)?
+    private var onSceneLoadingProgress: ((EditorSceneLoadingProgress) -> Void)?
     private var onSceneLoaded: ((EditorSceneRuntimeLoadResult) -> Void)?
     private var suppressSelectionOnPointerEnd = false
     private var isTwoDPanning = false
@@ -171,6 +172,7 @@ final class EditorSceneViewportModel {
         sceneLoadTask?.cancel()
         sceneLoadTask = nil
         onSceneLoadingChanged = nil
+        onSceneLoadingProgress = nil
         onSceneLoaded = nil
         endSpatialTransform(cancelled: true)
         isImmersive = false
@@ -237,19 +239,24 @@ final class EditorSceneViewportModel {
             return result
         }
         onSceneLoadingChanged?(true)
+        onSceneLoadingProgress?(EditorSceneLoadingProgress())
         let sourceURL = sceneSourceURL
         let rootURL = sceneResourceRootURL
         let previous = world.getResource(EditorSceneAssetCache.self) ?? EditorSceneAssetCache()
         sceneLoadTask = Task { @MainActor [weak self, weak world] in
             do {
                 let assets = try await EditorSceneAssetCache.prepare(
-                    model: model, sourceURL: sourceURL, resourceRootURL: rootURL, reusing: previous
+                    model: model, sourceURL: sourceURL, resourceRootURL: rootURL, reusing: previous,
+                    onProgress: { [weak self] progress in
+                        await self?.reportSceneLoadingProgress(progress, generation: generation)
+                    }
                 )
                 // A cancelled install still owns cleanup of the entities it created.
                 await previousLoad?.value
                 guard !Task.isCancelled, let self, let world, self.sceneLoadGeneration == generation else { return }
                 let install = { @MainActor @Sendable () async throws -> EditorSceneRuntimeLoadResult? in
                     guard !Task.isCancelled, self.sceneLoadGeneration == generation else { return nil }
+                    self.onSceneLoadingProgress?(EditorSceneLoadingProgress(phase: .objects))
                     world.insertResource(assets)
                     return try await self.installSceneRuntimeIncrementally(model, in: world)
                 }
@@ -281,14 +288,21 @@ final class EditorSceneViewportModel {
         _ world: World,
         application: AppWorlds? = nil,
         onLoadingChanged: @escaping (Bool) -> Void,
+        onLoadingProgress: @escaping (EditorSceneLoadingProgress) -> Void = { _ in },
         onLoaded: @escaping (EditorSceneRuntimeLoadResult) -> Void
     ) {
         self.world = world
         sceneApplication = application
         updatePresentationPause()
         onSceneLoadingChanged = onLoadingChanged
+        onSceneLoadingProgress = onLoadingProgress
         onSceneLoaded = onLoaded
         _ = reloadSceneRuntimeIfReady()
+    }
+
+    private func reportSceneLoadingProgress(_ progress: EditorSceneLoadingProgress, generation: Int) {
+        guard !Task.isCancelled, sceneLoadGeneration == generation else { return }
+        onSceneLoadingProgress?(progress)
     }
 
     /// Keep one prepared edit world while its pane shows code. A scoped hosted

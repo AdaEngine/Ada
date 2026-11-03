@@ -385,6 +385,8 @@ extension FontResource {
                 additionalCodepoints: [scalar.value],
                 variations: []
             )
+        #elseif os(Windows)
+            return WindowsFontFallback.resource(for: scalar)
         #else
             return nil
         #endif

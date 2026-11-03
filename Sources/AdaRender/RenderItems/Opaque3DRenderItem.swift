@@ -14,6 +14,10 @@ public struct Opaque3DRenderItem: RenderItem {
     public let sortKey: Float
     public var batchRange: Range<Int32>?
     public var indirectArgumentOffset: Int?
+    /// Main-pass-only cluster geometry; motion/shadow/contact draws retain the source part.
+    public var meshletOverride: MeshletDrawOverride?
+    /// Explicit force-visible meshes bypass cluster rejection too.
+    public var forceVisible: Bool = false
 
     public let modelIndex: Int
     public let partIndex: Int
@@ -54,5 +58,20 @@ public struct Opaque3DRenderItem: RenderItem {
         self.batchRange = batchRange
         self.skinningBuffer = skinningBuffer
         self.morphBuffer = morphBuffer
+    }
+}
+
+/// One frame/view's typed geometry override. Missing indirect support restores the complete source draw.
+public struct MeshletDrawOverride: Sendable {
+    public let indices: any IndexBuffer
+    public let arguments: (any Buffer)?
+    public let argumentOffset: Int
+    public let ranges: [Range<Int>]
+
+    public init(indices: any IndexBuffer, arguments: (any Buffer)? = nil, argumentOffset: Int = 0, ranges: [Range<Int>] = []) {
+        self.indices = indices
+        self.arguments = arguments
+        self.argumentOffset = argumentOffset
+        self.ranges = ranges
     }
 }

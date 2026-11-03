@@ -67,13 +67,19 @@ struct EditorSceneAssetCache: Resource {
         model: EditorSceneModel,
         sourceURL: URL?,
         resourceRootURL: URL?,
-        reusing previous: Self = Self()
+        reusing previous: Self = Self(),
+        onProgress: @Sendable (EditorSceneLoadingProgress) async -> Void = { _ in }
     ) async throws -> Self {
         var paths = Paths()
         try collect(model: model, sourceURL: sourceURL, resourceRootURL: resourceRootURL, ancestry: [], paths: &paths)
         var result = Self()
+        let total = paths.models.count + paths.skeletons.count
+        var completed = 0
+        await onProgress(EditorSceneLoadingProgress(phase: .resources, total: total))
         for path in paths.models.sorted() {
             try Task.checkCancellation()
+            let name = URL(fileURLWithPath: String(path.prefix { $0 != "#" })).lastPathComponent
+            await onProgress(EditorSceneLoadingProgress(phase: .resources, completed: completed, total: total, resourceName: name))
             do {
                 let revision = FileRevision(path: path)
                 if previous.revisions[path] == revision, let handle = previous.models[path], handle.asset != nil {
@@ -87,9 +93,13 @@ struct EditorSceneAssetCache: Resource {
             } catch {
                 result.failures[path] = error.localizedDescription
             }
+            completed += 1
+            await onProgress(EditorSceneLoadingProgress(phase: .resources, completed: completed, total: total, resourceName: name))
         }
         for path in paths.skeletons.sorted() {
             try Task.checkCancellation()
+            let name = URL(fileURLWithPath: path).lastPathComponent
+            await onProgress(EditorSceneLoadingProgress(phase: .resources, completed: completed, total: total, resourceName: name))
             do {
                 let revision = FileRevision(path: path)
                 if previous.revisions[path] == revision, let handle = previous.skeletons[path], handle.asset != nil {
@@ -103,6 +113,8 @@ struct EditorSceneAssetCache: Resource {
             } catch {
                 result.failures[path] = error.localizedDescription
             }
+            completed += 1
+            await onProgress(EditorSceneLoadingProgress(phase: .resources, completed: completed, total: total, resourceName: name))
         }
         try Task.checkCancellation()
         return result

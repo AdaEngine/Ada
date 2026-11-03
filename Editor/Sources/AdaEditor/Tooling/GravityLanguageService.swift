@@ -111,7 +111,8 @@ struct EditorGravityLanguageService: Sendable {
                     range: editorRange(from: diagnostic.range, in: text),
                     severity: diagnostic.severity == .error ? .error : .warning,
                     message: diagnostic.message,
-                    source: "adascript-lsp"
+                    source: diagnostic.code == nil ? "adascript-lsp" : "adascript-lint",
+                    code: diagnostic.code
                 )
             }
     }

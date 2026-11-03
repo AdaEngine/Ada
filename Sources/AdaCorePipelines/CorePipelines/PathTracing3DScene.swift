@@ -16,7 +16,7 @@ struct PathTracing3DScene: Sendable {
         !castsShadows && (material as? PBRMaterial)?.graphMaterial != nil
     }
     static let dataWidth = 2048
-    static let tileSize = 128
+    private(set) var tileSize = 128
     static let atlasColumns = 16
     static let maximumTextures = 256
     static let maximumTriangles = 131072
@@ -33,11 +33,13 @@ struct PathTracing3DScene: Sendable {
     private var atlasKeys: [ObjectIdentifier] = []
     private var hierarchy = PathTracing3DBVH([])
 
-    mutating func prepare(_ sources: [Mesh3DRenderSource], skinning: Skinning3DUniforms?, device: RenderDevice) async throws {
+    mutating func prepare(_ sources: [Mesh3DRenderSource], skinning: Skinning3DUniforms?, device: RenderDevice, textureTileSize: Int = 128) async throws {
         let sources = sources.filter { source in
             !source.materials.allSatisfy { Self.isRasterOverlay($0, castsShadows: source.castShadows) }
         }
         var hash = FrameDigest3D()
+        let requestedTileSize = textureTileSize >= 512 ? 512 : (textureTileSize >= 256 ? 256 : 128)
+        hash.combine(UInt64(requestedTileSize))
         var materialList: [PBRMaterial] = []
         var materialIDs: [RID: Int] = [:]
         var textures: [Texture2D] = []
@@ -81,7 +83,8 @@ struct PathTracing3DScene: Sendable {
         if digest == hash.value { return }
         guard textures.count <= Self.maximumTextures else { throw PathTracing3DError.unsupported("Path tracing texture budget exceeded (256)") }
         let keys = textures.map(ObjectIdentifier.init)
-        if keys != atlasKeys || atlas == nil {
+        if keys != atlasKeys || atlas == nil || tileSize != requestedTileSize {
+            tileSize = requestedTileSize
             let active = Set(keys)
             images = images.filter { active.contains($0.key) }; textureOwners = textureOwners.filter { active.contains($0.key) }
             for texture in textures where images[ObjectIdentifier(texture)] == nil {
@@ -90,18 +93,18 @@ struct PathTracing3DScene: Sendable {
                 }
                 images[ObjectIdentifier(texture)] = image; textureOwners[ObjectIdentifier(texture)] = texture
             }
-            let width = Self.tileSize*Self.atlasColumns
+            let width = tileSize*Self.atlasColumns
             let rows = max(1, (textures.count+Self.atlasColumns-1)/Self.atlasColumns)
-            var pixels = [UInt8](repeating: 255, count: width*Self.tileSize*rows*4)
+            var pixels = [UInt8](repeating: 255, count: width*tileSize*rows*4)
             for (index, texture) in textures.enumerated() {
                 guard let image = images[ObjectIdentifier(texture)] else { continue }
-                for y in 0..<Self.tileSize { for x in 0..<Self.tileSize {
-                    let color = Self.pixel(image, x: min(image.width-1,x*image.width/Self.tileSize), y: min(image.height-1,y*image.height/Self.tileSize))
-                    let start = ((index/Self.atlasColumns*Self.tileSize+y)*width+index%Self.atlasColumns*Self.tileSize+x)*4
+                for y in 0..<tileSize { for x in 0..<tileSize {
+                    let color = Self.pixel(image, x: min(image.width-1,x*image.width/tileSize), y: min(image.height-1,y*image.height/tileSize))
+                    let start = ((index/Self.atlasColumns*tileSize+y)*width+index%Self.atlasColumns*tileSize+x)*4
                     for channel in 0..<4 { pixels[start+channel] = UInt8(min(max(color[channel], 0), 1)*255) }
                 } }
             }
-            atlas = Texture2D(image: Image(width: width, height: rows*Self.tileSize, data: Data(pixels)))
+            atlas = Texture2D(image: Image(width: width, height: rows*tileSize, data: Data(pixels)))
             atlasKeys = keys
         }
         func tile(_ texture: Texture2D?) -> Float { texture.flatMap { textureIDs[ObjectIdentifier($0)] }.map(Float.init) ?? -1 }

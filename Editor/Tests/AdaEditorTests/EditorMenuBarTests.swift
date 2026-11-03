@@ -52,6 +52,9 @@ struct EditorMenuBarTests {
         let systemTitles = system.items.filter { !$0.isSeparator }.map(\.title)
         let expectedPrefix = EditorDistribution.current == .standalone ? ["Settings...", "Check for Updates…"] : ["Settings..."]
         #expect(systemTitles.starts(with: expectedPrefix))
+        #if os(macOS) || os(Windows) || os(Linux)
+        #expect(systemTitles.contains("Install adastudio Command in PATH…") == (EditorDistribution.current == .standalone))
+        #endif
         #expect(systemTitles.contains("Movie Maker"))
         #expect(Array(systemTitles.suffix(5)) == [
             "Disable Debug Overlay",

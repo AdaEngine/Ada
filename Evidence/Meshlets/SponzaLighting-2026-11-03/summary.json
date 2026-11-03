@@ -1,0 +1,50 @@
+[
+  {
+    "preset": "lodRaster",
+    "localLights": 0,
+    "medianFPS": 56.63099338536594,
+    "minFPS": 53.88299099978889,
+    "maxFPS": 58.75308676114657,
+    "medianP95Milliseconds": 55.3836
+  },
+  {
+    "preset": "lodRaster",
+    "localLights": 4,
+    "medianFPS": 72.50726566440589,
+    "minFPS": 71.34111860775708,
+    "maxFPS": 72.78062607906921,
+    "medianP95Milliseconds": 39.1628
+  },
+  {
+    "preset": "lodRaster",
+    "localLights": 12,
+    "medianFPS": 75.57732381419437,
+    "minFPS": 73.34621537362679,
+    "maxFPS": 78.4989831959899,
+    "medianP95Milliseconds": 38.9635
+  },
+  {
+    "preset": "pathTracing",
+    "localLights": 0,
+    "medianFPS": 29.231173272265043,
+    "minFPS": 27.332084542128307,
+    "maxFPS": 30.927072258446273,
+    "medianP95Milliseconds": 59.737
+  },
+  {
+    "preset": "pathTracing",
+    "localLights": 4,
+    "medianFPS": 27.465969747733997,
+    "minFPS": 25.024610774728302,
+    "maxFPS": 27.510809455548575,
+    "medianP95Milliseconds": 62.7006
+  },
+  {
+    "preset": "pathTracing",
+    "localLights": 12,
+    "medianFPS": 29.807402798234815,
+    "minFPS": 29.238595221274245,
+    "maxFPS": 32.345092439173754,
+    "medianP95Milliseconds": 57.9221
+  }
+]

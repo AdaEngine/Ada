@@ -30,9 +30,8 @@ struct EditorAgentSuggestionsView: View {
                             .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 7)
-                            .background(RoundedRectangleShape(cornerRadius: 7).fill(theme.editorColors.blue.opacity(0.07)))
                     }
-                    .buttonStyle(DefaultButtonStyle())
+                    .buttonStyle(EditorPickerRowButtonStyle(theme: theme, selectionColor: theme.editorColors.blue.opacity(0.07), cornerRadius: 7))
                     .accessibilityIdentifier("AdaEditor.Agent.PromptSuggestion.\(index)")
                 }
             }

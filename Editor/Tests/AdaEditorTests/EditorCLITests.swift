@@ -1,4 +1,4 @@
-#if os(macOS) || os(Windows)
+#if os(macOS) || os(Windows) || os(Linux)
 import Foundation
 import Testing
 
@@ -114,7 +114,7 @@ struct EditorCLITests {
             try Data().write(to: url)
             #endif
         }
-        #if os(macOS)
+        #if !os(Windows)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: sdkRoot.appendingPathComponent(compiler).path)
         #endif
         try Data("{\"schemaVersion\":1}".utf8).write(to: sdkRoot.appendingPathComponent("sdk.json"))
@@ -123,6 +123,7 @@ struct EditorCLITests {
         #expect(sdk.compilerRoot.path == sdkRoot.appendingPathComponent("AdaScript").path)
     }
 
+    #if !os(Linux)
     @Test func concurrentBuildLockReleases() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -133,6 +134,7 @@ struct EditorCLITests {
         let next = try EditorCLIBuildLock(at: url)
         next.release()
     }
+    #endif
 
     @Test func buildPreflightRejectsMissingSDKWithoutReplacingOutput() async throws {
         let root = try fixture()

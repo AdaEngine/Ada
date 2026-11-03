@@ -1,0 +1,89 @@
+◊ Test run started.
+→ Testing Library Version: 6.3.1 (937120cbc281cf2)
+→ Target Platform: x86_64-unknown-windows-msvc
+◊ Suite "3D GPU rendering" started.
+◊ Suite "Sponza renderer benchmark" started.
+◊ Test runsFixedCameraPathsThroughProductionRenderer() started.
+2026-11-02T18:56:23+0300 info org.adaengine.webgpu: [AdaRender] Selected WebGPU adapter: backend=4 vendor=nvidia device=NVIDIA GeForce RTX 4070 description=D3D12 driver version 32.0.16.1088
+SPONZA importing benchmark-opaque.gltf (base, geometry)
+SPONZA sponza-base geometry atrium round=0 hiz=false ms=2.5289756666666667
+SPONZA sponza-base geometry atrium round=0 hiz=true ms=2.5516116666666666
+SPONZA sponza-base geometry atrium round=1 hiz=true ms=2.5077021666666663
+SPONZA sponza-base geometry atrium round=1 hiz=false ms=2.1291358333333332
+SPONZA sponza-base geometry atrium round=2 hiz=false ms=2.105377333333333
+SPONZA sponza-base geometry atrium round=2 hiz=true ms=2.5406568333333333
+SPONZA sponza-base geometry ground-floor-corridor round=0 hiz=false ms=2.1248655
+SPONZA sponza-base geometry ground-floor-corridor round=0 hiz=true ms=3.2388363333333334
+SPONZA sponza-base geometry ground-floor-corridor round=1 hiz=true ms=2.899786833333333
+SPONZA sponza-base geometry ground-floor-corridor round=1 hiz=false ms=2.3991546666666665
+SPONZA sponza-base geometry ground-floor-corridor round=2 hiz=false ms=2.518018833333333
+SPONZA sponza-base geometry ground-floor-corridor round=2 hiz=true ms=3.011818666666666
+SPONZA sponza-base geometry upper-gallery round=0 hiz=false ms=2.420292166666667
+SPONZA sponza-base geometry upper-gallery round=0 hiz=true ms=2.6397665
+SPONZA sponza-base geometry upper-gallery round=1 hiz=true ms=2.6106491666666662
+SPONZA sponza-base geometry upper-gallery round=1 hiz=false ms=2.340545333333333
+SPONZA sponza-base geometry upper-gallery round=2 hiz=false ms=2.087405833333334
+SPONZA sponza-base geometry upper-gallery round=2 hiz=true ms=3.101781
+SPONZA importing benchmark-pbr.gltf (base, pbr)
+SPONZA sponza-base pbr atrium round=0 hiz=false ms=6.250927666666667
+SPONZA sponza-base pbr atrium round=0 hiz=true ms=6.958993166666668
+SPONZA sponza-base pbr atrium round=1 hiz=true ms=6.907365999999999
+SPONZA sponza-base pbr atrium round=1 hiz=false ms=6.3189321666666665
+SPONZA sponza-base pbr atrium round=2 hiz=false ms=6.637675666666667
+SPONZA sponza-base pbr atrium round=2 hiz=true ms=6.760933333333332
+SPONZA sponza-base pbr ground-floor-corridor round=0 hiz=false ms=7.5966318333333325
+SPONZA sponza-base pbr ground-floor-corridor round=0 hiz=true ms=8.030183833333334
+SPONZA sponza-base pbr ground-floor-corridor round=1 hiz=true ms=8.309440333333333
+SPONZA sponza-base pbr ground-floor-corridor round=1 hiz=false ms=7.4550735
+SPONZA sponza-base pbr ground-floor-corridor round=2 hiz=false ms=7.287666166666668
+SPONZA sponza-base pbr ground-floor-corridor round=2 hiz=true ms=8.168989833333333
+SPONZA sponza-base pbr upper-gallery round=0 hiz=false ms=7.672740833333334
+SPONZA sponza-base pbr upper-gallery round=0 hiz=true ms=7.960968333333334
+SPONZA sponza-base pbr upper-gallery round=1 hiz=true ms=8.2025645
+SPONZA sponza-base pbr upper-gallery round=1 hiz=false ms=7.593214
+SPONZA sponza-base pbr upper-gallery round=2 hiz=false ms=8.169807500000001
+SPONZA sponza-base pbr upper-gallery round=2 hiz=true ms=8.416035833333332
+SPONZA importing benchmark-opaque.gltf (base, geometry)
+SPONZA importing benchmark-opaque.gltf (ivy, geometry)
+SPONZA sponza-ivy geometry atrium round=0 hiz=false ms=2.181563166666666
+SPONZA sponza-ivy geometry atrium round=0 hiz=true ms=3.031404333333333
+SPONZA sponza-ivy geometry atrium round=1 hiz=true ms=2.8885500000000004
+SPONZA sponza-ivy geometry atrium round=1 hiz=false ms=2.1098036666666666
+SPONZA sponza-ivy geometry atrium round=2 hiz=false ms=2.0970961666666668
+SPONZA sponza-ivy geometry atrium round=2 hiz=true ms=2.6478068333333336
+SPONZA sponza-ivy geometry ground-floor-corridor round=0 hiz=false ms=2.4496901666666666
+SPONZA sponza-ivy geometry ground-floor-corridor round=0 hiz=true ms=3.2161923333333333
+SPONZA sponza-ivy geometry ground-floor-corridor round=1 hiz=true ms=2.86859
+SPONZA sponza-ivy geometry ground-floor-corridor round=1 hiz=false ms=2.9643794999999997
+SPONZA sponza-ivy geometry ground-floor-corridor round=2 hiz=false ms=2.737363666666667
+SPONZA sponza-ivy geometry ground-floor-corridor round=2 hiz=true ms=2.7324365000000004
+SPONZA sponza-ivy geometry upper-gallery round=0 hiz=false ms=2.6460621666666664
+SPONZA sponza-ivy geometry upper-gallery round=0 hiz=true ms=3.1319004999999995
+SPONZA sponza-ivy geometry upper-gallery round=1 hiz=true ms=3.0316824999999996
+SPONZA sponza-ivy geometry upper-gallery round=1 hiz=false ms=2.3426455
+SPONZA sponza-ivy geometry upper-gallery round=2 hiz=false ms=2.6535545
+SPONZA sponza-ivy geometry upper-gallery round=2 hiz=true ms=3.311562
+SPONZA importing benchmark-pbr.gltf (base, pbr)
+SPONZA importing benchmark-pbr.gltf (ivy, pbr)
+SPONZA sponza-ivy pbr atrium round=0 hiz=false ms=6.452397833333333
+SPONZA sponza-ivy pbr atrium round=0 hiz=true ms=7.423331
+SPONZA sponza-ivy pbr atrium round=1 hiz=true ms=7.0841005
+SPONZA sponza-ivy pbr atrium round=1 hiz=false ms=6.3480105
+SPONZA sponza-ivy pbr atrium round=2 hiz=false ms=6.4616871666666675
+SPONZA sponza-ivy pbr atrium round=2 hiz=true ms=7.326199
+SPONZA sponza-ivy pbr ground-floor-corridor round=0 hiz=false ms=7.551598666666665
+SPONZA sponza-ivy pbr ground-floor-corridor round=0 hiz=true ms=8.5556255
+SPONZA sponza-ivy pbr ground-floor-corridor round=1 hiz=true ms=8.2650325
+SPONZA sponza-ivy pbr ground-floor-corridor round=1 hiz=false ms=7.554164833333334
+SPONZA sponza-ivy pbr ground-floor-corridor round=2 hiz=false ms=7.602606166666668
+SPONZA sponza-ivy pbr ground-floor-corridor round=2 hiz=true ms=8.380941166666666
+SPONZA sponza-ivy pbr upper-gallery round=0 hiz=false ms=7.523655333333333
+SPONZA sponza-ivy pbr upper-gallery round=0 hiz=true ms=8.266887833333334
+SPONZA sponza-ivy pbr upper-gallery round=1 hiz=true ms=8.449070166666665
+SPONZA sponza-ivy pbr upper-gallery round=1 hiz=false m√ Test runsFixedCameraPathsThroughProductionRenderer() passed after 402.507 seconds.
+√ Suite "Sponza renderer benchmark" passed after 402.508 seconds.
+√ Suite "3D GPU rendering" passed after 402.508 seconds.
+√ Test run with 1 test in 2 suites passed after 402.508 seconds.
+s=7.427916
+SPONZA sponza-ivy pbr upper-gallery round=2 hiz=false ms=7.510141
+SPONZA sponza-ivy pbr upper-gallery round=2 hiz=true ms=8.230819166666668

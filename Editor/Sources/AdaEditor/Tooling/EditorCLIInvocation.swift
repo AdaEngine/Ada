@@ -1,5 +1,5 @@
 import Foundation
-#if os(macOS) || os(Windows)
+#if os(macOS) || os(Windows) || os(Linux)
 
 /// Strict, noninteractive command contract shared by the bundled CLI and its tests.
 struct EditorCLIInvocation: Sendable {
@@ -40,7 +40,8 @@ struct EditorCLIInvocation: Sendable {
         switch command {
         case .help, .version: allowed = common
         case .doctor: allowed = common.union(toolchain)
-        case .inspect, .validate: allowed = common.union(project)
+        case .inspect: allowed = common.union(project)
+        case .validate: allowed = common.union(project).union(["lint"])
         case .build, .export: allowed = common.union(project).union(toolchain).union(build)
         case .agentResources: allowed = common.union(["output"])
         }
@@ -64,6 +65,9 @@ struct EditorCLIInvocation: Sendable {
         }
         if let configuration = parsed["configuration"], !["debug", "release"].contains(configuration) {
             throw EditorCLIError.argument("--configuration must be debug or release.")
+        }
+        if let lint = parsed["lint"], !["warning", "strict", "off"].contains(lint) {
+            throw EditorCLIError.argument("--lint must be warning, strict or off.")
         }
         if let target = parsed["target"], !["macos", "web", "android"].contains(target) {
             throw EditorCLIError.argument("--target must be macos, web or android. iOS export is not available yet.")
@@ -89,6 +93,8 @@ struct EditorCLIInvocation: Sendable {
     Ada Studio CLI
 
     Usage: adastudio <command> [options]
+           adastudio <directory>   Open a project in Ada Studio (e.g. adastudio .)
+           adastudio -- <directory>  Open a directory whose name matches a command
       --help                     Show this help
       --version                  Show CLI and protocol versions
       doctor                     Check the build SDK and host tools
@@ -100,6 +106,7 @@ struct EditorCLIInvocation: Sendable {
 
     Common:    --format text|json
     Project:   --project <directory> (default: current directory)
+    Validate:  --lint warning|strict|off (default: warning; strict fails on style issues)
     Build:     --target macos|web|android --configuration debug|release --output <directory>
                --scratch-path <directory> --swift-sdk <SDK identifier> (Web)
     Android:   --product <Swift product> --abi arm64-v8a|x86_64|all
@@ -117,7 +124,7 @@ struct EditorCLIInvocation: Sendable {
     Windows does not package macOS apps or a standalone Windows game through this CLI.
     Web export additionally requires a matching Swift WebAssembly SDK.
     Validation reads saved files; it does not validate every asset or execute gameplay.
-    JSON goes to stdout, build logs to stderr. No UI or prompts are opened.
+    Commands: JSON goes to stdout, build logs to stderr. No UI or prompts are opened.
     Exit codes: 0 success, 2 usage, 3 project, 4 environment, 5 build, 130 cancelled.
     """
 }

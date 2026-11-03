@@ -16,6 +16,7 @@ final class EditorWorkbenchViewModel {
     var activeEditorTab: String
     var activeOutputTab: String
     var openDocuments: [EditorWorkbenchDocument]
+    @ObservationIgnored var textSelections: [String: EditorTextSelection] = [:]
     var tileMapResourceRevision = 0
     var activeDocumentID: String
     var secondaryDocumentIDs: Set<String> = []
@@ -131,7 +132,7 @@ final class EditorWorkbenchViewModel {
     }
 
     var activeDocument: EditorWorkbenchDocument? {
-        openDocuments.first { $0.id == activeDocumentID }
+        openDocuments.first { $0.id == activeDocumentID }.map(applyingTextSelection)
     }
 
     var activeSceneDocument: EditorSceneDocument? {
@@ -156,6 +157,7 @@ final class EditorWorkbenchViewModel {
             }
         }
 
+        textSelections.removeValue(forKey: document.id)
         selectDocument(id: document.id)
         prepareSceneDocument(id: document.id)
     }
@@ -261,6 +263,7 @@ final class EditorWorkbenchViewModel {
             onActiveDocumentWillChange?()
         }
         openDocuments.remove(at: closingIndex)
+        textSelections.removeValue(forKey: documentID)
         uiSceneModels.removeValue(forKey: documentID)
         tileSourceModels.removeValue(forKey: documentID)
         tileMapModels.removeValue(forKey: documentID)
@@ -298,6 +301,7 @@ final class EditorWorkbenchViewModel {
         let discardedIDSet = Set(discardedIDs)
         let wasActiveDocumentDiscarded = discardedIDSet.contains(activeDocumentID)
         openDocuments.removeAll { discardedIDSet.contains($0.id) }
+        textSelections = textSelections.filter { !discardedIDSet.contains($0.key) }
         uiSceneModels = uiSceneModels.filter { !discardedIDSet.contains($0.key) }
         tileSourceModels = tileSourceModels.filter { !discardedIDSet.contains($0.key) }
         tileMapModels = tileMapModels.filter { !discardedIDSet.contains($0.key) }

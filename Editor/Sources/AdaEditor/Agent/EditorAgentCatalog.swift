@@ -79,9 +79,21 @@ enum EditorAgentDiscovery {
             .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "\"")) }
             .filter { EditorHostTools.isAbsolutePath($0) }
         paths += [".local/bin", ".bun/bin", ".volta/bin", ".cargo/bin", "AppData/Roaming/npm"].map { home.appendingPathComponent($0).path }
-        if let local = EditorHostTools.environmentValue("LOCALAPPDATA", in: environment) {
-            paths.append(URL(fileURLWithPath: local).appendingPathComponent("Programs/nodejs").path)
-        }
+        let local = EditorHostTools.environmentValue("LOCALAPPDATA", in: environment).map { URL(fileURLWithPath: $0) }
+            ?? home.appendingPathComponent("AppData/Local")
+        paths += ["Programs/nodejs", "Sloppy/bin"].map { local.appendingPathComponent($0).path }
+        let codex = local.appendingPathComponent("OpenAI/Codex/bin")
+        let versions = (try? fileManager.contentsOfDirectory(at: codex, includingPropertiesForKeys: nil)) ?? []
+        paths += versions.compactMap { version -> (path: String, modified: Date)? in
+            let binary = version.appendingPathComponent("codex.exe")
+            guard fileManager.isExecutableFile(atPath: binary.path),
+                  let values = try? binary.resourceValues(forKeys: [.isRegularFileKey, .contentModificationDateKey]),
+                  values.isRegularFile == true else { return nil }
+            return (version.path, values.contentModificationDate ?? .distantPast)
+        }.sorted { lhs, rhs in
+            lhs.modified == rhs.modified ? lhs.path < rhs.path : lhs.modified > rhs.modified
+        }.map(\.path)
+        paths.append(codex.path)
         if let programs = EditorHostTools.environmentValue("ProgramFiles", in: environment) {
             paths.append(URL(fileURLWithPath: programs).appendingPathComponent("nodejs").path)
         }

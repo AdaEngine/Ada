@@ -148,6 +148,10 @@ extension AppWorlds {
 
     /// Updates this world and its subworlds, serializing concurrent frame requests.
     public func update() async throws {
+        let stall = PerformanceStallProbe.begin()
+        defer {
+            if stall != nil { PerformanceStallProbe.end("App.Update.\(main.name ?? "root")", since: stall) }
+        }
         while activeUpdates > 0 {
             await withCheckedContinuation { updateWaiters.append($0) }
         }
@@ -210,11 +214,15 @@ extension AppWorlds {
         }
 
         if shouldRunMainWorld {
+            let stall = PerformanceStallProbe.begin()
             await main.runScheduler(updateScheduler)
+            if stall != nil { PerformanceStallProbe.end("App.Scheduler.\(main.name ?? "root")", since: stall) }
         }
 
         for world in self.subWorlds.values where !world.isHostedUpdateSuspended && world.hostedUpdateSuspensionCount == 0 {
+            let stall = PerformanceStallProbe.begin()
             unsafe await world.worldExctractor?.exctract(from: main, to: world.main)
+            if stall != nil { PerformanceStallProbe.end("App.Extract.\(world.main.name ?? "subworld")", since: stall) }
             try await world.update()
         }
 

@@ -1,7 +1,7 @@
 import AdaUtils
 import Foundation
 
-private struct EditorDocumentSession: Codable {
+struct EditorDocumentSession: Codable {
     let relativePath: String
 }
 

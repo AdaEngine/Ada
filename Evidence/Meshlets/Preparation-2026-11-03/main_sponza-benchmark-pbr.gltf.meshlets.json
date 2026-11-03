@@ -1,0 +1,2862 @@
+{
+  "schema": 1,
+  "builder": "meshoptimizer-1.3-scan",
+  "maximumVertices": 64,
+  "maximumTriangles": 96,
+  "primitiveOrder": "preserved",
+  "dependencies": {
+    "benchmark-pbr.gltf": "f93e88cfce48b1f044fbc6a6aa56b81b167f1d59050d02cb6f127025e17ef821",
+    "NewSponza_Main_glTF_003.bin": "903d443b46b51c8397c25b65286d9f9e111121f12a3e0e303f19019982568d6b"
+  },
+  "parts": [
+    {
+      "mesh": 0,
+      "part": 0,
+      "triangles": 5640,
+      "meshlets": 110,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 1,
+      "triangles": 57413,
+      "meshlets": 1018,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 1,
+      "part": 0,
+      "triangles": 5640,
+      "meshlets": 110,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 1,
+      "part": 1,
+      "triangles": 57413,
+      "meshlets": 1018,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 2,
+      "part": 0,
+      "triangles": 1680,
+      "meshlets": 18,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 2,
+      "part": 1,
+      "triangles": 302,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 3,
+      "part": 0,
+      "triangles": 28840,
+      "meshlets": 449,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 3,
+      "part": 1,
+      "triangles": 2484,
+      "meshlets": 60,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 3,
+      "part": 2,
+      "triangles": 23940,
+      "meshlets": 343,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 4,
+      "part": 0,
+      "triangles": 36900,
+      "meshlets": 573,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 4,
+      "part": 1,
+      "triangles": 6180,
+      "meshlets": 97,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 4,
+      "part": 2,
+      "triangles": 24,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 4,
+      "part": 3,
+      "triangles": 320,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 4,
+      "part": 4,
+      "triangles": 7539,
+      "meshlets": 99,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 5,
+      "part": 0,
+      "triangles": 4180,
+      "meshlets": 97,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 5,
+      "part": 1,
+      "triangles": 24156,
+      "meshlets": 358,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 6,
+      "part": 0,
+      "triangles": 2400,
+      "meshlets": 61,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 6,
+      "part": 1,
+      "triangles": 19380,
+      "meshlets": 278,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 7,
+      "part": 0,
+      "triangles": 2720,
+      "meshlets": 68,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 7,
+      "part": 1,
+      "triangles": 19380,
+      "meshlets": 278,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 8,
+      "part": 0,
+      "triangles": 3360,
+      "meshlets": 84,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 8,
+      "part": 1,
+      "triangles": 17548,
+      "meshlets": 252,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 9,
+      "part": 0,
+      "triangles": 3740,
+      "meshlets": 86,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 9,
+      "part": 1,
+      "triangles": 24156,
+      "meshlets": 358,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 10,
+      "part": 0,
+      "triangles": 9428,
+      "meshlets": 174,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 10,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 10,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 11,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 11,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 11,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 12,
+      "part": 0,
+      "triangles": 2867,
+      "meshlets": 48,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 12,
+      "part": 1,
+      "triangles": 9688,
+      "meshlets": 148,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 12,
+      "part": 2,
+      "triangles": 30282,
+      "meshlets": 450,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 12,
+      "part": 3,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 13,
+      "part": 0,
+      "triangles": 2754,
+      "meshlets": 46,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 13,
+      "part": 1,
+      "triangles": 967,
+      "meshlets": 13,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 13,
+      "part": 2,
+      "triangles": 22666,
+      "meshlets": 367,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 14,
+      "part": 0,
+      "triangles": 5808,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 14,
+      "part": 1,
+      "triangles": 27030,
+      "meshlets": 427,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 14,
+      "part": 2,
+      "triangles": 10,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 15,
+      "part": 0,
+      "triangles": 5808,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 15,
+      "part": 1,
+      "triangles": 27030,
+      "meshlets": 427,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 15,
+      "part": 2,
+      "triangles": 10,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 16,
+      "part": 0,
+      "triangles": 5808,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 16,
+      "part": 1,
+      "triangles": 27030,
+      "meshlets": 427,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 16,
+      "part": 2,
+      "triangles": 10,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 17,
+      "part": 0,
+      "triangles": 5808,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 17,
+      "part": 1,
+      "triangles": 27030,
+      "meshlets": 427,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 17,
+      "part": 2,
+      "triangles": 10,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 18,
+      "part": 0,
+      "triangles": 5808,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 18,
+      "part": 1,
+      "triangles": 27030,
+      "meshlets": 427,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 18,
+      "part": 2,
+      "triangles": 10,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 19,
+      "part": 0,
+      "triangles": 5808,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 19,
+      "part": 1,
+      "triangles": 27030,
+      "meshlets": 427,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 19,
+      "part": 2,
+      "triangles": 10,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 20,
+      "part": 0,
+      "triangles": 5734,
+      "meshlets": 95,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 20,
+      "part": 1,
+      "triangles": 9688,
+      "meshlets": 148,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 20,
+      "part": 2,
+      "triangles": 32954,
+      "meshlets": 480,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 20,
+      "part": 3,
+      "triangles": 4,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 21,
+      "part": 0,
+      "triangles": 5827,
+      "meshlets": 97,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 21,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 21,
+      "part": 2,
+      "triangles": 11460,
+      "meshlets": 170,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 21,
+      "part": 3,
+      "triangles": 967,
+      "meshlets": 13,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 21,
+      "part": 4,
+      "triangles": 5220,
+      "meshlets": 59,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 21,
+      "part": 5,
+      "triangles": 4,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 22,
+      "part": 0,
+      "triangles": 62074,
+      "meshlets": 1007,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 23,
+      "part": 0,
+      "triangles": 140,
+      "meshlets": 3,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 23,
+      "part": 1,
+      "triangles": 38,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 23,
+      "part": 2,
+      "triangles": 974,
+      "meshlets": 21,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 23,
+      "part": 3,
+      "triangles": 231,
+      "meshlets": 5,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 24,
+      "part": 0,
+      "triangles": 81967,
+      "meshlets": 1518,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 24,
+      "part": 1,
+      "triangles": 4,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 25,
+      "part": 0,
+      "triangles": 11854,
+      "meshlets": 232,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 25,
+      "part": 1,
+      "triangles": 4,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 25,
+      "part": 2,
+      "triangles": 6636,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 25,
+      "part": 3,
+      "triangles": 31960,
+      "meshlets": 821,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 26,
+      "part": 0,
+      "triangles": 14,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 26,
+      "part": 1,
+      "triangles": 88,
+      "meshlets": 2,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 26,
+      "part": 2,
+      "triangles": 261,
+      "meshlets": 7,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 27,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 27,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 27,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 28,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 28,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 28,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 29,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 29,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 29,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 30,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 30,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 30,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 31,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 31,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 31,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 32,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 32,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 32,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 33,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 33,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 33,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 34,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 34,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 34,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 35,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 35,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 35,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 36,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 36,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 36,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 37,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 37,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 37,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 38,
+      "part": 0,
+      "triangles": 5586,
+      "meshlets": 80,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 38,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 38,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 39,
+      "part": 0,
+      "triangles": 6,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 39,
+      "part": 1,
+      "triangles": 807,
+      "meshlets": 18,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 39,
+      "part": 2,
+      "triangles": 1416,
+      "meshlets": 42,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 39,
+      "part": 3,
+      "triangles": 876,
+      "meshlets": 24,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 40,
+      "part": 0,
+      "triangles": 1560,
+      "meshlets": 33,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 40,
+      "part": 1,
+      "triangles": 31487,
+      "meshlets": 551,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 40,
+      "part": 2,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 40,
+      "part": 3,
+      "triangles": 320,
+      "meshlets": 8,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 40,
+      "part": 4,
+      "triangles": 44,
+      "meshlets": 2,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 40,
+      "part": 5,
+      "triangles": 2060,
+      "meshlets": 33,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 40,
+      "part": 6,
+      "triangles": 6042,
+      "meshlets": 70,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 40,
+      "part": 7,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 40,
+      "part": 8,
+      "triangles": 96,
+      "meshlets": 2,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 40,
+      "part": 9,
+      "triangles": 774,
+      "meshlets": 11,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 41,
+      "part": 0,
+      "triangles": 2128,
+      "meshlets": 44,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 41,
+      "part": 1,
+      "triangles": 41208,
+      "meshlets": 733,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 41,
+      "part": 2,
+      "triangles": 2959,
+      "meshlets": 53,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 42,
+      "part": 0,
+      "triangles": 84602,
+      "meshlets": 1255,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 43,
+      "part": 0,
+      "triangles": 2660,
+      "meshlets": 58,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 44,
+      "part": 0,
+      "triangles": 447,
+      "meshlets": 12,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 44,
+      "part": 1,
+      "triangles": 1777,
+      "meshlets": 27,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 44,
+      "part": 2,
+      "triangles": 1729,
+      "meshlets": 39,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 45,
+      "part": 0,
+      "triangles": 360,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 45,
+      "part": 1,
+      "triangles": 50389,
+      "meshlets": 769,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 46,
+      "part": 0,
+      "triangles": 360,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 46,
+      "part": 1,
+      "triangles": 50385,
+      "meshlets": 769,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 47,
+      "part": 0,
+      "triangles": 360,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 47,
+      "part": 1,
+      "triangles": 50389,
+      "meshlets": 769,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 48,
+      "part": 0,
+      "triangles": 4882,
+      "meshlets": 76,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 48,
+      "part": 1,
+      "triangles": 898,
+      "meshlets": 20,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 48,
+      "part": 2,
+      "triangles": 46285,
+      "meshlets": 680,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 49,
+      "part": 0,
+      "triangles": 4882,
+      "meshlets": 76,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 49,
+      "part": 1,
+      "triangles": 898,
+      "meshlets": 20,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 49,
+      "part": 2,
+      "triangles": 46228,
+      "meshlets": 679,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 50,
+      "part": 0,
+      "triangles": 6756,
+      "meshlets": 112,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 50,
+      "part": 1,
+      "triangles": 1920,
+      "meshlets": 32,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 50,
+      "part": 2,
+      "triangles": 28840,
+      "meshlets": 449,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 50,
+      "part": 3,
+      "triangles": 192,
+      "meshlets": 4,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 50,
+      "part": 4,
+      "triangles": 28177,
+      "meshlets": 399,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 51,
+      "part": 0,
+      "triangles": 72374,
+      "meshlets": 1417,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 51,
+      "part": 1,
+      "triangles": 1416,
+      "meshlets": 30,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 51,
+      "part": 2,
+      "triangles": 379,
+      "meshlets": 8,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 52,
+      "part": 0,
+      "triangles": 5850,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 52,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 52,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 53,
+      "part": 0,
+      "triangles": 84,
+      "meshlets": 3,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 53,
+      "part": 1,
+      "triangles": 314,
+      "meshlets": 7,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 53,
+      "part": 2,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 54,
+      "part": 0,
+      "triangles": 56880,
+      "meshlets": 932,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 55,
+      "part": 0,
+      "triangles": 5107,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 55,
+      "part": 1,
+      "triangles": 1379,
+      "meshlets": 34,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 55,
+      "part": 2,
+      "triangles": 38380,
+      "meshlets": 561,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 56,
+      "part": 0,
+      "triangles": 20,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 56,
+      "part": 1,
+      "triangles": 5107,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 56,
+      "part": 2,
+      "triangles": 1359,
+      "meshlets": 33,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 56,
+      "part": 3,
+      "triangles": 38380,
+      "meshlets": 561,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 57,
+      "part": 0,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 57,
+      "part": 1,
+      "triangles": 5281,
+      "meshlets": 86,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 57,
+      "part": 2,
+      "triangles": 1037,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 57,
+      "part": 3,
+      "triangles": 38380,
+      "meshlets": 561,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 58,
+      "part": 0,
+      "triangles": 4,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 58,
+      "part": 1,
+      "triangles": 4882,
+      "meshlets": 76,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 58,
+      "part": 2,
+      "triangles": 894,
+      "meshlets": 20,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 58,
+      "part": 3,
+      "triangles": 46285,
+      "meshlets": 680,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 59,
+      "part": 0,
+      "triangles": 5107,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 59,
+      "part": 1,
+      "triangles": 1219,
+      "meshlets": 33,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 59,
+      "part": 2,
+      "triangles": 38380,
+      "meshlets": 561,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 60,
+      "part": 0,
+      "triangles": 339,
+      "meshlets": 8,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 60,
+      "part": 1,
+      "triangles": 5107,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 60,
+      "part": 2,
+      "triangles": 1040,
+      "meshlets": 26,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 60,
+      "part": 3,
+      "triangles": 38380,
+      "meshlets": 561,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 61,
+      "part": 0,
+      "triangles": 5107,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 61,
+      "part": 1,
+      "triangles": 1379,
+      "meshlets": 34,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 61,
+      "part": 2,
+      "triangles": 38380,
+      "meshlets": 561,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 62,
+      "part": 0,
+      "triangles": 4882,
+      "meshlets": 76,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 62,
+      "part": 1,
+      "triangles": 898,
+      "meshlets": 20,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 62,
+      "part": 2,
+      "triangles": 46228,
+      "meshlets": 679,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 63,
+      "part": 0,
+      "triangles": 360,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 63,
+      "part": 1,
+      "triangles": 50389,
+      "meshlets": 769,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 64,
+      "part": 0,
+      "triangles": 360,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 64,
+      "part": 1,
+      "triangles": 50389,
+      "meshlets": 769,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 65,
+      "part": 0,
+      "triangles": 360,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 65,
+      "part": 1,
+      "triangles": 50389,
+      "meshlets": 769,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 66,
+      "part": 0,
+      "triangles": 360,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 66,
+      "part": 1,
+      "triangles": 50389,
+      "meshlets": 769,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 67,
+      "part": 0,
+      "triangles": 360,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 67,
+      "part": 1,
+      "triangles": 50389,
+      "meshlets": 769,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 68,
+      "part": 0,
+      "triangles": 360,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 68,
+      "part": 1,
+      "triangles": 50375,
+      "meshlets": 769,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 69,
+      "part": 0,
+      "triangles": 360,
+      "meshlets": 6,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 69,
+      "part": 1,
+      "triangles": 50389,
+      "meshlets": 769,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 70,
+      "part": 0,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 70,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 70,
+      "part": 2,
+      "triangles": 6334,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 70,
+      "part": 3,
+      "triangles": 27818,
+      "meshlets": 425,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 70,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 70,
+      "part": 5,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 71,
+      "part": 0,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 71,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 71,
+      "part": 2,
+      "triangles": 6334,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 71,
+      "part": 3,
+      "triangles": 27818,
+      "meshlets": 425,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 71,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 71,
+      "part": 5,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 72,
+      "part": 0,
+      "triangles": 68,
+      "meshlets": 2,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 72,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 72,
+      "part": 2,
+      "triangles": 3401,
+      "meshlets": 52,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 72,
+      "part": 3,
+      "triangles": 22666,
+      "meshlets": 367,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 72,
+      "part": 4,
+      "triangles": 30,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 73,
+      "part": 0,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 73,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 73,
+      "part": 2,
+      "triangles": 6334,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 73,
+      "part": 3,
+      "triangles": 27818,
+      "meshlets": 425,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 73,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 73,
+      "part": 5,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 74,
+      "part": 0,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 74,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 74,
+      "part": 2,
+      "triangles": 6334,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 74,
+      "part": 3,
+      "triangles": 27818,
+      "meshlets": 425,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 74,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 74,
+      "part": 5,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 75,
+      "part": 0,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 75,
+      "part": 1,
+      "triangles": 5808,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 75,
+      "part": 2,
+      "triangles": 27028,
+      "meshlets": 427,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 75,
+      "part": 3,
+      "triangles": 10,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 75,
+      "part": 4,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 76,
+      "part": 0,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 76,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 76,
+      "part": 2,
+      "triangles": 6334,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 76,
+      "part": 3,
+      "triangles": 27818,
+      "meshlets": 425,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 76,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 76,
+      "part": 5,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 77,
+      "part": 0,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 77,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 77,
+      "part": 2,
+      "triangles": 6334,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 77,
+      "part": 3,
+      "triangles": 27818,
+      "meshlets": 425,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 77,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 77,
+      "part": 5,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 78,
+      "part": 0,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 78,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 78,
+      "part": 2,
+      "triangles": 6334,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 78,
+      "part": 3,
+      "triangles": 27818,
+      "meshlets": 425,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 78,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 78,
+      "part": 5,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 79,
+      "part": 0,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 79,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 79,
+      "part": 2,
+      "triangles": 6334,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 79,
+      "part": 3,
+      "triangles": 27818,
+      "meshlets": 425,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 79,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 79,
+      "part": 5,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 80,
+      "part": 0,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 80,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 80,
+      "part": 2,
+      "triangles": 6334,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 80,
+      "part": 3,
+      "triangles": 27818,
+      "meshlets": 425,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 80,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 80,
+      "part": 5,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 81,
+      "part": 0,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 81,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 81,
+      "part": 2,
+      "triangles": 6334,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 81,
+      "part": 3,
+      "triangles": 27818,
+      "meshlets": 425,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 81,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 81,
+      "part": 5,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 82,
+      "part": 0,
+      "triangles": 68,
+      "meshlets": 2,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 82,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 82,
+      "part": 2,
+      "triangles": 3401,
+      "meshlets": 52,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 82,
+      "part": 3,
+      "triangles": 22666,
+      "meshlets": 367,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 82,
+      "part": 4,
+      "triangles": 30,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 83,
+      "part": 0,
+      "triangles": 68,
+      "meshlets": 2,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 83,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 83,
+      "part": 2,
+      "triangles": 3401,
+      "meshlets": 52,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 83,
+      "part": 3,
+      "triangles": 22666,
+      "meshlets": 367,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 83,
+      "part": 4,
+      "triangles": 30,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 84,
+      "part": 0,
+      "triangles": 1675,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 84,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 84,
+      "part": 2,
+      "triangles": 6334,
+      "meshlets": 94,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 84,
+      "part": 3,
+      "triangles": 27818,
+      "meshlets": 425,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 84,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 84,
+      "part": 5,
+      "triangles": 60,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 85,
+      "part": 0,
+      "triangles": 5850,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 85,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 85,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 86,
+      "part": 0,
+      "triangles": 5850,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 86,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 86,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 87,
+      "part": 0,
+      "triangles": 5850,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 87,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 87,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 88,
+      "part": 0,
+      "triangles": 5850,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 88,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 88,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 89,
+      "part": 0,
+      "triangles": 5850,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 89,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 89,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 90,
+      "part": 0,
+      "triangles": 5850,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 90,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 90,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 91,
+      "part": 0,
+      "triangles": 5850,
+      "meshlets": 82,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 91,
+      "part": 1,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 91,
+      "part": 2,
+      "triangles": 368,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 92,
+      "part": 0,
+      "triangles": 76639,
+      "meshlets": 1260,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 92,
+      "part": 1,
+      "triangles": 38,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 93,
+      "part": 0,
+      "triangles": 4512,
+      "meshlets": 81,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 94,
+      "part": 0,
+      "triangles": 6,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 94,
+      "part": 1,
+      "triangles": 66541,
+      "meshlets": 961,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 95,
+      "part": 0,
+      "triangles": 6,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 95,
+      "part": 1,
+      "triangles": 64670,
+      "meshlets": 933,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 96,
+      "part": 0,
+      "triangles": 16834,
+      "meshlets": 273,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 96,
+      "part": 1,
+      "triangles": 1464,
+      "meshlets": 22,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 96,
+      "part": 2,
+      "triangles": 2192,
+      "meshlets": 27,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 96,
+      "part": 3,
+      "triangles": 4,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 97,
+      "part": 0,
+      "triangles": 71594,
+      "meshlets": 1028,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 98,
+      "part": 0,
+      "triangles": 44210,
+      "meshlets": 753,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 98,
+      "part": 1,
+      "triangles": 1503,
+      "meshlets": 31,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 99,
+      "part": 0,
+      "triangles": 6,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 99,
+      "part": 1,
+      "triangles": 68006,
+      "meshlets": 983,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 100,
+      "part": 0,
+      "triangles": 6,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 100,
+      "part": 1,
+      "triangles": 66541,
+      "meshlets": 962,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 101,
+      "part": 0,
+      "triangles": 3350,
+      "meshlets": 55,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 101,
+      "part": 1,
+      "triangles": 32,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 101,
+      "part": 2,
+      "triangles": 10598,
+      "meshlets": 123,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 101,
+      "part": 3,
+      "triangles": 4,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 101,
+      "part": 4,
+      "triangles": 432,
+      "meshlets": 15,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 101,
+      "part": 5,
+      "triangles": 238,
+      "meshlets": 4,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 101,
+      "part": 6,
+      "triangles": 53901,
+      "meshlets": 797,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 102,
+      "part": 0,
+      "triangles": 38,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 102,
+      "part": 1,
+      "triangles": 84,
+      "meshlets": 2,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 102,
+      "part": 2,
+      "triangles": 4,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 102,
+      "part": 3,
+      "triangles": 78855,
+      "meshlets": 1163,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 103,
+      "part": 0,
+      "triangles": 6,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 103,
+      "part": 1,
+      "triangles": 40212,
+      "meshlets": 583,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 104,
+      "part": 0,
+      "triangles": 6,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 104,
+      "part": 1,
+      "triangles": 39203,
+      "meshlets": 566,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 105,
+      "part": 0,
+      "triangles": 56,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 105,
+      "part": 1,
+      "triangles": 50864,
+      "meshlets": 907,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 105,
+      "part": 2,
+      "triangles": 71,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 105,
+      "part": 3,
+      "triangles": 476,
+      "meshlets": 9,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 105,
+      "part": 4,
+      "triangles": 16,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 106,
+      "part": 0,
+      "triangles": 164,
+      "meshlets": 4,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 106,
+      "part": 1,
+      "triangles": 900,
+      "meshlets": 20,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 106,
+      "part": 2,
+      "triangles": 560,
+      "meshlets": 14,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 107,
+      "part": 0,
+      "triangles": 492,
+      "meshlets": 11,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 107,
+      "part": 1,
+      "triangles": 2700,
+      "meshlets": 60,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 107,
+      "part": 2,
+      "triangles": 1680,
+      "meshlets": 42,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 108,
+      "part": 0,
+      "triangles": 492,
+      "meshlets": 11,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 108,
+      "part": 1,
+      "triangles": 2700,
+      "meshlets": 60,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 108,
+      "part": 2,
+      "triangles": 1680,
+      "meshlets": 42,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 109,
+      "part": 0,
+      "triangles": 16834,
+      "meshlets": 273,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 109,
+      "part": 1,
+      "triangles": 1464,
+      "meshlets": 22,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 109,
+      "part": 2,
+      "triangles": 2192,
+      "meshlets": 27,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 109,
+      "part": 3,
+      "triangles": 4,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 110,
+      "part": 0,
+      "triangles": 16834,
+      "meshlets": 273,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 110,
+      "part": 1,
+      "triangles": 1464,
+      "meshlets": 22,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 110,
+      "part": 2,
+      "triangles": 2192,
+      "meshlets": 27,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 110,
+      "part": 3,
+      "triangles": 4,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 111,
+      "part": 0,
+      "triangles": 16834,
+      "meshlets": 273,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 111,
+      "part": 1,
+      "triangles": 1464,
+      "meshlets": 22,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 111,
+      "part": 2,
+      "triangles": 2192,
+      "meshlets": 27,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 111,
+      "part": 3,
+      "triangles": 4,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 112,
+      "part": 0,
+      "triangles": 8417,
+      "meshlets": 137,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 112,
+      "part": 1,
+      "triangles": 732,
+      "meshlets": 11,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 112,
+      "part": 2,
+      "triangles": 1096,
+      "meshlets": 14,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 112,
+      "part": 3,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 113,
+      "part": 0,
+      "triangles": 966,
+      "meshlets": 17,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 0,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 1,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 2,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 3,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 5,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 6,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 7,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 8,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 9,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 10,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 11,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 12,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 13,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 14,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 15,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 16,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 17,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 18,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 19,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 20,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 21,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 22,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 23,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 24,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 25,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 26,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 114,
+      "part": 27,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    }
+  ],
+  "nativeTool": {
+    "version": "1.3",
+    "revision": "9e1f07b159d3cb777f1c67ed31fc11fd117986f4",
+    "source": "https://github.com/zeux/meshoptimizer",
+    "license": "MIT",
+    "sourceSHA256": {
+      "src/meshoptimizer.h": "e3688ef553f603391747895a5c221ef1528574cc7f8173782417a96cb531f61b",
+      "src/clusterizer.cpp": "a2775edf77d86a9a5f0ca82f4635ce6ce741bbda79fd9a652ffc8c5dd61d3b0e",
+      "src/allocator.cpp": "d2cc48691fe2f4c6d097bf7a766389cfb7f83ca14a5f747e3944332656d02254",
+      "LICENSE.md": "f03037ca7bad1e3eb7f4a63fa6084a8baabd5ba30d3c239a9a7f35705d873e26"
+    },
+    "toolSHA256": "e7d9fd597620c5393bf409c85dd9e3861453486c364ef3dcaa457559eecdffc1"
+  },
+  "sidecarSHA256": "6db874b32f5c1956305ed492c7845dcb0fd30b738e55d623ebda2c17a217571c"
+}

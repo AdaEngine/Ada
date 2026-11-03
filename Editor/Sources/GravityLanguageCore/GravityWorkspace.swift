@@ -113,6 +113,9 @@ public final class GravityWorkspace {
         analysis.diagnostics += importDiagnostics(uri: key, imports: analysis.imports)
         analysis.diagnostics += moduleGraphDiagnostics(for: key, imports: analysis.imports)
         analysis.diagnostics += moduleTypeDiagnostics(for: key)
+        analysis.diagnostics += AdaScriptLinter.lint(source: document.text).map { issue in
+            GravityDiagnostic(message: issue.rule.message, range: issue.range.gravityRange, severity: .warning, code: issue.rule.rawValue)
+        }
         var seenDiagnostics = Set<GravityDiagnostic>()
         analysis.diagnostics = analysis.diagnostics.filter { seenDiagnostics.insert($0).inserted }
         return analysis

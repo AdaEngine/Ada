@@ -22,8 +22,8 @@ actor TerminalDelegate {
             directory: cwd.map { URL(fileURLWithPath: $0) }, environment: environment)
         try? process.input.close()
         let id = TerminalId(UUID().uuidString)
-        let output = EditorWindowsACPTransport.chunks(process.output, onOverflow: { process.terminate() })
-        let errors = EditorWindowsACPTransport.chunks(process.error, onOverflow: { process.terminate() })
+        let output = EditorWindowsACPTransport.chunks(process.output)
+        let errors = EditorWindowsACPTransport.chunks(process.error)
         let completion = Task {
             async let out: Void = collect(output, terminal: id)
             async let err: Void = collect(errors, terminal: id)
@@ -75,15 +75,19 @@ actor TerminalDelegate {
         return terminal
     }
 
-    private func collect(_ chunks: AsyncStream<Data>, terminal id: TerminalId) async {
-        for await chunk in chunks {
-            guard var terminal = terminals[id] else { continue }
-            terminal.output.append(chunk)
-            if terminal.output.count > terminal.limit {
-                terminal.output.removeFirst(terminal.output.count - terminal.limit)
-                terminal.truncated = true
+    private func collect(_ chunks: AsyncThrowingStream<Data, any Error>, terminal id: TerminalId) async {
+        do {
+            for try await chunk in chunks {
+                guard var terminal = terminals[id] else { continue }
+                terminal.output.append(chunk)
+                if terminal.output.count > terminal.limit {
+                    terminal.output.removeFirst(terminal.output.count - terminal.limit)
+                    terminal.truncated = true
+                }
+                terminals[id] = terminal
             }
-            terminals[id] = terminal
+        } catch {
+            terminals[id]?.process.terminate()
         }
     }
 }

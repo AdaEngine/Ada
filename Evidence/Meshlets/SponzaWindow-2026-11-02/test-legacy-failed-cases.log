@@ -1,0 +1,150 @@
+◊ Test run started.
+→ Testing Library Version: 6.3.1 (937120cbc281cf2)
+→ Target Platform: x86_64-unknown-windows-msvc
+◊ Suite "3D GPU rendering" started.
+◊ Suite "3D auto exposure on GPU" started.
+◊ Test autoExposureEvensOutSceneBrightness() started.
+2026-11-02T23:06:00+0300 info org.adaengine.webgpu: [AdaRender] Selected WebGPU adapter: backend=4 vendor=nvidia device=NVIDIA GeForce RTX 4070 description=D3D12 driver version 32.0.16.1088
+× Test autoExposureEvensOutSceneBrightness() recorded an issue at Render3DAutoExposureTests.swift:75:29: Issue recorded
+→ pbr-spheres-dim-autoexposure differs in 4623 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-dim-autoexposure-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-dim-autoexposure-difference.png
+× Test autoExposureEvensOutSceneBrightness() recorded an issue at Render3DAutoExposureTests.swift:75:29: Issue recorded
+→ pbr-spheres-dim-manual differs in 3241 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-dim-manual-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-dim-manual-difference.png
+× Test autoExposureEvensOutSceneBrightness() failed after 2.596 seconds with 2 issues.
+× Suite "3D auto exposure on GPU" failed after 2.596 seconds with 2 issues.
+→ /// Renders automatic exposure through the real Metal pipeline.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DAutoExposureGPUTests`.
+◊ Suite "3D color grading on GPU" started.
+◊ Test vignetteDarkensCornersAndLeavesTheCenterAlone() started.
+× Test vignetteDarkensCornersAndLeavesTheCenterAlone() recorded an issue at Render3DColorGradingTests.swift:117:29: Issue recorded
+→ pbr-spheres-vignette differs in 3664 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-vignette-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-vignette-difference.png
+× Test vignetteDarkensCornersAndLeavesTheCenterAlone() failed after 1.972 seconds with 1 issue.
+◊ Test contrastSpreadsBrightAndDarkAwayFromMidGray() started.
+× Test contrastSpreadsBrightAndDarkAwayFromMidGray() recorded an issue at Render3DColorGradingTests.swift:117:29: Issue recorded
+→ pbr-spheres-contrast differs in 4695 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-contrast-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-contrast-difference.png
+× Test contrastSpreadsBrightAndDarkAwayFromMidGray() failed after 1.518 seconds with 1 issue.
+◊ Test lutIsAppliedAfterToneMappingOnEveryPath(path:) started.
+◊ Test case passing 1 argument path → direct to lutIsAppliedAfterToneMappingOnEveryPath(path:) started.
+× Test lutIsAppliedAfterToneMappingOnEveryPath(path:) recorded an issue with 1 argument path → direct at Render3DColorGradingTests.swift:117:29: Issue recorded
+→ pbr-spheres-lut-inverted differs in 3646 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-lut-inverted-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-lut-inverted-difference.png
+◊ Test case passing 1 argument path → fxaa to lutIsAppliedAfterToneMappingOnEveryPath(path:) started.
+× Test lutIsAppliedAfterToneMappingOnEveryPath(path:) with 2 test cases failed after 3.021 seconds with 1 issue.
+× Suite "3D color grading on GPU" failed after 6.513 seconds with 3 issues.
+→ /// Renders vignette, saturation, contrast and LUT grading through the real Metal pipeline.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DColorGradingGPUTests`.
+◊ Suite "3D debug views on GPU" started.
+◊ Test everyViewMatchesItsGoldenFrame() started.
+× Test everyViewMatchesItsGoldenFrame() recorded an issue at Render3DDebugViewTests.swift:444:33: Issue recorded
+→ pbr-spheres-none differs in 3672 pixels (largest step 101). Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-none-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-none-difference.png
+× Test everyViewMatchesItsGoldenFrame() recorded an issue at Render3DDebugViewTests.swift:444:33: Issue recorded
+→ pbr-spheres-ambientOcclusion differs in 19272 pixels (largest step 208). Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-ambientOcclusion-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-ambientOcclusion-difference.png
+× Test everyViewMatchesItsGoldenFrame() recorded an issue at Render3DDebugViewTests.swift:444:33: Issue recorded
+→ pbr-spheres-wireframe differs in 3672 pixels (largest step 101). Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-wireframe-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-wireframe-difference.png
+× Test everyViewMatchesItsGoldenFrame() failed after 2.294 seconds with 3 issues.
+◊ Test debugDrawIsDepthTestedExpiresAndMatchesItsGoldenFrame() started.
+× Test debugDrawIsDepthTestedExpiresAndMatchesItsGoldenFrame() recorded an issue at Render3DDebugViewTests.swift:504:29: Issue recorded
+→ Debug draw differs in 3665 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-debugdraw-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-debugdraw-difference.png
+× Test debugDrawIsDepthTestedExpiresAndMatchesItsGoldenFrame() failed after 1.629 seconds with 1 issue.
+× Suite "3D debug views on GPU" failed after 3.924 seconds with 4 issues.
+→ /// Renders a lit PBR scene through the real Metal pipeline for each debug view and checks the frames
+→ /// against golden references.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DDebugViewGPUTests`.
+→ /// Record references with `ADAENGINE_GOLDEN_RECORD=1`; set `ADAENGINE_GOLDEN_OUTPUT` to keep actual frames.
+→ /// Other integration suites initialize the process-wide engine as headless.
+◊ Suite "3D depth of field on GPU" started.
+◊ Test aFullScreenDebugViewSkipsDepthOfFieldAndMatchesGoldenFrames() started.
+× Test aFullScreenDebugViewSkipsDepthOfFieldAndMatchesGoldenFrames() recorded an issue at Render3DDepthOfFieldTests.swift:98:29: Issue recorded
+→ pbr-spheres-dof-near-focus differs in 2835 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-dof-near-focus-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-dof-near-focus-difference.png
+× Test aFullScreenDebugViewSkipsDepthOfFieldAndMatchesGoldenFrames() failed after 1.571 seconds with 1 issue.
+× Suite "3D depth of field on GPU" failed after 1.571 seconds with 1 issue.
+→ /// Renders depth of field through the real pipeline.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/DepthOfField`.
+◊ Suite "3D fog on GPU" started.
+◊ Test lightShaftsMatchGoldenFrames() started.
+× Test lightShaftsMatchGoldenFrames() recorded an issue at Render3DFogTests.swift:224:29: Issue recorded
+→ pbr-spheres-light-shafts differs in 1207 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-light-shafts-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-light-shafts-difference.png
+× Test lightShaftsMatchGoldenFrames() failed after 1.528 seconds with 1 issue.
+× Suite "3D fog on GPU" failed after 1.528 seconds with 1 issue.
+→ /// Renders fog through the real composite pass.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/Fog`.
+◊ Suite "3D material extensions on GPU" started.
+◊ Test aHigherIORBrightensTheHighlightAndZeroSpecularRemovesIt() started.
+× Test aHigherIORBrightensTheHighlightAndZeroSpecularRemovesIt() recorded an issue at Render3DMaterialExtensionTests.swift:238:13: Expectation failed: (total(strong) → 3.0) > (total(standard) → 3.0)
+→ An IOR of 3 reflects more than 1.5 (\(total(strong)) vs \(total(standard))).
+× Test aHigherIORBrightensTheHighlightAndZeroSpecularRemovesIt() failed after 1.273 seconds with 1 issue.
+◊ Test clearcoatMatchesItsGoldenFrame() started.
+2026-11-02T23:06:18+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T23:06:18+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T23:06:18+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T23:06:18+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+× Test clearcoatMatchesItsGoldenFrame() recorded an issue at Render3DMaterialExtensionTests.swift:538:29: Issue recorded
+→ pbr-sphere-clearcoat differs in 7089 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-sphere-clearcoat-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-sphere-clearcoat-difference.png
+× Test clearcoatMatchesItsGoldenFrame() failed after 2.272 seconds with 1 issue.
+◊ Test sheenAndAnisotropyMatchTheirGoldenFrames() started.
+2026-11-02T23:06:20+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T23:06:21+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T23:06:21+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T23:06:21+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+× Test sheenAndAnisotropyMatchTheirGoldenFrames() recorded an issue at Render3DMaterialExtensionTests.swift:549:29: Issue recorded
+→ pbr-sphere-sheen differs in 6988 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-sphere-sheen-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-sphere-sheen-difference.png
+2026-11-02T23:06:23+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T23:06:23+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+2026-11-02T23:06:23+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save spirv to cache: failed("Source file URL not found")
+2026-11-02T23:06:23+0300 warning org.adaengine.shader-compiler: [AdaRender] Failed to save device compiled shader to cache: failed("Source file URL not found")
+× Test sheenAndAnisotropyMatchTheirGoldenFrames() recorded an issue at Render3DMaterialExtensionTests.swift:549:29: Issue recorded
+→ pbr-sphere-anisotropy differs in 8448 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-sphere-anisotropy-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-sphere-anisotropy-difference.png
+× Test sheenAndAnisotropyMatchTheirGoldenFrames() failed after 4.325 seconds with 2 issues.
+× Suite "3D material extensions on GPU" failed after 7.872 seconds with 4 issues.
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/MaterialExtensions`.
+◊ Suite "3D post-process on GPU" started.
+◊ Test toneMappersMatchGoldenFrames() started.
+× Test toneMappersMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:279:33: Issue recorded
+→ emissive-tonemap-neutral differs in 2707 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-tonemap-neutral-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-tonemap-neutral-difference.png
+× Test toneMappersMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:279:33: Issue recorded
+→ emissive-tonemap-none differs in 2675 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-tonemap-none-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-tonemap-none-difference.png
+× Test toneMappersMatchGoldenFrames() failed after 1.823 seconds with 2 issues.
+◊ Test bloomAndExposureMatchGoldenFrames() started.
+× Test bloomAndExposureMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:364:33: Issue recorded
+→ emissive-plain differs in 3672 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-plain-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-plain-difference.png
+× Test bloomAndExposureMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:364:33: Issue recorded
+→ emissive-bloom differs in 135207 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-bloom-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-bloom-difference.png
+× Test bloomAndExposureMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:364:33: Issue recorded
+→ emissive-bloom-exposure-minus1 differs in 141347 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-bloom-exposure-minus1-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-bloom-exposure-minus1-difference.png
+× Test bloomAndExposureMatchGoldenFrames() recorded an issue at Render3DPostProcessTests.swift:364:33: Issue recorded
+→ emissive-exposure-plus1 differs in 4099 pixels. Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-exposure-plus1-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/emissive-exposure-plus1-difference.png
+× Test bloomAndExposureMatchGoldenFrames() failed after 2.403 seconds with 4 issues.
+× Suite "3D post-process on GPU" failed after 4.226 seconds with 6 issues.
+→ /// Renders an emissive sphere through the real Metal pipeline to check exposure and bloom.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DPostProcessGPUTests`.
+◊ Suite "3D reflections on GPU" started.
+◊ Test reflectionsMatchTheirGoldenFrames() started.
+× Test reflectionsMatchTheirGoldenFrames() recorded an issue at Render3DReflectionTests.swift:30:29: Issue recorded
+→ pbr-spheres-ssr differs in 3857 pixels (largest step 90). Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-ssr-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-ssr-difference.png
+× Test reflectionsMatchTheirGoldenFrames() recorded an issue at Render3DReflectionTests.swift:30:29: Issue recorded
+→ pbr-spheres-ssr-skybox differs in 2659 pixels (largest step 100). Actual: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-ssr-skybox-actual.png, difference: D:/Development/AdaEngine/.build-codex/meshlets-scene-research/legacy-all-golden/pbr-spheres-ssr-skybox-difference.png
+× Test reflectionsMatchTheirGoldenFrames() failed after 1.785 seconds with 2 issues.
+× Suite "3D reflections on GPU" failed after 1.785 seconds with 2 issues.
+→ /// Screen-space reflections through the real pipeline. These frames guard performance work on the reflection
+→ /// pass: a faster trace must not visibly change what it draws.
+→ ///
+→ /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/Reflections`.
+× Suite "3D GPU rendering" failed after 30.020 seconds with 23 issues.
+→ /// Parent of every GPU rendering suite. The engine owns one process-wide renderer and tests on the main actor
+→ /// interleave at each `await`, so these suites must run one test at a time; `.serialized` on a parent suite
+→ /// applies to its nested suites, which is the only way to serialize across suites.
+◊ Suite "Path tracing settings and BVH" started.
+◊ Test pathShadersCompileFreshWithoutAGPU() started.
+√ Test pathShadersCompileFreshWithoutAGPU() passed after 0.428 seconds.
+√ Suite "Path tracing settings and BVH" passed after 0.428 seconds.
+◊ Suite "Sprite layout GPU rendering" started.
+◊ Test rendersLayoutsAndPickingWithWebGPU() started.
+× Test rendersLayoutsAndPickingWithWebGPU() recorded an issue at SpriteMetalRenderingTests.swift:56:9: Expectation failed: try await device.readImage(from: samplingOnly) == nil
+× Test rendersLayoutsAndPickingWithWebGPU() failed after 0.500 seconds with 1 issue.
+× Suite "Sprite layout GPU rendering" failed after 0.500 seconds with 1 issue.
+→ /// Run one backend alone so the process does not share a previously initialized renderer.
+× Test run with 16 tests in 11 suites failed after 30.949 seconds with 24 issues.

@@ -1,5 +1,42 @@
 # Large scene loading
 
+## Opening a project
+
+The project window first draws a loading screen. It reports settings, file
+indexing, script components, document restoration and workspace preparation.
+Blocking filesystem reads and script schema parsing run on the concurrent
+executor. The workspace consumes that prepared snapshot, including the restored
+document, without repeating the file index or script reads on the UI actor.
+Closing or replacing the window cancels preparation and discards stale results.
+
+File indexing reads each entry's directory/link properties once before sorting.
+Folders retain natural name ordering, resource-root membership and the existing
+generated-directory exclusions. Symbolic directories remain visible without
+recursively traversing them. Script component bindings share one reflection
+descriptor snapshot per catalog load.
+
+Scene preparation also reports document decoding, resource discovery, distinct
+model/skeleton imports and scene object creation. The import stage shows its
+completed/total resource count and current file, including authored LOD models.
+Unknown-length stages use an animated progress bar. Both loading screens follow
+the editor's English/Russian language setting.
+
+Run the focused loading, ownership and localization checks:
+
+```powershell
+swift test --package-path Editor --filter EditorProjectLoadingTests
+swift test --package-path Editor --skip-build --filter EditorSceneAssetCacheTests
+swift test --package-path Editor --skip-build --filter EditorLocalizationTests
+```
+
+Measure the actual project index/catalog and the background preparation's UI-actor
+heartbeat with `EditorProjectStartupTests`. Set `ADAEDITOR_STARTUP_BENCHMARK` to
+the project directory, `ADAEDITOR_STARTUP_BENCHMARK_REPORT` for the index/catalog
+JSON, and `ADAEDITOR_STARTUP_RESPONSIVENESS_REPORT` for the background preparation
+JSON. These CPU/filesystem measurements complement native window verification.
+
+## Loading the editing viewport
+
 The editing viewport prepares imported models, their authored LOD alternatives and
 Spine skeletons asynchronously before installing the scene. It uses the parsed,
 possibly unsaved document model. Closing the viewport or replacing the document

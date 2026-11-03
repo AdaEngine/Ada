@@ -50,7 +50,7 @@ struct EditorAgentSidebar: View {
         VStack(alignment: .leading, spacing: 0) {
             transcript
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            if presentation == .workspace, viewModel.activeSession?.events.isEmpty == false, let message = viewModel.statusMessage {
+            if presentation == .workspace, viewModel.hasActiveSessionEvents, let message = viewModel.statusMessage {
                 Text(message)
                     .font(.system(size: 12))
                     .foregroundColor(theme.editorColors.muted)
@@ -60,7 +60,7 @@ struct EditorAgentSidebar: View {
                     .accessibilityIdentifier("AdaEditor.Agent.StatusMessage")
             }
             if presentation == .workspace, let onOpenChangedFile {
-                EditorAgentChangesSummary(events: viewModel.activeSession?.events ?? [], onOpenFile: onOpenChangedFile)
+                EditorAgentLiveChangesSummary(viewModel: viewModel, onOpenFile: onOpenChangedFile)
             }
             composer
                 .padding(.bottom, presentation == .workspace ? 12 : 0)
@@ -70,7 +70,7 @@ struct EditorAgentSidebar: View {
 
     private var agentHeader: some View {
         HStack(spacing: 8) {
-            Text(presentation == .workspace ? (viewModel.activeSession?.title ?? L10n.text("New session")) : viewModel.projectName)
+            Text(presentation == .workspace ? (viewModel.activeSessionTitle ?? L10n.text("New session")) : viewModel.projectName)
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(theme.editorColors.text)
                 .lineLimit(1)
@@ -79,7 +79,7 @@ struct EditorAgentSidebar: View {
                     .accessibilityIdentifier("AdaEditor.Agent.ConnectionFlip")
             }
             Text(viewModel.isSending
-                ? (viewModel.runningSessionID == viewModel.activeSession?.id ? L10n.text("Working") : L10n.text("Another session is running"))
+                ? (viewModel.runningSessionID == viewModel.activeSessionID ? L10n.text("Working") : L10n.text("Another session is running"))
                 : viewModel.isConnectingCatalogAgent ? L10n.text("Connecting") : (viewModel.settings.configuration.enabled ? viewModel.currentConnectionState.title : L10n.text("Choose an agent")))
                 .font(.system(size: 10))
                 .foregroundColor(theme.editorColors.muted)
@@ -150,7 +150,7 @@ struct EditorAgentSidebar: View {
     }
 
     private func sessionButton(_ session: EditorAgentSessionSummary) -> some View {
-        let active = session.id == viewModel.activeSession?.id
+        let active = session.id == viewModel.activeSessionID
         return Button(action: { viewModel.selectSession(session) }) {
             Text(session.title)
                 .font(.system(size: 13, weight: active ? .semibold : .regular))
@@ -240,7 +240,7 @@ struct EditorAgentSidebar: View {
 
     @ViewBuilder
     private var transcript: some View {
-        if viewModel.activeSession?.events.isEmpty == false {
+        if viewModel.hasActiveSessionEvents {
             EditorAgentTranscript(viewModel: viewModel)
         } else {
             ScrollView { emptyState.padding(10) }

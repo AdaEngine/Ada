@@ -5,6 +5,10 @@ import Observation
 
 extension EditorViewModel {
     func openProjectItem(_ item: EditorProjectSidebarViewModel.Item) {
+        openProjectItem(item, preparedDocument: nil)
+    }
+
+    func openProjectItem(_ item: EditorProjectSidebarViewModel.Item, preparedDocument: EditorWorkbenchDocument?) {
         if item.isFolder {
             projectSidebar.select(item)
             projectSidebar.toggleFolder(item)
@@ -30,7 +34,7 @@ extension EditorViewModel {
             if case .ui = existing { refreshUIExports() }
             return
         }
-        let document = Self.document(for: item)
+        let document = preparedDocument ?? Self.document(for: item)
         workbench.open(document)
         if case let .asset(asset) = document, asset.kind == .tileSource {
             presentSceneInspector()

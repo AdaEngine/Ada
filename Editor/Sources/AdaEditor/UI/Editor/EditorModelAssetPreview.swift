@@ -7,6 +7,7 @@ import Observation
 @MainActor
 final class EditorModelAssetPreviewModel {
     var asset: ModelAsset3D?
+    var previewLighting: AssetHandle<ImageBasedLighting3D>?
     var error: String?
     var isLoading = true
     var selectedAnimation = "Rest pose" { didSet { updatePlayback() } }
@@ -40,8 +41,11 @@ final class EditorModelAssetPreviewModel {
             do {
                 guard let path else { throw AssetError.message("Model file is unavailable.") }
                 let handle = try await AssetsManager.load(ModelAsset3D.self, at: path)
+                let lightingPath = Bundle.editor.resourceURL?.appendingPathComponent("Assets/PreviewLighting/Studio.ibl").path
+                let lighting = try await AssetsManager.load(ImageBasedLighting3D.self, at: lightingPath ?? "Assets/PreviewLighting/Studio.ibl")
                 try Task.checkCancellation()
                 guard let asset = handle.asset else { throw AssetError.message("Model has not loaded.") }
+                self?.previewLighting = lighting
                 self?.asset = asset
             } catch is CancellationError {
                 return

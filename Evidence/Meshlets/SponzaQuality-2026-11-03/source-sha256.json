@@ -1,0 +1,20 @@
+{
+  "Demos/Sponza/Camera/SponzaCameraMotion.swift": "2f1dea58e3bb99324a8aa34e044ed19357c62f7a7961ca271b7df2ffc1b9f7e0",
+  "Demos/Sponza/Camera/SponzaFlyCamera.swift": "6b538d6bd2bdcbd4d7da5da87f01f02e939fed20998f169cfed913309264cd1d",
+  "Demos/Sponza/Camera/SponzaLightMotion.swift": "fdef06f355c9681ec69313706027b205d94f0b706910dd8b60756071112a98b1",
+  "Demos/Sponza/Package.swift": "a073bf97070016abe40378278ea4a03baf4bbd0e037487ca260b70de58a05141",
+  "Demos/Sponza/SponzaDemo.swift": "8d6dded18ad250180e54eee37eea34c843510f4c6752d3424c49d2a81873d208",
+  "Demos/Sponza/SponzaDemoProfiler.swift": "96dd492c8aff6ed42cd1126346183b17efaedf21c1ea2f9e1d552fa0dccec3ae",
+  "Demos/Sponza/SponzaLighting.swift": "3369f948ff9f34b4186c227a93e891d3ce87826513c4ba1f21df8654dc05fc04",
+  "Demos/Sponza/Tests/SponzaCameraTests.swift": "d7c6742591a58c2c6ba9e298404abd3d21f3d718a5477ff2924f033c2ff702f7",
+  "Sources/AdaCorePipelines/Assets/Shaders/path_tracing_3d.glsl": "ac8df1decff9acba284b6a3a9b640d75a40f6f80c75e15360d0ed00f35d488b8",
+  "Sources/AdaCorePipelines/CorePipelines/PathTracing3D.swift": "6000e2802598e49081bdf8109c0d6c918a99ebfb7a218a3cd37cdee38c7a53a1",
+  "Sources/AdaCorePipelines/CorePipelines/PathTracing3DScene.swift": "bc040df8d19f64e52ee8136c18491e42e1942ac2a784f598e5c6f9da345cba44",
+  "Sources/AdaCorePipelines/CorePipelines/RenderNodes3D/PathTracing3DRenderNode.swift": "baf5bc93a121954e3ae88279df0a4da0c0f86d506698e81f7d733ab349366346",
+  "Sources/AdaCorePipelines/CorePipelines/RenderNodes3D/Temporal3DRenderNode.swift": "f64e3688f8ca877ca831ef212ec8aec5c4b2f7a8fcbd66637e6523800bb2560f",
+  "Sources/AdaCorePipelines/CorePipelines/Temporal3DHistory.swift": "722f6c4d195bf15db36c294f97aa274cc73ec0c90b4d8564a7f88895d27e5401",
+  "Sources/AdaRender/Camera/CameraPlugin.swift": "5c1d9ba115837079beb1c8420c6aae236bfa007efde183284ac95d832acffc15",
+  "Tests/AdaEngineTests/Render3DDLSSTests.swift": "49a9e1b63824ed72aaad664067ec0eea24b581d9b203c2aad9b79cbf3f3f6605",
+  "Tests/AdaEngineTests/Render3DPathTracingTests.swift": "e81cfdba63ed6bb32240259c5ed30556efaf353c8bc8b6245411693464fb30f7",
+  "script/prepare_sponza_path_tracing.py": "105fa52f68aa6cd877b801231ba134605e90706ae91bb2c2bd32681d1330844e"
+}

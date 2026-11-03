@@ -91,6 +91,7 @@ struct PrepareTemporal3DSystem {
     @Query<Camera, CameraRenderGraph, Ref<RenderViewTarget>, GlobalViewUniform, ExtractedCameraSource> private var cameras
     @ResMut<Temporal3DViews> private var views
     @Res<RenderDeviceHandler> private var device
+    @Res<ExtractedCameraRenderViewTargets?> private var cameraTargets
 
     init(world _: World) {}
 
@@ -164,7 +165,10 @@ struct PrepareTemporal3DSystem {
             target.mainTexture = target.temporalPresentationTexture
             views.entries[source.entityId] = entry
         }
-        for id in views.entries.keys where !active.contains(id) { views.entries.removeValue(forKey: id) }
+        // A full offscreen display ring temporarily removes the extracted view. Keep its
+        // backend feature while the source camera still requests temporal reconstruction.
+        let retained = cameraTargets?.temporalCameraIDs ?? Set(active)
+        for id in views.entries.keys where !retained.contains(id) { views.entries.removeValue(forKey: id) }
     }
 }
 

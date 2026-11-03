@@ -71,8 +71,18 @@ $studioBuildArguments = @('build', '--package-path', $studioEditor, '--configura
 if ($ScratchPath) { $studioBuildArguments += @('--scratch-path', $ScratchPath) }
 $studioBuildLog = Join-Path $studioRoot ".build-tools/studio-$Configuration-build.log"
 Write-Host "Building Studio ($Configuration); compiler log: $studioBuildLog"
-& swift @studioBuildArguments *> $studioBuildLog
-$studioBuildExit = $LASTEXITCODE
+$studioPreviousErrorAction = $ErrorActionPreference
+try {
+    # Windows PowerShell 5.1 wraps redirected native stderr in ErrorRecords.
+    # SwiftPM also uses stderr for progress and warnings; only its exit code
+    # determines success. Convert diagnostics to plain text before logging them.
+    $ErrorActionPreference = 'Continue'
+    & swift @studioBuildArguments 2>&1 | ForEach-Object { $_.ToString() } |
+        Out-File -LiteralPath $studioBuildLog -Encoding utf8 -ErrorAction Stop
+    $studioBuildExit = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $studioPreviousErrorAction
+}
 Get-Content -LiteralPath $studioBuildLog -Tail 30 | Out-Host
 if ($studioBuildExit -ne 0) { throw "Studio build failed. See $studioBuildLog for full diagnostics." }
 

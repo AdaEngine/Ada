@@ -3,6 +3,19 @@ import AdaPackageManifestTool
 import Foundation
 import Observation
 
+private struct EditorProjectTreeEntry {
+    let url: URL
+    let name: String
+    let isDirectory: Bool
+    let isSymbolicLink: Bool
+}
+
+private let editorProjectSkippedNames: Set<String> = [".ada", ".builds", ".DS_Store", ".git", ".lore", ".swiftpm", "DerivedData"]
+private let editorProjectTextExtensions: Set<String> = [
+    "ada", "c", "cc", "comp", "cpp", "cxx", "frag", "geom", "glsl", "gravity", "h", "hpp", "hxx", "json", "md", "markdown",
+    "ui", "ascn", "tileset", "metal", "plist", "scn", "scene", "shader", "strings", "swift", "tesc", "tese", "toml", "txt", "vert", "wgsl", "xml", "yaml", "yml",
+]
+
 extension EditorViewModel {
     static func projectTreeItems(for project: EditorProjectReference?, fileManager: FileManager) -> [EditorProjectSidebarViewModel.Item] {
         guard let project else {
@@ -13,7 +26,7 @@ extension EditorViewModel {
         return buildProjectTreeItems(at: projectURL, fileManager: fileManager)
     }
 
-    static func document(for item: EditorProjectSidebarViewModel.Item) -> EditorWorkbenchDocument {
+    nonisolated static func document(for item: EditorProjectSidebarViewModel.Item) -> EditorWorkbenchDocument {
         if URL(fileURLWithPath: item.title).pathExtension.lowercased() == "ui" {
             let content = textFileContent(for: item)
             return .ui(
@@ -88,7 +101,7 @@ extension EditorViewModel {
         }
     }
 
-    static func textFileContent(for item: EditorProjectSidebarViewModel.Item) -> (value: String, errorMessage: String?) {
+    nonisolated static func textFileContent(for item: EditorProjectSidebarViewModel.Item) -> (value: String, errorMessage: String?) {
         guard let absolutePath = absoluteFilePath(from: item.id) else {
             return (AdaEngineStyleContent.sampleTextDocuments[item.relativePath] ?? "", nil)
         }
@@ -100,7 +113,7 @@ extension EditorViewModel {
         }
     }
 
-    static func sceneFileContent(for item: EditorProjectSidebarViewModel.Item) -> (value: String, errorMessage: String?) {
+    nonisolated static func sceneFileContent(for item: EditorProjectSidebarViewModel.Item) -> (value: String, errorMessage: String?) {
         guard let absolutePath = absoluteFilePath(from: item.id) else {
             return (SceneDocumentFormat.defaultSceneYAML(projectName: item.title), nil)
         }
@@ -112,7 +125,7 @@ extension EditorViewModel {
         }
     }
 
-    static func absoluteFilePath(from path: String) -> String? {
+    nonisolated static func absoluteFilePath(from path: String) -> String? {
         if path.hasPrefix("/") { return path }
         #if os(Windows)
             if path.hasPrefix("\\\\") { return path }
@@ -126,23 +139,18 @@ extension EditorViewModel {
         #endif
     }
 
-    static func buildProjectTreeItems(at projectURL: URL, fileManager: FileManager) -> [EditorProjectSidebarViewModel.Item] {
-        let projectMetadata = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager)
+    nonisolated static func buildProjectTreeItems(
+        at projectURL: URL, fileManager: FileManager, projectMetadata suppliedMetadata: AdaProject? = nil
+    ) -> [EditorProjectSidebarViewModel.Item] {
+        let projectMetadata = suppliedMetadata ?? (try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager))
         let assetsRoot = projectMetadata?.paths.assets ?? "Assets"
         let resourceRoots = Array(Set((projectMetadata?.paths.resourceRoots ?? []) + [assetsRoot]))
             .sorted { $0.count > $1.count }
         var items: [EditorProjectSidebarViewModel.Item] = []
-        let rootEntries =
-            (try? fileManager.contentsOfDirectory(
-                at: projectURL,
-                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-                options: []
-            )) ?? []
-
-        for url in rootEntries.sorted(by: projectTreeSort) where !shouldSkipProjectTreeURL(url) {
+        for entry in projectTreeEntries(at: projectURL, fileManager: fileManager) {
             appendProjectTreeItems(
-                url: url,
-                projectURL: projectURL,
+                entry: entry,
+                parentPath: "",
                 level: 0,
                 resourceRoots: resourceRoots,
                 fileManager: fileManager,
@@ -157,18 +165,19 @@ extension EditorViewModel {
         return items
     }
 
-    static func appendProjectTreeItems(
-        url: URL,
-        projectURL: URL,
+    nonisolated private static func appendProjectTreeItems(
+        entry: EditorProjectTreeEntry,
+        parentPath: String,
         level: Int,
         resourceRoots: [String],
         fileManager: FileManager,
         items: inout [EditorProjectSidebarViewModel.Item]
     ) {
-        let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
-        let isDirectory = resourceValues?.isDirectory == true
-        let isSymbolicLink = resourceValues?.isSymbolicLink == true
-        let relativePath = relativePath(for: url, projectURL: projectURL)
+        guard !Task.isCancelled else { return }
+        let url = entry.url
+        let isDirectory = entry.isDirectory
+        let isSymbolicLink = entry.isSymbolicLink
+        let relativePath = parentPath.isEmpty ? entry.name : "\(parentPath)/\(entry.name)"
         let kind = fileKind(for: url, isDirectory: isDirectory)
         let itemAssetRoot = resourceRoots.first { root in
             let resourcePrefix = root.hasSuffix("/") ? root : "\(root)/"
@@ -180,7 +189,7 @@ extension EditorViewModel {
                 id: url.path,
                 disclosure: isDirectory ? "▾" : "",
                 icon: "▱",
-                title: url.lastPathComponent,
+                title: entry.name,
                 relativePath: relativePath,
                 level: level,
                 isActive: false,
@@ -195,17 +204,10 @@ extension EditorViewModel {
             return
         }
 
-        let childURLs =
-            (try? fileManager.contentsOfDirectory(
-                at: url,
-                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-                options: []
-            )) ?? []
-
-        for childURL in childURLs.sorted(by: projectTreeSort) where !shouldSkipProjectTreeURL(childURL) {
+        for child in projectTreeEntries(at: url, fileManager: fileManager) {
             appendProjectTreeItems(
-                url: childURL,
-                projectURL: projectURL,
+                entry: child,
+                parentPath: relativePath,
                 level: level + 1,
                 resourceRoots: resourceRoots,
                 fileManager: fileManager,
@@ -214,7 +216,24 @@ extension EditorViewModel {
         }
     }
 
-    static func fileKind(for url: URL, isDirectory: Bool) -> EditorProjectFileKind {
+    nonisolated private static func projectTreeEntries(at directory: URL, fileManager: FileManager) -> [EditorProjectTreeEntry] {
+        guard !Task.isCancelled else { return [] }
+        let urls = (try? fileManager.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: []
+        )) ?? []
+        // On Windows URL resource queries can hit the filesystem even during sorting.
+        // Snapshot each entry once instead of issuing two queries per comparison.
+        return urls.filter { !shouldSkipProjectTreeURL($0) }.map { url in
+            let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            return EditorProjectTreeEntry(url: url, name: url.lastPathComponent,
+                                          isDirectory: values?.isDirectory == true, isSymbolicLink: values?.isSymbolicLink == true)
+        }.sorted { lhs, rhs in
+            if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    nonisolated static func fileKind(for url: URL, isDirectory: Bool) -> EditorProjectFileKind {
         if isDirectory {
             return .folder
         }
@@ -243,7 +262,7 @@ extension EditorViewModel {
         return .genericAsset
     }
 
-    static func assetDocument(for item: EditorProjectSidebarViewModel.Item) -> EditorAssetDocument {
+    nonisolated static func assetDocument(for item: EditorProjectSidebarViewModel.Item) -> EditorAssetDocument {
         let absolutePath = absoluteFilePath(from: item.id)
         let url = absolutePath.map { URL(fileURLWithPath: $0, isDirectory: false) }
         let values = url.flatMap { try? $0.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]) }
@@ -263,7 +282,7 @@ extension EditorViewModel {
         )
     }
 
-    static func assetPreviewKind(
+    nonisolated static func assetPreviewKind(
         for kind: EditorProjectFileKind,
         fileExtension: String
     ) -> EditorAssetPreviewKind {
@@ -297,7 +316,7 @@ extension EditorViewModel {
         }
     }
 
-    static func assetReference(for relativePath: String, assetsRoot: String = "Assets") -> String? {
+    nonisolated static func assetReference(for relativePath: String, assetsRoot: String = "Assets") -> String? {
         let prefix = assetsRoot.hasSuffix("/") ? assetsRoot : "\(assetsRoot)/"
         guard relativePath == assetsRoot || relativePath.hasPrefix(prefix) else {
             return nil
@@ -430,27 +449,23 @@ extension EditorViewModel {
         return projectURL.appendingPathComponent(projectMetadata?.paths.assets ?? "Assets", isDirectory: true)
     }
 
-    static func isImageAsset(_ url: URL) -> Bool {
+    nonisolated static func isImageAsset(_ url: URL) -> Bool {
         Image.extensions().contains(url.pathExtension.lowercased())
     }
 
-    static func isAudioAsset(_ url: URL) -> Bool {
+    nonisolated static func isAudioAsset(_ url: URL) -> Bool {
         ["wav", "mp3", "ogg", "flac", "m4a"].contains(url.pathExtension.lowercased())
     }
 
-    static func isTextFile(_ url: URL) -> Bool {
-        let textExtensions: Set<String> = [
-            "ada", "c", "cc", "comp", "cpp", "cxx", "frag", "geom", "glsl", "gravity", "h", "hpp", "hxx", "json", "md", "markdown",
-            "ui", "ascn", "tileset", "metal", "plist", "scn", "scene", "shader", "strings", "swift", "tesc", "tese", "toml", "txt", "vert", "wgsl", "xml", "yaml", "yml",
-        ]
+    nonisolated static func isTextFile(_ url: URL) -> Bool {
         let lowercasedName = url.lastPathComponent.lowercased()
 
         return lowercasedName == "package.swift"
             || lowercasedName == "readme"
-            || textExtensions.contains(url.pathExtension.lowercased())
+            || editorProjectTextExtensions.contains(url.pathExtension.lowercased())
     }
 
-    static func relativePath(for url: URL, projectURL: URL) -> String {
+    nonisolated static func relativePath(for url: URL, projectURL: URL) -> String {
         let projectPath = projectURL.standardizedFileURL.path
         let path = url.standardizedFileURL.path
 
@@ -462,24 +477,12 @@ extension EditorViewModel {
         return String(path[startIndex...]).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 
-    static func projectTreeSort(lhs: URL, rhs: URL) -> Bool {
-        let lhsIsDirectory = (try? lhs.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-        let rhsIsDirectory = (try? rhs.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-
-        if lhsIsDirectory != rhsIsDirectory {
-            return lhsIsDirectory
-        }
-
-        return lhs.lastPathComponent.localizedStandardCompare(rhs.lastPathComponent) == .orderedAscending
-    }
-
-    static func shouldSkipProjectTreeURL(_ url: URL) -> Bool {
+    nonisolated static func shouldSkipProjectTreeURL(_ url: URL) -> Bool {
         let name = url.lastPathComponent
-        let skippedNames: Set<String> = [".ada", ".builds", ".DS_Store", ".git", ".lore", ".swiftpm", "DerivedData"]
-        return skippedNames.contains(name) || name == ".build" || name.hasPrefix(".build-")
+        return editorProjectSkippedNames.contains(name) || name == ".build" || name.hasPrefix(".build-")
     }
 
-    static func isSymbolicLink(at url: URL) -> Bool {
+    nonisolated static func isSymbolicLink(at url: URL) -> Bool {
         (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
     }
 }

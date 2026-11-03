@@ -66,6 +66,30 @@ AdaEngine is a game engine written in Swift for building 2D and 3D games and use
   </tr>
 </table>
 
+Build and install Ada Studio from the repository root:
+
+```powershell
+# Windows: %LOCALAPPDATA%\Programs\Ada Studio, with a Start menu shortcut
+./script/install_studio_windows.cmd
+```
+
+```bash
+# macOS: /Applications/Ada Studio.app
+bash script/install_studio_macos.sh
+```
+
+Windows uses the [Studio build prerequisites](Editor/README.md#windows).
+macOS requires Xcode, XcodeGen and the editor's build dependencies. Both scripts
+build Release and install the complete standalone application. Close Studio before
+updating. Add `-Launch` (Windows) or `--launch` (macOS) to open it after installation.
+
+To install an existing build, pass `-SourcePath 'path/to/extracted-release'` on
+Windows or `--source '/path/to/Ada Studio.app'` on macOS. Windows release ZIPs also
+include `install_studio_windows.cmd` for installation by double-click after extraction.
+Override the destination with `-InstallDirectory` (the app folder) on Windows or
+`--destination` (the Applications folder) on macOS; for a per-user Mac install, use
+`--destination "$HOME/Applications"`.
+
 ## Design Goals
 
 * **Capable:** Offer a complete 2D feature set.

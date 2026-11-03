@@ -1,0 +1,16 @@
+{
+  "full-turn-summary.json": "02286d0f7bea120c78ce39e051b02b040c5c07bb1c6292c863a25395573bd48e",
+  "gallery-memory.jsonl.gz": "ecc7ff94decfa5b9bdbbf5264f7f8089fc2695bffb4d07b4fb251e4b81f56543",
+  "gallery-motion.json.gz": "27fd1ee38f8af2bb292c959b3d71b15806c6f34ad749bffa25aac5efb21a2111",
+  "gallery-motion.stderr.log": "fdbb59d99ad96d527acd934665014354ef5e03eefbcd90faa49669ac26cf0979",
+  "gallery-motion.stdout.log": "37478011bf21ce2581048130cb67a6703379bb29f2165294257aed774ca7bb36",
+  "gallery-rotation-memory.jsonl.gz": "f941358ad08fecce348aad4123ef97570fc63204dad64260270c2b2429df0876",
+  "gallery-rotation.json.gz": "1ef8fcefc7360dc8b9f06a5536efe9fa947c19064cfa6411d6f52dffd32bcb7b",
+  "gallery-rotation.stderr.log": "5224896fba65d0f87de529d62f3a34b0d90342fa9585e2e96c66ff99d343e2d0",
+  "gallery-rotation.stdout.log": "e3d8e980310351ee1945f9acf9b633e63a58c0764b215819a4609f2c6f419455",
+  "short-sweep-parameters.json": "75af1c872d3795b931baf9730f6bb939d0fbd75106acb0a7fc0ba0b150f0d710",
+  "short-sweep-summary.json": "ce64cf7983d70a9ba852aed1c6e1757c00c35dae146a2677b20c6016ccc5c185",
+  "source-hashes.json": "1a8777dc6fce2b65c12b82c8f285cf9c8bf9794b18d41688ee269ea59c50632f",
+  "test-gallery-motion.log": "615a378501488aef67403db2deb073ca58fe54bb4194a04818297e05b8a980a7",
+  "test-gallery-rotation.log": "6563d51ae63be5cd556024bdd3ed8b1f2b0ef5aa22e17b9fb85555e3b42d9417"
+}

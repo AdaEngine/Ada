@@ -173,6 +173,24 @@ struct EditorSceneAssetCacheTests {
         #expect(counter.value.withLock { $0 } == 3, "Installation reports the prepared error without retrying the broken import on the UI actor")
     }
 
+    @Test("Resource progress counts distinct imported files rather than scene references")
+    func resourceLoadingProgress() async throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try modelFile(in: root)
+        let recorder = ResourceProgressRecorder()
+        let cache = try await EditorSceneAssetCache.prepare(
+            model: sceneModel(source: source.lastPathComponent, count: 5),
+            sourceURL: root.appendingPathComponent("Main.ascn"), resourceRootURL: root,
+            onProgress: { progress in await recorder.append(progress) }
+        )
+        #expect(cache.models.count == 1)
+        #expect(recorder.values.first?.completed == 0)
+        #expect(recorder.values.last?.completed == 1)
+        #expect(recorder.values.allSatisfy { $0.total == 1 && $0.completed <= $0.total })
+        #expect(recorder.values.last?.resourceName == source.lastPathComponent)
+    }
+
     @Test("Open a selected large scene through the editing viewport", .enabled(if: ProcessInfo.processInfo.environment["ADAEDITOR_PREVIEW_BENCHMARK"] != nil))
     func realPreviewBenchmark() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["ADAEDITOR_PREVIEW_BENCHMARK"])
@@ -349,4 +367,10 @@ struct EditorSceneAssetCacheTests {
             return try await NativeGLTFLoader().load(url: url)
         }
     }
+}
+
+@MainActor
+private final class ResourceProgressRecorder {
+    var values: [EditorSceneLoadingProgress] = []
+    func append(_ progress: EditorSceneLoadingProgress) { values.append(progress) }
 }

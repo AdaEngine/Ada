@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "radiance": {
+    "file": "Studio-radiance.rgba16f",
+    "width": 256,
+    "height": 128
+  },
+  "irradiance": {
+    "file": "Studio-irradiance.rgba16f",
+    "width": 32,
+    "height": 16
+  },
+  "specular": {
+    "file": "Studio-specular.rgba16f",
+    "width": 128,
+    "height": 384
+  },
+  "brdf": {
+    "file": "Studio-brdf.rgba16f",
+    "width": 64,
+    "height": 64
+  },
+  "specularLevels": 6
+}

@@ -1,0 +1,293 @@
+{
+  "schema": 1,
+  "builder": "meshoptimizer-1.3-scan",
+  "maximumVertices": 64,
+  "maximumTriangles": 96,
+  "primitiveOrder": "preserved",
+  "dependencies": {
+    "lighting-pt.gltf": "f7029e917b82b90f1aa4ade72ad24fc18ac315ea901e23aa03afff0628e2a1a3",
+    "lighting-pt.bin": "d3eb15a4d2f9c1aaa503c8319d325ad9440bb86ed5337d505cd3049c18cdcd40"
+  },
+  "parts": [
+    {
+      "mesh": 0,
+      "part": 0,
+      "triangles": 1630,
+      "meshlets": 25,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 1,
+      "triangles": 17833,
+      "meshlets": 229,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 2,
+      "triangles": 19922,
+      "meshlets": 317,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 3,
+      "triangles": 954,
+      "meshlets": 20,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 4,
+      "triangles": 4134,
+      "meshlets": 48,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 5,
+      "triangles": 229,
+      "meshlets": 4,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 6,
+      "triangles": 903,
+      "meshlets": 12,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 7,
+      "triangles": 1216,
+      "meshlets": 21,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 8,
+      "triangles": 990,
+      "meshlets": 22,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 9,
+      "triangles": 903,
+      "meshlets": 13,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 10,
+      "triangles": 2928,
+      "meshlets": 35,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 11,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 0,
+      "part": 12,
+      "triangles": 116,
+      "meshlets": 3,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 1,
+      "part": 0,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 2,
+      "part": 0,
+      "triangles": 2187,
+      "meshlets": 26,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 2,
+      "part": 1,
+      "triangles": 47,
+      "meshlets": 2,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 2,
+      "part": 2,
+      "triangles": 1772,
+      "meshlets": 30,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 2,
+      "part": 3,
+      "triangles": 691,
+      "meshlets": 13,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 2,
+      "part": 4,
+      "triangles": 2479,
+      "meshlets": 28,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 2,
+      "part": 5,
+      "triangles": 5958,
+      "meshlets": 120,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 3,
+      "part": 0,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 4,
+      "part": 0,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 5,
+      "part": 0,
+      "triangles": 8,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 6,
+      "part": 0,
+      "triangles": 350,
+      "meshlets": 9,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 6,
+      "part": 1,
+      "triangles": 2367,
+      "meshlets": 26,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 6,
+      "part": 2,
+      "triangles": 923,
+      "meshlets": 25,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 6,
+      "part": 3,
+      "triangles": 14108,
+      "meshlets": 152,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 6,
+      "part": 4,
+      "triangles": 1528,
+      "meshlets": 32,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 6,
+      "part": 5,
+      "triangles": 11627,
+      "meshlets": 126,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 6,
+      "part": 6,
+      "triangles": 788,
+      "meshlets": 9,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 7,
+      "part": 0,
+      "triangles": 46,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 7,
+      "part": 1,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 7,
+      "part": 2,
+      "triangles": 176,
+      "meshlets": 3,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 7,
+      "part": 3,
+      "triangles": 758,
+      "meshlets": 10,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 7,
+      "part": 4,
+      "triangles": 2,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 7,
+      "part": 5,
+      "triangles": 12,
+      "meshlets": 1,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 8,
+      "part": 0,
+      "triangles": 13382,
+      "meshlets": 147,
+      "referenceBoundariesMatch": true
+    },
+    {
+      "mesh": 8,
+      "part": 1,
+      "triangles": 2003,
+      "meshlets": 22,
+      "referenceBoundariesMatch": true
+    }
+  ],
+  "nativeTool": {
+    "version": "1.3",
+    "revision": "9e1f07b159d3cb777f1c67ed31fc11fd117986f4",
+    "source": "https://github.com/zeux/meshoptimizer",
+    "license": "MIT",
+    "sourceSHA256": {
+      "src/meshoptimizer.h": "e3688ef553f603391747895a5c221ef1528574cc7f8173782417a96cb531f61b",
+      "src/clusterizer.cpp": "a2775edf77d86a9a5f0ca82f4635ce6ce741bbda79fd9a652ffc8c5dd61d3b0e",
+      "src/allocator.cpp": "d2cc48691fe2f4c6d097bf7a766389cfb7f83ca14a5f747e3944332656d02254",
+      "LICENSE.md": "f03037ca7bad1e3eb7f4a63fa6084a8baabd5ba30d3c239a9a7f35705d873e26"
+    },
+    "toolSHA256": "e7d9fd597620c5393bf409c85dd9e3861453486c364ef3dcaa457559eecdffc1"
+  },
+  "sidecarSHA256": "1250de7a9622acbe833a753f37ffd11be9520a3d75f267890d5c44a465a6a999"
+}

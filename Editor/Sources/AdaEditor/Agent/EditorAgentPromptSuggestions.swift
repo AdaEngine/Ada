@@ -12,12 +12,13 @@ final class EditorAgentPromptSuggestions {
         var mode: String
         var languageCode: String
         var messages: [EditorAgentSuggestionMessage]
+        var followUps: [String] = []
         var completedReplyID: String?
 
         static func == (lhs: Self, rhs: Self) -> Bool {
             lhs.sessionID == rhs.sessionID && lhs.draft.utf8.elementsEqual(rhs.draft.utf8)
                 && lhs.caretOffset == rhs.caretOffset && lhs.mode == rhs.mode && lhs.languageCode == rhs.languageCode
-                && lhs.messages == rhs.messages && lhs.completedReplyID == rhs.completedReplyID
+                && lhs.messages == rhs.messages && lhs.followUps == rhs.followUps && lhs.completedReplyID == rhs.completedReplyID
         }
     }
 
@@ -32,7 +33,7 @@ final class EditorAgentPromptSuggestions {
             let draft = context.draft
             let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
             if draft.isEmpty, context.completedReplyID != nil {
-                return .init(purpose: .followUps, draft: draft, messages: context.messages, languageCode: context.languageCode)
+                return .init(purpose: .followUps, draft: draft, messages: context.messages, languageCode: context.languageCode, followUps: context.followUps)
             }
             guard trimmed.count >= 4, context.caretOffset == draft.count,
                   !trimmed.hasPrefix("/"), !trimmed.hasPrefix("@") else { return nil }

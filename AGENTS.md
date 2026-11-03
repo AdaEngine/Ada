@@ -53,6 +53,12 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
 ### Lint
 - SwiftLint is wired as a SwiftPM build tool plugin for macOS/Linux.
 - Run SwiftLint manually (if installed): `swiftlint --config .swiftlint.yml`
+- AdaScript layout is checked by `AdaScriptLinter` in `AdaScriptCompilerCore` and
+  published as `adascript-lint` workspace warnings. Fix these after script edits.
+  Desktop projects can enforce them with
+  `adastudio validate --project <directory> --lint strict --format json`
+  (exit code 3 for style violations). Rules and modes:
+  [Editor/Documentation/AdaScriptLint.md](Editor/Documentation/AdaScriptLint.md).
 
 ### Documentation
 - Build docs (from CI workflow):

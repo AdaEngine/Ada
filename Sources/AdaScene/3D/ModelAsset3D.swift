@@ -148,6 +148,32 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         let loader = GLTFLoaderResolver.shared.getLoader()
         let result = try await loader.load(url: assetDecoder.assetMeta.filePath)
         importWarnings = result.warnings
+        var preparedMeshlets: MeshletSidecar?
+        let sidecarURL = assetDecoder.assetMeta.filePath.appendingPathExtension("meshlets")
+        if FileManager.default.fileExists(atPath: sidecarURL.path) {
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: sidecarURL.path)
+                guard let size = attributes[.size] as? NSNumber, size.uint64Value <= UInt64(MeshletSidecar.maximumByteCount) else {
+                    throw MeshletDataError.invalidSidecar
+                }
+                preparedMeshlets = try MeshletSidecar(data: Data(contentsOf: sidecarURL))
+            } catch {
+                importWarnings.append("Ignored invalid meshlet sidecar: \(sidecarURL.lastPathComponent). Original geometry is retained.")
+            }
+        }
+        var preparedMeshletLOD: MeshletLODSidecar?
+        let hierarchyURL = assetDecoder.assetMeta.filePath.appendingPathExtension("meshletlod")
+        if FileManager.default.fileExists(atPath: hierarchyURL.path) {
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: hierarchyURL.path)
+                guard let size = attributes[.size] as? NSNumber, size.uint64Value <= UInt64(MeshletLODSidecar.maximumByteCount) else {
+                    throw MeshletDataError.invalidSidecar
+                }
+                preparedMeshletLOD = try MeshletLODSidecar(data: Data(contentsOf: hierarchyURL))
+            } catch {
+                importWarnings.append("Ignored invalid meshlet LOD sidecar: \(hierarchyURL.lastPathComponent). Original geometry is retained.")
+            }
+        }
 
         guard result.skins.allSatisfy({ $0.joints.count <= Skinning3DUniforms.maximumJoints }) else {
             throw AssetError.message("A skinned mesh supports at most \(Skinning3DUniforms.maximumJoints) joints.")
@@ -161,7 +187,9 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
 
         // 2. Convert Meshes
         var meshes: [Mesh] = []
-        for gltfMesh in result.meshes {
+        var incompatibleMeshletParts = 0
+        var incompatibleMeshletLODParts = 0
+        for (meshIndex, gltfMesh) in result.meshes.enumerated() {
             var parts: [Mesh.Part] = []
 
             for (index, primitive) in gltfMesh.primitives.enumerated() {
@@ -211,6 +239,22 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
                 let converted = primitive.convertTopology(indices: sourceIndices)
                 descriptor.indicies = converted.indices
                 descriptor.primitiveTopology = converted.topology
+                if descriptor.primitiveTopology == .triangleList, let preparedMeshlets {
+                    do {
+                        descriptor.meshlets = try preparedMeshlets.geometry(meshIndex: meshIndex, partIndex: index,
+                            positions: descriptor.positions.elements, indices: descriptor.indicies)
+                    } catch {
+                        incompatibleMeshletParts += 1
+                    }
+                }
+                if descriptor.primitiveTopology == .triangleList, let preparedMeshletLOD {
+                    do {
+                        descriptor.meshletLOD = try preparedMeshletLOD.geometry(meshIndex: meshIndex, partIndex: index,
+                            positions: descriptor.positions.elements, indices: descriptor.indicies)
+                    } catch {
+                        incompatibleMeshletLODParts += 1
+                    }
+                }
 
                 var part = Mesh.Part(
                     id: index,
@@ -240,6 +284,12 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
 
             meshes.append(Mesh(models: [Mesh.Model(name: gltfMesh.name ?? "", parts: parts)]))
             meshMorphWeights.append(gltfMesh.defaultWeights)
+        }
+        if incompatibleMeshletParts > 0 {
+            importWarnings.append("Ignored \(incompatibleMeshletParts) stale or invalid meshlet parts. Original geometry is retained.")
+        }
+        if incompatibleMeshletLODParts > 0 {
+            importWarnings.append("Ignored \(incompatibleMeshletLODParts) stale or invalid meshlet LOD parts. Exact source geometry is retained.")
         }
 
         nodes = result.nodes.map {

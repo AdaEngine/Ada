@@ -5,6 +5,8 @@ import AdaInput
 import AdaUIDescription
 import Foundation
 import Math
+import Observation
+import Synchronization
 import Testing
 
 @testable import AdaEditor
@@ -26,6 +28,21 @@ struct EditorAgentA2UITests {
         frames += try stream.finish().map { try $0.get() }
         #expect(frames.count == 1)
         #expect(stream.displayText == "Before\n```swift\nlet label = \"```a2ui\"\n```\nAfter")
+    }
+
+    @Test func growingReplyDoesNotInvalidateOtherDisplayTexts() {
+        let ui = EditorAgentA2UISession(session: .init(id: "session"))
+        ui.receive(assistant("Earlier reply", id: "earlier"))
+        let changed = Mutex(false)
+        withObservationTracking {
+            _ = ui.displayText(for: "earlier")
+        } onChange: { changed.withLock { $0 = true } }
+        ui.receive(assistant("New streamed reply", id: "latest"))
+        #expect(!changed.withLock { $0 })
+        #expect(ui.displayText(for: "earlier") == "Earlier reply")
+        #expect(ui.displayText(for: "latest") == "New streamed reply")
+        ui.receive(assistant("Earlier reply updated", id: "earlier"))
+        #expect(changed.withLock { $0 })
     }
 
     @Test func concatenatedPlannerAndFinalReplyStillRendersTheForm() throws {

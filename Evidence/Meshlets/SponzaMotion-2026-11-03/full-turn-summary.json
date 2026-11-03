@@ -1,0 +1,80 @@
+[
+  {
+    "motion": "rotation",
+    "shadows": true,
+    "round": 0,
+    "width": 3810,
+    "height": 1883,
+    "cameraUpdates": 531,
+    "fps": 74.08992170313907,
+    "medianMilliseconds": 9.8546,
+    "p95Milliseconds": 30.8153,
+    "maxMilliseconds": 226.4608,
+    "minimumHalfSecondFPS": 41.939749356075055
+  },
+  {
+    "motion": "rotation",
+    "shadows": false,
+    "round": 0,
+    "width": 3810,
+    "height": 1883,
+    "cameraUpdates": 612,
+    "fps": 82.17407344848961,
+    "medianMilliseconds": 6.7232,
+    "p95Milliseconds": 36.7456,
+    "maxMilliseconds": 250.6475,
+    "minimumHalfSecondFPS": 33.9699705460373
+  },
+  {
+    "motion": "rotation",
+    "shadows": false,
+    "round": 1,
+    "width": 3810,
+    "height": 1883,
+    "cameraUpdates": 585,
+    "fps": 78.94642780711294,
+    "medianMilliseconds": 6.7808,
+    "p95Milliseconds": 38.4051,
+    "maxMilliseconds": 205.033,
+    "minimumHalfSecondFPS": 50.567542872524285
+  },
+  {
+    "motion": "rotation",
+    "shadows": true,
+    "round": 1,
+    "width": 3810,
+    "height": 1883,
+    "cameraUpdates": 500,
+    "fps": 70.23868702183816,
+    "medianMilliseconds": 9.792,
+    "p95Milliseconds": 32.6598,
+    "maxMilliseconds": 229.8991,
+    "minimumHalfSecondFPS": 37.98635530117582
+  },
+  {
+    "motion": "rotation",
+    "shadows": true,
+    "round": 2,
+    "width": 3810,
+    "height": 1883,
+    "cameraUpdates": 531,
+    "fps": 74.39026271915935,
+    "medianMilliseconds": 9.6599,
+    "p95Milliseconds": 33.5617,
+    "maxMilliseconds": 240.7594,
+    "minimumHalfSecondFPS": 35.759765892732624
+  },
+  {
+    "motion": "rotation",
+    "shadows": false,
+    "round": 2,
+    "width": 3810,
+    "height": 1883,
+    "cameraUpdates": 569,
+    "fps": 76.75738365983477,
+    "medianMilliseconds": 6.877599999999999,
+    "p95Milliseconds": 38.6475,
+    "maxMilliseconds": 256.7931,
+    "minimumHalfSecondFPS": 34.59509536229076
+  }
+]

@@ -14,6 +14,53 @@ extension Render3DGPUTests {
     @Suite("Local shadow depth precision")
     @MainActor
     struct LocalShadowPrecision {
+        @Test
+        func faceResolutionDecodesLegacySettingsAndBoundsPortableAtlasSize() throws {
+            let legacy = try JSONDecoder().decode(LocalShadowSettings3D.self, from: Data("{}".utf8))
+            #expect(legacy.resolution == 512 && legacy.sanitizedResolution == 512)
+            let high = LocalShadowSettings3D(resolution: 1024)
+            let restored = try JSONDecoder().decode(LocalShadowSettings3D.self, from: JSONEncoder().encode(high))
+            #expect(restored.resolution == 1024)
+            #expect(LocalShadowSettings3D(resolution: Int.max).sanitizedResolution == 1024)
+            #expect(LocalShadowSettings3D(resolution: Int.min).sanitizedResolution == 128)
+        }
+
+        @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
+        func largerAtlasReallocatesCachedFacesAndPacksItsActualTexelSize() async throws {
+            let scene = try await MeshletBaselineFixtures.empty(size: [64, 64], shadows: true)
+            let material = PBRMaterial()
+            scene.app.main.spawn("Shadow resolution caster") {
+                Mesh3DComponent(mesh: Mesh.generateCube(renderDevice: scene.device), materials: [material])
+                Transform(position: [0, 0, 3])
+            }
+            scene.app.main.spawn("Shadow resolution spotlight") {
+                SpotLightComponent(intensity: 5, castShadows: true, range: 10)
+                Transform()
+            }
+            var environment = try #require(scene.camera.components[Environment3D.self])
+            environment.localShadows = .init(maximumLights: 1, resolution: 128)
+            scene.camera.components[Environment3D.self] = environment
+            for _ in 0..<3 { try await scene.app.update() }
+            _ = try #require(try await scene.device.readImage(from: scene.target))
+            let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+            let original = try #require(world.getResource(LocalShadow3DViews.self)?.entries[scene.camera.id])
+            #expect(original.color?.size == SizeInt(width: 768, height: 128))
+
+            environment.shadows.resolution = 2048
+            environment.localShadows.resolution = 1024
+            scene.camera.components[Environment3D.self] = environment
+            for _ in 0..<3 { try await scene.app.update() }
+            _ = try #require(try await scene.device.readImage(from: scene.target))
+            let resized = try #require(world.getResource(LocalShadow3DViews.self)?.entries[scene.camera.id])
+            #expect(resized.color?.size == SizeInt(width: 6144, height: 1024))
+            #expect(original.color !== resized.color && original.depth !== resized.depth)
+            #expect(!resized.faceDigests.isEmpty, "Resizing must redraw valid faces before they can be reused.")
+            #expect(world.getResource(DirectionalShadow3D.self)?.colorTexture?.size == SizeInt(width: 6144, height: 2048))
+            var packed = [Vector4](repeating: .zero, count: 97)
+            packLocalShadowMatrices(resized, into: &packed)
+            #expect(packed[96] == Vector4(1 / Float(6144), 1 / Float(1024), 1024, 0))
+        }
+
         @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
         func aThinCasterNearTheLightRangeKeepsItsShadow() async throws {
             let scene = try await Render3DDebugViewGPUTests.makeScene()

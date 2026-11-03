@@ -23,6 +23,14 @@ Codex.app. Codex and Claude CLIs are recommendations: they require their ACP
 adapters. Already installed adapters can be added directly. Gemini CLI, OpenCode,
 GitHub Copilot and Sloppy ACP are also recognized.
 
+On Windows, discovery also checks Sloppy's local installation and Codex Desktop's
+versioned executable folders under `%LOCALAPPDATA%/OpenAI/Codex/bin`. Empty folders
+left by updates are ignored; the newest executable is preferred. Refresh rereads
+the Windows environment and rescans these folders without restarting Studio.
+Adapter launches include current host/application paths even when their saved
+PATH refers to a removed Codex version. Added agents also show the executable
+path detected by the current scan.
+
 Node agents require Node.js/npm; Python agents require uv. The installer uses
 private installation directories rather than global package installations. macOS
 binary distributions support zip, tar.gz and tar.bz2 archives. SHA-256 is checked
@@ -34,7 +42,7 @@ Registry metadata and registrations live in
 `~/Library/Application Support/AdaEditor/Agents`. Installation does not sign in,
 copy credentials, or send prompts. Authentication and subscriptions belong to the
 agent, as described in [Zed's external-agent documentation](https://github.com/zed-industries/zed/blob/main/docs/src/ai/external-agents.md).
-Local processes are supported on macOS; iPad displays an availability message.
+Local processes are supported on macOS and Windows; iPad displays an availability message.
 
 Validation:
 

@@ -9,14 +9,19 @@ public struct LocalShadowSettings3D: Codable, Sendable {
     /// Keep the shadow faces of lights and casters that did not change since the last frame instead of redrawing
     /// them. Faces with skinned casters are always redrawn.
     public var reusesStaticFaces: Bool
+    /// Pixels per cubemap face or spot tile. Clamped to 128...1024 so six faces fit the portable 8192-pixel atlas limit.
+    public var resolution: Int
 
-    public init(isEnabled: Bool = true, maximumLights: Int = 4, reusesStaticFaces: Bool = true) {
+    public init(isEnabled: Bool = true, maximumLights: Int = 4, reusesStaticFaces: Bool = true, resolution: Int = 512) {
         self.isEnabled = isEnabled
         self.maximumLights = maximumLights
         self.reusesStaticFaces = reusesStaticFaces
+        self.resolution = resolution
     }
 
-    private enum CodingKeys: CodingKey { case isEnabled, maximumLights, reusesStaticFaces }
+    var sanitizedResolution: Int { min(max(resolution, 128), 1024) }
+
+    private enum CodingKeys: CodingKey { case isEnabled, maximumLights, reusesStaticFaces, resolution }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -24,6 +29,7 @@ public struct LocalShadowSettings3D: Codable, Sendable {
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? defaults.isEnabled
         maximumLights = try container.decodeIfPresent(Int.self, forKey: .maximumLights) ?? defaults.maximumLights
         reusesStaticFaces = try container.decodeIfPresent(Bool.self, forKey: .reusesStaticFaces) ?? defaults.reusesStaticFaces
+        resolution = try container.decodeIfPresent(Int.self, forKey: .resolution) ?? defaults.resolution
     }
 }
 
@@ -275,5 +281,6 @@ func packLocalShadowMatrices(_ shadows: LocalShadow3DViews.Entry?, into data: in
         data[index * 4 + 2] = matrix.z
         data[index * 4 + 3] = matrix.w
     }
-    data[96] = [1 / Float(shadows?.color?.size.width ?? 1), 1 / Float(shadows?.color?.size.height ?? 1), Float(LocalLighting3DMath.shadowResolution), 0]
+    let faceResolution = (shadows?.color).map { $0.size.width / 6 } ?? LocalLighting3DMath.shadowResolution
+    data[96] = [1 / Float(shadows?.color?.size.width ?? 1), 1 / Float(shadows?.color?.size.height ?? 1), Float(faceResolution), 0]
 }

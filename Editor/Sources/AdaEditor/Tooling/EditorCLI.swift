@@ -1,8 +1,10 @@
-#if os(macOS) || os(Windows)
+#if os(macOS) || os(Windows) || os(Linux)
 import AdaEngine
 import AdaScriptCompilerCore
 #if os(macOS)
 import Darwin
+#elseif os(Linux)
+import Glibc
 #endif
 import Dispatch
 import Foundation
@@ -15,6 +17,13 @@ struct EditorCLIDiagnostic: Codable, Equatable, Sendable {
     /// One-based positions; column uses UTF-16, matching the editor's language services.
     var line: Int?
     var column: Int?
+
+    var text: String {
+        guard let file else {
+            return "\(code): \(message)"
+        }
+        return "\(file):\(line ?? 1):\(column ?? 1): \(severity): \(message) (\(code))"
+    }
 }
 
 struct EditorCLIReport: Codable, Sendable {
@@ -35,7 +44,7 @@ struct EditorCLIReport: Codable, Sendable {
     }
 }
 
-/// CLI mode exits before AppRuntime is initialized. No windows, recents or preferences are touched.
+/// Headless commands exit before AppRuntime is initialized; a positional directory launches Studio.
 enum EditorCLI {
     static func isInvocation(_ arguments: [String]) -> Bool {
         arguments.first.map { ["adastudio", "adastudio.exe"].contains(URL(fileURLWithPath: $0).lastPathComponent.lowercased()) } == true
@@ -47,6 +56,12 @@ enum EditorCLI {
         if words.first == "--ada-studio-cli" { words.removeFirst() }
         let invocation: EditorCLIInvocation
         do {
+            if let project = try EditorCommandLineProject.projectURL(arguments: arguments) {
+                do { _ = try EditorProjectStore().projectForOpening(at: project) }
+                catch { throw EditorCLIError.project(error.localizedDescription) }
+                try EditorCommandLineProject.open(project)
+                return 0
+            }
             invocation = try EditorCLIInvocation(arguments: words)
         } catch {
             let report = failure(command: words.first ?? "help", error: error, fallbackCode: 2)
@@ -61,7 +76,7 @@ enum EditorCLI {
             }
         }
         // The CLI owns signal handling for its lifetime. Cancel both the task and tool processes.
-        #if os(macOS)
+        #if !os(Windows)
         let previous = signal(SIGINT, SIG_IGN)
         let interrupt = DispatchSource.makeSignalSource(signal: SIGINT, queue: .global())
         interrupt.setEventHandler {
@@ -73,7 +88,7 @@ enum EditorCLI {
         let interrupt = EditorCLIWindowsInterrupt { task.cancel(); Task { await runner.cancelAll() } }
         #endif
         let report = await task.value
-        #if os(macOS)
+        #if !os(Windows)
         interrupt.cancel()
         signal(SIGINT, previous)
         #else
@@ -133,6 +148,14 @@ enum EditorCLI {
                     report.details["validationScope"] = "metadata,layout"
                 }
                 if invocation.command == .validate {
+                    if project.build.system.isAdaScript, invocation.options["lint"] != "off" {
+                        report.diagnostics += try EditorAdaScriptLint.diagnostics(project: project, at: root)
+                        report.details["lintIssueCount"] = String(report.diagnostics.count)
+                        if invocation.options["lint"] == "strict", !report.diagnostics.isEmpty {
+                            report.ok = false
+                            report.exitCode = 3
+                        }
+                    }
                     return report
                 }
                 #if os(Windows)
@@ -140,6 +163,9 @@ enum EditorCLI {
                     throw EditorCLIError.environment("Windows Studio can validate and run AdaScript projects locally. CLI app export supports --target web or android through the configured WSL toolchain; macOS app packaging requires macOS.")
                 }
                 #endif
+                #if os(Linux)
+                throw EditorCLIError.environment("CLI app export is not yet available on Linux. Use Studio to build and run projects locally.")
+                #else
                 if invocation.options["target"] == "android" {
                     let sdk = try EditorBuildSDK.locate(override: invocation.options["sdk"])
                     var configuration = EditorAndroidConfiguration.load(engineRoot: sdk.engineRoot)
@@ -224,6 +250,7 @@ enum EditorCLI {
                 #else
                 throw EditorCLIError.environment("This Studio build does not include the AdaScript AOT backend.")
                 #endif
+                #endif
             }
             try Task.checkCancellation()
             return report
@@ -296,6 +323,8 @@ enum EditorCLI {
     private static var nativeTargets: String {
         #if os(Windows)
         "web,android"
+        #elseif os(Linux)
+        ""
         #else
         "macos,web,android"
         #endif
@@ -336,7 +365,7 @@ enum EditorCLI {
                 text = (["\(report.command): \(report.ok ? "succeeded" : "failed")"]
                     + report.details.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }
                     + report.artifacts.map { "artifact: \($0)" }
-                    + report.diagnostics.map { "\($0.code): \($0.message)" }).joined(separator: "\n")
+                    + report.diagnostics.map(\.text)).joined(separator: "\n")
             }
             try? (report.ok ? FileHandle.standardOutput : FileHandle.standardError).write(contentsOf: Data((text + "\n").utf8))
         }

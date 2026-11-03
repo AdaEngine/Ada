@@ -1,0 +1,134 @@
+[
+  {
+    "view": "atrium",
+    "shadows": true,
+    "round": 0,
+    "width": 1890,
+    "height": 1030,
+    "frames": 185,
+    "fps": 92.97374773156619,
+    "medianMilliseconds": 10.5628,
+    "p95Milliseconds": 12.1651
+  },
+  {
+    "view": "atrium",
+    "shadows": false,
+    "round": 0,
+    "width": 1890,
+    "height": 1030,
+    "frames": 262,
+    "fps": 131.2621304745577,
+    "medianMilliseconds": 7.5991,
+    "p95Milliseconds": 8.7208
+  },
+  {
+    "view": "atrium",
+    "shadows": false,
+    "round": 1,
+    "width": 1890,
+    "height": 1030,
+    "frames": 45,
+    "fps": 22.782745260049847,
+    "medianMilliseconds": 31.1197,
+    "p95Milliseconds": 39.0005
+  },
+  {
+    "view": "atrium",
+    "shadows": true,
+    "round": 1,
+    "width": 1890,
+    "height": 1030,
+    "frames": 45,
+    "fps": 22.87710505588597,
+    "medianMilliseconds": 31.2968,
+    "p95Milliseconds": 40.0731
+  },
+  {
+    "view": "atrium",
+    "shadows": true,
+    "round": 2,
+    "width": 1890,
+    "height": 1030,
+    "frames": 45,
+    "fps": 22.797934811078584,
+    "medianMilliseconds": 31.4026,
+    "p95Milliseconds": 44.0833
+  },
+  {
+    "view": "atrium",
+    "shadows": false,
+    "round": 2,
+    "width": 1890,
+    "height": 1030,
+    "frames": 46,
+    "fps": 23.230118717521705,
+    "medianMilliseconds": 31.07725,
+    "p95Milliseconds": 39.0822
+  },
+  {
+    "view": "outside",
+    "shadows": true,
+    "round": 0,
+    "width": 3810,
+    "height": 1883,
+    "frames": 41,
+    "fps": 20.56554238357646,
+    "medianMilliseconds": 31.1901,
+    "p95Milliseconds": 187.8114
+  },
+  {
+    "view": "outside",
+    "shadows": false,
+    "round": 0,
+    "width": 3810,
+    "height": 1883,
+    "frames": 47,
+    "fps": 23.67013978124057,
+    "medianMilliseconds": 31.3092,
+    "p95Milliseconds": 42.1872
+  },
+  {
+    "view": "outside",
+    "shadows": false,
+    "round": 1,
+    "width": 3810,
+    "height": 1883,
+    "frames": 46,
+    "fps": 23.28208692934023,
+    "medianMilliseconds": 31.47265,
+    "p95Milliseconds": 42.4764
+  },
+  {
+    "view": "outside",
+    "shadows": true,
+    "round": 1,
+    "width": 3810,
+    "height": 1883,
+    "frames": 47,
+    "fps": 23.708366909677427,
+    "medianMilliseconds": 31.2977,
+    "p95Milliseconds": 40.1662
+  },
+  {
+    "view": "outside",
+    "shadows": true,
+    "round": 2,
+    "width": 3810,
+    "height": 1883,
+    "frames": 48,
+    "fps": 24.078456037228907,
+    "medianMilliseconds": 31.35535,
+    "p95Milliseconds": 36.0924
+  },
+  {
+    "view": "outside",
+    "shadows": false,
+    "round": 2,
+    "width": 3810,
+    "height": 1883,
+    "frames": 46,
+    "fps": 23.3861890013838,
+    "medianMilliseconds": 31.481749999999998,
+    "p95Milliseconds": 42.0152
+  }
+]
