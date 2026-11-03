@@ -27,6 +27,7 @@ class Check:
     tests: bool = False
     env: dict = field(default_factory=dict)
     required_output: list = field(default_factory=list)
+    ci_targets: list = field(default_factory=list)
 
 
 def tool_state():
@@ -84,7 +85,7 @@ def execute(check, root, logs):
     start = time.monotonic()
     result = {"name": check.name, "category": check.category, "status": check.status,
               "reason": check.reason, "command": check.argv, "cwd": check.cwd,
-              "environment": check.env, "required_output": check.required_output}
+              "environment": check.env, "required_output": check.required_output, "ci_targets": check.ci_targets}
     if check.status:
         return result
     log = Path(logs) / (check.name + ".log")

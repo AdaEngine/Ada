@@ -14,6 +14,7 @@ import unittest
 
 from contribution import adapters, hooks, workflow
 from contribution.cli import main
+from contribution.cli import status_code
 from contribution.evidence import find_full_report
 from contribution.documentation import is_article
 from contribution.execution import Check, execute, has_executed_tests, tool_state, write_json
@@ -165,6 +166,9 @@ class RepositoryTests(RepositoryFixture):
 
 
 class ExecutionTests(RepositoryFixture):
+    def test_deferred_check_does_not_pass_complete_validation(self):
+        report = {"purpose": "publication", "checks": [{"status": "deferred"}]}
+        self.assertEqual(status_code(report), 2)
     def test_utility_success_cannot_replace_required_gpu_evidence(self):
         result = self.run_check([sys.executable, "-c", "print('Ran 1 test')"], tests=True,
                                 required_output=["GPU pixel test passed"])

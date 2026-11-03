@@ -45,6 +45,10 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
 - `install-hooks` explicitly connects pre-commit/pre-push checks while preserving existing hooks.
   Hooks are bypassable; hosted required checks remain necessary. A local report does not prove CI
   or server-side branch protection is enabled.
+- Pre-push uses local checks plus mandatory CI. A locally unavailable check may be `deferred` only
+  through a validated workflow/job mapping in `.agents/validation.json`; failed local checks and
+  unmapped prerequisites still block publication. Publication reports cannot close tasks or count
+  pending CI as passed. `run --stage review` and `verify --stage done` retain complete validation requirements.
 
 ### Unified developer CLI
 - Use `python ada_tool.py` from the repository root (Python 3.9+, standard library only;

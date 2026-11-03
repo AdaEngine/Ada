@@ -14,6 +14,7 @@ Do not label a missing tool, empty suite, disabled backend, or unsupported host 
 | failed | A problem was detected; inspect the linked log |
 | blocked | A required prerequisite or evidence is missing |
 | not_applicable | The profile explains why the category is irrelevant; reviewer checks the reason |
+| deferred | Publication only: an unavailable local check is assigned to a mandatory CI job; never a completion success |
 
 Install pinned Python tools explicitly with `python -m pip install -r script/contribution-requirements.txt`,
 inside a Python 3.11+ venv. The interpreter running the full profile must see those tools.

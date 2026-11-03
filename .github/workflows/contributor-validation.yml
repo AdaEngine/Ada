@@ -37,7 +37,8 @@ jobs:
         run: python script/check_contribution.py check --files .agents/validation.json
       - name: Verify the standard-library runner on minimum Python
         if: matrix.python == '3.9'
-        run: python script/test_contribution.py
+        working-directory: script
+        run: python -m unittest test_contribution test_publication
       - uses: actions/upload-artifact@v4
         if: always()
         with:

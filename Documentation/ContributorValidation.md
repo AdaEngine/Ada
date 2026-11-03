@@ -9,6 +9,22 @@ Create a virtual environment, install `script/contribution-requirements.txt`, an
 with that interpreter. `install-hooks` opts into repository-local hooks and preserves existing hooks.
 No global Git configuration is changed, and the runner never installs tools implicitly.
 
+Pre-push runs local checks and retains mandatory CI obligations. `plan --publication --base origin/main`
+shows its selection; `check --publication` executes the same publication profile without pushing.
+An unavailable local check is deferred only if `.agents/validation.json` maps it to a real push/PR
+workflow job. The report prints `DEFERRED` and the required CI job, never `PASSED` or `not_applicable`.
+Real local failures, secret findings and missing unmapped prerequisites still stop the push.
+The original Git LFS hook receives its original arguments/stdin after successful local gating.
+
+Publication evidence cannot close a task: complete review/Done validation still requires native,
+runtime and dependency evidence. Delegation does not provision a missing CI adapter or configure
+server rules; a CI job without its required command remains blocked until it is configured.
+CI outcomes must be checked after publication. The one-time bootstrap bypass is not persisted.
+
+For a new remote branch, the hook checks changes from the merge base with
+`pre_push.base_ref` (`refs/remotes/origin/main` by default). Without that ref or a common
+ancestor, it checks all tracked files. Existing remote branches use their outgoing Git diff.
+
 Existing hooks are saved as `<hook>.ada-original`. To uninstall, inspect the generated marker,
 restore that hook from its saved original, or remove only the generated hook if no original existed.
 Never remove unrelated hooks. A backup conflict requires manual reconciliation before installation.
