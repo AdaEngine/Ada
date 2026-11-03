@@ -26,7 +26,7 @@ Keep conditionals aligned between `Package.swift`, Swift sources, C/C++ settings
 
 AdaEngine's browser export is experimental and spans the root manifest, `AdaWeb`, `AdaPlatform/Web`, `Plugins/AdaWebExportPlugin`, shader transpilation, resources, JavaScript runtime files, and the WASI SDK.
 
-For detailed browser build/export/debug instructions, use the separate `adaengine-wasm-build` skill. For publishing demos into the website repository, use `adaengine-website-demos`. Do not duplicate or improvise their deployment workflow here.
+For browser build/export/debug instructions, inspect current export plugins, the contributor platform knowledge, and `ada_tool.py` / `Documentation/Tooling.md` when available. Do not assume personally installed WASM or website-deployment skills exist. Publishing into a separate website repository requires an explicit task and its own instructions.
 
 An export is complete only when the emitted bundle contains its `.wasm`, JavaScript runtime/loader, manifests, package metadata, and required SwiftPM/game resources, and it is served over HTTP for a browser smoke test. A successful WASI compile alone is not an export validation.
 

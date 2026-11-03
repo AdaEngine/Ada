@@ -5,7 +5,7 @@ description: Develop, debug, review, or validate AdaEngine runtime, ECS, renderi
 
 # AdaEngine Development
 
-Use this skill for production work in the AdaEngine repository. Treat the checked-out source, `Package.swift`, the nearest tests, and the repository `AGENTS.md` as the source of truth; documentation and generated projects can lag behind them.
+Use this skill for production work in the AdaEngine repository. The checked-out source, manifests and tests establish current behavior; accepted designs establish required behavior. Investigate discrepancies instead of silently rewriting the design. Follow repository `AGENTS.md` and [the knowledge index](../../knowledge/README.md).
 
 ## Start Here
 
@@ -44,6 +44,10 @@ For an unfamiliar subsystem or a cross-module change, read [references/architect
 Trace behavior from its public entry point to the owning subsystem. Confirm the failing state with a focused command or test when practical. Report the cause and evidence; do not implement a fix unless the request includes implementation.
 
 ### Change or build
+
+Classify the task through [the feature flow](../adaengine-feature-flow/SKILL.md), satisfy any design approval,
+and use [TDD](../adaengine-tdd/SKILL.md) for testable behavior. Run the shared validation script and obtain
+[independent review](../adaengine-review/SKILL.md) before completion; the steps below describe engineering scope.
 
 1. Define the behavioral invariant and the owning target.
 2. Add or update the nearest focused test when practical.

@@ -11,6 +11,78 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
 
 ## Build, Lint, Test Commands
 
+### Contributor workflow and required validation
+
+- Follow [the accepted contributor workflow](Documentation/Designs/contributor-workflow.md).
+  Use [adaengine-feature-flow](.agents/skills/adaengine-feature-flow/SKILL.md) for new features
+  and extensions/reworking of existing subsystems. Adding SVGSerializer to an existing importer
+  is an improvement. Ask the human if classification is uncertain.
+- For features, use Task → Enrich → Design → human approval → Plan → Code → Review.
+  Offer the project flow when detecting a new feature; use the repository-local
+  [Enrich skill](.agents/skills/adaengine-enrich/SKILL.md), not a personally installed dependency.
+- Design documents are English-only. Give the actual document to the human and wait for explicit
+  approval before the next stage. Improvements update the existing design or create a concise one
+  if missing. Bugs within the existing contract do not need a new permanent PRD/design/plan.
+- Use [the TDD skill](.agents/skills/adaengine-tdd/SKILL.md) for testable behavior and fixes.
+  Record meaningful Red → Green → Refactor evidence; infrastructure failures are not Red.
+- Every feature ships a discoverable user-facing article or substantial relevant guide update in the same change.
+  Declare article/navigation and example/docs checks in Design/Plan; update them before independent review.
+  Author in the relevant DocC catalog or user-guide source, not generated `docs/`. Designs, ADRs, changelogs,
+  and agent knowledge do not replace the article. User-facing improvements update guides; internal-only
+  improvements require a reviewed reason. See [user documentation](.agents/knowledge/user-documentation.md).
+- Run `python script/check_contribution.py` before advancing stages; command examples and setup
+  are in [workflow commands](.agents/knowledge/workflow.md). The script runs lint, analyzers,
+  tests and applicable security/runtime checks with compact output and full local logs.
+  Install its pinned tools explicitly in Python 3.11+ with `python -m pip install -r script/contribution-requirements.txt`.
+- Record exact task-owned files and expand scope as files are added. Preserve unrelated user work.
+  Missing tools/platforms are blocked, not inapplicable. Do not weaken checks, add suppressions,
+  hardcode a passing outcome, remove tests, or claim unexecuted checks passed.
+- Before closing any code task, use [adaengine-review](.agents/skills/adaengine-review/SKILL.md)
+  in a separate subagent context. Another model is optional. Fix findings and repeat affected
+  checks/review; design ambiguities or deviations require the human. Self-review is not independent review.
+- Read [the knowledge index](.agents/knowledge/README.md) and only the relevant subsystem references.
+  Actual code describes current behavior; accepted designs specify required behavior. Report conflicts.
+- `install-hooks` explicitly connects pre-commit/pre-push checks while preserving existing hooks.
+  Hooks are bypassable; hosted required checks remain necessary. A local report does not prove CI
+  or server-side branch protection is enabled.
+
+### Unified developer CLI
+- Use `python ada_tool.py` from the repository root (Python 3.9+, standard library only;
+  `python3` on hosts where that is the Python command). Guide: [Documentation/Tooling.md](Documentation/Tooling.md).
+- `python ada_tool.py doctor` reports missing tools and fixes without installing/downloading.
+  Use `--profile studio|wasm|playground` to narrow checks and `--json` for automation;
+  exit code 1 means a required dependency is missing.
+- `python ada_tool.py prepare` installs system prerequisites, pinned Swift, Tint, native
+  Studio dependencies, the WASM SDK and Node/pnpm frontend dependencies. Select components
+  with `prepare studio`, `prepare swift`, `prepare tint`, `prepare wasm` or `prepare playground`.
+  `--skip-system` skips apt/brew/winget prerequisites; it does not skip toolchain downloads.
+  Windows WASM uses the existing Ubuntu 24.04 WSL worker; WSL must already be enabled.
+- `python ada_tool.py install studio` builds and installs Release Standalone;
+  `--debug` installs Debug alongside Release with a separate folder/shortcut.
+  `--source PATH` installs a complete extracted distribution or macOS `.app` without compiling;
+  `--destination PATH` names the exact application folder, including `.app` on macOS.
+  `--launch` opens it after installation. Defaults are per-user, including `~/Applications` on macOS.
+- `python ada_tool.py build studio|engine` builds without installing; `--debug`, `--jobs N`,
+  `--scratch-path PATH` and `--swift PATH` select the build configuration/tools.
+  `python ada_tool.py run studio [--debug]` opens an installed distribution.
+- `python ada_tool.py build playground --cloud-panels PATH` builds the existing DOM shell;
+  the panels must first be built in adawebsite with `npm run build:panels`.
+  `python ada_tool.py build wasm --output dist/web` exports DOM Studio and AdaWebPlayer,
+  using WSL on Windows. `--ui-dist PATH` reuses a built frontend.
+  `python ada_tool.py serve playground|wasm` provides a loopback static preview, without Cloud services.
+- Mutating commands support `--dry-run`; no installers, downloads or builds run in that mode.
+  Host-specific state and default scratch directories live under `.build-tools/ada-tool/<os>-<arch>/`;
+  compiler logs are there too. Do not delete the user's shared `.build`.
+- Version policy lives in [Tools/ada-toolchain.json](Tools/ada-toolchain.json): Windows native
+  Swift 6.3.1, macOS/Linux and WASM Swift 6.3.2; the engine language mode remains Swift 6.2.
+  Tint/Lore retain their existing pins. The CLI reads the pnpm pin from `Editor/WebUI/package.json`.
+  Windows Dawn requires MSVC 14.44+ (VS 2022 17.14+); `doctor` rejects older toolsets
+  before a build, and `prepare studio` upgrades existing VS 2022 Build Tools when necessary.
+- Keep implementation in `script/ada_tools/`. Test with `python script/test_ada_tool.py`.
+  Existing platform installers/packagers, bootstrap helpers, GPU validators and their tests
+  remain used by CLI/CI/plugins/release distributions. Do not delete them as temporary task scripts
+  without checking their callers and migrating those callers.
+
 ### Build
 - SwiftPM build: `swift build`
 - Build docs: see Documentation section below.

@@ -148,3 +148,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 See the [Building guide](Sources/AdaEngine/AdaEngine.docc/Building.md) for development and integration steps.
 
 Quick start: open `Package.swift` in Xcode 26.3 or build from the command line with `swift build`.
+
+For standalone Studio, toolchain setup and web builds, use the cross-platform Python CLI:
+
+```sh
+python ada_tool.py doctor
+python ada_tool.py prepare
+python ada_tool.py install studio          # Release Standalone
+python ada_tool.py install studio --debug  # Debug alongside Release
+```
+
+Requires Python 3.9+ (`python3` on macOS/Linux if needed). See the
+[CLI guide](Documentation/Tooling.md) for build, WASM, playground and preview commands.

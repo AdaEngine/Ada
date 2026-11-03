@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "timeout_seconds": 900,
+  "profiles": {
+    "python": {
+      "paths": [
+        "*.py",
+        "script/contribution-requirements.txt",
+        ".agents/ruff.toml"
+      ]
+    },
+    "swift": {
+      "paths": [
+        "Sources/*",
+        "Tests/*",
+        "Plugins/*",
+        "Demos/*",
+        "Package.swift",
+        "Package.resolved",
+        ".swiftlint.yml"
+      ]
+    },
+    "editor": {
+      "paths": [
+        "Editor/Sources/*",
+        "Editor/Tests/*",
+        "Editor/Package.*",
+        "Editor/project.yml"
+      ]
+    },
+    "web": {
+      "paths": [
+        "Editor/WebUI/*",
+        "Plugins/AdaWebExportPlugin/*"
+      ]
+    },
+    "gpu": {
+      "paths": [
+        "Sources/AdaRender/*",
+        "Sources/AdaSprite/*",
+        "Sources/AdaTilemap/*",
+        "Sources/AdaShaderCompiler/*",
+        "*.glsl",
+        "*.wgsl",
+        "*.metal",
+        "*.vert",
+        "*.frag",
+        "script/validate_webgpu.sh"
+      ]
+    },
+    "platform": {
+      "paths": [
+        "Sources/*",
+        "Tools/Android/*",
+        "Package.swift",
+        "Package.resolved",
+        "Editor/Package.*",
+        "Plugins/*",
+        "Tools/ada-toolchain.json"
+      ]
+    },
+    "documentation": {
+      "paths": [
+        "*.md",
+        ".agents/skills/*"
+      ]
+    },
+    "user_documentation": {
+      "paths": [
+        "Sources/*.docc/*",
+        "Editor/Documentation/*",
+        "Editor/Sources/AdaEditor/Assets/Documentation/*",
+        "Editor/scripts/update-offline-documentation.py"
+      ]
+    },
+    "workflow": {
+      "paths": [
+        ".agents/validation.json",
+        ".agents/ruff.toml",
+        "script/contribution/*",
+        "script/check_contribution.py",
+        "script/test_contribution.py",
+        "script/contribution-requirements.txt",
+        ".github/workflows/contributor-validation.yml",
+        ".agents/secret-exceptions.json"
+      ]
+    }
+  },
+  "python_suites": {
+    "script/contribution/*": [
+      "script/test_contribution.py"
+    ],
+    "script/check_contribution.py": [
+      "script/test_contribution.py"
+    ],
+    "script/contribution-requirements.txt": [
+      "script/test_contribution.py"
+    ],
+    "script/ada_tools/*": [
+      "script/test_ada_tool.py"
+    ],
+    "ada_tool.py": [
+      "script/test_ada_tool.py"
+    ],
+    "Tools/Android/*": [
+      "Tools/Android/tests"
+    ]
+  },
+  "runtime_paths": [
+    "Sources/AdaAssets/*",
+    "Sources/AdaUI/*",
+    "Sources/AdaAudio/*",
+    "Sources/AdaRender/*",
+    "Editor/Sources/*",
+    "Editor/WebUI/*"
+  ],
+  "dependency_paths": [
+    "*Package.swift",
+    "*Package.resolved",
+    "*package.json",
+    "*pnpm-lock.yaml",
+    "*requirements*.txt",
+    "*Cargo.lock",
+    "*CMakeLists.txt"
+  ],
+  "swift_scratch": ".build-tools/contribution/swift-build",
+  "user_documentation_roots": [
+    "Sources/*.docc/*.md",
+    "Editor/Documentation/*.md",
+    "Documentation/*.md"
+  ],
+  "internal_documentation_roots": [
+    "Documentation/Designs/*",
+    "Documentation/Plans/*",
+    "Documentation/ArchitectureDecisions/*",
+    "Documentation/ADR/*",
+    "Documentation/Performance/*",
+    "Editor/Documentation/Design/*",
+    "Editor/Documentation/AgentGuides/*"
+  ],
+  "commands": {
+    "runtime": null,
+    "platform": null,
+    "dependency": null
+  }
+}

@@ -1,0 +1,39 @@
+name: Ada developer CLI
+
+on:
+  pull_request:
+    paths:
+      - 'ada_tool.py'
+      - 'script/ada_tools/**'
+      - 'script/test_ada_tool.py'
+      - 'script/*studio*'
+      - 'Tools/ada-toolchain.json'
+      - '.github/workflows/ada-tool.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'ada_tool.py'
+      - 'script/ada_tools/**'
+      - 'script/test_ada_tool.py'
+      - 'script/*studio*'
+      - 'Tools/ada-toolchain.json'
+      - '.github/workflows/ada-tool.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [windows-2022, macos-26, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test CLI and installation transactions
+        run: python script/test_ada_tool.py

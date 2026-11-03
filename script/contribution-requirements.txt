@@ -1,0 +1,10 @@
+# Analyzer environment: Python 3.11+. The standard-library orchestrator still supports Python 3.9.
+ruff==0.17.3
+bandit==1.9.4
+detect-secrets==1.5.0
+pip-audit==2.10.1
+# Security floors are pinned because Python 3.9 otherwise resolves known-vulnerable older releases.
+requests==2.33.0
+urllib3==2.8.0
+msgpack==1.2.3
+filelock==4.2.1

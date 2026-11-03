@@ -10,7 +10,8 @@
 .build-web-*/
 .build-tools/
 .zed/
-
+.ruff_cache
+.codex/
 
 dist/
 !Plugins/AdaWebExportPlugin/BrowserWASIShim/dist/
