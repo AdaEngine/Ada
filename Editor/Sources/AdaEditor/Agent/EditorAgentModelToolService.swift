@@ -20,7 +20,11 @@ final class EditorAgentModelToolService {
             "inspection": "CPU native glTF import; rest-pose scene bounds, geometry, PBR slots, hierarchy, skins and named clips",
             "verification": "Import/profile validation only. Use visible Play and a completed frame capture for rendering; exercise named clips for animation playback.",
             "limits": ["128 MiB model and local dependencies combined", "128 joints per skin", "glTF primitive topologies", "UV0/UV1", "one set of four skin influences"],
-            "unavailable": ["Blender execution", "organic or rigged model generation", "rig editing", "skeletal clip authoring", "Draco/Meshopt/KTX2 decoding"],
+            "proceduralAuthoring": """
+            editor.model.generate accepts AdaScript geometry, explicitly placed joints, rigid/two-joint weights
+            and linear joint translation/rotation clips; no Swift compiler or JIT at recipe execution
+            """,
+            "unavailable": ["Blender execution", "automatic organic mesh generation", "automatic rig inference", "visual imported rig/keyframe editing", "Draco/Meshopt/KTX2 decoding"],
         ]
     }
 

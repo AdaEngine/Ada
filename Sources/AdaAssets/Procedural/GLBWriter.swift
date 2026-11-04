@@ -32,6 +32,8 @@ public struct ProceduralNode: Sendable, Equatable {
     public var scale = SIMD3<Float>.one
     /// Index of the parent node, which must come earlier in ``ProceduralModel/nodes``.
     public var parent: Int?
+    /// Four joint influences per vertex. Joint indices address the selected skin's ordered palette.
+    public var skinning: ProceduralSkinning?
 
     public init(name: String, mesh: ProceduralMeshData? = nil) {
         self.name = name
@@ -42,10 +44,14 @@ public struct ProceduralNode: Sendable, Equatable {
 public struct ProceduralModel: Sendable, Equatable {
     public var materials: [ProceduralMaterial]
     public var nodes: [ProceduralNode]
+    public var skins: [ProceduralSkin]
+    public var animations: [ProceduralAnimation]
 
-    public init(materials: [ProceduralMaterial], nodes: [ProceduralNode]) {
+    public init(materials: [ProceduralMaterial], nodes: [ProceduralNode], skins: [ProceduralSkin] = [], animations: [ProceduralAnimation] = []) {
         self.materials = materials
         self.nodes = nodes
+        self.skins = skins
+        self.animations = animations
     }
 }
 
@@ -59,6 +65,10 @@ extension ProceduralModel {
         var result = self
         let parents = Set(nodes.compactMap(\.parent))
         for index in result.nodes.indices where !parents.contains(index) {
+            // Skin inverse bind matrices refer to the authored mesh space; baking only its vertices changes that space.
+            guard nodes[index].skinning == nil,
+                !animations.contains(where: { $0.tracks.contains(where: { $0.node == index && $0.path == .scale }) })
+            else { continue }
             let scale = result.nodes[index].scale
             guard scale != .one,
                 scale.x > 0, scale.y > 0, scale.z > 0,
@@ -82,6 +92,9 @@ public enum GLBWritingError: Error, Equatable, Sendable {
     case invalidMaterial(node: Int)
     case invalidParent(node: Int)
     case invalidMesh(node: Int)
+    case invalidSkin(index: Int)
+    case invalidSkinning(node: Int)
+    case invalidAnimation(index: Int)
 }
 
 /// Encodes a ``ProceduralModel`` as a binary glTF 2.0 file that ``NativeGLTFLoader`` imports.
@@ -91,18 +104,22 @@ public struct GLBWriter: Sendable {
     public func encode(_ source: ProceduralModel) throws -> Data {
         let model = source.bakingLeafScales()
         guard model.nodes.contains(where: { $0.mesh?.isEmpty == false }) else { throw GLBWritingError.noGeometry }
+        try model.validateRig()
 
         var binary = Data()
         var bufferViews: [[String: Any]] = []
         var accessors: [[String: Any]] = []
 
-        func addAccessor(_ values: [Float], components: Int, type: String, target: Int, bounds: Bool = false) -> Int {
+        func addAccessor(_ values: [Float], components: Int, type: String, target: Int? = nil, bounds: Bool = false) -> Int {
             var data = Data(capacity: values.count * 4)
             for value in values { data.append(contentsOf: withUnsafeBytes(of: value.bitPattern.littleEndian) { Array($0) }) }
             return append(data, count: values.count / components, componentType: 5126, type: type, target: target, bounds: bounds ? values : nil, components: components)
         }
-        func append(_ data: Data, count: Int, componentType: Int, type: String, target: Int, bounds: [Float]? = nil, components: Int = 1) -> Int {
-            bufferViews.append(["buffer": 0, "byteOffset": binary.count, "byteLength": data.count, "target": target])
+        func append(_ data: Data, count: Int, componentType: Int, type: String, target: Int? = nil, bounds: [Float]? = nil, components: Int = 1) -> Int {
+            while binary.count % 4 != 0 { binary.append(0) }
+            var view: [String: Any] = ["buffer": 0, "byteOffset": binary.count, "byteLength": data.count]
+            if let target { view["target"] = target }
+            bufferViews.append(view)
             binary.append(data)
             var accessor: [String: Any] = ["bufferView": bufferViews.count - 1, "componentType": componentType, "count": count, "type": type]
             if let bounds {
@@ -137,11 +154,21 @@ public struct GLBWriter: Sendable {
                 var indices = Data(capacity: mesh.indices.count * 4)
                 for value in mesh.indices { indices.append(contentsOf: withUnsafeBytes(of: value.littleEndian) { Array($0) }) }
                 let indexAccessor = append(indices, count: mesh.indices.count, componentType: 5125, type: "SCALAR", target: 34963)
+                var attributes = ["POSITION": position, "NORMAL": normal, "TEXCOORD_0": uv]
+                if let skinning = node.skinning {
+                    var joints = Data()
+                    for joint in skinning.joints {
+                        for axis in 0..<4 { joints.append(contentsOf: withUnsafeBytes(of: joint[axis].littleEndian) { Array($0) }) }
+                    }
+                    attributes["JOINTS_0"] = append(joints, count: skinning.joints.count, componentType: 5123, type: "VEC4", target: 34962)
+                    attributes["WEIGHTS_0"] = addAccessor(skinning.weights.flatMap { [$0.x, $0.y, $0.z, $0.w] }, components: 4, type: "VEC4", target: 34962)
+                    json["skin"] = skinning.skin
+                }
                 meshes.append([
                     "name": node.name,
                     "primitives": [
                         [
-                            "attributes": ["POSITION": position, "NORMAL": normal, "TEXCOORD_0": uv],
+                            "attributes": attributes,
                             "indices": indexAccessor,
                             "material": node.material,
                         ] as [String: Any]
@@ -174,17 +201,37 @@ public struct GLBWriter: Sendable {
             if material.emissive != .zero { json["emissiveFactor"] = doubles(material.emissive) }
             return json
         }
-        let document: [String: Any] = [
+        var document: [String: Any] = [
             "asset": ["version": "2.0", "generator": "AdaEngine procedural model"],
             "scene": 0,
             "scenes": [["nodes": roots]],
             "nodes": nodes,
             "meshes": meshes,
             "materials": materials,
-            "accessors": accessors,
-            "bufferViews": bufferViews,
-            "buffers": [["byteLength": binary.count]],
         ]
+        if !model.skins.isEmpty {
+            document["skins"] = model.skins.map { skin -> [String: Any] in
+                let matrices = addAccessor(skin.inverseBindMatrices.flatMap { matrix in (0..<16).map { matrix[$0] } }, components: 16, type: "MAT4")
+                return ["name": skin.name, "joints": skin.joints, "skeleton": skin.skeletonRoot, "inverseBindMatrices": matrices]
+            }
+        }
+        if !model.animations.isEmpty {
+            document["animations"] = model.animations.map { animation -> [String: Any] in
+                var samplers: [[String: Any]] = []
+                var channels: [[String: Any]] = []
+                for track in animation.tracks {
+                    let components = track.path == .rotation ? 4 : 3
+                    let times = addAccessor(track.times, components: 1, type: "SCALAR", bounds: true)
+                    let values = addAccessor(track.values.flatMap { value in (0..<components).map { value[$0] } }, components: components, type: "VEC\(components)")
+                    channels.append(["sampler": samplers.count, "target": ["node": track.node, "path": track.path.rawValue]])
+                    samplers.append(["input": times, "output": values, "interpolation": track.interpolation.rawValue])
+                }
+                return ["name": animation.name, "samplers": samplers, "channels": channels]
+            }
+        }
+        document["accessors"] = accessors
+        document["bufferViews"] = bufferViews
+        document["buffers"] = [["byteLength": binary.count]]
         var json = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
         while json.count % 4 != 0 { json.append(0x20) }
         while binary.count % 4 != 0 { binary.append(0) }

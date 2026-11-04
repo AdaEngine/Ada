@@ -15,4 +15,4 @@ If the scene payload already contains `animationGraph`, it takes precedence over
 
 For a frozen pose, check the selected name, autoplay, Play state and missing model/clip errors. For deformation, investigate joint order, inverse bind matrices, rest transforms and vertex weights. Imported asset bounds reported by inspection are rest-pose bounds, not animated bounds. Do not decimate a character as a static prop or discard its skeleton to solve a rendering issue.
 
-Studio tools do not author skeletons, retarget rigs or create skeletal clips. Use an external authoring pipeline and reimport its validated GLB; report that boundary explicitly.
+For new procedural assets, load `ada-procedural-models`: `editor.model.generate` accepts explicitly placed joints, rigid/two-joint weights and linear joint translation/rotation clips from interpreted AdaScript. Geometry and rig rules are authored together in that recipe. Visual imported-skeleton/keyframe editing, automatic rig inference and retargeting remain separate gaps; importing a model does not expose it as editable generator geometry.

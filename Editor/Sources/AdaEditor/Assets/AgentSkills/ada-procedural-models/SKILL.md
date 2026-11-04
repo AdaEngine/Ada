@@ -1,12 +1,12 @@
 ---
 name: ada-procedural-models
-description: Generate low-poly GLB 3D models from an AdaScript program in Ada Studio (primitives, revolved profiles, triangles, part hierarchy, PBR materials), then place them with Model3DSource.
+description: Generate low-poly GLB assets from AdaScript, including explicit joints, rigid/two-joint skinning and linear skeletal clips, then validate and play them through Model3DSource.
 allowed-tools: editor.project.context, editor.model.generate, editor.model.inspect, editor.model.validate, editor.components.describe, editor.scene.get, editor.scene.apply, editor.docs.read, editor.build.start, editor.play.start, editor.task.status
 ---
 
 # Ada Studio Procedural Models
 
-Use this for props, furniture, vehicles, buildings, trees, robots and other stylized or low-poly objects built from simple shapes. Blender is not available; describe the model in AdaScript and Studio writes a `.glb`. For blocky voxel art use `ada-voxel-models` instead. Organic meshes, skinned characters and animation clips cannot be generated this way.
+Use this for props, furniture, buildings, trees, robots and stylized low-poly characters built from authored shapes. Describe geometry and optional rig in AdaScript; Studio writes a `.glb`. For blocky voxel art use `ada-voxel-models`. A character recipe explicitly chooses joint pivots and weight rules; automatic anatomical inference and organic mesh reconstruction are separate capabilities.
 
 1. Read `editor.project.context` for the Assets root. Choose a new destination such as `Assets/Models/lamp.glb`; `editor.model.generate` never overwrites, so use a new name for each revision.
 2. Call `editor.model.generate` with `source` (the script) and `destination`. The script runs in an isolated VM: no files, network, scene or engine access, a 64 KiB source limit and a small time/step budget. Errors come back as text; fix the script and call again.
@@ -38,6 +38,42 @@ Define `func build(model)`. Axes follow the engine: X right, Y up, Z forward. Ev
 | `model.paint(id, i)` | Material for the part. Material 0 is neutral gray unless you define it. |
 | `model.parent(id, parentId)` | Attach to a part created earlier; transforms are inherited. |
 | `model.name(id, "text")` | Name shown in the scene hierarchy and `editor.model.inspect`. |
+
+## Explicit rigs in the interpreted generator
+
+These functions run in the existing embedded bytecode VM. The native builder is compiled into the application; executing a recipe does not launch a Swift compiler, generate machine code or require JIT. Changes to the builder API must first ship in an updated application binary. Source/API presence is not iPad device validation.
+
+Finish all geometry, names, parents and transforms before the first `joint` or `vertexPosition` call: those operations freeze the original parts. Part ids and joint ids are separate namespaces. Part metadata below refers to the original recipe geometry. Rigged output bakes mesh transforms into model-space buffers and merges by material.
+
+| Call | Meaning |
+| --- | --- |
+| `model.partCount()` | Original part count, including groups. |
+| `model.partName(part)`, `model.partParent(part)` | Original name and parent part id; `-1` for no parent. |
+| `model.hasMesh(part)`, `model.vertexCount(part)` | Whether a part has geometry and its vertex count. |
+| `model.vertexPosition(part, vertex, axis)` | Model-space coordinate; axis 0/1/2 is X/Y/Z. |
+| `model.joint(name, parentJoint, x, y, z)` | Create a joint and return its joint id. Rest translation is local to its parent. First root uses `-1`; later parents must already exist. Names must be unique. |
+| `model.bind(part, joint)` | Assign every vertex of the part fully to this joint. Bind every mesh part. |
+| `model.weights(part, vertex, j0, w0, j1, w1)` | Override a bound vertex with up to two influences. Nonnegative weights must sum to one. Use existing joints even for zero-weight entries. |
+| `model.clip(name)` | Create a uniquely named clip and return its clip id. |
+| `model.rotationKey(clip, joint, time, x, y, z)` | Joint-local Euler rotation in degrees; converted to a unit quaternion. |
+| `model.translationKey(clip, joint, time, x, y, z)` | Joint-local translation. |
+
+Keys use LINEAR interpolation; timestamps must strictly increase within each joint/channel. Looping is selected on `Model3DSource`, not encoded in glTF. For a seamless loop make the first and last values equal. Limits: 128 joints, 32 clips, 16,384 keys, key times 0...3600 seconds, joint/translation coordinates within 1000 meters. Existing source/execution/geometry budgets still apply. No rest-joint rotations or imported-mesh editing are exposed by this recipe API.
+
+```
+func build(model) {
+    var body = model.box(0.4, 0.6, 0.2);
+    model.place(body, 0, 0.3, 0);
+    var root = model.joint("Root", -1, 0, 0, 0);
+    model.bind(body, root);
+    var idle = model.clip("Idle");
+    model.rotationKey(idle, root, 0, 0, -10, 0);
+    model.rotationKey(idle, root, 0.5, 0, 10, 0);
+    model.rotationKey(idle, root, 1, 0, -10, 0);
+}
+```
+
+Validate the written asset, check joint order and clip names, then verify actual deformations in completed game frames at several phases. Import success alone does not establish animation playback or adequate weights.
 
 Winding: triangles must be counter-clockwise when seen from outside, so `cross(b - a, c - a)` points out. A `lathe` profile runs from the top, outward and down the side, back to the axis at the bottom (a solid), as in a cup: `profile(0, 1)`, `profile(0.5, 1)`, `profile(0.3, 0)`, `profile(0, 0)`. Repeat the first point to close a ring profile. Corners sharper than 60 degrees get hard edges; gentler turns are smooth.
 
