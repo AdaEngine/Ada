@@ -103,10 +103,10 @@ It returns `nil` when `--write-movie` is absent, so a game's entry point can cho
 between its normal launch and a recording. Parsing alone does not change app startup;
 pass the configuration to `MovieMaker.record` with your game's setup.
 
-Run the included animated sprite and audio example from the engine root:
+Clone [AdaExamples](https://github.com/AdaEngine/AdaExamples) and run its animated sprite and audio example:
 
 ```sh
-swift run MovieMakerDemo --write-movie Movies/demo.png --fixed-fps 60 --resolution 1280x720 --quit-after 180
+swift run --package-path Examples/Technical/MovieMaker MovieMakerDemo --write-movie Movies/demo.png --fixed-fps 60 --resolution 1280x720 --quit-after 180
 ```
 
 Additional flags are `--movie-warmup N` and `--movie-no-audio`. `--quit-after N`

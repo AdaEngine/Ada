@@ -45,4 +45,4 @@ GPU validation build cache. For direct WASM builds set both
 both for its nested build automatically.
 
 Browser/mobile runtime checks use the separate
-[SpriteInstancingValidation](../../Demos/SpriteInstancingValidation/README.md) app.
+[SpriteInstancingValidation](https://github.com/AdaEngine/AdaExamples/tree/main/Examples/Technical/SpriteInstancingValidation/README.md) app.

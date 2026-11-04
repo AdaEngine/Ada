@@ -127,9 +127,9 @@ Both character modes, exact global revolute anchors, native debug geometry and o
 
 ## Runnable acceptance
 
-`Demos/Physics2D` includes an Advanced tab with conveyors/rolling/mixing, wind/drag/damping, axis and sleep controls, a bullet crossing a thin kinematic target, contact point markers and solver presets. The controls use only public runtime APIs.
+`Examples/Technical/Physics2D` includes an Advanced tab with conveyors/rolling/mixing, wind/drag/damping, axis and sleep controls, a bullet crossing a thin kinematic target, contact point markers and solver presets. The controls use only public runtime APIs.
 
-From the engine worktree, run `Demos/Physics2D/script/build_and_run.sh --verify` to build/stage/open the native app and generate actual scene GPU frames plus `dist/proof/verification.json`. The executable's `--validate` mode runs deterministic simulation checks without opening a window. Generated bundles and proof files are ignored.
+From an AdaExamples checkout, run `Examples/Technical/Physics2D/script/build_and_run.sh --verify` to build/stage/open the native app and generate actual scene GPU frames plus `dist/proof/verification.json`. The executable's `--validate` mode runs deterministic simulation checks without opening a window. Generated bundles and proof files are ignored.
 
 The Large worlds tab simulates at global coordinates near 1e9. Its one-millimeter target nudge changes an actual precise ray hit; shifting the render origin keeps the camera view, contact identity and exact hinge intact. Movement/jump and mode controls exercise both virtual and dynamic characters there. Native proof includes `large-world-before.png`, `large-world-shifted.png` and `large-world-dynamic.png`, plus scene re-entry and handle-isolation checks.
 

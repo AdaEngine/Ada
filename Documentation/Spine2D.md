@@ -91,11 +91,11 @@ separate render smoke test.
 
 ## Visual preview
 
-[SpineNative](../Demos/SpineNative/README.md) runs the production render systems
+[SpineNative](https://github.com/AdaEngine/AdaExamples/tree/main/Examples/Technical/SpineNative/README.md) runs the production render systems
 in a native engine window. Its AdaMCP endpoint exposes exact pose selection and
 the engine's GPU screenshot tools.
 
-[SpinePreview](../Demos/SpinePreview/README.md) exports the official Spineboy's
+[SpinePreview](https://github.com/AdaEngine/AdaExamples/tree/main/Examples/Technical/SpinePreview/README.md) exports the official Spineboy's
 walk, run, jump and idle poses through the production Swift player. Its portable
 browser viewer displays the textured triangles, bone overlay and frame scrubber.
 This preview makes animation behavior visible without requiring a native GPU backend.

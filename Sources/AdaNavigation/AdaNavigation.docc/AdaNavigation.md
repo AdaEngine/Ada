@@ -149,7 +149,9 @@ controller on the character as usual. The host still owns mesh baking, loading a
 
 ## Playground demo
 
-Run `swift run NavigationDemo` for a 3D playground with a robot and obstacles.
+Set `ADAEXAMPLES_PATH` to a clone of [AdaExamples](https://github.com/AdaEngine/AdaExamples).
+
+Run `swift run --package-path "$ADAEXAMPLES_PATH/Examples/Technical/Navigation" NavigationDemo` for a 3D playground with a robot and obstacles.
 On Windows, use `./script/run_navigation_demo_windows.ps1`; it selects the checked-in
 AdaScript runtime and prepares the shader compiler automatically.
 Click the floor to choose a destination. Buttons cycle goals, toggle the mesh,
@@ -161,7 +163,7 @@ floor switches to manual goals; the **Патруль AdaScript** button resumes 
 `NavigationDemo --validate` runs the same fixture, file round trip, automatic
 requests and physics movement without creating a renderer. To build without GPU
 dependencies on Windows, use `$env:ADAENGINE_HEADLESS='1'` before
-`swift run NavigationDemo --validate`. Clear that setting for the interactive demo.
+`swift run --package-path "$ADAEXAMPLES_PATH/Examples/Technical/Navigation" NavigationDemo --validate`. Clear that setting for the interactive demo.
 
 `NavigationDemo --capture /absolute/path/playground.png` renders offscreen using
 the real GPU backend, checks viewport mouse picking, and saves the resulting frame.

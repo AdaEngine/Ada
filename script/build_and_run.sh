@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$REPO_ROOT/Demos/A2UIForm/script/build_and_run.sh" "$@"
+: "${ADAEXAMPLES_PATH:?Set ADAEXAMPLES_PATH to an AdaExamples checkout}"
+exec "$ADAEXAMPLES_PATH/Examples/Technical/A2UIForm/script/build_and_run.sh" "$@"

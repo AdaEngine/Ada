@@ -6,7 +6,7 @@ no dependency on Compose, an LLM SDK, an agent framework, or a networking client
 
 ## Run the first experiment
 
-From this worktree on macOS:
+From this worktree on macOS: Set `ADAEXAMPLES_PATH` to your AdaExamples checkout.
 
 ```sh
 ./script/build_and_run.sh
@@ -16,7 +16,7 @@ From this worktree on macOS:
 The Run action launches **A2UIFormDemo** as an application bundle. The script
 uses `/private/tmp/adaengine-a2ui-build` by default; set `ADAENGINE_A2UI_BUILD_PATH` to
 choose another task-owned cache. Logs and proof artifacts live in
-`Demos/A2UIForm/dist/`. `--debug`, `--logs`, and `--telemetry` are also supported.
+`Examples/Technical/A2UIForm/dist/`. `--debug`, `--logs`, and `--telemetry` are also supported.
 
 The demo streams a local agent fixture in arbitrary byte chunks, progressively
 renders an NPC form, and binds its name field and toggle to a surface model.

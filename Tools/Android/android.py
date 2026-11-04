@@ -154,7 +154,8 @@ def compile_java(args, output, sdk, build_tools, env):
     dex=output/"dex"
     # Both directories are task-owned, under the selected APK output directory.
     for directory in (classes, dex):
-        if directory.exists(): shutil.rmtree(directory)
+        if directory.exists():
+            shutil.rmtree(directory)
         directory.mkdir(parents=True)
     javac=Path(env["JAVA_HOME"])/"bin/javac" if env.get("JAVA_HOME") else Path(shutil.which("javac") or "javac")
     android_jar=tool(sdk/"platforms"/f"android-{args.target_sdk}"/"android.jar")
@@ -322,7 +323,7 @@ def launch(args):
 def parser():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command",choices=["doctor","build","run","devices"])
-    parser.add_argument("--package",default=str(ROOT))
+    parser.add_argument("--package", help="Swift package to build; AndroidDemo lives in AdaExamples/Examples/Technical/AndroidDemo")
     parser.add_argument("--product",default="AndroidDemo")
     parser.add_argument("--application-id",default="org.adaengine.android.demo")
     parser.add_argument("--label",default="AdaEngine Android")
@@ -348,11 +349,17 @@ def parser():
     return parser
 
 def main():
-    args=parser().parse_args()
+    cli=parser()
+    args=cli.parse_args()
+    if args.command in ("build", "run") and not args.apk and not args.package:
+        cli.error("--package is required to build; pass the AndroidDemo package in AdaExamples/Examples/Technical/AndroidDemo")
     try:
-        if args.command=="build": build(args)
-        elif args.command=="run": launch(args)
-        elif args.command=="devices": run([tool(sdk_path(args)/"platform-tools/adb"),"devices","-l"])
+        if args.command=="build":
+            build(args)
+        elif args.command=="run":
+            launch(args)
+        elif args.command=="devices":
+            run([tool(sdk_path(args)/"platform-tools/adb"),"devices","-l"])
         else:
             validate_options(args)
             env=build_env()
@@ -361,7 +368,8 @@ def main():
             print("Swift SDK:",swift_sdk_root(args)[1])
             print("NDK:",ndk_host(ndk_path(args)))
             sdk=sdk_path(args)
-            for name in ["aapt2","zipalign","apksigner"]: print("Tool:",tool(sdk/"build-tools"/args.build_tools/name))
+            for name in ["aapt2","zipalign","apksigner"]:
+                print("Tool:",tool(sdk/"build-tools"/args.build_tools/name))
             print("Android platform:",tool(sdk/"platforms"/f"android-{args.target_sdk}"/"android.jar"))
             run([tool(sdk/"platform-tools/adb"),"devices","-l"])
     except (AndroidError,OSError) as error:

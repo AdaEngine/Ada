@@ -105,7 +105,7 @@ the final benchmark. Earlier history-test logs predate the complete backpressure
 regression and are retained only as diagnostic history.
 
 Reproduce asset preparation and demo profiling with the instructions in
-[Demos/Sponza/README.md](../../Demos/Sponza/README.md). Set
+[Examples/Technical/Sponza/README.md](https://github.com/AdaEngine/AdaExamples/tree/main/Examples/Technical/Sponza/README.md). Set
 `ADAENGINE_SPONZA_PROFILE_LIGHTING=1`,
 `ADAENGINE_SPONZA_PROFILE_MOTION=rotation`,
 `ADAENGINE_SPONZA_RENDER_PRESET=lodRaster` and an absolute

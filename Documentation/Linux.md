@@ -48,7 +48,8 @@ python3 script/prepare_swan_linux.py "$HOME/adaengine-linux-tools/swan-source" "
 export ADAENGINE_SWAN_PACKAGE_PATH="$HOME/adaengine-linux-tools/swan"
 export ADAENGINE_TINT_CACHE="$HOME/adaengine-linux-tools/tint"
 export TINT_EXECUTABLE="$(python3 script/ensure_tint.py)"
-swift run --scratch-path "$ADAENGINE_LINUX_SCRATCH" -j 6 LinuxSmoke
+# ADAEXAMPLES_PATH points to a clone of https://github.com/AdaEngine/AdaExamples
+swift run --package-path "$ADAEXAMPLES_PATH/Examples/Technical/LinuxSmoke" --scratch-path "$ADAENGINE_LINUX_SCRATCH" -j 6 LinuxSmoke
 ```
 
 The checkout used for this port is Swan commit

@@ -70,12 +70,13 @@ extension String {
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS, .watchOS, .visionOS]
 
 var products: [Product] = [
-    .executable(name: "MovieMakerDemo", targets: ["MovieMakerDemo"]),
-    .executable(name: "NavigationDemo", targets: ["NavigationDemo"]),
-    .executable(name: "Physics2DDemo", targets: ["Physics2DDemo"]),
+    // Public runtime modules used by independently packaged examples.
+    .library(name: "AdaAssets", targets: ["AdaAssets"]),
+    .library(name: "AdaPlatform", targets: ["AdaPlatform"]),
+    .library(name: "AdaInput", targets: ["AdaInput"]),
+    .library(name: "AdaSpineRuntime", targets: ["AdaSpineRuntime"]),
     .library(name: "AdaNavigation", targets: ["AdaNavigation"]),
     .library(name: "AdaNavigationBaking", targets: ["AdaNavigationBaking"]),
-    .executable(name: "SpinePreview", targets: ["SpinePreview"]),
     .library(name: "AdaSpine", targets: ["AdaSpine"]),
     .library(name: "CAndroid", targets: ["CAndroid"]),
     .executable(name: "AdaWebPlayer", targets: ["AdaWebPlayer"]),
@@ -83,7 +84,6 @@ var products: [Product] = [
     .executable(name: "AdaScriptTest", targets: ["AdaScriptTest"]),
     .library(name: "AdaUIDescription", targets: ["AdaUIDescription"]),
     .library(name: "AdaA2UI", targets: ["AdaA2UI"]),
-    .executable(name: "A2UIFormDemo", targets: ["A2UIFormDemo"]),
     .library(
         name: "AdaEngine",
         targets: ["AdaEngine"]
@@ -172,7 +172,6 @@ var products: [Product] = [
     ])
 ]
 
-products.append(.library(name: "AndroidDemo", type: .dynamic, targets: ["AndroidDemo"]))
 
 // MARK: - Targets
 
@@ -344,26 +343,6 @@ let adaEngineMacros: Target = .macro(
 // MARK: Other Targets
 
 var targets: [Target] = [
-    .executableTarget(
-        name: "MovieMakerDemo",
-        dependencies: ["AdaEngine"],
-        path: "Demos/MovieMaker",
-        swiftSettings: swiftSettings
-    ),
-    .executableTarget(
-        name: "Physics2DDemo",
-        dependencies: ["AdaEngine"],
-        path: "Demos/Physics2D",
-        exclude: ["README.md", "script", "dist", ".codex"],
-        swiftSettings: swiftSettings
-    ),
-    .executableTarget(
-        name: "NavigationDemo",
-        dependencies: ["AdaEngine", "AdaNavigationBaking"],
-        path: "Demos/Navigation",
-        resources: [.copy("NavigationRobot.ada")],
-        swiftSettings: swiftSettings
-    ),
     .target(
         name: "Detour",
         path: "Sources/RecastNavigation/Detour",
@@ -381,14 +360,6 @@ var targets: [Target] = [
     .target(name: "AdaNavigation", dependencies: ["CNavigation", "Math"], swiftSettings: swiftSettings),
     .target(name: "AdaNavigationBaking", dependencies: ["AdaNavigation", "CNavigationBaking", "Math"], swiftSettings: swiftSettings),
     .testTarget(name: "AdaNavigationTests", dependencies: ["AdaNavigation", "AdaNavigationBaking", "Math"], swiftSettings: swiftSettings),
-    .executableTarget(
-        name: "SpinePreview",
-        dependencies: ["AdaSpineRuntime"],
-        path: "Demos/SpinePreview",
-        exclude: ["README.md"],
-        resources: [.copy("Assets")],
-        swiftSettings: swiftSettings
-    ),
     .target(
         name: "SpineRuntimeC",
         exclude: ["LICENSE", "UPSTREAM.md"],
@@ -410,14 +381,6 @@ var targets: [Target] = [
             .linkedLibrary("android", .when(platforms: [.android])),
             .linkedLibrary("log", .when(platforms: [.android])),
         ]
-    ),
-    .target(
-        name: "AndroidDemo",
-        dependencies: ["AdaEngine", "CAndroid"],
-        path: "Demos/AndroidDemo",
-        exclude: ["README.md"],
-        resources: [.copy("Assets")],
-        swiftSettings: swiftSettings
     ),
     adaEngineTarget,
     adaEngineEmbeddable,
@@ -645,17 +608,6 @@ var targets: [Target] = [
         name: "AdaA2UI",
         dependencies: ["AdaUI", "AdaUIDescription"],
         resources: [.process("Resources")],
-        swiftSettings: swiftSettings
-    ),
-    .executableTarget(
-        name: "A2UIFormDemo",
-        dependencies: ["AdaA2UI", "AdaEngine", "AdaPlatform"],
-        path: "Demos/A2UIForm",
-        exclude: ["README.md", "script"] + (
-            FileManager.default.fileExists(atPath: URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Demos/A2UIForm/dist").path)
-                ? ["dist"] : []
-        ),
-        resources: [.copy("Fixtures")],
         swiftSettings: swiftSettings
     ),
     .adaTarget(
@@ -942,9 +894,7 @@ if isWGPUEnabled {
 // MARK: Extra
 
 #if os(Linux)
-products.append(.executable(name: "LinuxSmoke", targets: ["LinuxSmoke"]))
 targets += [
-    .executableTarget(name: "LinuxSmoke", dependencies: ["AdaEngine", "AdaPlatform"], path: "Demos/LinuxSmoke", swiftSettings: swiftSettings),
     .testTarget(name: "AdaPlatformTests", dependencies: ["AdaPlatform", "AdaECS", "AdaInput", "AdaRender", "AdaUI", "AdaUtils", "Math", "X11"], swiftSettings: swiftSettings),
 ]
 #endif
@@ -1438,7 +1388,7 @@ targets += [
     .testTarget(
         name: "AdaTransformTests",
         dependencies: [
-            "AdaECS", 
+            "AdaECS",
             "AdaTransform",
             "Math"
         ],
@@ -1522,17 +1472,6 @@ targets += [
 #if os(macOS)
 //targets.append(contentsOf: swiftLintTargets)
 #endif
-
-// Portable GPU readback QA app; kept outside the engine and Studio runtime.
-products.append(.executable(name: "SpriteInstancingValidation", targets: ["SpriteInstancingValidation"]))
-targets.append(.executableTarget(
-    name: "SpriteInstancingValidation",
-    dependencies: ["AdaApp", "AdaAssets", "AdaCorePipelines", "AdaECS", "AdaInput", "AdaPlatform", "AdaRender", "AdaSprite", "AdaText", "AdaTransform", "AdaUI", "AdaUtils", "Math"],
-    path: "Demos/SpriteInstancingValidation",
-    exclude: ["project.yml", "README.md", "SpriteInstancingValidation.xcodeproj"],
-    swiftSettings: swiftSettings,
-    linkerSettings: wasmExecutableLinkerSettings
-))
 
 if let config = dlssBuildConfiguration,
     let includes = config["includePaths"] as? [String], let libraries = config["libraries"] as? [String] {

@@ -1,5 +1,7 @@
 import importlib.util
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
@@ -10,17 +12,28 @@ android=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(android)
 
 class AndroidPackagingTests(unittest.TestCase):
+    def test_build_requires_explicit_external_package(self):
+        for command in ("build", "run"):
+            result = subprocess.run([sys.executable, str(Path(android.__file__)), command], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("--package is required", result.stderr)
+
     def test_apk_preserves_every_manifest_asset_and_utf8_filename(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary); binary=root/"bin"; staging=root/"staging"
-            bundle=binary/"Game.resources"/"Assets"; bundle.mkdir(parents=True)
+            root=Path(temporary)
+            binary=root/"bin"
+            staging=root/"staging"
+            bundle=binary/"Game.resources"/"Assets"
+            bundle.mkdir(parents=True)
             (bundle/".gitkeep").touch()
             (bundle/"Текстура 🌈.png").write_bytes(bytes(range(256)))
             android.stage_resources(binary,staging/"assets")
-            library=staging/"lib/arm64-v8a/libGame.so"; library.parent.mkdir(parents=True)
+            library=staging/"lib/arm64-v8a/libGame.so"
+            library.parent.mkdir(parents=True)
             library.write_bytes(b"native runtime")
             apk=root/"unsigned.apk"
-            with zipfile.ZipFile(apk,"w") as archive: archive.writestr("AndroidManifest.xml",b"manifest")
+            with zipfile.ZipFile(apk,"w") as archive:
+                archive.writestr("AndroidManifest.xml",b"manifest")
             android.append_payload(apk,staging)
             with zipfile.ZipFile(apk) as archive:
                 self.assertIsNone(archive.testzip())
@@ -33,12 +46,16 @@ class AndroidPackagingTests(unittest.TestCase):
 
     def test_java_host_dex_and_utf8_resources_share_the_apk(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary); staging=root/"staging"
+            root=Path(temporary)
+            staging=root/"staging"
             asset=staging/"assets/bundles/Studio.resources/Привет.txt"
-            asset.parent.mkdir(parents=True); asset.write_bytes("🙂".encode("utf-8"))
-            dex=root/"classes.dex"; dex.write_bytes(b"dex\n035\0host")
+            asset.parent.mkdir(parents=True)
+            asset.write_bytes("🙂".encode("utf-8"))
+            dex=root/"classes.dex"
+            dex.write_bytes(b"dex\n035\0host")
             apk=root/"unsigned.apk"
-            with zipfile.ZipFile(apk,"w") as archive: archive.writestr("AndroidManifest.xml",b"manifest")
+            with zipfile.ZipFile(apk,"w") as archive:
+                archive.writestr("AndroidManifest.xml",b"manifest")
             android.append_payload(apk,staging,[dex])
             with zipfile.ZipFile(apk) as archive:
                 self.assertIsNone(archive.testzip())
@@ -47,8 +64,11 @@ class AndroidPackagingTests(unittest.TestCase):
 
     def test_preserves_nested_resource_manifest_and_binary_font(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary); binary=root/"bin"; assets=root/"assets"
-            bundle=binary/"Game_GameNative.resources"/"Assets"; bundle.mkdir(parents=True)
+            root=Path(temporary)
+            binary=root/"bin"
+            assets=root/"assets"
+            bundle=binary/"Game_GameNative.resources"/"Assets"
+            bundle.mkdir(parents=True)
             (bundle/"manifest.txt").write_text("game manifest")
             (bundle/"font.ttf").write_bytes(bytes(range(256)))
             android.stage_resources(binary,assets)
@@ -59,25 +79,33 @@ class AndroidPackagingTests(unittest.TestCase):
 
     def test_second_abi_does_not_leave_files_deleted_from_bundle(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary); binary=root/"bin"; assets=root/"assets"
-            bundle=binary/"Game_GameNative.resources"; bundle.mkdir(parents=True)
+            root=Path(temporary)
+            binary=root/"bin"
+            assets=root/"assets"
+            bundle=binary/"Game_GameNative.resources"
+            bundle.mkdir(parents=True)
             (bundle/"old.txt").write_text("old")
             android.stage_resources(binary,assets)
-            (bundle/"old.txt").unlink(); (bundle/"new.txt").write_text("new")
+            (bundle/"old.txt").unlink()
+            (bundle/"new.txt").write_text("new")
             android.stage_resources(binary,assets)
             self.assertFalse((assets/"bundles/Game_GameNative.resources/old.txt").exists())
             self.assertEqual((assets/"bundles/manifest.txt").read_text(),"Game_GameNative.resources/new.txt\n")
 
     def test_refuses_apk_without_resources(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary); (root/"bin").mkdir()
-            with self.assertRaises(android.AndroidError): android.stage_resources(root/"bin",root/"assets")
+            root=Path(temporary)
+            (root/"bin").mkdir()
+            with self.assertRaises(android.AndroidError):
+                android.stage_resources(root/"bin",root/"assets")
 
     def test_native_activity_manifest_has_exported_entry_and_no_dex_requirement(self):
         with tempfile.TemporaryDirectory() as temporary:
             args=android.parser().parse_args(["build","--label",'Game & "test"'])
-            path=Path(temporary)/"AndroidManifest.xml"; android.write_manifest(path,args)
-            manifest=ET.parse(path).getroot(); app=manifest.find("application")
+            path=Path(temporary)/"AndroidManifest.xml"
+            android.write_manifest(path,args)
+            manifest=ET.parse(path).getroot()
+            app=manifest.find("application")
             self.assertEqual(app.attrib[android.ANDROID+"hasCode"],"false")
             self.assertEqual(app.attrib[android.ANDROID+"label"],'Game & "test"')
             activity=app.find("activity")
@@ -86,7 +114,8 @@ class AndroidPackagingTests(unittest.TestCase):
 
     def test_rejects_incompatible_api_level_before_building(self):
         args=android.parser().parse_args(["build","--min-sdk","28"])
-        with self.assertRaises(android.AndroidError): android.validate_options(args)
+        with self.assertRaises(android.AndroidError):
+            android.validate_options(args)
 
     def test_studio_manifest_enables_dex_and_excludes_keystore_backup(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -117,13 +146,15 @@ class AndroidPackagingTests(unittest.TestCase):
 
     def test_browser_callback_returns_to_the_existing_activity(self):
         with tempfile.TemporaryDirectory() as temporary:
-            source=Path(temporary)/"StudioActivity.java"; source.write_text("class StudioActivity {}")
+            source=Path(temporary)/"StudioActivity.java"
+            source.write_text("class StudioActivity {}")
             args=android.parser().parse_args([
                 "build", "--activity", "org.adaengine.studio.StudioActivity", "--java-source", str(source),
                 "--callback-url", "adaeditor://cloud/callback"
             ])
             android.validate_options(args)
-            path=Path(temporary)/"AndroidManifest.xml"; android.write_manifest(path,args)
+            path=Path(temporary)/"AndroidManifest.xml"
+            android.write_manifest(path,args)
             activity=ET.parse(path).getroot().find("application/activity")
             self.assertEqual(activity.attrib[android.ANDROID+"launchMode"],"singleTask")
             link=activity.findall("intent-filter")[1]
@@ -137,7 +168,8 @@ class AndroidPackagingTests(unittest.TestCase):
         with self.assertRaisesRegex(android.AndroidError,"Java host"):
             android.validate_options(args)
 
-if __name__=="__main__": unittest.main()
+if __name__=="__main__":
+    unittest.main()
 
 class AndroidWebGPUSetupTests(unittest.TestCase):
     def test_requires_explicit_android_dawn_setup(self):
@@ -148,8 +180,10 @@ class AndroidWebGPUSetupTests(unittest.TestCase):
     def test_rejects_an_unbuilt_abi_before_swift_build(self):
         import json
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary); (root/"Package.swift").write_text("// fixture")
-            bundle=root/"android.artifactbundle"; bundle.mkdir()
+            root=Path(temporary)
+            (root/"Package.swift").write_text("// fixture")
+            bundle=root/"android.artifactbundle"
+            bundle.mkdir()
             (bundle/"lib.a").write_bytes(b"library")
             (bundle/"info.json").write_text(json.dumps({"artifacts":{"dawn":{"variants":[
                 {"path":"lib.a","supportedTriples":["aarch64-unknown-linux-android29"]}
@@ -164,7 +198,9 @@ class AndroidWebGPUSetupTests(unittest.TestCase):
 class AndroidSDKSelectionTests(unittest.TestCase):
     def test_export_staging_does_not_change_sdk_import_paths(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary); bundle=root/"sdk.artifactbundle/swift-android"; bundle.mkdir(parents=True)
+            root=Path(temporary)
+            bundle=root/"sdk.artifactbundle/swift-android"
+            bundle.mkdir(parents=True)
             first=android.parser().parse_args(["build","--scratch",str(root/"cache"),"--output",str(root/"stage-one")])
             second=android.parser().parse_args(["build","--scratch",str(root/"cache"),"--output",str(root/"stage-two")])
             self.assertEqual(android.select_swift_sdks(first,bundle),android.select_swift_sdks(second,bundle))
