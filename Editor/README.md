@@ -172,6 +172,9 @@ private environment variables. No credentials belong in the public repository.
 
 ## Offline Documentation
 
+For explicit joints, vertex weights and animation authored by an interpreted
+AdaScript model recipe, see [Procedural rigging](Documentation/ProceduralRigging.md).
+
 Open **Help > AdaEngine Documentation**, or use the **Documentation** button on the welcome screen or editor toolbar. The native SwiftUI reader includes full-text guide search, section navigation, Back/Forward history, and copyable code examples. On macOS it opens a reusable window; on iPadOS it opens an in-app reader with a Done button.
 
 The bundled library contains the editor guide and substantive Markdown articles from the AdaEngine and AdaScripting DocC catalogs. It works without internet or a source checkout. Generated API reference pages and external websites are not bundled; external links are labeled **Internet**.

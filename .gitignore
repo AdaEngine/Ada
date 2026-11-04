@@ -62,3 +62,6 @@ __pycache__/
 
 # Generated agent sessions from editor test fixtures.
 Editor/Tests/AdaEditorTests/Fixtures/**/.ada/workspace/agent/
+
+# Local technical studies are maintained separately in AdaExamples.
+/Demos/

@@ -139,7 +139,12 @@ enum EditorAgentAssetTools {
             ),
             tool(
                 "editor.model.generate",
-                "Generate a low-poly GLB model from an AdaScript `func build(model)` (primitives, revolved profiles, triangles, part hierarchy, PBR materials) and save it under Assets. Read the ada-procedural-models skill for the model API. Runs in an isolated VM without file, network or scene access; existing files are preserved.",
+                """
+                Generate a procedural GLB from AdaScript `func build(model)`: geometry, PBR materials,
+                optional explicit joints, rigid/two-joint skinning and linear joint translation/rotation clips.
+                Read ada-procedural-models for the API. Uses the embedded VM without a Swift compiler,
+                JIT, file, network or scene access; existing files are preserved.
+                """,
                 ["source": string, "destination": string],
                 ["source", "destination"],
                 false
