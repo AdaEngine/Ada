@@ -45,7 +45,7 @@ def stage(engine, compiler, destination, swan=None):
         staged = Path(temporary) / "BuildSDK"
         staged.mkdir()
         copy_inputs(engine, staged / "AdaEngine", ["Package.swift", "Package.resolved", ".swiftlint.yml", "LICENSE", "NOTICE",
-                                                   "Sources", "Plugins", "Tools", "Tests", "Demos", "Assets", "script"])
+                                                   "Sources", "Plugins", "Tools", "Tests", "Assets", "script"])
         copy_inputs(compiler, staged / "AdaScript", ["Package.swift", "Package.resolved", "LICENSE", "Makefile", "src", "binding",
                                                     "tools", "Tests", "examples", "gravity", "gravity.exe"])
         host = staged / "AdaScript" / ("gravity.exe" if os.name == "nt" else "gravity")

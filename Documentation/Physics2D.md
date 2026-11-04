@@ -242,7 +242,7 @@ platforms follow their velocity instead of receiving gravity.
 
 ### Runnable coverage
 
-`Demos/Physics2D` contains ray/event, geometry/query, nine-mechanism and character
+`Examples/Technical/Physics2D` contains ray/event, geometry/query, nine-mechanism and character
 playgrounds. Its `--validate` mode runs the same scene setup deterministically;
 `script/build_and_run.sh --verify` stages a native macOS app, exercises controls,
 checks live state/re-entry and saves real Metal GPU frames and verification JSON.

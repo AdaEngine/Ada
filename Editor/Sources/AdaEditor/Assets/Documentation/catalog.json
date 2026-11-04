@@ -3115,13 +3115,18 @@
       },
       {
         "kind": "text",
-        "text": "Run the included animated sprite and audio example from the engine root:",
+        "text": "Clone AdaExamples and run its animated sprite and audio example:",
         "level": 0,
-        "links": []
+        "links": [
+          {
+            "title": "AdaExamples",
+            "destination": "https://github.com/AdaEngine/AdaExamples"
+          }
+        ]
       },
       {
         "kind": "code",
-        "text": "swift run MovieMakerDemo --write-movie Movies/demo.png --fixed-fps 60 --resolution 1280x720 --quit-after 180",
+        "text": "swift run --package-path Examples/Technical/MovieMaker MovieMakerDemo --write-movie Movies/demo.png --fixed-fps 60 --resolution 1280x720 --quit-after 180",
         "language": "sh",
         "links": []
       },

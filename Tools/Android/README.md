@@ -1,5 +1,7 @@
 # Native Android apps
 
+The Android demo is maintained in [AdaExamples](https://github.com/AdaEngine/AdaExamples). Set `ADAEXAMPLES_PATH` to that checkout when using the commands below.
+
 AdaEngine can build a native Swift shared library, package it in a debug-signed
 APK, install it, and launch it on an authorized device or emulator. The host uses
 Android NativeActivity, native WebGPU (Swan + Dawn/Vulkan), Choreographer, and Swift Concurrency.
@@ -64,16 +66,16 @@ From the AdaEngine repository root:
 ```sh
 python3 Tools/Android/android.py doctor
 python3 Tools/Android/android.py devices
-python3 Tools/Android/android.py build
-python3 Tools/Android/android.py run --serial emulator-5554
+python3 Tools/Android/android.py build --package "$ADAEXAMPLES_PATH/Examples/Technical/AndroidDemo"
+python3 Tools/Android/android.py run --package "$ADAEXAMPLES_PATH/Examples/Technical/AndroidDemo" --serial emulator-5554
 # Convenience wrapper; optionally reads task-local .build-android/local-env.sh
-Tools/Android/run_demo.sh --serial emulator-5554
+Tools/Android/run_demo.sh --package "$ADAEXAMPLES_PATH/Examples/Technical/AndroidDemo" --serial emulator-5554
 ```
 
 `run` builds, installs, and starts the app. To reuse an APK:
 
 ```sh
-python3 Tools/Android/android.py run \
+python3 Tools/Android/android.py run --package "$ADAEXAMPLES_PATH/Examples/Technical/AndroidDemo" \
   --apk .build-android/apk/AndroidDemo-debug.apk --serial emulator-5554
 ```
 
@@ -126,7 +128,7 @@ python3 /path/to/AdaEngine/Tools/Android/android.py run \
 
 For the app target's own SwiftPM resources, pass
 `AndroidResourceBundle.bundle(named: "PackageName_TargetName")` as `assetBundle`
-to `WindowGroup` or `DefaultAppWindow` on Android. See `Demos/AndroidDemo`.
+to `WindowGroup` or `DefaultAppWindow` on Android. See [AndroidDemo](https://github.com/AdaEngine/AdaExamples/tree/main/Examples/Technical/AndroidDemo).
 The packaging tool extracts bundles from the APK into app-private storage
 before engine bootstrap; engine shaders/fonts use the same path. Writable data
 and caches also stay inside the app's private files directory.

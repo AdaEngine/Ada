@@ -37,7 +37,7 @@ The root `AdaEngine` product is the high-level facade. Prefer implementing behav
 ### Tools and applications
 
 - `Editor/`: its own SwiftPM package with executable `AdaEditor`, tests, resources, package tooling, local root-AdaEngine dependency, and `project.yml` for a macOS app wrapper generated with XcodeGen.
-- `Demos/`: real examples and stress/benchmark scenes. Use these to understand current API style and for manual/runtime validation, but do not treat a demo as the implementation layer.
+- `AdaExamples/Examples/Technical/` (separate repository): real examples and stress/benchmark scenes. The engine checkout keeps `Demos/` ignored for local work only. Use these to understand current API style and for manual/runtime validation, but do not treat a demo as the implementation layer.
 - `Plugins/`: SwiftPM build/command plugins for WebGPU/Tint, web export, shader transpilation, and texture atlas generation.
 - `Tests/<Module>Tests`: focused tests aligned with root modules. `Editor/Tests/AdaEditorTests` belongs to the separate editor package.
 

@@ -2,6 +2,7 @@
 """Stage focused production test sources without building unrelated demo/editor targets."""
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 
@@ -9,7 +10,14 @@ root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("destination", type=Path)
 parser.add_argument("--include-sponza-demo", action="store_true", help="Build the Sponza demo and camera tests with the same renderer objects")
+parser.add_argument("--examples-root", type=Path, default=os.environ.get("ADAEXAMPLES_PATH"), help="AdaExamples checkout for optional Sponza validation")
 args = parser.parse_args()
+if args.include_sponza_demo:
+    if args.examples_root is None:
+        parser.error("--include-sponza-demo requires --examples-root or ADAEXAMPLES_PATH pointing to AdaExamples")
+    sponza_source = args.examples_root.resolve() / "Examples/Technical/Sponza"
+    if not (sponza_source / "SponzaDemo.swift").is_file():
+        parser.error("The examples checkout does not contain Examples/Technical/Sponza")
 destination = args.destination.resolve()
 sources = destination / "Tests/RenderingValidationTests"
 sources.mkdir(parents=True, exist_ok=True)
@@ -109,20 +117,21 @@ modules = ["AdaAnimation", "AdaApp", "AdaCorePipelines", "AdaECS", "AdaRender", 
 dependencies = ',\n'.join('.product(name: ' + json.dumps(module) + ', package: "AdaEngine")' for module in modules)
 extra_targets = ""
 if args.include_sponza_demo:
-    demo = destination / "Demos/Sponza"
-    camera = destination / "Demos/SponzaCamera"
+    demo = destination / "Examples/Sponza"
+    camera = destination / "Examples/SponzaCamera"
     demo.mkdir(parents=True, exist_ok=True)
     camera.mkdir(parents=True, exist_ok=True)
     for name in ["SponzaDemo.swift", "SponzaDemoProfiler.swift", "SponzaLighting.swift", "SponzaStutterProfiler.swift", "SponzaWarmup.swift"]:
-        shutil.copy2(root / "Demos/Sponza" / name, demo / name)
-    for source in (root / "Demos/Sponza/Camera").glob("*.swift"):
+        shutil.copy2(sponza_source / name, demo / name)
+    shutil.copytree(sponza_source / "Assets", demo / "Assets", dirs_exist_ok=True)
+    for source in (sponza_source / "Camera").glob("*.swift"):
         shutil.copy2(source, camera / source.name)
-    shutil.copy2(root / "Demos/Sponza/Tests/SponzaCameraTests.swift", sources / "SponzaCameraTests.swift")
+    shutil.copy2(sponza_source / "Tests/SponzaCameraTests.swift", sources / "SponzaCameraTests.swift")
     dependencies += ',\n"SponzaCamera"'
     extra_targets = ''', .target(name: "SponzaCamera", dependencies: [
-        .product(name: "AdaTransform", package: "AdaEngine"), .product(name: "Math", package: "AdaEngine")], path: "Demos/SponzaCamera"),
+        .product(name: "AdaTransform", package: "AdaEngine"), .product(name: "Math", package: "AdaEngine")], path: "Examples/SponzaCamera"),
     .executableTarget(name: "SponzaDemo", dependencies: ["SponzaCamera", .product(name: "AdaEngine", package: "AdaEngine"),
-        .product(name: "Math", package: "AdaEngine")], path: "Demos/Sponza")'''
+        .product(name: "Math", package: "AdaEngine")], path: "Examples/Sponza", resources: [.copy("Assets")])'''
 (destination / "Package.swift").write_text('''// swift-tools-version: 6.2
 import PackageDescription
 let package = Package(name: "RenderingValidation", platforms: [.macOS(.v15)], dependencies: [

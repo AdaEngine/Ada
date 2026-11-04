@@ -81,7 +81,7 @@ paths, including alpha picking, padded texture readback and tile occlusion.
 The developer command also verifies host-tool discovery, real fresh GLSL → SPIR-V
 → Tint WGSL compilation and WGSL binding reflection: six tests in four suites pass.
 
-The separate `Demos/SpriteInstancingValidation` app exercises the same production
+The separate `Examples/Technical/SpriteInstancingValidation` app exercises the same production
 SpriteRenderSystem / SpriteDrawPass / shaders on all three validated runtimes:
 
 | Runtime | Backend | Result |
