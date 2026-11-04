@@ -1,0 +1,792 @@
+{
+  "assetReference": "@res://Models/Skeleton.glb",
+  "bytes": 418684,
+  "materials": [
+    "Default",
+    "Material 1",
+    "Material 2",
+    "Material 3",
+    "Material 4",
+    "Material 5",
+    "Material 6",
+    "Material 7",
+    "Material 8",
+    "Material 9",
+    "Material 10"
+  ],
+  "parts": [
+    {
+      "hasMesh": false,
+      "name": "Skeleton minion"
+    },
+    {
+      "hasMesh": false,
+      "name": "Head",
+      "parent": "Skeleton minion"
+    },
+    {
+      "hasMesh": true,
+      "name": "Faceted cranium shell",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Left orbital ivory rim",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Left recessed socket walls",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Left socket shadow",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Left ember eye",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Right orbital ivory rim",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Right recessed socket walls",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Right socket shadow",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Right ember eye",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Nasal cavity",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Nasal bevel",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Upper tooth 1",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Upper tooth 2",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Upper tooth 3",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Upper tooth 4",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Upper tooth 5",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": false,
+      "name": "Lower jaw",
+      "parent": "Head"
+    },
+    {
+      "hasMesh": true,
+      "name": "Chin",
+      "parent": "Lower jaw"
+    },
+    {
+      "hasMesh": true,
+      "name": "Jaw hinge",
+      "parent": "Lower jaw"
+    },
+    {
+      "hasMesh": true,
+      "name": "Jaw hinge",
+      "parent": "Lower jaw"
+    },
+    {
+      "hasMesh": true,
+      "name": "Chin light facet",
+      "parent": "Lower jaw"
+    },
+    {
+      "hasMesh": false,
+      "name": "Torso",
+      "parent": "Skeleton minion"
+    },
+    {
+      "hasMesh": true,
+      "name": "Spine",
+      "parent": "Torso"
+    },
+    {
+      "hasMesh": true,
+      "name": "Neck joint",
+      "parent": "Torso"
+    },
+    {
+      "hasMesh": false,
+      "name": "Rib cage row 1",
+      "parent": "Torso"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment -1 0",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment -1 1",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment -1 2",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment -1 3",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment -1 4",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment -1 5",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment -1 6",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment 1 0",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment 1 1",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment 1 2",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment 1 3",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment 1 4",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment 1 5",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 1 segment 1 6",
+      "parent": "Rib cage row 1"
+    },
+    {
+      "hasMesh": false,
+      "name": "Rib cage row 2",
+      "parent": "Torso"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment -1 0",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment -1 1",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment -1 2",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment -1 3",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment -1 4",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment -1 5",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment -1 6",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment 1 0",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment 1 1",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment 1 2",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment 1 3",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment 1 4",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment 1 5",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 2 segment 1 6",
+      "parent": "Rib cage row 2"
+    },
+    {
+      "hasMesh": false,
+      "name": "Rib cage row 3",
+      "parent": "Torso"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment -1 0",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment -1 1",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment -1 2",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment -1 3",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment -1 4",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment -1 5",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment -1 6",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment 1 0",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment 1 1",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment 1 2",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment 1 3",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment 1 4",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment 1 5",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 3 segment 1 6",
+      "parent": "Rib cage row 3"
+    },
+    {
+      "hasMesh": false,
+      "name": "Rib cage row 4",
+      "parent": "Torso"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment -1 0",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment -1 1",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment -1 2",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment -1 3",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment -1 4",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment -1 5",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment -1 6",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment 1 0",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment 1 1",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment 1 2",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment 1 3",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment 1 4",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment 1 5",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Rib 4 segment 1 6",
+      "parent": "Rib cage row 4"
+    },
+    {
+      "hasMesh": true,
+      "name": "Sternum",
+      "parent": "Torso"
+    },
+    {
+      "hasMesh": true,
+      "name": "Clavicle",
+      "parent": "Torso"
+    },
+    {
+      "hasMesh": true,
+      "name": "Clavicle",
+      "parent": "Torso"
+    },
+    {
+      "hasMesh": false,
+      "name": "Terracotta neckerchief",
+      "parent": "Torso"
+    },
+    {
+      "hasMesh": true,
+      "name": "Scarf bib",
+      "parent": "Terracotta neckerchief"
+    },
+    {
+      "hasMesh": true,
+      "name": "Scarf left folded facet",
+      "parent": "Terracotta neckerchief"
+    },
+    {
+      "hasMesh": true,
+      "name": "Scarf seam",
+      "parent": "Terracotta neckerchief"
+    },
+    {
+      "hasMesh": true,
+      "name": "Scarf seam",
+      "parent": "Terracotta neckerchief"
+    },
+    {
+      "hasMesh": true,
+      "name": "Scarf seam",
+      "parent": "Terracotta neckerchief"
+    },
+    {
+      "hasMesh": true,
+      "name": "Scarf seam",
+      "parent": "Terracotta neckerchief"
+    },
+    {
+      "hasMesh": true,
+      "name": "Back scarf tail",
+      "parent": "Terracotta neckerchief"
+    },
+    {
+      "hasMesh": true,
+      "name": "Scarf collar",
+      "parent": "Terracotta neckerchief"
+    },
+    {
+      "hasMesh": false,
+      "name": "Pelvis and belt",
+      "parent": "Skeleton minion"
+    },
+    {
+      "hasMesh": true,
+      "name": "Dark shorts",
+      "parent": "Pelvis and belt"
+    },
+    {
+      "hasMesh": true,
+      "name": "Leather belt",
+      "parent": "Pelvis and belt"
+    },
+    {
+      "hasMesh": true,
+      "name": "Buckle upper",
+      "parent": "Pelvis and belt"
+    },
+    {
+      "hasMesh": true,
+      "name": "Buckle lower",
+      "parent": "Pelvis and belt"
+    },
+    {
+      "hasMesh": true,
+      "name": "Buckle left",
+      "parent": "Pelvis and belt"
+    },
+    {
+      "hasMesh": true,
+      "name": "Buckle right",
+      "parent": "Pelvis and belt"
+    },
+    {
+      "hasMesh": true,
+      "name": "Buckle tongue",
+      "parent": "Pelvis and belt"
+    },
+    {
+      "hasMesh": false,
+      "name": "Left leg",
+      "parent": "Skeleton minion"
+    },
+    {
+      "hasMesh": true,
+      "name": "Shorts leg",
+      "parent": "Left leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Leather cuff",
+      "parent": "Left leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Shin",
+      "parent": "Left leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Knee",
+      "parent": "Left leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Ankle",
+      "parent": "Left leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Chunky foot",
+      "parent": "Left leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Toe separation",
+      "parent": "Left leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Toe separation",
+      "parent": "Left leg"
+    },
+    {
+      "hasMesh": false,
+      "name": "Left arm",
+      "parent": "Skeleton minion"
+    },
+    {
+      "hasMesh": true,
+      "name": "Shoulder",
+      "parent": "Left arm"
+    },
+    {
+      "hasMesh": true,
+      "name": "Humerus",
+      "parent": "Left arm"
+    },
+    {
+      "hasMesh": true,
+      "name": "Elbow",
+      "parent": "Left arm"
+    },
+    {
+      "hasMesh": true,
+      "name": "Radius",
+      "parent": "Left arm"
+    },
+    {
+      "hasMesh": true,
+      "name": "Ulna",
+      "parent": "Left arm"
+    },
+    {
+      "hasMesh": true,
+      "name": "Hand",
+      "parent": "Left arm"
+    },
+    {
+      "hasMesh": false,
+      "name": "Right leg",
+      "parent": "Skeleton minion"
+    },
+    {
+      "hasMesh": true,
+      "name": "Shorts leg",
+      "parent": "Right leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Leather cuff",
+      "parent": "Right leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Shin",
+      "parent": "Right leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Knee",
+      "parent": "Right leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Ankle",
+      "parent": "Right leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Chunky foot",
+      "parent": "Right leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Toe separation",
+      "parent": "Right leg"
+    },
+    {
+      "hasMesh": true,
+      "name": "Toe separation",
+      "parent": "Right leg"
+    },
+    {
+      "hasMesh": false,
+      "name": "Right arm",
+      "parent": "Skeleton minion"
+    },
+    {
+      "hasMesh": true,
+      "name": "Shoulder",
+      "parent": "Right arm"
+    },
+    {
+      "hasMesh": true,
+      "name": "Humerus",
+      "parent": "Right arm"
+    },
+    {
+      "hasMesh": true,
+      "name": "Elbow",
+      "parent": "Right arm"
+    },
+    {
+      "hasMesh": true,
+      "name": "Radius",
+      "parent": "Right arm"
+    },
+    {
+      "hasMesh": true,
+      "name": "Ulna",
+      "parent": "Right arm"
+    },
+    {
+      "hasMesh": true,
+      "name": "Hand",
+      "parent": "Right arm"
+    },
+    {
+      "hasMesh": false,
+      "name": "Equipment",
+      "parent": "Skeleton minion"
+    },
+    {
+      "hasMesh": false,
+      "name": "Broken sword",
+      "parent": "Equipment"
+    },
+    {
+      "hasMesh": true,
+      "name": "Notched blade",
+      "parent": "Broken sword"
+    },
+    {
+      "hasMesh": true,
+      "name": "Blade fuller",
+      "parent": "Broken sword"
+    },
+    {
+      "hasMesh": true,
+      "name": "Cross guard",
+      "parent": "Broken sword"
+    },
+    {
+      "hasMesh": true,
+      "name": "Leather grip",
+      "parent": "Broken sword"
+    },
+    {
+      "hasMesh": true,
+      "name": "Grip wrap",
+      "parent": "Broken sword"
+    },
+    {
+      "hasMesh": true,
+      "name": "Grip wrap",
+      "parent": "Broken sword"
+    },
+    {
+      "hasMesh": true,
+      "name": "Grip wrap",
+      "parent": "Broken sword"
+    },
+    {
+      "hasMesh": true,
+      "name": "Pommel",
+      "parent": "Broken sword"
+    },
+    {
+      "hasMesh": false,
+      "name": "Round shield",
+      "parent": "Equipment"
+    },
+    {
+      "hasMesh": true,
+      "name": "Steel shield rim",
+      "parent": "Round shield"
+    },
+    {
+      "hasMesh": true,
+      "name": "Wood shield face",
+      "parent": "Round shield"
+    },
+    {
+      "hasMesh": true,
+      "name": "Steel shield boss",
+      "parent": "Round shield"
+    },
+    {
+      "hasMesh": true,
+      "name": "Wood plank groove",
+      "parent": "Round shield"
+    },
+    {
+      "hasMesh": true,
+      "name": "Wood plank groove",
+      "parent": "Round shield"
+    }
+  ],
+  "path": "Assets/Models/Skeleton.glb",
+  "requiresRebuild": true,
+  "triangleCount": 4284,
+  "vertexCount": 7348
+}

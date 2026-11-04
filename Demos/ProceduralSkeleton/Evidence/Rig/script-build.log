@@ -1,0 +1,916 @@
+Fetching https://github.com/swiftlang/swift-syntax from cache
+Fetched https://github.com/swiftlang/swift-syntax from cache (9.99s)
+Computing version for https://github.com/swiftlang/swift-syntax
+Computed https://github.com/swiftlang/swift-syntax at 602.0.0 (11.39s)
+Creating working copy for https://github.com/swiftlang/swift-syntax
+Working copy of https://github.com/swiftlang/swift-syntax resolved at 602.0.0
+Building for debugging...
+[0/65] Write sources
+[18/65] Compiling gravity_visitor.c
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\utils\gravity_json.c:1334:4: warning: 'strcpy' is deprecated: This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+ 1334 |    strcpy (error, "Memory allocation failure");
+
+      |    ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\string.h:130:1: note: 'strcpy' has been explicitly marked deprecated here
+
+  130 | __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1(
+
+      | ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:835:5: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1'
+
+  835 |     __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX(_ReturnType, _ReturnPolicy, _DeclSpec, _FuncName, _FuncName##_s, _DstType, _SalAttributeDst, _DstType, _Dst, _TType1, _TArg1)
+
+      |     ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:1894:17: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX'
+
+ 1894 |                 _CRT_INSECURE_DEPRECATE(_SecureFuncName) _DeclSpec _ReturnType __cdecl _FuncName(_SalAttributeDst _DstType *_Dst, _TType1 _TArg1);
+
+      |                 ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\utils\gravity_json.c:1347:10: warning: 'strcpy' is deprecated: This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+ 1347 |          strcpy (error_buf, error);
+
+      |          ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\string.h:130:1: note: 'strcpy' has been explicitly marked deprecated here
+
+  130 | __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1(
+
+      | ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:835:5: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1'
+
+  835 |     __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX(_ReturnType, _ReturnPolicy, _DeclSpec, _FuncName, _FuncName##_s, _DstType, _SalAttributeDst, _DstType, _Dst, _TType1, _TArg1)
+
+      |     ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:1894:17: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX'
+
+ 1894 |                 _CRT_INSECURE_DEPRECATE(_SecureFuncName) _DeclSpec _ReturnType __cdecl _FuncName(_SalAttributeDst _DstType *_Dst, _TType1 _TArg1);
+
+      |                 ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\utils\gravity_json.c:1349:10: warning: 'strcpy' is deprecated: This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+ 1349 |          strcpy (error_buf, "Unknown error");
+
+      |          ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\string.h:130:1: note: 'strcpy' has been explicitly marked deprecated here
+
+  130 | __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1(
+
+      | ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:835:5: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1'
+
+  835 |     __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX(_ReturnType, _ReturnPolicy, _DeclSpec, _FuncName, _FuncName##_s, _DstType, _SalAttributeDst, _DstType, _Dst, _TType1, _TArg1)
+
+      |     ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:1894:17: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX'
+
+ 1894 |                 _CRT_INSECURE_DEPRECATE(_SecureFuncName) _DeclSpec _ReturnType __cdecl _FuncName(_SalAttributeDst _DstType *_Dst, _TType1 _TArg1);
+
+      |                 ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+3 warnings generated.
+
+[19/65] Compiling gravity_json.c
+[20/65] Write swift-version-4338A9387FA42D0F.txt
+[21/65] Compiling _SwiftSyntaxCShims PlatformMutex.c
+[22/65] Compiling gravity_debug.c
+[23/65] Compiling gravity_optimizer.c
+[24/65] Compiling gravity_semacheck1.c
+[24/65] Compiling gravity_semacheck2.c
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\runtime\gravity_core.c:2530:5: warning: 'strcpy' is deprecated: This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+ 2530 |     strcpy(ret, main_str->s);
+
+      |     ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\string.h:130:1: note: 'strcpy' has been explicitly marked deprecated here
+
+  130 | __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1(
+
+      | ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:835:5: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1'
+
+  835 |     __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX(_ReturnType, _ReturnPolicy, _DeclSpec, _FuncName, _FuncName##_s, _DstType, _SalAttributeDst, _DstType, _Dst, _TType1, _TArg1)
+
+      |     ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:1894:17: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX'
+
+ 1894 |                 _CRT_INSECURE_DEPRECATE(_SecureFuncName) _DeclSpec _ReturnType __cdecl _FuncName(_SalAttributeDst _DstType *_Dst, _TType1 _TArg1);
+
+      |                 ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\runtime\gravity_core.c:2569:5: warning: 'strcpy' is deprecated: This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+ 2569 |     strcpy(ret, main_str->s);
+
+      |     ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\string.h:130:1: note: 'strcpy' has been explicitly marked deprecated here
+
+  130 | __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1(
+
+      | ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:835:5: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1'
+
+  835 |     __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX(_ReturnType, _ReturnPolicy, _DeclSpec, _FuncName, _FuncName##_s, _DstType, _SalAttributeDst, _DstType, _Dst, _TType1, _TArg1)
+
+      |     ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:1894:17: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX'
+
+ 1894 |                 _CRT_INSECURE_DEPRECATE(_SecureFuncName) _DeclSpec _ReturnType __cdecl _FuncName(_SalAttributeDst _DstType *_Dst, _TType1 _TArg1);
+
+      |                 ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\runtime\gravity_core.c:2638:9: warning: 'strncpy' is deprecated: This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+ 2638 |         strncpy((char *)original, string->s, string->len);
+
+      |         ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\string.h:334:1: note: 'strncpy' has been explicitly marked deprecated here
+
+  334 | __DEFINE_CPP_OVERLOAD_STANDARD_NFUNC_0_2_EX(
+
+      | ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:1935:17: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_NFUNC_0_2_EX'
+
+ 1935 |                 _CRT_INSECURE_DEPRECATE(_SecureFuncName) _DeclSpec _ReturnType __cdecl _FuncName(_SalAttributeDst _DstType *_Dst, _TType1 _TArg1, _TType2 _TArg2);
+
+      |                 ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+3 warnings generated.
+
+[26/65] Compiling gravity_codegen.c
+[27/65] Compiling gravity_parser.c
+[27/65] Compiling gravity_compiler.c
+[27/65] Compiling gravity_core.c
+[30/65] Compiling gravity_memory.c
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\optionals\gravity_opt_file.c:268:18: warning: 'fopen' is deprecated: This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+  268 |     FILE *file = fopen(path, mode);
+
+      |                  ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\stdio.h:212:20: note: 'fopen' has been explicitly marked deprecated here
+
+  212 |     _Check_return_ _CRT_INSECURE_DEPRECATE(fopen_s)
+
+      |                    ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+1 warning generated.
+
+[31/65] Compiling gravity_opt_file.c
+[32/65] Compiling gravity_opt_json.c
+In file included from D:\Development\AdaEngine\.build-tools\gravity-windows\src\compiler\gravity_aot_metadata.c:1:
+
+In file included from D:\Development\AdaEngine\.build-tools\gravity-windows\src\compiler\gravity_aot_internal.h:4:
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\compiler\../shared/gravity_aot_runtime.h:12:15: warning: 'remainder' redeclared without 'dllimport' attribute: previous 'dllimport' ignored [-Winconsistent-dllimport]
+
+   12 | extern double remainder(double, double);
+
+      |               ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt_math.h:534:44: note: previous declaration is here
+
+  534 |     _Check_return_ _ACRTIMP double __cdecl remainder(_In_ double _X, _In_ double _Y);
+
+      |                                            ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt_math.h:534:20: note: previous attribute is here
+
+  534 |     _Check_return_ _ACRTIMP double __cdecl remainder(_In_ double _X, _In_ double _Y);
+
+      |                    ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:136:37: note: expanded from macro '_ACRTIMP'
+
+  136 |         #define _ACRTIMP __declspec(dllimport)
+
+      |                                     ^
+
+1 warning generated.
+
+In file included from D:\Development\AdaEngine\.build-tools\gravity-windows\src\compiler\gravity_aot.c:1:
+
+In file included from D:\Development\AdaEngine\.build-tools\gravity-windows\src\compiler\gravity_aot_internal.h:4:
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\compiler\../shared/gravity_aot_runtime.h:12:15: warning: 'remainder' redeclared without 'dllimport' attribute: previous 'dllimport' ignored [-Winconsistent-dllimport]
+
+   12 | extern double remainder(double, double);
+
+      |               ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt_math.h:534:44: note: previous declaration is here
+
+  534 |     _Check_return_ _ACRTIMP double __cdecl remainder(_In_ double _X, _In_ double _Y);
+
+      |                                            ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt_math.h:534:20: note: previous attribute is here
+
+  534 |     _Check_return_ _ACRTIMP double __cdecl remainder(_In_ double _X, _In_ double _Y);
+
+      |                    ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:136:37: note: expanded from macro '_ACRTIMP'
+
+  136 |         #define _ACRTIMP __declspec(dllimport)
+
+      |                                     ^
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\compiler\gravity_aot.c:393:32: warning: 'tmpfile' is deprecated: This function or variable may be unsafe. Consider using tmpfile_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+  393 |     FILE *output=e->out, *body=tmpfile();
+
+      |                                ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\stdio.h:434:20: note: 'tmpfile' has been explicitly marked deprecated here
+
+  434 |     _Check_return_ _CRT_INSECURE_DEPRECATE(tmpfile_s)
+
+      |                    ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\compiler\gravity_aot.c:409:13: warning: 'sscanf' is deprecated: This function or variable may be unsafe. Consider using sscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+  409 |         if (sscanf(p,"gravity_aot_value a%u[%u]",&id,&count)==2 && id<=e->temporary) { arrays[id]=slots; slots+=count; }
+
+      |             ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\stdio.h:2239:20: note: 'sscanf' has been explicitly marked deprecated here
+
+ 2239 |     _Check_return_ _CRT_INSECURE_DEPRECATE(sscanf_s)
+
+      |                    ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\compiler\gravity_aot.c:515:13: warning: 'tmpfile' is deprecated: This function or variable may be unsafe. Consider using tmpfile_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+  515 |     e.out = tmpfile();
+
+      |             ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\stdio.h:434:20: note: 'tmpfile' has been explicitly marked deprecated here
+
+  434 |     _Check_return_ _CRT_INSECURE_DEPRECATE(tmpfile_s)
+
+      |                    ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+4 warnings generated.
+
+[33/65] Compiling gravity_opt_math.c
+[34/65] Compiling gravity_ast.c
+[35/65] Compiling gravity_aot_metadata.c
+[36/65] Compiling gravity_ircode.c
+[37/65] Compiling gravity_aot.c
+[38/65] Compiling gravity_lexer.c
+[39/65] Compiling gravity_value.c
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\optionals\gravity_opt_env.c:43:19: warning: 'getenv' is deprecated: This function or variable may be unsafe. Consider using _dupenv_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+   43 |     char *value = getenv(key);
+
+      |                   ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\stdlib.h:1183:20: note: 'getenv' has been explicitly marked deprecated here
+
+ 1183 |     _Check_return_ _CRT_INSECURE_DEPRECATE(_dupenv_s)
+
+      |                    ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+1 warning generated.
+
+[40/65] Compiling gravity_opt_env.c
+[41/69] Compiling gravity_hash.c
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\utils\gravity_utils.c:143:10: warning: '_open' is deprecated: This function or variable may be unsafe. Consider using _sopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+  143 |     fd = open(path, oflags);
+
+      |          ^
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\utils\../shared\gravity_config.h:28:21: note: expanded from macro 'open'
+
+   28 | #define open        _open
+
+      |                     ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt_io.h:420:24: note: '_open' has been explicitly marked deprecated here
+
+  420 |         _Check_return_ _CRT_INSECURE_DEPRECATE(_sopen_s)
+
+      |                        ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\utils\gravity_utils.c:171:14: warning: '_open' is deprecated: This function or variable may be unsafe. Consider using _sopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+  171 |     int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, mode);
+
+      |              ^
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\utils\../shared\gravity_config.h:28:21: note: expanded from macro 'open'
+
+   28 | #define open        _open
+
+      |                     ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt_io.h:420:24: note: '_open' has been explicitly marked deprecated here
+
+  420 |         _Check_return_ _CRT_INSECURE_DEPRECATE(_sopen_s)
+
+      |                        ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+D:\Development\AdaEngine\.build-tools\gravity-windows\src\utils\gravity_utils.c:470:9: warning: 'strcpy' is deprecated: This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details. [-Wdeprecated-declarations]
+
+  470 |         strcpy(ret, str);
+
+      |         ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\string.h:130:1: note: 'strcpy' has been explicitly marked deprecated here
+
+  130 | __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1(
+
+      | ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:835:5: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1'
+
+  835 |     __DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX(_ReturnType, _ReturnPolicy, _DeclSpec, _FuncName, _FuncName##_s, _DstType, _SalAttributeDst, _DstType, _Dst, _TType1, _TArg1)
+
+      |     ^
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:1894:17: note: expanded from macro '__DEFINE_CPP_OVERLOAD_STANDARD_FUNC_0_1_EX'
+
+ 1894 |                 _CRT_INSECURE_DEPRECATE(_SecureFuncName) _DeclSpec _ReturnType __cdecl _FuncName(_SalAttributeDst _DstType *_Dst, _TType1 _TArg1);
+
+      |                 ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:368:55: note: expanded from macro '_CRT_INSECURE_DEPRECATE'
+
+  368 |         #define _CRT_INSECURE_DEPRECATE(_Replacement) _CRT_DEPRECATE_TEXT(    \
+
+      |                                                       ^
+
+C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Tools\MSVC\14.50.35717\include\vcruntime.h:358:47: note: expanded from macro '_CRT_DEPRECATE_TEXT'
+
+  358 | #define _CRT_DEPRECATE_TEXT(_Text) __declspec(deprecated(_Text))
+
+      |                                               ^
+
+3 warnings generated.
+
+[42/69] Compiling gravity_utils.c
+[43/75] Compiling gravity_token.c
+[44/75] Compiling gravity_symboltable.c
+[45/75] Compiling gravity_vm.c
+[47/75] Emitting module SwiftSyntax601
+[48/75] Compiling SwiftSyntax601 Empty.swift
+[50/76] Compiling SwiftSyntax600 Empty.swift
+[51/76] Emitting module SwiftSyntax600
+[52/76] Compiling SwiftSyntax510 Empty.swift
+[53/76] Emitting module SwiftSyntax510
+[54/76] Emitting module SwiftSyntax509
+[55/76] Compiling SwiftSyntax509 Empty.swift
+[56/76] Compiling SwiftSyntax602 Empty.swift
+[57/76] Emitting module SwiftSyntax602
+[57/80] Wrapping AST for SwiftSyntax601 for debugging
+[62/80] Wrapping AST for SwiftSyntax600 for debugging
+[63/80] Wrapping AST for SwiftSyntax602 for debugging
+[64/80] Wrapping AST for SwiftSyntax509 for debugging
+[65/80] Wrapping AST for SwiftSyntax510 for debugging
+[67/149] Compiling SwiftSyntax SourceLength.swift
+[68/149] Compiling SwiftSyntax SourceLocation.swift
+[69/149] Compiling SwiftSyntax SourcePresence.swift
+[70/151] Compiling SwiftSyntax SyntaxNodeStructure.swift
+[71/151] Compiling SwiftSyntax SyntaxProtocol.swift
+[72/151] Compiling SwiftSyntax SyntaxText.swift
+[73/151] Compiling SwiftSyntax Identifier.swift
+[74/151] Compiling SwiftSyntax MemoryLayout.swift
+[75/151] Compiling SwiftSyntax MissingNodeInitializers.swift
+[76/151] Compiling SwiftSyntax SyntaxNodesQRS.swift
+[77/151] Compiling SwiftSyntax SyntaxNodesTUVWXYZ.swift
+[78/151] Compiling SwiftSyntax SyntaxRewriter.swift
+[79/151] Compiling SwiftSyntax SyntaxTraits.swift
+[80/151] Compiling SwiftSyntax SyntaxVisitor.swift
+[81/151] Compiling SwiftSyntax AbsolutePosition.swift
+[82/151] Compiling SwiftSyntax AbsoluteSyntaxInfo.swift
+[83/151] Compiling SwiftSyntax ArenaAllocatedBuffer.swift
+[84/151] Emitting module SwiftSyntax
+[85/151] Compiling SwiftSyntax RawSyntax.swift
+[86/151] Compiling SwiftSyntax RawSyntaxArena.swift
+[87/151] Compiling SwiftSyntax RawSyntaxLayoutView.swift
+[88/151] Compiling SwiftSyntax RawSyntaxValidation.swift
+[89/151] Compiling SwiftSyntax SyntaxNodesAB.swift
+[90/151] Compiling SwiftSyntax SyntaxNodesC.swift
+[91/151] Compiling SwiftSyntax RawSyntaxNodesAB.swift
+[92/151] Compiling SwiftSyntax RawSyntaxNodesC.swift
+[93/151] Compiling SwiftSyntax RawSyntaxNodesD.swift
+[94/151] Compiling SwiftSyntax SyntaxNodesD.swift
+[95/151] Compiling SwiftSyntax SyntaxNodesEF.swift
+[96/151] Compiling SwiftSyntax SyntaxNodesGHI.swift
+[97/151] Compiling SwiftSyntax RawSyntaxNodeProtocol.swift
+[98/151] Compiling SwiftSyntax RawSyntaxTokenView.swift
+[99/151] Compiling SwiftSyntax SourceEdit.swift
+[100/151] Compiling SwiftSyntax SyntaxTreeViewMode.swift
+[101/151] Compiling SwiftSyntax TokenDiagnostic.swift
+[102/151] Compiling SwiftSyntax TokenSequence.swift
+[103/151] Compiling SwiftSyntax RenamedNodesCompatibility.swift
+[104/151] Compiling SwiftSyntax SyntaxAnyVisitor.swift
+[105/151] Compiling SwiftSyntax SyntaxBaseNodes.swift
+[106/151] Compiling SwiftSyntax SyntaxCollection.swift
+[107/151] Compiling SwiftSyntax SyntaxHashable.swift
+[108/151] Compiling SwiftSyntax SyntaxIdentifier.swift
+[109/151] Compiling SwiftSyntax TokenSyntax.swift
+[110/151] Compiling SwiftSyntax Trivia.swift
+[111/151] Compiling SwiftSyntax Utils.swift
+[112/151] Compiling SwiftSyntax Assert.swift
+[113/151] Compiling SwiftSyntax BumpPtrAllocator.swift
+[114/151] Compiling SwiftSyntax CommonAncestor.swift
+[115/151] Compiling SwiftSyntax SyntaxCollections.swift
+[116/151] Compiling SwiftSyntax SyntaxEnum.swift
+[117/151] Compiling SwiftSyntax SyntaxKind.swift
+[118/151] Compiling SwiftSyntax ChildNameForKeyPath.swift
+[119/151] Compiling SwiftSyntax Keyword.swift
+[120/151] Compiling SwiftSyntax RenamedChildrenCompatibility.swift
+[121/151] Compiling SwiftSyntax SyntaxNodesJKLMN.swift
+[122/151] Compiling SwiftSyntax SyntaxNodesOP.swift
+[123/151] Compiling SwiftSyntax RawSyntaxNodesEF.swift
+[124/151] Compiling SwiftSyntax RawSyntaxNodesGHI.swift
+[125/151] Compiling SwiftSyntax RawSyntaxNodesJKLMN.swift
+[126/151] Compiling SwiftSyntax RawSyntaxNodesOP.swift
+[127/151] Compiling SwiftSyntax RawSyntaxNodesQRS.swift
+[128/151] Compiling SwiftSyntax RawSyntaxNodesTUVWXYZ.swift
+[129/151] Compiling SwiftSyntax SwiftSyntaxCompatibility.swift
+[130/151] Compiling SwiftSyntax Syntax.swift
+[131/151] Compiling SwiftSyntax SyntaxChildren.swift
+[132/151] Compiling SwiftSyntax TokenKind.swift
+[133/151] Compiling SwiftSyntax Tokens.swift
+[134/151] Compiling SwiftSyntax TriviaPieces.swift
+[135/151] Compiling SwiftSyntax Convenience.swift
+[136/151] Compiling SwiftSyntax CustomTraits.swift
+[137/151] Compiling SwiftSyntax EditorPlaceholder.swift
+[138/170] Wrapping AST for SwiftSyntax for debugging
+[140/216] Compiling SwiftDiagnostics Convenience.swift
+[141/216] Emitting module SwiftDiagnostics
+[142/216] Compiling SwiftDiagnostics ANSIDiagnosticDecorator.swift
+[143/216] Compiling SwiftDiagnostics Diagnostic.swift
+[144/216] Compiling SwiftDiagnostics BasicDiagnosticDecorator.swift
+[145/216] Compiling SwiftDiagnostics DiagnosticDecorator.swift
+[146/216] Compiling SwiftDiagnostics GroupedDiagnostics.swift
+[147/216] Compiling SwiftDiagnostics FixIt.swift
+[148/216] Compiling SwiftDiagnostics Note.swift
+[149/216] Compiling SwiftDiagnostics Message.swift
+[150/216] Compiling SwiftDiagnostics DiagnosticsFormatter.swift
+[151/217] Wrapping AST for SwiftDiagnostics for debugging
+[153/217] Emitting module SwiftBasicFormat
+[154/217] Compiling SwiftBasicFormat BasicFormat.swift
+[155/217] Compiling SwiftBasicFormat Indenter.swift
+[156/217] Compiling SwiftBasicFormat InferIndentation.swift
+[157/217] Compiling SwiftBasicFormat Syntax+Extensions.swift
+[158/217] Compiling SwiftBasicFormat SyntaxProtocol+Formatted.swift
+[159/217] Compiling SwiftBasicFormat Trivia+FormatExtensions.swift
+[161/218] Compiling SwiftParser Types.swift
+[162/218] Compiling SwiftParser ExperimentalFeatures.swift
+[162/218] Wrapping AST for SwiftBasicFormat for debugging
+[164/219] Compiling SwiftParser TokenSpecStaticMembers.swift
+[165/219] Compiling SwiftParser Parameters.swift
+[166/219] Compiling SwiftParser ParseSourceFile.swift
+[167/219] Compiling SwiftParser SwiftVersion.swift
+[168/219] Compiling SwiftParser SyntaxUtils.swift
+[169/219] Compiling SwiftParser TokenSpec.swift
+[170/219] Compiling SwiftParser TokenSpecSet.swift
+[171/219] Compiling SwiftParser TokenConsumer.swift
+[172/219] Compiling SwiftParser TokenPrecedence.swift
+[173/219] Compiling SwiftParser StringLiterals.swift
+[174/219] Compiling SwiftParser SwiftParserCompatibility.swift
+[175/219] Compiling SwiftParser TopLevel.swift
+[176/219] Compiling SwiftParser TriviaParser.swift
+[177/219] Compiling SwiftParser CharacterInfo.swift
+[178/219] Compiling SwiftParser CollectionNodes+Parsable.swift
+[179/219] Compiling SwiftParser CompilerFiles.swift
+[180/219] Compiling SwiftParser Declarations.swift
+[181/219] Compiling SwiftParser IsValidIdentifier.swift
+[182/219] Compiling SwiftParser Cursor.swift
+[183/219] Compiling SwiftParser Expressions.swift
+[184/219] Compiling SwiftParser IncrementalParseTransition.swift
+[185/219] Compiling SwiftParser Lexer.swift
+[186/219] Compiling SwiftParser RegexLiteralLexer.swift
+[187/219] Compiling SwiftParser Directives.swift
+[188/219] Compiling SwiftParser ExpressionInterpretedAsVersionTuple.swift
+[189/219] Compiling SwiftParser UnicodeScalarExtensions.swift
+[190/219] Compiling SwiftParser Lookahead.swift
+[191/219] Compiling SwiftParser Attributes.swift
+[192/219] Compiling SwiftParser Availability.swift
+[193/219] Compiling SwiftParser Lexeme.swift
+[194/219] Compiling SwiftParser LexemeSequence.swift
+[195/219] Compiling SwiftParser Parser.swift
+[196/219] Compiling SwiftParser Patterns.swift
+[197/219] Compiling SwiftParser Recovery.swift
+[198/219] Compiling SwiftParser Specifiers.swift
+[199/219] Compiling SwiftParser Statements.swift
+[200/219] Compiling SwiftParser StringLiteralRepresentedLiteralValue.swift
+[201/219] Emitting module SwiftParser
+[202/219] Compiling SwiftParser Names.swift
+[203/219] Compiling SwiftParser Nominals.swift
+[204/219] Compiling SwiftParser IsLexerClassified.swift
+[205/219] Compiling SwiftParser LayoutNodes+Parsable.swift
+[206/219] Compiling SwiftParser Parser+TokenSpecSet.swift
+[207/219] Compiling SwiftParser LoopProgressCondition.swift
+[208/219] Compiling SwiftParser Modifiers.swift
+[209/240] Wrapping AST for SwiftParser for debugging
+[211/245] Compiling SwiftOperators Operator.swift
+[212/245] Compiling SwiftOperators OperatorError.swift
+[213/245] Emitting module SwiftOperators
+[214/245] Compiling SwiftOperators OperatorError+Diagnostics.swift
+[215/245] Compiling SwiftOperators OperatorTable+Defaults.swift
+[216/245] Compiling SwiftOperators OperatorTable+Semantics.swift
+[217/245] Compiling SwiftOperators OperatorTable+Folding.swift
+[218/245] Compiling SwiftOperators PrecedenceGraph.swift
+[219/245] Compiling SwiftOperators SyntaxSynthesis.swift
+[220/245] Compiling SwiftOperators PrecedenceGroup.swift
+[221/245] Compiling SwiftOperators OperatorTable.swift
+[222/246] Wrapping AST for SwiftOperators for debugging
+[224/246] Compiling SwiftParserDiagnostics DiagnosticExtensions.swift
+[225/246] Emitting module SwiftParserDiagnostics
+[226/246] Compiling SwiftParserDiagnostics MissingTokenError.swift
+[227/246] Compiling SwiftParserDiagnostics LexerDiagnosticMessages.swift
+[228/246] Compiling SwiftParserDiagnostics ParseDiagnosticsGenerator.swift
+[229/246] Compiling SwiftParserDiagnostics MissingNodesError.swift
+[230/246] Compiling SwiftParserDiagnostics ParserDiagnosticMessages.swift
+[231/246] Compiling SwiftParserDiagnostics MultiLineStringLiteralDiagnosticsGenerator.swift
+[232/246] Compiling SwiftParserDiagnostics PresenceUtils.swift
+[233/246] Compiling SwiftParserDiagnostics Utils.swift
+[234/246] Compiling SwiftParserDiagnostics SyntaxExtensions.swift
+[235/246] Compiling SwiftParserDiagnostics ChildNameForDiagnostics.swift
+[236/246] Compiling SwiftParserDiagnostics SyntaxKindNameForDiagnostics.swift
+[237/246] Compiling SwiftParserDiagnostics TokenNameForDiagnostics.swift
+[238/261] Wrapping AST for SwiftParserDiagnostics for debugging
+[240/263] Compiling SwiftSyntaxBuilder ConvenienceInitializers.swift
+[241/263] Emitting module SwiftSyntaxBuilder
+[242/263] Compiling SwiftSyntaxBuilder DeclSyntaxParseable.swift
+[243/263] Compiling SwiftSyntaxBuilder Indenter.swift
+[244/263] Compiling SwiftSyntaxBuilder ListBuilder.swift
+[245/263] Compiling SwiftSyntaxBuilder SwiftSyntaxBuilderCompatibility.swift
+[246/263] Compiling SwiftSyntaxBuilder ResultBuilderExtensions.swift
+[247/263] Compiling SwiftSyntaxBuilder SyntaxParsable+ExpressibleByStringInterpolation.swift
+[248/263] Compiling SwiftSyntaxBuilder Syntax+StringInterpolation.swift
+[249/263] Compiling SwiftSyntaxBuilder SyntaxNodeWithBody.swift
+[250/263] Compiling SwiftSyntaxBuilder ValidatingSyntaxNodes.swift
+[251/263] Compiling SwiftSyntaxBuilder BuildableNodes.swift
+[252/263] Compiling SwiftSyntaxBuilder WithTrailingCommaSyntax+EnsuringTrailingComma.swift
+[253/263] Compiling SwiftSyntaxBuilder SyntaxExpressibleByStringInterpolationConformances.swift
+[254/263] Compiling SwiftSyntaxBuilder ResultBuilders.swift
+[255/263] Compiling SwiftSyntaxBuilder RenamedChildrenBuilderCompatibility.swift
+[256/272] Wrapping AST for SwiftSyntaxBuilder for debugging
+[258/283] Emitting module SwiftSyntaxMacros
+[259/283] Compiling SwiftSyntaxMacros AbstractSourceLocation.swift
+[260/283] Compiling SwiftSyntaxMacros MacroExpansionContext.swift
+[261/283] Compiling SwiftSyntaxMacros MacroExpansionDiagnosticMessages.swift
+[262/283] Compiling SwiftSyntaxMacros AccessorMacro.swift
+[263/283] Compiling SwiftSyntaxMacros BodyMacro.swift
+[264/283] Compiling SwiftSyntaxMacros AttachedMacro.swift
+[265/283] Compiling SwiftSyntaxMacros DeclarationMacro.swift
+[266/283] Compiling SwiftSyntaxMacros CodeItemMacro.swift
+[267/283] Compiling SwiftSyntaxMacros ExtensionMacro.swift
+[268/283] Compiling SwiftSyntaxMacros FreestandingMacro.swift
+[269/283] Compiling SwiftSyntaxMacros ExpressionMacro.swift
+[270/283] Compiling SwiftSyntaxMacros Macro+Format.swift
+[271/283] Compiling SwiftSyntaxMacros Macro.swift
+[272/283] Compiling SwiftSyntaxMacros MemberMacro.swift
+[273/283] Compiling SwiftSyntaxMacros Syntax+LexicalContext.swift
+[274/283] Compiling SwiftSyntaxMacros PeerMacro.swift
+[275/283] Compiling SwiftSyntaxMacros MemberAttributeMacro.swift
+[276/283] Compiling SwiftSyntaxMacros PreambleMacro.swift
+[277/294] Wrapping AST for SwiftSyntaxMacros for debugging
+[279/294] Emitting module SwiftSyntaxMacroExpansion
+[280/294] Compiling SwiftSyntaxMacroExpansion FunctionParameterUtils.swift
+[281/294] Compiling SwiftSyntaxMacroExpansion IndentationUtils.swift
+[282/294] Compiling SwiftSyntaxMacroExpansion BasicMacroExpansionContext.swift
+[283/294] Compiling SwiftSyntaxMacroExpansion MacroArgument.swift
+[284/294] Compiling SwiftSyntaxMacroExpansion MacroExpansion.swift
+[285/294] Compiling SwiftSyntaxMacroExpansion MacroReplacement.swift
+[286/294] Compiling SwiftSyntaxMacroExpansion MacroExpansionDiagnosticMessages.swift
+[287/294] Compiling SwiftSyntaxMacroExpansion MacroSpec.swift
+[288/294] Compiling SwiftSyntaxMacroExpansion MacroSystem.swift
+[289/308] Wrapping AST for SwiftSyntaxMacroExpansion for debugging
+[291/308] Emitting module SwiftCompilerPluginMessageHandling
+[292/308] Compiling SwiftCompilerPluginMessageHandling Diagnostics.swift
+[293/308] Compiling SwiftCompilerPluginMessageHandling CompilerPluginMessageHandler.swift
+[294/308] Compiling SwiftCompilerPluginMessageHandling JSON.swift
+[295/308] Compiling SwiftCompilerPluginMessageHandling CodingUtilities.swift
+[296/308] Compiling SwiftCompilerPluginMessageHandling Macros.swift
+[297/308] Compiling SwiftCompilerPluginMessageHandling JSONEncoding.swift
+[298/308] Compiling SwiftCompilerPluginMessageHandling LRUCache.swift
+[299/308] Compiling SwiftCompilerPluginMessageHandling JSONDecoding.swift
+[300/308] Compiling SwiftCompilerPluginMessageHandling PluginMessageCompatibility.swift
+[301/308] Compiling SwiftCompilerPluginMessageHandling StandardIOMessageConnection.swift
+[302/308] Compiling SwiftCompilerPluginMessageHandling PluginMacroExpansionContext.swift
+[303/308] Compiling SwiftCompilerPluginMessageHandling PluginMessages.swift
+[304/311] Wrapping AST for SwiftCompilerPluginMessageHandling for debugging
+[306/311] Compiling SwiftCompilerPlugin CompilerPlugin.swift
+[307/311] Emitting module SwiftCompilerPlugin
+[308/316] Wrapping AST for SwiftCompilerPlugin for debugging
+[310/316] Emitting module GravitySwiftMacros
+[311/316] Compiling GravitySwiftMacros GSExportableIgnore.swift
+[312/316] Compiling GravitySwiftMacros GSExportableMacro.swift
+[313/316] Compiling GravitySwiftMacros MacrosPlugin.swift
+[314/317] Wrapping AST for GravitySwiftMacros for debugging
+[315/317] Write Objects.LinkFileList
+[316/317] Linking GravitySwiftMacros-tool.exe
+[318/332] Compiling Gravity GravityExportEncoder.swift
+[319/332] Compiling Gravity MethodDescription.swift
+[320/332] Compiling Gravity GravityBridgeClassDescriptor.swift
+[321/332] Compiling Gravity GSExportable.swift
+[322/332] Compiling Gravity PropertyDescriptor.swift
+[323/332] Compiling Gravity GravityPropertyExportEncoder.swift
+[324/332] Emitting module Gravity
+<module-includes>:3:10: note: in file included from <module-includes>:3:
+
+ 1 | #include "D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\debug_macros.h"
+
+ 2 | #include "D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_aot.h"
+
+ 3 | #include "D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_aot_internal.h"
+
+   |          `- note: in file included from <module-includes>:3:
+
+ 4 | #include "D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_ast.h"
+
+ 5 | #include "D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_codegen.h"
+
+
+
+D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_aot_internal.h:4:10: note: in file included from D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_aot_internal.h:4:
+
+ 2 | #define GRAVITY_AOT_INTERNAL_H
+
+ 3 | #include "gravity_aot.h"
+
+ 4 | #include "../shared/gravity_aot_runtime.h"
+
+   |          `- note: in file included from D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_aot_internal.h:4:
+
+ 5 | typedef struct {
+
+ 6 |     FILE *out;
+
+
+
+D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\../shared/gravity_aot_runtime.h:12:15: warning: 'remainder' redeclared without 'dllimport' attribute: previous 'dllimport' ignored
+
+ 10 | extern "C" double remainder(double, double) noexcept;
+
+ 11 | #else
+
+ 12 | extern double remainder(double, double);
+
+    |               `- warning: 'remainder' redeclared without 'dllimport' attribute: previous 'dllimport' ignored
+
+ 13 | #endif
+
+ 14 | static inline int gravity_aot_text_compare(const char *a, const char *b) {
+
+
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt_math.h:534:44: note: previous declaration is here
+
+ 532 |     _Check_return_ _ACRTIMP double __cdecl nextafter(_In_ double _X, _In_ double _Y);
+
+ 533 |     _Check_return_ _ACRTIMP double __cdecl nexttoward(_In_ double _X, _In_ long double _Y);
+
+ 534 |     _Check_return_ _ACRTIMP double __cdecl remainder(_In_ double _X, _In_ double _Y);
+
+     |                    |                       `- note: previous declaration is here
+
+     |                    `- note: previous attribute is here
+
+ 535 |     _Check_return_ _ACRTIMP double __cdecl remquo(_In_ double _X, _In_ double _Y, _Out_ int* _Z);
+
+ 536 |     _Check_return_ _ACRTIMP double __cdecl rint(_In_ double _X);
+
+
+
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\ucrt\corecrt.h:136:37: note: expanded from macro '_ACRTIMP'
+
+ 134 |         #define _ACRTIMP _CRTIMP
+
+ 135 |     #elif !defined _CORECRT_BUILD && defined _DLL
+
+ 136 |         #define _ACRTIMP __declspec(dllimport)
+
+     |                                     `- note: expanded from macro '_ACRTIMP'
+
+ 137 |     #else
+
+ 138 |         #define _ACRTIMP
+
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[325/332] Compiling Gravity GSValue.swift
+[326/332] Compiling Gravity GravityAnnotation.swift
+[327/332] Compiling Gravity GravityCompiler.swift
+[328/332] Compiling Gravity GravityMacros.swift
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+<module-includes>:3:10: note: in file included from <module-includes>:3:
+
+ 1 | #include "D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\debug_macros.h"
+
+ 2 | #include "D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_aot.h"
+
+ 3 | #include "D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_aot_internal.h"
+
+   |          `- note: in file included from <module-includes>:3:
+
+ 4 | #include "D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_ast.h"
+
+ 5 | #include "D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_codegen.h"
+
+
+
+D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_aot_internal.h:4:10: note: in file included from D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_aot_internal.h:4:
+
+ 2 | #define GRAVITY_AOT_INTERNAL_H
+
+ 3 | #include "gravity_aot.h"
+
+ 4 | #include "../shared/gravity_aot_runtime.h"
+
+   |          `- note: in file included from D:\\Development\\AdaEngine\\.build-tools\\gravity-windows\\src\compiler\gravity_aot_internal.h:4:
+
+ 5 | typedef struct {
+
+ 6 |     FILE *out;
+
+[329/332] Compiling Gravity GravityVirtualMachine+Bridge.swift
+[330/332] Compiling Gravity Gravity.swift
+[331/332] Compiling Gravity GravityVirtualMachine.swift
+[332/332] Compiling Gravity GravityVirtualMachineDelegate.swift
+Build of target: 'Gravity' complete! (80.77s)

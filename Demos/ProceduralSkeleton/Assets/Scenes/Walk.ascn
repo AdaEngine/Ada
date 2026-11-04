@@ -1,0 +1,271 @@
+format: ada.scene
+schemaVersion: 1
+engineVersion: 1.0.0
+scene:
+  id: procedural-skeleton-walk
+  name: Skeleton walk
+entities:
+- id: camera
+  name: Camera
+  enabled: false
+  components:
+    AdaCorePipelines.Environment3D:
+      screenSpaceReflection:
+        edgeFade: 7.99999982118607e-2
+        maxDistance: 35
+        intensity: 6.99999988079071e-1
+        maxSteps: 48
+        thickness: 1.80000007152557e-1
+        stride: 2.5e-1
+        isEnabled: false
+      skybox:
+        starfield:
+          intensity: 2
+          density: 1.80000007152557e-1
+          isEnabled: false
+          seed: 0
+          size: 1
+        zenithColor:
+          green: 3e-2
+          red: 2.2e-2
+          alpha: 1
+          blue: 4.5e-2
+        groundColor:
+          red: 2.8e-2
+          blue: 4.5e-2
+          alpha: 1
+          green: 3.5e-2
+        intensity: 1
+        isEnabled: true
+        horizonColor:
+          green: 8e-2
+          red: 6e-2
+          alpha: 1
+          blue: 1.1e-1
+        texture: null
+      postProcess:
+        vignette:
+          smoothness: 4.00000005960464e-1
+          intensity: 0
+          radius: 7.5e-1
+        colorGrading:
+          saturation: 1
+          contrast: 1
+          lut: null
+          correctionMode: lut
+          lutIntensity: 1
+          curves:
+            red:
+              points:
+              - output: 0
+                input: 0
+              - input: 1
+                output: 1
+            blue:
+              points:
+              - output: 0
+                input: 0
+              - output: 1
+                input: 1
+            green:
+              points:
+              - input: 0
+                output: 0
+              - input: 1
+                output: 1
+            master:
+              points:
+              - input: 0
+                output: 0
+              - input: 1
+                output: 1
+        bloom:
+          intensity: 2.2e-1
+          scatter: 6.99999988079071e-1
+          threshold: 8e-1
+          softKnee: 5e-1
+          isEnabled: true
+        toneMapper: aces
+        exposureEV: 0
+        autoExposure:
+          speedUp: 1
+          maximumEV: 3
+          minimumEV: -3
+          speedDown: 2.5e+0
+          isEnabled: false
+        depthOfField:
+          isEnabled: false
+          focusDistance: 5
+          maximumBlurRadius: 10
+          aperture: 1
+      debugView: none
+      localShadows:
+        isEnabled: true
+        maximumLights: 4
+    AdaRender.Camera:
+      backgroundColor:
+        alpha: 1
+        blue: 7.5e-2
+        red: 4.5e-2
+        green: 5.5e-2
+      isActive: true
+      projection: perspective
+      fieldOfViewDegrees: 36
+    AdaTransform.Transform:
+      position:
+      - 0
+      - 8.5e-1
+      - -2.25e+0
+      scale:
+      - 1
+      - 1
+      - 1
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+- id: lighting
+  name: Studio lighting
+  enabled: true
+  components:
+    AdaTransform.Transform:
+      scale:
+      - 1
+      - 1
+      - 1
+      position:
+      - 0
+      - 0
+      - 0
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+- id: sun
+  name: Warm key light
+  enabled: true
+  parent: lighting
+  components:
+    AdaScene.DirectionalLightComponent:
+      intensity: 3
+      castShadows: true
+      radiance:
+      - 1
+      - 9.1e-1
+      - 7.8e-1
+    AdaRender.Visibility:
+      value: visible
+    AdaTransform.Transform:
+      rotation:
+      - 3.2e-1
+      - -2.4e-1
+      - 0
+      - 9.165e-1
+      position:
+      - -2
+      - 4
+      - -3
+      scale:
+      - 1
+      - 1
+      - 1
+- id: subject
+  name: Skeleton minion
+  enabled: true
+  components:
+    AdaScene.Model3DSource:
+      animation: Walk
+      repeats: true
+      source: '@res://Models/Skeleton-AdaScript.glb'
+      autoplay: true
+    AdaTransform.Transform:
+      rotation:
+      - 0
+      - -2.41921895599668e-1
+      - 0
+      - 9.70295726275996e-1
+      scale:
+      - 1
+      - 1
+      - 1
+      position:
+      - 0
+      - 0
+      - 0
+- id: fill
+  name: Cool fill light
+  enabled: true
+  parent: lighting
+  components:
+    AdaScene.DirectionalLightComponent:
+      castShadows: false
+      radiance:
+      - 6.6e-1
+      - 7.9e-1
+      - 1
+      intensity: 1.5e+0
+    AdaTransform.Transform:
+      position:
+      - 2
+      - 3
+      - 2
+      rotation:
+      - 1.8e-1
+      - 9.2e-1
+      - -2.5e-1
+      - 2.4e-1
+      scale:
+      - 1
+      - 1
+      - 1
+    AdaRender.Visibility:
+      value: visible
+- id: 79B9B0A5-A526-42FD-BF49-2A2895257025
+  name: Group
+  enabled: true
+  components:
+    AdaTransform.Transform:
+      position:
+      - 0e+0
+      - 0e+0
+      - 0e+0
+      rotation:
+      - 0e+0
+      - 0e+0
+      - 0e+0
+      - 1e+0
+      scale:
+      - 1e+0
+      - 1e+0
+      - 1e+0
+- id: walk-stage
+  name: Walk preview stage
+  enabled: true
+  components:
+    AdaTransform.Transform:
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+      scale:
+      - 1
+      - 1
+      - 1
+      position:
+      - 0
+      - 0
+      - 0
+    AdaScene.Model3DSource:
+      animation: ''
+      source: '@res://Models/WalkStage.glb'
+      autoplay: false
+      repeats: true
+editor:
+  selectedEntity: 79B9B0A5-A526-42FD-BF49-2A2895257025
+  expandedEntities:
+  - lighting
+  - fill
+  - 79B9B0A5-A526-42FD-BF49-2A2895257025

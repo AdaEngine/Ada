@@ -36,8 +36,14 @@ CPU native import, import project-local dependency bundles and patch PBR materia
 factors. Offline docs/API/component/examples tools are shared; bundled workflow
 skills are readable on demand through `editor.skills.list/read`. `basic-3d-scene`
 is a complete camera/cube/light example. Import validation does not prove GPU
-rendering, clip playback or gameplay; Blender execution, rig/clip authoring and
-organic or skinned model generation remain outside these tools. Desktop scene changes use document revisions
+rendering, clip playback or gameplay. `editor.model.generate` supports explicit
+procedural joints, rigid/two-joint weights and linear translation/rotation clips
+in its interpreted AdaScript recipe. The builder ships precompiled; recipe
+execution needs no Swift compiler or JIT. Windows VM/buffer checks are covered by
+`AdaScriptModelRigTests`; physical iPad execution and a rebuilt Studio bundle
+remain unverified. Blender execution, automatic organic mesh generation,
+anatomy inference and visual imported-rig editing remain outside these tools.
+Desktop scene changes use document revisions
 and undo, and asset writes reject matching dirty open documents.
 
 The bundled `ada-game-builder` workflow is advertised in desktop and mobile

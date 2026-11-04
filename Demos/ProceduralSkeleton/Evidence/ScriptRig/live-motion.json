@@ -1,0 +1,1114 @@
+{
+  "diagnostics": [],
+  "durationSeconds": 3,
+  "elapsedSeconds": 5.82,
+  "errors": [],
+  "frames": [
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 5,
+      "height": 800,
+      "label": "walk-live-a",
+      "meanRGB": [
+        32.3,
+        32,
+        31.9
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-walk-live-a-9BB6CC09.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.8,
+      "uniform": false,
+      "width": 960
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 6,
+      "height": 800,
+      "label": "walk-live-b",
+      "meanRGB": [
+        31.8,
+        31.6,
+        31.7
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-walk-live-b-26CE4ABE.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 1.8,
+      "uniform": false,
+      "width": 960
+    }
+  ],
+  "inputEventsSent": 0,
+  "logs": [],
+  "scriptErrorCount": 0,
+  "snapshots": [
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "entities": [
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                0.361134797334671,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, 0.3611348, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 10,
+          "name": "Rig.hips"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                -0.14000000059604645,
+                -0.05000000074505806,
+                0
+              ],
+              "rotation": [
+                0.39365026354789734,
+                0,
+                0,
+                0.9192602634429932
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: -0.14, -0.05, 0.0 \u00b7 Rotation: 0.39365026, 0.0, 0.0, 0.91926026 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 24,
+          "name": "Rig.leftHip"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0.14000000059604645,
+                -0.05000000074505806,
+                0
+              ],
+              "rotation": [
+                0.5510942935943604,
+                0,
+                0,
+                0.8344429731369019
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.14, -0.05, 0.0 \u00b7 Rotation: 0.5510943, 0.0, 0.0, 0.834443 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 28,
+          "name": "Rig.rightHip"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.07999999821186066,
+                0
+              ],
+              "rotation": [
+                -0.5562591552734375,
+                0,
+                0,
+                0.8310089707374573
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.08, 0.0 \u00b7 Rotation: -0.55625916, 0.0, 0.0, 0.831009 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 25,
+          "name": "Rig.leftKnee"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.07999999821186066,
+                0
+              ],
+              "rotation": [
+                -0.7681854367256165,
+                0,
+                0,
+                0.6402275562286377
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.08, 0.0 \u00b7 Rotation: -0.76818544, 0.0, 0.0, 0.64022756 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 29,
+          "name": "Rig.rightKnee"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.14000000059604645,
+                -0.014999999664723873
+              ],
+              "rotation": [
+                0.18422017991542816,
+                0,
+                0,
+                0.9828851222991943
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.14, -0.015 \u00b7 Rotation: 0.18422018, 0.0, 0.0, 0.9828851 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 26,
+          "name": "Rig.leftAnkle"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.14000000059604645,
+                -0.014999999664723873
+              ],
+              "rotation": [
+                0.28818103671073914,
+                0,
+                0,
+                0.9575759172439575
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.14, -0.015 \u00b7 Rotation: 0.28818104, 0.0, 0.0, 0.9575759 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 30,
+          "name": "Rig.rightAnkle"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                -0.03999999910593033,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: -0.04, 0.0, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 19,
+          "name": "Rig.leftHand"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0.03999999910593033,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.04, 0.0, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 23,
+          "name": "Rig.rightHand"
+        }
+      ],
+      "entityCount": 46,
+      "frameSequence": 4,
+      "label": "a",
+      "t": 0.4,
+      "worldElapsedSeconds": 252357.890625
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "entities": [
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                0.3680829107761383,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, 0.3680829, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 10,
+          "name": "Rig.hips"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                -0.14000000059604645,
+                -0.05000000074505806,
+                0
+              ],
+              "rotation": [
+                0.36493241786956787,
+                0,
+                0,
+                0.9310341477394104
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: -0.14, -0.05, 0.0 \u00b7 Rotation: 0.36493242, 0.0, 0.0, 0.93103415 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 24,
+          "name": "Rig.leftHip"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0.14000000059604645,
+                -0.05000000074505806,
+                0
+              ],
+              "rotation": [
+                0.23686109483242035,
+                0,
+                0,
+                0.971543550491333
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.14, -0.05, 0.0 \u00b7 Rotation: 0.2368611, 0.0, 0.0, 0.97154355 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 28,
+          "name": "Rig.rightHip"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.07999999821186066,
+                0
+              ],
+              "rotation": [
+                -0.35021159052848816,
+                0,
+                0,
+                0.9366706013679504
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.08, 0.0 \u00b7 Rotation: -0.3502116, 0.0, 0.0, 0.9366706 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 25,
+          "name": "Rig.leftKnee"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.07999999821186066,
+                0
+              ],
+              "rotation": [
+                -0.5620807409286499,
+                0,
+                0,
+                0.8270823359489441
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.08, 0.0 \u00b7 Rotation: -0.56208074, 0.0, 0.0, 0.82708234 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 29,
+          "name": "Rig.rightKnee"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.14000000059604645,
+                -0.014999999664723873
+              ],
+              "rotation": [
+                -0.01576249487698078,
+                0,
+                0,
+                0.9998758435249329
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.14, -0.015 \u00b7 Rotation: -0.015762495, 0.0, 0.0, 0.99987584 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 26,
+          "name": "Rig.leftAnkle"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.14000000059604645,
+                -0.014999999664723873
+              ],
+              "rotation": [
+                0.35018232464790344,
+                0,
+                0,
+                0.9366815686225891
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.14, -0.015 \u00b7 Rotation: 0.35018232, 0.0, 0.0, 0.93668157 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 30,
+          "name": "Rig.rightAnkle"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                -0.03999999910593033,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: -0.04, 0.0, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 19,
+          "name": "Rig.leftHand"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0.03999999910593033,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.04, 0.0, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 23,
+          "name": "Rig.rightHand"
+        }
+      ],
+      "entityCount": 46,
+      "frameSequence": 5,
+      "label": "b",
+      "t": 1.3,
+      "worldElapsedSeconds": 252360.078125
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "entities": [
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                0.3646888732910156,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, 0.36468887, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 10,
+          "name": "Rig.hips"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                -0.14000000059604645,
+                -0.05000000074505806,
+                0
+              ],
+              "rotation": [
+                0.5576656460762024,
+                0,
+                0,
+                0.8300657272338867
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: -0.14, -0.05, 0.0 \u00b7 Rotation: 0.55766565, 0.0, 0.0, 0.8300657 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 24,
+          "name": "Rig.leftHip"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0.14000000059604645,
+                -0.05000000074505806,
+                0
+              ],
+              "rotation": [
+                0.26958340406417847,
+                0,
+                0,
+                0.9629770517349243
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.14, -0.05, 0.0 \u00b7 Rotation: 0.2695834, 0.0, 0.0, 0.96297705 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 28,
+          "name": "Rig.rightHip"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.07999999821186066,
+                0
+              ],
+              "rotation": [
+                -0.6657971739768982,
+                0,
+                0,
+                0.7461327910423279
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.08, 0.0 \u00b7 Rotation: -0.6657972, 0.0, 0.0, 0.7461328 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 25,
+          "name": "Rig.leftKnee"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.07999999821186066,
+                0
+              ],
+              "rotation": [
+                -0.5268583297729492,
+                0,
+                0,
+                0.8499531745910645
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.08, 0.0 \u00b7 Rotation: -0.5268583, 0.0, 0.0, 0.8499532 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 29,
+          "name": "Rig.rightKnee"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.14000000059604645,
+                -0.014999999664723873
+              ],
+              "rotation": [
+                0.13656273484230042,
+                0,
+                0,
+                0.9906314611434937
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.14, -0.015 \u00b7 Rotation: 0.13656273, 0.0, 0.0, 0.99063146 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 26,
+          "name": "Rig.leftAnkle"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.14000000059604645,
+                -0.014999999664723873
+              ],
+              "rotation": [
+                0.2782192528247833,
+                0,
+                0,
+                0.9605175852775574
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.14, -0.015 \u00b7 Rotation: 0.27821925, 0.0, 0.0, 0.9605176 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 30,
+          "name": "Rig.rightAnkle"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                -0.03999999910593033,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: -0.04, 0.0, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 19,
+          "name": "Rig.leftHand"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0.03999999910593033,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.04, 0.0, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 23,
+          "name": "Rig.rightHand"
+        }
+      ],
+      "entityCount": 46,
+      "frameSequence": 8,
+      "label": "c",
+      "t": 2.5,
+      "worldElapsedSeconds": 252363.234375
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "entities": [
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                0.3646888732910156,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, 0.36468887, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 10,
+          "name": "Rig.hips"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                -0.14000000059604645,
+                -0.05000000074505806,
+                0
+              ],
+              "rotation": [
+                0.5576656460762024,
+                0,
+                0,
+                0.8300657272338867
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: -0.14, -0.05, 0.0 \u00b7 Rotation: 0.55766565, 0.0, 0.0, 0.8300657 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 24,
+          "name": "Rig.leftHip"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0.14000000059604645,
+                -0.05000000074505806,
+                0
+              ],
+              "rotation": [
+                0.26958340406417847,
+                0,
+                0,
+                0.9629770517349243
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.14, -0.05, 0.0 \u00b7 Rotation: 0.2695834, 0.0, 0.0, 0.96297705 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 28,
+          "name": "Rig.rightHip"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.07999999821186066,
+                0
+              ],
+              "rotation": [
+                -0.6657971739768982,
+                0,
+                0,
+                0.7461327910423279
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.08, 0.0 \u00b7 Rotation: -0.6657972, 0.0, 0.0, 0.7461328 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 25,
+          "name": "Rig.leftKnee"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.07999999821186066,
+                0
+              ],
+              "rotation": [
+                -0.5268583297729492,
+                0,
+                0,
+                0.8499531745910645
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.08, 0.0 \u00b7 Rotation: -0.5268583, 0.0, 0.0, 0.8499532 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 29,
+          "name": "Rig.rightKnee"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.14000000059604645,
+                -0.014999999664723873
+              ],
+              "rotation": [
+                0.13656273484230042,
+                0,
+                0,
+                0.9906314611434937
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.14, -0.015 \u00b7 Rotation: 0.13656273, 0.0, 0.0, 0.99063146 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 26,
+          "name": "Rig.leftAnkle"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0,
+                -0.14000000059604645,
+                -0.014999999664723873
+              ],
+              "rotation": [
+                0.2782192528247833,
+                0,
+                0,
+                0.9605175852775574
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.0, -0.14, -0.015 \u00b7 Rotation: 0.27821925, 0.0, 0.0, 0.9605176 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 30,
+          "name": "Rig.rightAnkle"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                -0.03999999910593033,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: -0.04, 0.0, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 19,
+          "name": "Rig.leftHand"
+        },
+        {
+          "active": true,
+          "componentFields": {
+            "AdaTransform.Transform": {
+              "position": [
+                0.03999999910593033,
+                0,
+                0
+              ],
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "scale": [
+                1,
+                1,
+                1
+              ]
+            }
+          },
+          "components": {
+            "Transform": "Position: 0.04, 0.0, 0.0 \u00b7 Rotation: 0.0, 0.0, 0.0, 1.0 \u00b7 Scale: 1.0, 1.0, 1.0"
+          },
+          "id": 23,
+          "name": "Rig.rightHand"
+        }
+      ],
+      "entityCount": 46,
+      "frameSequence": 8,
+      "label": "final",
+      "t": 3,
+      "worldElapsedSeconds": 252363.234375
+    }
+  ],
+  "status": "completed",
+  "target": "offscreen",
+  "verification": {
+    "evidence": "Frames are completed GPU frames of the game camera; snapshots are read from the live game world. Compare frames and snapshot values across times to prove behavior.",
+    "framesRendered": true,
+    "stateRead": true
+  }
+}

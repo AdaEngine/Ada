@@ -5,8 +5,8 @@ import Gravity
 /// Runs an agent-authored AdaScript `build(model)` function in an isolated VM and collects the parts it creates.
 ///
 /// The script sees only the `model` builder (materials, primitives, a revolve profile, raw triangles and part
-/// transforms) and the limits of ``AdaScriptGeneratorRunner``. Encoding and writing the `.glb` stay with the
-/// host (see ``GLBWriter``).
+/// transforms, plus explicit joints, weights and translation/rotation clips) and the limits of
+/// ``AdaScriptGeneratorRunner``. Encoding and writing the `.glb` stay with the host (see ``GLBWriter``).
 @MainActor
 public enum AdaScriptModelGenerator {
     public static func generate(source: String) throws -> ProceduralModel {
@@ -43,6 +43,18 @@ public enum AdaScriptModelGenerator {
             func paint(id, material) { return __host.setMaterial(id, material); }
             func parent(id, parentId) { return __host.setParent(id, parentId); }
             func name(id, text) { return __host.setName(id, text); }
+            func partCount() { return __host.partCount(); }
+            func partName(id) { return __host.partName(id); }
+            func partParent(id) { return __host.partParent(id); }
+            func hasMesh(id) { return __host.partHasMesh(id); }
+            func vertexCount(id) { return __host.partVertexCount(id); }
+            func vertexPosition(id, vertex, axis) { return __host.rigVertexPosition(id, vertex, axis); }
+            func joint(name, parent, x, y, z) { return __host.rigJoint(name, parent, [x, y, z]); }
+            func bind(part, joint) { return __host.rigBind(part, joint); }
+            func weights(part, vertex, first, firstWeight, second, secondWeight) { return __host.rigWeights(part, vertex, [first, firstWeight, second, secondWeight]); }
+            func clip(name) { return __host.rigClip(name); }
+            func rotationKey(clip, joint, time, x, y, z) { return __host.rigRotationKey(clip, joint, [time, x, y, z]); }
+            func translationKey(clip, joint, time, x, y, z) { return __host.rigTranslationKey(clip, joint, [time, x, y, z]); }
         }
         func __ada_make_model_builder(host) { return __AdaModelBuilder(host); }
         """
@@ -64,6 +76,7 @@ final class AdaScriptModelBridge {
     @GSExportableIgnore private var vertices: [SIMD3<Float>] = []
     @GSExportableIgnore private var triangles: [SIMD3<Int>] = []
     @GSExportableIgnore private var vertexCount = 0
+    @GSExportableIgnore private var rig: AdaScriptModelRigBuilder?
 
     init() {}
 
@@ -77,7 +90,8 @@ final class AdaScriptModelBridge {
         for index in remapped.indices where remapped[index].mesh != nil {
             remapped[index].material = used.firstIndex(of: remapped[index].material) ?? 0
         }
-        return ProceduralModel(materials: used.map { materials[$0] ?? Self.defaultMaterial($0) }, nodes: remapped)
+        let source = ProceduralModel(materials: used.map { materials[$0] ?? Self.defaultMaterial($0) }, nodes: remapped)
+        return try rig?.finish(source) ?? source
     }
 
     // MARK: - Materials
@@ -200,6 +214,7 @@ final class AdaScriptModelBridge {
     }
 
     func addGroup() -> Int {
+        guard rig == nil else { return failed("Finish geometry before starting rig authoring.") }
         guard nodes.count < Self.maximumNodes else { return failed("A model has at most \(Self.maximumNodes) parts.") }
         nodes.append(ProceduralNode(name: "Group \(nodes.count)"))
         return nodes.count - 1
@@ -208,6 +223,7 @@ final class AdaScriptModelBridge {
     // MARK: - Part properties
 
     func setPosition(id: GSValue, x: GSValue, y: GSValue, z: GSValue) -> Bool {
+        guard rig == nil else { return fail("Geometry transforms are frozen during rig authoring.") }
         guard let id = nodeIndex(id), let x = x.finiteNumber, let y = y.finiteNumber, let z = z.finiteNumber else {
             return fail("model.place expects a part id and x, y, z numbers.")
         }
@@ -216,6 +232,7 @@ final class AdaScriptModelBridge {
     }
 
     func setRotation(id: GSValue, x: GSValue, y: GSValue, z: GSValue) -> Bool {
+        guard rig == nil else { return fail("Geometry transforms are frozen during rig authoring.") }
         guard let id = nodeIndex(id), let x = x.finiteNumber, let y = y.finiteNumber, let z = z.finiteNumber else {
             return fail("model.rotate expects a part id and x, y, z angles in degrees.")
         }
@@ -224,6 +241,7 @@ final class AdaScriptModelBridge {
     }
 
     func setScale(id: GSValue, x: GSValue, y: GSValue, z: GSValue) -> Bool {
+        guard rig == nil else { return fail("Geometry transforms are frozen during rig authoring.") }
         guard let id = nodeIndex(id), let x = length(x), let y = length(y), let z = length(z) else {
             return fail("model.scale expects a part id and positive x, y, z factors; mirroring is not supported.")
         }
@@ -240,6 +258,7 @@ final class AdaScriptModelBridge {
     }
 
     func setParent(id: GSValue, parent: GSValue) -> Bool {
+        guard rig == nil else { return fail("Geometry parents are frozen during rig authoring.") }
         guard let id = nodeIndex(id), let parent = nodeIndex(parent), parent < id else {
             return fail("model.parent expects two part ids, and the parent must have been created before the child.")
         }
@@ -248,6 +267,7 @@ final class AdaScriptModelBridge {
     }
 
     func setName(id: GSValue, text: GSValue) -> Bool {
+        guard rig == nil else { return fail("Geometry names are frozen during rig authoring.") }
         guard let id = nodeIndex(id), text.isString else { return fail("model.name expects a part id and a string.") }
         let name = String(text.toString.prefix(64)).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return fail("model.name expects a non-empty string.") }
@@ -255,7 +275,56 @@ final class AdaScriptModelBridge {
         return true
     }
 
+    // MARK: - Interpreted rig authoring
+
+    func partCount() -> Int { nodes.count }
+    func partName(id: GSValue) -> String {
+        guard let index = nodeIndex(id) else { _ = fail("Invalid part id"); return "" }
+        return nodes[index].name
+    }
+    func partParent(id: GSValue) -> Int {
+        guard let index = nodeIndex(id) else { return failed("Invalid part id") }
+        return nodes[index].parent ?? -1
+    }
+    func partHasMesh(id: GSValue) -> Bool {
+        guard let index = nodeIndex(id) else { return fail("Invalid part id") }
+        return nodes[index].mesh != nil
+    }
+    func partVertexCount(id: GSValue) -> Int {
+        guard let index = nodeIndex(id) else { return failed("Invalid part id") }
+        return nodes[index].mesh?.positions.count ?? 0
+    }
+    func rigJoint(name: GSValue, parent: GSValue, position: GSValue) -> Int {
+        rigCall(-1) { try $0.scriptJoint(name, parent, position) }
+    }
+    func rigBind(part: GSValue, joint: GSValue) -> Bool { rigCall(false) { try $0.bind(part: $0.index(part), joint: $0.index(joint)) } }
+    func rigVertexPosition(part: GSValue, vertex: GSValue, axis: GSValue) -> Double {
+        rigCall(0) { try $0.position(part: $0.index(part), vertex: $0.index(vertex), axis: $0.index(axis)) }
+    }
+    func rigWeights(part: GSValue, vertex: GSValue, values: GSValue) -> Bool {
+        rigCall(false) { try $0.scriptWeights(part, vertex, values) }
+    }
+    func rigClip(name: GSValue) -> Int { rigCall(-1) { try $0.addClip(name: $0.text(name)) } }
+    func rigRotationKey(clip: GSValue, joint: GSValue, values: GSValue) -> Bool {
+        rigCall(false) { try $0.scriptKey(clip, joint, values, rotation: true) }
+    }
+    func rigTranslationKey(clip: GSValue, joint: GSValue, values: GSValue) -> Bool {
+        rigCall(false) { try $0.scriptKey(clip, joint, values, rotation: false) }
+    }
+
     // MARK: - Helpers
+
+    @GSExportableIgnore
+    private func rigCall<T>(_ fallback: T, _ action: (AdaScriptModelRigBuilder) throws -> T) -> T {
+        do {
+            if rig == nil { rig = try AdaScriptModelRigBuilder(nodes: nodes) }
+            guard let rig else { return fallback }
+            return try action(rig)
+        } catch {
+            _ = fail(error.localizedDescription)
+            return fallback
+        }
+    }
 
     @GSExportableIgnore
     private static func defaultMaterial(_ index: Int) -> ProceduralMaterial {
@@ -264,6 +333,7 @@ final class AdaScriptModelBridge {
 
     @GSExportableIgnore
     private func add(_ name: String, _ mesh: ProceduralMeshData) -> Int {
+        guard rig == nil else { return failed("Finish geometry before starting rig authoring.") }
         guard nodes.count < Self.maximumNodes else { return failed("A model has at most \(Self.maximumNodes) parts.") }
         guard vertexCount + mesh.positions.count <= Self.maximumVertices else {
             return failed("A model has at most \(Self.maximumVertices) vertices; use fewer segments or fewer parts.")
@@ -287,7 +357,7 @@ final class AdaScriptModelBridge {
 
     @GSExportableIgnore
     private func wholeNumber(_ value: GSValue) -> Int? {
-        guard let number = value.finiteNumber, number == number.rounded() else { return nil }
+        guard let number = value.finiteNumber, number == number.rounded(), abs(number) <= 1_000_000 else { return nil }
         return Int(number)
     }
 

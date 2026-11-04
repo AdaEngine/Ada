@@ -17,6 +17,7 @@ enum AdaScriptGeneratorRunner {
         guard source.utf8.count <= 64 * 1024 else {
             throw AdaScriptError.invalidManifest("The \(kind) script exceeds 64 KiB.")
         }
+        let source = source.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
         try AdaScriptCommunityLowerer.validate(source: source)
         guard source.contains("func build(") else {
             throw AdaScriptError.invalidManifest("Define `func build(model) { ... }`; the host calls it with the \(kind) builder.")
@@ -26,7 +27,7 @@ enum AdaScriptGeneratorRunner {
             ResolvedGravityScriptModule.Source(fileID: $0.fileID, source: try AdaScriptCommunityLowerer.instrument(source: $0.source))
         }
         // Gravity holds its delegate unowned, so it must outlive the VM below.
-        let delegate = AnnotatedGravityRuntimeDelegate(module: module, sourcesByPath: guarded)
+        let delegate = AdaScriptGeneratorDelegate(module: module, sourcesByPath: guarded)
         try AdaScriptRuntimeCoordinator.lock.withLock {
             let vm = GravityVirtualMachine(settings: .init(), delegate: delegate)
             try AdaScriptIdentifiers.bind(to: vm)

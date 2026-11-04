@@ -1,0 +1,36 @@
+{
+  "passed": true,
+  "asset": "Assets\\Models\\Skeleton.glb",
+  "sha256": "a58a97c4ae96212a5b3b4e9c477131d4eab86c34ceabe34ebd62d351f7475b0f",
+  "bytes": 418684,
+  "nodes": 154,
+  "meshes": 137,
+  "materials": 11,
+  "vertices": 7348,
+  "triangles": 4284,
+  "normalLengthRange": [
+    0.9999999014164342,
+    1.0000001223531878
+  ],
+  "checks": [
+    "GLB/chunk bounds",
+    "self-contained buffers",
+    "accessor ranges",
+    "index ranges",
+    "finite positions and unit normals",
+    "non-degenerate triangles",
+    "normals agree with winding",
+    "UV counts",
+    "material indices",
+    "acyclic single-parent hierarchy",
+    "named character parts",
+    "static/no-texture contract",
+    "triangle and byte budgets"
+  ],
+  "notChecked": [
+    "manifoldness",
+    "self-intersections",
+    "rig or deformation quality",
+    "reference similarity"
+  ]
+}

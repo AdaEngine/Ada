@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 3,
+  "project": {
+    "name": "ProceduralSkeleton",
+    "displayName": "Skeleton — AdaScript rig and walk",
+    "id": "4b888882-6278-4d72-a10c-fcae68cb5e97",
+    "bundleIdentifier": "org.adaengine.proceduralskeleton"
+  },
+  "paths": { "sources": "Sources", "assets": "Assets", "resourceRoots": ["Assets"] },
+  "build": { "system": "adascript" },
+  "runtime": {
+    "moduleName": "ProceduralSkeleton",
+    "entry": { "scene": "Assets/Scenes/Walk.ascn" },
+    "plugins": { "preset": "game3d", "presetVersion": 1 }
+  },
+  "editor": { "startupScene": "Assets/Scenes/Walk.ascn" },
+  "inputActions": []
+}

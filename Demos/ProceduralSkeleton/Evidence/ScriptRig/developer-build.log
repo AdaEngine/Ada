@@ -1,0 +1,27 @@
+[0/1] Planning build
+Building for debugging...
+[0/2] Write swift-version-4338A9387FA42D0F.txt
+[2/3] Emitting module AdaAssets
+[4/5] Emitting module AdaScripting
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[5/7] Write sources
+[7/9] Emitting module ScriptRig
+[8/9] Compiling ScriptRig Main.swift
+[9/12] Wrapping AST for ScriptRig for debugging
+[10/12] Write Objects.LinkFileList
+[11/12] Linking ScriptRig.exe
+Build of product 'ScriptRig' complete! (24.68s)
+{
+  "bytes" : 514060,
+  "clips" : [
+    "BindPose",
+    "Walk"
+  ],
+  "execution" : "AdaScript bytecode VM plus precompiled native builder; no subprocess during generation",
+  "generationSeconds" : 0.5372538,
+  "joints" : 23,
+  "meshes" : 11,
+  "sourceBytes" : 46996,
+  "sourceLintIssues" : 0
+}

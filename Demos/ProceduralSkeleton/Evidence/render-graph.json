@@ -1,0 +1,610 @@
+{
+  "backend": {
+    "capabilities": {
+      "gpuCounters": {
+        "provider": "none",
+        "supported": false
+      },
+      "programmaticCapture": {
+        "provider": "none",
+        "supported": false
+      },
+      "timestampQueries": {
+        "provider": "WebGPU GPUQuerySet, runtime dependent",
+        "supported": false
+      }
+    },
+    "maxFramesInFlight": 3,
+    "type": "webgpu"
+  },
+  "cameras": [
+    {
+      "attachments": [
+        {
+          "height": 1050,
+          "isAvailable": true,
+          "isReadableColor": true,
+          "name": "main",
+          "pixelFormat": "bgra8",
+          "scaleFactor": 1.5,
+          "typeName": "AdaRender.RenderTexture",
+          "width": 1536
+        },
+        {
+          "height": 1050,
+          "isAvailable": true,
+          "isReadableColor": true,
+          "name": "output",
+          "pixelFormat": "bgra8",
+          "scaleFactor": 1,
+          "typeName": "AdaRender.RenderTexture",
+          "width": 1536
+        },
+        {
+          "isAvailable": false,
+          "isReadableColor": false,
+          "name": "depth",
+          "unsupportedReason": "Attachment is not allocated."
+        },
+        {
+          "isAvailable": false,
+          "isReadableColor": false,
+          "name": "sceneColor",
+          "unsupportedReason": "Attachment is not allocated."
+        },
+        {
+          "isAvailable": false,
+          "isReadableColor": false,
+          "name": "lightAccum",
+          "unsupportedReason": "Attachment is not allocated."
+        },
+        {
+          "isAvailable": false,
+          "isReadableColor": false,
+          "name": "shadowMask",
+          "unsupportedReason": "Attachment is not allocated."
+        }
+      ],
+      "entityId": 1,
+      "graph": {
+        "inputSlot": "view",
+        "subgraphLabel": "Scene 2D Render Graph"
+      },
+      "isActive": true,
+      "name": "ExtractedCameraEntity",
+      "renderOrder": 0
+    }
+  ],
+  "graph": {
+    "edges": [],
+    "issues": [
+      {
+        "code": "disconnected_node",
+        "message": "Node has no input or output edges.",
+        "node": "CameraRenderNode",
+        "severity": "warning"
+      }
+    ],
+    "label": "RenderWorld_Root",
+    "nodes": [
+      {
+        "inputEdgeCount": 0,
+        "inputSlots": [],
+        "label": "CameraRenderNode",
+        "outputEdgeCount": 0,
+        "outputSlots": [],
+        "typeName": "AdaRender.CameraRenderNode"
+      }
+    ],
+    "subgraphs": [
+      {
+        "edges": [
+          {
+            "fromNode": "Light2DCompositeRenderNode",
+            "kind": "node",
+            "toNode": "Main2D.EndPass"
+          },
+          {
+            "fromNode": "Main2D.BeginPass",
+            "kind": "node",
+            "toNode": "Main2DRenderNode"
+          },
+          {
+            "fromNode": "Main2D.EndPass",
+            "kind": "node",
+            "toNode": "UpscaleNode"
+          },
+          {
+            "fromNode": "Main2DRenderNode",
+            "kind": "node",
+            "toNode": "Light2DCompositeRenderNode"
+          },
+          {
+            "fromNode": "Main2DRenderNode",
+            "kind": "node",
+            "toNode": "UIRenderNode"
+          },
+          {
+            "fromNode": "UIRenderNode",
+            "kind": "node",
+            "toNode": "Main2D.EndPass"
+          },
+          {
+            "fromNode": "_GraphEntryNode",
+            "inputSlot": "view",
+            "inputSlotKind": "entity",
+            "kind": "slot",
+            "outputSlot": "view",
+            "outputSlotKind": "entity",
+            "toNode": "Main2DRenderNode"
+          }
+        ],
+        "entryNode": "_GraphEntryNode",
+        "issues": [],
+        "label": "Scene 2D Render Graph",
+        "nodes": [
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Light2DCompositeRenderNode",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaSprite.Light2DCompositeRenderNode"
+          },
+          {
+            "inputEdgeCount": 0,
+            "inputSlots": [],
+            "label": "Main2D.BeginPass",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaRender.EmptyNode"
+          },
+          {
+            "inputEdgeCount": 2,
+            "inputSlots": [],
+            "label": "Main2D.EndPass",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaRender.EmptyNode"
+          },
+          {
+            "inputEdgeCount": 2,
+            "inputSlots": [
+              {
+                "kind": "entity",
+                "name": "view"
+              }
+            ],
+            "label": "Main2DRenderNode",
+            "outputEdgeCount": 2,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.Main2DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [
+              {
+                "kind": "entity",
+                "name": "view"
+              }
+            ],
+            "label": "UIRenderNode",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaUI.UIRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [
+              {
+                "kind": "entity",
+                "name": "view"
+              }
+            ],
+            "label": "UpscaleNode",
+            "outputEdgeCount": 0,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.UpscaleNode"
+          },
+          {
+            "inputEdgeCount": 0,
+            "inputSlots": [
+              {
+                "kind": "entity",
+                "name": "view"
+              }
+            ],
+            "label": "_GraphEntryNode",
+            "outputEdgeCount": 1,
+            "outputSlots": [
+              {
+                "kind": "entity",
+                "name": "view"
+              }
+            ],
+            "typeName": "AdaRender.GraphEntryNode"
+          }
+        ],
+        "subgraphs": []
+      },
+      {
+        "edges": [
+          {
+            "fromNode": "DirectionalShadow3DRenderNode",
+            "kind": "node",
+            "toNode": "Main3D.LocalShadows"
+          },
+          {
+            "fromNode": "DirectionalShadow3DRenderNode",
+            "kind": "node",
+            "toNode": "Main3DRenderNode"
+          },
+          {
+            "fromNode": "Main3D.AutoExposure",
+            "kind": "node",
+            "toNode": "Main3D.Bloom"
+          },
+          {
+            "fromNode": "Main3D.BeginPass",
+            "kind": "node",
+            "toNode": "DirectionalShadow3DRenderNode"
+          },
+          {
+            "fromNode": "Main3D.Bloom",
+            "kind": "node",
+            "toNode": "Main3D.ScreenSpaceReflection"
+          },
+          {
+            "fromNode": "Main3D.CameraEffects",
+            "kind": "node",
+            "toNode": "Main3D.DebugView"
+          },
+          {
+            "fromNode": "Main3D.DebugDraw",
+            "kind": "node",
+            "toNode": "Main3D.EndPass"
+          },
+          {
+            "fromNode": "Main3D.DebugView",
+            "kind": "node",
+            "toNode": "Main3D.DebugDraw"
+          },
+          {
+            "fromNode": "Main3D.DepthOfField",
+            "kind": "node",
+            "toNode": "Main3D.CameraEffects"
+          },
+          {
+            "fromNode": "Main3D.DynamicIrradiance",
+            "kind": "node",
+            "toNode": "Main3DRenderNode"
+          },
+          {
+            "fromNode": "Main3D.EndPass",
+            "kind": "node",
+            "toNode": "UpscaleNode"
+          },
+          {
+            "fromNode": "Main3D.FXAA",
+            "kind": "node",
+            "toNode": "Main3D.TemporalResolve"
+          },
+          {
+            "fromNode": "Main3D.LocalShadows",
+            "kind": "node",
+            "toNode": "Main3D.DynamicIrradiance"
+          },
+          {
+            "fromNode": "Main3D.Particles",
+            "kind": "node",
+            "toNode": "Main3D.SSAO"
+          },
+          {
+            "fromNode": "Main3D.Particles",
+            "kind": "node",
+            "toNode": "Main3D.VolumetricFog"
+          },
+          {
+            "fromNode": "Main3D.PathTracing",
+            "kind": "node",
+            "toNode": "Main3D.PathTracingOverlays"
+          },
+          {
+            "fromNode": "Main3D.PathTracingOverlays",
+            "kind": "node",
+            "toNode": "Main3D.Particles"
+          },
+          {
+            "fromNode": "Main3D.PathTracingOverlays",
+            "kind": "node",
+            "toNode": "Main3D.SSAO"
+          },
+          {
+            "fromNode": "Main3D.PathTracingOverlays",
+            "kind": "node",
+            "toNode": "Main3D.ScreenSpaceGI"
+          },
+          {
+            "fromNode": "Main3D.PathTracingOverlays",
+            "kind": "node",
+            "toNode": "Main3D.VolumetricFog"
+          },
+          {
+            "fromNode": "Main3D.SSAO",
+            "kind": "node",
+            "toNode": "Main3D.AutoExposure"
+          },
+          {
+            "fromNode": "Main3D.ScreenSpaceGI",
+            "kind": "node",
+            "toNode": "Main3D.Particles"
+          },
+          {
+            "fromNode": "Main3D.ScreenSpaceReflection",
+            "kind": "node",
+            "toNode": "Main3D.FXAA"
+          },
+          {
+            "fromNode": "Main3D.TemporalResolve",
+            "kind": "node",
+            "toNode": "Main3D.DepthOfField"
+          },
+          {
+            "fromNode": "Main3D.VolumetricFog",
+            "kind": "node",
+            "toNode": "Main3D.ScreenSpaceReflection"
+          },
+          {
+            "fromNode": "Main3DRenderNode",
+            "kind": "node",
+            "toNode": "Main3D.Particles"
+          },
+          {
+            "fromNode": "Main3DRenderNode",
+            "kind": "node",
+            "toNode": "Main3D.PathTracing"
+          },
+          {
+            "fromNode": "Main3DRenderNode",
+            "kind": "node",
+            "toNode": "Main3D.SSAO"
+          },
+          {
+            "fromNode": "Main3DRenderNode",
+            "kind": "node",
+            "toNode": "Main3D.ScreenSpaceGI"
+          },
+          {
+            "fromNode": "Main3DRenderNode",
+            "kind": "node",
+            "toNode": "Main3D.ScreenSpaceReflection"
+          },
+          {
+            "fromNode": "Main3DRenderNode",
+            "kind": "node",
+            "toNode": "Main3D.VolumetricFog"
+          },
+          {
+            "fromNode": "_GraphEntryNode",
+            "inputSlot": "view",
+            "inputSlotKind": "entity",
+            "kind": "slot",
+            "outputSlot": "view",
+            "outputSlotKind": "entity",
+            "toNode": "Main3DRenderNode"
+          }
+        ],
+        "entryNode": "_GraphEntryNode",
+        "issues": [],
+        "label": "Scene 3D Render Graph",
+        "nodes": [
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "DirectionalShadow3DRenderNode",
+            "outputEdgeCount": 2,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.DirectionalShadow3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.AutoExposure",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.AutoExposure3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 0,
+            "inputSlots": [],
+            "label": "Main3D.BeginPass",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaRender.EmptyNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.Bloom",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.Bloom3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.CameraEffects",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.CameraEffects3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.DebugDraw",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.DebugDraw3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.DebugView",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.DebugView3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.DepthOfField",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.DepthOfField3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.DynamicIrradiance",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.DynamicIrradiance3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.EndPass",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaRender.EmptyNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.FXAA",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.AntiAliasing3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.LocalShadows",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.LocalShadow3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 3,
+            "inputSlots": [],
+            "label": "Main3D.Particles",
+            "outputEdgeCount": 2,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.Particles3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.PathTracing",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.PathTracing3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.PathTracingOverlays",
+            "outputEdgeCount": 4,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.PathTracingOverlays3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 3,
+            "inputSlots": [],
+            "label": "Main3D.SSAO",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.ScreenSpaceAO3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 2,
+            "inputSlots": [],
+            "label": "Main3D.ScreenSpaceGI",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.ScreenSpaceGI3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 3,
+            "inputSlots": [],
+            "label": "Main3D.ScreenSpaceReflection",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.ScreenSpaceReflectionRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [],
+            "label": "Main3D.TemporalResolve",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.Temporal3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 3,
+            "inputSlots": [],
+            "label": "Main3D.VolumetricFog",
+            "outputEdgeCount": 1,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.VolumetricFog3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 3,
+            "inputSlots": [
+              {
+                "kind": "entity",
+                "name": "view"
+              }
+            ],
+            "label": "Main3DRenderNode",
+            "outputEdgeCount": 6,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.Main3DRenderNode"
+          },
+          {
+            "inputEdgeCount": 1,
+            "inputSlots": [
+              {
+                "kind": "entity",
+                "name": "view"
+              }
+            ],
+            "label": "UpscaleNode",
+            "outputEdgeCount": 0,
+            "outputSlots": [],
+            "typeName": "AdaCorePipelines.UpscaleNode"
+          },
+          {
+            "inputEdgeCount": 0,
+            "inputSlots": [
+              {
+                "kind": "entity",
+                "name": "view"
+              }
+            ],
+            "label": "_GraphEntryNode",
+            "outputEdgeCount": 1,
+            "outputSlots": [
+              {
+                "kind": "entity",
+                "name": "view"
+              }
+            ],
+            "typeName": "AdaRender.GraphEntryNode"
+          }
+        ],
+        "subgraphs": []
+      }
+    ]
+  }
+}

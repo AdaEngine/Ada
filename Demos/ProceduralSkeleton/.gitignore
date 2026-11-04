@@ -1,0 +1,16 @@
+.ada/*
+!.ada/project.json
+.builds/
+Evidence/session-*.json
+Evidence/studio-*.log
+__pycache__/
+Assets/Models/Skeleton-v*.glb
+Assets/Models/Skeleton-Walk-samples.glb
+Evidence/Rig/phase-*.png
+Evidence/Rig/walk-test-*.png
+Evidence/Rig/first-scenario.json
+Evidence/Rig/motion-probe.json
+Evidence/first-pass.png
+Evidence/*-v*.png
+Evidence/generation-v1.json
+Evidence/front-native.png

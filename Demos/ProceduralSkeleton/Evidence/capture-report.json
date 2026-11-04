@@ -1,0 +1,93 @@
+{
+  "model": "Assets/Models/Skeleton.glb",
+  "views": [
+    {
+      "yawDegrees": 0,
+      "savedAs": "front.png",
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 18,
+      "height": 960,
+      "label": "front",
+      "meanRGB": [
+        23.7,
+        21.7,
+        20.5
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-front-178CB897.png",
+      "sourceHeight": 960,
+      "sourceWidth": 1280,
+      "t": 0.4,
+      "uniform": false,
+      "width": 1280
+    },
+    {
+      "yawDegrees": -28,
+      "savedAs": "three-quarter.png",
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 18,
+      "height": 960,
+      "label": "three-quarter",
+      "meanRGB": [
+        22.6,
+        21.4,
+        20.8
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-three-quarter-D5C0A1EA.png",
+      "sourceHeight": 960,
+      "sourceWidth": 1280,
+      "t": 0.4,
+      "uniform": false,
+      "width": 1280
+    },
+    {
+      "yawDegrees": -90,
+      "savedAs": "side.png",
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 18,
+      "height": 960,
+      "label": "side",
+      "meanRGB": [
+        10.4,
+        11.3,
+        13.4
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-side-14344B05.png",
+      "sourceHeight": 960,
+      "sourceWidth": 1280,
+      "t": 0.4,
+      "uniform": false,
+      "width": 1280
+    },
+    {
+      "yawDegrees": 180,
+      "savedAs": "back.png",
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 16,
+      "height": 960,
+      "label": "back",
+      "meanRGB": [
+        20.6,
+        19.8,
+        20
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-back-189C2893.png",
+      "sourceHeight": 960,
+      "sourceWidth": 1280,
+      "t": 0.4,
+      "uniform": false,
+      "width": 1280
+    }
+  ],
+  "limitations": [
+    "Static multipart model; no skin, animation clips, retopology or texture maps.",
+    "These checks do not prove manifold topology, absence of intersections, or reference similarity."
+  ]
+}

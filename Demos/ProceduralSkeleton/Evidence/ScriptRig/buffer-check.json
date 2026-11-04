@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "sha256": "9d1124de7e89d0519a6552f556ea46e92aae9ca61de30b947bcf3d56c720e69f",
+  "vertices": 7348,
+  "triangles": 4284,
+  "joints": 23,
+  "skinnedMeshes": 11,
+  "blendedVertices": 306,
+  "maximumWeightSumError": 2.9802322387695312e-08,
+  "maximumBindPoseErrorMeters": 4.255644849984296e-08,
+  "maximumSourcePositionErrorMeters": 6.372690287239804e-08,
+  "maximumLoopSeamError": 0.0,
+  "maximumSourceNormalError": 1.8504824464256352e-07,
+  "walkDurationSeconds": 1.2,
+  "keysPerTrack": 49,
+  "notChecked": [
+    "arbitrary character auto-rigging",
+    "manifoldness",
+    "all possible self-intersections"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "comparison": "All BindPose/Walk channels, times and values against previous native Swift recipe",
+  "comparedComponents": 4354,
+  "maximumAbsoluteDifference": 4.172325134277344e-07,
+  "tolerance": 1e-05
+}

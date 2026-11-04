@@ -1,0 +1,529 @@
+{
+  "renderer": {
+    "capabilities": {
+      "gpuCounters": {
+        "provider": "none",
+        "supported": false
+      },
+      "programmaticCapture": {
+        "provider": "none",
+        "supported": false
+      },
+      "timestampQueries": {
+        "provider": "WebGPU GPUQuerySet, runtime dependent",
+        "supported": false
+      }
+    },
+    "maxFramesInFlight": 3,
+    "type": "webgpu"
+  },
+  "frames": [
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-00",
+      "meanRGB": [
+        32.1,
+        31.8,
+        31.8
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-00-E86B3BE0.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.0,
+      "savedAs": "frames\\frame-00.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-01",
+      "meanRGB": [
+        31.8,
+        31.6,
+        31.7
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-01-DCDCF877.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.05,
+      "savedAs": "frames\\frame-01.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 9,
+      "height": 800,
+      "label": "pose-02",
+      "meanRGB": [
+        31.9,
+        31.6,
+        31.6
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-02-FA317F0F.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.1,
+      "savedAs": "frames\\frame-02.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-03",
+      "meanRGB": [
+        31.9,
+        31.7,
+        31.7
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-03-3056FB59.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.15000000000000002,
+      "savedAs": "frames\\frame-03.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 9,
+      "height": 800,
+      "label": "pose-04",
+      "meanRGB": [
+        32.1,
+        31.8,
+        31.8
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-04-1CEE2B96.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.2,
+      "savedAs": "frames\\frame-04.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-05",
+      "meanRGB": [
+        32.2,
+        31.8,
+        31.8
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-05-F446123E.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.25,
+      "savedAs": "frames\\frame-05.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-06",
+      "meanRGB": [
+        32,
+        31.7,
+        31.8
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-06-0EC01E1B.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.30000000000000004,
+      "savedAs": "frames\\frame-06.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-07",
+      "meanRGB": [
+        32.3,
+        32,
+        32
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-07-63333FD9.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.35000000000000003,
+      "savedAs": "frames\\frame-07.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 4,
+      "height": 800,
+      "label": "pose-08",
+      "meanRGB": [
+        32,
+        31.7,
+        31.8
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-08-C97C7FC2.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.4,
+      "savedAs": "frames\\frame-08.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-09",
+      "meanRGB": [
+        32,
+        31.7,
+        31.9
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-09-D5AFDE28.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.45,
+      "savedAs": "frames\\frame-09.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-10",
+      "meanRGB": [
+        32.1,
+        31.7,
+        31.9
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-10-96492552.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.5,
+      "savedAs": "frames\\frame-10.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 9,
+      "height": 800,
+      "label": "pose-11",
+      "meanRGB": [
+        32.3,
+        32,
+        32.1
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-11-250D78E0.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.55,
+      "savedAs": "frames\\frame-11.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-12",
+      "meanRGB": [
+        32.6,
+        32.4,
+        32.6
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-12-868D9CCB.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.6000000000000001,
+      "savedAs": "frames\\frame-12.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-13",
+      "meanRGB": [
+        32.6,
+        32.3,
+        32.5
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-13-19AB8135.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.65,
+      "savedAs": "frames\\frame-13.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 9,
+      "height": 800,
+      "label": "pose-14",
+      "meanRGB": [
+        32.5,
+        32.3,
+        32.5
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-14-AE60C843.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.7000000000000001,
+      "savedAs": "frames\\frame-14.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-15",
+      "meanRGB": [
+        32.7,
+        32.5,
+        32.7
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-15-E9B12B56.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.75,
+      "savedAs": "frames\\frame-15.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-16",
+      "meanRGB": [
+        32.4,
+        32.1,
+        32.2
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-16-2E03D4A7.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.8,
+      "savedAs": "frames\\frame-16.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 7,
+      "height": 800,
+      "label": "pose-17",
+      "meanRGB": [
+        32.6,
+        32.2,
+        32.3
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-17-A7DC9E92.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.8500000000000001,
+      "savedAs": "frames\\frame-17.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-18",
+      "meanRGB": [
+        32.3,
+        32,
+        32
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-18-BD62EBBE.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.9,
+      "savedAs": "frames\\frame-18.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 9,
+      "height": 800,
+      "label": "pose-19",
+      "meanRGB": [
+        32.4,
+        32,
+        32
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-19-63F07727.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 0.9500000000000001,
+      "savedAs": "frames\\frame-19.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-20",
+      "meanRGB": [
+        32.5,
+        32.1,
+        32
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-20-41596115.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 1.0,
+      "savedAs": "frames\\frame-20.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 7,
+      "height": 800,
+      "label": "pose-21",
+      "meanRGB": [
+        32.4,
+        32.1,
+        32
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-21-5AE9535C.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 1.05,
+      "savedAs": "frames\\frame-21.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 8,
+      "height": 800,
+      "label": "pose-22",
+      "meanRGB": [
+        32.8,
+        32.3,
+        32.2
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-22-4F956691.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 1.1,
+      "savedAs": "frames\\frame-22.png"
+    },
+    {
+      "activeCameras": [
+        "Camera"
+      ],
+      "frameSequence": 10,
+      "height": 800,
+      "label": "pose-23",
+      "meanRGB": [
+        32.5,
+        32.1,
+        32.1
+      ],
+      "path": "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton/.ada/workspace/agent-captures/scenario-pose-23-210A3283.png",
+      "sourceHeight": 800,
+      "sourceWidth": 960,
+      "t": 0.12,
+      "uniform": false,
+      "width": 960,
+      "poseTime": 1.1500000000000001,
+      "savedAs": "frames\\frame-23.png"
+    }
+  ],
+  "method": "Fixed CapturePose clips sampled from every second Walk key; rendered by native skinning, 20 fps.",
+  "sourceSha256": "152ae72fe37c082a298378ea5252759c4315842b867dc1b9aa259eeec5100bc3",
+  "liveDistinctHipPoses": 4
+}

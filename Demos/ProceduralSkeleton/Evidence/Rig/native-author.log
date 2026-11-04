@@ -1,0 +1,139 @@
+[0/1] Planning build
+Building for debugging...
+[0/3] Write swift-version-4338A9387FA42D0F.txt
+Build of product 'SkeletonRig' complete! (0.42s)
+{
+  "author" : "Native Swift using AdaAssets NativeGLTFLoader and GLBWriter",
+  "bytes" : 514068,
+  "clips" : [
+    {
+      "duration" : 1.2,
+      "name" : "BindPose"
+    },
+    {
+      "duration" : 1.2,
+      "name" : "Walk"
+    }
+  ],
+  "joints" : [
+    {
+      "name" : "Rig.root",
+      "node" : 1,
+      "paletteIndex" : 0
+    },
+    {
+      "name" : "Rig.hips",
+      "node" : 2,
+      "paletteIndex" : 1
+    },
+    {
+      "name" : "Rig.spine",
+      "node" : 3,
+      "paletteIndex" : 2
+    },
+    {
+      "name" : "Rig.chest",
+      "node" : 4,
+      "paletteIndex" : 3
+    },
+    {
+      "name" : "Rig.neck",
+      "node" : 5,
+      "paletteIndex" : 4
+    },
+    {
+      "name" : "Rig.head",
+      "node" : 6,
+      "paletteIndex" : 5
+    },
+    {
+      "name" : "Rig.jaw",
+      "node" : 7,
+      "paletteIndex" : 6
+    },
+    {
+      "name" : "Rig.leftHip",
+      "node" : 8,
+      "paletteIndex" : 7
+    },
+    {
+      "name" : "Rig.leftKnee",
+      "node" : 9,
+      "paletteIndex" : 8
+    },
+    {
+      "name" : "Rig.leftAnkle",
+      "node" : 10,
+      "paletteIndex" : 9
+    },
+    {
+      "name" : "Rig.leftToe",
+      "node" : 11,
+      "paletteIndex" : 10
+    },
+    {
+      "name" : "Rig.rightHip",
+      "node" : 12,
+      "paletteIndex" : 11
+    },
+    {
+      "name" : "Rig.rightKnee",
+      "node" : 13,
+      "paletteIndex" : 12
+    },
+    {
+      "name" : "Rig.rightAnkle",
+      "node" : 14,
+      "paletteIndex" : 13
+    },
+    {
+      "name" : "Rig.rightToe",
+      "node" : 15,
+      "paletteIndex" : 14
+    },
+    {
+      "name" : "Rig.leftShoulder",
+      "node" : 16,
+      "paletteIndex" : 15
+    },
+    {
+      "name" : "Rig.leftElbow",
+      "node" : 17,
+      "paletteIndex" : 16
+    },
+    {
+      "name" : "Rig.leftWrist",
+      "node" : 18,
+      "paletteIndex" : 17
+    },
+    {
+      "name" : "Rig.leftHand",
+      "node" : 19,
+      "paletteIndex" : 18
+    },
+    {
+      "name" : "Rig.rightShoulder",
+      "node" : 20,
+      "paletteIndex" : 19
+    },
+    {
+      "name" : "Rig.rightElbow",
+      "node" : 21,
+      "paletteIndex" : 20
+    },
+    {
+      "name" : "Rig.rightWrist",
+      "node" : 22,
+      "paletteIndex" : 21
+    },
+    {
+      "name" : "Rig.rightHand",
+      "node" : 23,
+      "paletteIndex" : 22
+    }
+  ],
+  "meshes" : 11,
+  "output" : "C:\/Users\/Vladislav\/.codex\/worktrees\/procedural-skeleton-study\/AdaEngine\/Demos\/ProceduralSkeleton\/Assets\/Models\/Skeleton-Walk.glb",
+  "skinning" : "JOINTS_0 uint16 + WEIGHTS_0 float32, four slots; rigid bones and blended clothing",
+  "source" : "C:\/Users\/Vladislav\/.codex\/worktrees\/procedural-skeleton-study\/AdaEngine\/Demos\/ProceduralSkeleton\/Assets\/Models\/Skeleton.glb"
+}

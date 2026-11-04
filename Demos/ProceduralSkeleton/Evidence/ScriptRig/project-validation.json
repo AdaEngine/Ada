@@ -1,0 +1,114 @@
+{
+  "artifacts" : [
+
+  ],
+  "cliVersion" : "1.0.0",
+  "command" : "validate",
+  "details" : {
+    "entry" : "scene Assets/Scenes/Walk.ascn",
+    "lintIssueCount" : "0",
+    "projectPath" : "C:/Users/Vladislav/.codex/worktrees/procedural-skeleton-study/AdaEngine/Demos/ProceduralSkeleton",
+    "sourceCount" : "1",
+    "systemCount" : "0",
+    "validationScope" : "metadata,adascript,entry-scene,runtime-bindings"
+  },
+  "diagnostics" : [
+
+  ],
+  "exitCode" : 0,
+  "ok" : true,
+  "project" : {
+    "ai" : {
+      "mcp" : {
+        "allowedResourceRoots" : [
+
+        ],
+        "enabled" : true
+      }
+    },
+    "build" : {
+      "excludedFiles" : [
+
+      ],
+      "includedFiles" : [
+
+      ],
+      "system" : "adascript",
+      "targets" : [
+
+      ]
+    },
+    "editor" : {
+      "startupScene" : "Assets/Scenes/Walk.ascn"
+    },
+    "engine" : {
+
+    },
+    "paths" : {
+      "assets" : "Assets",
+      "resourceRoots" : [
+        "Assets"
+      ],
+      "run" : {
+
+      },
+      "sources" : "Sources"
+    },
+    "project" : {
+      "bundleIdentifier" : "org.adaengine.proceduralskeleton",
+      "displayName" : "Skeleton — AdaScript rig and walk",
+      "id" : "4b888882-6278-4d72-a10c-fcae68cb5e97",
+      "name" : "ProceduralSkeleton"
+    },
+    "run" : {
+      "arguments" : [
+
+      ],
+      "destination" : "macos",
+      "environment" : {
+
+      }
+    },
+    "runtime" : {
+      "entry" : {
+        "scene" : "Assets/Scenes/Walk.ascn"
+      },
+      "moduleName" : "ProceduralSkeleton",
+      "plugins" : {
+        "disable" : [
+
+        ],
+        "enable" : [
+
+        ],
+        "preset" : "game3d",
+        "presetVersion" : 1,
+        "settings" : {
+          "multiplayer" : {
+            "buildIdentifier" : "1",
+            "gameIdentifier" : "org.adaengine.adascript-game",
+            "host" : "::1",
+            "peerIndex" : 1,
+            "port" : 37777,
+            "role" : "host"
+          },
+          "physics2d" : {
+            "gravity" : [
+              0,
+              -9.81
+            ]
+          }
+        }
+      },
+      "window" : {
+        "isResizable" : true,
+        "size" : {
+          "height" : 700,
+          "width" : 1024
+        }
+      }
+    },
+    "schemaVersion" : 3
+  },
+  "schemaVersion" : 1
+}

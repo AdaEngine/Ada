@@ -1,0 +1,185 @@
+[0/1] Planning build
+Building for debugging...
+[0/20] Write sources
+[3/20] Write swift-version-4338A9387FA42D0F.txt
+[5/19] Emitting module AdaAssets
+[6/19] Compiling AdaAssets VOXLoader.swift
+[7/19] Compiling AdaAssets VOXModels.swift
+[8/20] Compiling AdaAssets VOXWriter.swift
+[9/27] Compiling AdaAssets PNGWriter.swift
+[10/27] Compiling AdaAssets StandaloneAssetScope.swift
+[11/27] Compiling AdaAssets WAV.swift
+[12/27] Compiling AdaAssets GLBWriter.swift
+[13/27] Compiling AdaAssets GLTFLoader.swift
+[14/27] Compiling AdaAssets NativeGLTFLoader+Accessors.swift
+[15/27] Compiling AdaAssets NativeGLTFLoader.swift
+[16/28] Wrapping AST for AdaAssets for debugging
+[18/34] Emitting module AdaScripting
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[19/34] Compiling AdaScripting AdaScriptCommunityPolicy.swift
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[20/34] Compiling AdaScripting AdaScriptGeneratorDelegate.swift
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[21/34] Compiling AdaScripting AdaScriptGeneratorRunner.swift
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[22/34] Compiling AdaScripting AdaScriptModelGenerator.swift
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[23/34] Compiling AdaScripting AdaScriptModelRigBuilder.swift
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[24/39] Compiling AdaScripting AdaScriptSoundGenerator.swift
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[25/39] Compiling AdaScripting AdaScriptSpriteGenerator.swift
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[26/39] Compiling AdaScripting AdaScriptStandardLibrary.swift
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[27/39] Compiling AdaScripting AdaScriptVoxelGenerator.swift
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[28/39] Compiling AdaScripting GravityScriptModule.swift
+Internal Error: DecodingError.dataCorrupted: Data was corrupted. Debug description: Corrupted JSON. Underlying error: unexpected end of file
+
+[29/40] Wrapping AST for AdaScripting for debugging
+[31/45] Compiling ScriptRig Main.swift
+[32/45] Emitting module ScriptRig
+[33/45] Write Objects.LinkFileList
+[34/45] Linking ScriptRig.exe
+[36/45] Emitting module AdaScriptingTests
+[37/45] Compiling AdaScriptingTests AdaScriptMediaGeneratorTests.swift
+[38/45] Compiling AdaScriptingTests AdaScriptModelGeneratorTests.swift
+[39/47] Compiling AdaScriptingTests AdaScriptModelRigTests.swift
+[40/47] Compiling AdaScriptingTests AdaScriptVoxelGeneratorTests.swift
+[41/48] C:\Users\Vladislav\.codex\worktrees\procedural-skeleton-study\AdaEngine\.build-tools\skeleton-script\.build\x86_64-unknown-windows-msvc\debug\ScriptRigStudyPackageDiscoveredTests.derived\all-discovered-tests.swift
+[42/49] Write sources
+[43/49] Wrapping AST for AdaScriptingTests for debugging
+[45/51] Emitting module ScriptRigStudyPackageDiscoveredTests
+[46/51] Compiling ScriptRigStudyPackageDiscoveredTests AdaScriptingTests.swift
+[47/52] Compiling ScriptRigStudyPackageDiscoveredTests all-discovered-tests.swift
+[48/50] Write Objects.LinkFileList
+[49/50] Linking ScriptRigStudyPackageTests.xctest
+Build complete! (29.52s)
+Test Suite 'All tests' started at 2026-11-03 23:50:31.474
+
+Test Suite 'debug.xctest' started at 2026-11-03 23:50:31.475
+
+Test Suite 'debug.xctest' passed at 2026-11-03 23:50:31.475
+
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+
+Test Suite 'All tests' passed at 2026-11-03 23:50:31.475
+
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+
+◊ Test run started.
+
+→ Testing Library Version: 6.3.1 (937120cbc281cf2)
+
+→ Target Platform: x86_64-unknown-windows-msvc
+
+◊ Suite "AdaScript sound and sprite generators" started.
+
+◊ Suite "AdaScript voxel generator" started.
+
+◊ Suite "AdaScript model generator" started.
+
+◊ Suite "AdaScript interpreted rig authoring" started.
+
+◊ Test "Paints primitives with a custom palette and round-trips through the VOX loader" started.
+
+◊ Test "Interpreted recipe exports joints, weights, clips and transformed geometry through the native importer" started.
+
+◊ Test "Builds a layered sound effect with a pitch sweep, filter and echo" started.
+
+◊ Test "Builds a hierarchy of primitives with materials and encodes it as GLB" started.
+
+√ Test "Interpreted recipe exports joints, weights, clips and transformed geometry through the native importer" passed after 0.064 seconds.
+
+√ Test "Builds a hierarchy of primitives with materials and encodes it as GLB" passed after 0.064 seconds.
+
+√ Test "Builds a layered sound effect with a pitch sweep, filter and echo" passed after 0.064 seconds.
+
+◊ Test "World vertex queries and baked normals agree with rotated custom geometry" started.
+
+◊ Test "MIDI helper follows equal temperament" started.
+
+◊ Test "Revolves a profile, builds custom triangles and loops inside the script" started.
+
+√ Test "Paints primitives with a custom palette and round-trips through the VOX loader" passed after 0.073 seconds.
+
+◊ Test "Loops run inside the script" started.
+
+√ Test "Revolves a profile, builds custom triangles and loops inside the script" passed after 0.048 seconds.
+
+√ Test "World vertex queries and baked normals agree with rotated custom geometry" passed after 0.048 seconds.
+
+√ Test "MIDI helper follows equal temperament" passed after 0.048 seconds.
+
+◊ Test "Rejects invalid scripts and arguments with an error" started.
+
+◊ Test "Rejects invalid bindings, joint hierarchies, key times, late geometry edits and oversized integer indices" started.
+
+◊ Test "Rejects invalid sound scripts and arguments" started.
+
+√ Test "Loops run inside the script" passed after 0.045 seconds.
+
+◊ Test "Rejects invalid scripts" started.
+
+◊ Test case passing 1 argument source → "func build(model) { model.voxel(0, 0, 0, 1); }" to "Rejects invalid scripts" started.
+
+√ Test "Rejects invalid bindings, joint hierarchies, key times, late geometry edits and oversized integer indices" passed after 1.674 seconds.
+
+√ Test "Rejects invalid scripts and arguments with an error" passed after 1.674 seconds.
+
+√ Test "Rejects invalid sound scripts and arguments" passed after 1.674 seconds.
+
+√ Suite "AdaScript interpreted rig authoring" passed after 1.787 seconds.
+
+◊ Test "Enforces the part and vertex budgets" started.
+
+◊ Test "Enforces the voice budgets" started.
+
+◊ Test case passing 1 argument source → "func build(model) { model.size(2, 2, 2); }" to "Rejects invalid scripts" started.
+
+√ Test "Enforces the part and vertex budgets" passed after 0.112 seconds.
+
+√ Test "Enforces the voice budgets" passed after 0.112 seconds.
+
+√ Suite "AdaScript model generator" passed after 1.900 seconds.
+
+◊ Test "Paints a symmetric outlined sprite with a translucent palette entry" started.
+
+◊ Test case passing 1 argument source → "func build(model) { model.size(300, 2, 2); }" to "Rejects invalid scripts" started.
+
+√ Test "Paints a symmetric outlined sprite with a translucent palette entry" passed after 0.015 seconds.
+
+◊ Test "Rejects invalid sprite scripts and arguments" started.
+
+◊ Test case passing 1 argument source → "func build(model) { model.size(2, 2, 2); model.voxel(5, 0, 0, 1); }" to "Rejects invalid scripts" started.
+
+√ Test "Rejects invalid sprite scripts and arguments" passed after 0.717 seconds.
+
+√ Suite "AdaScript sound and sprite generators" passed after 2.633 seconds.
+
+◊ Test case passing 1 argument source → "func build(model) { model.size(2, 2, 2); model.voxel(0, 0, 0, 999); }" to "Rejects invalid scripts" started.
+
+◊ Test case passing 1 argument source → "func build(model) { model.size(2, 2, 2); model.voxel(0.5, 0, 0, 1); }" to "Rejects invalid scripts" started.
+
+◊ Test case passing 1 argument source → "func other(model) { }" to "Rejects invalid scripts" started.
+
+◊ Test case passing 1 argument source → "func build(model) { System.exit(1); }" to "Rejects invalid scripts" started.
+
+◊ Test case passing 1 argument source → "func build(model) { while (true) { } }" to "Rejects invalid scripts" started.
+
+√ Test "Rejects invalid scripts" with 9 test cases passed after 3.296 seconds.
+
+√ Suite "AdaScript voxel generator" passed after 3.416 seconds.
+
+√ Test run with 16 tests in 4 suites passed after 3.416 seconds.

@@ -1,0 +1,13 @@
+{
+  "bytes" : 514060,
+  "clips" : [
+    "BindPose",
+    "Walk"
+  ],
+  "execution" : "AdaScript bytecode VM plus precompiled native builder; no subprocess during generation",
+  "generationSeconds" : 1.1938742,
+  "joints" : 23,
+  "meshes" : 11,
+  "sourceBytes" : 46996,
+  "sourceLintIssues" : 0
+}

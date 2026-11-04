@@ -1,0 +1,167 @@
+{
+  "hasMore": false,
+  "lines": [
+    {
+      "id": "40A066E7-A6DD-446E-9DA4-4F3D4E49AF2E",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed TransformPlugin"
+    },
+    {
+      "id": "89DD13F5-490A-42EB-81C9-98F03275FA6D",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed InputPlugin"
+    },
+    {
+      "id": "306E95B1-4204-4C8C-9FBE-277D3191B905",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed RenderWorldPlugin"
+    },
+    {
+      "id": "F8D8A0F5-807F-4001-AB13-AFC0535CD597",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed EventsPlugin"
+    },
+    {
+      "id": "1F091EDA-FC4C-4BC1-830F-E596C2F11B61",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed CameraPlugin"
+    },
+    {
+      "id": "B9579AF0-FB19-45A2-971D-71DDDEBFA026",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed AssetsPlugin"
+    },
+    {
+      "id": "2642BF40-2AFC-46FC-B48C-9280F01B8FEF",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed VisibilityPlugin"
+    },
+    {
+      "id": "8754C055-1285-44F0-8A0D-8689EA26AA7D",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed TextPlugin"
+    },
+    {
+      "id": "3961E555-362C-4D9E-AD7D-71B795EED5C3",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed ScenePlugin"
+    },
+    {
+      "id": "437DB8A0-29B1-4AB6-B57B-020E6C752DFE",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed Camera2DControllerPlugin"
+    },
+    {
+      "id": "C7FB69EF-1F87-4CFB-8BD3-BE0FD63F42AE",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed EditorProjectScriptObjectsPlugin"
+    },
+    {
+      "id": "44E2B5AB-3A53-4029-871C-B689854D06A0",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed Core3DPlugin"
+    },
+    {
+      "id": "BE9DB366-992E-4665-A4AF-B96ED8F00381",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed Physics3DPlugin"
+    },
+    {
+      "id": "710DAD80-E313-4BD3-BED8-49E5FF9326AA",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed AudioPlugin"
+    },
+    {
+      "id": "712FFD61-AC77-495C-A011-A3718A470570",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed UpscalePlugin"
+    },
+    {
+      "id": "4EF774BE-C3D2-4D21-94FB-495153E918D4",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed AdaScriptPlugin"
+    },
+    {
+      "id": "624433E2-1792-4A55-95B4-90541FC14CCE",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed EditorAdaScriptRuntimeEntryPlugin"
+    },
+    {
+      "id": "B4180899-FB13-437D-BE98-8CACA110FC95",
+      "text": "Compiling AdaScript sources (SwiftPM disabled)..."
+    },
+    {
+      "id": "F59F45CB-1B19-4952-A09E-19F1660C4E30",
+      "text": "AdaScript build succeeded: 1 source(s), 0 system(s), 0 view(s), entry scene Assets/Scenes/Walk.ascn."
+    },
+    {
+      "id": "99645040-30FB-4642-B7F9-DCDB79B2BD25",
+      "text": "Runtime plugins: core3d, model3d, physics3d, audio, upscale"
+    },
+    {
+      "id": "25A06D28-8416-4A95-A29A-42526A72FAA8",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed TransformPlugin"
+    },
+    {
+      "id": "92A38F44-0718-42E6-9B0F-6C5B9E48A6A2",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed InputPlugin"
+    },
+    {
+      "id": "2F392D38-B3FA-485D-8F7F-02EF2D6DA0C9",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed RenderWorldPlugin"
+    },
+    {
+      "id": "E4941FF6-EB0E-46D7-A5FF-B3D0BC2D96D6",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed EventsPlugin"
+    },
+    {
+      "id": "40E22471-B947-43F8-B37F-C998F0609E10",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed CameraPlugin"
+    },
+    {
+      "id": "F0C9A1A8-D866-4583-9080-335DB92C6198",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed AssetsPlugin"
+    },
+    {
+      "id": "18731686-1CC2-455B-A3B4-5D38DB2BD381",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed VisibilityPlugin"
+    },
+    {
+      "id": "54DB5F85-C292-4A71-B296-44BD2D1D32CC",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed TextPlugin"
+    },
+    {
+      "id": "0A1CE73A-B2CB-4EB3-B450-6F5A6BC85479",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed ScenePlugin"
+    },
+    {
+      "id": "F884BDFD-49D1-4F70-89AF-8E8896681906",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed Camera2DControllerPlugin"
+    },
+    {
+      "id": "312343F1-706F-4AE6-94BA-E9E91E76A4C1",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed EditorProjectScriptObjectsPlugin"
+    },
+    {
+      "id": "CEBB75AE-5B8B-4CA2-8E95-057A6211FE9F",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed Core3DPlugin"
+    },
+    {
+      "id": "7BCA0903-25E7-4E1E-9486-138EE964BFC9",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed Physics3DPlugin"
+    },
+    {
+      "id": "B6485C7D-D1BC-47FB-BA0C-484477CF1ECE",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed AudioPlugin"
+    },
+    {
+      "id": "33CF2FAE-FE70-4BC8-8BC1-3E07AADDD512",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed UpscalePlugin"
+    },
+    {
+      "id": "FEEC015C-CF5D-4D0D-8E36-BCF2F052C03A",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed AdaScriptPlugin"
+    },
+    {
+      "id": "6D133D16-3EAB-41E0-BAA1-D262B381272F",
+      "text": "DEBUG [org.adaengine.AdaApp.SceneView] Plugin installed EditorAdaScriptRuntimeEntryPlugin"
+    },
+    {
+      "id": "EA399E67-B7B1-4266-AF3C-C406EFF13299",
+      "text": "Compiling AdaScript sources (SwiftPM disabled)..."
+    },
+    {
+      "id": "906A42D8-B51D-4B8A-81C8-1CEE6601AF66",
+      "text": "AdaScript build succeeded: 1 source(s), 0 system(s), 0 view(s), entry scene Assets/Scenes/Walk.ascn."
+    },
+    {
+      "id": "8144328F-A10D-4075-9AFA-8E84D232952B",
+      "text": "Runtime plugins: core3d, model3d, physics3d, audio, upscale"
+    }
+  ],
+  "nextCursor": "8144328F-A10D-4075-9AFA-8E84D232952B",
+  "source": "editor"
+}

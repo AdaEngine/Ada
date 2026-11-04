@@ -1,0 +1,148 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write sources
+[1/6] Write swift-version-4338A9387FA42D0F.txt
+[3/5] Emitting module AdaScriptingTests
+[4/5] Compiling AdaScriptingTests AdaScriptModelRigTests.swift
+[5/12] C:\Users\Vladislav\.codex\worktrees\procedural-skeleton-study\AdaEngine\.build-tools\skeleton-script\.build\x86_64-unknown-windows-msvc\debug\ScriptRigStudyPackageDiscoveredTests.derived\all-discovered-tests.swift
+[6/13] Write sources
+[7/13] Wrapping AST for AdaScriptingTests for debugging
+[9/15] Compiling ScriptRigStudyPackageDiscoveredTests AdaScriptingTests.swift
+[10/15] Emitting module ScriptRigStudyPackageDiscoveredTests
+[11/16] Compiling ScriptRigStudyPackageDiscoveredTests all-discovered-tests.swift
+[12/14] Write Objects.LinkFileList
+[13/14] Linking ScriptRigStudyPackageTests.xctest
+Build complete! (13.53s)
+Test Suite 'All tests' started at 2026-11-04 00:08:32.082
+
+Test Suite 'debug.xctest' started at 2026-11-04 00:08:32.083
+
+Test Suite 'debug.xctest' passed at 2026-11-04 00:08:32.083
+
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+
+Test Suite 'All tests' passed at 2026-11-04 00:08:32.083
+
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.0 (0.0) seconds
+
+◊ Test run started.
+
+→ Testing Library Version: 6.3.1 (937120cbc281cf2)
+
+→ Target Platform: x86_64-unknown-windows-msvc
+
+◊ Suite "AdaScript interpreted rig authoring" started.
+
+◊ Suite "AdaScript model generator" started.
+
+◊ Suite "AdaScript voxel generator" started.
+
+◊ Suite "AdaScript sound and sprite generators" started.
+
+◊ Test "Builds a layered sound effect with a pitch sweep, filter and echo" started.
+
+◊ Test "Interprets recipes with platform line endings" started.
+
+◊ Test "Builds a hierarchy of primitives with materials and encodes it as GLB" started.
+
+◊ Test "Paints primitives with a custom palette and round-trips through the VOX loader" started.
+
+◊ Test case passing 1 argument ending → "
+
+" to "Interprets recipes with platform line endings" started.
+
+√ Test "Builds a hierarchy of primitives with materials and encodes it as GLB" passed after 0.065 seconds.
+
+√ Test "Builds a layered sound effect with a pitch sweep, filter and echo" passed after 0.065 seconds.
+
+◊ Test "Revolves a profile, builds custom triangles and loops inside the script" started.
+
+◊ Test "MIDI helper follows equal temperament" started.
+
+√ Test "Paints primitives with a custom palette and round-trips through the VOX loader" passed after 0.088 seconds.
+
+◊ Test case passing 1 argument ending → "
+
+
+" to "Interprets recipes with platform line endings" started.
+
+◊ Test "Loops run inside the script" started.
+
+√ Test "Revolves a profile, builds custom triangles and loops inside the script" passed after 0.061 seconds.
+
+√ Test "MIDI helper follows equal temperament" passed after 0.061 seconds.
+
+◊ Test "Rejects invalid scripts and arguments with an error" started.
+
+◊ Test "Rejects invalid sound scripts and arguments" started.
+
+◊ Test case passing 1 argument ending → "
+" to "Interprets recipes with platform line endings" started.
+
+√ Test "Loops run inside the script" passed after 1.095 seconds.
+
+◊ Test "Rejects invalid scripts" started.
+
+◊ Test case passing 1 argument source → "func build(model) { model.voxel(0, 0, 0, 1); }" to "Rejects invalid scripts" started.
+
+√ Test "Rejects invalid sound scripts and arguments" passed after 1.950 seconds.
+
+√ Test "Rejects invalid scripts and arguments with an error" passed after 1.950 seconds.
+
+◊ Test "Enforces the voice budgets" started.
+
+◊ Test "Enforces the part and vertex budgets" started.
+
+◊ Test case passing 1 argument source → "func build(model) { model.size(2, 2, 2); }" to "Rejects invalid scripts" started.
+
+√ Test "Interprets recipes with platform line endings" with 3 test cases passed after 2.100 seconds.
+
+◊ Test "Interpreted recipe exports joints, weights, clips and transformed geometry through the native importer" started.
+
+√ Test "Enforces the part and vertex budgets" passed after 0.142 seconds.
+
+√ Test "Enforces the voice budgets" passed after 0.142 seconds.
+
+√ Suite "AdaScript model generator" passed after 2.220 seconds.
+
+◊ Test "Paints a symmetric outlined sprite with a translucent palette entry" started.
+
+√ Test "Interpreted recipe exports joints, weights, clips and transformed geometry through the native importer" passed after 0.146 seconds.
+
+◊ Test case passing 1 argument source → "func build(model) { model.size(300, 2, 2); }" to "Rejects invalid scripts" started.
+
+◊ Test "World vertex queries and baked normals agree with rotated custom geometry" started.
+
+√ Test "Paints a symmetric outlined sprite with a translucent palette entry" passed after 0.039 seconds.
+
+◊ Test "Rejects invalid sprite scripts and arguments" started.
+
+√ Test "World vertex queries and baked normals agree with rotated custom geometry" passed after 0.032 seconds.
+
+◊ Test case passing 1 argument source → "func build(model) { model.size(2, 2, 2); model.voxel(5, 0, 0, 1); }" to "Rejects invalid scripts" started.
+
+◊ Test "Rejects invalid bindings, joint hierarchies, key times, late geometry edits and oversized integer indices" started.
+
+√ Test "Rejects invalid sprite scripts and arguments" passed after 0.963 seconds.
+
+√ Suite "AdaScript sound and sprite generators" passed after 3.224 seconds.
+
+◊ Test case passing 1 argument source → "func build(model) { model.size(2, 2, 2); model.voxel(0, 0, 0, 999); }" to "Rejects invalid scripts" started.
+
+√ Test "Rejects invalid bindings, joint hierarchies, key times, late geometry edits and oversized integer indices" passed after 1.111 seconds.
+
+√ Suite "AdaScript interpreted rig authoring" passed after 3.391 seconds.
+
+◊ Test case passing 1 argument source → "func build(model) { model.size(2, 2, 2); model.voxel(0.5, 0, 0, 1); }" to "Rejects invalid scripts" started.
+
+◊ Test case passing 1 argument source → "func other(model) { }" to "Rejects invalid scripts" started.
+
+◊ Test case passing 1 argument source → "func build(model) { System.exit(1); }" to "Rejects invalid scripts" started.
+
+◊ Test case passing 1 argument source → "func build(model) { while (true) { } }" to "Rejects invalid scripts" started.
+
+√ Test "Rejects invalid scripts" with 9 test cases passed after 3.303 seconds.
+
+√ Suite "AdaScript voxel generator" passed after 4.488 seconds.
+
+√ Test run with 17 tests in 4 suites passed after 4.488 seconds.
