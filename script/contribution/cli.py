@@ -14,6 +14,7 @@ from .execution import execute, tool_state, write_json
 from .evidence import find_full_report
 from .profiles import build_checks, select_profiles
 from .repository import changed_files, git, safe_path, snapshot, staged_files
+from .publication import publication_checks
 
 
 def parser():
@@ -27,6 +28,8 @@ def parser():
             command.add_argument("--base", default="HEAD")
             command.add_argument("--files", nargs="+")
             command.add_argument("--files-from", type=Path)
+        if name in ("plan", "check"):
+            command.add_argument("--publication", action="store_true")
         if name == "init":
             command.add_argument("--kind", choices=("feature", "improvement", "bug", "maintenance"), required=True)
             command.add_argument("--design")
@@ -103,12 +106,14 @@ def checks_for(root, paths, config, directory, args):
                         dependency_command=command_vector(args.dependency_command))
 
 
-def run_checks(root, paths, config, directory, args, stage="review"):
+def run_checks(root, paths, config, directory, args, stage="review", purpose="complete"):
     directory.mkdir(parents=True, exist_ok=True)
     write_json(directory / "paths.json", paths)
     before = snapshot(root)
     before_tools = tool_state()
     checks = checks_for(root, paths, config, directory, args)
+    if purpose == "publication":
+        checks = publication_checks(root, checks, config)
     if stage != "review":
         checks = [check for check in checks if check.name == "content"]
     results = []
@@ -117,7 +122,7 @@ def run_checks(root, paths, config, directory, args, stage="review"):
         results.append(result)
         print(f"{result['status'].upper():14} {result['name']}" +
               (": " + result["reason"] if result.get("reason") else ""), flush=True)
-    report = {"schema": 1, "snapshot": before, "tools": tool_state(), "stage": stage,
+    report = {"schema": 1, "snapshot": before, "tools": tool_state(), "stage": stage, "purpose": purpose,
               "quick": args.quick, "paths": paths, "profiles": sorted(select_profiles(paths, config)),
               "checks": results, "created": time.time(),
               "recipes": {"runtime": args.runtime_command, "platform": args.platform_command,
@@ -129,9 +134,27 @@ def run_checks(root, paths, config, directory, args, stage="review"):
     return report
 
 
-def status_code(report):
+def status_code(report, publication=False):
     statuses = {check["status"] for check in report["checks"]}
-    return 1 if "failed" in statuses else (2 if "blocked" in statuses else 0)
+    if "failed" in statuses:
+        return 1
+    allowed = {"passed", "not_applicable"}
+    if publication and report.get("purpose") == "publication" and all(
+            check.get("ci_targets") for check in report["checks"] if check["status"] == "deferred"):
+        allowed.add("deferred")
+    return 0 if statuses and statuses.issubset(allowed) else 2
+
+
+def new_branch_paths(root, config):
+    base = config.get("pre_push", {}).get("base_ref", "refs/remotes/origin/main")
+    if not isinstance(base, str) or not base.startswith("refs/remotes/"):
+        raise ValueError("New-branch validation requires a remote-tracking base_ref")
+    try:
+        ancestor = git(root, "merge-base", "HEAD", base).strip()
+    except subprocess.CalledProcessError:
+        print("No common remote base available; validating all tracked files")
+        return sorted(filter(None, git(root, "ls-files", "-z").split("\0")))
+    return changed_files(root, ancestor)
 
 
 def hook(root, args, config):
@@ -149,7 +172,7 @@ def hook(root, args, config):
             if local != git(root, "rev-parse", "HEAD").strip():
                 raise ValueError("Check out each outgoing branch before validating its push")
             if set(remote) == {"0"}:
-                paths.update(filter(None, git(root, "ls-files", "-z").split("\0")))
+                paths.update(new_branch_paths(root, config))
             else:
                 paths.update(changed_files(root, remote))
         paths = sorted(paths)
@@ -157,18 +180,24 @@ def hook(root, args, config):
         args.quick = args.event == "pre-commit"
         args.runtime_command = args.platform_command = args.dependency_command = None
         if args.event == "pre-push":
-            cached, recipes = find_full_report(root, paths, config)
+            cached, recipes = find_full_report(root, paths, config, publication=True)
             if cached:
-                print("Reused verified full validation: " + str(cached))
+                cached_report = json.loads(cached.read_text(encoding="utf-8"))
+                if any(check["status"] == "deferred" for check in cached_report["checks"]):
+                    print("Reused local publication checks; CI remains pending: " + str(cached))
+                else:
+                    print("Reused verified full validation: " + str(cached))
                 return hooks.original(root, args.event, args.arguments, stdin)
             if recipes:
                 args.runtime_command = command_vector(recipes.get("runtime"))
                 args.platform_command = command_vector(recipes.get("platform"))
                 args.dependency_command = command_vector(recipes.get("dependency"))
         directory = root / ".build-tools/contribution/hooks" / args.event
-        report = run_checks(root, paths, config, directory, args)
-        if status_code(report):
-            return status_code(report)
+        report = run_checks(root, paths, config, directory, args,
+                            purpose="publication" if args.event == "pre-push" else "complete")
+        code = status_code(report, publication=args.event == "pre-push")
+        if code:
+            return code
     return hooks.original(root, args.event, args.arguments, stdin)
 
 
@@ -254,13 +283,18 @@ def main(argv=None):
             directory = (workflow.task_directory(root, args.task) if state else
                          root / ".build-tools/contribution/checks" / str(time.time_ns()))
             if args.command == "plan":
-                print(json.dumps([asdict(check) for check in checks_for(root, paths, config, directory, args)], indent=2))
+                checks = checks_for(root, paths, config, directory, args)
+                if args.publication:
+                    checks = publication_checks(root, checks, config)
+                print(json.dumps([asdict(check) for check in checks], indent=2))
             else:
-                report = run_checks(root, paths, config, directory, args, args.stage if state else "review")
+                publication = getattr(args, "publication", False)
+                report = run_checks(root, paths, config, directory, args, args.stage if state else "review",
+                                    purpose="publication" if publication else "complete")
                 if state:
                     report["task_fingerprint"] = workflow.evidence_hash(state)
                     write_json(directory / "report.json", report)
-                return status_code(report)
+                return status_code(report, publication=publication)
         return 0
     except (ValueError, OSError, KeyError, TypeError, subprocess.SubprocessError) as error:
         print("BLOCKED: " + str(error), file=sys.stderr)

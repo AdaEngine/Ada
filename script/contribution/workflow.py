@@ -158,6 +158,8 @@ def verify(root, task, stage="done"):
     if not report_path.exists():
         raise ValueError("Run the full validation profile first")
     report = json.loads(report_path.read_text(encoding="utf-8"))
+    if report.get("purpose", "complete") != "complete":
+        raise ValueError("Publication evidence cannot close a task; obtain complete validation and required CI results")
     current = snapshot(root)
     if report["snapshot"] != current or report["tools"] != tool_state():
         raise ValueError("Validation evidence is stale: source, configuration, tools, or environment changed")

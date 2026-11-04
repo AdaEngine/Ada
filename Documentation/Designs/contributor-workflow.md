@@ -281,6 +281,13 @@ Partially staged files must be checked using the index snapshot or rejected with
 checking a different file version does not validate the commit.
 
 `pre-push` runs the applicable complete profile for outgoing changes and reuses fresh local results.
+Following the explicit user decision on 2026-11-04, publication uses local checks plus mandatory CI:
+checks unavailable locally may be marked `deferred` only when mapped to a real version-controlled
+CI job. Failed local checks and missing tools without such a mapping still block publication.
+Deferred checks are not successes or inapplicable checks. A publication report cannot satisfy task
+completion; full validation and the required CI/platform evidence remain mandatory for Review/Done.
+The pre-push report lists the required CI jobs. This does not authenticate their result or configure
+server-side branch protection, and a CI job lacking its adapter remains blocked until configured.
 Hooks support Windows and POSIX systems and invoke the Python orchestrator.
 Installation must preserve existing hooks and `core.hooksPath`, explicitly identifying conflicts.
 Checks do not stash, reset, or clean the user's worktree to create a temporary validation state.

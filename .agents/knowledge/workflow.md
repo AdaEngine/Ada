@@ -98,10 +98,20 @@ Hook installation is explicit. Existing hooks are backed up and chained, includi
 stdin, and exit codes. Conflicts stop installation. No global Git settings are changed.
 Pre-commit runs quick checks and rejects partially staged/dirty tracked worktrees rather than checking
 a different snapshot. Pre-push requires the outgoing branch checked out with a clean worktree and runs
-the complete applicable profile. Fresh complete results are reused only after checking source/tool
+the local publication profile. Fresh complete results are reused only after checking source/tool
 fingerprints, exact coverage, commands, and retained logs. After a commit makes evidence stale, previously
 successful explicit recipes may be carried forward, but the checks themselves run again.
-New branches validate all tracked files, not an arbitrary HEAD~1 diff.
+New branches validate the diff from the merge base with `pre_push.base_ref`
+(default `refs/remotes/origin/main`). If that remote-tracking ref or a common ancestor is
+unavailable, all tracked files are validated conservatively. No arbitrary HEAD~1 diff is used.
+
+Inspect publication requirements before pushing with `plan --publication --base origin/main`;
+`check --publication` runs that profile explicitly. Failed local checks and missing tools without an
+approved CI mapping block the push. Configured checks unavailable locally can be `deferred`, with
+the mandatory workflow/job shown in the report. Secret scanning and available local checks still run.
+CI mappings live in `.agents/validation.json` and must reference existing push/PR jobs.
+A publication report never satisfies `verify --stage done`; it is not proof that CI has passed.
+The complete `run --stage review` profile stays strict, including missing native/advisory adapters.
 
 Full reports/logs are under `.build-tools/contribution/`; stdout contains compact statuses and paths.
 Hooks can be bypassed; use required hosted CI statuses for actual merge blocking. Local validation and

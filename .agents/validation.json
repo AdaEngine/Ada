@@ -82,16 +82,19 @@
         "script/test_contribution.py",
         "script/contribution-requirements.txt",
         ".github/workflows/contributor-validation.yml",
-        ".agents/secret-exceptions.json"
+        ".agents/secret-exceptions.json",
+        "script/test_publication.py"
       ]
     }
   },
   "python_suites": {
     "script/contribution/*": [
-      "script/test_contribution.py"
+      "script/test_contribution.py",
+      "script/test_publication.py"
     ],
     "script/check_contribution.py": [
-      "script/test_contribution.py"
+      "script/test_contribution.py",
+      "script/test_publication.py"
     ],
     "script/contribution-requirements.txt": [
       "script/test_contribution.py"
@@ -142,5 +145,109 @@
     "runtime": null,
     "platform": null,
     "dependency": null
+  },
+  "pre_push": {
+    "base_ref": "refs/remotes/origin/main",
+    "ci_checks": {
+      "platform-matrix": {
+        "targets": [
+          {
+            "workflow": ".github/workflows/contributor-validation.yml",
+            "job": "quality"
+          }
+        ],
+        "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
+      },
+      "dependency-review": {
+        "targets": [
+          {
+            "workflow": ".github/workflows/contributor-validation.yml",
+            "job": "quality"
+          }
+        ],
+        "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
+      },
+      "swift-lint": {
+        "targets": [
+          {
+            "workflow": ".github/workflows/contributor-validation.yml",
+            "job": "quality"
+          }
+        ],
+        "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
+      },
+      "swift-analysis": {
+        "targets": [
+          {
+            "workflow": ".github/workflows/contributor-validation.yml",
+            "job": "quality"
+          }
+        ],
+        "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
+      },
+      "editor-analysis": {
+        "targets": [
+          {
+            "workflow": ".github/workflows/contributor-validation.yml",
+            "job": "quality"
+          }
+        ],
+        "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
+      },
+      "swift-build": {
+        "targets": [
+          {
+            "workflow": ".github/workflows/contributor-validation.yml",
+            "job": "quality"
+          }
+        ],
+        "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
+      },
+      "swift-tests": {
+        "targets": [
+          {
+            "workflow": ".github/workflows/contributor-validation.yml",
+            "job": "quality"
+          }
+        ],
+        "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
+      },
+      "editor-build": {
+        "targets": [
+          {
+            "workflow": ".github/workflows/contributor-validation.yml",
+            "job": "quality"
+          }
+        ],
+        "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
+      },
+      "editor-tests": {
+        "targets": [
+          {
+            "workflow": ".github/workflows/contributor-validation.yml",
+            "job": "quality"
+          }
+        ],
+        "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
+      },
+      "webgpu": {
+        "targets": [
+          {
+            "workflow": ".github/workflows/contributor-validation.yml",
+            "job": "quality"
+          }
+        ],
+        "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
+      },
+      "runtime-smoke": {
+        "targets": [
+          {
+            "workflow": ".github/workflows/contributor-validation.yml",
+            "job": "quality"
+          }
+        ],
+        "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
+      }
+    }
   }
 }
