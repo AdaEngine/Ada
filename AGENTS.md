@@ -20,7 +20,7 @@ Game-authored UI follows its own art direction unless the task explicitly adopts
 
 - Use [adaengine-studio-design](.agents/skills/adaengine-studio-design/SKILL.md) and
   [ui-ux-pro-max](.agents/skills/ui-ux-pro-max/SKILL.md) for Studio visual/interaction work.
-  Load other design skills from the catalog below only when relevant.
+  Use the engineering skills below when the task also changes implementation behavior.
 - Inspect the affected screen, neighboring controls, existing theme tokens, and target platform.
   Shared editor UI is AdaUI; do not infer SwiftUI support from Swift syntax or introduce a web
   styling framework into the native editor. Reuse the owning platform's existing components.
@@ -61,6 +61,10 @@ Game-authored UI follows its own art direction unless the task explicitly adopts
   control styles. Add missing reusable roles to the existing theme instead of hardcoding a new
   palette per screen. Keep alignment, control heights, padding, and panel density consistent.
   Support long English/Russian labels, empty/error/loading states, and narrow windows.
+- **Fonts and visual direction:** use only Studio's existing font assets and text roles.
+  Do not add font files, remote font imports, substitute font families, font-pairing catalogs,
+  or alternative visual style/palette catalogs. Build new UI within the existing Studio theme.
+  Keep readability, wrapping, glyph coverage, and text-scaling checks for the actual Studio fonts.
 - **Accessibility:** provide visible keyboard focus, logical navigation, readable contrast, and
   non-color cues for state. Tooltips supplement labels and accessibility semantics.
   Keep animations subtle and respect reduced-motion preferences.
@@ -334,9 +338,9 @@ Game-authored UI follows its own art direction unless the task explicitly adopts
 ## Skills for Agents (Swift 6.2 + Concurrency)
 
 Repository-local skills live in `.agents/skills/`. Read the applicable `SKILL.md`; do not load
-the entire catalog for every task. The Studio rules above and accepted project designs take
-precedence over generic external style suggestions. Examples in imported skills do not authorize
-framework migrations, replacing theme files, paid API calls, or unrelated changes.
+the entire catalog for every task. The two Studio skills retain practical UI construction and
+verification guidance. The Studio rules and accepted designs govern the existing theme/fonts;
+the skills do not select a new visual identity or authorize framework migrations.
 
 | Skill | When to use |
 | --- | --- |
@@ -347,16 +351,10 @@ framework migrations, replacing theme files, paid API calls, or unrelated change
 | [adaengine-review](.agents/skills/adaengine-review/SKILL.md) | Independent review before completion |
 | [adaengine-studio-design](.agents/skills/adaengine-studio-design/SKILL.md) | Studio visual proposal, controls, and rendered compliance review |
 | [ui-ux-pro-max](.agents/skills/ui-ux-pro-max/SKILL.md) | UI/UX research, interaction, accessibility, and visual review |
-| [design](.agents/skills/design/SKILL.md) | Route broader brand and creative design tasks |
-| [design-system](.agents/skills/design-system/SKILL.md) | Theme tokens, component specifications, and states |
-| [ui-styling](.agents/skills/ui-styling/SKILL.md) | Web styling when its stack matches the affected frontend |
-| [brand](.agents/skills/brand/SKILL.md) | Brand identity, voice, and asset consistency |
-| [banner-design](.agents/skills/banner-design/SKILL.md) | Banner composition and format variants |
-| [slides](.agents/skills/slides/SKILL.md) | HTML presentations and slide layouts |
 
-The seven external design skills are vendored from
+The practical UI/UX guidance is adapted from
 [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill).
-Their pinned revision, license, and local adaptations are recorded in
+Its source revision, retained license, and reduced scope are recorded in
 [design skill provenance](.agents/skills/design-skills-provenance.md).
 
 Engineering competencies:

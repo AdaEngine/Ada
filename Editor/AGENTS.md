@@ -58,8 +58,8 @@ Use the existing repository skills when their task applies; do not load them all
 
 - Swift/editor implementation: [adaengine-development](../.agents/skills/adaengine-development/SKILL.md).
 - Studio visual design and review: [adaengine-studio-design](../.agents/skills/adaengine-studio-design/SKILL.md)
-  with [ui-ux-pro-max](../.agents/skills/ui-ux-pro-max/SKILL.md); other design skills are listed
-  in the root [skill catalog](../AGENTS.md#skills-for-agents-swift-62--concurrency).
+  with [ui-ux-pro-max](../.agents/skills/ui-ux-pro-max/SKILL.md), using Studio's existing font
+  assets and theme. These skills retain UI construction and verification guidance.
 - New or extended product behavior: [feature flow](../.agents/skills/adaengine-feature-flow/SKILL.md)
   and its repository-local [requirements interview](../.agents/skills/adaengine-enrich/SKILL.md).
 - Testable behavior/fixes: [TDD](../.agents/skills/adaengine-tdd/SKILL.md).

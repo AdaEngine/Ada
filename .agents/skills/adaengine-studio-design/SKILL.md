@@ -16,26 +16,15 @@ Inspect the current screen and its shared controls before proposing a change. In
 screens, start with [Theme.swift](../../../Editor/Sources/AdaEditor/UI/Editor/Theme.swift),
 `Theme.adaEditor`, and `theme.editorColors`; trace the current Material Symbols/font helper and
 control styles in the owning source. Browser and mobile surfaces may have different theme owners.
+Use only the font assets and text roles already used by Studio. Verify readability, glyph coverage,
+wrapping, and scaling using those fonts; do not select a new font family or visual style.
 
-Use [ui-ux-pro-max](../ui-ux-pro-max/SKILL.md) for focused research. Run its search script from
-the repository root, using the Python interpreter available on the host:
-
-```text
-python .agents/skills/ui-ux-pro-max/scripts/search.py "keyboard focus dropdown" --domain ux
-python .agents/skills/ui-ux-pro-max/scripts/search.py "touch target spacing" --domain web
-```
-
-For a new screen or broader visual direction, also run:
-
-```text
-python .agents/skills/ui-ux-pro-max/scripts/search.py "developer IDE dark compact" --design-system -p "Ada Studio"
-```
-
-Treat generated palettes/layouts as research to reconcile with Studio's existing theme and references.
-Do not persist a competing theme system. AdaUI is not a supported search stack: use domain guidance
-and actual AdaUI APIs. Use `--stack swiftui` only for actual SwiftUI surfaces; inspect browser
-dependencies before choosing web stack guidance. Load [design-system](../design-system/SKILL.md)
-for token/component work and [ui-styling](../ui-styling/SKILL.md) only for matching web tooling.
+Use [ui-ux-pro-max](../ui-ux-pro-max/SKILL.md) and its
+[construction guidance](../ui-ux-pro-max/references/quick-reference.md) for layout,
+control choice, states, validation, focus, accessibility, and responsive behavior.
+The retained skill is Markdown guidance; there is no search or design-system generation step.
+Reuse the current theme/component owners instead of generating a competing token system.
+Inspect actual APIs and browser dependencies; do not apply SwiftUI or web-framework advice to AdaUI.
 
 Before production UI edits, present a rendered mockup, annotated screenshot, or runnable preview.
 Show the affected screen/control, important states, and touch adaptation when applicable. Identify
