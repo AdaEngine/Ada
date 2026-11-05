@@ -13,6 +13,9 @@
 .ruff_cache
 .codex/
 
+# Local validation evidence and captures.
+/Evidence/
+
 dist/
 !Plugins/AdaWebExportPlugin/BrowserWASIShim/dist/
 !Plugins/AdaWebExportPlugin/BrowserWASIShim/dist/*.js

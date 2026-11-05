@@ -12,6 +12,10 @@ before editing. Do not load the whole capability inventory by default.
   [project.yml](project.yml) owns XcodeGen app configuration.
 - Shared editor UI uses AdaUI. Native wrappers, mobile screens and browser UI
   have separate boundaries; verify availability on the actual target platform.
+- For Studio visual/interaction work, follow the root
+  [visual design rules](../AGENTS.md#ada-studio-visual-design-rules) and use
+  [adaengine-studio-design](../.agents/skills/adaengine-studio-design/SKILL.md):
+  present a visual before implementation and inspect the rendered result before completion.
 - Every UI change includes English and Russian text in the same change. Native
   UI uses `L10n` and the shared language preference; read the
   [localization rules](Documentation/AgentGuides/localization.md) before changing it.
@@ -53,6 +57,9 @@ For cross-area changes, read each affected area; keep inventory details there.
 Use the existing repository skills when their task applies; do not load them all.
 
 - Swift/editor implementation: [adaengine-development](../.agents/skills/adaengine-development/SKILL.md).
+- Studio visual design and review: [adaengine-studio-design](../.agents/skills/adaengine-studio-design/SKILL.md)
+  with [ui-ux-pro-max](../.agents/skills/ui-ux-pro-max/SKILL.md), using Studio's existing font
+  assets and theme. These skills retain UI construction and verification guidance.
 - New or extended product behavior: [feature flow](../.agents/skills/adaengine-feature-flow/SKILL.md)
   and its repository-local [requirements interview](../.agents/skills/adaengine-enrich/SKILL.md).
 - Testable behavior/fixes: [TDD](../.agents/skills/adaengine-tdd/SKILL.md).
