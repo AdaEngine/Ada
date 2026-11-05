@@ -9,6 +9,84 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
 - CI: SwiftPM tests on macOS 26 and Windows using `swift test --parallel`.
 - Linting: SwiftLint via SwiftLintPlugins and `.swiftlint.yml`.
 
+## Ada Studio Visual Design Rules
+
+Apply these rules to Ada Studio/editor interfaces on desktop, web, and iOS, including
+dialogs, settings, inspectors, toolbars, onboarding, and reusable controls. They describe
+required design behavior; verify existing controls rather than assuming they already comply.
+Game-authored UI follows its own art direction unless the task explicitly adopts Studio styling.
+
+### Before changing UI
+
+- Use [adaengine-studio-design](.agents/skills/adaengine-studio-design/SKILL.md) and
+  [ui-ux-pro-max](.agents/skills/ui-ux-pro-max/SKILL.md) for Studio visual/interaction work.
+  Load other design skills from the catalog below only when relevant.
+- Inspect the affected screen, neighboring controls, existing theme tokens, and target platform.
+  Shared editor UI is AdaUI; do not infer SwiftUI support from Swift syntax or introduce a web
+  styling framework into the native editor. Reuse the owning platform's existing components.
+- **Present a visual proposal before production UI implementation**: a rendered mockup,
+  annotated screenshot, or runnable preview showing layout, controls, spacing, and key states.
+  For a small visual fix, an annotated crop of the affected control is enough.
+  Reuse an already approved visual when it covers the change; seek approval for a new visual
+  direction through the existing feature/design workflow. A prose-only plan is not a visual.
+- Use **IntelliJ IDEA, Android Studio, Zed, and Godot** as references for a focused editor:
+  compact consistent controls, clear panel hierarchy, readable typography, restrained accents,
+  and predictable navigation. Preserve Ada Studio's identity and existing theme tokens.
+  Avoid decorative marketing layouts in working editor panels.
+
+### Controls and visual consistency
+
+- **Buttons:** show a themed background or visible border, with distinct hover feedback on
+  pointer devices. Toolbar/icon buttons may have a quiet resting surface but must reveal a
+  background or border on hover and keyboard focus. Provide pressed, focused, disabled, and
+  selected states where applicable; a persistent selected state must survive mouse exit.
+  Use real button semantics, not clickable text or a generic container.
+- **Dropdowns:** when an interaction calls for a dropdown, use the shared `DropDown`/select
+  control or the owning platform's equivalent. Show the current value and disclosure affordance;
+  support opening, selection, dismissal, focus return, keyboard navigation, and scrolling long lists.
+  Use a combo box only when text entry/search is part of the requirement.
+- **Text fields:** use the application theme, a visible border, dark input surface, readable
+  text/placeholder, and a **white text insertion caret in Studio's dark theme**. Show focus and
+  validation errors without changing layout. Provide labels rather than placeholder-only names.
+  If a supported alternate theme changes these colors, use its corresponding contrast-safe tokens.
+- **Boolean settings:** prefer a `Toggle` for an immediate on/off setting. Use checkboxes for
+  multi-selection or deferred form choices, segmented controls/radio buttons for mutually
+  exclusive modes, and buttons for commands. Choose by meaning and available space.
+- **Icons:** prefer **Material Icons / Material Symbols**, using the existing bundled font or
+  asset helper. Keep size, weight, optical alignment, and filled/outlined style consistent.
+  Do not substitute emoji or arbitrary Unicode glyphs for interface icons. Add localized tooltips
+  describing icon actions and shortcuts when available, plus accessible names for icon-only
+  controls. Decorative icons beside an explicit label need no duplicate tooltip/name.
+- **Theme and layout:** reuse semantic colors, typography, spacing, borders, radii, and shared
+  control styles. Add missing reusable roles to the existing theme instead of hardcoding a new
+  palette per screen. Keep alignment, control heights, padding, and panel density consistent.
+  Support long English/Russian labels, empty/error/loading states, and narrow windows.
+- **Accessibility:** provide visible keyboard focus, logical navigation, readable contrast, and
+  non-color cues for state. Tooltips supplement labels and accessibility semantics.
+  Keep animations subtle and respect reduced-motion preferences.
+
+### iOS and touch
+
+- Design for fingers: at least **44 x 44 pt** tappable areas, including small icons, with enough
+  separation to prevent adjacent actions firing accidentally. A larger hit area may surround a
+  smaller visual icon; it must not overlap another control's hit area.
+- Provide immediate pressed feedback. Essential actions, help, and state must work without hover;
+  expose icon meaning through visible labels, accessible names, or a touch-operable help affordance.
+- Respect safe areas, the on-screen keyboard, text scaling, orientation, and compact/expanded layouts.
+  Adapt desktop density for touch rather than shrinking a desktop toolbar onto a phone.
+
+### Required visual verification
+
+- Inspect the **rendered result** on each affected platform against the approved proposal and
+  these rules. Build success, source inspection, and unit tests alone do not prove visual quality.
+- Exercise default, hover (pointer), pressed, focus, disabled, selected, open, and error states
+  where applicable. Check dropdowns, caret visibility, icon tooltips, keyboard use, and touch targets.
+- Check the supported themes, narrow/normal layouts, scaling, English/Russian text, and relevant
+  empty/loading/error content. Confirm no clipping, overlaps, invisible borders, or focus loss.
+- Include screenshots/preview paths and a brief compliance result in the handoff. Name the
+  platforms and states actually checked; report unavailable runtime/device checks as blocked.
+  Fix discrepancies before declaring the UI complete. Include this evidence in independent review.
+
 ## Build, Lint, Test Commands
 
 ### Contributor workflow and required validation
@@ -254,6 +332,35 @@ Swift 6.2, Swift Concurrency, and AdaEngine-specific workflows.
 - Add tests for new behavior in the nearest test target when practical.
 
 ## Skills for Agents (Swift 6.2 + Concurrency)
+
+Repository-local skills live in `.agents/skills/`. Read the applicable `SKILL.md`; do not load
+the entire catalog for every task. The Studio rules above and accepted project designs take
+precedence over generic external style suggestions. Examples in imported skills do not authorize
+framework migrations, replacing theme files, paid API calls, or unrelated changes.
+
+| Skill | When to use |
+| --- | --- |
+| [adaengine-development](.agents/skills/adaengine-development/SKILL.md) | Engine/editor implementation and architecture |
+| [adaengine-enrich](.agents/skills/adaengine-enrich/SKILL.md) | Resolve feature requirements and design decisions |
+| [adaengine-feature-flow](.agents/skills/adaengine-feature-flow/SKILL.md) | Feature/improvement stages and approval |
+| [adaengine-tdd](.agents/skills/adaengine-tdd/SKILL.md) | Testable behavior and fixes |
+| [adaengine-review](.agents/skills/adaengine-review/SKILL.md) | Independent review before completion |
+| [adaengine-studio-design](.agents/skills/adaengine-studio-design/SKILL.md) | Studio visual proposal, controls, and rendered compliance review |
+| [ui-ux-pro-max](.agents/skills/ui-ux-pro-max/SKILL.md) | UI/UX research, interaction, accessibility, and visual review |
+| [design](.agents/skills/design/SKILL.md) | Route broader brand and creative design tasks |
+| [design-system](.agents/skills/design-system/SKILL.md) | Theme tokens, component specifications, and states |
+| [ui-styling](.agents/skills/ui-styling/SKILL.md) | Web styling when its stack matches the affected frontend |
+| [brand](.agents/skills/brand/SKILL.md) | Brand identity, voice, and asset consistency |
+| [banner-design](.agents/skills/banner-design/SKILL.md) | Banner composition and format variants |
+| [slides](.agents/skills/slides/SKILL.md) | HTML presentations and slide layouts |
+
+The seven external design skills are vendored from
+[nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill).
+Their pinned revision, license, and local adaptations are recorded in
+[design skill provenance](.agents/skills/design-skills-provenance.md).
+
+Engineering competencies:
+
 - SwiftPM and SwiftLint usage in Swift 6.2 projects.
 - Swift Concurrency correctness: actor isolation, Sendable, structured
   concurrency patterns, async-safe APIs.

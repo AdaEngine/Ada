@@ -10,6 +10,7 @@ of silently selecting whichever source makes implementation easier.
 | Module ownership and dependency direction | [Architecture](../skills/adaengine-development/references/architecture.md) |
 | Entity storage, queries, scheduling, scripting bridges | [ECS runtime](../skills/adaengine-development/references/ecs-runtime.md) |
 | UI identity, event paths, editor packages and real-path testing | [UI and editor](../skills/adaengine-development/references/ui-editor.md) |
+| Studio appearance, visual proposals, controls, icons, touch and visual QA | [Studio design rules](../../AGENTS.md#ada-studio-visual-design-rules), [Studio design skill](../skills/adaengine-studio-design/SKILL.md) |
 | Swift isolation, ownership, style, API design | [Swift engineering](swift.md) |
 | Platform constraints and required evidence | [Platforms](platforms.md) |
 | Profiles, analysis, tests, and truthful results | [Validation](validation.md) |

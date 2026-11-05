@@ -1,3 +1,0 @@
-2026-11-03T00:23:18+0300 info org.adaengine.webgpu: [AdaRender] Selected WebGPU adapter: backend=4 vendor=nvidia device=NVIDIA GeForce RTX 4070 description=D3D12 driver version 32.0.16.1088
-2026-11-03T00:23:23+0300 warning org.adaengine.wgsl: [AdaRender] Tint: warning: code is unreachable
-

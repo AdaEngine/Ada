@@ -1,8 +1,0 @@
-{
-  "path": ".build-codex/meshlets-p0/x86_64-unknown-windows-msvc/release/SponzaDemo.exe",
-  "sha256": "bcdb924798eae4f81fd3d36416a5e13e05764963d31784c609b8a6f5faf89371",
-  "configuration": "release",
-  "runtime": "Swift6.3.1",
-  "backend": "DawnD3D12",
-  "device": "RTX4070"
-}
