@@ -6,6 +6,7 @@
 //
 
 import AdaApp
+import AdaAssets
 import AdaCorePipelines
 import AdaECS
 @_spi(Internal) import AdaRender
@@ -24,6 +25,8 @@ public struct Model3DPlugin: Plugin {
             app.addSystem(EventsUpdateSystem.self, on: .preUpdate)
         }
         Model3DSource.registerComponent()
+        AnimationSceneIdentity3D.registerComponent()
+        AssetsManager.registerAssetType(AnimationModifierResource.self)
         Model3DSourceState.registerComponent()
         ModelAnimationPlayback3DComponent.registerComponent()
         app.addSystem(ModelAnimationPlayback3DSystem.self, on: .postUpdate)

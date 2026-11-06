@@ -89,10 +89,23 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         self.animationClips = animationClips
     }
 
-    public init(from assetDecoder: any AssetDecoder) async throws {
-        if assetDecoder.assetMeta.filePath.pathExtension.lowercased() == "vox" {
-            let settings = VoxelImportSettings(queryParams: assetDecoder.assetMeta.queryParams)
-            let contents = try await Self.loadVoxelContents(url: assetDecoder.assetMeta.filePath, options: settings.options)
+    public convenience init(from assetDecoder: any AssetDecoder) async throws {
+        try await self.init(fileURL: assetDecoder.assetMeta.filePath, queryParams: assetDecoder.assetMeta.queryParams, gltfLoader: nil)
+    }
+
+    /// Constructs a glTF model using a caller-owned import policy, without changing the global loader resolver.
+    /// A host can supply a restricted native loader to bound files, dependencies and decoded accessor work.
+    public convenience init(gltfAt url: URL, loader: any GLTFLoader) async throws {
+        guard ["glb", "gltf"].contains(url.pathExtension.lowercased()) else {
+            throw AssetDecodingError.invalidAssetExtension(url.pathExtension)
+        }
+        try await self.init(fileURL: url, queryParams: [], gltfLoader: loader)
+    }
+
+    private init(fileURL: URL, queryParams: [AssetQuery], gltfLoader: (any GLTFLoader)?) async throws {
+        if fileURL.pathExtension.lowercased() == "vox" {
+            let settings = VoxelImportSettings(queryParams: queryParams)
+            let contents = try await Self.loadVoxelContents(url: fileURL, options: settings.options)
             self.nodes = contents.nodes
             self.meshes = contents.meshes
             self.materials = contents.materials
@@ -105,9 +118,9 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
             return
         }
 
-        if assetDecoder.assetMeta.filePath.pathExtension.lowercased() == "obj" {
+        if fileURL.pathExtension.lowercased() == "obj" {
             let loader = OBJLoaderResolver.shared.getLoader()
-            let result = try await loader.load(url: assetDecoder.assetMeta.filePath)
+            let result = try await loader.load(url: fileURL)
             let device = unsafe RenderEngine.shared.renderDevice
 
             self.materials = result.materials.map { _ in PBRMaterial() }
@@ -145,11 +158,11 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
             return
         }
 
-        let loader = GLTFLoaderResolver.shared.getLoader()
-        let result = try await loader.load(url: assetDecoder.assetMeta.filePath)
+        let loader = gltfLoader ?? GLTFLoaderResolver.shared.getLoader()
+        let result = try await loader.load(url: fileURL)
         importWarnings = result.warnings
         var preparedMeshlets: MeshletSidecar?
-        let sidecarURL = assetDecoder.assetMeta.filePath.appendingPathExtension("meshlets")
+        let sidecarURL = fileURL.appendingPathExtension("meshlets")
         if FileManager.default.fileExists(atPath: sidecarURL.path) {
             do {
                 let attributes = try FileManager.default.attributesOfItem(atPath: sidecarURL.path)
@@ -162,7 +175,7 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
             }
         }
         var preparedMeshletLOD: MeshletLODSidecar?
-        let hierarchyURL = assetDecoder.assetMeta.filePath.appendingPathExtension("meshletlod")
+        let hierarchyURL = fileURL.appendingPathExtension("meshletlod")
         if FileManager.default.fileExists(atPath: hierarchyURL.path) {
             do {
                 let attributes = try FileManager.default.attributesOfItem(atPath: hierarchyURL.path)

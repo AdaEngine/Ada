@@ -1,5 +1,23 @@
 # Skeletal animation graphs
 
+For editable project-owned clips, see [Animation authoring](../Editor/Documentation/AnimationAuthoring.md).
+Bound `.animlib` clips use `library.runtimeName(for: clipID)` in existing graph clip nodes.
+
+In Studio, **Animator → Animation Graph** displays pose cards and wires on a canvas.
+Drag an output to an input to connect cards, or drag a connected input to move its
+connection while retaining its weight and bone mask. The right Inspector edits
+the selected card and its input properties. **Fit**, middle-drag/**Pan**, and scroll
+control canvas navigation. Node and wire edits support Undo/Redo; cyclic connections
+are rejected. The card marked Output identifies the graph root. This visual editor
+uses the clip/blend/additive model described here; state machines and blend spaces
+remain separate extensions.
+
+The shared agent/Tools contract also exposes `graphInspect`, `graphApply`,
+`graphUndo`, `graphRedo`, `graphPreview` and `graphBind` for an open model/library
+workspace. Graph revisions are separate from clip-library revisions. See the
+[request contract](../Editor/Documentation/AnimationAuthoring.md#agent-request-contract)
+for paging, permissions and explicit scene publication.
+
 `AnimationGraph` combines imported GLB/glTF clips into a single local pose. It is
 available through `AdaAnimation` and the `AdaEngine` facade. Each
 `SkeletalAnimationPlayer` owns its clock, graph buffers and pending events.

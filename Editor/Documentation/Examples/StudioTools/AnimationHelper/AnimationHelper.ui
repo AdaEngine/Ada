@@ -1,0 +1,144 @@
+format: ada.ui
+schemaVersion: 1
+inputs:
+  - {name: path, type: string, defaultValue: Assets/Animations/Robot.animlib}
+  - {name: modelPath, type: string, defaultValue: Assets/Robot.glb}
+  - {name: sourceClip, type: string, defaultValue: Walk}
+  - {name: entityID, type: string, defaultValue: robot}
+  - {name: status, type: string, defaultValue: Ready}
+actions:
+  - {name: inspect}
+  - {name: extract}
+  - {name: inspectTracks}
+  - {name: inspectKeys}
+  - {name: rotateBone}
+  - {name: sample}
+  - {name: bind}
+  - {name: oneShot}
+  - {name: save}
+  - {name: preview}
+  - {name: inspectGraph}
+  - {name: halfWeightGraph}
+  - {name: previewGraph}
+  - {name: bindGraph}
+  - {name: poll}
+root:
+  id: animation-helper
+  type: VStack
+  arguments:
+    spacing: {value: 8}
+  children:
+    - id: instructions
+      type: Text
+      arguments:
+        text: {value: 'For GardenRobot.glb Walk: Extract, Inspect Tracks, Inspect Key, Rotate Bone, Sample, Save and Bind. Poll after each action. The first rotation track is Foot.L; binding needs an open scene with the model entity ID below.'}
+    - id: path
+      type: TextField
+      arguments:
+        text: {binding: path}
+    - id: model-path
+      type: TextField
+      arguments:
+        text: {binding: modelPath}
+    - id: source-clip
+      type: TextField
+      arguments:
+        text: {binding: sourceClip}
+    - id: extract
+      type: Button
+      arguments:
+        title: {value: Extract Editable Copy}
+      actions:
+        action: extract
+    - id: inspect
+      type: Button
+      arguments:
+        title: {value: Inspect}
+      actions:
+        action: inspect
+    - id: entity-id
+      type: TextField
+      arguments:
+        text: {binding: entityID}
+    - id: tracks
+      type: Button
+      arguments:
+        title: {value: Inspect Rotation Tracks}
+      actions:
+        action: inspectTracks
+    - id: keys
+      type: Button
+      arguments:
+        title: {value: Inspect First Key}
+      actions:
+        action: inspectKeys
+    - id: rotate-bone
+      type: Button
+      arguments:
+        title: {value: Set Bone Local Z Rotation to 90 Degrees}
+      actions:
+        action: rotateBone
+    - id: sample
+      type: Button
+      arguments:
+        title: {value: Sample Inspected Bone Pose}
+      actions:
+        action: sample
+    - id: bind
+      type: Button
+      arguments:
+        title: {value: Bind Saved Clip to Scene Entity}
+      actions:
+        action: bind
+    - id: one-shot
+      type: Button
+      arguments:
+        title: {value: Make One-Shot}
+      actions:
+        action: oneShot
+    - id: save
+      type: Button
+      arguments:
+        title: {value: Save Draft}
+      actions:
+        action: save
+    - id: preview
+      type: Button
+      arguments:
+        title: {value: Preview}
+      actions:
+        action: preview
+    - id: poll
+      type: Button
+      arguments:
+        title: {value: Poll}
+      actions:
+        action: poll
+    - id: inspect-graph
+      type: Button
+      arguments:
+        title: {value: Inspect Open Model Graph}
+      actions:
+        action: inspectGraph
+    - id: half-weight-graph
+      type: Button
+      arguments:
+        title: {value: Replace Preview Graph with Half-Weight Clip}
+      actions:
+        action: halfWeightGraph
+    - id: preview-graph
+      type: Button
+      arguments:
+        title: {value: Preview Graph}
+      actions:
+        action: previewGraph
+    - id: bind-graph
+      type: Button
+      arguments:
+        title: {value: Apply Graph to Scene Entity}
+      actions:
+        action: bindGraph
+    - id: status
+      type: Text
+      arguments:
+        text: {binding: status}

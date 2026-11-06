@@ -3,16 +3,85 @@ import Foundation
 
 /// Node and connection authoring shared by the model preview and scene Animator.
 struct EditorAnimationGraphEditor: View {
+    enum Presentation { case canvas, inspector, properties }
     let model: EditorAnimationGraphModel
+    var presentation: Presentation = .canvas
+    @State private var interaction: EditorNodeCanvasInteraction?
     @Environment(\.theme) private var theme
 
     var body: some View {
+        Group {
+            if presentation == .canvas { canvasContent }
+            else if presentation == .inspector { inspectorContent }
+            else { propertiesContent }
+        }
+        .foregroundColor(theme.editorColors.text)
+        .textFieldStyle(EditorAnimationFieldStyle(colors: theme.editorColors))
+    }
+
+    private var inspectorContent: some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(L10n.tr("Animation Graph")).font(.system(size: 12, weight: .semibold))
+                EditorEnumField(cases: model.graph.nodes.map(\.id), selection: Binding(
+                    get: { model.selectedNodeID }, set: { model.selectedNodeID = $0; model.canvasSelection = [$0] }),
+                    accessibilityID: "AdaEditor.AnimationGraph.SelectedNode", localizesValues: false)
+                if let node = model.selectedNode { nodeEditor(node).id(node.id) }
+                button("Remove node", id: "RemoveNode") { model.removeSelectedNode() }.disabled(model.selectedNodeID == model.graph.root)
+                Text(L10n.tr("Output")).font(.system(size: 11))
+                EditorEnumField(cases: model.graph.nodes.map(\.id), selection: Binding(
+                    get: { model.graph.root }, set: { model.graph.root = $0 }),
+                    accessibilityID: "AdaEditor.AnimationGraph.Output", localizesValues: false)
+                if let message = model.validationMessage { Text(message).font(.system(size: 11)).foregroundColor(.red) }
+            }.padding(10).frame(maxWidth: .infinity, alignment: .topLeading)
+        }.accessibilityIdentifier("AdaEditor.AnimationGraph.Inspector")
+    }
+
+    private var canvasContent: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                ForEach(AnimationGraph.Node.Kind.allCases, id: \.rawValue) { kind in
+                    button("+ \(kind.rawValue)", id: "Add.\(kind.rawValue)") { model.addNode(kind) }
+                }
+                button("Undo", id: "Undo") { model.undoCanvas() }.disabled(model.undoStack.isEmpty || model.transaction != nil)
+                button("Redo", id: "Redo") { model.redoCanvas() }.disabled(model.redoStack.isEmpty || model.transaction != nil)
+                button("Fit", id: "Fit") { model.canvas.fit(model.canvasItems, in: model.canvasViewportSize) }
+                button("Pan", id: "Pan", selected: model.canvas.panMode) { model.canvas.panMode.toggle() }
+                Spacer(minLength: 0)
+            }.frame(height: 32).padding(.horizontal, 6)
+            EditorNodeCanvas(items: model.canvasItems, wires: model.canvasWires,
+                selection: model.canvasSelection.isEmpty ? [model.selectedNodeID] : model.canvasSelection,
+                state: model.canvas, revision: model.layoutRevision, interaction: interaction,
+                onKeyEvent: { event in
+                    guard event.status == .down else { return }
+                    if event.modifiers.contains(.command) || event.modifiers.contains(.control) {
+                        if event.keyCode == .z {
+                            if event.modifiers.contains(.shift) { model.redoCanvas() } else { model.undoCanvas() }
+                        }
+                        if event.keyCode == .y { model.redoCanvas() }
+                        return
+                    }
+                    if event.keyCode == .escape { interaction?.abort() }
+                    if event.keyCode == .delete || event.keyCode == .backspace { model.deleteCanvasSelection() }
+                }, viewportSizeChanged: { model.canvasViewportSize = $0 }, selectedWire: model.selectedWire)
+            if let message = model.canvasError ?? model.validationMessage {
+                Text(message).font(.system(size: 11)).foregroundColor(.red).lineLimit(2).padding(4)
+            }
+        }
+        .onAppear { interaction = model.canvasInteraction() }
+        .onDisappear { interaction?.abort() }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityIdentifier("AdaEditor.AnimationGraph.Editor")
+    }
+
+    private var propertiesContent: some View {
         GeometryReader { geometry in
             content(height: max(80, geometry.size.height - 76))
         }
         .padding(8)
         .foregroundColor(theme.editorColors.text)
-        .accessibilityIdentifier("AdaEditor.AnimationGraph.Editor")
+        .textFieldStyle(EditorAnimationFieldStyle(colors: theme.editorColors))
+        .accessibilityIdentifier("AdaEditor.AnimationGraph.Inspector")
     }
 
     private func content(height: Float) -> some View {
@@ -20,7 +89,7 @@ struct EditorAnimationGraphEditor: View {
             HStack(spacing: 6) {
                 Text(L10n.text("Output")).font(.system(size: 11))
                 EditorEnumField(
-                    cases: model.graph.nodes.map(\.id), 
+                    cases: model.graph.nodes.map(\.id),
                     selection: Binding(get: { model.graph.root }, set: { model.graph.root = $0 }),
                     accessibilityID: "AdaEditor.AnimationGraph.Output"
                 )
@@ -30,14 +99,14 @@ struct EditorAnimationGraphEditor: View {
                 }
             }
             HStack(alignment: .top, spacing: 12) {
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: true) {
                     VStack(alignment: .leading, spacing: 5) {
                         ForEach(model.graph.nodes, id: \.id) { node in
                             Button(action: { model.selectedNodeID = node.id }) {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(node.id + (node.id == model.graph.root ? " → Output" : ""))
                                         .font(.system(size: 11, weight: .semibold))
-                                    Text(node.kind == .clip ? node.clip : node.inputs.map(\.node).joined(separator: " + "))
+                                    Text(node.kind == .clip ? model.clipLabels[node.clip] ?? node.clip : node.inputs.map(\.node).joined(separator: " + "))
                                         .font(.system(size: 10)).foregroundColor(theme.editorColors.muted)
                                 }
                                 .padding(7)
@@ -56,7 +125,7 @@ struct EditorAnimationGraphEditor: View {
                     }
                 }
                 .frame(width: 150, height: height)
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: true) {
                     VStack(alignment: .leading, spacing: 8) {
                         if let node = model.selectedNode {
                             nodeEditor(node).id(node.id)
@@ -108,11 +177,11 @@ struct EditorAnimationGraphEditor: View {
                     set: { value in
                         model.editNode(node.id) { $0.clip = value }
                     }
-                ), accessibilityID: "AdaEditor.AnimationGraph.Clip"
+                ), accessibilityID: "AdaEditor.AnimationGraph.Clip", labels: model.clipLabels, localizesValues: false
                 )
             HStack {
                 number("Speed", value: node.speed, id: "Speed") { value in model.editNode(node.id) { $0.speed = value } }
-                button(node.repeats ? "Loop: On" : "Loop: Off", id: "Loop") { model.editNode(node.id) { $0.repeats.toggle() } }
+                button(node.repeats ? "Loop: On" : "Loop: Off", id: "Loop", selected: node.repeats) { model.editNode(node.id) { $0.repeats.toggle() } }
             }
             eventsEditor(node)
         } else {
@@ -233,9 +302,9 @@ struct EditorAnimationGraphEditor: View {
         EditorAnimationGraphNumberField(title: title, value: value, identifier: id, set: set)
     }
 
-    private func button(_ title: String, id: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Text(L10n.tr(title)).font(.system(size: 11)).padding(4) }
-            .buttonStyle(DefaultButtonStyle())
+    private func button(_ title: String, id: String, selected: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Text(L10n.tr(title)).font(.system(size: 11)) }
+            .buttonStyle(EditorAnimationButtonStyle(colors: theme.editorColors, selected: selected))
             .accessibilityIdentifier("AdaEditor.AnimationGraph.\(id)")
     }
 }
@@ -253,8 +322,7 @@ private struct EditorAnimationGraphNumberField: View {
         HStack(spacing: 4) {
             Text(L10n.tr(title)).font(.system(size: 10)).foregroundColor(theme.editorColors.muted)
             TextField(L10n.tr(title), text: $draft)
-                .font(.system(size: 11)).frame(width: 54, height: 28)
-                .background(RoundedRectangleShape(cornerRadius: 4).fill(theme.editorColors.background))
+                .textFieldStyle(EditorAnimationFieldStyle(colors: theme.editorColors)).frame(width: 64, height: 28)
                 .accessibilityIdentifier("AdaEditor.AnimationGraph.\(identifier)")
         }
         .onAppear { draft = String(format: "%.6g", value) }

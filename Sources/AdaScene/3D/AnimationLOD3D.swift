@@ -67,18 +67,18 @@ struct AnimationLOD3DState: Sendable {
         )
         let rate = visible && settings.sampleRates.indices.contains(nextLevel) ? settings.sampleRates[nextLevel] : settings.offscreenRate
         let nextInterval = visible && rate == 0 ? 0 : 1 / Double(rate.isFinite ? min(max(rate, 1), 120) : 12)
-        let externalChange = generation != player.poseGeneration
+        let externalChange = generation != player.basePoseGeneration
         let wasPlaying = player.isPlaying
         let dt = delta.isFinite ? max(0, delta) : 0
         // When rendering is already below the selected sampling rate, interpolation
         // adds cost and delay without skipping any evaluations. Present the current pose.
         if visible, nextInterval > 0, dt >= nextInterval {
-            player.advance(by: dt)
+            player.advance(by: dt, evaluatePose: true, finalizeModifiers: false)
             level = nextLevel; interval = nextInterval; elapsed = 0
-            source = player.poses; target = player.poses; generation = player.poseGeneration
+            source = player.basePoses; target = player.basePoses; generation = player.basePoseGeneration
             return
         }
-        player.advance(by: dt, evaluatePose: nextInterval == 0)
+        player.advance(by: dt, evaluatePose: nextInterval == 0, finalizeModifiers: false)
         elapsed += dt
         let immediate = externalChange || level != nextLevel || interval != nextInterval || wasPlaying && !player.isPlaying
         level = nextLevel
@@ -89,9 +89,9 @@ struct AnimationLOD3DState: Sendable {
             elapsed = 0
         } else {
             if immediate || player.isPlaying && elapsed >= nextInterval {
-                source = target.isEmpty ? player.poses : target
-                player.sampleCurrentPose()
-                target = player.poses
+                source = target.isEmpty ? player.basePoses : target
+                player.sampleCurrentPose(finalizeModifiers: false)
+                target = player.basePoses
                 if immediate {
                     source = target
                     elapsed = 0
@@ -100,9 +100,9 @@ struct AnimationLOD3DState: Sendable {
                 }
             }
             if visible, source != target, source.count == player.poses.count, target.count == player.poses.count {
-                player.presentPose(from: source, to: target, amount: Float(elapsed / nextInterval))
+                player.presentPose(from: source, to: target, amount: Float(elapsed / nextInterval), finalizeModifiers: false)
             }
         }
-        generation = player.poseGeneration
+        generation = player.basePoseGeneration
     }
 }

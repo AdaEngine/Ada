@@ -108,6 +108,7 @@ public extension AdaScriptTypeEnvironment {
             ),
         ]),
         "$AdaEditorToolContext": members([
+            property("animations", type: .named("$AdaEditorAnimations"), detail: "API 2 detached animation jobs; requires editor.animations.read"),
             property("entityCount", type: .int, detail: "Entity count in the action's scene snapshot; requires editor.documents.read"),
             property("scenePath", type: .string, detail: "Path of the active scene; requires editor.documents.read"),
             property("sceneRevision", type: .string, detail: "Revision of the active scene; requires editor.documents.read"),
@@ -156,6 +157,12 @@ public extension AdaScriptTypeEnvironment {
                 detail: "subscribe(event, action) — subscribe to a supported editor event",
                 insertText: "subscribe(event: \"\", action: \"\")"
             ),
+        ]),
+        "$AdaEditorAnimations": members([
+            method("submit", parameters: [.any], returning: .string,
+                   detail: "submit(requestMap) -> job ID; stage an AnimationAuthoringRequest after the callback succeeds. No editor objects enter the VM."),
+            method("poll", parameters: [.string], returning: .any,
+                   detail: "poll(jobID) -> detached Map: status pending/completed/failed; a successful terminal poll consumes the result.")
         ]),
         "$AdaEntity": members([
             property("id", type: .int, detail: "Entity identifier")

@@ -278,12 +278,17 @@ public struct AdaScriptSystemCapabilities: Equatable, Sendable {
 public enum AdaScriptToolPlatform: String, CaseIterable, Equatable, Sendable {
     /// The native macOS AdaEditor host.
     case macOS = "macos"
+    /// The native Windows Ada Studio host.
+    case windows
     /// The native iPadOS AdaEditor host.
     case iPadOS = "ipados"
 }
 
 /// A host capability requested statically by an AdaEditor tool.
 public enum AdaScriptToolPermission: String, CaseIterable, Equatable, Sendable {
+    case animationRead = "editor.animations.read"
+    case animationWrite = "editor.animations.write"
+    case animationPreview = "editor.animations.preview"
     case clipboardRead = "clipboard.read"
     case clipboardWrite = "clipboard.write"
     case documentRead = "editor.documents.read"

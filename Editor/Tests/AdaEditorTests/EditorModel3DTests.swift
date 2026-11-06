@@ -162,7 +162,7 @@ struct EditorModel3DTests {
         #expect(previewRoot.components[ModelAnimation3DComponent.self]?.player.isPlaying == true)
     }
 
-    @Test("Runtime plugin loads serialized references, replaces only generated children and cleans up removed references")
+    @Test("Runtime plugin retains the last valid model on failed changes and cleans up removed references")
     func runtimeLifecycle() async throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -181,16 +181,21 @@ struct EditorModel3DTests {
         app.main.flush()
         let state = try #require(owner.components[Model3DSourceState.self])
         #expect(state.error == nil && state.rootEntityID != nil)
+        let generatedRoot = try #require(state.rootEntityID)
         #expect(owner.children.count == 2)
         owner.components[Model3DSource.self] = Model3DSource(source: source.path, animation: "Missing")
         app.main.flush()
         await app.main.runScheduler(.preUpdate)
         #expect(owner.components[Model3DSourceState.self]?.error?.contains("Missing") == true)
-        #expect(owner.children.map(\.id) == [other.id])
+        #expect(owner.children.map(\.id) == [other.id, generatedRoot])
+        #expect(owner.components[Model3DSourceState.self]?.rootEntityID == generatedRoot)
+        #expect(app.main.getEntityByID(generatedRoot) != nil)
         owner.components[Model3DSource.self] = nil
         app.main.flush()
         await app.main.runScheduler(.preUpdate)
         #expect(owner.components[Model3DSourceState.self] == nil)
+        #expect(owner.children.map(\.id) == [other.id])
+        #expect(app.main.getEntityByID(generatedRoot) == nil)
         #expect(app.main.getEntityByID(other.id) != nil)
     }
 

@@ -3,7 +3,7 @@
     name: "Level Helper",
     version: "1.0.0",
     api: 1,
-    platforms: ["macos"],
+    platforms: ["macos", "windows"],
     permissions: ["editor.documents.read", "editor.documents.write"]
 )
 class LevelHelper {

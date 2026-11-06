@@ -326,8 +326,14 @@ extension EditorViewModel {
                     sceneDocument.statusMessage = "Reload failed"
                     workbench.replaceSceneDocument(sceneDocument)
                 }
-            case .asset,
-                .git:
+            case let .asset(asset):
+                if asset.kind == .animationLibrary, !asset.isDirty, let service = workbench.animationService {
+                    do {
+                        let library = try service.open(asset.relativePath)
+                        try service.reload(library, expectedRevision: library.revision)
+                    } catch { appendOutput("Animation reload failed: \(error.localizedDescription)") }
+                }
+            case .git:
                 continue
             }
         }

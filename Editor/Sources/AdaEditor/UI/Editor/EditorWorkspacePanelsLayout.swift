@@ -16,6 +16,8 @@ final class EditorWorkspaceResizeState {
     @ObservationIgnored private var leftWidth: Float = AdaEngineStyleLayoutSpec.projectSidebarWidth
     @ObservationIgnored private var rightWidth: Float = AdaEngineStyleLayoutSpec.inspectorWidth
     @ObservationIgnored private var bottomHeight: Float = 180
+    @ObservationIgnored private var animatorHeight: Float = 380
+    @ObservationIgnored private var animatorWasResized = false
     @ObservationIgnored private var dragStart: Float?
 
     func layout(in size: Size, viewModel: EditorViewModel) -> EditorWorkspaceLayout {
@@ -26,7 +28,8 @@ final class EditorWorkspaceResizeState {
             showsBottomPanel: viewModel.showBottomPanel && !viewModel.performance.isExpanded,
             requestedLeftPanelWidth: leftWidth,
             requestedRightPanelWidth: rightWidth,
-            requestedBottomPanelHeight: bottomHeight,
+            requestedBottomPanelHeight: viewModel.toolStrip.activeLeftBottomTool == "animator"
+                ? (animatorWasResized ? animatorHeight : min(animatorHeight, max(0, size.height * 0.46))) : bottomHeight,
             fallbackLeftPanelWidth: AdaEngineStyleLayoutSpec.projectSidebarWidth,
             fallbackRightPanelWidth: AdaEngineStyleLayoutSpec.inspectorWidth
         )
@@ -58,15 +61,19 @@ final class EditorWorkspaceResizeState {
                 rightWidth = width
             }
         case .bottom:
+            if viewModel.toolStrip.activeLeftBottomTool == "animator" { animatorWasResized = true }
             let start = dragStart ?? before.bottomPanelHeight
             dragStart = start
             let height = start - translation.height
             if height < EditorWorkspaceLayout.minimumBottomPanelHeight {
                 viewModel.showBottomPanel = false
-                bottomHeight = start
+                if viewModel.toolStrip.activeLeftBottomTool == "animator" { animatorHeight = start }
+                else { bottomHeight = start }
                 dragStart = nil
             } else {
-                bottomHeight = EditorWorkspaceLayout.clampedBottomPanelHeight(height, in: size)
+                let adjusted = EditorWorkspaceLayout.clampedBottomPanelHeight(height, in: size)
+                if viewModel.toolStrip.activeLeftBottomTool == "animator" { animatorHeight = adjusted }
+                else { bottomHeight = adjusted }
             }
         }
         let after = layout(in: size, viewModel: viewModel)

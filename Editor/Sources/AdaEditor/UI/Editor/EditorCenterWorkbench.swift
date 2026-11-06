@@ -373,7 +373,7 @@ extension EditorCenterWorkbench {
             switch document.kind {
             case .shaderGraph:
                 return EditorProjectFileAppearance.shaderGraph.symbol
-            case .particleEffect, .spriteAnimation, .atlas,
+            case .particleEffect, .spriteAnimation, .animationLibrary, .animationModifiers, .atlas,
                 .tileSource,
                 .tileMap:
                 return "\u{E8F1}"
@@ -414,7 +414,7 @@ extension EditorCenterWorkbench {
             switch document.kind {
             case .shaderGraph:
                 return EditorProjectFileAppearance.shaderGraph.color(in: theme.editorColors)
-            case .particleEffect, .spriteAnimation, .atlas,
+            case .particleEffect, .spriteAnimation, .animationLibrary, .animationModifiers, .atlas,
                 .tileSource,
                 .tileMap:
                 return theme.editorColors.blue
@@ -480,6 +480,8 @@ extension EditorCenterWorkbench {
     @ViewBuilder
     private func assetPreview(document: EditorAssetDocument) -> some View {
         switch document.kind {
+        case .animationLibrary, .animationModifiers:
+            EditorAnimationLibraryAssetEditor(document: document, workbench: viewModel).id(document.id)
         case .shaderGraph:
             EditorShaderGraphEditor(model: viewModel.shaderGraphModel(for: document), modelDocuments: viewModel.openDocuments.compactMap {
                 if case .asset(let asset) = $0, asset.kind == .model3D { return asset }
@@ -494,7 +496,7 @@ extension EditorCenterWorkbench {
         case .spine2D:
             EditorSpineAssetPreview(document: document, workbench: viewModel).id(document.id)
         case .model3D:
-            EditorModelAssetPreview(document: document, workbench: viewModel, resourceRootURL: sceneResourceRootURL)
+            EditorModelAssetPreview(document: document, workbench: viewModel)
                 .id(document.id)
         case .tileSource:
             EditorTileSourceAssetEditor(document: document, model: viewModel.tileSourceModel(for: document))

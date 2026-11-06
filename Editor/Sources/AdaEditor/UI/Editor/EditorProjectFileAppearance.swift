@@ -17,7 +17,7 @@ enum EditorProjectFileAppearance: Equatable {
         case "tilemap": return .tileMap
         case "atlas": return .atlas
         case "particles": return .particleEffect
-        case "spriteanim": return .spriteAnimation
+        case "spriteanim", "animlib", "animmod": return .spriteAnimation
         case "ttf", "otf", "woff", "woff2": return .font
         case "mat": return .material
         case "mesh", "obj", "gltf", "glb", "fbx", "usdz", "vox": return .mesh

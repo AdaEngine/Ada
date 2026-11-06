@@ -136,6 +136,22 @@ enum EditorSceneFileLoader {
         }
         if typeName == EditorBuiltInComponentType.model3DSource, let reference = payload["source"]?.stringValue, !reference.isEmpty {
             resolvedPayload["source"] = .string(try EditorModelResource.resolve(reference, sourceURL: sourceURL, resourceRootURL: resourceRootURL).path)
+            if let path = payload["animationModifiers"]?.stringValue, !path.isEmpty {
+                guard let url = resolveTileMapReference(path, relativeTo: sourceURL, resourceRootURL: resourceRootURL, fileExtension: "animmod") else {
+                    throw AssetError.message("Animation modifiers must be an .animmod resource inside project assets.")
+                }
+                resolvedPayload["animationModifiers"] = .string(url.path)
+            }
+            if let libraries = payload["animationLibraries"], libraries != .null {
+                guard case let .array(values) = libraries else { throw AssetError.message("Animation libraries must be a list of .animlib references.") }
+                resolvedPayload["animationLibraries"] = .array(try values.map { value in
+                    guard case let .string(path) = value,
+                        let url = resolveTileMapReference(path, relativeTo: sourceURL, resourceRootURL: resourceRootURL, fileExtension: "animlib") else {
+                        throw AssetError.message("Animation library must be an .animlib resource inside project assets.")
+                    }
+                    return .string(url.path)
+                })
+            }
             if case var .object(lod) = payload["lod"], case let .array(sources) = lod["sources"] {
                 lod["sources"] = .array(try sources.map {
                     .string(try EditorModelResource.resolve($0.stringValue, sourceURL: sourceURL, resourceRootURL: resourceRootURL).path)
@@ -259,6 +275,7 @@ enum EditorSceneFileLoader {
         let parentEntity: Entity?
         let idPrefix: String
         let ancestry: Set<URL>
+        let identityNamespace = UUID().uuidString
         var assets: EditorSceneAssetCache
         var warnings: [String] = []
         var entityCount: Int
@@ -294,6 +311,7 @@ enum EditorSceneFileLoader {
             let entity = world.spawn(sceneEntity.name)
             entity.isActive = sceneEntity.enabled
             let runtimeEditorID = "\(idPrefix)\(sceneEntity.id)"
+            entity.components[AnimationSceneIdentity3D.self] = .init(namespace: identityNamespace, id: sceneEntity.id)
             entitiesByEditorID[sceneEntity.id] = entity
             runtimeEntityIDsByEditorID[runtimeEditorID] = entity.id
             editorIDsByRuntimeEntityID[entity.id] = runtimeEditorID
@@ -366,7 +384,9 @@ enum EditorSceneFileLoader {
                     let alternatives = try (reference.lod?.sources ?? []).map { source in
                         try assets.model(at: source)
                     }
-                    let root = try reference.instantiate(asset, alternatives: alternatives, in: world, under: entity)
+                    let libraries = try reference.animationLibraries.map { try assets.library(at: $0) }
+                    let modifiers = try reference.animationModifiers.map { try assets.modifierStack(at: $0) }
+                    let root = try reference.instantiate(asset, alternatives: alternatives, libraries: libraries, modifiers: modifiers, in: world, under: entity)
                     func registerNodes(_ node: Entity) {
                         entityCount += 1
                         editorIDsByRuntimeEntityID[node.id] = runtimeEditorID
@@ -527,7 +547,7 @@ enum EditorSceneFileLoader {
         return result
     }
 
-    private static func resolveTileMapReference(
+    static func resolveTileMapReference(
         _ reference: String,
         relativeTo sourceURL: URL?,
         resourceRootURL: URL?,
@@ -544,7 +564,7 @@ enum EditorSceneFileLoader {
         }
         let resolved = url.resolvingSymlinksInPath().standardizedFileURL
         guard resolved.pathExtension == fileExtension else { return nil }
-        if reference.hasPrefix("@res://") || fileExtension == "particles", let root {
+        if reference.hasPrefix("@res://") || fileExtension == "particles" || fileExtension == "animlib" || fileExtension == "animmod", let root {
             let rootPath = root.resolvingSymlinksInPath().standardizedFileURL.path
             guard resolved.path.hasPrefix(rootPath + "/") else { return nil }
         }

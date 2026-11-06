@@ -464,6 +464,7 @@ var targets: [Target] = [
     .adaTarget(
         name: "AdaScripting",
         dependencies: [
+            "AdaAnimation",
             "AdaScriptCompilerCore",
             "AdaApp",
             "AdaAssets",
@@ -527,6 +528,7 @@ var targets: [Target] = [
     .adaTarget(
         name: "AdaAssets",
         dependencies: [
+            "AdaAnimation",
             "AdaApp",
             "AdaUtils",
             "Math",
@@ -1366,6 +1368,7 @@ targets += [
     .testTarget(
         name: "AdaAssetsTests",
         dependencies: [
+            "AdaAnimation",
             "AdaAssets",
             "Math"
         ],

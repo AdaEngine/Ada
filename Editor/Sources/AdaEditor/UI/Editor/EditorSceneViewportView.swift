@@ -134,8 +134,12 @@ struct EditorSceneViewportView: View {
                     }
                     .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    viewportSceneOverlay
-                        .frame(width: geometry.size.width, height: geometry.size.height)
+                    // Retained scenes stay prepared behind asset tabs. Their custom drawing
+                    // layers must be removed while inactive; inherited opacity does not hide them.
+                    if isDocumentActive {
+                        viewportSceneOverlay
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                    }
 
                     sceneControls(size: geometry.size)
                     statusBar

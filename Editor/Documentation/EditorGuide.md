@@ -1,5 +1,8 @@
 # AdaEditor Guide
 
+Native control appearance follows the [Studio control design rules](Design/Controls.md):
+visible action surfaces and states, themed fields, colored vector-axis badges and overflow indicators.
+
 ## Open or create a project
 
 Use **Create new project** on the welcome screen, or choose **File > Open Project** to open an existing project. AdaScript projects use `.ada` source files. Projects with native Swift code also use Swift Package Manager.
@@ -34,8 +37,21 @@ glTF imports with external buffers or textures are copied into a new model folde
 with those dependencies. Keep dependencies beneath the source model's directory;
 remote URLs and references escaping that directory are rejected. Missing files
 fail the bundle import. Repeated imports create another bundle without replacing
-the original. Imported materials are preserved; visual material editing and
-skeleton/clip authoring are not part of this workflow yet.
+the original. Imported materials are preserved. Imported meshes/rigs remain source
+assets; editable animation clips are stored separately as described below.
+
+## Edit bone animation
+
+Select a Model 3D entity and open **Animator → Bone Keyframes**. Extract an editable
+copy of an imported clip or create a clip from the rig's rest pose. Select bones,
+tracks and timeline keys to edit translation, rotation, scale or morph weights.
+Preview the model, use Undo/Redo, then explicitly **Save** the `.animlib` resource.
+Autosave and tab switches retain animation drafts without writing them.
+**Save and Bind** attaches a saved compatible library through the scene's own history;
+the Skeletal Graph can then select its qualified clips. See
+[Editing bone animation](AnimationAuthoring.md) for key commands, conflict recovery
+and the shared agent/Studio Tools API. The offline **Authoring skeletal animation**
+guide also covers Swift library construction and runtime graph references.
 
 ## MagicaVoxel models
 

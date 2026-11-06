@@ -7,21 +7,29 @@ import Foundation
 struct EditorSceneAssetCache: Resource {
     private(set) var models: [String: AssetHandle<ModelAsset3D>] = [:]
     private(set) var skeletons: [String: AssetHandle<SpineSkeleton>] = [:]
+    private(set) var libraries: [String: AssetHandle<AnimationLibraryResource>] = [:]
+    private(set) var modifiers: [String: AssetHandle<AnimationModifierResource>] = [:]
     private var failures: [String: String] = [:]
     private var revisions: [String: FileRevision] = [:]
     private var usedModels: Set<String> = []
     private var usedSkeletons: Set<String> = []
+    private var usedLibraries: Set<String> = []
+    private var usedModifiers: Set<String> = []
 
     mutating func beginLoad() {
         usedModels.removeAll(keepingCapacity: true)
         usedSkeletons.removeAll(keepingCapacity: true)
+        usedLibraries.removeAll(keepingCapacity: true)
+        usedModifiers.removeAll(keepingCapacity: true)
     }
 
     mutating func finishLoad() {
         models = models.filter { usedModels.contains($0.key) }
         skeletons = skeletons.filter { usedSkeletons.contains($0.key) }
+        libraries = libraries.filter { usedLibraries.contains($0.key) }
+        modifiers = modifiers.filter { usedModifiers.contains($0.key) }
         failures.removeAll()
-        revisions = revisions.filter { usedModels.contains($0.key) || usedSkeletons.contains($0.key) }
+        revisions = revisions.filter { usedModels.contains($0.key) || usedSkeletons.contains($0.key) || usedLibraries.contains($0.key) || usedModifiers.contains($0.key) }
     }
 
     mutating func model(at path: String) throws -> ModelAsset3D {
@@ -60,6 +68,24 @@ struct EditorSceneAssetCache: Resource {
         #endif
     }
 
+    mutating func library(at path: String) throws -> AnimationLibrary {
+        usedLibraries.insert(path)
+        if let failure = failures[path] { throw AssetError.message(failure) }
+        let revision = FileRevision(path: path)
+        if revisions[path] == revision, let library = libraries[path]?.asset?.library { return library }
+        #if WASM
+        throw AssetError.message("Animation library has not loaded.")
+        #else
+        let handle = try libraries[path] == nil
+            ? AssetsManager.loadSync(AnimationLibraryResource.self, at: path)
+            : AssetHandle(AssetsManager.loadFreshSync(AnimationLibraryResource.self, at: path))
+        guard let library = handle.asset?.library else { throw AssetError.message("Animation library has not loaded: \(path)") }
+        libraries[path] = handle
+        revisions[path] = revision
+        return library
+        #endif
+    }
+
     /// Decode/import off the UI actor, sequentially to bound temporary import memory.
     /// Invalid assets remain per-entity warnings instead of preventing the scene from opening.
     @concurrent
@@ -73,7 +99,7 @@ struct EditorSceneAssetCache: Resource {
         var paths = Paths()
         try collect(model: model, sourceURL: sourceURL, resourceRootURL: resourceRootURL, ancestry: [], paths: &paths)
         var result = Self()
-        let total = paths.models.count + paths.skeletons.count
+        let total = paths.models.count + paths.skeletons.count + paths.libraries.count + paths.modifiers.count
         var completed = 0
         await onProgress(EditorSceneLoadingProgress(phase: .resources, total: total))
         for path in paths.models.sorted() {
@@ -116,6 +142,38 @@ struct EditorSceneAssetCache: Resource {
             completed += 1
             await onProgress(EditorSceneLoadingProgress(phase: .resources, completed: completed, total: total, resourceName: name))
         }
+        for path in paths.libraries.sorted() {
+            try Task.checkCancellation()
+            do {
+                let revision = FileRevision(path: path)
+                if previous.revisions[path] == revision, let handle = previous.libraries[path], handle.asset != nil {
+                    result.libraries[path] = handle
+                } else if previous.libraries[path] != nil {
+                    result.libraries[path] = AssetHandle(try await AssetsManager.loadFresh(AnimationLibraryResource.self, at: path))
+                } else {
+                    result.libraries[path] = try await AssetsManager.load(AnimationLibraryResource.self, at: path)
+                }
+                result.revisions[path] = revision
+            } catch { result.failures[path] = error.localizedDescription }
+            completed += 1
+            await onProgress(EditorSceneLoadingProgress(phase: .resources, completed: completed, total: total,
+                                                       resourceName: URL(fileURLWithPath: path).lastPathComponent))
+        }
+        for path in paths.modifiers.sorted() {
+            try Task.checkCancellation()
+            do {
+                let revision = FileRevision(path: path)
+                if previous.revisions[path] == revision, let handle = previous.modifiers[path], handle.asset != nil {
+                    result.modifiers[path] = handle
+                } else if previous.modifiers[path] != nil {
+                    result.modifiers[path] = AssetHandle(try await AssetsManager.loadFresh(AnimationModifierResource.self, at: path))
+                } else { result.modifiers[path] = try await AssetsManager.load(AnimationModifierResource.self, at: path) }
+                result.revisions[path] = revision
+            } catch { result.failures[path] = error.localizedDescription }
+            completed += 1
+            await onProgress(EditorSceneLoadingProgress(phase: .resources, completed: completed, total: total,
+                                                       resourceName: URL(fileURLWithPath: path).lastPathComponent))
+        }
         try Task.checkCancellation()
         return result
     }
@@ -123,6 +181,8 @@ struct EditorSceneAssetCache: Resource {
     private struct Paths {
         var models: Set<String> = []
         var skeletons: Set<String> = []
+        var libraries: Set<String> = []
+        var modifiers: Set<String> = []
     }
 
     private struct FileRevision: Equatable, Sendable {
@@ -144,6 +204,24 @@ struct EditorSceneAssetCache: Resource {
         var ancestry = ancestry
         if let sourceURL { ancestry.insert(sourceURL.resolvingSymlinksInPath().standardizedFileURL) }
         for entity in model.entities {
+            if let path = entity.components[EditorBuiltInComponentType.model3DSource]?["animationModifiers"]?.stringValue, !path.isEmpty {
+                guard let url = EditorSceneFileLoader.resolveTileMapReference(path, relativeTo: sourceURL, resourceRootURL: resourceRootURL,
+                                                                            fileExtension: "animmod") else {
+                    throw AssetError.message("Animation modifiers must be an .animmod resource inside project assets.")
+                }
+                paths.modifiers.insert(url.path)
+            }
+            if let payload = entity.components[EditorBuiltInComponentType.model3DSource], let references = payload["animationLibraries"], references != .null {
+                guard case let .array(values) = references else { throw AssetError.message("Animation libraries must be a list of resources.") }
+                for value in values {
+                    guard case let .string(path) = value,
+                        let url = EditorSceneFileLoader.resolveTileMapReference(path, relativeTo: sourceURL, resourceRootURL: resourceRootURL,
+                                                                              fileExtension: "animlib") else {
+                        throw AssetError.message("Animation library must be an .animlib resource inside project assets.")
+                    }
+                    paths.libraries.insert(url.path)
+                }
+            }
             if let payload = entity.components[EditorBuiltInComponentType.model3DSource],
                let source = payload["source"]?.stringValue, !source.isEmpty,
                let url = try? EditorModelResource.resolve(source, sourceURL: sourceURL, resourceRootURL: resourceRootURL) {
@@ -168,5 +246,25 @@ struct EditorSceneAssetCache: Resource {
                 try collect(model: nested, sourceURL: url, resourceRootURL: resourceRootURL, ancestry: ancestry, paths: &paths)
             }
         }
+    }
+}
+
+extension EditorSceneAssetCache {
+    mutating func modifierStack(at path: String) throws -> AnimationModifierStack {
+        usedModifiers.insert(path)
+        if let failure = failures[path] { throw AssetError.message(failure) }
+        let revision = FileRevision(path: path)
+        if revisions[path] == revision, let stack = modifiers[path]?.asset?.stack { return stack }
+        #if WASM
+        throw AssetError.message("Animation modifiers have not loaded.")
+        #else
+        let handle = try modifiers[path] == nil
+            ? AssetsManager.loadSync(AnimationModifierResource.self, at: path)
+            : AssetHandle(AssetsManager.loadFreshSync(AnimationModifierResource.self, at: path))
+        guard let stack = handle.asset?.stack else { throw AssetError.message("Animation modifiers have not loaded: \(path)") }
+        modifiers[path] = handle
+        revisions[path] = revision
+        return stack
+        #endif
     }
 }

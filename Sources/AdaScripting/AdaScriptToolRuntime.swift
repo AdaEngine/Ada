@@ -1,4 +1,5 @@
 import AdaScriptCompilerCore
+import AdaUI
 import Foundation
 import Gravity
 
@@ -53,10 +54,10 @@ public final class AdaScriptToolRuntime {
         guard try AdaScriptSchemaParser.parseTools(sources: sources).first(where: { $0.id == schema.id }) == schema else {
             throw AdaScriptError.invalidManifest("Tool metadata does not match its sources.")
         }
-        guard schema.apiVersion == 1, schema.platforms.contains(.macOS) else {
+        guard [1, 2].contains(schema.apiVersion), schema.platforms.contains(.macOS) || schema.platforms.contains(.windows) else {
             throw AdaScriptError.invalidManifest("This tool requires an unsupported Studio API or platform.")
         }
-        let supported: Set<AdaScriptToolPermission> = [.documentRead, .documentWrite]
+        let supported = Self.supportedPermissions(apiVersion: schema.apiVersion)
         guard Set(schema.permissions).isSubset(of: supported), Set(schema.permissions).isSubset(of: Set(grantedPermissions)) else {
             throw AdaScriptError.invalidManifest("The tool's requested permissions are unsupported or have not been granted.")
         }
@@ -71,10 +72,11 @@ public final class AdaScriptToolRuntime {
         }
         let delegate = AnnotatedGravityRuntimeDelegate(module: module, sourcesByPath: guardedSources)
         self.delegate = delegate
-        let bridge = AdaScriptToolBridge.make(permissions: Set(schema.permissions))
+        let bridge = AdaScriptToolBridge.make(permissions: Set(schema.permissions), apiVersion: schema.apiVersion)
         self.bridge = bridge
         let bundle = try AdaScriptRuntimeCoordinator.lock.withLock {
             let vm = GravityVirtualMachine(settings: .init(), delegate: delegate)
+            bridge.virtualMachine = vm
             try AdaScriptIdentifiers.bind(to: vm)
             let budget = try AdaScriptCommunityBudget.install(in: vm, policy: .init(maximumCheckpoints: 20_000, maximumCallbackSeconds: 0.05))
             try vm.bindClass(with: AdaScriptToolBridge.self)
@@ -137,7 +139,10 @@ public final class AdaScriptToolRuntime {
             try validateAction(action)
             bridge.scene = scene
             bridge.entities = []
+            bridge.animations.begin()
+            var succeeded = false
             defer {
+                bridge.animations.finish(success: succeeded)
                 bridge.scene = nil
                 bridge.entities = []
             }
@@ -149,6 +154,10 @@ public final class AdaScriptToolRuntime {
             }
             try invoke(action, arguments: [context])
             try refreshValues()
+            guard bridge.entities.isEmpty || !bridge.animations.hasStagedJobs else {
+                throw AdaScriptError.invalidManifest("Submit animation jobs and entity-creation batches in separate callbacks.")
+            }
+            succeeded = true
             return bridge.entities
         }
     }
@@ -161,10 +170,29 @@ public final class AdaScriptToolRuntime {
             // A retired bridge cannot write documents or register new panels.
             bridge.scene = nil
             bridge.isRetired = true
+            bridge.animations.retire()
             if instance.hasMethod(named: "deactivate") { try? invoke("deactivate", arguments: []) }
             isActive = false
             panels = []
         }
+    }
+
+    /// Supported capabilities are versioned independently of project consent.
+    public static func supportedPermissions(apiVersion: Int) -> Set<AdaScriptToolPermission> {
+        if apiVersion == 1 { return [.documentRead, .documentWrite] }
+        if apiVersion == 2 { return [.documentRead, .documentWrite, .animationRead, .animationWrite, .animationPreview] }
+        return []
+    }
+
+    /// The host owns cancellation and generation checks after `perform` succeeds.
+    public func takeAnimationJobs() -> [AdaScriptAnimationToolJob] {
+        AdaScriptRuntimeCoordinator.lock.withLock { bridge.animations.takePending() }
+    }
+
+    /// Terminal results are consumed by a successful poll callback.
+    public func completeAnimationJob(_ id: String, responseJSON: String) throws {
+        guard isActive, !isFailed, !bridge.isRetired else { return }
+        try AdaScriptRuntimeCoordinator.lock.withLock { try bridge.animations.complete(id, responseJSON: responseJSON) }
     }
 
     private func invoke(_ method: String, arguments: [Any]) throws {
@@ -228,9 +256,16 @@ public final class AdaScriptToolRuntime {
     // bridge receives positional raw values and validates them before conversion.
     private static let contextPrelude = """
 
-        class __AdaStudioContext {
+        class __AdaStudioAnimations {
             var __host;
             func init(host) { __host = host; }
+            func submit(request) { return __host.submitAnimation(request); }
+            func poll(job) { return __host.pollAnimation(job); }
+        }
+        class __AdaStudioContext {
+            var __host;
+            var animations;
+            func init(host) { __host = host; animations = __AdaStudioAnimations(host); }
             var scenePath { get { return __host.scenePath; } };
             var sceneRevision { get { return __host.sceneRevision; } };
             var entityCount { get { return __host.entityCount; } };
@@ -245,6 +280,8 @@ public final class AdaScriptToolRuntime {
 // Bridge calls collect detached data; they never invoke AdaUI or editor models.
 @GSExportable("AdaEditorToolContext")
 final class AdaScriptToolBridge {
+    @GSExportableIgnore weak var virtualMachine: GravityVirtualMachine?
+    @GSExportableIgnore let animations: AdaScriptAnimationToolBridge
     @GSExportableIgnore let permissions: Set<AdaScriptToolPermission>
     @GSExportableIgnore var panels: [AdaScriptToolPanel] = []
     @GSExportableIgnore var entities: [AdaScriptToolEntity] = []
@@ -267,9 +304,43 @@ final class AdaScriptToolBridge {
     }
 
     @GSExportableIgnore
-    static func make(permissions: Set<AdaScriptToolPermission>) -> AdaScriptToolBridge { AdaScriptToolBridge(permissions: permissions) }
+    static func make(permissions: Set<AdaScriptToolPermission>, apiVersion: Int) -> AdaScriptToolBridge { AdaScriptToolBridge(permissions: permissions, apiVersion: apiVersion) }
 
-    private init(permissions: Set<AdaScriptToolPermission>) { self.permissions = permissions }
+    private init(permissions: Set<AdaScriptToolPermission>, apiVersion: Int) {
+        self.permissions = permissions
+        self.animations = .init(permissions: permissions, apiVersion: apiVersion)
+    }
+
+    func submitAnimation(request: GSValue) -> String {
+        guard !isRetired, !isRegistering else {
+            failure = "Animation requests can only be submitted from an active action."
+            return ""
+        }
+        do {
+            guard let detached = AdaScriptUIValueBridge.detached(request, maximumNodes: 8_192, maximumStringBytes: 65_536), case .object = detached else {
+                throw AdaScriptError.invalidManifest("Animation request conversion budget exceeded (8,192 values, 64 KiB UTF-8 strings, depth 64); use a bounded Map.")
+            }
+            let data = try JSONEncoder().encode(detached)
+            return try animations.submit(String(decoding: data, as: UTF8.self))
+        }
+        catch { failure = error.localizedDescription; return "" }
+    }
+
+    func pollAnimation(job: GSValue) -> GSValue? {
+        guard let virtualMachine else { return nil }
+        guard !isRetired, !isRegistering, job.isString else {
+            failure = "Animation jobs can only be polled from an active action."
+            return AdaScriptUIValueBridge.make(.object(["status": .string("failed"), "error": .string(failure ?? "Animation job is unavailable.")]), in: virtualMachine)
+        }
+        do {
+            let data = Data(try animations.poll(job.toString).utf8)
+            return AdaScriptUIValueBridge.make(try JSONDecoder().decode(UIValue.self, from: data), in: virtualMachine)
+        }
+        catch {
+            failure = error.localizedDescription
+            return AdaScriptUIValueBridge.make(.object(["status": .string("failed"), "error": .string("Animation job is unavailable.")]), in: virtualMachine)
+        }
+    }
 
     func addPanel(id: GSValue, title: GSValue, location: GSValue, ui: GSValue) -> Bool {
         guard id.isString, title.isString, location.isString, ui.isString else {

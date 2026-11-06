@@ -4,11 +4,13 @@ struct EditorEnumField: View {
     let cases: [String]
     let selection: Binding<String>
     var accessibilityID = "AdaEditor.Enum.Toggle"
+    var labels: [String: String] = [:]
+    var localizesValues = true
     @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(L10n.tr(selection.wrappedValue))
+            Text(label(selection.wrappedValue))
                 .font(.system(size: 12))
                 .lineLimit(1)
             Spacer()
@@ -23,11 +25,16 @@ struct EditorEnumField: View {
         .overlay { RoundedRectangleShape(cornerRadius: 6).stroke(theme.editorColors.border.opacity(0.6), lineWidth: 1) }
         .contextMenu(opensOnPrimaryAction: true) {
             ForEach(cases, id: \.self) { value in
-                ContextMenuOption(L10n.tr(value), isSelected: selection.wrappedValue == value) {
+                ContextMenuOption(label(value), isSelected: selection.wrappedValue == value) {
                     selection.wrappedValue = value
                 }
             }
         }
         .accessibilityIdentifier(accessibilityID)
+    }
+
+    private func label(_ value: String) -> String {
+        let title = labels[value] ?? value
+        return localizesValues ? L10n.tr(title) : title
     }
 }

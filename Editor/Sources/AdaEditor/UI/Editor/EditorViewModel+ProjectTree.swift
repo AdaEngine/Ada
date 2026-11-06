@@ -306,6 +306,8 @@ extension EditorViewModel {
         if fileExtension == "spriteanim" {
             return .spriteAnimation
         }
+        if fileExtension == "animlib" { return .animationLibrary }
+        if fileExtension == "animmod" { return .animationModifiers }
         switch kind {
         case .image:
             return .image

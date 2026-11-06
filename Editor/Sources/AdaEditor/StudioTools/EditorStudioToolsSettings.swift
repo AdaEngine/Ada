@@ -35,7 +35,7 @@ struct EditorStudioToolsSettings: View {
                     Text(host.isAuthorized(definition) ? L10n.text("Access allowed") : L10n.text("Access not allowed"))
                         .font(.system(size: 12))
                     ForEach(definition.schema.permissions, id: \.rawValue) { permission in
-                        Text(permission.studioAccessTitle).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
+                        Text(L10n.tr(permission.studioAccessTitle)).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
                     }
                     if let reason = host.unavailabilityReason(definition) {
                         Text(reason).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)

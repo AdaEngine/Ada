@@ -39,7 +39,28 @@ extension EditorWorkbenchViewModel {
 
     @discardableResult
     func performDocumentHistory(redo: Bool) -> Bool {
+        if case let .asset(asset)? = activeDocument,
+           let workspace = animationWorkspaces[asset.id], workspace.timeline.inspectorMode == "modifiers",
+           let document = workspace.modifiers, !document.isDiscarded {
+            guard redo ? document.canRedo : document.canUndo else { return false }
+            do {
+                if redo { try document.redo(expectedRevision: document.revision) } else { try document.undo(expectedRevision: document.revision) }
+                return true
+            } catch { return false }
+        }
         switch activeDocument {
+        case let .asset(asset) where asset.kind == .animationModifiers:
+            guard let document = try? animationService?.openModifiers(asset.relativePath), redo ? document.canRedo : document.canUndo else { return false }
+            do {
+                if redo { try document.redo(expectedRevision: document.revision) } else { try document.undo(expectedRevision: document.revision) }
+                return true
+            } catch { return false }
+        case let .asset(document) where document.kind == .animationLibrary:
+            guard let model = try? animationService?.open(document.relativePath), redo ? model.canRedo : model.canUndo else { return false }
+            do {
+                if redo { try model.redo(expectedRevision: model.revision) } else { try model.undo(expectedRevision: model.revision) }
+                return true
+            } catch { return false }
         case let .asset(document) where document.kind == .shaderGraph:
             let model = shaderGraphModel(for: document)
             guard redo ? model.canRedo : model.canUndo else { return false }

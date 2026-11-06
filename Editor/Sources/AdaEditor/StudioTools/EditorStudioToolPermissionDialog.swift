@@ -15,6 +15,9 @@ struct EditorStudioToolPermissionRequest: Identifiable, Hashable {
 extension AdaScriptToolPermission {
     var studioAccessTitle: String {
         switch self {
+        case .animationRead: "Read animation resources"
+        case .animationWrite: "Edit animation resources"
+        case .animationPreview: "Control animation previews"
         case .documentRead: "Read open scenes"
         case .documentWrite: "Change open scenes"
         case .workspaceRead: "Read project files"
@@ -28,6 +31,9 @@ extension AdaScriptToolPermission {
 
     var studioAccessDetail: String {
         switch self {
+        case .animationRead: "Inspect project animation drafts, bindings, keys and sampled poses."
+        case .animationWrite: "Create, edit and explicitly save animation libraries through their Undo history."
+        case .animationPreview: "Open animation library previews and seek their viewport."
         case .documentRead: "Read the active scene's path, revision and entity count."
         case .documentWrite: "Create entities in the active scene through its Undo history."
         default: "This capability is not available to Studio tools in this version."
@@ -56,8 +62,8 @@ struct EditorStudioToolPermissionDialog: View {
                     }
                     ForEach(request.definition.schema.permissions, id: \.rawValue) { permission in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(permission.studioAccessTitle).font(.system(size: 13, weight: .semibold))
-                            Text(permission.studioAccessDetail).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
+                            Text(L10n.tr(permission.studioAccessTitle)).font(.system(size: 13, weight: .semibold))
+                            Text(L10n.tr(permission.studioAccessDetail)).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
                         }
                     }
                     VStack(alignment: .leading, spacing: 4) {

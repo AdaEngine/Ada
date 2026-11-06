@@ -31,6 +31,7 @@ struct EditorSkeletalAnimatorPanel: View {
                     }
                     .frame(width: 220)
                     EditorAnimationGraphEditor(model: graphModel)
+                    EditorAnimationGraphEditor(model: graphModel, presentation: .inspector).frame(width: 280)
                 }
                 .frame(maxHeight: .infinity)
             }
@@ -57,7 +58,8 @@ struct EditorSkeletalAnimatorPanel: View {
         HStack(spacing: 8) {
             Text(L10n.text("SKELETAL GRAPH")).font(.system(size: 11, weight: .semibold))
             action(preview.playsAnimation ? "Pause" : "Play", id: "Play") { preview.playsAnimation.toggle() }
-            TextField(L10n.text("Seconds"), text: $seekTime).font(.system(size: 11)).frame(width: 55, height: 26)
+            TextField(L10n.text("Seconds"), text: $seekTime)
+                .textFieldStyle(EditorAnimationFieldStyle(colors: theme.editorColors, height: 26)).frame(width: 70, height: 26)
                 .accessibilityIdentifier("AdaEditor.AnimationGraph.SeekTime")
             action("Seek", id: "Seek") {
                 if let value = Double(seekTime), value.isFinite { preview.seekGraph(to: value) }
@@ -69,22 +71,23 @@ struct EditorSkeletalAnimatorPanel: View {
                     guard let graph = graphModel.validGraph else {
                         return
                     }
-                    if try viewModel.workbench.setAnimationGraph(graph, target: target, autoplay: autoplay) {
+                    if try viewModel.workbench.setAnimationGraph(graph, target: target, autoplay: autoplay, asset: preview.asset) {
                         status = "Applied to scene. Save the scene to keep this graph."
                     }
                 } catch { status = error.localizedDescription }
             }
             .disabled(graphModel.validGraph == nil || viewModel.workbench.activeSceneDocument?.isReadOnly == true)
             action("Use Single Clip", id: "Clear") {
-                do { _ = try viewModel.workbench.setAnimationGraph(nil, target: target) } catch { status = error.localizedDescription }
+                do { _ = try viewModel.workbench.setAnimationGraph(nil, target: target, asset: preview.asset) } catch { status = error.localizedDescription }
             }
             .disabled(target.source.animationGraph == nil || viewModel.workbench.activeSceneDocument?.isReadOnly == true)
         }
     }
 
     private func action(_ title: String, id: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) { Text(L10n.tr(title)).font(.system(size: 11)).padding(4) }
-            .buttonStyle(DefaultButtonStyle())
+        Button(action: action) { Text(L10n.tr(title)).font(.system(size: 11)) }
+            .buttonStyle(EditorAnimationButtonStyle(colors: theme.editorColors, prominent: id == "Apply",
+                selected: id == "Autoplay" && autoplay || id == "Play" && preview.playsAnimation))
             .accessibilityIdentifier("AdaEditor.AnimationGraph.\(id)")
     }
 
@@ -102,8 +105,25 @@ struct EditorSkeletalAnimatorPanel: View {
         guard let asset = preview.asset else {
             return
         }
-        graphModel.configure(asset: asset, graph: target.source.animationGraph)
-        autoplay = target.source.autoplay
-        if let graph = graphModel.validGraph { preview.animationGraph = graph }
+        do {
+            let documents = try viewModel.workbench.animationService?.savedDocuments(references: target.source.animationLibraries, sceneURL: target.sceneURL) ?? []
+            let libraries = documents.map(\.library)
+            try preview.installAnimationLibraries(libraries)
+            let authored = try libraries.flatMap { library in
+                guard let rig = asset.animationRig else { throw AssetError.message("Model has no animation rig.") }
+                return try library.compiledClips(for: rig)
+            }
+            var labels: [String: String] = [:]
+            for document in documents {
+                let names = Dictionary(grouping: document.library.clips, by: \.name)
+                for (index, clip) in document.library.clips.enumerated() {
+                    let suffix = names[clip.name, default: []].count > 1 ? " [\(index + 1)]" : ""
+                    labels[document.library.runtimeName(for: clip.id)] = "\(clip.name)\(suffix) · \(document.url.lastPathComponent)"
+                }
+            }
+            graphModel.configure(asset: asset, graph: target.source.animationGraph, authoredClips: authored, clipLabels: labels)
+            autoplay = target.source.autoplay
+            if let graph = graphModel.validGraph { preview.animationGraph = graph }
+        } catch { preview.error = error.localizedDescription }
     }
 }

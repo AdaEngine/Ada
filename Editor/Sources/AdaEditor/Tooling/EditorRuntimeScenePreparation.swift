@@ -8,6 +8,8 @@ struct EditorRuntimeScenePreparation: Sendable {
     let model: EditorSceneModel
     private let models: [AssetHandle<ModelAsset3D>]
     private let skeletons: [AssetHandle<SpineSkeleton>]
+    private let libraries: [AssetHandle<AnimationLibraryResource>]
+    private let modifiers: [AssetHandle<AnimationModifierResource>]
 
     @concurrent
     static func prepare(
@@ -20,7 +22,9 @@ struct EditorRuntimeScenePreparation: Sendable {
         let model = try collect(at: url, assetsDirectory: assetsDirectory, ancestry: [], paths: &paths)
         var models: [AssetHandle<ModelAsset3D>] = []
         var skeletons: [AssetHandle<SpineSkeleton>] = []
-        let total = max(1, paths.models.count + paths.skeletons.count)
+        var libraries: [AssetHandle<AnimationLibraryResource>] = []
+        var modifiers: [AssetHandle<AnimationModifierResource>] = []
+        let total = max(1, paths.models.count + paths.skeletons.count + paths.libraries.count + paths.modifiers.count)
         var completed = 0
         reportProgress(.init(fraction: 0.05, stage: "assets"))
         // Keep imports bounded rather than decoding every GLB/texture at once.
@@ -41,14 +45,32 @@ struct EditorRuntimeScenePreparation: Sendable {
             completed += 1
             reportProgress(.init(fraction: 0.05 + 0.9 * Double(completed) / Double(total), stage: "assets"))
         }
+        for path in paths.libraries.sorted() {
+            try Task.checkCancellation()
+            let handle = try await AssetsManager.load(AnimationLibraryResource.self, at: path)
+            guard handle.asset != nil else { throw AssetError.message("Animation library has not loaded: \(path)") }
+            libraries.append(handle)
+            completed += 1
+            reportProgress(.init(fraction: 0.05 + 0.9 * Double(completed) / Double(total), stage: "assets"))
+        }
+        for path in paths.modifiers.sorted() {
+            try Task.checkCancellation()
+            let handle = try await AssetsManager.load(AnimationModifierResource.self, at: path)
+            guard handle.asset != nil else { throw AssetError.message("Animation modifiers have not loaded: \(path)") }
+            modifiers.append(handle)
+            completed += 1
+            reportProgress(.init(fraction: 0.05 + 0.9 * Double(completed) / Double(total), stage: "assets"))
+        }
         try Task.checkCancellation()
         reportProgress(.init(fraction: 0.95, stage: "installing"))
-        return Self(model: model, models: models, skeletons: skeletons)
+        return Self(model: model, models: models, skeletons: skeletons, libraries: libraries, modifiers: modifiers)
     }
 
     private struct Paths {
         var models: Set<String> = []
         var skeletons: Set<String> = []
+        var libraries: Set<String> = []
+        var modifiers: Set<String> = []
     }
 
     private static func collect(at url: URL, assetsDirectory: URL, ancestry: Set<URL>, paths: inout Paths) throws -> EditorSceneModel {
@@ -66,6 +88,22 @@ struct EditorRuntimeScenePreparation: Sendable {
                     voxel = try JSONDecoder().decode(VoxelImportSettings.self, from: JSONEncoder().encode(value))
                 } else { voxel = nil }
                 paths.models.insert(Model3DSource(source: resolved, voxel: voxel).assetPath)
+                if let path = payload["animationModifiers"]?.stringValue, !path.isEmpty {
+                    guard let modifierURL = EditorSceneFileLoader.resolveTileMapReference(path, relativeTo: url, resourceRootURL: assetsDirectory,
+                                                                                       fileExtension: "animmod") else {
+                        throw AssetError.message("Animation modifiers must be inside project assets.")
+                    }
+                    paths.modifiers.insert(modifierURL.path)
+                }
+                if case let .array(references) = payload["animationLibraries"] {
+                    for reference in references {
+                        guard case let .string(path) = reference,
+                            let url = EditorSceneFileLoader.resolveTileMapReference(path, relativeTo: url, resourceRootURL: assetsDirectory, fileExtension: "animlib") else {
+                            throw AssetError.message("Animation library must be inside project assets.")
+                        }
+                        paths.libraries.insert(url.path)
+                    }
+                }
                 if case let .object(lod) = payload["lod"], case let .array(sources) = lod["sources"] {
                     for source in sources {
                         paths.models.insert(try EditorModelResource.resolve(source.stringValue, sourceURL: url, resourceRootURL: assetsDirectory).path)

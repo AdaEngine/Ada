@@ -5,10 +5,39 @@ import Synchronization
 
 /// Preview state shared by UI controls and the post-animation drawing system.
 final class EditorSkeleton3DOverlay: Resource, Sendable {
-    private let visibility = Mutex(false)
+    struct State: Sendable {
+        var enabled = false
+        var selected: Set<Int> = []
+        var grid = false
+        var axes = false
+        var height: Float = 0
+        var modifierHandles: [Vector3] = []
+    }
+    private let storage = Mutex(State())
+    var state: State { storage.withLock { $0 } }
     var isEnabled: Bool {
-        get { visibility.withLock { $0 } }
-        set { visibility.withLock { $0 = newValue } }
+        get { storage.withLock { $0.enabled } }
+        set { storage.withLock { $0.enabled = newValue } }
+    }
+    var selectedNodes: Set<Int> {
+        get { storage.withLock { $0.selected } }
+        set { storage.withLock { $0.selected = newValue } }
+    }
+    var showsGrid: Bool {
+        get { storage.withLock { $0.grid } }
+        set { storage.withLock { $0.grid = newValue } }
+    }
+    var showsAxes: Bool {
+        get { storage.withLock { $0.axes } }
+        set { storage.withLock { $0.axes = newValue } }
+    }
+    var gridHeight: Float {
+        get { storage.withLock { $0.height } }
+        set { storage.withLock { $0.height = newValue } }
+    }
+    var modifierHandles: [Vector3] {
+        get { storage.withLock { $0.modifierHandles } }
+        set { storage.withLock { $0.modifierHandles = newValue } }
     }
 
     /// Skip helper nodes while preserving their transforms in the animated global pose.
@@ -47,7 +76,29 @@ struct EditorSkeleton3DSystem {
     init(world _: World) {}
 
     func update(context _: UpdateContext) {
-        guard overlay.isEnabled else { return }
+        let settings = overlay.state
+        if settings.grid {
+            for step in -20...20 {
+                let value = Float(step) * 0.25
+                debug.line(from: [value, settings.height, -5], to: [value, settings.height, 5], color: Color(0.5, 0.5, 0.5, 0.35), depthTested: true)
+                debug.line(from: [-5, settings.height, value], to: [5, settings.height, value], color: Color(0.5, 0.5, 0.5, 0.35), depthTested: true)
+            }
+        }
+        if settings.axes {
+            let origin = Vector3(0, settings.height, 0)
+            debug.line(from: origin, to: origin + [1, 0, 0], color: .red, depthTested: false)
+            debug.line(from: origin, to: origin + [0, 1, 0], color: .green, depthTested: false)
+            debug.line(from: origin, to: origin + [0, 0, 1], color: .blue, depthTested: false)
+        }
+        for index in stride(from: 0, to: settings.modifierHandles.count - settings.modifierHandles.count % 2, by: 2) {
+            let anchor = settings.modifierHandles[index], point = settings.modifierHandles[index + 1]
+            let color = index == 0 ? Color(0.2, 0.55, 1, 1) : Color(0.8, 0.3, 1, 1)
+            debug.line(from: anchor, to: point, color: color, depthTested: false)
+            for axis in [Vector3.right, .up, Vector3(0, 0, 1)] {
+                debug.line(from: point - axis * 0.05, to: point + axis * 0.05, color: color, depthTested: false)
+            }
+        }
+        guard settings.enabled else { return }
         models.forEach { root, animation, _ in
             guard let transform = EditorPicking.worldMatrix(for: root) else { return }
             var jointSet: Set<Int> = []
@@ -63,10 +114,11 @@ struct EditorSkeleton3DSystem {
                 debug.line(from: start, to: end, color: Color(0.15, 1, 0.75, 1), depthTested: false)
             }
             let scale = max(0.0001, (transform * Vector4(0.025, 0, 0, 0)).xyz.length)
-            for joint in joints where pose.indices.contains(joint) {
+            for joint in jointSet.union(settings.selected).sorted() where pose.indices.contains(joint) {
                 let point = (transform * pose[joint] * Vector4(0, 0, 0, 1)).xyz
                 for axis in [Vector3.right, .up, Vector3(0, 0, 1)] {
-                    debug.line(from: point - axis * scale, to: point + axis * scale, color: .yellow, depthTested: false)
+                    debug.line(from: point - axis * scale, to: point + axis * scale,
+                               color: settings.selected.contains(joint) ? Color(1, 0.4, 0.1, 1) : .yellow, depthTested: false)
                 }
             }
         }

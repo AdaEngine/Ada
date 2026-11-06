@@ -95,9 +95,13 @@ extension EditorWorkbenchViewModel {
     }
 
     @discardableResult
-    func saveAllDocuments() -> Bool {
+    func saveAllDocuments(includeAnimationDrafts: Bool = false) -> Bool {
         var didSaveAll = true
         for document in openDocuments where document.isDirty {
+            if case let .asset(asset) = document, (asset.kind == .animationLibrary || asset.kind == .animationModifiers), !includeAnimationDrafts {
+                didSaveAll = false
+                continue
+            }
             if !saveDocument(document) {
                 didSaveAll = false
             }
@@ -110,6 +114,7 @@ extension EditorWorkbenchViewModel {
         guard let activeDocument, activeDocument.isDirty else {
             return false
         }
+        if case let .asset(asset) = activeDocument, (asset.kind == .animationLibrary || asset.kind == .animationModifiers) { return false }
 
         return saveDocument(activeDocument)
     }
@@ -124,7 +129,8 @@ extension EditorWorkbenchViewModel {
         case .git:
             nil
         case let .asset(document):
-            document.errorMessage
+            document.errorMessage ?? ((document.kind == .animationLibrary || document.kind == .animationModifiers) && document.isDirty
+                ? L10n.tr("Save the animation draft explicitly before continuing.") : nil)
         case nil:
             nil
         }
@@ -146,6 +152,11 @@ extension EditorWorkbenchViewModel {
         case let .text(document):
             return saveTextDocument(id: document.id)
         case let .asset(document):
+            if document.kind == .animationLibrary { return (try? animationService?.open(document.relativePath))?.save() ?? false }
+            if document.kind == .animationModifiers {
+                do { let draft = try animationService?.openModifiers(document.relativePath); try draft?.save(expectedRevision: draft?.revision ?? ""); return draft != nil }
+                catch { return false }
+            }
             return document.kind == .shaderGraph && shaderGraphModel(for: document).save()
         case .git:
             return false

@@ -6,6 +6,12 @@
     "source": "Editor/Documentation/EditorGuide.md",
     "blocks": [
       {
+        "kind": "text",
+        "text": "Native control appearance follows the [Studio control design rules](Design/Controls.md):\nvisible action surfaces and states, themed fields, colored vector-axis badges and overflow indicators.",
+        "level": 0,
+        "links": []
+      },
+      {
         "kind": "heading",
         "text": "Open or create a project",
         "level": 2,
@@ -61,7 +67,19 @@
       },
       {
         "kind": "text",
-        "text": "glTF imports with external buffers or textures are copied into a new model folder\nwith those dependencies. Keep dependencies beneath the source model's directory;\nremote URLs and references escaping that directory are rejected. Missing files\nfail the bundle import. Repeated imports create another bundle without replacing\nthe original. Imported materials are preserved; visual material editing and\nskeleton/clip authoring are not part of this workflow yet.",
+        "text": "glTF imports with external buffers or textures are copied into a new model folder\nwith those dependencies. Keep dependencies beneath the source model's directory;\nremote URLs and references escaping that directory are rejected. Missing files\nfail the bundle import. Repeated imports create another bundle without replacing\nthe original. Imported materials are preserved. Imported meshes/rigs remain source\nassets; editable animation clips are stored separately as described below.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Edit bone animation",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Select a Model 3D entity and open **Animator → Bone Keyframes**. Extract an editable\ncopy of an imported clip or create a clip from the rig's rest pose. Select bones,\ntracks and timeline keys to edit translation, rotation, scale or morph weights.\nPreview the model, use Undo/Redo, then explicitly **Save** the `.animlib` resource.\nAutosave and tab switches retain animation drafts without writing them.\n**Save and Bind** attaches a saved compatible library through the scene's own history;\nthe Skeletal Graph can then select its qualified clips. See\n[Editing bone animation](AnimationAuthoring.md) for key commands, conflict recovery\nand the shared agent/Studio Tools API. The offline **Authoring skeletal animation**\nguide also covers Swift library construction and runtime graph references.",
         "level": 0,
         "links": []
       },
@@ -280,7 +298,7 @@
       },
       {
         "kind": "text",
-        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Movie Maker\n• visionOS Windowed Mode",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Movie Maker\n• visionOS Windowed Mode",
         "level": 0,
         "links": [
           {
@@ -298,6 +316,14 @@
           {
             "title": "Loading images and adding formats",
             "destination": "ImageDecoders"
+          },
+          {
+            "title": "Authoring skeletal animation",
+            "destination": "AnimationAuthoring"
+          },
+          {
+            "title": "Animation IK and pose modifiers",
+            "destination": "AnimationIK"
           },
           {
             "title": "Movie Maker",
@@ -2255,7 +2281,7 @@
       },
       {
         "kind": "text",
-        "text": "This profile supports glTF 2.0 primitive topologies, UV0/UV1, one set of four skin influences and at most 128 joints per skin. Required Draco/Meshopt/KTX2 extensions are unsupported. Node TRS clips can use LINEAR, STEP and CUBICSPLINE interpolation; morph-weight animation is unsupported. Models and their local dependencies have a combined 128 MiB budget. JSON and decoded accessor inventories have additional bounds.",
+        "text": "This profile supports glTF 2.0 primitive topologies, UV0/UV1, one set of four skin influences and at most 128 joints per skin. Required Draco/Meshopt/KTX2 extensions are unsupported. Node TRS and morph-weight clips can use LINEAR, STEP and CUBICSPLINE interpolation. Models and their local dependencies have a combined 128 MiB budget. JSON and decoded accessor inventories have additional bounds.",
         "level": 0,
         "links": []
       },
@@ -2327,7 +2353,7 @@
       },
       {
         "kind": "text",
-        "text": "After validation and build, inspect a completed frame from visible Play. A 3D scene needs a camera, a light and an `Environment3D` (or a camera `backgroundColor`/clear flags) so the frame is not a flat clear color; `editor.play.run_scenario` can capture before/after frames around input. Exercise selected clips and compare frames at different times for animation. Isolated simulation verifies logic and keyboard/physics behavior; it does not install Model3D or prove rendering. Blender execution, rig editing and skeletal clip authoring are not exposed by these Studio tools. To create a new low-poly model use editor.model.generate (an AdaScript program that writes a GLB) or editor.voxel.generate (a .vox).",
+        "text": "After validation and build, inspect a completed frame from visible Play. A 3D scene needs a camera, a light and an `Environment3D` (or a camera `backgroundColor`/clear flags) so the frame is not a flat clear color; `editor.play.run_scenario` can capture before/after frames around input. Exercise selected clips and compare frames at different times for animation. Isolated simulation verifies logic and keyboard/physics behavior; it does not install Model3D or prove rendering. Native desktop agents can create/extract and edit skeletal/morph clips using the revision-checked `editor.animation.*` API; read [Animation authoring](AnimationAuthoring.md) for explicit Save, scene binding, shared Tool API 2, budgets and verification. Query `animationAuthoring` in desktop project context before use; mobile hosts do not advertise these desktop authoring commands. Blender execution, visual rig-structure editing and automatic rig inference remain unavailable. To create a new low-poly model use editor.model.generate (an AdaScript program that writes a GLB) or editor.voxel.generate (a .vox).",
         "level": 0,
         "links": []
       }
@@ -2903,6 +2929,314 @@
       {
         "kind": "text",
         "text": "Changing a native Swift compiler also uses its sibling SourceKit-LSP when present\non subsequent toolchain discovery. Reopen the project to refresh an already-running\nlanguage server. Web and Android tools have separate profiles and do not override\nthe native project compiler.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "AnimationAuthoring",
+    "title": "Authoring skeletal animation",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/Developers/AnimationAuthoring.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Copy an imported animation or capture a rest/current pose into a project-owned\n`.animlib` resource. Source GLB/glTF bytes remain unchanged. Swift code, Studio's\nAnimator, the editor agent and project Tools share the same data and edit commands.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Opening a GLB/glTF or `.animlib` in Studio reveals the bottom **Animator**. A\nresizable **Model** panel shows the imported node hierarchy, and the right Inspector\nfollows bone, track, key and graph selection. The timeline places all bones on a\nshared seconds ruler with a draggable playhead, clip/duration/loop controls, key\ninsertion and grouped editing. Graph uses connected pose cards on a canvas.\nThese surfaces share the large center viewport's player and camera. Asset editing\ndoes not require an open scene. See the Studio animation-authoring guide for the\ncomplete pointer and keyboard workflow.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Create a library",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A binding snapshots the complete hierarchy: stable node IDs, parents, names, rest\nmatrices/TRS and morph target widths. Tracks target hierarchy nodes, including\nnon-joint nodes, rather than offsets in a skin palette. Changed rigs fail binding\nexplicitly; guessing by duplicate bone names or reordered indices is not remapping.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaAnimation\nimport Foundation\n\nlet rig = try SkeletalRig(nodes: [\n    .init(parentIndex: nil, restPose: .init(), restMatrix: .identity, name: \"Root\")\n])\nvar library = AnimationLibrary(id: \"hero\", binding: .init(rig: rig, sourceAsset: \"Assets/Hero.glb\"))\nlet clip = try library.poseClip(id: \"wave\", name: \"Wave\", duration: 1)\ntry library.apply([.init(id: \"create-wave\", kind: .createClip, clip: clip)])\n// This known one-bone rig has one rotation track in the captured pose clip.\nif let rotation = clip.tracks.first(where: { $0.channel == .rotation }), var key = rotation.keys.first {\n    key.value = [0, 0, 0.70710677, 0.70710677]\n    try library.apply([.init(id: \"rotate-root\", kind: .putKey, clipID: clip.id,\n                             trackID: rotation.id, key: key, replaceExisting: true)])\n}\nlet reopened = try AnimationLibrary.decode(library.encodedData())\nlet player = try reopened.sample(clipID: \"wave\", at: 0.5)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use `library.extract(clip, rig: rig)` to copy a runtime clip from the same source rig.\nTranslation, normalized XYZW quaternion rotation, scale and morph-weight tracks\nretain their linear/step/cubic-spline values and derivatives. Explicit clip duration\npreserves a hold after the last key. `poseClip(name:duration:from:)` can capture a\ncompatible player's local pose/morphs. Matrix-authored static nodes retain matrices.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Edit keys and play clips",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`AnimationEdit` supports `clip.create/duplicate/remove/configure`,\n`track.create/remove/configure` and `key.put/remove`. IDs are scoped to the library,\nclip and track respectively. Duplicated clips own independent value data.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Batches are atomic. Each operation leaves a valid document; an invalid operation\nreports its ID and preserves the original library. Updating/moving an existing key\nID requires `replaceExisting:true`. Another key at the same time remains a conflict\nand must be removed explicitly. Keys use finite seconds in strictly increasing\norder within duration, typed finite values, and normalized quaternion rotations.\nCubic incoming/outgoing tangents are component derivatives per second.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Native temporal curves",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Key `curve` metadata adds easing to the outgoing segment. Families are linear,\nquadratic, cubic, quartic, quintic, sine, exponential, circular, back, elastic and\nbounce; directions are `in`, `out`, `inOut` and `outIn`. Back exposes overshoot;\nelastic exposes amplitude and period. Overshoot is retained rather than clamped.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaAnimation\n\nlet pose = SkeletalJointPose()\nlet rig = try SkeletalRig(nodes: [.init(parentIndex: nil, restPose: pose, restMatrix: pose.matrix)])\nvar library = AnimationLibrary(binding: .init(rig: rig, sourceAsset: \"Assets/Hero.glb\"))\nlet track = AnimationLibraryTrack(id: \"move\", nodeID: \"node-0\", channel: .translation, keys: [\n    .init(id: \"start\", time: 0, value: [0, 0, 0]),\n    .init(id: \"end\", time: 1, value: [1, 0, 0])\n])\ntry library.apply([.init(kind: .createClip, clip: .init(id: \"move\", name: \"Move\", duration: 1, tracks: [track]))])\nvar key = track.keys[0]\nkey.curve = .init(easing: .init(family: .quadratic, direction: .in))\ntry library.apply([.init(kind: .putKey, clipID: \"move\", trackID: \"move\", key: key, replaceExisting: true)])\nlet player = try library.sample(clipID: \"move\", at: 0.5) // translation.x is 0.25\nlet reopened = try AnimationLibrary.decode(library.encodedData())",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For translation, scale and morph weights, `bezier` interpolation accepts per-component\n`curve.incoming` and `curve.outgoing` arrays of `AnimationBezierHandle`. Each handle\nstores a time offset in seconds and a value offset relative to its key. Missing\nhandles default to one third of the straight segment. They are distinct from\nHermite's `incoming`/`outgoing` derivatives on the key itself. Sampling first inverts\nmonotone Bézier time, applies easing to that parameter and then evaluates the value.\nReversing temporal curves, invalid dimensions, non-finite values and unsafe Float\nranges fail before replacing the document. Flat and crossing temporal controls are\nsupported when their full time polynomial remains monotone.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Quaternion linear tracks use shortest-path slerp with eased progress. Imported cubic\nquaternion tracks retain their normalized component interpolation; easing remaps\ntheir segment parameter. Arbitrary scalar Bézier handles are rejected on rotations.\nUnedited linear/step/imported cubic tracks retain their existing evaluator.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Edits and extraction promote native curve data to `.animlib` schema **2**. Legacy\nlibraries without that data remain schema 1; old readers must reject schema 2 rather\nthan silently remove its curves. A library permits at most 500,000 compiled native\nscalar segments in addition to its existing key/byte limits. A sparse easing edit\nonly compiles the changed segments; Bézier tracks compile every scalar segment.\nThe same key payload goes through `key.put` from native Inspector, agents and Tools,\nincluding resource revisions, atomic rejection, history and explicit Save.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Load `AnimationLibraryResource` through AssetsManager or decode its JSON, then\nprovide libraries to `Model3DSource.instantiate(_:libraries:in:under:)`. The source's\n`animationLibraries` references and loaded libraries must match in count/order.\nDistinct library IDs, compatible bindings, imported/authored name collisions and\nthe complete graph validate before runtime entities are allocated.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use `library.runtimeName(for: clipID)` for a single animation or an existing\n`AnimationGraph` clip reference. Display names may repeat; qualified names encode\nlibrary/clip identity. Native compiled tracks retain the existing mixer, crossfade,\nrepeat/one-shot clock and skin-palette behavior. Each player owns mutable poses.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Studio and automation",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Select a Model 3D entity and open **Animator → Bone Keyframes**. Extract a copy or\ncreate a rest-pose clip, select bone/node tracks and edit keys. The model viewport\nshows the animated mesh and bones. **Save and Bind** explicitly saves the resource\nand performs a separate undoable scene transaction. The graph picker includes\nbound saved clips. Inspector edits easing and per-component Bézier offsets; Curves\nplots the production evaluator. Additional tangent modes, canvas handle dragging,\nstate machines/blend spaces, paths and native 2D spline deformation remain later work.\nProcedural 3D IK is described below.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The editor agent calls `editor.animation.<action>` with a `requestJSON` string\ncontaining `AnimationAuthoringRequest`. Studio API 2 project Tools use\n`editor.animations.submit(requestMap)` and `poll(jobID)`. All clients share the same\nproject drafts/history. Inspect first for stable IDs and `revision`; writes require\n`expectedRevision`. Binding also needs an open scene revision and saved resource.\nDrafts require explicit Save. Reload/Discard recover external-file conflicts.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Requests support 64 KiB, responses 1 MiB, pages 256 items and batches 256 operations.\nLibraries/model imports support 32 MiB; a library allows 16,384 nodes, 256 clips,\n4,096 tracks per clip, 100,000 keys and 1,024 morph targets per node. IDs are limited\nto 256 UTF-8 bytes, names to 1,024, source paths to 4,096 and fingerprints to 256.\nLarge morph-key pages may need smaller limits. CPU samples and preview\nacknowledgements do not establish pixels: verify the viewport and visible Play.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Save and bind from Swift",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Given a model compatible with the library's complete rig and an existing owner in\nits world, explicitly save the resource and instantiate an authored clip:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\nimport Foundation\n\nfunc saveAndBind(_ library: AnimationLibrary, resourceURL: URL, resourceReference: String,\n                 model: ModelAsset3D, world: World, owner: Entity, clipID: String) throws {\n    try FileManager.default.createDirectory(at: resourceURL.deletingLastPathComponent(), withIntermediateDirectories: true)\n    try library.encodedData().write(to: resourceURL, options: .atomic)\n    let reopened = try AnimationLibrary.decode(Data(contentsOf: resourceURL))\n    let source = Model3DSource(source: reopened.binding.sourceAsset,\n                               animation: reopened.runtimeName(for: clipID), autoplay: true,\n                               animationLibraries: [resourceReference])\n    _ = try source.instantiate(model, libraries: [reopened], in: world, under: owner)\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use a project-owned resource URL and its portable `@res://Animations/Hero.animlib`\nreference. For an imported model, derive the binding from\n`GLTFAnimationAdapter.makeRig(nodes:meshes:)` using that model's native import data,\nthen extract its compatible clip. The synthetic Root rig above is only for a model\nwith that same rig; incompatible models fail explicitly. Studio Tools can follow\nthe complete bone-key, sample, Save and Bind workflow in the AnimationHelper example\nlinked from the Studio guide. Native Tools bound expanded request conversion to\n8,192 values and 64 KiB of UTF-8 strings, and restricted imports preflight repeated\ndecoded accessor work before allocation.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Native hosts can construct a preview with `ModelAsset3D(gltfAt:loader:)`, supplying\n`NativeGLTFLoader(resourceRoot:maximumTotalBytes:)` for the full model import. Studio's\nlibrary viewport uses this scoped loader; it does not change the global resolver.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Studio's shared request envelope also carries `graphInspect`, `graphApply`,\n`graphUndo`, `graphRedo`, `graphPreview` and `graphBind`. These address an open\nmodel/library workspace and use its graph revision rather than the clip-library\nrevision. `graphApply` replaces a detached `AnimationGraph` in the same canvas\nhistory. Binding validates the complete destination rig and saved libraries,\nthen commits one scene-history edit. See the Studio guide and AnimationHelper\nexample for request maps, separate permissions, budgets and explicit scene Save.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Procedural IK after animation",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "See Animation IK and pose modifiers for ordered two-bone/FABRIK constraints, model-space targets,\ncurrent scene marker bindings, `.animmod` resources and the shared Tool/agent API.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Animation IK and pose modifiers",
+            "destination": "AnimationIK"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "AnimationIK",
+    "title": "Animation IK and pose modifiers",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/Developers/AnimationIK.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Constrain a skeletal chain after its clip, Animation Graph and visual LOD pose have been mixed.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "IK belongs to each playback instance. Editing a target does not rewrite the imported GLB or\nbake corrections into an animation library. An ordered stack supports two-bone IK and FABRIK.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Solve an editable chain",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This complete example constructs two unit segments and moves their endpoint. For an imported\nmodel, use its full rig binding; skin-palette indices are not stable bone IDs.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaAnimation\nimport Math\n\nlet poses = [SkeletalJointPose(), SkeletalJointPose(translation: [1, 0, 0]),\n             SkeletalJointPose(translation: [1, 0, 0])]\nlet rig = try SkeletalRig(nodes: poses.indices.map { index in\n    .init(parentIndex: index == 0 ? nil : index - 1,\n          restPose: poses[index], restMatrix: poses[index].matrix)\n})\nlet binding = AnimationRigBinding(rig: rig, sourceAsset: \"Assets/Robot.glb\")\nvar player = try SkeletalAnimationPlayer(rig: rig, clips: [])\nlet arm = AnimationPoseModifier(id: \"arm\", kind: .twoBone,\n    joints: [\"node-0\", \"node-1\", \"node-2\"], target: [1, 1, 0], pole: [0, 0, 1])\ntry player.setPoseModifiers([arm], binding: binding)\nassert((player.globalTransforms[2].origin - Vector3(1, 1, 0)).length < 0.0002)\n\n// Transient scene input does not change the saved stack or advance the clip clock.\nplayer.finalizePoseModifiers(inputs: [\"arm\": .init(target: [0, 2, 0])])\nassert(player.basePoses == poses)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`setPoseModifiers` validates before replacing the stack. Chains are contiguous and have\neditable TRS and nonzero segments. Two-bone IK requires exactly three joints. FABRIK accepts\n1–64 segments, 1–64 iterations (default 16) and a positive tolerance. Its automatic tolerance\nis `max(1e-5, length * 1e-4)`. Influence is in `0...1`; coordinates must be finite. A stack has\nat most 32 modifiers and 32,768 compiled segment-iterations. Neither solver stretches bones.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Separate base and final poses",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`basePoses` contains animation/graph/LOD output. `poses`, local/global transforms, scene\nbones and skin palettes contain the final constrained result. Repeated finalization starts\nfrom the same base pose, without accumulating corrections. Crossfade sources and LOD\nendpoints also contain base poses. Moving targets and paused clips still finalize active IK;\ntarget movement does not emit animation markers or advance playback clocks.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Modifiers execute in saved order, each observing the previous influenced result. Influence\nblends local rotations once. Local translation, scale and the end joint's authored local\nrotation remain intact; its world orientation is not independently locked. Rigid transforms\nand positive uniform scale are supported. An unsupported participating hierarchy skips that\nmodifier; unrelated nonuniform branches do not disable valid chains.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Read `modifierDiagnostics` for each stable modifier ID. `solverError` measures the\nfull-strength solution; `reachError` measures the published endpoint after influence.\nUnreachable targets and iteration exhaustion can produce valid approximate results. Missing\ntargets skip their modifier instead of holding an old solved frame. CPU samples do not prove\nrendered output.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Resources and scene bindings",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`AnimationModifierStack` stores a versioned full-rig snapshot and an ordered list. Bounded\nJSON uses `.animmod`; `AnimationModifierResource` supplies normal asset codecs. Unknown\nversions and changed rigs are rejected. `Model3DSource.animationModifiers` loads the stack\nbefore replacing a live model. Scene overrides remain in `Model3DSource.modifierBindings`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "An `AnimationIKTarget3D` is a model-space point or a stable scene entity ID with a local\noffset. Studio assigns `AnimationSceneIdentity3D` to authored entities. Programmatic scenes\nassign a shared namespace to the model owner and its ordinary target markers. Namespaces\nisolate loaded scene instances; runtime Entity.ID values are never persisted as targets.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Owners and marker offsets resolve from one current local-transform snapshot before applying\nany stack. A marker beneath any animated rig is rejected, including another instance.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Studio, agents and developer Tools",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Open a GLB/glTF or `.animmod`. **Modifiers** is in the resizable Model panel. Select a\ncontiguous chain, then add **Two-bone IK** or **FABRIK**. The Inspector owns chain, target,\npole, influence and solver settings. Blue target and purple pole handles preview a drag;\nrelease creates one Undo entry and Escape cancels. Save explicitly before binding to a scene.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Agents call `editor.animation.modifierInspect/Create/Apply/Sample/Save/Undo/Redo/Preview/Bind/Reload/Discard`\n(each suffix is a separate action, for example `editor.animation.modifierApply`). API 2 Tools\nsubmit the same `AnimationAuthoringRequest` through `editor.animations.submit` and poll\nasynchronously. Edits use the inspected `expectedRevision`; binding also requires a current\n`sceneRevision` and a saved compatible stack. Standard animation read/write, preview and\ndocument-write permissions apply. See Authoring skeletal animation for job limits and transport.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Authoring skeletal animation",
+            "destination": "AnimationAuthoring"
+          }
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "This article describes 3D skeletal IK. Native 2D weighted deformation, continuous-turn angles,\nspline-chain authoring and typed timeline bindings for modifier parameters remain separate\nimplementation stages. A 3D numerical solve does not establish those workflows.",
         "level": 0,
         "links": []
       }

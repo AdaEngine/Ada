@@ -1,7 +1,12 @@
 # Studio tools with .ui panels
 
-Studio API 1 supports project-local AdaScript tools with a `.ui` panel in the
-macOS workspace's right sidebar. Open **Studio Tools** using the wrench icon,
+Studio APIs 1 and 2 support project-local AdaScript tools with a `.ui` panel in the
+native macOS/Windows workspace's right sidebar. Declare the desired hosts in `platforms`.
+API 2 adds [animation authoring jobs](AnimationAuthoring.md) through the shared
+Animator/agent service. API 1 retains its existing document capabilities.
+Copy the complete [Animation Helper](Examples/StudioTools/AnimationHelper) into
+`Tools/AnimationHelper` to inspect/extract/edit/save a clip with the job API.
+Open **Studio Tools** using the wrench icon,
 review the access dialog and click **Allow and Enable** before the tool code or
 its `.ui` is activated. The panel contains the tool interface plus reload/settings
 icons. Enablement, versions and access management live in **Settings → Project →

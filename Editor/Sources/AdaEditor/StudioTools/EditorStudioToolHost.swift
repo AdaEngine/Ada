@@ -6,6 +6,7 @@ import Observation
 @MainActor
 @Observable
 final class EditorStudioToolHost {
+    typealias AnimationExecutor = @MainActor (AnimationAuthoringRequest, EditorWorkbenchViewModel) async throws -> [String: Any]
     private(set) var definitions: [EditorStudioToolDefinition] = []
     private(set) var panels: [EditorStudioToolPanel] = []
     var selectedPanelID: String?
@@ -20,8 +21,17 @@ final class EditorStudioToolHost {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var reloadTask: Task<Void, Never>?
     @ObservationIgnored private var actionTask: Task<Void, Never>?
+    @ObservationIgnored private var animationTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var animationQueues: [String: [AdaScriptAnimationToolJob]] = [:]
+    @ObservationIgnored private let animationExecutor: AnimationExecutor
 
-    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+    init(defaults: UserDefaults = .standard, animationExecutor: @escaping AnimationExecutor = { request, workbench in
+        guard let service = workbench.animationService else { throw EditorStudioToolDiscovery.Failure("Open a project before running animation jobs.") }
+        return try await service.execute(request, workbench: workbench)
+    }) {
+        self.defaults = defaults
+        self.animationExecutor = animationExecutor
+    }
 
     var selectedPanel: EditorStudioToolPanel? { panels.first { $0.id == selectedPanelID } ?? panels.first }
     private var preferenceKey: String { "studio.tools." + (projectURL?.path ?? "") }
@@ -84,6 +94,7 @@ final class EditorStudioToolHost {
     }
 
     private func install(_ definition: EditorStudioToolDefinition, projectURL: URL, overrides: [String: String]) throws {
+        if let reason = unavailabilityReason(definition) { throw EditorStudioToolDiscovery.Failure(reason) }
         let id = definition.schema.id
         let keepsRuntime = signatures[id] == definition.signature && runtimes[id]?.isFailed == false
         let uiSignature = try resourceSignature(definition, projectURL: projectURL, overrides: overrides) + "|" + String(describing: editor?.workbench.uiCatalog.generation)
@@ -113,7 +124,11 @@ final class EditorStudioToolHost {
             for panel in mounted { panel.bindActions { [weak self] panel, action in self?.enqueue(panel: panel, action: action) } }
             for panel in panels where panel.toolID == id { panel.isRetired = true }
             panels.removeAll { $0.toolID == id }
-            if !keepsRuntime { runtimes[id]?.deactivate() }
+            if !keepsRuntime {
+                animationTasks.removeValue(forKey: id)?.cancel()
+                animationQueues.removeValue(forKey: id)
+                runtimes[id]?.deactivate()
+            }
             runtimes[id] = runtime
             signatures[id] = definition.signature
             uiSignatures[id] = uiSignature
@@ -126,6 +141,8 @@ final class EditorStudioToolHost {
     }
 
     private func retire(_ id: String) {
+        animationTasks.removeValue(forKey: id)?.cancel()
+        animationQueues.removeValue(forKey: id)
         for panel in panels where panel.toolID == id { panel.isRetired = true }
         runtimes.removeValue(forKey: id)?.deactivate()
         panels.removeAll { $0.toolID == id }
@@ -233,6 +250,7 @@ final class EditorStudioToolHost {
                 updated.statusMessage = "Applied \(panel.title)"
                 editor.workbench.replaceSceneDocument(updated)
             }
+            enqueueAnimationJobs(toolID: panel.toolID, runtime: panel.runtime)
             for item in panels where item.toolID == panel.toolID {
                 for (key, value) in panel.runtime.values { item.session.context.set(key, to: EditorStudioToolPanel.uiValue(value)) }
             }
@@ -240,6 +258,44 @@ final class EditorStudioToolHost {
         } catch {
             panel.error = error.localizedDescription
             editor?.appendOutput("Studio tool \(panel.toolID): \(error.localizedDescription)")
+        }
+    }
+
+    private func enqueueAnimationJobs(toolID: String, runtime: AdaScriptToolRuntime) {
+        let jobs = runtime.takeAnimationJobs()
+        guard !jobs.isEmpty else { return }
+        animationQueues[toolID, default: []].append(contentsOf: jobs)
+        guard animationTasks[toolID] == nil else { return }
+        animationTasks[toolID] = Task { [weak self, weak runtime] in
+            guard let self, let runtime else { return }
+            defer {
+                if self.runtimes[toolID] === runtime {
+                    self.animationTasks.removeValue(forKey: toolID)
+                    self.animationQueues.removeValue(forKey: toolID)
+                }
+            }
+            while let job = self.animationQueues[toolID]?.first {
+                self.animationQueues[toolID]?.removeFirst()
+                guard !Task.isCancelled, !runtime.isFailed,
+                    self.runtimes[toolID] === runtime, let editor = self.editor,
+                    editor.workbench.animationService != nil else { return }
+                let envelope: [String: Any]
+                do {
+                    let payload = try await self.animationExecutor(job.request, editor.workbench)
+                    try Task.checkCancellation()
+                    guard self.runtimes[toolID] === runtime else { return }
+                    envelope = ["status": "completed", "result": payload]
+                } catch is CancellationError { return }
+                catch { envelope = ["status": "failed", "error": String(error.localizedDescription.prefix(4_096))] }
+                guard !Task.isCancelled, self.runtimes[toolID] === runtime else { return }
+                do {
+                    let data = try EditorAnimationAuthoringService.responseData(envelope)
+                    try runtime.completeAnimationJob(job.id, responseJSON: String(decoding: data, as: UTF8.self))
+                } catch {
+                    let data = try? JSONSerialization.data(withJSONObject: ["status": "failed", "error": error.localizedDescription])
+                    if let data { try? runtime.completeAnimationJob(job.id, responseJSON: String(decoding: data, as: UTF8.self)) }
+                }
+            }
         }
     }
 }
@@ -311,10 +367,16 @@ extension EditorStudioToolHost {
     }
 
     func unavailabilityReason(_ definition: EditorStudioToolDefinition) -> String? {
-        guard definition.schema.apiVersion == 1, definition.schema.platforms.contains(.macOS) else {
+        #if os(Windows)
+        let platform = AdaScriptToolPlatform.windows
+        #else
+        let platform = AdaScriptToolPlatform.macOS
+        #endif
+        guard [1, 2].contains(definition.schema.apiVersion), definition.schema.platforms.contains(platform) else {
             return "This tool requires an unsupported Studio API or platform."
         }
-        let unsupported = definition.schema.permissions.filter { ![.documentRead, .documentWrite].contains($0) }
+        let supported = AdaScriptToolRuntime.supportedPermissions(apiVersion: definition.schema.apiVersion)
+        let unsupported = definition.schema.permissions.filter { !supported.contains($0) }
         return unsupported.isEmpty ? nil : "This version of Studio does not support the requested \(unsupported.map(\.rawValue).joined(separator: ", ")) access."
     }
 
