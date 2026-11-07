@@ -210,7 +210,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                         .init(binding: 20, shaderStages: .fragment, resource: .texture(giTexture ?? Texture2D.whiteTexture)),
                         .init(binding: 18, shaderStages: .fragment, resource: .texture(environment.imageBasedLighting?.asset.asset?.specular ?? Texture2D.whiteTexture)),
                         // Match the PBR pass's atlas filtering exactly, including programmatically supplied maps.
-                        .init(binding: 19, shaderStages: .fragment, resource: .sampler((environment.imageBasedLighting?.asset.asset?.irradiance ?? Texture2D.whiteTexture).sampler)),
+                        .init(binding: 10, shaderStages: .fragment, resource: .sampler((environment.imageBasedLighting?.asset.asset?.irradiance ?? Texture2D.whiteTexture).sampler)),
                         .init(binding: 13, shaderStages: .fragment, resource: .texture(gradingLUT?.texture ?? Texture2D.whiteTexture)),
                         .init(binding: 14, shaderStages: .fragment, resource: .sampler(pipeline.sampler)),
                         .init(binding: 15, shaderStages: .fragment, resource: .texture(autoExposureTexture ?? Texture2D.whiteTexture)),

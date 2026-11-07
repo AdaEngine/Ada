@@ -294,7 +294,7 @@ extension Render3DGPUTests {
             let pipeline = device.createRenderPipeline(from: .init(vertex: try #require(module.getShader(for: .vertex)),
                 fragment: module.getShader(for: .fragment), debugName: "Production SDF query regression",
                 backfaceCulling: false, depthPixelFormat: .none, colorAttachments: [.init(format: .bgra8)]))
-            let uniform = device.createUniformBuffer(Vector4.self, count: 3, binding: 50)
+            let uniform = device.createUniformBuffer(Vector4.self, count: 3, binding: 30)
             var constants: [Vector4] = [Vector4(minimum, voxelSize),
                 [Float(counts[0]), Float(counts[1]), Float(counts[2]), 6], [steps, bias, 0, 1]]
             uniform.setElements(&constants)
@@ -306,7 +306,7 @@ extension Render3DGPUTests {
             ]))
             pass.setViewport(.init(x: 0, y: 0, width: Float(width), height: Float(height)))
             pass.setRenderPipelineState(pipeline)
-            pass.setFragmentBuffer(uniform, offset: 0, slot: 50)
+            pass.setFragmentBuffer(uniform, offset: 0, slot: 30)
             pass.setFragmentTexture(texture, slot: 49)
             pass.setFragmentSamplerState(sampler, slot: 11)
             pass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)

@@ -1,7 +1,7 @@
 // World-space SDF shadow queries. R32F node samples, tiled Z slices, no filtering across slices.
 // The caller supplies its existing nearest sampler as u_DirectionalShadowSampler.
 layout(binding=49) uniform texture2D u_DistanceFieldTexture;
-layout(binding=50) uniform DistanceField3DUniform {
+layout(binding=30) uniform DistanceField3DUniform {
     vec4 u_SDFMinimumVoxel;   // world minimum.xyz, cubic voxel size
     vec4 u_SDFCountsDistance; // sample counts.xyz, maximum shadow ray distance
     vec4 u_SDFTrace;          // maximum steps, normal bias, cone tangent, 0 off / 1 shadows / 2 debug

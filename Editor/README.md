@@ -204,3 +204,7 @@ See [Examples.md](Documentation/Examples.md) for downloading editable projects a
 Desktop projects can use **Git** or **Lore**, selected during project creation
 and in the Source Control panel. See [Source control](Documentation/SourceControl.md)
 for supported platforms, repository behavior and Windows build preparation.
+
+## Studio interaction flows
+
+Run workbench gestures and assertions from one YAML file through [the Studio flow CLI or AdaMCP](Documentation/StudioInteractionFlows.md).
