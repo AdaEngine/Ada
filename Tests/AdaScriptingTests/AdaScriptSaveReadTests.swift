@@ -9,6 +9,15 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct AdaScriptSaveReadTests {
+    @Test func missingSaveSucceedsWithoutAFile() async throws {
+        try await withRoots { _ in
+            let result = try await waitForOperation(AdaScriptAsyncHost().readText("@user://missing.json"))
+            #expect(result.isSuccess(), "\(result.errorCode()): \(result.message())")
+            #expect(!result.exists())
+            #expect(result.value().isEmpty)
+        }
+    }
+
     @Test func scriptReadsWrittenMissingAndEmptySaves() async throws {
         try await withRoots { root in
             AsyncPosition.registerComponent()

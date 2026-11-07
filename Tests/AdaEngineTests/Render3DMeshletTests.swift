@@ -41,6 +41,7 @@ struct Render3DMeshletSettingsTests {
         #expect(MemoryLayout<IndexedIndirectArguments>.offset(of: \.firstInstance) == 16)
     }
 
+    #if canImport(WebGPU) && !WASM && !os(Android)
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_TINT"] == "1"), arguments: [0, 1, 2, 3])
     func mapShadersCompileFreshForEveryAttachmentLayout(variant: Int) async throws {
         let root = ProcessInfo.processInfo.environment["ADAENGINE_SHADER_SOURCE_ROOT"].map { URL(fileURLWithPath: $0) }
@@ -56,6 +57,7 @@ struct Render3DMeshletSettingsTests {
             #expect(converted.language == .wgsl && converted.source.contains("fn meshlet_map_validation("))
         }
     }
+    #endif
 }
 
 extension Render3DGPUTests {
@@ -343,9 +345,11 @@ extension Render3DGPUTests {
                     let cluster = try #require(geometry.clusters.first)
                     #expect(expected.starts(with: [0, 1, 2]))
                     for corner in 0..<8 {
-                        let p = Vector3(corner & 1 == 0 ? cluster.minimum.x : cluster.maximum.x,
+                        let p = Vector3(
+                            corner & 1 == 0 ? cluster.minimum.x : cluster.maximum.x,
                             corner & 2 == 0 ? cluster.minimum.y : cluster.maximum.y,
-                            corner & 4 == 0 ? cluster.minimum.z : cluster.maximum.z)
+                            corner & 4 == 0 ? cluster.minimum.z : cluster.maximum.z
+                        )
                         let clip = projection * transform * Vector4(p, 1)
                         #expect(clip.x > clip.w + 0.05, "The fixture must expose the old tighter OBB rejection.")
                     }
@@ -414,8 +418,10 @@ extension Render3DGPUTests {
                 "scenes": [["nodes": [0]]], "nodes": [["mesh": 0]],
                 "buffers": [["uri": "geometry.bin", "byteLength": 72]],
                 "bufferViews": [["buffer": 0, "byteOffset": 0, "byteLength": 48], ["buffer": 0, "byteOffset": 48, "byteLength": 24]],
-                "accessors": [["bufferView": 0, "componentType": 5126, "count": 4, "type": "VEC3"],
-                              ["bufferView": 1, "componentType": 5125, "count": 6, "type": "SCALAR"]],
+                "accessors": [
+                    ["bufferView": 0, "componentType": 5126, "count": 4, "type": "VEC3"],
+                    ["bufferView": 1, "componentType": 5125, "count": 6, "type": "SCALAR"],
+                ],
                 "materials": [["pbrMetallicRoughness": ["baseColorFactor": [1, 1, 1, 1], "metallicFactor": 0, "roughnessFactor": 1]]],
                 "meshes": [["primitives": [["attributes": ["POSITION": 0], "indices": 1, "material": 0]]]],
             ]
@@ -480,10 +486,21 @@ extension Render3DGPUTests.Meshlets {
         let lists = try #require(render.getResource(VisibleMesh3DLists.self))
         let original = try #require(lists.items(view: scene.camera.id, pass: -1).first)
         #expect(Meshlet3DEligibility.fallbackReason(original) == nil, "The actual extracted singleton must otherwise be eligible.")
-        let custom = Opaque3DRenderItem(entity: original.entity, drawPass: UnmarkedModelPass(), sortKey: original.sortKey,
-            modelIndex: original.modelIndex, partIndex: original.partIndex, mesh: original.mesh, material: original.material,
-            worldTransform: original.worldTransform, castShadows: original.castShadows, receiveShadows: original.receiveShadows,
-            batchRange: original.batchRange, skinningBuffer: original.skinningBuffer, morphBuffer: original.morphBuffer)
+        let custom = Opaque3DRenderItem(
+            entity: original.entity,
+            drawPass: UnmarkedModelPass(),
+            sortKey: original.sortKey,
+            modelIndex: original.modelIndex,
+            partIndex: original.partIndex,
+            mesh: original.mesh,
+            material: original.material,
+            worldTransform: original.worldTransform,
+            castShadows: original.castShadows,
+            receiveShadows: original.receiveShadows,
+            batchRange: original.batchRange,
+            skinningBuffer: original.skinningBuffer,
+            morphBuffer: original.morphBuffer
+        )
         #expect(Meshlet3DEligibility.fallbackReason(custom) == "drawPass")
         let uniform = try #require(scene.camera.components[GlobalViewUniform.self])
         for mode: MeshletVisibilityMode3D in [.cpuReference, .gpu] {
@@ -491,8 +508,14 @@ extension Render3DGPUTests.Meshlets {
             var settings = try #require(scene.camera.components[Environment3D.self]).meshVisibility
             settings.meshlets = mode
             let command = scene.device.createCommandQueue().makeCommandBuffer()
-            let count = state.prepare(items: &items, view: scene.camera.id, projection: uniform.viewProjectionMatrix,
-                settings: settings, command: command, device: scene.device)
+            let count = state.prepare(
+                items: &items,
+                view: scene.camera.id,
+                projection: uniform.viewProjectionMatrix,
+                settings: settings,
+                command: command,
+                device: scene.device
+            )
             #expect(count.eligibleItems == 0 && count.gpuDraws == 0 && count.fallbackItems == 1)
             #expect(count.fallbackReasons["drawPass"] == 1 && state.output(for: scene.camera.id) == nil)
             #expect(items[0].meshletOverride == nil)

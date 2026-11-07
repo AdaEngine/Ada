@@ -318,7 +318,13 @@ final class AdaScriptAsyncHost: @unchecked Sendable {
         }
         let virtualRoot = path.hasPrefix("@user://") ? "@user://" : "@cache://"
         let root = AssetsManager.resolveAssetURL(at: virtualRoot).resolvingSymlinksInPath().standardizedFileURL
+        #if os(Windows)
+        // Windows leaves short path aliases unresolved when the file does not exist.
+        let resolved = url.deletingLastPathComponent().resolvingSymlinksInPath()
+            .appendingPathComponent(url.lastPathComponent).resolvingSymlinksInPath().standardizedFileURL
+        #else
         let resolved = url.resolvingSymlinksInPath().standardizedFileURL
+        #endif
         // Unlike replacement writes, reads follow the final file link as well as directory links.
         guard resolved.path.hasPrefix(root.path + "/") else {
             return nil
