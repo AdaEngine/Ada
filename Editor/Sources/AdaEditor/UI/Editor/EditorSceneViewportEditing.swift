@@ -20,6 +20,7 @@ extension EditorSceneViewportView {
             sourceURL: document.absolutePath.map { URL(fileURLWithPath: $0) },
             resourceRootURL: resourceRootURL,
             scriptableObjectCatalog: inspectorViewModel.scriptableObjectCatalog,
+            isHistoryChange: document.statusMessage == "Undo" || document.statusMessage == "Redo",
             onSelectionChanged: { [weak inspectorViewModel] selection in
                 inspectorViewModel?.selectEntity(selection)
                 if selection != nil {
@@ -91,7 +92,9 @@ extension EditorSceneViewportView {
                     model.removeComponent(typeName: typeName, from: selectedEntityID)
                 }
             },
-            updateComponentField: { typeName, field, value in
+            updateComponentField: { [weak viewportModel] typeName, field, value in
+                if typeName == EditorBuiltInComponentType.transform,
+                    viewportModel?.applyMeshTerrainInspectorField(field, value: value) == true { return }
                 Self.mutateSceneDocument(document: document, status: "Edited", onDocumentChanged: onDocumentChanged) { model in
                     guard let selectedEntityID = model.editor?.selectedEntity else {
                         return
@@ -133,6 +136,10 @@ extension EditorSceneViewportView {
                     viewportModel.createTerrain()
                     viewportPresentation.refresh(viewportModel: viewportModel)
                     viewProxy.setNeedsDisplay()
+                },
+                detach: { [weak viewportModel] id in
+                    guard let viewportModel, viewportModel.selectedEditorID == id else { return }
+                    viewportModel.detachSelectedMeshTerrain()
                 },
                 settingsChanged: { [weak viewportModel] in
                     guard let viewportModel else { return }

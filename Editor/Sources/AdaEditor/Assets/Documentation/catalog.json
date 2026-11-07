@@ -121,6 +121,23 @@
       },
       {
         "kind": "heading",
+        "text": "Shape terrain",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Open a scene and choose **Terrain** in the viewport toolbar. In the dock, choose\n**Mesh Terrain** to join a static model to the ground or **Heightfield** to sculpt\nheight samples with Raise, Lower, Smooth or Flatten. Inspect the triangles with\nthe 3D viewport's **Wireframe** mode. See the Terrain guide for a\nworked join, heightfield tools, saved versions, and collision.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Terrain guide",
+            "destination": "EditorTerrain"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
         "text": "Build and run",
         "level": 2,
         "links": []
@@ -298,7 +315,7 @@
       },
       {
         "kind": "text",
-        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Movie Maker\n• visionOS Windowed Mode",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Movie Maker\n• Terrain\n• visionOS Windowed Mode",
         "level": 0,
         "links": [
           {
@@ -328,6 +345,10 @@
           {
             "title": "Movie Maker",
             "destination": "MovieMaker"
+          },
+          {
+            "title": "Terrain",
+            "destination": "Terrain"
           },
           {
             "title": "visionOS Windowed Mode",
@@ -2935,6 +2956,1000 @@
     ]
   },
   {
+    "id": "EditorTerrain",
+    "title": "Terrain",
+    "section": "Editor",
+    "source": "Editor/Documentation/Terrain.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Open a native Studio scene and select **Terrain** in the viewport toolbar. The\nterrain dock opens **below the viewport**. It includes **Sculpt**, **Materials**,\n**Joining**, **Mesh Instancing**, and **Height Generator**. The Inspector keeps\nordinary entity components. **Mesh Instancing** also has its own viewport toolbar\nbutton. Play uses a separate runtime and does not show the authoring dock.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Create and join Mesh Terrain",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Set **Terrain Type** to **Mesh Terrain** and choose **Create Terrain**. This\ncreates a saved 128-unit surface from a 64 Ã— 64 grid of cells. Choose **Heightfield**\nto create ground for the heightfield workflow described below.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For a first join, add a static cube to the scene and position it so it crosses the\nground surface. In **Joining**, select the cube, choose the **Target Terrain**, set\n**Operation** to **Join**, and choose **Join selected mesh**. A closed mesh with\nconsistent face winding works as a solid. Joining replaces the overlapping faces\nwith a connected surface. The cube stays in the hierarchy and remains selectable.\nA self-contained GLB can contribute its opaque trunk and roots while its\ncutout leaves keep their own draw. Joined source triangles keep the original\ncolor, roughness, normal maps and texture coordinates. Keep the model in\nproject Assets so the joined surface can load its textures when you reopen the\nscene.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use **Contact width** to control the transition around a joined object. Choose\n**Subtract** to cut a closed shape out of the terrain, or **Conform** to project\nthe existing ground toward a static mesh. Conform keeps the source visible and\nworks with an open surface. **Projection distance** limits the reach of the\nprojection above and below the ground; **Projection strength** controls how far\nthe affected vertices move. Choose **Apply operation** to rebuild.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Select the cube and use the viewport's Move tool. While the editor prepares a new\nsurface, the previous terrain remains visible. Releasing saves the accepted shape\nand position in one Undo step. Escape cancels an in-progress move. Undo and Redo\nrestore the saved surface with the cube's corresponding position. The original\nmodel asset stays available for reuse. Keep the entire joined mesh within the\nterrain's boundary. A move past the edge is rejected and the last accepted\nposition stays in the scene.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "To place a joined object precisely, edit its Transform in the Inspector and\npress Enter. The terrain and the object's new transform are saved together.\nIf the new position crosses the terrain boundary, Studio keeps the last valid\nposition and shows why the edit was rejected.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "To move a group of joined objects, select their parent in the hierarchy. All\njoined objects in the group must share one Mesh Terrain target. Release the\nMove handle or press Enter in the Inspector to save the group and the rebuilt\nterrain in one Undo step.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Select the bound object and choose **Detach from terrain** in Joining or in the\nInspector to make it independent again. The ground and its procedural population\nrebuild without that object. Undo restores the original binding and surface.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use the render selector in the 3D viewport to choose **Wireframe** or **Shaded +\nWireframe**. Wireframe shows triangle edges; the combined mode keeps the shaded\nsurface visible under the edges. Choose **Shaded** to return to the usual view.\nThese modes are for inspection in the viewport and do not change Play or the\nscene's authored materials.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Zoom out in Wireframe to inspect Mesh Terrain's render LOD. Eligible regions\nswitch to a coarser meshlet level as they occupy fewer pixels. Adjacent terrain\nsections keep the same shared edge, even when one section shows finer triangles.\nRegions with varying material paint retain their original triangles.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Create and generate heightfield ground",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "With **Terrain Type** set to **Heightfield**, **Create Terrain** creates a saved\n128-unit terrain with 129 Ã— 129 height samples under an Environment parent. The\nresource lives in project Assets. In **Height\nGenerator**, set **Height Amplitude**, **Noise Frequency**, and the seed, then choose\n**Generate Heightmap**. Five deterministic noise octaves create hills and valleys;\n**New Seed** changes their arrangement. Generating on an existing source keeps its\nother saved channels and creates one undoable resource version.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Add region** expands a partial region before adding an adjacent 256-cell region.\nThe runtime uses 64-cell surface chunks, independent persistence regions, distance\nLOD, and bounded streaming. Old heightfield Terrain components remain readable.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Sculpt in the viewport",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Choose **Raise**, **Lower**, **Smooth**, or **Flatten**. On Mesh Terrain, Smooth\nfollows connected triangles on the selected surface. Flatten uses the plane at\nthe start of the stroke. The Heightfield workflow also offers presets for ramps,\nterraces, noise, erosion and brush shapes. Radius and strength are shared\ncontrols. Hold the left button and drag over visible terrain. A blue\nring follows its surface. Source strokes publish worker batches **while the button\nis held**. Releasing finishes the stroke and saves one resource version; Escape\ncancels it. Each complete stroke is one ordinary scene Undo action. Undo, Redo,\nSave and reopening the scene retain the selected resource version.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Terrain authoring uses coherent asynchronous worker publication. Large volumetric\nregions can take longer to prepare than a simple heightfield. The previous valid\nmesh stays visible while a batch is prepared, and camera navigation remains usable.\nHeight tools edit the base heightfield; volume tools address additional strata.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Materials and texture variation",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In **Materials**, choose a card to paint its layer. **Add Materialâ€¦** opens the\nsystem file picker and imports a PNG or JPEG as a new layer, with a thumbnail.\nImported textures are copied into the terrain resource directory. Terrain layers\nhave stable IDs; choosing another card does not renumber saved paint.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Automatic Grass / Rock / Snow** initializes height and slope rules. Grass covers\nlower gentle ground, rock covers steeper surfaces, and snow covers higher ground.\nExisting layers are retained when applying variation settings again. Painted\nmaterial overrides these rules; **Erase material paint** reveals them again.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "On Mesh Terrain, select its entity in the hierarchy before painting. Each stroke\nfollows the connected side under the brush. Paint on the ground stays in place;\npaint on a joined rock or root follows the source when it moves. If that part of\nthe surface disappears, the stroke stays saved and can apply again when a\nmatching surface returns. Erasing reveals the current contact and automatic\nlayers. Paint and erase each create one Undo step and leave the mesh shape alone.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "New texture layers use deterministic flips, quarter-turn rotations, random offsets,\nmacro variation and triplanar projection. Terrain-local coordinates keep variation\nstable across chunk boundaries and camera movement. Volume material fields evaluate\nactual surface height and normal, including multiple strata at the same X/Z.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Mesh instancing and solids",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Select the separate **Mesh Instancing** button, then **Add Meshâ€¦** to import a\nself-contained GLB or VOX. Choose its palette entry, density and brush radius.\n**Paint meshes** and **Erase meshes** edit persistent instance records. Copies share\nmesh buffers rather than becoming thousands of authored hierarchy entities.\nDecorative instances do not create per-instance physics bodies by default.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "On Mesh Terrain, **Paint meshes** records where to generate the selected\nprototype. **Erase meshes** clears its generated coverage without deleting\nmanual placements or pinned overrides. A pin that loses its supporting surface\nis retained in the resource for recovery. If a joined object moves, the ground\nit uncovers can grow the painted vegetation again. The area around its new\nposition clears according to the rule's exclusion distance.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Add solid** and **Subtract solid** use a sphere, box, capsule or a registered\npalette mesh as an ordered volume operation. Position it with the brush and release\nto apply. Caves and overhangs are real generated surfaces, with matching runtime\ncollision. Mesh operands must be supported closed static solids. Self-contained\nmodels avoid silently omitting external model dependencies. Invalid resources keep\nthe last valid terrain generation.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Saved sources and compatibility",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "An entity's **Terrain Source** component references a project `.aterrain` resource,\nfor example `@res://Terrain/playground.aterrain`. Keep its immutable region, mesh\ndocument, model, texture and volume files together. The editing runtime resolves absolute paths;\nscene references stay portable. Missing or outside-project terrain roots are rejected.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Strokes operate on private same-directory manifest versions and publish their URI\nthrough scene history. Earlier resources remain exact for Undo; unpublished manifests\nare removed only after active filesystem writers finish. Shared payloads are never\ndeleted by gesture cancellation. Intermediate versions can therefore accumulate.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The edit viewport omits source collision cooking; authored collision settings and\nPlay retain runtime physics. A nil streaming radius retains full-declared-set\nresidency, while newly added generic Source components use the engine's camera\nstreaming default. The old Terrain component still supports its four legacy brushes.\nAdvanced presets and saved palettes belong to Terrain Source resources.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Native Windows is exercised during development. Other platform acceptance and full\nportable export validation remain separate checks; local editor tests do not prove\nthose platforms. Three-dimensional manual paint storage and volumetric curvature\nrules are not yet equivalent to the heightfield paint channels.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "Terrain",
+    "title": "Terrain",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/3D/Terrain.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Create editable ground with `Terrain3D`. Its heights describe one square surface\nin the entity's local X/Z plane. `Model3DPlugin` generates the visible geometry;\n`Physics3DPlugin` adds matching static triangle collision.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Load Mesh Terrain",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Mesh Terrain uses a `Terrain3DSource` whose `.aterrain` manifest references an\n`.atmesh` document. Keep the manifest, its document, and its relative resources\ntogether. The document retains the source sections and ordered modifiers. Its\ncompiled product contains the triangles and placement records that the runtime\ncan use without the desktop authoring kernel.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "With `MainSchedulerPlugin`, `TransformPlugin`, `RenderWorldPlugin`, and\n`Model3DPlugin` installed, pass the resolved manifest path to the source:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "let terrain = world.spawn(\"Mesh Terrain\") {\n    Transform()\n    Terrain3DSource(source: manifestPath, generatesCollision: false, queries: .init())\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Enable `generatesCollision` and install `Physics3DPlugin` if you need terrain\ncollision. When the source is ready, read `MeshTerrain3DSourceSurface` on the\nauthored entity. The optional `queries` value supports terrain-local `raycast`\nand `closest` queries against the accepted triangles, including surfaces that do\nnot fit a single height at each X/Z position. Convert world coordinates into the\nterrain's local coordinates before querying. A retained query value continues to\ndescribe its original surface after a newer version is published.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "When building authoring tools on desktop, enable the `MeshTerrainAuthoring`\npackage trait and check `TriangleMeshBoolean.isAvailable` before compiling a\ndocument. `MeshTerrainDocumentAsset.compiling()` produces an immutable asset\nwith an input key covering its geometry and population rules. Recompile changed\ninputs before distributing them; the runtime rejects a missing or mismatched\ncompiled product and retains the last valid surface after a failed update.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A Mesh Terrain manifest can use the shared `TerrainMaterialPalette`. Set a join\nmodifier's `materialLayer` to an existing palette ID. The operand uses that\nlayer and `contactWidth` controls how far its material blends along connected\nground, independently of optional geometry rounding. Subtraction uses the\ninterior layer by default. The renderer stores material fields per triangle;\npalette changes do not change the geometry used by queries or collision.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The source prepares one optional coarser meshlet level for eligible display\nsections within its geometry budget. The renderer selects it by projected error,\nusing a two-pixel threshold. Simplification preserves section boundaries and\nretains full detail where triangle material fields vary. Shaded and Wireframe\nuse the same selected index ranges. Set `maximumLOD` to zero to keep full\ndetail. Terrain queries and collision use the full accepted surface.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "An opaque join can retain per-part source materials and vertex attributes in the\ntriangle document. Portable source maps are read from their self-contained\nglTF or GLB resource under `@res://`; keep that resource when moving or packaging\nthe terrain. The display uses source UV sets on retained source faces and terrain\nprojection for the palette and cut interior. Transparent or custom shader parts\nstay on the original model.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Author material strokes in `MeshTerrainDocument.paint`. Capture a\n`MeshTerrainSurfaceAnchor` from the selected triangle hit: ground anchors are\nsection-local and joined-source anchors are operand-local. Compilation\nreprojects each stroke onto a compatible connected side and stores its material\ncoverage alongside the compiled patch. The player loads that coverage without\nreplaying brushes. Missing surfaces leave recoverable IDs in\n`MeshTerrainCompiledProduct.paintOrphans`; the authored strokes stay in the\ndocument. Erase removes authored coverage so the current rule and contact\nmaterials can show through.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A population rule can also retain `MeshTerrainPopulationCoverage` stamps.\nThese stamps limit where the selected prototype is generated and can erase\nprevious coverage. Their anchors preserve the chosen side and source.\nCompilation re-evaluates source clearances after a join moves and includes the\nresulting placements in the same accepted generation. The player groups the\nrecords into three-dimensional cells using the rule's cell size and shares\nprototype geometry across those cells. Authoring reuses previously accepted\ncells when the surface, masks and source clearance in their spacing halo\nstay the same. Compiled products retain unsupported pins as recoverable\n`orphanedPins`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use Mesh Terrain authoring to publish new `.atmesh` generations.\n`AssetsManager.saveTerrainRegions` edits height and volume sources and rejects\nMesh Terrain manifests, including an outdated heightfield manifest aimed at\nthe same destination.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Create a heightfield",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Install `MainSchedulerPlugin`, `TransformPlugin`, `RenderWorldPlugin` and\n`Model3DPlugin` in your app. Add `Physics3DPlugin` when the ground must block\nphysics bodies. Create the entity in its main world:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\n\n@MainActor\nfunc createGround(in world: World) {\n    var terrain = Terrain3D(resolution: 129, size: 128)\n    terrain.heights[10 * terrain.resolution + 10] = 3\n    terrain.color = [0.28, 0.43, 0.18, 1]\n    world.spawn(\"Ground\") {\n        Transform()\n        terrain\n    }\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`resolution` is the number of height samples along each axis; there is one fewer\ncell. Heights are row-major along Z. The example creates a 128-unit square centered\non the origin, with one raised sample. Keep heights finite and preserve the\n`resolution * resolution` array length. `validate()` rejects malformed data.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Tile geometry and updates",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The runtime divides the patch into tiles of at most 64 Ã— 64 cells. The example\nabove produces four tiles. Tiles are generated children of the authored entity,\nmarked by `TerrainTile3DComponent`; save the `Terrain3D` component rather than\nthese transient meshes or colliders. Generated entities carry `TransientEntity`;\nWorld/Scene serialization omits them and their descendants, and terrain regenerates\nthem when the scene initializes. Authored parent/child relationships and local\ntransforms survive the round trip; generated child IDs are omitted from saved\nrelationships. The raw ECS hierarchy is otherwise unchanged: even\nwhen its owner is removed nonrecursively, terrain cleans its generated mesh and\ncollision children while ordinary authored children remain.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Changing heights replaces the affected tile meshes and their collision. The\nnormal's neighbor samples also invalidate adjoining tiles when needed, preserving\ncontinuous lighting at their borders. An edit at a shared corner can update four\ntiles. Changing the ground color retains the geometry and updates the shared\nmaterial; moving the terrain retains meshes and updates world-space collision.\nParent rotation, scale and reflected transforms are included in collision.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For custom tools, `meshTiles(cellCount:)` returns CPU mesh descriptors with stable\n`TerrainTileCoordinate` addresses. `meshTile(at:cellCount:)` builds one tile directly.\nPositions and UVs remain in the parent terrain's coordinates. Partial edge tiles\npreserve the original cell count; cell counts outside `1...256` throw a validation\nerror. Runtime tile size uses `Terrain3D.defaultTileCellCount`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Queries and persistence",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`surfaceHeight(at:)` takes a terrain-local X/Z position as a `Vector2`. It returns\nthe height on the same triangles used by rendering and collision, or `nil` outside\nthe patch. Transform a world point into terrain-local coordinates before querying.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The Codable component retains heights, size, color and collision settings through\nscene loading and native export. Set `generatesCollision` to `false` to remove\ngenerated colliders. Removing the component removes generated tile geometry and\ncollision. Geometry is rebuilt from authored data after reopening a scene.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Sparse height data",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Terrain manifests can retain a `TerrainMaterialPalette` with up to 32 named\n`TerrainLayerReference` entries and 128 automatic `TerrainMaterialRule` entries.\nEach layer has a stable `UInt16` ID: changing its display order preserves rule\nreferences. Choose existing IDs for the fallback surface and volume interior.\nTexture paths are relative to the manifest directory. Albedo, normal, packed\nocclusion/roughness/metallic and blend-height maps are optional; scale is measured\nin terrain-local units per repetition. Height and curvature ranges use local units,\nand slope ranges use degrees from the terrain's up axis.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "let palette = TerrainMaterialPalette(\n    layers: [\n        TerrainLayerReference(id: 7, name: \"Grass\", albedoPath: \"Textures/grass.png\", scale: 2),\n        TerrainLayerReference(id: 12, name: \"Rock\", albedoPath: \"Textures/rock.png\", projection: .triplanar)\n    ],\n    fallbackLayerID: 7,\n    interiorLayerID: 12,\n    rules: [TerrainMaterialRule(layerID: 12, slope: TerrainMaterialRange(minimum: 40, maximum: 90, transition: 8))]\n)\nlet layout = TerrainManifestAsset(materials: palette)\ntry layout.validate()",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`validate()` rejects duplicate IDs, missing rule/fallback references, invalid\nranges and escaping texture paths. Both native region-save modes preserve this\npalette. A manifest containing materials uses version 3; height-only and model-\npalette manifests keep versions 1 and 2 respectively.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Source rendering resolves rules into four canonical layer IDs and weights per\nsample, then interpolates those fields independently of visual LOD. The strongest\nfour contributions shade layer tints, roughness and metallic values through the\nshared PBR lighting pipeline. `Terrain3DSource.color` multiplies the palette tint;\nuse `.one` to preserve its authored colors. Color-only edits retain tile meshes\nand material fields. Removing the palette on reload restores the ordinary source\nmaterial. Albedo maps load relative to the manifest into shared mipmapped arrays;\nlayer scale controls their repetitions. Preparation caps normalized dimensions at\n256 pixels, bounds encoded/decoded/staging memory before allocation, and reports\nmissing or incompatible images in `Terrain3DSourceStatus.warnings` while preserving\na usable fallback. Tangent-space normal maps share the existing PBR normal frame.\nPacked ORM maps use linear R/G/B for occlusion, roughness and metallic; G/B multiply\nthe layer factors. Missing maps preserve those factors. Triplanar projection samples\nterrain-local ZY/XZ/XY planes and blends by the local surface normal, reducing\nstretching on cliffs. Its normal-map blend preserves the geometric baseline,\nincluding ridges and mixed planar/triplanar layers under nonuniform owner scale.\nOptional `blendHeightPath` maps use linear red-channel heights from black (low)\nto white (high). Their bounded influence favors raised details in material\ntransitions while preserving equal-height proportions and fading layers smoothly\nto zero. Height samples share all UV flips, rotations, mip filtering and projection\nwith the other maps. Missing or invalid height maps warn and remain neutral;\nwithout height maps, the ordinary automatic-rule blend stays unchanged.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainLayerReference.variation` stores opt-in `TerrainTextureVariation` controls:\na full `UInt64` seed, U/V flips, quarter-turns, offsets, variation cell size and\nlow-frequency macro strength/scale. Missing settings default to disabled. Cell\nsize accepts 0.25...64 texture repetitions and macro strength accepts 0...1;\nmacro scale is positive terrain-local units. Both native save modes preserve these\nsettings. Enable variation to randomize flips, quarter-turns and offsets from the\nterrain-local coordinates, stable layer ID and seed. Neighbor samples blend\nsmoothly; the same transforms apply to all maps, gradients and tangent normals.\nMoving the owner and camera together preserves the pattern. Macro variation adds\nseeded low-frequency albedo modulation; disabled variation preserves the ordinary\nsingle-sample texture path. Scales below the shader coordinate range use filtered\nfallbacks: unresolved layer sampling reads the coarsest prepared mip, while\nunresolved macro modulation averages to its neutral value. Material-field uploads\nrequire a finite reciprocal sample spacing; an unsupported spacing reports a load\nerror before publication and retains the previous working generation.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainHeightStorage` is a separate data API for sparse regions. It uses signed\nregion coordinates, 256 cells per region and 64 cells per tile. Allocate a surface\nexplicitly with `allocateRegion(at:)`, then edit its canonical samples with\n`setHeight(_:at:)`. Missing surfaces return `nil` from height queries. The default\n64 MiB budget covers allocated height pages; mesh snapshots and GPU resources need\nseparate budgets. Flat regions do not allocate height pages until a nonzero edit.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use `snapshot(of:)` to obtain immutable tile geometry and `tileRevision(at:)` to\ndetect affected tiles. Shared border samples have one owner. Normals sample across\nborders, so an edit can invalidate adjacent tiles. `takeDirtyTiles(limit:)` drains\na bounded batch from a single-consumer queue; independent consumers should inspect\nthe storage and tile revisions. The queue holds at most 65,536 distinct pending\naddresses. Removed-tile history can exceed that bound even when no terrain remains.\nCheck `dirtyOverflowGeneration` before and after draining: if it changed since your\nlast successful synchronization, discard your derived tile set and rebuild it from\n`tileCoordinates`. An overflow discards earlier queue entries; height data remain\nunchanged. Source-managed runtime data use revisions rather than this FIFO. `init(importing:)` preserves a legacy patch's\npositions, sample spacing and partial edge tiles.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainRegionAsset` stores independently loadable height pages in `.atregion`\nfiles. Version 1 starts with the eight-byte signature `ADATRN01`, signed little-endian\n32-bit region X/Z coordinates, and two unsigned 32-bit counts. Up to 16 four-byte\ntile records contain local X/Z and cell counts. Up to 16 page records contain local\nX/Z, two zero reserved bytes and 4,096 little-endian R32F samples. Pages own samples\nby integer grid address rather than duplicating neighbors' borders. The positive\ngrid boundary permits data-only pages. Decoding rejects unsupported versions,\ninvalid dimensions or addresses, duplicate records, nonfinite heights and mismatched\nbyte lengths. `encodedData()` validates in-memory records before encoding.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Region assets with artist-authored surface channels use `ADATRN03`. Sparse\n`surface` records retain up to four stable layer IDs and normalized weights,\nan explicit `overrideStrength`, tint and roughness overrides. `ruleMasks` store\nnonzero values by mask ID; absence means zero. Values use little-endian Float32\nwithout requantization on save. These optional sections coexist with heights and\nplacements; files without surface channels retain their earlier encoding. The\ncodec rejects duplicate coordinates/IDs, invalid weights, reserved bytes, unbounded\ncounts and payloads above 8 MiB before allocating record arrays. These data types\nprovide persistence. A material-palette source resolves saved rule masks and layer\npaint into its full-resolution fields. Manual weights blend with the automatic\nresult by `overrideStrength`; zero override reveals the rules. Active painted IDs\nmust exist in the palette or publication fails with a diagnostic. `tintStrength`\nmixes white toward the saved RGB tint, then multiplies the resolved layer color.\n`roughnessStrength` blends the resolved roughness toward the saved value. These\ncanonical fields retain their full resolution across visual LOD changes; unpainted\ntiles share a neutral fallback. Runtime edits and brushes use the atomic authoring path\ndescribed below; native Studio controls remain in development.\n`TerrainRegionCache.Limits.maximumResidentSurfaceBytes` separately bounds decoded\npaint/mask records (32 MiB by default); it does not consume the height-page or\nplacement allowances. Canonical `TerrainHeightStorage` has its own\n`surfaceMemoryBudgetBytes` allowance (32 MiB by default), conservatively charging\nsparse hash tables and COW staging. `statistics.residentSurfaceBytes` reports the cache charge,\nand eviction releases that allowance. A rejected load retains the resident generation.\nCanonical pages also retain exact tint/roughness coverage metadata, so moving the\ncamera or changing LOD does not repeatedly walk unchanged layer-paint records.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Shared palette images initialize over multiple updates, submitting at most 1 MiB\nper source per update. Array slices and mip levels stay private until the complete\npalette is ready; a replacement retains the previously published surface meanwhile.\nTile meshes, canonical material fields and collision preparation use the separate\n`maximumTileUpdatesPerFrame` allowance. Completed arrays are shared across tiles\nand retained across idle frames and visual LOD changes.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Terrain layer shading uses the raster PBR pipeline. When a view requests the\nexperimental portable path tracer, layered terrain selects the existing raster\nfallback for that view and records the reason in `Render3DPathTracingStatistics`.\nIts layer colors, maps and manual fields remain visible. Ordinary PBR meshes and\nterrain without a layer palette keep their existing tracing behavior.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For a region-file round trip, enumerate `resourceCoordinates` and call\n`regionAsset(at:)` for each address, then encode its returned asset. This list\nincludes canonical data-only regions that `regionCoordinates` omits. Keep them\nwhen saving: a shared border may be stored there. Restore a set of loaded\n`TerrainRegionAsset` values with `TerrainHeightStorage(regions:spacing:origin:)`,\nusing the original spacing and origin. Restore validates every payload, rejects\nduplicate region addresses and checks the total resident height-page budget.\nIt preserves partial tiles and queues their initial geometry generation.\nCapturing individual regions during concurrent edits does not form an atomic\nwhole-terrain save; stop edits while collecting that set.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainManifestAsset` describes spacing, `originX`, `originZ` and a table of\n`TerrainRegionReference` values in a portable `.aterrain` JSON resource. Each entry\ncontains signed X/Z coordinates and `fileName`, a basename beside the manifest.\nVersion 1 accepts at most 16,384 entries and 4 MiB of encoded input. File names must\nstart with an ASCII letter or digit, use letters, digits, dots, hyphens or underscores,\nend in `.atregion` and fit within 128 bytes. Paths, URI references and percent escapes\nare rejected. Region addresses and file names must be unique; filename comparisons\nignore case for portability. Unknown versions and invalid spacing/origins throw.\nThe decoder checks the table count before constructing its reference array.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Native tools can persist a complete immutable region set with\n`AssetsManager.saveTerrainRegions(_:manifest:at:mode:maximumStagedBytes:onProgress:)`.\nPass the previous layout manifest and all region assets. Changed regions receive\nnew, uniquely named files beside the destination `.aterrain`. Byte-identical regions\nretain their previous filenames and references after a bounded comparison; symbolic\nlinks are not reused. Capture the whole region set while edits are stopped.\nAn omitted `.aterrain` extension is appended and included in the returned asset's\nreload path. The default 128 MiB staging budget includes\nall encoded regions and the manifest. Validation and budget checks happen before\ncreating files. Progress reports completed region writes; cancellation is checked\nbetween writes and immediately before the manifest commit.\nProgress callbacks are asynchronous and may await a UI actor update. Only one save\nto a given manifest can run in a process. An overlapping call throws\n`TerrainSaveError.saveInProgress`; retry after the active operation completes.\nThe reservation is released on success, failure and cancellation.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For streamed terrain, pass `mode: .update(removing: [])` and only the changed\nregion assets. Untouched manifest references remain present without reading their\npayloads; the staging budget covers the supplied payloads and resulting manifest.\nPass exact prior `TerrainRegionReference` values in `removing` to delete regions.\nDuplicate, mismatched or simultaneously replaced removals throw\n`TerrainSaveError.invalidRemoval`. The omitted-mode default replaces the complete\nset, so callers must explicitly choose incremental mode for a partial snapshot.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Incremental saves require an existing destination matching the supplied baseline.\nThe writer checks that generation before staging and again before publication;\na mismatch throws `TerrainSaveError.staleManifest` and discards unpublished files.\nThe in-process reservation serializes engine saves to the same path. This is not a\ncross-process lock: independent tools must coordinate their own simultaneous writes.\nRetain the returned manifest as the baseline for the next save.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The writer flushes each file, stages the manifest beside its destination and\nreplaces it without deleting the previous manifest first. A failed or cancelled\noperation removes its completed unpublished files and leaves the previous manifest\nreadable. A successful commit returns its published generation even if cancellation\narrives afterward. Previous generation files stay available to existing readers;\nautomatic collection of those files is not yet provided. Use the returned manifest\nor load the destination with `AssetsManager.loadFresh` to observe the new version.\nSaving through this API is native-only; WASM consumers can load exported resources.\nThe commit uses the native same-directory rename operation on Windows and POSIX\nhosts. A focused Linux filesystem test exercises the actual codecs and writer;\ncomplete package, renderer and Studio platform validation remain separate checks.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainRegionCache.open(manifestAt:limits:)` opens an immutable manifest generation\nand loads individual regions with `loadRegion(at:)`. A coordinate absent from the\nmanifest returns `nil`; a declared resource that is missing, malformed or has the\nwrong coordinate throws. Loaded values remain resident until explicit eviction,\neven if the underlying file is later modified. This keeps a running generation\nconsistent. Evict and reload to observe a changed file.\nThe cache captures its originating app-world asset scope. A request made from\nanother world retains that scope rather than resolving the same virtual filename\nunder the requesting world's resource directory.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Cache limits default to 64 MiB of decoded Float height pages, 128 resident regions\nand four concurrent loads. Region count bounds metadata separately; encoded input\nand decoder temporaries are bounded by the resource format and load count. Returned\nvalues retained by callers, mesh snapshots and GPU resources have separate lifetimes\nand budgets. Failed admission preserves existing resident values. Use `statistics`\nto inspect resident regions, height bytes and active loads.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Pin a region with `.dirty`, `.selected`, `.transaction` or `.physics` to prevent\n`evictRegion(at:)` from releasing it. Each reason must be unpinned independently.\nThe cache provides explicit residency controls. `Terrain3DSource` uses it to stage\ncamera and physics region residency.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For render-only heightfield LOD, call `snapshot.meshLOD(level:finerEdges:)` with a\nlevel from 0 through 6. A full 64-cell tile reduces from 4,225 vertices at level 0\nto 1,089 at level 1 without stitched edges. Samples retain their canonical positions,\nnormals and UVs. Continue using the full snapshot for collision and editing queries.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Adjacent levels must differ by at most one. On the coarse tile, mark each boundary\nwith a finer neighbor using `TerrainLODEdges.minX`, `.maxX`, `.minZ` or `.maxZ`.\nThe coarse mesh explicitly includes the finer boundary samples. Center fans handle\ncorners, preserving complete upward-facing coverage without degenerate triangles\nor unmatched border vertices. Partial tiles retain level 0, and their adjoining\ntiles must also stay at full detail. This API builds geometry independently of the\nruntime camera policy.\n`TerrainLODBalancer.select(proposed:fullDetailTiles:partialTiles:)` refines proposed\nlevels until edge neighbors differ by at most one, then returns each tile's level\nand finer-neighbor mask. Requested detail is never coarsened. Full-detail pins stay\nat level 0; partial tiles also force adjoining tiles to level 0. Disconnected tiles\nretain their own proposals, and the result does not depend on dictionary ordering.\nInputs are limited to 65,536 tiles and validated grid coordinates before traversal.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "To render a saved manifest, attach `Terrain3DSource` to an entity in a world with\n`Model3DPlugin`:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "world.spawn(\"Landscape\") {\n    Transform()\n    Terrain3DSource(source: \"@res://Terrain/world.aterrain\")\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The system loads nearby manifest regions within explicit limits, prepares tile\ngeometry and creates generated children. Defaults allow 64 MiB of canonical\nheight pages, 128 regions and 128 MiB of conservatively estimated mesh data.\n`streamingRadius` defaults to 384 terrain-local X/Z units around active cameras.\nSet it to `nil` to load the complete declared set within limits. With no usable\nactive cameras or physical interests, the conservative fallback also requests the\ncomplete set.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Residency includes neighboring declared resources for canonical border heights\nand normal coverage, so the region count includes this halo. Halo topology does\nnot create visible meshes or make height queries report an unloaded surface.\nChanging camera regions stages a replacement, retains unaffected tile generations\nand releases distant generated meshes while preserving the runtime storage object.\nThe manifest generation and its originating asset scope remain stable across moves.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Local edits retain region overrides across residency changes. Those data remain\npinned within the same height/count budgets; if the requested set cannot fit, the\nprevious valid surface remains available and status reports the admission error.\nNew geometry and collision are prepared before committing the staged storage.\nA revision check prevents staging from discarding an intervening author edit.\nChanging the region or height budget stages against those same live edits instead\nof reloading the original files. An accepted height-budget change updates the\nexisting storage object; a rejected change retains its last valid budget and data.\nStaging may retain both old and new page generations, each within the configured\npage budget; metadata, CPU mesh descriptors and GPU allocations have separate costs.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Terrain3DSourceSurface.storage` exposes the loaded height storage for local edits\nand queries. The system watches tile revisions and retains unaffected mesh buffers.\nSource-owned storage uses revision tracking instead of the standalone storage's\nsingle-consumer dirty FIFO.\n`Terrain3DSourceStatus` reports readiness, generated tile count and load/build errors.\nA failed source replacement keeps the last working geometry and collision. Its\nretained collision continues to follow valid parent/owner transform changes using\nthe same incremental preparation budget. Admission failure preserves the published\nvisual LOD and mesh buffers while recovery updates changed samples and collision. Change\nthe source or increment `reloadGeneration` to retry a failed load. Local storage\nedits update the retained generation without silently adopting a repaired file;\nthe error remains visible until a successful explicit retry. Camera/transform\nupdates also preserve that failed request, including when no generation has loaded\nyet; they do not repeatedly read the same missing resource. Emptying the path\nclears generated geometry, and removing the component also clears transient state,\nincluding a pending height request and its completion status. Ordinary authored\nchildren remain; only generated terrain children are removed.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For a bounded height change, attach `Terrain3DHeightEdit` to the loaded source owner:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@MainActor\nfunc raiseGround(_ owner: Entity) {\n    guard let surface = owner.components[Terrain3DSourceSurface.self] else { return }\n    let edit = Terrain3DHeightEdit(\n        storage: surface.storage,\n        updates: [.init(point: .init(x: 64, z: 64), height: 5)]\n    )\n    owner.components[Terrain3DHeightEdit.self] = edit\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The request captures the storage identity and revision. It accepts at most 65,536\nunique sample addresses on resident surfaces. Nonfinite heights, duplicate/missing\nsamples, insufficient page budgets and stale requests fail without changing live\nsamples or mesh buffers. Observe `Terrain3DHeightEditStatus` and match its `id` to\nyour request. Invalid edits report a separate error while preserving the working\nsource's readiness. Residency, collision, LOD and memory settings must already be\npublished before capturing a height edit. Changing those settings rejects the edit\nand lets the normal source pipeline admit the new settings or report their error;\nresubmit after it finishes. Color and the per-frame upload budget do not invalidate\nresidency admission. An applied result contains a compact `TerrainEditDelta`.\nFor each Undo command submit `Terrain3DEdit(storage: storage, undoing: delta)` at\nthe current revision. The result is itself reversible for Redo. This restores exact\nplacement channels together with heights; `reversedUpdates` contains heights only.\nAn unchanged request produces an empty delta rather than a new data revision.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Preparation copies metadata once and copies touched Float pages on write. It checks\nthe final page count before allocating; a batch can free one complete page and\nallocate another within the same budget. The live storage object stays unchanged\nwhile the replacement tile meshes and collision resources are prepared. Removing\nthe request before publication cancels its prepared work and preserves the live\ngeneration. Direct `setHeight` remains an immediate low-level data API; use edit\nrequests when preparing a coherent scene replacement. A ready result exposes its\nnative collision immediately, including Undo, without waiting for a later physics\ntick. `physicsWorld3D.collisionPreparationMetrics.snapshot` exposes cumulative\nsuccessful native BVH creations and their triangle count. Compare snapshots around\nan update to inspect real collision preparation rather than generated-child counts.\nRuntime height changes are not automatically written to asset files; save\nresource data separately through the terrain persistence API. Scene files retain\nthe source reference.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "With `Physics3DPlugin`, colliders use full-detail triangles and include the owner's\nparent transforms, rotation and reflected scale. Geometry and collision replacements\nare prepared before world changes are published. Changing color retains geometry;\nchanging transforms retains visible mesh buffers and rebuilds world-space colliders.\nThe runtime selects stitched render levels from the nearest active camera's distance\nto each tile in terrain-local X/Z. `lodDistance` defaults to 128 units; subsequent\nboundaries double. `maximumLOD` defaults to 6, and setting it to 0 keeps full detail.\nA 15% hysteresis band avoids buffer replacement from small boundary oscillations.\nCamera parent transforms are included. Multiple cameras retain the detail required\nby the nearest one; with no active camera or more than 16 active cameras, the\nconservative fallback is full detail. Partial tiles and their neighbors remain at\nfull detail. Collision and queries always use canonical samples, including narrow\nfeatures that disappear from a distant visual mesh.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This initial runtime retains canonical CPU descriptors for resident collision and\npose updates, and its mesh budget uses a conservative full-tile bound. LOD reduces\ndraw geometry, while camera and physics residency control the retained region set.\nDynamic and kinematic bodies request terrain around their complete collision bounds;\ncharacter controllers request their capsules, including requested height changes.\nThe margin `physicsPadding` defaults to 64 terrain-local units. Swept interests\ninclude at least a quarter-second of motion (or the fixed tick if longer), including\nrigid-body gravity and the character's possible downward motion. Rotating bodies\nreceive conservative rotation coverage. Sleeping rigid bodies retain their ground. More than 64 distinct\nphysical interests conservatively request all declared terrain instead of dropping\nactors from residency planning.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Physics3DPlugin` installs `PhysicsSimulationGate3D`. If collision-enabled terrain\ncannot admit its requested data while physical actors are present, rigid simulation\nand character movement wait. The source status reports the error; successful\npublication resumes movement. Removing a source or despawning its owner releases\nits hold. Other providers' hold reasons remain independent. Ray queries may still\ninspect the last valid collision generation while movement waits.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "After body synchronization, terrain rechecks physical coverage before each fixed\nstep. A character teleported by a script after `preUpdate` waits until the new region\nis resident. The check also verifies source/data revisions, owner transforms and\nnative collider initialization. It resumes after coherent publication; independent\nowner/reason holds remain active until their own provider releases them.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Region reads and CPU meshing run in owned background tasks. At most two sources\nprepare concurrently, including completed CPU jobs awaiting GPU publication.\nWaiting sources enter a FIFO queue so repeated camera updates cannot indefinitely\noccupy both preparation slots ahead of another terrain.\n`maximumTileUpdatesPerFrame` defaults to 4 and accepts 1 through 64; it limits tile\nmesh uploads and actual native collision tree preparation in each frame. Prepared\nimmutable collision data are reused when the completed generation activates its\nbodies, so final publication does not recook all tiles. Prepared children stay hidden\nuntil the complete replacement can publish together. `Terrain3DSourceStatus` reports\n`isPreparing`, `preparedTileCount` and `pendingTileCount` while the last valid\ngeneration remains available. Changing the source or removing its owner cancels\npending work. Revision checks reject results superseded by local edits. Camera\nmotion can finish an already prepared generation before requesting its next view,\nso continuous navigation does not repeatedly discard useful work.\nNative Studio exposes source sculpting, material import/painting, mesh instancing and seeded height generation in a terrain dock below the viewport. Height, surface and placement strokes publish asynchronous batches while dragging and save one private resource version through ordinary scene history. A visible surface ring follows the brush; Escape restores the previous resource. Attaching `Terrain3D` continues to use the compatible legacy patch described above.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Terrain resource loaders can bound encoded input before decoding by declaring\n`static var maximumEncodedBytes: Int?` on their `Asset` type. The default is `nil`.\nNative loads check the file size and read bounded chunks, including a check for\nfiles that grow while being read. Browser loads consume the response stream and\nreject a chunk that would exceed the limit. The limit also applies during hot reload;\ndecoders still need their own validation of counts, coordinates and numeric values.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Runtime height brushes",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainHeightBrushSettings` selects raise, lower, smooth, flatten, set height,\nramp, terrace, seeded noise or bounded local talus relaxation. Supply settings and\nterrain-local `TerrainBrushPoint` events to `TerrainHeightBrushStroke`, then attach\n`Terrain3DHeightEdit(storage:brush:)`. Completion and inverse Undo use the same\nheight-edit status and delta as explicit sample updates.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Raise, lower, smooth, flatten and talus sample time at fixed intervals, scaling\nby elapsed seconds and optional pressure. Stamp operations use deterministic path\ndistance spacing. Flatten defaults to the surface height at stroke start. Set height\nrequires `targetHeight`; ramps interpolate the first/last input heights. Terraces\nuse `terraceStep` and an optional height offset. Noise uses the seed and canonical\nsample coordinates. Talus has explicit iteration and angle controls.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The worker reads an immutable input generation and publishes one complete delta;\ninvalid settings or excessive work retain the previous surface. At most 4096 input\npoints/dabs and 65536 affected samples are accepted, with a separate sample-visit\nbudget. Work preflight counts both dab supports and scans over their union, including\nlocal stencil reads. Rotated square/alpha/ridge bounds follow the rotated support.\nSlope masks share the renderer's one-sided and normal-halo derivatives. Brush updates\nplan and load their complete declared footprint into a private editing view before\napplication, including normal-only and unloaded neighboring regions. The original\nvisible tile set is restored before publication. Missing payloads or insufficient\nresidency reject the whole gesture without changing visible geometry.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Shapes include soft/hard round, square, ridge, a signed crater mask, ridged noise and\na bounded grayscale alpha. `TerrainBrushAlpha` accepts up to 1024 Ã— 1024 bytes and\nvalidates dimensions/counts before decoding pixels. Rotation/jitter and height/slope\nranges belong to settings. Studio brush controls, named presets and imported-image\nhandling are not connected to this resource path yet.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Runtime surface brushes",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainSurfaceBrushSettings` selects `paintLayer`, `eraseLayer`, `paintMask`,\n`paintTint`, `eraseTint`, `paintRoughness` or `eraseRoughness`. Submit its stroke to\nthe loaded source owner, using the source's `Terrain3DSourceSurface.storage` and\nterrain-local input points. The target layer must exist in its material palette.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "func paintTerrainPath(owner: Entity, storage: TerrainHeightStorage, points: [TerrainBrushPoint]) {\n    var settings = TerrainSurfaceBrushSettings(operation: .paintLayer, radius: 4, strength: 0.3)\n    settings.layerID = 12 // A stable layer ID declared in this source's palette.\n    settings.shape = .softRound\n    settings.spacing = 0.25\n    owner.components[Terrain3DEdit.self] = .init(\n        storage: storage,\n        brush: TerrainSurfaceBrushStroke(settings: settings, points: points)\n    )\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Strength is coverage per distance-spaced dab, between zero and one. Rotation,\nseeded jitter, pressure, procedural shapes, grayscale alpha, height and slope masks\nuse the sculpt brush conventions. Event duration does not multiply surface opacity.\nOverlapping dabs accumulate coverage; layer painting retains the strongest four\nstable IDs and normalizes their weights. Erasing the layer override reveals the\nautomatic rules while retaining separately painted tint and roughness.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For `paintMask`, set `maskID` and `maskValue`; a target value of zero erases that\nautomatic-rule mask. Tint and roughness brushes affect only their own channels.\nThe original surface supplies height/slope filters throughout the gesture.\nPlanning bounds dabs, canonical samples and work before hydration, and the complete\nresult must fit resident storage and native region limits before publication.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "One gesture publishes one revision and compact `TerrainEditDelta` changes. Read\n`Terrain3DEditStatus` and create `Terrain3DEdit(storage:undoing:)` from an applied\ndelta for exact Undo. Removing the request before publication cancels it. Direct\n`TerrainSurfaceUpdate` and `TerrainRuleMaskUpdate` arrays can also accompany height\nupdates in one `Terrain3DEdit`. Material-only changes retain unchanged mesh buffers\nand collision; sculpted geometry and LOD transitions continue to rebuild as needed.\nUse `Terrain3DSave` to persist the committed channels with heights and placements.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Saving runtime edits",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "After a height edit has published, attach `Terrain3DSave(storage:)` to its source\nowner. `Terrain3DSaveStatus` reports `pending`, `saved`, `failed` or `cancelled`, plus\nthe saved revision or error. The default 128 MiB encoded staging budget can be\nreduced. An optional asynchronous `onProgress` callback receives completed and\ntotal region writes. Native writable projects support this operation; browser\nsaving remains unavailable.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The operation captures changed resident data and hidden dirty regions, restoring\neach hidden region's authored tile layout. It uses incremental persistence, so\nunloaded references survive without loading their payloads. Successful publication\nadopts a new immutable reader and releases only data matching the committed\nsnapshot from dirty residency. Later edits remain unsaved. Saving itself preserves\nthe surface object and visible mesh buffers; normal edits and streaming can continue\npublishing their own changes while the immutable snapshot writes.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "At most two filesystem snapshots run per source system, including cancelled tasks\nwaiting for their final result. Additional requests wait in FIFO order. If an\nuncaptured queued request must yield to residency or geometry work, it fails busy;\nretry after publication. A request captured before its current heights are published\nalso fails busy. Changing the source URI/reload generation or removing the request\ncancels an unpublished save. Pose, camera, physics and newer height changes allow\nthe existing snapshot to finish. A commit that already succeeded reports `saved`;\nits status includes the captured revision, which may precede later edits.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A stale disk manifest fails explicitly while retaining local data and geometry.\nSaving a scene persists its terrain URI; save terrain edits separately before\nclosing or exporting that scene.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "An in-flight transaction pins its canonical regions through normal residency\nadmission. Camera or physics requests that cannot fit those pages plus their new\nregions fail without evicting the transaction's data. Saving the captured snapshot\nreleases its transaction pins, while newer unsaved data remain dirty. A one-page\nworking set can therefore refuse a second nonzero region until the newer Undo is\nalso saved or its data are otherwise released.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Shared mesh placements",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Mesh3DInstancesComponent` is the initial shared-mesh runtime path for spatial cells.\nIt takes one mesh/material table and an array of `Mesh3DInstance` records with stable\nIDs, local transforms and tint. The owner/parent transform applies to every record.\nExtraction keeps one render source per component and compatible materials share\ninstanced draws. It does not create an authored scene entity for each placement.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainMeshPrototype` prepares a selected scene from a `ModelAsset3D`. It retains\nall active mesh nodes, every primitive and the shared material table. Imported\nparent/rest-pose transforms are composed after each placement, beneath the terrain\nowner. Mesh buffers and materials are reused.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "let prototype = try TerrainMeshPrototype(model: importedModel)\nlet batches = try prototype.makeBatches(instances: placements)\nfor batch in batches {\n    let child = world.spawn(\"Terrain model batch\") {\n        Transform()\n        batch\n    }\n    terrain.addChild(child)\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Run this setup after the renderer is ready, in the scene's normal world-mutation\ncontext. Keep placement IDs stable when moving or reordering records. Update the\nexisting batch components when placements change; preparing them is not a per-frame\noperation. This runtime example does not save placement records into a terrain asset.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Preparation accepts static indexed triangle geometry with standard position,\nnormal, UV, tangent and color streams. Animation, skinning/joint streams and morph\ntargets require ordinary model entities. Invalid hierarchies, missing materials,\nnonfinite/noninvertible transforms, invalid vertex/index data and transformed-bound\noverflow throw `TerrainMeshPrototypeError`. The glTF import path also validates\nattribute cardinality and indexed vertex references before GPU upload.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A model is limited to 4096 nodes, 64 draw parts and 256 materials. Geometry\npreflight allows 1048576 vertices and 6291456 indices across its unique active\nmeshes. A cell allows at most 65536 placements and 262144 placement/part pairs.\n`maximumExpandedBytes` covers expanded CPU placement records, with a 64 MiB\ndefault and 128 MiB hard cap; shared source assets and renderer pass buffers have\nadditional costs. Tints use normalized RGBA values. Negative scales are supported\nwhen the resulting transform and mesh bounds remain finite and invertible.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The forward/shadow lists consume placement transforms. Portable tracing has a\n131072-placement/input-triangle work budget and a 262144-material-packet cap;\nline, point, empty and cosmetic-only parts do not expand. It transforms referenced\nvertices only. These limits do not establish the decorative-instance benchmark.\nRegion assets now preserve stable placement records in a versioned binary section.\nRecords retain compact rotation, tint and attachment-normal channels without repeated\nquantization on save. Height-only files retain their original encoding. Residency\nand saves preserve records in hidden dirty regions, including placement-only resource\nremoval. Decoded placement rows have an independent 16 MiB default storage/cache\nbudget; expanded draw records and renderer buffers have separate costs. A manifest's `meshPrototypes` table assigns stable `UInt16` IDs to static model\npaths relative to the manifest directory. It also selects an optional imported\nscene and world-space draw distance. Nonempty palettes use manifest version two;\nempty palettes keep version one. Both save modes preserve model references.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Source loading creates one shared batch per imported mesh node, prototype and\n64-cell placement group. Region streaming removes inactive draw cells. Existing\ncells retain their entities and shared buffers through unrelated height edits.\nA failed source replacement preserves the previous valid generation.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For example, save an unanchored decorative placement in a native writable project:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "let layout = TerrainManifestAsset(meshPrototypes: [\n    .init(id: 17, assetPath: \"Models/rock.glb\", maximumDistance: 500),\n])\nlet rock = try TerrainRegionInstance(\n    id: 1, prototypeID: 17, localPosition: [10, 0, 10], flags: []\n)\nlet region = TerrainRegionAsset(\n    x: 0, z: 0, tiles: [], pages: [], instances: [rock]\n)\ntry await AssetsManager.saveTerrainRegions(\n    [region], manifest: layout, at: terrainURL.path\n)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The model must exist at `Models/rock.glb` relative to `terrainURL`. Attach\n`Terrain3DSource(source: terrainURL.path)` to the terrain owner after saving.\nPlacement position and vertical offset use base-cell units; X/Z include the\nregion's 256-cell offset and terrain origin, while model scale remains a model\ntransform. Sculpt commands now move nearby anchored placements with the edited surface and\nalign their orientation when requested. Unanchored/distant rows remain unchanged.\nAttachment queries include canonical halo coverage without exposing hidden draw\ntiles. Local yaw is recovered against a canonical normal frame, so many small\nslope edits do not lose tilt through repeated quaternion quantization. A gesture\nvisits at most 262144 nearby records. Its delta retains previous/current placement\nrows for exact combined Undo/Redo, preserving quantized channels across repeated\nhistory steps. `Terrain3DEdit`, `Terrain3DEditStatus` and `TerrainEditDelta` are general\naliases for the original height-edit spellings.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Explicit placement gestures use `Terrain3DEdit(storage:instances:)` with\n`TerrainInstanceCellChange` entries. Each entry addresses one 64-cell spatial group\nand includes its expected previous rows and desired rows. The worker validates\nunique cells, record membership, stable IDs, stale input, decoded budgets and the\n65536-record limit per region before publication. A gesture permits at most 65536\ncells and 262144 previous/desired row visits. Saving includes these placement edits.\nDeclared regions must have a complete loaded baseline before explicit cell replacement;\nan unloaded declaration is not interpreted as an empty cell. Newly addressed regions,\nincluding canonical height pages across an outer edge/corner, pass region admission\nbefore publication. Loaded baselines survive adoption of a new save reader.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Native Studio's separate Mesh Instancing toolbar button opens its terrain dock. Import a self-contained GLB or VOX, select its palette entry, then paint or erase shared instances. The runtime paint/erase request path below authors the same saved placements. Actual backend pixels and the 100k-instance benchmark remain required\nbefore the feature is complete.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Runtime mesh brushes",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainInstanceBrushSettings` selects paint or erase and a stable mesh palette ID.\nSubmit a `TerrainInstanceBrushStroke` through `Terrain3DEdit(storage:brush:)` on the\nterrain source owner. The general edit/status/delta names alias the existing height\nrequest types; saves and exact inverse Undo share the same atomic publication path.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "var settings = TerrainInstanceBrushSettings(prototypeID: 17, radius: 8, density: 2)\nsettings.minimumDistance = 1.5\nsettings.scaleRange = 0.8...1.2\nsettings.heightRange = 0...100\nsettings.slopeRange = 0...35\nsettings.seed = 42\nterrain.components[Terrain3DEdit.self] = .init(\n    storage: surface.storage,\n    brush: TerrainInstanceBrushStroke(settings: settings, points: gesturePoints)\n)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Density is the requested placements per square terrain-local unit before spacing and\nsurface masks. Minimum distance applies to placements of the selected prototype,\nincluding existing nearby rows. A jittered deterministic lattice provides stable\ncandidate IDs and random scale/yaw; changing its physical scale selects a distinct\ncandidate lattice. Repeating the same paint request leaves accepted records\nunchanged, and subdividing a straight input segment preserves its result. Terrain\nowner transforms apply after local authoring, as for sculpt brushes.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The brush supports the existing soft/hard round, square, ridge, crater, noise and\nalpha masks, rotation/jitter, pressure, tint, height offset and height/slope filters.\nPainted records anchor to the sampled surface and can align their up axis with the\nsurface normal. Sculpt edits reproject those anchors. Erase removes covered records\nfrom the selected prototype, or every prototype with `eraseAllPrototypes`; inverse\nhistory restores exact row order, IDs and compact transforms.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Set `materialLayerID` to a registered stable layer ID and `minimumMaterialWeight`\nto a value in 0...1 to restrict paint or erase to that layer's contribution. The\ndefault threshold is .5; zero accepts any positive contribution. Leave the ID\nunset to disable this filter. The brush resolves automatic height/slope/curvature,\nnoise, rule masks and painted overrides at canonical samples, then interpolates\nthe selected layer's weights. Missing layer IDs reject the gesture without\nchanging placements or geometry. This uses layer weights, not texture color.\nEach gesture caches at most 65536 canonical filter samples and charges sample\nand rule evaluations to its existing work budget. Unfiltered brushes do not\nallocate this material cache.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Planning loads the complete declared gesture footprint into a private editing\nview, including unloaded height/placement regions and a normal halo. Extra query\ntiles do not become visible render tiles. Unknown declared payloads, missing models,\ninvalid settings, cancellation or exceeded budgets retain the published generation.\nThere are at most 262144 candidate lattice cells and 1048576 counted work visits\nper planning/evaluation stage;\nbounds searches, mask evaluations and spacing comparisons all count. Placement and\nresident resource limits also apply. Native Studio brush controls remain pending.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Nearby placement collision",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Decorative placements have no collision. Set `TerrainInstanceFlags.collision` on\nexplicit records, or `settings.requestsCollision = true` before painting, to request\nstatic triangle collision near active cameras and physical bodies. The flag is saved\nwith each placement and follows exact placement Undo/Redo.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Terrain3DSource.instanceCollision` controls this mode. Its defaults are a horizontal\ndistance of 64 terrain-local units, at most 128 colliders, a conservative 32 MiB\ngeometry/native-tree allowance, and four native preparations per update. Count is\nlimited to 1024 and per-update preparations to 64. Selection uses transformed model\nbounds and stable placement IDs to break equal-distance ties. Count limits can omit\nnearby placements; use suitable limits for gameplay obstacles. Setting the count to\nzero disables placement collision. `generatesCollision = false` disables both the\nbase surface and placement collision.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The placement preparation budget is separate from the height tile update budget.\nAll selected shapes are prepared before their generation publishes. Cancelled or\nrejected preparations retain the last published collision; unchanged selections\nreuse their entities and native trees. Camera/body movement releases distant props\nand prepares newly selected ones. Full parent transforms, including reflections,\napply to collision as well as rendering. The physics readiness gate waits when\nmovement requests selected prop collision that has not published yet.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Terrain3DSourceStatus.instanceColliderCount` reports the published count, including\nwhile a replacement is pending. Use the physics world's existing preparation metrics\nto measure actual native BVH work. Selection visits at most 262144 flagged candidates;\ndecorative-only cells retain no collision candidate rows. Exceeding candidate or\ngeometry budgets reports an error rather than partially publishing collision.\nIf more than 16 active cameras exceed the bounded camera collector, collision\nselection conservatively considers all loaded flagged props, within the same\ncount, memory and work limits.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Measuring large placement scenes",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Render3DGPUTests.Benchmarks.terrainHundredThousandInstances` loads two native\nregions containing 100000 decorative placements, renders spatial batches and\nthen compares one entity per placement using the same shared assets. It verifies\nidentical pixels and records actual camera draw counts, runtime entity count,\nplacement storage and frame wall time. Windows also records process CPU time, working set\nand committed bytes. Process CPU includes worker threads. These figures include the renderer, caches and test\nharness; they are not exclusive placement allocations.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Run an optimized build with `ADAENGINE_PERF=1`, the applicable golden backend\nenabled, and `swift test -c release -Xswiftc -enable-testing --filter\nterrainHundredThousandInstances`. Use `ADAENGINE_PERF_FRAMES` to select the measured\nframe count and `ADAENGINE_TERRAIN_PERF_OUTPUT` for a JSON result file. Run on a\nquiet machine and compare results on the same hardware. Timing includes a final\nreadback to wait for submitted GPU work; it is not a per-pass GPU timestamp or\na universal frame-rate promise. This fixture uses warmed albedo view rather than\nfull shaded gameplay; keep that distinction when reporting its results.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Solid geometry preparation",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The renderer-neutral Math module provides bounded scalar geometry for tools that prepare\nsolid operations. `ScalarSolid` evaluates spheres, boxes and capsules under a finite,\ninvertible affine transform, including reflection, nonuniform scale and shear.\n`ScalarMeshSolid` validates a closed static triangle mesh, welds exact duplicate positions\nat attribute seams and evaluates concave membership with nearest-surface distance.\nOpen or nonmanifold edges/vertices, inconsistent winding, degenerate faces and intersecting\nfaces are errors. Mesh preparation accepts at most 65,536 triangles and 196,608 source\nvertices, with explicit validation and query work budgets. Cancellation and exhausted\nbudgets throw; callers must retain their previous valid terrain result.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Both fields are negative inside. `ScalarBooleanOperation.union` takes the minimum;\n`subtract` takes the maximum of the base and negated operand. Transformed analytic values\npreserve their surface but need not be exact distances after nonuniform scale/shear.\n`ScalarFieldGrid` holds at most 32 cells per axis, with signed integer lattice offsets for\nshared boundaries. `ScalarFieldSurface.extract` returns indexed smooth triangles and\narea-weighted normals, with explicit triangle and contact-processing bounds. Neighboring\ngrids must select the same tetrahedral diagonal orientation. Precision\nis sampled: features not captured by the chosen grid can disappear. Representable sampled\nthin faces are retained, rather than removed by a fixed endpoint-snapping tolerance.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For standalone picking and proximity tools, `TriangleSurfaceIndex` builds an immutable\nBVH over open or closed indexed triangles. `raycast` returns the nearest two-sided hit;\nits distance uses the normalized ray direction, and its normal retains geometric winding.\n`closest(to:)` returns the nearest point within the supplied distance. Hits retain the\noriginal triangle-list index through BVH sorting. Exact shared edges remain hittable;\nrepresentable points outside an edge stay outside. Empty indices return no hit.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Construction validates referenced finite vertices, nondegenerate triangles and index\nrepresentability, with explicit triangle, conservative byte and work allowances. Unused\nposition-accessor rows are not copied into Double geometry. Query overloads accept a\nshared `TriangleSurfaceQueryBudget` across chunks; exceeding the allowance throws rather\nthan returning a partially searched answer. Cancellation also throws. This Math API does\nnot itself attach acceleration to a scene or transform local hits into world space.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Enable `Terrain3DSource(queries: .init())` to prepare acceleration for published source\ntiles. `Terrain3DSourceSurface.queries` then exposes immutable `TerrainSurfaceQueries`\nwith `raycast`, `closest(to:)`, revision, byte charge and per-tile generation diagnostics.\nThe default `queries: nil` avoids this construction and memory cost. Settings independently\nbound the conservative current-generation index/staging bytes and shared construction work.\nIndices build in workers, reuse geometry-equal tiles and publish with the same canonical\nmesh and collision revision. Budget failure keeps the previous valid snapshot; disabling\nqueries drops the current acceleration while retaining render buffers.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The query snapshot follows published geometry, including cave floors, ceilings and stacked\nledges. Holding a snapshot retains its surface while the editable base changes; a completed\nstaged edit or Undo publishes a replacement. Unchanged save acknowledgment retains the\nindices. Positions, normals and distances use terrain-local space. Transform world rays\ninto that space and returned positions back through the terrain hierarchy; transform\nnormals with the inverse transpose. Closest-point distance uses the local metric under\nnonuniform scale. When comparing ray hits from different transformed entities, reconstruct\nthe world ray parameter from each returned world position.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TriangleSurfaceHit.preciseDistance` retains the Double metric for ordering across tile\nindices. `distance` provides the Float value for normal application use. The scene layer\ncompares the precise metric so distinguishable close surfaces cannot be reordered by Float\nrounding. One query work allowance covers tile bounds and all visited BVH nodes/triangles.\nThese native CPU checks do not establish backend pixels or browser interaction behavior.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainVolumeBrickAsset` stores canonical 33-cubed density samples and stable optional\nmaterial IDs in an independently loadable `.atvolbrick` resource. Its versioned little-endian\nencoding preserves Float bits and rejects malformed sizes, counts, coordinates and samples.\n`TerrainVolumeDocumentAsset` stores the explicit lattice origin/cell size, ordered solid\noperations and cached-brick references in `.atvolume` metadata. Operations retain UUIDs,\nenabled state, full affine placement, a primitive or portable static-model source, and an\noptional material layer. Validation rejects unsafe paths, duplicate identities/cache\naddresses/names, invalid operands and oversized tables before resource staging. Metadata\nalone does not publish a cache or commit a multi-resource save.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Native multi-resource saves use `AssetsManager.saveTerrainRegions(..., volume:)` with\n`TerrainVolumeSave(document:bricks:mode:)`. The manifest uses version 4 when it references\na volume document; height-only manifests retain their previous encoding. The default\n`.replaceAll` writes a complete cache; `.update(removing:)` replaces supplied addresses\nand explicitly removes referenced bricks while retaining the others. Pass the current\npublished document and manifest as the update baseline. Unchanged payloads and canonical\ncache tables retain their filenames, regardless of supplied brick order.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Height resources, changed bricks and document metadata stage before the manifest is\natomically replaced. The combined encoded-byte budget covers both height and volume data.\nCancellation or failure removes newly staged files and keeps the previous manifest and\nits resources readable. Old committed generations remain on disk; this API does not\nperform resource garbage collection. Saving heights without a `volume` argument preserves\nand checks the referenced volume resources. These native writes require a writable local\nasset directory; browser asset loading uses the separate typed asynchronous read path.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainRegionCache.loadVolumeResources()` opens the manifest's operation metadata in\nthe project context that opened the cache. A height-only manifest returns `nil`. The\nreturned `TerrainVolumeResources` keeps that context when another project requests\n`loadBricks(at:maximumBytes:maximumBricks:)`. Supply signed brick coordinates from its\ndocument; duplicate or undeclared requests and count/byte overruns fail before payload\nreads. Unrequested bricks stay unloaded, including unavailable distant files. Requested\npayload addresses and material tags must match the document and manifest palette.\nLoading returns the complete requested array or throws; it does not install scene geometry.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use `TerrainVolumeResources.loadPreparedMesh(operationID:maximumBytes:maximumValidationWork:)`\nfor an enabled static-model operation. It retains the cache's model import limits and project\ncontext. Its per-load encoded/decoded import caps also respect `maximumBytes`. The model\nbridge selects the operation's scene (or the model default), visits all active nodes and\nprimitives, honors rest poses and inherited affine transforms, and corrects reflected-node\nwinding before applying the complete operation placement. Open, deformed or otherwise\ninvalid solids throw. Programmatic models use `TerrainVolumePreparedMesh(operation:model:)`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Preparation reserves retained source geometry, conservative per-index validation storage\nand complete position-accessor copies, including unused imported rows and repeated scene\nreferences. An otherwise valid operand can exceed the explicit byte or validation-work\nallowance. Keep its last committed terrain generation when preparation fails; these loading\nAPIs do not publish replacement geometry on their own.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainVolumeField` captures an immutable COW heightfield base and applies enabled\noperations in document order. Prepare static mesh operands with `TerrainVolumePreparedMesh`\nso their source identity and complete placement can be checked. The field builds canonical\n32-cell bricks with explicit allocation/work budgets and cancellation, and can extract their\nstandalone surfaces. Base density retains the heightfield's `y - height` distances;\noperand contributions use a two-cell narrow band and deterministic expanded support.\nTerrain extraction selects the heightfield's falling X/Z cell diagonal. Exact unchanged-base\nmatching requires the same sample grid or an exact aligned refinement; coarser or unaligned\ngrids still resample detail. Brick addresses do not change shared sample values. Mesh sampling charges a\nconservative configurable query allowance. A failed build returns no partial brick.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`TerrainVolumeCache.preparing` returns a complete immutable sparse generation for requested\nand pinned bricks. Unchanged local base pages and relevant operations retain their runtime\nbrick generation IDs; a local sculpt or source reload rebuilds affected bricks. Hidden\nauthored regions keep their canonical page dependencies when draw residency changes.\nCount, conservative byte and shared evaluation-work limits apply before the replacement\nis returned. A failed preparation leaves the previous cache available. Its byte statistics\ncover one generation, including bounded sample/dependency staging; retained older generations\nand render/physics resources need their own admission budgets.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Terrain3DSource` consumes enabled operations for full 64-cell height tiles. Its initial\nhybrid path requires a brick-aligned lattice origin and the same height sample spacing or\nan exact aligned refinement, within the existing density/geometry work and memory bounds.\nAffected tiles retain full visual detail, while the existing LOD balancer refines their\nneighbors. A halo keeps edits away from ownership boundaries. Explicit one-cell transition\nstrips preserve the adjacent heightfield edges and conform their inner edges to the density\ntessellation. Transition interpolation brackets actual canonical coordinates, which can\nhave uneven Float increments far from the origin. The same committed mesh descriptor supplies rendering and triangle collision;\nthe old heightfield mesh is replaced in owned tiles. Source preparation retains prior valid\ngeometry until the existing paced publication transaction is complete.\nVolume source tiles interpolate central lattice gradients for consistent normals at shared\nbrick positions. Pure-heightfield transition edges keep their original normals. Derivative\nsampling shares a per-tile work budget and its one-sample halo participates in cache dependencies.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Open `Editor/Samples/MeshTerrainWorkshop` in Ada Studio to explore the joined rock,\npainted cave and procedural grass and stones. Use Play to inspect collision on the joined rock.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Native Studio's mesh tab exposes primitive or registered closed-mesh union/subtraction. Volume materials evaluate actual vertex height and normal; three-corner material fields use a separate triangle atlas while textures retain terrain-local coordinates for triplanar projection and detiling. Native collision cooking has its\nown small-area precision limit; render geometry below that limit may not become collision faces.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This initial source integration is still in development: partial height tiles, volume-only\ncoverage outside the heightfield and cached-only/baked fallback remain incomplete. Three-dimensional manual paint storage and volumetric curvature rules are not yet equivalent to heightfield paint. Palette-bearing volume sources use an independent three-corner material field per triangle; no single X/Z field is reused for separate strata. `Terrain3DSourceSurface.storage`\ncontinues to represent the editable heightfield base; its height query does not describe\nmultiple surfaces in a volume column; enable the source queries above for committed surface\npicking and proximity. Complete portable export and platform acceptance remain open.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Current limits",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A heightfield has one height per X/Z position, so it cannot represent caves or\noverhangs. The legacy `Terrain3D` patch supports at most 257 Ã— 257 samples.\n`Terrain3DSource` supports sparse resource tiles within its configured residency\nand mesh budgets, with camera-driven residency. Source palettes render rule-selected\ntints and albedo maps; the legacy patch keeps its single ground color. Material\npainting controls in native Studio, instance controls and volume editing remain\nin development.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The tile data and headless runtime tests exercise CPU geometry and real physics\nqueries. They do not establish Metal/WebGPU pixel agreement or native mobile,\nbrowser-shell and VR authoring parity; those need separate backend/runtime checks.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
     "id": "AnimationAuthoring",
     "title": "Authoring skeletal animation",
     "section": "AdaEngine",
@@ -3280,7 +4295,7 @@
       },
       {
         "kind": "code",
-        "text": "import AdaEngine\nimport Foundation\n\nstruct RawRGBAImageDecoder: ImageDecoder {\n    let supportedExtensions = [\"rawrgba\"]\n\n    func canDecode(_ data: Data) -> Bool {\n        data.starts(with: [65, 68, 65, 73]) // \"ADAI\"\n    }\n\n    func decode(_ data: Data) throws -> Image {\n        let bytes = Array(data)\n        guard canDecode(data), bytes.count >= 6 else {\n            throw ImageDecodingError.invalidData\n        }\n        let width = Int(bytes[4])\n        let height = Int(bytes[5])\n        guard width > 0, height > 0, bytes.count == 6 + width * height * 4 else {\n            throw ImageDecodingError.invalidData\n        }\n        return Image(width: width, height: height, data: Data(bytes.dropFirst(6)))\n    }\n}\n\nImage.registerDecoder(RawRGBAImageDecoder())\nlet image = try await AssetsManager.load(Image.self, at: \"@res://Sprites/player.rawrgba\")",
+        "text": "import AdaEngine\nimport Foundation\n\nstruct RawRGBAImageDecoder: ImageDecoder {\n    let supportedExtensions = [\"rawrgba\"]\n\n    func canDecode(_ data: Data) -> Bool {\n        data.starts(with: [65, 68, 65, 73]) // \"ADAI\"\n    }\n\n    func decodedRGBAByteCount(_ data: Data) throws -> Int {\n        guard canDecode(data), data.count >= 6 else {\n            throw ImageDecodingError.invalidData\n        }\n        let header = Array(data.prefix(6)) // A fixed-size header, including for Data slices.\n        let width = Int(header[4])\n        let height = Int(header[5])\n        let count = width * height * 4 // One-byte dimensions bound this multiplication.\n        guard width > 0, height > 0, data.count == 6 + count else {\n            throw ImageDecodingError.invalidData\n        }\n        return count\n    }\n\n    func decode(_ data: Data) throws -> Image {\n        _ = try decodedRGBAByteCount(data)\n        let header = Array(data.prefix(6))\n        return Image(width: Int(header[4]), height: Int(header[5]), data: Data(data.dropFirst(6)))\n    }\n}\n\nImage.registerDecoder(RawRGBAImageDecoder())\nlet image = try await AssetsManager.load(Image.self, at: \"@res://Sprites/player.rawrgba\")",
         "language": "swift",
         "links": []
       },
@@ -3299,6 +4314,60 @@
       {
         "kind": "text",
         "text": "Registration adds decoding only; it does not add an image encoder. WebP, GIF,\nTIFF, HDR/EXR and KTX2 are not built-in raster decoders.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Texture arrays",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Once the renderer is configured, `TextureDescriptor` can initialize a 2D texture\narray. Set `textureType` to `.texture2DArray`, set `arrayLength`, and provide a\n`TextureSubresource` for every slice and mip level. Images in each mip level need\nmatching dimensions and formats. Slice numbers start at zero. Sample the result\nwith a 2D-array shader binding, including when the array contains one slice.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "let slices = [\n    Image(width: 2, height: 2, color: .red, format: .rgba8),\n    Image(width: 2, height: 2, color: .blue, format: .rgba8)\n]\nvar descriptor = TextureDescriptor(\n    width: 2, height: 2, pixelFormat: .rgba8,\n    textureUsage: [.read], textureType: .texture2DArray, mipmapLevel: 1\n)\ndescriptor.arrayLength = slices.count\ndescriptor.subresources = slices.enumerated().map {\n    TextureSubresource(image: $0.element, mipLevel: 0, slice: $0.offset)\n}\nlet arrayTexture = Texture2D(descriptor: descriptor)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Bounded model and image imports",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Model pipelines can install `ModelImportLimits` for one structured resource\nrequest. The bounded native paths accept glTF/GLB, OBJ and static VOX data. Terrain palette readers retain their limits across actor calls,\nreader forks and save adoption. The root/dependency byte limit applies before\nresource reads; decoded geometry and texture preparation share a conservative\nbudget. Pixel checks happen before decoding, mip conversion and GPU texture creation.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Optional `.meshlets` and `.meshletlod` files share the encoded allowance. Their\nparsed records and staging copies use the remaining decoded allowance after\nmandatory model textures. If a derived file is invalid or exceeds these limits,\nthe model keeps its original geometry and materials and reports an import warning.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\n\nlet limits = ModelImportLimits(\n    maximumEncodedBytes: 16 * 1024 * 1024,\n    maximumDecodedBytes: 64 * 1024 * 1024\n)\nlet model = try await ModelImportContext.$limits.withValue(limits) {\n    try await AssetsManager.loadFresh(ModelAsset3D.self, at: \"@res://Models/rock.glb\")\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`decodedRGBAByteCount(_:)` must inspect only bounded header data and return the\nRGBA8 pixel size without allocating pixel buffers. Check dimensions and arithmetic\nbefore multiplying them. Built-in PNG, JPEG, BMP and TGA decoders provide this\ninspection. The custom decoder above opts in too. The default implementation\nrejects bounded inspection explicitly; ordinary image loading keeps its existing\nbehavior when no import limits are installed. Header readers must honor `Data`\nslices whose `startIndex` is nonzero.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Bounded OBJ loading uses the built-in parser and meters text/token expansion before\nallocation. Repeated faces and distinct materials use shared buffers and indexed\nprimitive selection; nonfinite coordinates reject before GPU preparation. Bounded\nVOX loading admits raw records, dense grids and conservative meshing work before\nallocation. It requires a static, acyclic visible hierarchy with bounded depth;\nstatic subtree merging is unavailable under these limits. Ordinary imports without\nlimits preserve the existing loader/options path. Conservative estimates can reject\nan asset that would fit after geometry reduction; raise the scoped limit when needed.",
         "level": 0,
         "links": []
       },

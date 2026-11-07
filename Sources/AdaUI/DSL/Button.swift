@@ -214,6 +214,12 @@ final class ButtonViewNode: ViewModifierNode {
         self.invalidateContentIfStateChanged(from: previousState)
     }
 
+    override func onKeyEvent(_ event: KeyEvent) {
+        guard state.isEnabled, environment.isEnabled, event.status == .down, !event.isRepeated, event.modifiers.subtracting(.capsLock).isEmpty,
+            event.keyCode == .enter || event.keyCode == .space else { return }
+        action()
+    }
+
     // MARK: - Interaction
 
     override func hitTest(_ point: Point, with event: any InputEvent) -> ViewNode? {

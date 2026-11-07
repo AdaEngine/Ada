@@ -13,7 +13,7 @@ struct EditorSceneViewportView: View {
     let onPlay: (() -> Void)?
     let onStop: (() -> Void)?
     let onDocumentChanged: (EditorSceneDocument) -> Void
-    var onTerrainToolSelected: (() -> Void)? = nil
+    var onTerrainToolSelected: (() -> Void)?
     var initialDisplayMode: EditorSceneViewportDisplayMode = .twoD
     var isAssetPreview = false
     var onEditWorldReady: ((World) -> Void)?
@@ -77,15 +77,24 @@ struct EditorSceneViewportView: View {
 
     private func configureReadyViewport() {
         viewportModel.setPresentationActive(isDocumentActive)
-        guard isDocumentActive else { return }
-        guard !document.isLoading, document.errorMessage == nil else { return }
-        if isPlayingThisDocument { preparePlayModeViewport() }
-        else { configureViewportModel() }
+        guard isDocumentActive else {
+            return
+        }
+        guard !document.isLoading, document.errorMessage == nil else {
+            return
+        }
+        if isPlayingThisDocument {
+            preparePlayModeViewport()
+        } else {
+            configureViewportModel()
+        }
     }
 
     private var hasImportedModels: Bool {
         document.sceneModel?.entities.contains {
-            $0.components[EditorBuiltInComponentType.model3DSource] != nil || $0.components[EditorTerrainPayload.typeName] != nil
+            $0.components[EditorBuiltInComponentType.model3DSource] != nil
+                || $0.components[EditorTerrainPayload.typeName] != nil
+                || $0.components[EditorBuiltInComponentType.terrain3DSource] != nil
         } == true
     }
 
@@ -103,14 +112,21 @@ struct EditorSceneViewportView: View {
                                 viewportModel.threeDPitch = 0
                                 viewportModel.perspectiveBlend = 1
                             }
-                            guard configureSceneViewApp(&app) else { return }
+                            guard configureSceneViewApp(&app) else {
+                                return
+                            }
                             let world = app.main
-                            viewportModel.loadSceneWorld(world, application: app, onLoadingChanged: { isLoadingScene = $0 },
-                                                        onLoadingProgress: { loadingProgress = $0 }, onLoaded: { result in
-                                if runtimeWarnings != result.warnings { runtimeWarnings = result.warnings }
-                                redrawViewport()
-                                onEditWorldReady?(world)
-                            })
+                            viewportModel.loadSceneWorld(
+                                world,
+                                application: app,
+                                onLoadingChanged: { isLoadingScene = $0 },
+                                onLoadingProgress: { loadingProgress = $0 },
+                                onLoaded: { result in
+                                    if runtimeWarnings != result.warnings { runtimeWarnings = result.warnings }
+                                    redrawViewport()
+                                    onEditWorldReady?(world)
+                                }
+                            )
                         },
                         updateContent: { world, deltaTime in
                             world.getResource(EditorSkeleton3DOverlay.self)?.isEnabled = showsBones && displayMode == .threeD
@@ -167,10 +183,16 @@ struct EditorSceneViewportView: View {
                 .mask(RectangleShape())
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+            if viewportModel.terrainEditing.isEnabled, !isAssetPreview {
+                EditorTerrainDockPanel(state: viewportModel.terrainEditing, onChange: redrawViewport)
+                    .frame(maxWidth: .infinity)
+            }
         }
         .overlay(anchor: .top) {
-            toolbar
-                .frame(maxWidth: .infinity)
+            GeometryReader { geometry in
+                toolbar(width: geometry.size.width)
+            }
+            .frame(height: 34)
         }
     }
 
@@ -200,7 +222,9 @@ struct EditorSceneViewportView: View {
     }
 
     func configurePlayWorld(_ app: inout AppWorlds) {
-        guard configureSceneViewApp(&app) else { return }
+        guard configureSceneViewApp(&app) else {
+            return
+        }
         performanceSession.attach(app, title: document.title)
         var runtimeInstalled = true
         do {
@@ -226,13 +250,18 @@ struct EditorSceneViewportView: View {
         let sourceURL = document.absolutePath.map { URL(fileURLWithPath: $0) }
         let assets = resourceRootURL ?? sourceURL?.deletingLastPathComponent() ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let reportsLoad = runtimeInstalled
-        app.addPlugin(EditorAdaScriptRuntimeEntryPlugin(sceneModel: model, assetsDirectory: assets, sourceURL: sourceURL,
-            recordsAchievement: false, onInitialSceneLoaded: { result in
+        app.addPlugin(EditorAdaScriptRuntimeEntryPlugin(
+            sceneModel: model,
+            assetsDirectory: assets,
+            sourceURL: sourceURL,
+            recordsAchievement: false,
+            onInitialSceneLoaded: { result in
                 if reportsLoad { runtimeWarnings = result.warnings }
                 if reportsLoad, result.warnings.isEmpty, sourceURL != nil {
                     EditorAchievementBootstrap.center?.record(EditorAchievementRules.playedScene(model, adaScript: playRuntime != nil))
                 }
-            }))
+            }
+        ))
     }
 
     @MainActor
@@ -338,28 +367,37 @@ struct EditorSceneViewportView: View {
         .allowsHitTesting(false)
     }
 
-    private var toolbar: some View {
-        HStack(spacing: 8) {
-            Text(document.title)
-                .font(.system(size: 12))
-                .foregroundColor(theme.editorColors.text)
-                .lineLimit(1)
-            #if !os(iOS)
-            Text(document.relativePath)
-                .font(.system(size: 11))
-                .foregroundColor(theme.editorColors.muted)
-                .lineLimit(1)
-            #endif
-            Spacer()
+    private func toolbar(width: Float) -> some View {
+        let compact = width < 540
+        let iconCount = isAssetPreview ? 1 : (annotationAgent == nil ? 4 : 5)
+        let modeWidth = compact ? min(174, max(92, width - Float(26 * iconCount + 12))) : 174
+        let compactModeLabels = modeWidth < 158 ? [EditorSceneViewportRenderingMode.shadedWireframe.rawValue: "Wireframe overlay"] : [:]
+        return HStack(spacing: compact ? 2 : 8) {
+            if !compact || displayMode != .threeD {
+                Text(document.title)
+                    .font(.system(size: 12))
+                    .foregroundColor(theme.editorColors.text)
+                    .lineLimit(1)
+            }
+            if !compact {
+                #if !os(iOS)
+                Text(document.relativePath)
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.editorColors.muted)
+                    .lineLimit(1)
+                #endif
+            }
+            Spacer(minLength: 0)
             if !isAssetPreview {
-                entityMarkerVisibilityButton
+                entityMarkerVisibilityButton(compact: compact)
                 if let agent = annotationAgent {
                     EditorSceneToolbarButton(
                         title: "Annotate",
                         symbol: "\u{E3C9}",
                         identifier: "AdaEditor.SceneViewport.Annotate",
                         isSelected: agent.sceneAnnotations.isSelecting,
-                        isEnabled: agent.activeSessionID != nil && !agent.isSending
+                        isEnabled: agent.activeSessionID != nil && !agent.isSending,
+                        compact: compact
                     ) {
                         agent.sceneAnnotations.toggleSelection()
                         viewportModel.setAnnotationMode(agent.sceneAnnotations.isSelecting)
@@ -370,34 +408,82 @@ struct EditorSceneViewportView: View {
                     title: "Terrain",
                     symbol: "\u{E564}",
                     identifier: "AdaEditor.SceneViewport.Terrain",
-                    isSelected: viewportModel.terrainEditing.isEnabled
+                    isSelected: viewportModel.terrainEditing.isEnabled,
+                    compact: compact
                 ) {
                     annotationAgent?.sceneAnnotations.stopSelecting()
                     let enabled = !viewportModel.terrainEditing.isEnabled
                     if enabled { selectViewportMode(.threeD) }
                     viewportModel.setTerrainEditing(enabled)
-                    if enabled { (onTerrainToolSelected ?? onEntitySelected)?() }
+                    if enabled { viewportModel.refreshTerrainSourceControls() }
+                    redrawViewport()
+                }
+            }
+            if !isAssetPreview {
+                EditorSceneToolbarButton(
+                    title: "Mesh Instancing",
+                    symbol: "\u{E8F1}",
+                    identifier: "AdaEditor.SceneViewport.MeshInstancing",
+                    isSelected: viewportModel.terrainEditing.isEnabled && viewportModel.terrainEditing.dockTab == "Mesh Instancing",
+                    compact: compact
+                ) {
+                    selectViewportMode(.threeD)
+                    viewportModel.setTerrainEditing(true)
+                    viewportModel.terrainEditing.dockTab = "Mesh Instancing"
+                    viewportModel.terrainEditing.sourceTool = .scatter
                     redrawViewport()
                 }
             }
             if displayMode == .threeD {
-                skeletonVisibilityButton
+                if !isPlayingThisDocument {
+                    EditorEnumField(
+                        cases: EditorSceneViewportRenderingMode.allCases.map(\.rawValue),
+                        selection: Binding(
+                            get: { viewportModel.renderingMode.rawValue },
+                            set: { value in
+                                guard let mode = EditorSceneViewportRenderingMode(rawValue: value) else { return }
+                                viewportModel.renderingMode = mode
+                                viewportModel.applyCamera()
+                                redrawViewport()
+                            }
+                        ),
+                        accessibilityID: "AdaEditor.SceneViewport.RenderingMode",
+                        labels: compactModeLabels,
+                        compact: compact
+                    ).frame(width: modeWidth)
+                }
+                if compact {
+                    EditorSceneToolbarButton(
+                        title: showsBones ? "Hide bones" : "Show bones",
+                        symbol: "\u{E84E}",
+                        identifier: "AdaEditor.SceneViewport.Bones",
+                        isSelected: showsBones,
+                        compact: true,
+                        action: { showsBones.toggle() }
+                    )
+                } else {
+                    skeletonVisibilityButton
+                }
             }
-            Text(isPlayingThisDocument ? L10n.text("PLAY MODE") : isAssetPreview ? L10n.text("MODEL PREVIEW") : L10n.text("SCENE"))
-                .font(.system(size: 10))
-                .foregroundColor(isPlayingThisDocument ? theme.editorColors.purple : theme.editorColors.muted)
+            if !compact {
+                Text(isPlayingThisDocument ? L10n.text("PLAY MODE") : isAssetPreview ? L10n.text("MODEL PREVIEW") : L10n.text("SCENE"))
+                    .font(.system(size: 10))
+                    .foregroundColor(isPlayingThisDocument ? theme.editorColors.purple : theme.editorColors.muted)
+            }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, compact ? 4 : 12)
+        .frame(maxWidth: .infinity)
         .frame(height: 34)
         .background(theme.editorColors.surface)
     }
 
-    private var entityMarkerVisibilityButton: some View {
+    private func entityMarkerVisibilityButton(compact: Bool) -> some View {
         EditorSceneToolbarButton(
             title: showsEntityMarkers ? "Hide object points" : "Show object points",
             symbol: "\u{E3B4}",
             identifier: "AdaEditor.SceneViewport.EntityMarkers",
-            isSelected: showsEntityMarkers
+            isSelected: showsEntityMarkers,
+            compact: compact
         ) {
             showsEntityMarkers.toggle()
             viewportModel.showsEntityMarkers = showsEntityMarkers

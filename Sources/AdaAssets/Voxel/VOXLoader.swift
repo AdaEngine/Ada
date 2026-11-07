@@ -24,11 +24,20 @@ public struct VOXLoader: Sendable {
     public init() {}
 
     public func load(url: URL) async throws -> VOXFile {
-        try load(data: Data(contentsOf: url))
+        if let limits = ModelImportContext.limits {
+            guard limits.maximumEncodedBytes > 0, limits.maximumDecodedBytes > 0 else { throw ModelImportLimitError.invalidLimits }
+            #if WASM
+                throw AssetError.message("Bounded direct model URL reads are unavailable in the browser; provide root data")
+            #else
+                return try load(data: await AssetsManager.readBoundedFile(url: url, maximumBytes: limits.maximumEncodedBytes))
+            #endif
+        }
+        return try load(data: Data(contentsOf: url))
     }
 
     public func load(data: Data) throws -> VOXFile {
-        var reader = VOXReader(data: data)
+        let budget = try VOXDecodeBudget.make(rootBytes: data.count, limits: ModelImportContext.limits)
+        var reader = VOXReader(data: data, budget: budget)
 
         guard try reader.readTag() == "VOX " else {
             throw VOXLoadingError.invalidHeader
@@ -129,6 +138,8 @@ public struct VOXLoader: Sendable {
             throw VOXLoadingError.truncated
         }
 
+        try content.records(VOXModel.self, count: 1)
+        try content.records(VOXVoxel.self, count: count)
         var voxels: [VOXVoxel] = []
         voxels.reserveCapacity(count)
         for _ in 0..<count {
@@ -186,9 +197,11 @@ public struct VOXLoader: Sendable {
             throw VOXLoadingError.invalidChunk("nTRN")
         }
 
+        try content.records(VOXTransformFrame.self, count: frameCount)
         var frames: [VOXTransformFrame] = []
         frames.reserveCapacity(frameCount)
-        for _ in 0..<frameCount {
+        for index in 0..<frameCount {
+            if index.isMultiple(of: 256) { try content.checkCancellation() }
             frames.append(try parseTransformFrame(attributes: try content.readDictionary()))
         }
 
@@ -213,11 +226,11 @@ public struct VOXLoader: Sendable {
 
         var translation = SIMD3<Int>(repeating: 0)
         if let value = attributes["_t"] {
-            let components = value.split(separator: " ").compactMap { Int($0) }
-            guard components.count == 3 else {
+            let components = value.split(separator: " ", maxSplits: 3)
+            guard components.count == 3, let x = Int(components[0]), let y = Int(components[1]), let z = Int(components[2]) else {
                 throw VOXLoadingError.invalidAttribute(key: "_t", value: value)
             }
-            translation = SIMD3(components[0], components[1], components[2])
+            translation = SIMD3(x, y, z)
         }
 
         var frameIndex: Int?
@@ -269,19 +282,25 @@ public struct VOXLoader: Sendable {
 private struct VOXReader {
     private let data: Data
     private let end: Int
+    private let budget: VOXDecodeBudget?
     private(set) var position: Int
 
-    init(data: Data) {
+    init(data: Data, budget: VOXDecodeBudget?) {
         self.data = data
         self.position = data.startIndex
         self.end = data.endIndex
+        self.budget = budget
     }
 
-    private init(data: Data, start: Int, end: Int) {
+    private init(data: Data, start: Int, end: Int, budget: VOXDecodeBudget?) {
         self.data = data
         self.position = start
         self.end = end
+        self.budget = budget
     }
+
+    func records<T>(_ type: T.Type, count: Int) throws { try budget?.records(type, count: count) }
+    func checkCancellation() throws { if budget != nil { try Task.checkCancellation() } }
 
     var isAtEnd: Bool { position >= end }
     var remaining: Int { end - position }
@@ -297,8 +316,8 @@ private struct VOXReader {
         position = try offset(advancedBy: count)
     }
 
-    func subReader(length: Int) throws -> VOXReader {
-        VOXReader(data: data, start: position, end: try offset(advancedBy: length))
+    func subReader(length: Int) throws -> Self {
+        Self(data: data, start: position, end: try offset(advancedBy: length), budget: budget)
     }
 
     mutating func readUInt8() throws -> UInt8 {
@@ -336,7 +355,8 @@ private struct VOXReader {
         }
         let bytes = data[position..<position + 4]
         position += 4
-        return String(decoding: bytes, as: UTF8.self)
+        guard let result = String(bytes: bytes, encoding: .utf8) else { throw VOXLoadingError.invalidChunk("Invalid UTF-8") }
+        return result
     }
 
     mutating func readString() throws -> String {
@@ -344,9 +364,11 @@ private struct VOXReader {
         guard length <= remaining else {
             throw VOXLoadingError.truncated
         }
+        try budget?.charge(length, stride: 4)
         let bytes = data[position..<position + length]
         position += length
-        return String(decoding: bytes, as: UTF8.self)
+        guard let result = String(bytes: bytes, encoding: .utf8) else { throw VOXLoadingError.invalidChunk("Invalid UTF-8") }
+        return result
     }
 
     mutating func readDictionary() throws -> [String: String] {
@@ -355,6 +377,7 @@ private struct VOXReader {
         guard count <= remaining / 8 else {
             throw VOXLoadingError.truncated
         }
+        try budget?.charge(count, stride: 96)
         var result: [String: String] = [:]
         for _ in 0..<count {
             let key = try readString()

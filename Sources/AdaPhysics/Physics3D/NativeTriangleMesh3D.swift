@@ -1,12 +1,14 @@
 import box3d
 
-/// Box3D borrows this immutable BVH. Body3D retains it until after its native body is destroyed.
-/// Creation/destruction follows the same serialized physics lifetime as Body3D.
+/// Owns one immutable BVH. Box3D only borrows const mesh data; both Shape3DResource and
+/// Body3D retain this owner until every native shape is destroyed. The resource cache is locked.
+/// Sendable is safe because the C mesh is immutable after creation and ARC owns its allocation;
+/// b3DestroyMesh only frees that allocation after the last owner releases it.
 @unsafe
-final class NativeTriangleMesh3D {
+final class NativeTriangleMesh3D: @unchecked Sendable {
     let pointer: UnsafeMutablePointer<b3MeshData>
 
-    init?(_ mesh: Shape3DResource.TriangleMeshShape) {
+    init?(_ mesh: Shape3DResource.TriangleMeshShape, metrics: PhysicsCollisionPreparationMetrics? = nil) {
         var vertices = mesh.vertices.map(\.b3Vec)
         var indices = mesh.indices.map { Int32($0) }
         let data = unsafe vertices.withUnsafeMutableBufferPointer { points in
@@ -25,6 +27,7 @@ final class NativeTriangleMesh3D {
             return nil
         }
         unsafe pointer = data
+        metrics?.recordTriangleMesh(triangleCount: mesh.indices.count / 3)
     }
 
     deinit { unsafe b3DestroyMesh(pointer) }

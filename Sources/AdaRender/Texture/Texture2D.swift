@@ -32,6 +32,8 @@ open class Texture2D: Texture, @unchecked Sendable {
     public private(set) var height: Int
     /// Number of allocated and initialized mip levels for imported textures, including level zero.
     public private(set) var mipmapLevelCount: Int = 1
+    let subresourceArrayLength: Int
+    let subresourcePixelFormat: PixelFormat
 
     /// The size of the texture.
     public var size: SizeInt {
@@ -71,6 +73,8 @@ open class Texture2D: Texture, @unchecked Sendable {
         self.width = descriptor.width
         self.height = descriptor.height
         self.mipmapLevelCount = max(1, descriptor.mipmapLevel)
+        self.subresourceArrayLength = descriptor.textureType == .texture2DArray ? max(1, descriptor.arrayLength) : 1
+        self.subresourcePixelFormat = descriptor.pixelFormat
 
         super.init(gpuTexture: gpuTexture, sampler: sampler, textureType: descriptor.textureType)
         self.assetMetaInfo = image.assetMetaInfo
@@ -88,6 +92,8 @@ open class Texture2D: Texture, @unchecked Sendable {
         self.width = descriptor.width
         self.height = descriptor.height
         self.mipmapLevelCount = max(1, descriptor.mipmapLevel)
+        self.subresourceArrayLength = descriptor.textureType == .texture2DArray ? max(1, descriptor.arrayLength) : 1
+        self.subresourcePixelFormat = descriptor.pixelFormat
 
         super.init(gpuTexture: gpuTexture, sampler: sampler, textureType: descriptor.textureType)
         if let image = descriptor.image, descriptor.pixelFormat == image.format.toPixelFormat,
@@ -105,6 +111,8 @@ open class Texture2D: Texture, @unchecked Sendable {
     internal init(gpuTexture: GPUTexture, sampler: Sampler, size: SizeInt) {
         self.width = size.width
         self.height = size.height
+        self.subresourceArrayLength = 1
+        self.subresourcePixelFormat = .bgra8
 
         super.init(gpuTexture: gpuTexture, sampler: sampler, textureType: .texture2D)
     }

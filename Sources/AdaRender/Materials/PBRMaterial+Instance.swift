@@ -3,6 +3,7 @@ extension PBRMaterial {
     /// changing a model instance never mutates the imported asset's material.
     public func makeInstance() -> PBRMaterial {
         let result = PBRMaterial()
+        result.terrainBindings = terrainBindings
         result.baseColorFactor = baseColorFactor
         result.baseColorTexture = baseColorTexture
         result.metallicFactor = metallicFactor

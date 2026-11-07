@@ -11,7 +11,7 @@
     import Synchronization
     @unsafe @preconcurrency import WebGPU
 
-    public final class WGPUGPUTexture: GPUTexture {
+    public final class WGPUGPUTexture: GPUTexture, TextureSubresourceUploading {
         public let size: SizeInt
 
         public var label: String? {
@@ -78,8 +78,28 @@
             }
         }
 
+        func uploadSubresource(_ resource: TextureSubresource) throws {
+            guard let device else { throw TextureSubresourceUploadError.unsupportedBackend }
+            let image = resource.image
+            #if WASM
+                let origin = WebGPU.GPUOrigin3D(x: 0, y: 0, z: resource.slice)
+            #else
+                let origin = WebGPU.GPUOrigin3D(x: 0, y: 0, z: UInt32(resource.slice))
+            #endif
+            unsafe image.data.withUnsafeBytes { bytes in
+                webGPUDeviceLock.withLock { _ in
+                    unsafe device.queue.writeTexture(
+                        destination: WebGPU.GPUTexelCopyTextureInfo(texture: texture, mipLevel: UInt32(resource.mipLevel), origin: origin, aspect: .all),
+                        data: bytes,
+                        dataLayout: WebGPU.GPUTexelCopyBufferLayout(offset: 0, bytesPerRow: UInt32(image.width * 4), rowsPerImage: UInt32(image.height)),
+                        writeSize: WebGPU.GPUExtent3D(width: UInt32(image.width), height: UInt32(image.height), depthOrArrayLayers: 1)
+                    )
+                }
+            }
+        }
+
         init(descriptor: TextureDescriptor, device: WebGPU.GPUDevice) {
-            self.allowsBindingCache = !descriptor.textureUsage.contains(.renderTarget)
+            self.allowsBindingCache = descriptor.allowsBindingCache && !descriptor.textureUsage.contains(.renderTarget)
             self.size = SizeInt(width: descriptor.width, height: descriptor.height)
             var wgpuUsage: WebGPU.GPUTextureUsage = []
 
@@ -103,6 +123,8 @@
             if !descriptor.textureUsage.contains(.renderTarget) {
                 wgpuUsage.insert(.textureBinding)
             }
+            let layerCount = descriptor.textureType == .textureCube ? 6
+                : (descriptor.textureType == .texture2DArray ? max(1, descriptor.arrayLength) : 1)
 
             #if WASM
                 let textureDesc = WebGPU.GPUTextureDescriptor(
@@ -111,7 +133,7 @@
                     size: WebGPU.GPUExtent3D(
                         width: UInt32(descriptor.width),
                         height: UInt32(descriptor.height),
-                        depthOrArrayLayers: descriptor.textureType == .textureCube ? 6 : 1
+                        depthOrArrayLayers: UInt32(layerCount)
                     ),
                     format: descriptor.pixelFormat.toWebGPU,
                     mipLevelCount: UInt32(max(1, descriptor.mipmapLevel)),
@@ -126,7 +148,7 @@
                     size: WebGPU.GPUExtent3D(
                         width: UInt32(descriptor.width),
                         height: UInt32(descriptor.height),
-                        depthOrArrayLayers: descriptor.textureType == .textureCube ? 6 : 1
+                        depthOrArrayLayers: UInt32(layerCount)
                     ),
                     format: descriptor.pixelFormat.toWebGPU,
                     mipLevelCount: UInt32(max(1, descriptor.mipmapLevel)),
@@ -181,8 +203,17 @@
             }
 
             self.texture = texture
-            if descriptor.textureType == .textureCube {
-                self.textureView = texture.createView(descriptor: WebGPU.GPUTextureViewDescriptor(dimension: .cube))
+            if descriptor.textureType == .textureCube || descriptor.textureType == .texture2DArray {
+                let dimension: WebGPU.GPUTextureViewDimension = descriptor.textureType == .textureCube ? .cube : ._2DArray
+                #if WASM
+                    // BridgeJS encodes absent fields as null rather than omitting them.
+                    self.textureView = texture.createView(descriptor: .init(
+                        format: descriptor.pixelFormat.toWebGPU, dimension: dimension,
+                        mipLevelCount: max(1, descriptor.mipmapLevel), arrayLayerCount: layerCount
+                    ))
+                #else
+                    self.textureView = texture.createView(descriptor: .init(dimension: dimension))
+                #endif
             } else {
                 self.textureView = texture.createView()
             }
@@ -344,7 +375,7 @@
             case .texture2D:
                 ._2D
             case .texture2DArray:
-                ._2D
+                ._2DArray
             case .texture2DMultisample:
                 ._2D
             case .texture2DMultisampleArray:

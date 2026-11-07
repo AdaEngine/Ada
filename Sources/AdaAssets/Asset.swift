@@ -34,6 +34,9 @@ import Foundation
 /// Also, your asset can support ``Codable`` behaviour and for this scenario, you should implement only ``init(from decoder: Decoder)`` and ``func encode(to encoder: Encoder)`` methods.
 /// Meta and other information will be available from userInfo. Use `Decoder.assetsDecodingContext`, `Decoder.assetMeta` and `Encoder.assetMeta` properties to get this info.
 public protocol Asset: Sendable {
+    /// Maximum encoded bytes accepted by the loader, before decoding. `nil` leaves the size unrestricted.
+    static var maximumEncodedBytes: Int? { get }
+
     /// When asset load from the disk, this method will be called.
     ///
     /// - Parameter data: Asset's data.
@@ -53,6 +56,8 @@ public protocol Asset: Sendable {
 }
 
 extension Asset {
+    public static var maximumEncodedBytes: Int? { nil }
+
     /// If resource was initiated from resource, than property will return path to that file relative source dir.
     /// - Warning: Do not override stored value.
     public var assetPath: String {

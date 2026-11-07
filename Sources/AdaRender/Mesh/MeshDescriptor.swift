@@ -277,11 +277,19 @@ public extension MeshDescriptor {
         return vertexDescriptor
     }
 
-    /// Get the size of the vertex buffer.
+    /// Gets the byte size of complete interleaved POSITION rows.
+    /// Missing attribute entries are zero-filled during upload; surplus entries are ignored.
     func getVertexBufferSize() -> Int {
-        buffers.elements.values.reduce(into: 0) { partialResult, buffer in
-            partialResult += buffer.buffer.elementSize * buffer.count
+        var stride = 0
+        for buffer in buffers.elements.values {
+            let (next, overflow) = stride.addingReportingOverflow(buffer.buffer.elementSize)
+            guard !overflow else {
+                return 0
+            }
+            stride = next
         }
+        let (size, overflow) = stride.multipliedReportingOverflow(by: buffers[.positions]?.count ?? 0)
+        return overflow ? 0 : size
     }
 
     /// Get the index buffer for the mesh.
@@ -303,6 +311,10 @@ public extension MeshDescriptor {
             length: vertexBufferSize,
             binding: binding
         )
+        guard vertexBufferSize > 0 else {
+            return vertexBuffer
+        }
+        let vertexCount = buffers[.positions]?.count ?? 0
         var vertexBufferBytes = [UInt8](repeating: 0, count: vertexBufferSize)
 
         // Calculate stride (per-vertex size) as the sum of all attribute element sizes
@@ -318,7 +330,13 @@ public extension MeshDescriptor {
                 let elementSize = buffer.buffer.elementSize
 
                 unsafe buffer.buffer.iterateByElements { index, pointer in
+                    guard index < vertexCount else {
+                        return
+                    }
                     let offset = index * stride + attributeOffset
+                    guard elementSize <= vertexBufferSize, offset <= vertexBufferSize - elementSize else {
+                        return
+                    }
                     unsafe baseAddress
                         .advanced(by: offset)
                         .copyMemory(from: pointer, byteCount: elementSize)

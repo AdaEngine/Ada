@@ -43,7 +43,8 @@ struct Render3DDebugViewSettingsTests {
         let replacing = DebugView3D.allCases.filter(\.replacesFinalImage)
         #expect(!replacing.contains(.none))
         #expect(!replacing.contains(.wireframe))
-        #expect(replacing.count == DebugView3D.allCases.count - 2)
+        #expect(!replacing.contains(.shadedWireframe))
+        #expect(replacing.count == DebugView3D.allCases.count - 3)
         // Views that read a dedicated target select their own shader branch; the three views the main pass
         // colors itself share the scene-color branch but select distinct main-pass modes.
         let mainPass = replacing.filter { $0.mainPassMode > 0 }
@@ -431,8 +432,7 @@ extension Render3DGPUTests {
             // exercised by Render3DGPUTests.Meshlets rather than these legacy sphere golden frames.
             for view in DebugView3D.allCases where view != .meshlets {
                 let image = view == .none ? beauty : try await scene.render(view)
-                // The WebGPU encoder has no polygon fill mode, so wireframe renders solid there.
-                let isNoOp = view == .none || (view == .wireframe && GoldenFrame.activeBackend == .webgpu)
+                let isNoOp = view == .none
                 if !isNoOp {
                     #expect(image.data != beauty.data, "\(view) must change the image")
                 }
@@ -579,6 +579,73 @@ extension Render3DGPUTests {
             let four = crowded.getPixel(x: 320, y: 440)
             #expect(four.green > 0.8 && four.blue < one.blue, "Four lights ramp to green: \(four)")
             #expect(four.green > one.green + 0.5)
+        }
+
+        @Test("Portable triangle edges render and Shaded restores the original frame", .enabled(if: Render3DDebugViewGPUTests.enabled))
+        func portableWireframePixels() async throws {
+            let scene = try await Self.makeScene()
+            let beauty = try await scene.render(.none)
+            let wire = try await scene.render(.wireframe)
+            let overlay = try await scene.render(.shadedWireframe)
+            var brightEdges = 0, darkCoverage = 0
+            for y in 0..<wire.height { for x in 0..<wire.width {
+                let pixel = wire.getPixel(x: x, y: y)
+                if pixel.red > 0.8 && pixel.green > 0.8 && pixel.blue > 0.8 { brightEdges += 1 }
+                // Readback is display encoded, and the scene retains its fog.
+                if pixel.red < 0.25 && pixel.green < 0.3 && pixel.blue < 0.35 { darkCoverage += 1 }
+            } }
+            #expect(brightEdges > 500, "The GPU must draw triangle edges, including WebGPU line lists")
+            #expect(darkCoverage > 1_000, "Wireframe retains depth-tested neutral surface coverage")
+            #expect(wire.data != beauty.data && overlay.data != beauty.data && overlay.data != wire.data)
+            let resources = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.getResource(Wireframe3DResources.self))
+            #expect(resources.allocatedBytes > 0 && resources.allocatedBytes <= 64 * 1_024 * 1_024)
+            let restored = try await scene.render(.none)
+            #expect(GoldenFrame.compare(beauty, restored, tolerance: GoldenFrame.activeTolerance).passes(GoldenFrame.activeTolerance))
+            try FileManager.default.createDirectory(at: GoldenFrame.outputDirectory, withIntermediateDirectories: true)
+            try wire.writePNG(to: GoldenFrame.outputDirectory.appendingPathComponent("mesh-terrain-wireframe.png"))
+            try overlay.writePNG(to: GoldenFrame.outputDirectory.appendingPathComponent("mesh-terrain-shaded-wireframe.png"))
+        }
+
+        @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
+        func wireframeOccludesEdgesBehindAnOpaqueSurface() async throws {
+            let scene = try await Self.makeScene()
+            for sphere in scene.sphereEntities { scene.app.main.removeEntity(sphere.id, recursively: true) }
+            try scene.configure { $0.ambientOcclusion.isEnabled = false }
+            let wall = scene.app.main.spawn("Occluder") {
+                Mesh3DComponent(mesh: Mesh.generateCube(size: [100, 100, 0.5], renderDevice: scene.device),
+                    materials: [PBRMaterial()], castShadows: false, receiveShadows: false)
+                Transform(position: [0, 0.5, 150])
+            }
+            let baseline = try await scene.render(.shadedWireframe)
+            let hidden = scene.app.main.spawn("Occluded edges") {
+                Mesh3DComponent(mesh: Mesh.generateCube(size: [45, 45, 0.25], renderDevice: scene.device),
+                    materials: [PBRMaterial()], castShadows: false, receiveShadows: false)
+                Transform(position: [0, 0.5, 150.8])
+            }
+            let occluded = try await scene.render(.shadedWireframe)
+            scene.app.main.removeEntity(wall.id, recursively: true)
+            let revealed = try await scene.render(.shadedWireframe)
+            scene.app.main.removeEntity(hidden.id, recursively: true)
+            let empty = try await scene.render(.shadedWireframe)
+            func changedPixels(from first: Image, to second: Image) -> Int {
+                var count = 0
+                for y in (Self.height / 2 - 85)..<(Self.height / 2 + 85) {
+                    for x in (Self.width / 2 - 85)..<(Self.width / 2 + 85) {
+                        let a = first.getPixel(x: x, y: y), b = second.getPixel(x: x, y: y)
+                        if max(abs(a.red - b.red), abs(a.green - b.green), abs(a.blue - b.blue)) > 0.12 { count += 1 }
+                    }
+                }
+                return count
+            }
+            let leaked = changedPixels(from: baseline, to: occluded)
+            if leaked > 0 {
+                try FileManager.default.createDirectory(at: GoldenFrame.outputDirectory, withIntermediateDirectories: true)
+                try baseline.writePNG(to: GoldenFrame.outputDirectory.appendingPathComponent("wireframe-depth-baseline.png"))
+                try occluded.writePNG(to: GoldenFrame.outputDirectory.appendingPathComponent("wireframe-depth-occluded.png"))
+                try revealed.writePNG(to: GoldenFrame.outputDirectory.appendingPathComponent("wireframe-depth-revealed.png"))
+            }
+            #expect(leaked == 0, "Hidden lines must not overtake the occluder at distance")
+            #expect(changedPixels(from: empty, to: revealed) > 1_000, "The hidden mesh projects into the measured pixels")
         }
 
         @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))

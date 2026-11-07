@@ -112,7 +112,12 @@ actor MovieSequenceWriter {
         recording.status = status
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(recording).write(to: manifestURL, options: .atomic)
+        let manifest = try encoder.encode(recording)
+        #if WASM
+            try manifest.write(to: manifestURL)
+        #else
+            try manifest.write(to: manifestURL, options: .atomic)
+        #endif
         return recording
     }
 

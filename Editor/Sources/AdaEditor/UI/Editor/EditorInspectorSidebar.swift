@@ -23,17 +23,6 @@ struct EditorInspectorSidebar: View {
                 if showsTitle { adaEditorInspectorTitle(theme: theme) }
                 ScrollView(showsIndicators: true) {
                     VStack(alignment: .leading, spacing: 0) {
-                        if !viewModel.isInspectingPlayMode, viewModel.runtimeSelection == nil,
-                           let terrain = viewModel.terrainEditing, terrain.isEnabled {
-                            inspectorSection("Terrain Brush") {
-                                EditorTerrainPanel(
-                                    state: terrain,
-                                    onCreate: viewModel.createTerrainRequested,
-                                    onChange: viewModel.terrainSettingsChanged
-                                )
-                            }
-                            .accessibilityIdentifier("AdaEditor.Inspector.Terrain")
-                        }
                         if let runtimeSelection = viewModel.runtimeSelection {
                             inspectorSection(L10n.text("PLAY MODE · \(runtimeSelection.name.uppercased())")) {
                                 Text(L10n.text("Entity #\(runtimeSelection.id)"))
@@ -73,7 +62,14 @@ struct EditorInspectorSidebar: View {
                             }
                             inspectorSection("COMPONENTS") {
                                 ForEach(selectedEntity.components, id: \.typeName) { component in
-                                    componentEditor(component)
+                                    if component.typeName == String(reflecting: MeshTerrain3DBinding.self) {
+                                        if let state = viewModel.terrainEditing {
+                                            EditorMeshTerrainDetachButton(state: state, accessibilityID: "AdaEditor.Inspector.DetachTerrain",
+                                                action: viewModel.detachTerrainRequested)
+                                        }
+                                    } else if component.typeName != String(reflecting: MeshTerrain3DIdentity.self) {
+                                        componentEditor(component)
+                                    }
                                 }
                                 addComponentPicker
                             }
@@ -160,6 +156,11 @@ struct EditorInspectorSidebar: View {
             }
 
             if !isCollapsed {
+                if viewModel.requiresTerrainTransformSubmission(component.typeName) {
+                    Text(L10n.tr(viewModel.terrainEditing?.sourceFailure ?? "Press Enter to apply the transform."))
+                        .font(.system(size: 11))
+                        .foregroundColor(viewModel.terrainEditing?.sourceFailure == nil ? theme.editorColors.muted : .red)
+                }
                 ForEach(EditorInspectorFieldLayout.rows(fields: fields.map(\.field), collapsed: collapsedFieldGroups[component.typeName] ?? [])) { row in
                     if let index = row.fieldIndex {
                         componentFieldRow(fields[index])
@@ -225,14 +226,17 @@ struct EditorInspectorSidebar: View {
             } else if field.typeName == EditorBuiltInComponentType.spineSource, ["animation", "skin"].contains(field.field.key) {
                 spineChoiceField(field)
             } else {
+                let submitsTerrainTransform = viewModel.requiresTerrainTransformSubmission(field.typeName)
                 fieldControl(
                     fieldID: "\(field.typeName).\(field.field.key)",
                     value: field.value,
                     kind: field.field.kind,
                     isEditable: field.field.isEditable,
                     scalarBinding: viewModel.componentFieldBinding(typeName: field.typeName, field: field.field),
-                    axisBinding: { viewModel.componentVectorAxisBinding(typeName: field.typeName, field: field.field, axisIndex: $0) }
+                    axisBinding: { viewModel.componentVectorAxisBinding(typeName: field.typeName, field: field.field, axisIndex: $0) },
+                    onVectorSubmit: submitsTerrainTransform ? { viewModel.submitTerrainTransform(field.field) } : nil
                 )
+                .disabled(submitsTerrainTransform && viewModel.terrainEditing?.isSourceBusy == true)
             }
         }
     }
@@ -251,10 +255,11 @@ struct EditorInspectorSidebar: View {
         kind: EditorComponentFieldKind,
         isEditable: Bool,
         scalarBinding: Binding<String>,
-        axisBinding: @escaping (Int) -> Binding<String>
+        axisBinding: @escaping (Int) -> Binding<String>,
+        onVectorSubmit: (() -> Void)? = nil
     ) -> some View {
         if let axes = axisLabels(for: kind) {
-            vectorField(fieldID: fieldID, axes: axes, value: value, isEditable: isEditable, axisBinding: axisBinding)
+            vectorField(fieldID: fieldID, axes: axes, value: value, isEditable: isEditable, axisBinding: axisBinding, onSubmit: onVectorSubmit)
         } else if case .bool = kind, isEditable {
             boolField(text: scalarBinding)
                 .accessibilityIdentifier("AdaEditor.Inspector.Bool.\(fieldID)")
@@ -279,7 +284,8 @@ struct EditorInspectorSidebar: View {
         axes: [String],
         value: String,
         isEditable: Bool,
-        axisBinding: @escaping (Int) -> Binding<String>
+        axisBinding: @escaping (Int) -> Binding<String>,
+        onSubmit: (() -> Void)?
     ) -> some View {
         HStack(spacing: 4) {
             ForEach(Array(axes.indices), id: \.self) { index in
@@ -287,7 +293,8 @@ struct EditorInspectorSidebar: View {
                     label: axes[index],
                     value: vectorDisplayValue(from: value, index: index),
                     isEditable: isEditable,
-                    text: axisBinding(index)
+                    text: axisBinding(index),
+                    onSubmit: onSubmit
                 )
                 .accessibilityIdentifier("AdaEditor.Inspector.Axis.\(fieldID).\(axes[index])")
             }
@@ -296,7 +303,7 @@ struct EditorInspectorSidebar: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func vectorAxisField(label: String, value: String, isEditable: Bool, text: Binding<String>) -> some View {
+    private func vectorAxisField(label: String, value: String, isEditable: Bool, text: Binding<String>, onSubmit: (() -> Void)?) -> some View {
         HStack(spacing: 0) {
             Text(L10n.tr(label))
                 .font(.system(size: 10, weight: .bold))
@@ -304,7 +311,7 @@ struct EditorInspectorSidebar: View {
                 .frame(width: 24, height: 32)
                 .background(RoundedRectangleShape(cornerRadius: 5).fill(axisColor(for: label)))
             if isEditable {
-                TextField("", text: text)
+                TextField("", text: text, onSubmit: onSubmit)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(theme.editorColors.text)
                     .multilineTextAlignment(.leading)

@@ -5,7 +5,9 @@
 //  Created by Codex on 7/6/26.
 //
 
+import Foundation
 import Math
+import Synchronization
 
 /// A 3D physics shape description.
 public final class Shape3DResource: Codable, Sendable {
@@ -52,18 +54,26 @@ public final class Shape3DResource: Codable, Sendable {
     }
 
     let fixture: Fixture
+    private let preparedMesh = Mutex<NativeTriangleMesh3D?>(nil)
+    /// Immutable body-local bounds, cached without re-reading triangle vertices during residency planning.
+    public let localBounds: AABB?
 
     init(fixture: Fixture) {
         self.fixture = fixture
+        self.localBounds = Self.calculateBounds(fixture)
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let fixture = try container.decode(Fixture.self, forKey: .fixture)
+        let bounds: AABB?
         if case let .triangleMesh(mesh) = fixture {
-            _ = try Self.generateTriangleMesh(vertices: mesh.vertices, indices: mesh.indices)
+            bounds = try Self.generateTriangleMesh(vertices: mesh.vertices, indices: mesh.indices).localBounds
+        } else {
+            bounds = Self.calculateBounds(fixture)
         }
         self.fixture = fixture
+        self.localBounds = bounds
     }
 
     private enum CodingKeys: CodingKey { case fixture }
@@ -101,9 +111,37 @@ public final class Shape3DResource: Codable, Sendable {
         for index in stride(from: 0, to: indices.count, by: 3) {
             let first = vertices[Int(indices[index])]
             let cross = (vertices[Int(indices[index + 1])] - first).cross(vertices[Int(indices[index + 2])] - first)
-            guard cross.length.isFinite, cross.length > 0.000001 else { throw .degenerateTriangle }
+            // Match the native normalizer's representable range rather than imposing
+            // a world-unit area cutoff: isosurface intersections legitimately form thin faces.
+            let squaredArea = cross.dot(cross)
+            guard squaredArea.isFinite, squaredArea > 1_000 * Float.leastNormalMagnitude else { throw .degenerateTriangle }
         }
         return Shape3DResource(fixture: .triangleMesh(TriangleMeshShape(vertices: vertices, indices: indices)))
+    }
+
+    /// Prepares immutable native triangle data without adding a body to the physics world.
+    /// Subsequent bodies reuse this resource; preparation failures leave no active collision.
+    @_spi(Internal)
+    public func prepareStaticCollision(metrics: PhysicsCollisionPreparationMetrics? = nil) throws(StaticCollisionPreparationError) {
+        guard case .triangleMesh = fixture else {
+            return
+        }
+        guard unsafe nativeTriangleMesh(metrics: metrics) != nil else { throw .nativeMeshCreationFailed }
+    }
+
+    @unsafe
+    func nativeTriangleMesh(metrics: PhysicsCollisionPreparationMetrics?) -> NativeTriangleMesh3D? {
+        guard case let .triangleMesh(mesh) = fixture else {
+            return nil
+        }
+        return preparedMesh.withLock { value in
+            if let value {
+                return value
+            }
+            let native = unsafe NativeTriangleMesh3D(mesh, metrics: metrics)
+            value = native
+            return native
+        }
     }
 
     /// Creates a sphere or box shape offset from the body origin. Triangle meshes are returned unchanged.
@@ -131,4 +169,11 @@ extension Shape3DResource: Hashable, Equatable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(self.fixture)
     }
+}
+
+@_spi(Internal)
+public enum StaticCollisionPreparationError: LocalizedError {
+    case nativeMeshCreationFailed
+
+    public var errorDescription: String? { "Native triangle collision preparation failed" }
 }

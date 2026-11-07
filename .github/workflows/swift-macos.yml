@@ -29,3 +29,8 @@ jobs:
 
         - name: Test
           run: swift test --parallel
+
+        - name: Test Mesh Terrain authoring kernel
+          env:
+            ADAENGINE_HEADLESS: "1"
+          run: swift test --traits MeshTerrainAuthoring --parallel --filter "MeshTerrain|TriangleBoolean|TriangleIndexEdges"

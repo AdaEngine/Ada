@@ -28,6 +28,24 @@ public struct PhysicsBody3DComponent: Codable {
         self.runtimeBody?.getWorldCenter() ?? .zero
     }
 
+    /// Bounds of the current native simulation body, or nil before its first physics synchronization.
+    public var worldBounds: AABB? { runtimeBody?.getWorldBounds() }
+
+    /// Native mode when initialized; before synchronization, returns the authored mode.
+    public var currentSimulationMode: PhysicsBodyMode { runtimeBody?.getMode() ?? mode }
+
+    /// Union of immutable shape bounds in body-local coordinates. Empty bodies have no bounds.
+    public var localBounds: AABB? {
+        var result: AABB?
+        for shape in shapes {
+            guard let bounds = shape.localBounds else { continue }
+            if let previous = result {
+                result = AABB(min: min(previous.min, bounds.min), max: max(previous.max, bounds.max))
+            } else { result = bounds }
+        }
+        return result
+    }
+
     /// Is this body a sensor?
     public let isTrigger: Bool
 
@@ -96,6 +114,13 @@ public struct PhysicsBody3DComponent: Codable {
         self.massProperties = PhysicsMassProperties(mass: mass, inertia: .zero)
         self.material = material ?? .default
         self.isTrigger = isTrigger
+    }
+
+    /// Copies authored settings and immutable shapes without retaining a native simulation body.
+    public func authoredCopy() -> Self {
+        var copy = self
+        copy.runtimeBody = nil
+        return copy
     }
 
     // MARK: - Codable

@@ -38,6 +38,7 @@ public struct Physics3DPlugin: Plugin {
             }()
 
         PhysicsBody3DComponent.registerComponent()
+        if app.getResource(PhysicsSimulationGate3D.self) == nil { app.insertResource(PhysicsSimulationGate3D()) }
         PhysicsBody3DInitialized.registerComponent()
         CharacterController3DComponent.registerComponent()
         CameraCollision3DComponent.registerComponent()

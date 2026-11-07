@@ -104,7 +104,9 @@ public final class AdaScriptNativePlugin: Plugin, @unchecked Sendable {
     @MainActor
     private func installNetwork(in app: borrowing AppWorlds) throws {
         let replicated = metadata.dataSchemas.filter { $0.replication != nil }
-        guard !metadata.networkCommands.isEmpty || !replicated.isEmpty else { return }
+        guard !metadata.networkCommands.isEmpty || !replicated.isEmpty else {
+            return
+        }
         guard app.getResource(MultiplayerRegistry.self) != nil else {
             throw AdaScriptError.invalidManifest("Native networking requires MultiplayerPlugin")
         }
@@ -200,6 +202,7 @@ private struct NativeECSSystem: System {
             switch $0 {
             case .before(let id): .before(Self.identifier(plugin: plugin, system: id))
             case .after(let id): .after(Self.identifier(plugin: plugin, system: id))
+            case .afterIfPresent(let id): .afterIfPresent(Self.identifier(plugin: plugin, system: id))
             }
         } ?? []
     }

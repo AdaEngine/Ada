@@ -166,6 +166,7 @@ public struct Core3DPlugin: Plugin {
             .insertResource(ScreenQuality3DPipelines(device: renderDevice))
             .insertResource(ScreenQuality3DScratch())
             .insertResource(DebugView3DPipelines(device: renderDevice))
+            .insertResource(Wireframe3DResources())
             .insertResource(Bloom3DViews(device: renderDevice))
             .insertResource(AutoExposure3DViews(device: renderDevice))
             .insertResource(DepthOfField3DViews(device: renderDevice))

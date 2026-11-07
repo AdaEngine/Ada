@@ -14,6 +14,9 @@ import Math
 public final class PhysicsWorld3D: Codable, @unchecked Sendable {
     let worldId: b3WorldId
 
+    /// Actual native collision preparation, counted separately from simulation-step timings.
+    public let collisionPreparationMetrics = PhysicsCollisionPreparationMetrics()
+
     private var configuredSubStepCount: Int32
 
     /// Number of workers used by the Box3D scheduler.

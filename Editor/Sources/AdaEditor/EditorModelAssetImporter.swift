@@ -16,7 +16,7 @@ enum EditorModelAssetImporter {
             return target
         }
         let document = try JSONDecoder().decode(Document.self, from: jsonData(at: source))
-        let uris = ((document.buffers ?? []) + (document.images ?? [])).compactMap(\.uri).filter { !$0.hasPrefix("data:") }
+        let uris = externalURIs(in: document)
         guard !uris.isEmpty else {
             let target = uniqueURL(source.lastPathComponent, in: destination, fileManager: fileManager)
             try fileManager.copyItem(at: source, to: target)
@@ -50,6 +50,21 @@ enum EditorModelAssetImporter {
         return target.appendingPathComponent(source.lastPathComponent)
     }
 
+    /// Terrain prototypes copy a single immutable file, so external URIs are not portable.
+    static func requireSelfContainedGLB(_ data: Data) throws {
+        let count = try jsonChunkLength(data.prefix(20))
+        guard count <= data.count - 20 else { throw Failure(message: "Invalid GLB JSON chunk.") }
+        let json = data.dropFirst(20).prefix(count)
+        let document = try JSONDecoder().decode(Document.self, from: json)
+        guard externalURIs(in: document).isEmpty else {
+            throw Failure(message: "Terrain meshes must use a self-contained GLB or VOX file.")
+        }
+    }
+
+    private static func externalURIs(in document: Document) -> [String] {
+        ((document.buffers ?? []) + (document.images ?? [])).compactMap(\.uri).filter { !$0.hasPrefix("data:") }
+    }
+
     private static func uniqueURL(_ name: String, in destination: URL, fileManager: FileManager) -> URL {
         let input = URL(fileURLWithPath: name)
         var candidate = destination.appendingPathComponent(name)
@@ -68,14 +83,21 @@ enum EditorModelAssetImporter {
         }
         let file = try FileHandle(forReadingFrom: url)
         defer { try? file.close() }
-        guard let header = try file.read(upToCount: 20), header.count == 20 else { throw Failure(message: "Invalid GLB header.") }
-        func uint32(_ offset: Int) -> UInt32 {
-            (0..<4).reduce(UInt32(0)) { $0 | UInt32(header[offset + $1]) << (8 * $1) }
-        }
-        let count = Int(uint32(12))
-        guard uint32(0) == 0x46546C67, uint32(4) == 2, uint32(16) == 0x4E4F534A, count > 0, count <= 16 * 1024 * 1024,
-            let json = try file.read(upToCount: count), json.count == count else { throw Failure(message: "Invalid GLB JSON chunk.") }
+        let count = try jsonChunkLength(file.read(upToCount: 20) ?? Data())
+        guard let json = try file.read(upToCount: count), json.count == count else { throw Failure(message: "Invalid GLB JSON chunk.") }
         return json
+    }
+
+    private static func jsonChunkLength(_ header: Data) throws -> Int {
+        guard header.count == 20 else { throw Failure(message: "Invalid GLB header.") }
+        func uint32(_ offset: Int) -> UInt32 {
+            (0..<4).reduce(UInt32(0)) { $0 | UInt32(header[header.startIndex + offset + $1]) << (8 * $1) }
+        }
+        let count = uint32(12)
+        guard uint32(0) == 0x46546C67, uint32(4) == 2, uint32(16) == 0x4E4F534A, (1...16 * 1_024 * 1_024).contains(count) else {
+            throw Failure(message: "Invalid GLB JSON chunk.")
+        }
+        return Int(count)
     }
 
     private struct Failure: LocalizedError {

@@ -53,7 +53,7 @@ enum WGSLReflection {
                 let resource = ShaderResource.ImageSampler(
                     name: name,
                     binding: binding,
-                    textureType: .texture2D,
+                    textureType: textureType(for: type),
                     descriptorSet: group,
                     arraySize: 1,
                     shaderStage: stageFlag,
@@ -73,6 +73,17 @@ enum WGSLReflection {
         }
 
         return reflection
+    }
+
+    private static func textureType(for declaration: String) -> Texture.TextureType {
+        let name = declaration.prefix { !$0.isWhitespace && $0 != "<" }
+        return switch name {
+        case "texture_1d": .texture1D
+        case "texture_2d_array": .texture2DArray
+        case "texture_3d": .texture3D
+        case "texture_cube": .textureCube
+        default: .texture2D
+        }
     }
 
     /// Dawn's automatic layout includes only globals statically accessed by this entry point.

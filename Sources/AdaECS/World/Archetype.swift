@@ -34,6 +34,11 @@ public final class Entities: @unchecked Sendable {
     private let currentId = ManagedAtomic<Int>(1)
     let lock = NSRecursiveLock()
 
+    /// Called only while decoding a new world, before its entities become available to systems.
+    func reserveRestoredIDs(through identifier: Entity.ID) {
+        currentId.store(identifier + 1, ordering: .relaxed)
+    }
+
     func allocate(with name: String) -> Entity {
         let newId = currentId.loadThenWrappingIncrement(ordering: .relaxed)
         return Entity(name: name, id: newId)
@@ -146,11 +151,6 @@ public struct ComponentLayout: Hashable, Sendable {
     public struct Entry: @unchecked Sendable {
         public let componentType: any Component.Type
         public let identifier: ComponentId
-
-        init(componentType: any Component.Type, identifier: ComponentId) {
-            self.componentType = componentType
-            self.identifier = identifier
-        }
     }
 
     public private(set) var components: [Entry]

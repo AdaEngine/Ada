@@ -14,6 +14,7 @@ enum EditorMeshPicking {
         let mesh: Mesh?
         let skin: [Transform3D]
         let usesBounds: Bool
+        var isTerrain = false
     }
 
     static func pick(ray: Ray, world: World, authoredEntities: [String: Entity.ID], editorIDs: [Entity.ID: String], cameraID: Entity.ID?) -> String? {
@@ -23,6 +24,31 @@ enum EditorMeshPicking {
             guard entity.id != cameraID, let editorID = editorIDs[entity.id],
                 let matrix = EditorPicking.worldMatrix(for: entity, requiringVisible: true),
                 let localRay = EditorPicking.localRay(ray, matrix: matrix) else { continue }
+            if entity.components[Terrain3DSource.self] != nil {
+                if let queries = entity.components[MeshTerrain3DSourceSurface.self]?.queries ?? entity.components[Terrain3DSourceSurface.self]?.queries,
+                    let distance = terrainDistance(ray: localRay, queries: queries) {
+                    candidates.append(Candidate(editorID: editorID, ray: localRay, minimumDistance: distance, mesh: nil, skin: [], usesBounds: true, isTerrain: true))
+                }
+                // Generated chunks have no editor IDs; the authored source owns their query snapshot.
+                continue
+            }
+            if let terrain = entity.components[Terrain3D.self] {
+                // The authored terrain owns the surface; its generated tile children have no editor IDs.
+                if let hit = EditorTerrainBrush.hit(ray: localRay, terrain: terrain) {
+                    candidates.append(
+                        Candidate(
+                            editorID: editorID,
+                            ray: localRay,
+                            minimumDistance: hit.distance,
+                            mesh: nil,
+                            skin: [],
+                            usesBounds: true,
+                            isTerrain: true
+                        )
+                    )
+                }
+                continue
+            }
             if let component = entity.components[Mesh3DComponent.self] {
                 let mesh = component.mesh
                 let skin = entity.components[SkinnedMesh3DComponent.self]?.matrices ?? []
@@ -41,8 +67,16 @@ enum EditorMeshPicking {
                 // An unbounded skin still needs a triangle test; it cannot be rejected using rest-pose bounds.
                 let minimumDistance = bounds.flatMap { EditorPicking.rayAABBIntersectionDistance(ray: localRay, aabb: $0) }
                 guard bounds == nil || minimumDistance != nil else { continue }
-                candidates.append(Candidate(editorID: editorID, ray: localRay, minimumDistance: minimumDistance ?? 0,
-                                            mesh: mesh, skin: skin, usesBounds: (isMorphed && bounds != nil) || !hasTriangles))
+                candidates.append(
+                    Candidate(
+                        editorID: editorID,
+                        ray: localRay,
+                        minimumDistance: minimumDistance ?? 0,
+                        mesh: mesh,
+                        skin: skin,
+                        usesBounds: (isMorphed && bounds != nil) || !hasTriangles
+                    )
+                )
             } else {
                 // Imported roots and transform-only generated groups have no selectable surface.
                 // Keep the small bounds fallback for authored cameras, lights and empty entities.
@@ -53,6 +87,7 @@ enum EditorMeshPicking {
         }
         candidates.sort { $0.minimumDistance < $1.minimumDistance }
         var selectedID: String?
+        var selectedIsTerrain = false
         var nearest = Float.greatestFiniteMagnitude
         for candidate in candidates {
             if candidate.minimumDistance > nearest { break }
@@ -63,12 +98,32 @@ enum EditorMeshPicking {
                 // Morph deltas currently live in a GPU texture. Preserve conservative picking for those poses.
                 distance = candidate.minimumDistance
             }
-            if let distance, distance < nearest {
+            // The retained source owns selection at coincident joined triangles,
+            // so the artist can pick and move it after its draw is replaced.
+            if let distance, distance < nearest || (distance == nearest && selectedIsTerrain && !candidate.isTerrain) {
                 nearest = distance
                 selectedID = candidate.editorID
+                selectedIsTerrain = candidate.isTerrain
             }
         }
         return selectedID
+    }
+
+    private static func terrainDistance(ray: Ray, queries: TerrainSurfaceQueries) -> Float? {
+        guard let hit = try? queries.raycast(ray) else {
+            return nil
+        }
+        let direction = ray.direction
+        let length = (Double(direction.x) * Double(direction.x) + Double(direction.y) * Double(direction.y) + Double(direction.z) * Double(direction.z)).squareRoot()
+        guard length.isFinite, length > 0 else {
+            return nil
+        }
+        // Source queries normalize local rays; other candidates retain the original world-ray parameter.
+        let distance = hit.preciseDistance / length
+        guard distance.isFinite, distance >= 0, distance <= Double(Float.greatestFiniteMagnitude) else {
+            return nil
+        }
+        return Float(distance)
     }
 
     private static func intersectionDistance(ray: Ray, mesh: Mesh, skin: [Transform3D], maximumDistance: Float) -> Float? {
@@ -121,14 +176,20 @@ enum EditorMeshPicking {
         let cross = ray.direction.cross(secondEdge)
         let determinant = edge.dot(cross)
         // A relative tolerance works for both metre-sized and very small imported geometry.
-        guard determinant.isFinite, abs(determinant) > Float.ulpOfOne * Math.sqrt(edge.squaredLength * cross.squaredLength) else { return nil }
+        guard determinant.isFinite, abs(determinant) > Float.ulpOfOne * Math.sqrt(edge.squaredLength * cross.squaredLength) else {
+            return nil
+        }
         let inverse = 1 / determinant
         let offset = ray.origin - a
         let u = offset.dot(cross) * inverse
-        guard u >= 0, u <= 1 else { return nil }
+        guard u >= 0, u <= 1 else {
+            return nil
+        }
         let q = offset.cross(edge)
         let v = ray.direction.dot(q) * inverse
-        guard v >= 0, u + v <= 1 else { return nil }
+        guard v >= 0, u + v <= 1 else {
+            return nil
+        }
         let distance = secondEdge.dot(q) * inverse
         return distance.isFinite && distance >= 0 ? distance : nil
     }

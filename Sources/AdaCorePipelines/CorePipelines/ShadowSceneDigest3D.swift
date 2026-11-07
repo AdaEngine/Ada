@@ -14,6 +14,13 @@ enum ShadowSceneDigest3D {
                 return nil
             }
             digest.combine(sources[index].transform)
+            digest.combine(UInt64(sources[index].instances?.count ?? 1))
+            digest.combine(sources[index].instances == nil ? UInt64(0) : 1)
+            for instance in sources[index].instances ?? [] {
+                digest.combine(instance.id)
+                digest.combine(instance.transform)
+                digest.combine(instance.color)
+            }
             digest.combine(UInt64(sources[index].forceVisible ? 1 : 0))
             for model in sources[index].mesh.models {
                 for part in model.parts {

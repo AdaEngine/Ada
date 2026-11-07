@@ -92,7 +92,7 @@ public struct Meshlet3DState: Resource {
     }
     private var entries: [Entity.ID: Entry] = [:]
     private struct CPUIndexGeometry {
-        let source: any IndexBuffer
+        weak var source: (any IndexBuffer)?
         let indices: any IndexBuffer
     }
     private var cpuIndices: [UUID: CPUIndexGeometry] = [:]
@@ -104,6 +104,9 @@ public struct Meshlet3DState: Resource {
     mutating func recordMapCut(_ keys: Set<MeshletLODItemKey>, view: Entity.ID) { entries[view]?.acceptedLOD = keys }
     mutating func retain(_ views: [Entity.ID]) {
         for key in entries.keys where !views.contains(key) { entries.removeValue(forKey: key) }
+        for key in cpuIndices.keys where cpuIndices[key]?.source == nil {
+            if let entry = cpuIndices.removeValue(forKey: key) { cpuIndexBytes -= entry.indices.length }
+        }
     }
 
     mutating func prepare(
@@ -115,19 +118,23 @@ public struct Meshlet3DState: Resource {
         count.mode = map ? "map" : settings.meshlets.rawValue
         entries[view]?.output = nil
         entries[view]?.acceptedLOD = []
-        guard settings.meshlets != .disabled || map else { return count }
         if entries[view] == nil { entries[view] = Entry() }
         var acceptedLOD: Set<MeshletLODItemKey> = []
         defer { entries[view]?.acceptedLOD = acceptedLOD }
         var selected: [Int] = []
         var draws: [MeshletVisibilityDraw] = []
         let frustum = MeshVisibilityFrustum3D(viewProjection: projection)
-        let lodEnabled = settings.meshletLODPixelError.isFinite && settings.meshletLODPixelError > 0 && viewport.width > 0 && viewport.height > 0
         for index in items.indices {
             let item = items[index]
             let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
+            let automatic = settings.lod && part.meshletLOD?.automaticPixelError != nil
+            let mode: MeshletVisibilityMode3D = automatic ? .cpuReference : settings.meshlets
+            guard mode != .disabled || map else { continue }
+            if automatic, settings.meshlets == .disabled, !map { count.mode = mode.rawValue }
+            let pixelError = lodPixelError(for: part, settings: settings)
+            let lodEnabled = pixelError.isFinite && pixelError > 0 && viewport.width > 0 && viewport.height > 0
             count.sourceTriangles += part.indexCount / 3 * (item.batchRange?.count ?? 0)
-            let reason = settings.gpuOcclusion && !map ? "legacyOcclusion" : Meshlet3DEligibility.fallbackReason(item, allowLOD: lodEnabled)
+            let reason = settings.gpuOcclusion && !map && !automatic ? "legacyOcclusion" : Meshlet3DEligibility.fallbackReason(item, allowLOD: lodEnabled)
             if let reason {
                 count.fallbackItems += 1
                 count.fallbackTriangles += part.indexCount / 3 * (item.batchRange?.count ?? 0)
@@ -137,7 +144,7 @@ public struct Meshlet3DState: Resource {
             let preparedHierarchy = lodEnabled ? part.meshletLOD : nil
             var hierarchy = preparedHierarchy.flatMap { $0.nodes.count > $0.roots.count ? $0 : nil }
             var preparationFailure: String?
-            if let current = hierarchy, requiresMotionGuides || settings.meshlets == .cpuReference,
+            if let current = hierarchy, requiresMotionGuides || mode == .cpuReference,
                 prepareIndices(current, source: part.indexBuffer, device: device) == nil {
                 hierarchy = nil
                 preparationFailure = requiresMotionGuides ? "temporalGuideBudget" : "cpuLODBudget"
@@ -158,9 +165,9 @@ public struct Meshlet3DState: Resource {
             }
             if let hierarchy { count.lodNodes += hierarchy.nodes.count }
             var selectedNodes: [Int] = []
-            if let hierarchy, map || settings.meshlets == .cpuReference {
+            if let hierarchy, map || mode == .cpuReference {
                 selectedNodes = MeshletLODSelection.selectedNodes(geometry: hierarchy, transform: item.worldTransform,
-                    viewProjection: lodProjection ?? projection, viewport: viewport, pixelError: settings.meshletLODPixelError)
+                    viewProjection: lodProjection ?? projection, viewport: viewport, pixelError: pixelError)
                 count.selectedLODNodes += selectedNodes.count
                 for id in selectedNodes {
                     let node = hierarchy.nodes[id]
@@ -173,13 +180,13 @@ public struct Meshlet3DState: Resource {
             // Partition display has its own cached geometry. Do not run unused compute/compaction work.
             if map { continue }
             let simplifiedHierarchy = hierarchy.map { $0.nodes.count > $0.roots.count } == true
-            if settings.meshlets == .gpu, !simplifiedHierarchy,
+            if mode == .gpu, !simplifiedHierarchy,
                 !settings.frustumCulling || baseGeometry.bounds.map({ frustum.fullyContains(MeshVisibility3DMath.transformed($0, by: item.worldTransform)) }) == true {
                 count.fullyVisibleItems += 1
                 count.fastPathTriangles += part.indexCount / 3
                 continue
             }
-            if settings.meshlets == .cpuReference {
+            if mode == .cpuReference {
                 var ranges: [Range<Int>] = []
                 var visibleMeshlets = 0
                 var submittedTriangles = 0
@@ -204,13 +211,13 @@ public struct Meshlet3DState: Resource {
                 }
                 count.cpuVisibleMeshlets += visibleMeshlets
                 count.cpuSubmittedTriangles += submittedTriangles
-                items[index].meshletOverride = MeshletDrawOverride(indices: indexBuffer, ranges: ranges)
+                items[index].meshletOverride = MeshletDrawOverride(indices: indexBuffer, ranges: ranges, sourceIndices: hierarchy?.geometry.indices ?? part.meshDescriptor.indicies)
                 if let hierarchy { acceptedLOD.insert(MeshletLODItemKey(item: item, hierarchy: hierarchy)) }
             } else {
                 selected.append(index)
                 draws.append(MeshletVisibilityDraw(geometry: baseGeometry, sourceIndexBuffer: part.indexBuffer,
                     transform: item.worldTransform, forceVisible: !settings.frustumCulling,
-                    lod: simplifiedHierarchy ? hierarchy : nil, lodPixelError: settings.meshletLODPixelError,
+                    lod: simplifiedHierarchy ? hierarchy : nil, lodPixelError: pixelError,
                     viewport: viewport, lodViewProjection: lodProjection ?? projection))
             }
         }
@@ -251,19 +258,19 @@ public struct Meshlet3DState: Resource {
         let motionStart = PerformanceStallProbe.begin()
         var rangeCount = 0
         defer { PerformanceStallProbe.end("Meshlets.PrepareMotionCPU", since: motionStart, count: rangeCount) }
-        guard (settings.meshlets != .disabled || map), (!settings.gpuOcclusion || map),
-            settings.meshletLODPixelError.isFinite, settings.meshletLODPixelError > 0 else { return (0, 0) }
-        var count = 0, triangles = 0
         let accepted = entries[view]?.acceptedLOD ?? []
+        guard !accepted.isEmpty else { return (0, 0) }
+        var count = 0, triangles = 0
         for index in items.indices {
             let item = items[index]
             guard Meshlet3DEligibility.fallbackReason(item, allowLOD: true) == nil else { continue }
             let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
-            guard let hierarchy = part.meshletLOD, hierarchy.nodes.count > hierarchy.roots.count,
+            let pixelError = lodPixelError(for: part, settings: settings)
+            guard pixelError.isFinite, pixelError > 0, let hierarchy = part.meshletLOD, hierarchy.nodes.count > hierarchy.roots.count,
                 accepted.contains(MeshletLODItemKey(item: item, hierarchy: hierarchy)),
                 let buffer = cpuIndices[hierarchy.id]?.indices else { continue }
             let selected = MeshletLODSelection.selectedNodes(geometry: hierarchy, transform: item.worldTransform,
-                viewProjection: projection, viewport: viewport, pixelError: settings.meshletLODPixelError)
+                viewProjection: projection, viewport: viewport, pixelError: pixelError)
             var ranges: [Range<Int>] = []
             for id in selected {
                 let node = hierarchy.nodes[id]
@@ -279,6 +286,11 @@ public struct Meshlet3DState: Resource {
             count += 1
         }
         return (count, triangles)
+    }
+
+    private func lodPixelError(for part: Mesh.Part, settings: MeshVisibilitySettings3D) -> Float {
+        if let automatic = part.meshletLOD?.automaticPixelError { return settings.lod ? automatic : 0 }
+        return settings.meshletLODPixelError
     }
 
     private mutating func prepareIndices(_ hierarchy: MeshletLODGeometry, source: any IndexBuffer, device: RenderDevice) -> (any IndexBuffer)? {

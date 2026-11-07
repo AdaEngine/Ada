@@ -22,6 +22,16 @@ struct PNGImageSerializer: ImageDecoder {
         data.starts(with: [137, 80, 78, 71, 13, 10, 26, 10])
     }
 
+    func decodedRGBAByteCount(_ data: Data) throws -> Int {
+        let start = data.startIndex
+        guard canDecode(data), data.count >= 24, data[(start + 12)..<(start + 16)] == Data("IHDR".utf8) else { throw ImageDecodingError.invalidData }
+        func word(_ offset: Int) -> Int64 {
+            let index = start + offset
+            return Int64(data[index]) << 24 | Int64(data[index + 1]) << 16 | Int64(data[index + 2]) << 8 | Int64(data[index + 3])
+        }
+        return try Image.decodedRGBABytes(width: word(16), height: word(20))
+    }
+
     func decode(_ data: Data) throws -> Image {
         var pngImage = unsafe png_image()
         unsafe pngImage.version = png_uint_32(PNG_IMAGE_VERSION)

@@ -10,7 +10,7 @@ import OrderedCollections
 
 /// Contains information about relationship of entity.
 @Component
-public struct RelationshipComponent {
+public struct RelationshipComponent: Codable {
     /// Identifier of parent entity.
     public var parent: Entity.ID?
 
@@ -23,6 +23,13 @@ public struct RelationshipComponent {
     public init(parent: Entity.ID? = nil, children: OrderedSet<Entity.ID> = []) {
         self.parent = parent
         self.children = children
+    }
+
+    func excludingEntities(_ identifiers: Set<Entity.ID>) -> Self {
+        Self(
+            parent: parent.flatMap { identifiers.contains($0) ? nil : $0 },
+            children: .init(children.filter { !identifiers.contains($0) })
+        )
     }
 }
 

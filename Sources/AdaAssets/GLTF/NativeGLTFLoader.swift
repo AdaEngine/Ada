@@ -42,7 +42,10 @@ public struct NativeGLTFLoader: GLTFLoader {
             let handle = try FileHandle(forReadingFrom: url)
             defer { try? handle.close() }
             data = try handle.read(upToCount: min(maximumTotalBytes, Int.max - 1) + 1) ?? Data()
-        } else { data = try Data(contentsOf: url) }
+        } else {
+            var budget = try NativeGLTFBudget(rootBytes: 0)
+            data = try budget.read(url)
+        }
         return try load(data: data, baseURL: url.deletingLastPathComponent())
     }
 
@@ -75,8 +78,9 @@ public struct NativeGLTFLoader: GLTFLoader {
         return result
     }
 
-    public func load(data: Data, baseURL: URL? = nil) throws -> GLTFImportResult {
+    public func load(data: Data, baseURL: URL? = nil, allowExternalResources: Bool = true) throws -> GLTFImportResult {
         if let maximumTotalBytes, data.count > maximumTotalBytes { throw GLTFError.bufferOutOfBounds }
+        var budget = try NativeGLTFBudget(rootBytes: data.count)
         let resourceBaseURL = baseURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 
         let gltf: GLTF
@@ -113,9 +117,17 @@ public struct NativeGLTFLoader: GLTFLoader {
                 remaining -= count
             }
         }
-        let buffers = try loadBuffers(gltf.buffers ?? [], baseURL: resourceBaseURL, binaryBuffer: binaryBuffer)
+        if !allowExternalResources {
+            let uris = (gltf.buffers ?? []).compactMap(\.uri) + (gltf.images ?? []).compactMap(\.uri)
+            guard uris.allSatisfy({ $0.hasPrefix("data:") }) else { throw GLTFError.invalidDataURI }
+        }
+        try budget.preflight(gltf)
+        let buffers = try loadBuffers(gltf.buffers ?? [], baseURL: resourceBaseURL, binaryBuffer: binaryBuffer, budget: &budget)
 
-        return try convertToImportResult(gltf, buffers: buffers, baseURL: resourceBaseURL)
+        var result = try convertToImportResult(gltf, buffers: buffers, baseURL: resourceBaseURL, budget: &budget)
+        result.importFootprint = budget.footprint
+        try result.validateGeometry()
+        return result
     }
 
     /// Bounds allocations before decodeAccessor creates zero-filled storage, including sparse/unused accessors.
@@ -163,9 +175,9 @@ public struct NativeGLTFLoader: GLTFLoader {
         guard data.count >= 12 else {
             throw GLTFError.invalidGLB
         }
-        let magic = data.subdata(in: 0 ..< 4)
+        let magic = data.subdata(in: 0..<4)
         let version = readUInt32(data, at: 4)
-        let declaredLength = Int(readUInt32(data, at: 8))
+        guard let declaredLength = Int(exactly: readUInt32(data, at: 8)) else { throw GLTFError.invalidGLB }
 
         if magic != Data("glTF".utf8) || version != 2 || declaredLength != data.count {
             throw GLTFError.invalidGLB
@@ -176,19 +188,19 @@ public struct NativeGLTFLoader: GLTFLoader {
         var binaryBuffer: Data?
 
         while offset < data.count {
-            guard offset + 8 <= data.count else {
+            guard offset <= data.count - 8 else {
                 throw GLTFError.invalidGLB
             }
-            let chunkLength = Int(readUInt32(data, at: offset))
+            guard let chunkLength = Int(exactly: readUInt32(data, at: offset)) else { throw GLTFError.invalidGLB }
             let chunkType = readUInt32(data, at: offset + 4)
-            guard offset + 8 + chunkLength <= data.count else {
+            guard chunkLength <= data.count - offset - 8 else {
                 throw GLTFError.invalidGLB
             }
-            let chunkData = data.subdata(in: offset + 8 ..< offset + 8 + chunkLength)
+            let chunkData = data.subdata(in: offset + 8..<offset + 8 + chunkLength)
 
-            if chunkType == 0x4E4F_534A { // JSON
+            if chunkType == 0x4E4F_534A {  // JSON
                 gltf = try JSONDecoder().decode(GLTF.self, from: chunkData)
-            } else if chunkType == 0x004E_4942 { // BIN
+            } else if chunkType == 0x004E_4942 {  // BIN
                 binaryBuffer = chunkData
             }
 
@@ -202,7 +214,7 @@ public struct NativeGLTFLoader: GLTFLoader {
         return (resultGltf, binaryBuffer)
     }
 
-    private func loadBuffers(_ gltfBuffers: [GLTF.Buffer], baseURL: URL, binaryBuffer: Data?) throws -> [Data] {
+    private func loadBuffers(_ gltfBuffers: [GLTF.Buffer], baseURL: URL, binaryBuffer: Data?, budget: inout NativeGLTFBudget) throws -> [Data] {
         var buffers = [Data]()
 
         for (index, buffer) in gltfBuffers.enumerated() {
@@ -219,10 +231,13 @@ public struct NativeGLTFLoader: GLTFLoader {
             }
 
             if uri.starts(with: "data:") {
-                try buffers.append(decodeDataURI(uri))
+                try budget.preflightDataURI(uri)
+                let data = try decodeDataURI(uri)
+                try budget.consumeEncoded(data.count)
+                buffers.append(data)
             } else {
                 let bufferURL = try resourceURL(uri, relativeTo: baseURL)
-                let data = try Data(contentsOf: bufferURL)
+                let data = try budget.read(bufferURL)
                 buffers.append(data)
             }
 
@@ -234,15 +249,18 @@ public struct NativeGLTFLoader: GLTFLoader {
         return buffers
     }
 
-    private func convertToImportResult(_ gltf: GLTF, buffers: [Data], baseURL: URL) throws -> GLTFImportResult {
+    private func convertToImportResult(_ gltf: GLTF, buffers: [Data], baseURL: URL, budget: inout NativeGLTFBudget) throws -> GLTFImportResult {
         let images = try (gltf.images ?? [])
             .map { image -> GLTFImportResult.Image in
                 if let uri = image.uri {
                     if uri.starts(with: "data:") {
-                        return try GLTFImportResult.Image(uri: nil, data: decodeDataURI(uri), mimeType: image.mimeType)
+                        try budget.preflightDataURI(uri)
+                        let data = try decodeDataURI(uri)
+                        try budget.consumeEncoded(data.count)
+                        return GLTFImportResult.Image(uri: nil, data: data, mimeType: image.mimeType)
                     }
                     let imageURL = try resourceURL(uri, relativeTo: baseURL)
-                    return try GLTFImportResult.Image(uri: imageURL, data: Data(contentsOf: imageURL), mimeType: image.mimeType)
+                    return try GLTFImportResult.Image(uri: imageURL, data: budget.read(imageURL), mimeType: image.mimeType)
                 } else if let bufferViewIndex = image.bufferView {
                     let data = try getBufferViewData(bufferViewIndex, gltf: gltf, buffers: buffers)
                     return GLTFImportResult.Image(uri: nil, data: data, mimeType: image.mimeType)
@@ -253,7 +271,7 @@ public struct NativeGLTFLoader: GLTFLoader {
         let samplers = try importSamplers(gltf)
         let textures = try (gltf.textures ?? []).enumerated().map { index, texture in
             guard let source = texture.source, images.indices.contains(source),
-                  texture.sampler.map({ samplers.indices.contains($0) }) ?? true
+                texture.sampler.map({ samplers.indices.contains($0) }) ?? true
             else { throw GLTFError.invalidTexture(index) }
             return GLTFImportResult.Texture(source: source, sampler: texture.sampler)
         }
@@ -363,10 +381,10 @@ public struct NativeGLTFLoader: GLTFLoader {
         }
         let offset = bufferView.byteOffset ?? 0
         let buffer = buffers[bufferView.buffer]
-        guard offset >= 0, bufferView.byteLength >= 0, offset + bufferView.byteLength <= buffer.count else {
+        guard offset >= 0, offset <= buffer.count, bufferView.byteLength >= 0, bufferView.byteLength <= buffer.count - offset else {
             throw GLTFError.bufferOutOfBounds
         }
-        return buffer.subdata(in: offset ..< offset + bufferView.byteLength)
+        return buffer.subdata(in: offset..<offset + bufferView.byteLength)
     }
 
     private func resourceURL(_ uri: String, relativeTo base: URL) throws -> URL {
@@ -376,7 +394,8 @@ public struct NativeGLTFLoader: GLTFLoader {
             let canonicalRoot = root.resolvingSymlinksInPath().standardizedFileURL.path
             let canonicalTarget = target.resolvingSymlinksInPath().standardizedFileURL.path
             guard !decoded.hasPrefix("/"), !decoded.contains(":"), !decoded.contains("\\"),
-                  !decoded.contains("?"), !decoded.contains("#"), canonicalTarget.hasPrefix(canonicalRoot + "/") else {
+                !decoded.contains("?"), !decoded.contains("#"), canonicalTarget.hasPrefix(canonicalRoot + "/")
+            else {
                 throw GLTFError.invalidDataURI
             }
         }

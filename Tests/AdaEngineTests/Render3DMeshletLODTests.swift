@@ -3,6 +3,7 @@
 import AdaAssets
 @testable import AdaCorePipelines
 import AdaECS
+import AdaGeometry
 @_spi(Internal) @testable import AdaRender
 import AdaScene
 import AdaTransform
@@ -138,6 +139,70 @@ extension Render3DGPUTests {
     @MainActor
     @Suite("Hierarchical meshlet LOD", .enabled(if: GoldenFrame.isEnabled))
     struct MeshletLOD {
+        @Test("Mesh Terrain shaded and wireframe submit the same coarse triangles")
+        func terrainWireframeMatchesRenderedMeshletCut() async throws {
+            let scene = try await MeshletBaselineFixtures.empty(size: MeshletLODFixture.viewport, cameraPosition: [0, 56, 0])
+            scene.camera.components[Transform.self] = Transform(rotation: Quat(axis: .right, angle: .pi / 2), position: [0, 56, 0])
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent("AdaTerrainWireLOD-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let ground = try TriangleSurface.ground(size: [24, 24], cells: 16)
+            let sections = try [Float(-12), 12].map { x in
+                MeshTerrainBaseSection(surface: try ground.transformed(by: .init(translation: [x, 0, 0])), closure: .ground(bottomHeight: -4))
+            }
+            let asset = try await MeshTerrainDocumentAsset(document: .init(sections: sections)).compiling()
+            try asset.encodedData().write(to: directory.appendingPathComponent("ground.atmesh"))
+            let palette = TerrainMaterialPalette(layers: [.init(id: 1, name: "Grass")], fallbackLayerID: 1)
+            let manifest = directory.appendingPathComponent("ground.aterrain")
+            try TerrainManifestAsset(materials: palette, meshDocumentFileName: "ground.atmesh").encodedData().write(to: manifest)
+            let terrain = scene.app.main.spawn("Terrain") {
+                Transform()
+                Terrain3DSource(source: manifest.path, generatesCollision: false)
+            }
+            let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+            while terrain.components[Terrain3DSourceStatus.self]?.isReady != true, ContinuousClock.now < deadline {
+                try await scene.app.update()
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            let tiles = terrain.children.filter { $0.components[Mesh3DComponent.self] != nil }
+            try #require(tiles.count == 2)
+            let statistics = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.getResource(Render3DMeshletStatistics.self))
+            let view = String(scene.camera.id)
+            let shaded = try await Self.frame(scene, mode: .disabled, pixelError: 0, debug: .none)
+            let shadedCount = try #require(statistics.snapshots[view])
+            let wire = try await Self.frame(scene, mode: .disabled, pixelError: 0, debug: .wireframe)
+            let wireCount = try #require(statistics.snapshots[view])
+            let overlay = try await Self.frame(scene, mode: .disabled, pixelError: 0, debug: .shadedWireframe)
+            #expect(wireCount.selectedLODLevels == shadedCount.selectedLODLevels)
+            #expect(wireCount.cpuSubmittedTriangles == shadedCount.cpuSubmittedTriangles)
+            #expect(wireCount.cpuSubmittedTriangles > 0 && wireCount.cpuSubmittedTriangles < 1024)
+
+            var expectedTriangles = 0
+            for tile in tiles {
+                var drawable = try #require(tile.components[Mesh3DComponent.self])
+                let part = try #require(drawable.mesh.models.first?.parts.first)
+                let hierarchy = try #require(part.meshletLOD)
+                var descriptor = part.meshDescriptor
+                descriptor.meshletLOD = nil
+                descriptor.indicies = hierarchy.roots.flatMap { id in
+                    let node = hierarchy.nodes[id]
+                    return hierarchy.geometry.clusters[node.firstCluster..<(node.firstCluster + node.clusterCount)].flatMap { cluster in
+                        hierarchy.geometry.indices[cluster.firstIndex..<(cluster.firstIndex + cluster.indexCount)]
+                    }
+                }
+                expectedTriangles += descriptor.indicies.count / 3
+                drawable.mesh = Mesh.generate(from: [descriptor], renderDevice: scene.device)
+                tile.components[Mesh3DComponent.self] = drawable
+            }
+            #expect(wireCount.cpuSubmittedTriangles == expectedTriangles, "The camera must select the coarse cut on both sections.")
+            let referenceShaded = try await Self.frame(scene, mode: .disabled, pixelError: 0, debug: .none)
+            let referenceWire = try await Self.frame(scene, mode: .disabled, pixelError: 0, debug: .wireframe)
+            #expect(GoldenFrame.compare(shaded, referenceShaded, tolerance: GoldenFrame.activeTolerance).passes(GoldenFrame.activeTolerance))
+            #expect(GoldenFrame.compare(wire, referenceWire, tolerance: GoldenFrame.activeTolerance).passes(GoldenFrame.activeTolerance))
+            try FileManager.default.createDirectory(at: GoldenFrame.outputDirectory, withIntermediateDirectories: true)
+            try overlay.writePNG(to: GoldenFrame.outputDirectory.appendingPathComponent("mesh-terrain-lod-overlay.png"))
+        }
+
         private static func words(_ data: Data) -> [UInt32] {
             stride(from: 0, to: data.count - data.count % 4, by: 4).map { offset -> UInt32 in
                 let a = UInt32(data[offset]), b = UInt32(data[offset + 1]) << 8

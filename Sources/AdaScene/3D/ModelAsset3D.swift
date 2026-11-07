@@ -6,7 +6,7 @@
 //
 
 import AdaAnimation
-import AdaAssets
+@_spi(Internal) import AdaAssets
 import AdaCorePipelines
 import AdaECS
 @_spi(Internal) import AdaRender
@@ -50,6 +50,9 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         }
     }
 
+    /// Scoped resource pipelines cap the initial asset-manager read before model decoding starts.
+    public static var maximumEncodedBytes: Int? { ModelImportContext.limits?.maximumEncodedBytes }
+
     public let nodes: [Node]
     public let meshes: [Mesh]
     public let materials: [Material]
@@ -90,7 +93,12 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
     }
 
     public convenience init(from assetDecoder: any AssetDecoder) async throws {
-        try await self.init(fileURL: assetDecoder.assetMeta.filePath, queryParams: assetDecoder.assetMeta.queryParams, gltfLoader: nil)
+        try await self.init(
+            fileURL: assetDecoder.assetMeta.filePath,
+            queryParams: assetDecoder.assetMeta.queryParams,
+            boundedData: ModelImportContext.limits == nil ? nil : assetDecoder.assetData,
+            gltfLoader: nil
+        )
     }
 
     /// Constructs a glTF model using a caller-owned import policy, without changing the global loader resolver.
@@ -102,10 +110,24 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         try await self.init(fileURL: url, queryParams: [], gltfLoader: loader)
     }
 
-    private init(fileURL: URL, queryParams: [AssetQuery], gltfLoader: (any GLTFLoader)?) async throws {
+    private init(
+        fileURL: URL, queryParams: [AssetQuery], boundedData: Data? = nil, gltfLoader: (any GLTFLoader)?
+    ) async throws {
+        let importLimits = ModelImportContext.limits
+        if let limits = importLimits, let boundedData {
+            guard limits.maximumEncodedBytes > 0, limits.maximumDecodedBytes > 0 else { throw ModelImportLimitError.invalidLimits }
+            guard boundedData.count <= limits.maximumEncodedBytes else { throw ModelImportLimitError.encodedBudgetExceeded }
+        }
         if fileURL.pathExtension.lowercased() == "vox" {
             let settings = VoxelImportSettings(queryParams: queryParams)
-            let contents = try await Self.loadVoxelContents(url: fileURL, options: settings.options)
+            let contents: Contents
+            if let limits = importLimits, let boundedData {
+                let file = try VOXLoader().load(data: boundedData)
+                try Self.validateVoxelBudget(file, rootBytes: boundedData.count, options: settings.options, limits: limits)
+                contents = Self.makeVoxelContents(file: file, options: settings.options)
+            } else {
+                contents = try await Self.loadVoxelContents(url: fileURL, options: settings.options)
+            }
             self.nodes = contents.nodes
             self.meshes = contents.meshes
             self.materials = contents.materials
@@ -119,8 +141,14 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         }
 
         if fileURL.pathExtension.lowercased() == "obj" {
-            let loader = OBJLoaderResolver.shared.getLoader()
-            let result = try await loader.load(url: fileURL)
+            let result: OBJImportResult
+            if let boundedData {
+                // Bounded OBJ preparation uses the built-in parser, not an unbounded plugin callback.
+                result = try NativeOBJLoader().load(data: boundedData)
+            } else {
+                let loader = OBJLoaderResolver.shared.getLoader()
+                result = try await loader.load(url: fileURL)
+            }
             let device = unsafe RenderEngine.shared.renderDevice
 
             self.materials = result.materials.map { _ in PBRMaterial() }
@@ -159,34 +187,17 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         }
 
         let loader = gltfLoader ?? GLTFLoaderResolver.shared.getLoader()
-        let result = try await loader.load(url: fileURL)
+        var result: GLTFImportResult
+        if let boundedData, gltfLoader == nil {
+            guard let native = loader as? NativeGLTFLoader else {
+                throw AssetError.message("This custom glTF loader does not support bounded terrain imports")
+            }
+            result = try native.load(data: boundedData, baseURL: fileURL.deletingLastPathComponent())
+        } else {
+            result = try await loader.load(url: fileURL)
+        }
+        try result.validateGeometry()
         importWarnings = result.warnings
-        var preparedMeshlets: MeshletSidecar?
-        let sidecarURL = fileURL.appendingPathExtension("meshlets")
-        if FileManager.default.fileExists(atPath: sidecarURL.path) {
-            do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: sidecarURL.path)
-                guard let size = attributes[.size] as? NSNumber, size.uint64Value <= UInt64(MeshletSidecar.maximumByteCount) else {
-                    throw MeshletDataError.invalidSidecar
-                }
-                preparedMeshlets = try MeshletSidecar(data: Data(contentsOf: sidecarURL))
-            } catch {
-                importWarnings.append("Ignored invalid meshlet sidecar: \(sidecarURL.lastPathComponent). Original geometry is retained.")
-            }
-        }
-        var preparedMeshletLOD: MeshletLODSidecar?
-        let hierarchyURL = fileURL.appendingPathExtension("meshletlod")
-        if FileManager.default.fileExists(atPath: hierarchyURL.path) {
-            do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: hierarchyURL.path)
-                guard let size = attributes[.size] as? NSNumber, size.uint64Value <= UInt64(MeshletLODSidecar.maximumByteCount) else {
-                    throw MeshletDataError.invalidSidecar
-                }
-                preparedMeshletLOD = try MeshletLODSidecar(data: Data(contentsOf: hierarchyURL))
-            } catch {
-                importWarnings.append("Ignored invalid meshlet LOD sidecar: \(hierarchyURL.lastPathComponent). Original geometry is retained.")
-            }
-        }
 
         guard result.skins.allSatisfy({ $0.joints.count <= Skinning3DUniforms.maximumJoints }) else {
             throw AssetError.message("A skinned mesh supports at most \(Skinning3DUniforms.maximumJoints) joints.")
@@ -196,7 +207,31 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         animationClips = try Self.makeClips(result.animations, nodes: result.nodes, meshes: result.meshes)
         let device = unsafe RenderEngine.shared.renderDevice
 
-        let materials = try Self.makeMaterials(result)
+        let materials = try Self.makeMaterialsAccounting(&result)
+        var sidecarBudget = ModelSidecarBudget(footprint: result.importFootprint)
+        var preparedMeshlets: MeshletSidecar?
+        let sidecarURL = fileURL.appendingPathExtension("meshlets")
+        if FileManager.default.fileExists(atPath: sidecarURL.path) {
+            do {
+                preparedMeshlets = try sidecarBudget.decode(sidecarURL, maximumBytes: MeshletSidecar.maximumByteCount) { try MeshletSidecar(data: $0) }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                importWarnings.append("Ignored invalid meshlet sidecar: \(sidecarURL.lastPathComponent). \(error.localizedDescription). Original geometry is retained.")
+            }
+        }
+        var preparedMeshletLOD: MeshletLODSidecar?
+        let hierarchyURL = fileURL.appendingPathExtension("meshletlod")
+        if FileManager.default.fileExists(atPath: hierarchyURL.path) {
+            do {
+                preparedMeshletLOD = try sidecarBudget.decode(hierarchyURL, maximumBytes: MeshletLODSidecar.maximumByteCount) { try MeshletLODSidecar(data: $0) }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                importWarnings.append("Ignored invalid meshlet LOD sidecar: \(hierarchyURL.lastPathComponent). \(error.localizedDescription). Original geometry is retained.")
+            }
+        }
+        result.importFootprint = sidecarBudget.footprint
 
         // 2. Convert Meshes
         var meshes: [Mesh] = []
@@ -242,28 +277,38 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
                 }
 
                 if let skinning = primitive.skinning {
-                    descriptor[MeshDescriptor.jointIndices] = MeshBuffer(skinning.jointIndices.map { joints in
-                        Vector4(Float(joints.x), Float(joints.y), Float(joints.z), Float(joints.w))
-                    })
+                    descriptor[MeshDescriptor.jointIndices] = MeshBuffer(
+                        skinning.jointIndices.map { joints in
+                            Vector4(Float(joints.x), Float(joints.y), Float(joints.z), Float(joints.w))
+                        }
+                    )
                     descriptor[MeshDescriptor.jointWeights] = MeshBuffer(skinning.weights)
                 }
 
-                let sourceIndices = primitive.indices ?? Array(0 ..< UInt32(descriptor.positions.count))
+                let sourceIndices = primitive.indices ?? Array(0..<UInt32(descriptor.positions.count))
                 let converted = primitive.convertTopology(indices: sourceIndices)
                 descriptor.indicies = converted.indices
                 descriptor.primitiveTopology = converted.topology
                 if descriptor.primitiveTopology == .triangleList, let preparedMeshlets {
                     do {
-                        descriptor.meshlets = try preparedMeshlets.geometry(meshIndex: meshIndex, partIndex: index,
-                            positions: descriptor.positions.elements, indices: descriptor.indicies)
+                        descriptor.meshlets = try preparedMeshlets.geometry(
+                            meshIndex: meshIndex,
+                            partIndex: index,
+                            positions: descriptor.positions.elements,
+                            indices: descriptor.indicies
+                        )
                     } catch {
                         incompatibleMeshletParts += 1
                     }
                 }
                 if descriptor.primitiveTopology == .triangleList, let preparedMeshletLOD {
                     do {
-                        descriptor.meshletLOD = try preparedMeshletLOD.geometry(meshIndex: meshIndex, partIndex: index,
-                            positions: descriptor.positions.elements, indices: descriptor.indicies)
+                        descriptor.meshletLOD = try preparedMeshletLOD.geometry(
+                            meshIndex: meshIndex,
+                            partIndex: index,
+                            positions: descriptor.positions.elements,
+                            indices: descriptor.indicies
+                        )
                     } catch {
                         incompatibleMeshletLODParts += 1
                     }
@@ -281,14 +326,19 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
                     vertexBuffer: descriptor.getVertexBuffer(renderDevice: device)
                 )
                 if !primitive.morphTargets.isEmpty {
-                    guard let morph = MorphTargetSet(
-                        positionDeltas: primitive.morphTargets.map(\.positionDeltas),
-                        normalDeltas: primitive.morphTargets.map(\.normalDeltas),
-                        tangentDeltas: primitive.morphTargets.map(\.tangentDeltas),
-                        vertexCount: descriptor.positions.count,
-                        targetNames: gltfMesh.targetNames
-                    ) else {
-                        throw AssetError.message("The \(primitive.morphTargets.count) morph targets of mesh \"\(gltfMesh.name ?? "")\" do not fit the delta texture (at most \(MorphTargetSet.textureWidth * MorphTargetSet.maximumTextureRows) texels of vertices x targets x attributes).")
+                    guard
+                        let morph = MorphTargetSet(
+                            positionDeltas: primitive.morphTargets.map(\.positionDeltas),
+                            normalDeltas: primitive.morphTargets.map(\.normalDeltas),
+                            tangentDeltas: primitive.morphTargets.map(\.tangentDeltas),
+                            vertexCount: descriptor.positions.count,
+                            targetNames: gltfMesh.targetNames
+                        )
+                    else {
+                        throw AssetError.message(
+                            "The \(primitive.morphTargets.count) morph targets of mesh \"\(gltfMesh.name ?? "")\" do not fit the delta texture "
+                                + "(at most \(MorphTargetSet.textureWidth * MorphTargetSet.maximumTextureRows) texels of vertices x targets x attributes)."
+                        )
                     }
                     part.morphTargets = morph
                 }
@@ -387,7 +437,7 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
                 entity.components[MorphWeights3DComponent.self] = MorphWeights3DComponent(weights: weights, targetNames: mesh.morphTargetNames)
             }
             if let skinIndex = node.skinIndex, skins.indices.contains(skinIndex),
-               let animation = modelRoot.components[ModelAnimation3DComponent.self] {
+                let animation = modelRoot.components[ModelAnimation3DComponent.self] {
                 var binding = SkinnedMesh3DComponent(modelRoot: modelRoot.id, meshNodeIndex: nodeIndex, skin: skins[skinIndex])
                 binding.updateMatrices(using: animation.player)
                 entity.components[SkinnedMesh3DComponent.self] = binding
@@ -440,7 +490,7 @@ extension GLTFImportResult.Primitive {
             }
             var triangleIndices: [UInt32] = []
             triangleIndices.reserveCapacity((indices.count - 2) * 3)
-            for index in 1 ..< (indices.count - 1) {
+            for index in 1..<(indices.count - 1) {
                 triangleIndices.append(indices[0])
                 triangleIndices.append(indices[index])
                 triangleIndices.append(indices[index + 1])
