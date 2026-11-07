@@ -358,8 +358,8 @@ public struct Main3DRenderNode: RenderNode {
             renderPass.setFragmentBuffer(localMatrices, offset: 0, slot: 28)
             renderPass.setFragmentBuffer(tileConstants, offset: 0, slot: 27)
             renderPass.setFragmentBuffer(tileMaskBuffer, offset: 0, slot: 29)
-            renderPass.setFragmentBuffer(surfaceConstants, offset: 0, slot: 42)
-            renderPass.setFragmentBuffer(distanceFieldConstants, offset: 0, slot: 50)
+            renderPass.setFragmentBuffer(surfaceConstants, offset: 0, slot: 23)
+            renderPass.setFragmentBuffer(distanceFieldConstants, offset: 0, slot: 30)
             renderPass.setResourceSet(.init(bindings: [
                 .init(binding: 41, shaderStages: .fragment, resource: .texture(contactTexture)),
                 .init(binding: 49, shaderStages: .fragment,

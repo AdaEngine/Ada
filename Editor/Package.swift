@@ -9,6 +9,11 @@ let adaMCPURL = ProcessInfo.processInfo.environment["ADA_MCP_LOCAL_PATH"].map {
     URL(fileURLWithPath: $0, relativeTo: editorPackageURL).standardizedFileURL
 } ?? (FileManager.default.fileExists(atPath: adjacentAdaMCP.appendingPathComponent("Package.swift").path) ? adjacentAdaMCP : nil)
 let isAndroidStudio = ProcessInfo.processInfo.environment["ADAEDITOR_ANDROID"] == "1"
+#if os(macOS)
+let isStudioInteractionHost = !isAndroidStudio && ProcessInfo.processInfo.environment["ADAEDITOR_INTERACTION_HOST"] == "1"
+#else
+let isStudioInteractionHost = false
+#endif
 #if (os(macOS) && arch(arm64)) || (os(Windows) && arch(x86_64)) || (os(Linux) && (arch(x86_64) || arch(arm64)))
 #if os(Windows) || os(Linux)
 // Prepared by the host's ensure_*_lore.py --package helper. The shared native
@@ -198,6 +203,27 @@ let package = Package(
     ]
 )
 
+#if os(macOS)
+if isStudioInteractionHost {
+    package.products.removeAll { $0.name == "AdaEditor" }
+    package.products.append(.executable(name: "adastudio-flow", targets: ["StudioInteractionHost"]))
+    package.targets.append(.executableTarget(
+        name: "StudioInteractionHost",
+        dependencies: [
+            "AdaEditor",
+            "Yams",
+            .product(name: "AdaEngine", package: "AdaEngine"),
+            .product(name: "AdaMCPPlugin", package: "AdaMCP"),
+            .product(name: "AdaMCPCore", package: "AdaMCP"),
+            .product(name: "MCP", package: "AdaMCP"),
+        ],
+        path: "Tests/StudioInteractionHost",
+        exclude: ["check_flow.py"],
+        resources: [.copy("Fixtures")]
+    ))
+}
+#endif
+
 let editorSwiftSettings: [SwiftSetting] = [
     .define("MACOS", .when(platforms: [.macOS])),
     .define("WINDOWS", .when(platforms: [.windows])),
@@ -229,8 +255,9 @@ private func makeEditorTarget(
     swiftSettings: [SwiftSetting],
     linkerSettings: [LinkerSetting]
 ) -> Target {
-    if isAndroidStudio {
-        return .target(name: name, dependencies: dependencies, exclude: exclude, resources: resources, swiftSettings: swiftSettings, linkerSettings: linkerSettings)
+    if isAndroidStudio || isStudioInteractionHost {
+        let settings: [SwiftSetting] = isStudioInteractionHost ? [.define("EDITOR_INTERACTION_HOST")] : swiftSettings
+        return .target(name: name, dependencies: dependencies, exclude: exclude, resources: resources, swiftSettings: settings, linkerSettings: linkerSettings)
     }
     return .executableTarget(name: name, dependencies: dependencies, exclude: exclude, resources: resources, swiftSettings: swiftSettings, linkerSettings: linkerSettings)
 }

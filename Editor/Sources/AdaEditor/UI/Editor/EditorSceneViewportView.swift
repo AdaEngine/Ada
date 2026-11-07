@@ -33,6 +33,7 @@ struct EditorSceneViewportView: View {
     @State var viewportModel = EditorSceneViewportModel()
     @Environment(\.theme) var theme
     @Environment(\.viewProxy) var viewProxy
+    @Environment(\.workbenchInspection) private var workbenchInspection
 
     var body: some View {
         // A declaration is required inside AdaUI's result builder.
@@ -83,6 +84,7 @@ struct EditorSceneViewportView: View {
         guard !document.isLoading, document.errorMessage == nil else {
             return
         }
+        workbenchInspection?.viewport = viewportModel
         if isPlayingThisDocument {
             preparePlayModeViewport()
         } else {
@@ -134,6 +136,7 @@ struct EditorSceneViewportView: View {
                             if let input = world.getResource(Input.self) {
                                 for event in input.getInputEvents() {
                                     let handled = viewportModel.handleInput(event)
+                                    if let mouse = event as? MouseEvent { workbenchInspection?.observedInput(mouse) }
                                     didChangeViewport = didChangeViewport || handled
                                 }
                             }
@@ -149,6 +152,7 @@ struct EditorSceneViewportView: View {
                         viewportPresentation.prepareFrame(viewportModel: viewportModel, theme: viewportPresentation.annotationTheme)
                     }
                     .frame(width: geometry.size.width, height: geometry.size.height)
+                    .accessibilityIdentifier("AdaEditor.SceneViewport.Surface")
 
                     // Retained scenes stay prepared behind asset tabs. Their custom drawing
                     // layers must be removed while inactive; inherited opacity does not hide them.

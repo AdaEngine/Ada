@@ -1,5 +1,7 @@
 import Foundation
-import FoundationXML
+#if canImport(FoundationXML)
+    import FoundationXML
+#endif
 
 /// SwiftPM's parallel XCTest runner records per-test results in its xUnit report.
 final class EditorXCTestReport: NSObject, XMLParserDelegate {

@@ -1,0 +1,30 @@
+version: 1
+profile: studio-ui
+steps:
+  - tapOn: { id: AdaEditor.SceneHierarchy.Select.fixture-cube }
+  - tapOn: { id: AdaEditor.SceneViewport.Control.Move }
+  - drag:
+      from: { id: AdaEditor.SceneViewport.Surface, anchor: translate.x }
+      by: { x: 60, y: 0 }
+      durationMs: 250
+  - assertScene: { entity: fixture-cube, position: [0.4, 0, 0], tolerance: 0.02, undoCount: 1 }
+  - pressKey: { key: z, modifiers: [main] }
+  - assertScene: { entity: fixture-cube, position: [0, 0, 0], undoCount: 0 }
+  - drag:
+      from: { id: AdaEditor.SceneViewport.Surface, anchor: translate.x }
+      by: { x: 60, y: 0 }
+      durationMs: 250
+      end: cancel
+  - assertScene: { entity: fixture-cube, position: [0, 0, 0], undoCount: 0 }
+  - drag:
+      from: { id: AdaEditor.SceneHierarchy.Row.fixture-cube }
+      to: { id: AdaEditor.SceneHierarchy.Row.fixture-group }
+      durationMs: 250
+  - assertScene: { entity: fixture-cube, parent: fixture-group, undoCount: 1 }
+  - drag:
+      from: { id: AdaEditor.SceneHierarchy.Row.fixture-group }
+      to: { id: AdaEditor.SceneHierarchy.Row.fixture-cube }
+      durationMs: 250
+  - assertScene: { entity: fixture-group, parent: fixture-root, undoCount: 1 }
+  - pressKey: { key: z, modifiers: [main] }
+  - assertScene: { entity: fixture-cube, parent: fixture-root, undoCount: 0 }

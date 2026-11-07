@@ -1,0 +1,24 @@
+format: ada.scene
+schemaVersion: 1
+scene: { id: fixture-scene, name: Flow Fixture }
+entities:
+  - id: fixture-root
+    name: Root
+    enabled: true
+    components: {}
+  - id: fixture-cube
+    name: Cube
+    enabled: true
+    parent: fixture-root
+    components:
+      AdaTransform.Transform:
+        position: [0, 0, 0]
+        rotation: [0, 0, 0, 1]
+        scale: [1, 1, 1]
+  - id: fixture-group
+    name: Group
+    enabled: true
+    parent: fixture-root
+    components: {}
+editor:
+  expandedEntities: [fixture-root]

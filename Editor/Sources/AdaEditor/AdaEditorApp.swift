@@ -17,7 +17,7 @@ import Logging
     import AdaMCPPlugin
 #endif
 
-#if !os(visionOS) && !os(Android)
+#if !os(visionOS) && !os(Android) && !EDITOR_INTERACTION_HOST
 @main
 #endif
 enum AdaApplicationEntry {
