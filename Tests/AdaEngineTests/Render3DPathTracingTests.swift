@@ -54,7 +54,7 @@ struct Render3DPathTracingSettingsTests {
         #expect(bvh.nodes.first?.escape == bvh.nodes.count)
         #expect(bvh.triangles.count == input.count)
         #expect(Set(bvh.triangles.map { $0.vertices[0].w }) == Set((0..<39).map(Float.init)))
-        #expect(bvh.nodes.filter { !$0.isEmpty }.reduce(0) { $0 + $1.count } == input.count)
+        #expect(bvh.nodes.reduce(0) { $0 + $1.count } == input.count)
         for (index,node) in bvh.nodes.enumerated() {
             #expect(node.escape > index && node.escape <= bvh.nodes.count)
             #expect(node.count <= 4)

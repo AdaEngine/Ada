@@ -5,8 +5,8 @@
 //  Created by Codex on 7/6/26.
 //
 
-import AdaECS
 @_spi(Internal) @testable import AdaApp
+import AdaECS
 @testable import AdaPhysics
 import AdaTransform
 import Testing
@@ -14,7 +14,6 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct Physics3DTests {
-
     let world: AppWorlds
 
     init() async throws {
@@ -104,9 +103,10 @@ struct Physics3DTests {
         }
         let startY = try #require(box.components[Transform.self]?.position.y)
 
-        try await world.update()
-        try await Task.sleep(for: .milliseconds(20))
-        try await world.update()
+        try await SimulationClock.$fixedDeltaTime.withValue(1 / 60) {
+            try await world.update()
+            try await world.update()
+        }
 
         let runtimeBody = try #require(box.components[PhysicsBody3DComponent.self]?.runtimeBody)
         let endY = try #require(box.components[Transform.self]?.position.y)

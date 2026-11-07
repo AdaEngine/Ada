@@ -38,7 +38,7 @@ struct InputResourceBindingTests {
         #expect(plugin.diagnostics.isEmpty)
     }
 
-    @Test func declaresOnlyRequestedReadAccess() throws {
+    @Test func declaresInputReadAlongsideSharedVMAccess() throws {
         let plugin = try AdaScriptPlugin(source: """
         @system(id: "with-input")
         class WithInput {
@@ -56,12 +56,15 @@ struct InputResourceBindingTests {
         let scheduler = try #require(world.schedulers.getScheduler(.update))
         let withInput = try #require(scheduler.systemGraph.nodes.first { $0.name.hasSuffix("with-input") })
         let withoutInput = try #require(scheduler.systemGraph.nodes.first { $0.name.hasSuffix("without-input") })
-        var expected = SystemAccessSet()
-        expected.addResourceRead(DeltaTime.self)
+        let taskPump = try #require(scheduler.systemGraph.nodes.first { $0.name.hasPrefix("AdaScripting.TaskPump.") })
+        var expected = taskPump.queries.access
         #expect(withoutInput.queries.access == expected)
         expected.addResourceRead(Input.self)
         #expect(withInput.queries.access == expected)
-        #expect(withInput.queries.access.isCompatible(with: expected))
+        var reader = SystemAccessSet()
+        reader.addResourceRead(Input.self)
+        #expect(withInput.queries.access.isCompatible(with: reader))
+        #expect(!withInput.queries.access.isCompatible(with: withoutInput.queries.access))
         var writer = SystemAccessSet()
         writer.addResourceWrite(Input.self)
         #expect(!withInput.queries.access.isCompatible(with: writer))
