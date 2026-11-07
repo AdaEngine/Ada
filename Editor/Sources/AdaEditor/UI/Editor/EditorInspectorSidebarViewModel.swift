@@ -34,6 +34,7 @@ final class EditorInspectorSidebarViewModel {
         var addableScriptableObjects: [EditorScriptableObjectDescriptor] = []
         var gizmo: EditorGizmo?
         var hasExplicitGizmo: Bool
+        var hasJoinedDescendant = false
     }
 
     struct ComponentSection: Equatable {
@@ -84,6 +85,7 @@ final class EditorInspectorSidebarViewModel {
     var isInspectingPlayMode = false
     private(set) var terrainEditing: EditorTerrainEditingState?
     @ObservationIgnored private var createTerrainAction: (() -> Void)?
+    @ObservationIgnored private var detachTerrainAction: ((String) -> Void)?
     @ObservationIgnored private var terrainSettingsChangedAction: (() -> Void)?
     var isComponentPickerPresented = false
     var componentSearchText = ""
@@ -187,6 +189,7 @@ final class EditorInspectorSidebarViewModel {
         if sceneViewportActionOwner != ObjectIdentifier(owner) {
             terrainEditing = nil
             createTerrainAction = nil
+            detachTerrainAction = nil
             terrainSettingsChangedAction = nil
         }
         sceneViewportActionOwner = ObjectIdentifier(owner)
@@ -204,15 +207,21 @@ final class EditorInspectorSidebarViewModel {
         owner: AnyObject,
         state: EditorTerrainEditingState,
         create: @escaping () -> Void,
+        detach: ((String) -> Void)? = nil,
         settingsChanged: @escaping () -> Void
     ) {
         guard sceneViewportActionOwner == ObjectIdentifier(owner) else { return }
         if terrainEditing !== state { terrainEditing = state }
         createTerrainAction = create
+        detachTerrainAction = detach
         terrainSettingsChangedAction = settingsChanged
     }
 
     func createTerrainRequested() { createTerrainAction?() }
+
+    func detachTerrainRequested() {
+        if let id = selectedEntity?.editorID { detachTerrainAction?(id) }
+    }
 
     func terrainSettingsChanged() { terrainSettingsChangedAction?() }
 
@@ -224,6 +233,7 @@ final class EditorInspectorSidebarViewModel {
         sceneViewportActionOwner = nil
         terrainEditing = nil
         createTerrainAction = nil
+        detachTerrainAction = nil
         terrainSettingsChangedAction = nil
         applyGizmoChange = nil
         addEntity = nil
@@ -395,6 +405,33 @@ final class EditorInspectorSidebarViewModel {
         componentFieldBinding(typeName: EditorBuiltInComponentType.transform, field: field.field)
     }
 
+    func requiresTerrainTransformSubmission(_ typeName: String) -> Bool {
+        guard typeName == EditorBuiltInComponentType.transform, let selectedEntity else { return false }
+        return selectedEntity.hasJoinedDescendant || selectedEntity.components.contains {
+            $0.typeName == String(reflecting: MeshTerrain3DBinding.self)
+        }
+    }
+
+    func submitTerrainTransform(_ field: EditorComponentField) {
+        let typeName = EditorBuiltInComponentType.transform
+        guard requiresTerrainTransformSubmission(typeName), terrainEditing?.isSourceBusy != true else { return }
+        var values = vectorComponents(from: componentFieldValue(typeName: typeName, field: field), count: field.kind.vectorComponentCount)
+        let drafts = values.indices.map { VectorAxisDraftKey(typeName: typeName, fieldKey: field.key, axisIndex: $0) }
+        guard drafts.contains(where: { vectorAxisDrafts[$0] != nil }) else { return }
+        for (index, key) in drafts.enumerated() {
+            guard let draft = vectorAxisDrafts[key] else { continue }
+            let value = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let number = Float(value), number.isFinite else {
+                terrainEditing?.sourceFailure = "Enter a finite number for each edited coordinate."
+                return
+            }
+            values[index] = value
+        }
+        for key in drafts { vectorAxisDrafts[key] = nil }
+        terrainEditing?.sourceFailure = nil
+        updateComponentField?(typeName, field, values.joined(separator: ", "))
+    }
+
     func componentVectorAxisBinding(typeName: String, field: EditorComponentField, axisIndex: Int) -> Binding<String> {
         Binding(
             get: {
@@ -460,6 +497,10 @@ final class EditorInspectorSidebarViewModel {
         }
 
         let draftKey = VectorAxisDraftKey(typeName: typeName, fieldKey: field.key, axisIndex: axisIndex)
+        if requiresTerrainTransformSubmission(typeName) {
+            if terrainEditing?.isSourceBusy != true { vectorAxisDrafts[draftKey] = value }
+            return
+        }
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedValue.isEmpty || Double(trimmedValue) == nil {
             vectorAxisDrafts[draftKey] = value

@@ -46,4 +46,19 @@ struct WGSLReflectionTests {
         #expect(reflection.descriptorSets[0].uniformsBuffers.isEmpty)
         #expect(reflection.descriptorSets[2].uniformsBuffers[4]?.shaderStage == [.vertex, .fragment])
     }
+
+    @Test func preservesSampledTextureViewDimensionsForBrowserLayouts() {
+        let source = """
+            @group(0) @binding(0) var color: texture_2d<f32>;
+            @group(0) @binding(1) var terrain: texture_2d_array<f32>;
+            @group(0) @binding(2) var sky: texture_cube<f32>;
+            @group(0) @binding(3) var volume: texture_3d<f32>;
+            """
+        let reflection = WGSLReflection.parse(from: source, stage: .fragment)
+        let images = reflection.descriptorSets.first?.sampledImages
+        #expect(images?[0]?.textureType == .texture2D)
+        #expect(images?[1]?.textureType == .texture2DArray)
+        #expect(images?[2]?.textureType == .textureCube)
+        #expect(images?[3]?.textureType == .texture3D)
+    }
 }

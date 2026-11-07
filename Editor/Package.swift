@@ -87,7 +87,7 @@ let package = Package(
         ProcessInfo.processInfo.environment["ADAEDITOR_SWIFTTERM_PACKAGE_PATH"].map { .package(name: "SwiftTerm", path: $0) }
             ?? .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", revision: "caa1bdd3f1396c5b0ed66121f299d1c8b42bc94c"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0"),
-        .package(name: "AdaEngine", path: adaEngineLocalPath),
+        .package(name: "AdaEngine", path: adaEngineLocalPath, traits: ["default", "MeshTerrainAuthoring"]),
         .package(name: "AdaDebugging", path: "Debugging"),
         .package(name: "AdaPlayerConnect", path: "PlayerConnect"),
         adaMCPPackage,

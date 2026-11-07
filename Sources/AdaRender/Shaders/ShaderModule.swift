@@ -99,12 +99,23 @@ extension ShaderModule {
     ///
     /// The variant is compiled from the file's text rather than the file, so it bypasses the on-disk shader cache, whose
     /// entries are keyed by file and stage and would mix up variants of one file. Callers should keep the result.
-    /// WebAssembly builds ship precompiled modules, so there the plain module is returned and `defines` are ignored.
+    /// WebAssembly loads shipped variants for terrain and wireframe, and uses the plain module for other optional features.
     public static func createBundled(at path: String, from bundle: Bundle, defines: [String]) throws -> ShaderModule {
         guard !defines.isEmpty else {
             return try loadBundled(at: path, from: bundle).asset
         }
         #if WASM
+            #if canImport(WebGPU)
+                if path == "Shaders/flat3d.glsl" {
+                    let variants = Set(defines).intersection(["ADA_TERRAIN", "ADA_WIREFRAME"]).sorted()
+                    if !variants.isEmpty, let resourceURL = bundle.resourceURL {
+                        let url = resourceURL.appendingPathComponent(path)
+                        let baseURL = url.deletingPathExtension().appendingPathExtension(variants.joined(separator: "."))
+                        guard let module = try createWGSLModuleIfAvailable(at: baseURL) else { throw ShaderModuleError.notFound(baseURL.path) }
+                        return module
+                    }
+                }
+            #endif
             return try loadBundled(at: path, from: bundle).asset
         #else
             guard let resourceURL = bundle.resourceURL else {
@@ -143,7 +154,7 @@ extension ShaderModule {
         }
 
         #if WASM && canImport(WebGPU)
-            if path.hasSuffix(".glsl"), let wgslModule = try createWGSLModuleIfAvailable(for: url) {
+            if path.hasSuffix(".glsl"), let wgslModule = try createWGSLModuleIfAvailable(at: url.deletingPathExtension()) {
                 return AssetHandle(wgslModule)
             }
         #endif
@@ -165,8 +176,7 @@ private enum ShaderModuleError: LocalizedError {
 
 #if WASM && canImport(WebGPU)
     extension ShaderModule {
-        private static func createWGSLModuleIfAvailable(for glslURL: URL) throws -> ShaderModule? {
-            let baseURL = glslURL.deletingPathExtension()
+        private static func createWGSLModuleIfAvailable(at baseURL: URL) throws -> ShaderModule? {
             let vertexURL = baseURL.appendingPathExtension("vert.wgsl")
             let fragmentURL = baseURL.appendingPathExtension("frag.wgsl")
 

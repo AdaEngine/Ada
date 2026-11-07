@@ -1,9 +1,9 @@
 // swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
-import PackageDescription
-import Foundation
 import CompilerPluginSupport
+import Foundation
+import PackageDescription
 
 #if canImport(AppleProductTypes)
 import AppleProductTypes
@@ -142,6 +142,7 @@ var products: [Product] = [
         name: "Math",
         targets: ["Math"]
     ),
+    .library(name: "AdaGeometry", targets: ["AdaGeometry"]),
     .library(
         name: "AdaAnimation",
         targets: ["AdaAnimation"]
@@ -233,6 +234,7 @@ var adaEngineDependencies: [Target.Dependency] = [
     "AdaUI",
     "AdaEngineMacros",
     "AdaAssets",
+    "AdaGeometry",
     "AdaPlatform",
     "AdaAudio",
     "AdaCorePipelines",
@@ -253,9 +255,13 @@ var adaEngineDependencies: [Target.Dependency] = [
 // the renderer; this target shares its selected D3D12 device and textures.
 let dlssBuildConfiguration: [String: Any]? = {
     #if os(Windows)
-    guard !isHeadlessCIEnabled, ProcessInfo.processInfo.environment["ADAENGINE_DISABLE_DLSS"] != "1" else { return nil }
+    guard !isHeadlessCIEnabled, ProcessInfo.processInfo.environment["ADAENGINE_DISABLE_DLSS"] != "1" else {
+        return nil
+    }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-    guard let data = try? Data(contentsOf: root.appendingPathComponent(".build-tools/dlss-interop/build.json")) else { return nil }
+    guard let data = try? Data(contentsOf: root.appendingPathComponent(".build-tools/dlss-interop/build.json")) else {
+        return nil
+    }
     return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     #else
     return nil
@@ -386,6 +392,16 @@ var targets: [Target] = [
     adaEngineEmbeddable,
     adaEngineMacros,
     .adaTarget(name: "Math"),
+    .target(
+        name: "CManifold",
+        exclude: ["Vendor/LICENSE", "Vendor/AUTHORS", "Vendor/UPSTREAM.json", "README.md", "THIRD_PARTY_NOTICES.txt"],
+        publicHeadersPath: "include",
+        cxxSettings: [
+            .headerSearchPath("Vendor/include"), .headerSearchPath("Vendor/src"),
+            .define("MANIFOLD_PAR", to: "-1"), .define("MANIFOLD_NO_IOSTREAM"), .define("MANIFOLD_NO_FILESYSTEM")
+        ]
+    ),
+    .target(name: "AdaGeometry", dependencies: ["Math", .target(name: "CManifold", condition: .when(platforms: [.macOS, .windows, .linux], traits: ["MeshTerrainAuthoring"]))], swiftSettings: swiftSettings),
     .adaTarget(name: "AdaSpatial", dependencies: ["AdaECS", "AdaTransform", "Math"]),
     .testTarget(name: "AdaSpatialTests", dependencies: ["AdaSpatial", "AdaECS", "AdaTransform", "Math"], swiftSettings: swiftSettings),
     .adaTarget(
@@ -529,6 +545,7 @@ var targets: [Target] = [
         name: "AdaAssets",
         dependencies: [
             "AdaAnimation",
+            "AdaGeometry",
             "AdaApp",
             "AdaUtils",
             "Math",
@@ -647,6 +664,7 @@ var targets: [Target] = [
     .adaTarget(
         name: "AdaScene",
         dependencies: [
+            "AdaGeometry",
             "AdaApp",
             "AdaAssets",
             "AdaECS",
@@ -661,7 +679,10 @@ var targets: [Target] = [
             "AdaUI",
             "AdaPhysics"
         ],
-        swiftSettings: swiftSettings
+        swiftSettings: swiftSettings + [
+            // Swift 6.3.2 debug WASI can corrupt the heap when publishing large terrain values.
+            .unsafeFlags(["-Xfrontend", "-disable-large-loadable-types-reg2mem"], .when(platforms: [.wasi], configuration: .debug))
+        ]
     ),
     .adaTarget(
         name: "AdaTilemap",
@@ -876,7 +897,6 @@ targets.append(
 
 // MARK: Build Plugins
 if isWGPUEnabled {
-
     products.append(.plugin(name: "WebGPUTintPlugin", targets: ["WebGPUTintPlugin"]))
     targets.append(
         .plugin(
@@ -894,6 +914,14 @@ if isWGPUEnabled {
 }
 
 // MARK: Extra
+
+targets.append(.testTarget(
+    name: "AdaGeometryTests",
+    dependencies: ["AdaGeometry", "Math"],
+    swiftSettings: swiftSettings + [
+        .define("MESH_TERRAIN_AUTHORING", .when(platforms: [.macOS, .windows, .linux], traits: ["MeshTerrainAuthoring"]))
+    ]
+))
 
 #if os(Linux)
 targets += [
@@ -914,7 +942,6 @@ targets.append(.systemLibrary(name: "X11", pkgConfig: "x11", providers: [.apt(["
 // MARK: - CXX Internal Targets
 
 targets += [
-
     // Box2d
 
     .target(
@@ -1047,30 +1074,33 @@ targets += [
     ),
     .target(
         name: "SPIRV-Cross",
-        exclude: ["CMakeLists.txt",
-                  "CODE_OF_CONDUCT.adoc",
-                  "LICENSE",
-                  "LICENSES",
-                  "Makefile",
-                  "README.md",
-                  "appveyor.yml",
-                  "build_glslang_spirv_tools.sh",
-                  "checkout_glslang_spirv_tools.sh",
-                  "format_all.sh",
-                  "gn",
-                  "pkg-config"
-                 ],
-        sources: ["spirv_cfg.cpp",
-                  "spirv_cpp.cpp",
-                  "spirv_cross.cpp",
-                  "spirv_cross_c.cpp",
-                  "spirv_cross_parsed_ir.cpp",
-                  "spirv_cross_util.cpp",
-                  "spirv_glsl.cpp",
-                  "spirv_hlsl.cpp",
-                  "spirv_msl.cpp",
-                  "spirv_parser.cpp",
-                  "spirv_reflect.cpp"],
+        exclude: [
+            "CMakeLists.txt",
+            "CODE_OF_CONDUCT.adoc",
+            "LICENSE",
+            "LICENSES",
+            "Makefile",
+            "README.md",
+            "appveyor.yml",
+            "build_glslang_spirv_tools.sh",
+            "checkout_glslang_spirv_tools.sh",
+            "format_all.sh",
+            "gn",
+            "pkg-config"
+        ],
+        sources: [
+            "spirv_cfg.cpp",
+            "spirv_cpp.cpp",
+            "spirv_cross.cpp",
+            "spirv_cross_c.cpp",
+            "spirv_cross_parsed_ir.cpp",
+            "spirv_cross_util.cpp",
+            "spirv_glsl.cpp",
+            "spirv_hlsl.cpp",
+            "spirv_msl.cpp",
+            "spirv_parser.cpp",
+            "spirv_reflect.cpp"
+        ],
         publicHeadersPath: "include",
         cxxSettings: [
             .define("SPIRV_CROSS_C_API_CPP", to: "1"),
@@ -1473,7 +1503,7 @@ targets += [
 ]
 
 #if os(macOS)
-//targets.append(contentsOf: swiftLintTargets)
+// targets.append(contentsOf: swiftLintTargets)
 #endif
 
 if let config = dlssBuildConfiguration,
@@ -1504,7 +1534,8 @@ let package = Package(
         .trait(
             name: .wgpuTrait,
             description: "Enable WebGPU support"
-        )
+        ),
+        .trait(name: "MeshTerrainAuthoring", description: "Enable the desktop triangle authoring kernel; compiled players do not require it")
     ],
     dependencies: [],
     targets: targets,
@@ -1551,7 +1582,9 @@ package.dependencies += [
 // Platform conditions on product edges alone do not stop SwiftPM compiling them.
 for target in package.targets {
     target.dependencies.removeAll { dependency in
-        if case let .productItem(_, name, _, _) = dependency { return name == "JavaScriptKit" }
+        if case let .productItem(_, name, _, _) = dependency {
+            return name == "JavaScriptKit"
+        }
         return false
     }
 }
@@ -1641,7 +1674,6 @@ private extension Target {
             plugins: plugins
         )
     }
-
 }
 
 // MARK: - Traits

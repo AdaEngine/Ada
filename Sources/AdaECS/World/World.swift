@@ -81,6 +81,13 @@ public final class World: @unchecked Sendable, Codable {
         self.name = try container.decodeIfPresent(String.self, forKey: .name)
         let entities = try container.decode([Entity].self, forKey: .entities)
 
+        var identifiers: Set<Entity.ID> = []
+        for entity in entities {
+            guard entity.id >= 0, entity.id < Int.max, identifiers.insert(entity.id).inserted else {
+                throw DecodingError.dataCorruptedError(forKey: .entities, in: container, debugDescription: "Invalid or duplicate entity identifier")
+            }
+        }
+        self.entities.reserveRestoredIDs(through: identifiers.max() ?? 0)
         for entity in entities {
             self.addEntity(entity)
         }
@@ -110,11 +117,16 @@ public final class World: @unchecked Sendable, Codable {
         self.flush()
 
         var container = encoder.container(keyedBy: CodingKeys.self)
-        let entities = self.getEntities()
-            .sorted(by: {
-                $0.id < $1.id
-            })
-        try container.encode(entities, forKey: .entities)
+        let entities = self.getEntities().sorted { $0.id < $1.id }
+        var pending = entities.filter { $0.components.has(TransientEntity.self) }
+        var excluded = Set(pending.map(\.id))
+        while let entity = pending.popLast() {
+            for child in entity.children where excluded.insert(child.id).inserted { pending.append(child) }
+        }
+        let savedEntities = entities.filter { !excluded.contains($0.id) }.map {
+            WorldEncodedEntity(entity: $0, excludedEntities: excluded)
+        }
+        try container.encode(savedEntities, forKey: .entities)
         var unkeyedContainer = container.nestedContainer(keyedBy: CodingName.self, forKey: .resources)
         for resource in self.resources.getResources() {
             try unkeyedContainer.encode(AnyEncodable(resource), forKey: CodingName(stringValue: type(of: resource).swiftName))
@@ -1107,5 +1119,18 @@ public struct Tick: Sendable, Comparable {
         let changeTickSince = currentTick.value &- self.value
         let lastTickSince = currentTick.value &- lastTick.value
         return lastTickSince > changeTickSince
+    }
+}
+
+/// Encodes the authored entity using the ordinary scene schema, filtering generated relationship IDs.
+private struct WorldEncodedEntity: Encodable {
+    let entity: Entity
+    let excludedEntities: Set<Entity.ID>
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: Entity.CodingKeys.self)
+        try container.encode(entity.name, forKey: .name)
+        try container.encode(entity.id, forKey: .id)
+        try entity.components.encode(to: container.superEncoder(forKey: .components), excludingEntities: excludedEntities)
     }
 }

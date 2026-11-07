@@ -159,19 +159,41 @@ extension Image {
     /// The hint is case insensitive. If it does not match the bytes, other registered
     /// decoders are considered. Errors from a decoder that recognizes the bytes propagate.
     public static func decode(from data: Data, fileExtension: String?) throws -> Image {
+        let decoder = try decoder(for: data, fileExtension: fileExtension)
+        if let limits = ModelImportContext.limits {
+            guard limits.maximumDecodedBytes > 0 else { throw ModelImportLimitError.invalidLimits }
+            let count = try decoder.decodedRGBAByteCount(data)
+            guard count > 0, count <= limits.maximumDecodedBytes else { throw ModelImportLimitError.decodedBudgetExceeded }
+        }
+        return try decoder.decode(data)
+    }
+
+    /// Header-only accounting for model texture preparation before CPU/GPU resources are created.
+    @_spi(Internal) public static func decodedImportByteCount(from data: Data) throws -> Int {
+        try decoder(for: data, fileExtension: nil).decodedRGBAByteCount(data)
+    }
+
+    static func decodedRGBABytes(width: Int64, height: Int64) throws -> Int {
+        guard width > 0, height > 0, width <= Int64(Int.max / 4), height <= Int64(Int.max) / (width * 4) else {
+            throw ModelImportLimitError.decodedBudgetExceeded
+        }
+        return Int(width * height * 4)
+    }
+
+    private static func decoder(for data: Data, fileExtension: String?) throws -> any ImageDecoder {
         let candidates = decoders.withLock { Array($0.reversed()) }
         let hint = fileExtension?.lowercased()
         if let hint, !hint.isEmpty,
-           let decoder = candidates.first(where: {
-               $0.supportedExtensions.contains { $0.lowercased() == hint } && $0.canDecode(data)
-           }) {
-            return try decoder.decode(data)
+            let decoder = candidates.first(where: {
+                $0.supportedExtensions.contains { $0.lowercased() == hint } && $0.canDecode(data)
+            }) {
+            return decoder
         }
         if let decoder = candidates.first(where: { $0.canDecode(data) }) {
-            return try decoder.decode(data)
+            return decoder
         }
         if let hint, !hint.isEmpty,
-           !candidates.contains(where: { $0.supportedExtensions.contains { $0.lowercased() == hint } }) {
+            !candidates.contains(where: { $0.supportedExtensions.contains { $0.lowercased() == hint } }) {
             throw ImageDecodingError.unsupportedFormat(hint)
         }
         throw ImageDecodingError.invalidData

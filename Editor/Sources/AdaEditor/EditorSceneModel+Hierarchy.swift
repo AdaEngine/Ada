@@ -151,7 +151,7 @@ extension EditorSceneModel {
 }
 
 extension EditorSceneModel {
-    private func subtreeEntityIDs(rootedAt rootID: String) -> [String] {
+    func subtreeEntityIDs(rootedAt rootID: String) -> [String] {
         guard entities.contains(where: { $0.id == rootID }) else {
             return []
         }

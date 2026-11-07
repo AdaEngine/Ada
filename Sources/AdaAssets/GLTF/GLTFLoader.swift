@@ -205,6 +205,8 @@ public struct GLTFImportResult: Sendable {
     public let animations: [Animation]
     /// Content the importer read but could not honor, such as an optional extension it does not implement.
     public let warnings: [String]
+    /// Accounting for a bounded native import; absent for unconstrained/custom results.
+    @_spi(Internal) public var importFootprint: ModelImportFootprint?
 
     public init(
         nodes: [Node],

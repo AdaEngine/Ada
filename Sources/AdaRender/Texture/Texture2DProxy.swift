@@ -43,7 +43,7 @@ public final class Texture2DProxy: Texture2D, @unchecked Sendable {
         (source as? Texture2DProxy)?.backingSource() ?? source
     }
 
-    private func backingSource() -> Texture2D {
+    func backingSource() -> Texture2D {
         source.withLock { $0 }
     }
 

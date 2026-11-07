@@ -67,11 +67,14 @@ public struct MeshletDrawOverride: Sendable {
     public let arguments: (any Buffer)?
     public let argumentOffset: Int
     public let ranges: [Range<Int>]
+    /// CPU copy of the selected geometry generation, for portable topology diagnostics.
+    public let sourceIndices: [UInt32]?
 
-    public init(indices: any IndexBuffer, arguments: (any Buffer)? = nil, argumentOffset: Int = 0, ranges: [Range<Int>] = []) {
+    public init(indices: any IndexBuffer, arguments: (any Buffer)? = nil, argumentOffset: Int = 0, ranges: [Range<Int>] = [], sourceIndices: [UInt32]? = nil) {
         self.indices = indices
         self.arguments = arguments
         self.argumentOffset = argumentOffset
         self.ranges = ranges
+        self.sourceIndices = sourceIndices
     }
 }

@@ -44,3 +44,10 @@ jobs:
             swift build -j 2 --product TextureAtlasBuilderTool
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             swift test --skip-build --parallel --num-workers 2
+
+        - name: Test Mesh Terrain authoring kernel
+          # Authoring is optional for compiled players; explicitly exercise it in CI.
+          run: |
+            swift build -j 2 --traits MeshTerrainAuthoring --product AdaEnginePackageTests
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            swift test --traits MeshTerrainAuthoring --skip-build --parallel --num-workers 2 --filter "MeshTerrain|TriangleBoolean|TriangleIndexEdges"

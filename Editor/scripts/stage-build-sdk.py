@@ -45,7 +45,13 @@ def stage(engine, compiler, destination, swan=None):
         staged = Path(temporary) / "BuildSDK"
         staged.mkdir()
         copy_inputs(engine, staged / "AdaEngine", ["Package.swift", "Package.resolved", ".swiftlint.yml", "LICENSE", "NOTICE",
-                                                   "Sources", "Plugins", "Tools", "Tests", "Assets", "script"])
+                                                   "Sources", "Plugins", "Tools", "Tests", "Assets", "script", "Editor/StudioCore"])
+        # These checked-in browser modules are required by the Web export plugin.
+        # Ordinary generated dist directories remain excluded from the SDK.
+        browser_runtime = Path("Plugins/AdaWebExportPlugin/BrowserWASIShim/dist")
+        if (engine / browser_runtime).is_dir():
+            modules = sorted(file.name for file in (engine / browser_runtime).glob("*.js"))
+            copy_inputs(engine / browser_runtime, staged / "AdaEngine" / browser_runtime, modules)
         copy_inputs(compiler, staged / "AdaScript", ["Package.swift", "Package.resolved", "LICENSE", "Makefile", "src", "binding",
                                                     "tools", "Tests", "examples", "gravity", "gravity.exe"])
         host = staged / "AdaScript" / ("gravity.exe" if os.name == "nt" else "gravity")

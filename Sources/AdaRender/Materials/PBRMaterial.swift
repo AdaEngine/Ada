@@ -83,7 +83,7 @@ public enum PBRLayerTexture: Int, CaseIterable, Hashable, Sendable {
     }
 
     /// The layer a texture belongs to, if it only matters while that layer is on.
-    fileprivate var layer: PBRMaterial.ShaderFeatures? {
+    var layer: PBRMaterial.ShaderFeatures? {
         switch self {
         case .clearcoat, .clearcoatRoughness, .clearcoatNormal: .clearcoat
         case .sheenColor, .sheenRoughness: .sheen
@@ -96,6 +96,7 @@ public enum PBRLayerTexture: Int, CaseIterable, Hashable, Sendable {
 /// A material that uses Physically Based Rendering (PBR) to define its appearance.
 public class PBRMaterial: Material, @unchecked Sendable {
     /// Optional fragment graph; lighting, skinning and render-pass configuration stay shared.
+    @_spi(Internal) public var terrainBindings: TerrainMaterialBindings? { didSet { uniformRevision &+= 1 } }
     public var graphMaterial: ShaderGraphMaterial? { didSet { uniformRevision &+= 1 } }
     public var effectiveAlphaMode: AlphaMode {
         switch graphMaterial?.program.renderSettings.mode {
@@ -187,6 +188,9 @@ public class PBRMaterial: Material, @unchecked Sendable {
         public static let diffuseSurface = Self(rawValue: 1 << 13)
         public static let lightmap = Self(rawValue: 1 << 14)
         public static let irradianceGrid = Self(rawValue: 1 << 15)
+        public static let terrain = Self(rawValue: 1 << 16)
+        /// Diagnostic line pass; never an authored material feature.
+        public static let wireframe = Self(rawValue: 1 << 17)
 
         /// Every layer, without textures.
         public static let all: ShaderFeatures = [.clearcoat, .sheen, .anisotropy]
@@ -202,6 +206,8 @@ public class PBRMaterial: Material, @unchecked Sendable {
             if contains(.diffuseSurface) { macros.append("ADA_DIFFUSE_SURFACE") }
             if contains(.lightmap) { macros.append("ADA_LIGHTMAP") }
             if contains(.irradianceGrid) { macros.append("ADA_IRRADIANCE_GRID") }
+            if contains(.terrain) { macros.append("ADA_TERRAIN") }
+            if contains(.wireframe) { macros.append("ADA_WIREFRAME") }
             for texture in PBRLayerTexture.allCases where contains(texture.feature) {
                 macros.append(texture.macro)
             }
@@ -213,6 +219,7 @@ public class PBRMaterial: Material, @unchecked Sendable {
     public var shaderFeatures: ShaderFeatures {
         var features: ShaderFeatures = []
         if lightmapTexture != nil { features.insert(.lightmap) }
+        if terrainBindings != nil { features.insert(.terrain) }
         if clearcoatFactor > 0 { features.insert(.clearcoat) }
         if max(sheenColorFactor.x, max(sheenColorFactor.y, sheenColorFactor.z)) > 0 { features.insert(.sheen) }
         if anisotropyStrength > 0 { features.insert(.anisotropy) }

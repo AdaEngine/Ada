@@ -1,6 +1,6 @@
 @testable import AdaApp
 import AdaECS
-import AdaScripting
+@testable import AdaScripting
 import Testing
 
 @Suite("Annotation-driven Gravity scripts", .serialized)
@@ -149,6 +149,24 @@ struct AnnotatedAdaScriptPluginTests {
 
         #expect(plugin.diagnostics.isEmpty)
         #expect(world.get(AnnotatedPosition.self, from: entity.id)?.value == 7)
+    }
+
+    @Test("Optional native dependency validation stays within the registered scheduler")
+    func optionalNativeDependencyValidation() throws {
+        let consumer = AdaScriptSystemDependencyDescription(dependencies: [.afterIfPresent("target")], identifier: "consumer", scheduler: .update)
+        try AdaScriptSystemDependencyValidator.validate([consumer])
+        let startup = AdaScriptSystemDependencyDescription(dependencies: [], identifier: "target", scheduler: .startup)
+        try AdaScriptSystemDependencyValidator.validate([consumer, startup])
+        let target = AdaScriptSystemDependencyDescription(dependencies: [], identifier: "target", scheduler: .update)
+        try AdaScriptSystemDependencyValidator.validate([consumer, target])
+        let recursive = AdaScriptSystemDependencyDescription(dependencies: [.afterIfPresent("consumer")], identifier: "consumer", scheduler: .update)
+        #expect(throws: AdaScriptError.invalidManifest("system 'consumer' cannot depend on itself")) {
+            try AdaScriptSystemDependencyValidator.validate([recursive])
+        }
+        let cycle = AdaScriptSystemDependencyDescription(dependencies: [.afterIfPresent("consumer")], identifier: "target", scheduler: .update)
+        #expect(throws: AdaScriptError.invalidManifest("system dependency cycle: consumer -> target -> consumer")) {
+            try AdaScriptSystemDependencyValidator.validate([consumer, cycle])
+        }
     }
 
     @Test("Validates system dependency annotations")

@@ -56,6 +56,12 @@ public struct PBR3DPipeline: RenderPipelineConfigurator {
             descriptor.colorAttachments[3].isBlendingEnabled = true
             descriptor.colorAttachments[3].sourceRGBBlendFactor = .zero
         }
+        if configuration.features.contains(.wireframe) {
+            descriptor.primitive = .line
+            descriptor.depthStencilDescriptor?.isDepthWriteEnabled = false
+            descriptor.depthStencilDescriptor?.depthCompareOperator = .lessOrEqual
+            for index in descriptor.colorAttachments.indices { descriptor.colorAttachments[index].isBlendingEnabled = false }
+        }
         return descriptor
     }
 }

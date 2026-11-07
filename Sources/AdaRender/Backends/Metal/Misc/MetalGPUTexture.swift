@@ -9,7 +9,7 @@
     import Math
     import Metal
 
-    final class MetalGPUTexture: GPUTexture {
+    final class MetalGPUTexture: GPUTexture, TextureSubresourceUploading {
         var size: SizeInt {
             SizeInt(width: self.texture.width, height: self.texture.height)
         }
@@ -64,6 +64,9 @@
             textureDesc.mipmapLevelCount = max(1, descriptor.mipmapLevel)
             textureDesc.width = descriptor.width
             textureDesc.height = descriptor.height
+            if descriptor.textureType == .texture2DArray {
+                textureDesc.arrayLength = max(1, descriptor.arrayLength)
+            }
             textureDesc.pixelFormat = descriptor.pixelFormat.toMetal
             if descriptor.pixelFormat.isDepthFormat || descriptor.usesPrivateStorage {
                 textureDesc.storageMode = .private
@@ -155,6 +158,21 @@
                 withBytes: bytes,
                 bytesPerRow: bytesPerRow
             )
+        }
+
+        func uploadSubresource(_ resource: TextureSubresource) throws {
+            let image = resource.image
+            try unsafe image.data.withUnsafeBytes { buffer in
+                guard let address = unsafe buffer.baseAddress else { throw TextureSubresourceUploadError.invalidSubresource }
+                unsafe texture.replace(
+                    region: MTLRegionMake2D(0, 0, image.width, image.height),
+                    mipmapLevel: resource.mipLevel,
+                    slice: resource.slice,
+                    withBytes: address,
+                    bytesPerRow: image.width * 4,
+                    bytesPerImage: image.data.count
+                )
+            }
         }
 
         // TODO: (Vlad) think about it later

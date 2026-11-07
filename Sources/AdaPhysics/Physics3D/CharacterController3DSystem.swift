@@ -8,11 +8,15 @@ public struct CharacterController3DSystem {
     @FilterQuery<Ref<CharacterController3DComponent>, Ref<Transform>, Without<PhysicsBody3DComponent>> private var characters
     @ResMut<Physics3DWorldHolder> private var physics
     @Res<FixedTime?> private var time
+    @Res<PhysicsSimulationGate3D?> private var gate
 
     public init(world _: World) {}
 
     @MainActor
     public func update(context _: UpdateContext) {
+        guard gate?.isReady != false else {
+            return
+        }
         guard let time else {
             return
         }

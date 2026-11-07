@@ -1,6 +1,7 @@
 import AdaRender
 import AdaUtils
 import Foundation
+import Math
 import Testing
 
 /// Compares rendered frames against checked-in reference PNGs.

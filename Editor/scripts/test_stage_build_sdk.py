@@ -68,6 +68,52 @@ class StageSDKTests(unittest.TestCase):
             sdk.stage(engine, compiler, destination)
             self.assertFalse((destination / "BuildSDK").exists())
 
+    def test_sdk_includes_local_studio_core_package(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            engine = root / "engine"
+            compiler = root / "compiler"
+            package = engine / "Editor/StudioCore/Package.swift"
+            source = package.parent / "Sources/AdaStudioCore/Core.swift"
+            source.parent.mkdir(parents=True)
+            package.write_text("local package")
+            source.write_text("Swift source")
+            compiler.mkdir()
+            for host in ("gravity", "gravity.exe"):
+                executable = compiler / host
+                executable.touch()
+                executable.chmod(0o755)
+            destination = root / "Moved Studio/BuildSDK"
+            with patch.object(sdk.subprocess, "run"):
+                sdk.stage(engine, compiler, destination)
+            staged_package = destination / "AdaEngine/Editor/StudioCore/Package.swift"
+            self.assertTrue(staged_package.is_file())
+            self.assertEqual(staged_package.read_text(), "local package")
+            self.assertTrue((staged_package.parent / "Sources/AdaStudioCore/Core.swift").is_file())
+
+    def test_sdk_keeps_bundled_browser_wasi_runtime(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            engine = root / "engine"
+            compiler = root / "compiler"
+            shim = "Plugins/AdaWebExportPlugin/BrowserWASIShim/dist"
+            for relative in (shim + "/index.js", shim + "/wasi.js", "Demos/Project/dist/generated.txt"):
+                file = engine / relative
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text(relative)
+            compiler.mkdir()
+            for host in ("gravity", "gravity.exe"):
+                executable = compiler / host
+                executable.touch()
+                executable.chmod(0o755)
+            destination = root / "BuildSDK"
+            with patch.object(sdk.subprocess, "run"):
+                sdk.stage(engine, compiler, destination)
+            staged_engine = destination / "AdaEngine"
+            self.assertTrue((staged_engine / shim / "index.js").is_file())
+            self.assertTrue((staged_engine / shim / "wasi.js").is_file())
+            self.assertFalse((staged_engine / "Demos/Project/dist").exists())
+
     def test_android_sdk_keeps_dawn_static_library_after_relocation(self):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)

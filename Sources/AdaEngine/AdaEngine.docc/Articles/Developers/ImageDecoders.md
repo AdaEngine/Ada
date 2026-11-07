@@ -32,17 +32,24 @@ struct RawRGBAImageDecoder: ImageDecoder {
         data.starts(with: [65, 68, 65, 73]) // "ADAI"
     }
 
+    func decodedRGBAByteCount(_ data: Data) throws -> Int {
+        guard canDecode(data), data.count >= 6 else {
+            throw ImageDecodingError.invalidData
+        }
+        let header = Array(data.prefix(6)) // A fixed-size header, including for Data slices.
+        let width = Int(header[4])
+        let height = Int(header[5])
+        let count = width * height * 4 // One-byte dimensions bound this multiplication.
+        guard width > 0, height > 0, data.count == 6 + count else {
+            throw ImageDecodingError.invalidData
+        }
+        return count
+    }
+
     func decode(_ data: Data) throws -> Image {
-        let bytes = Array(data)
-        guard canDecode(data), bytes.count >= 6 else {
-            throw ImageDecodingError.invalidData
-        }
-        let width = Int(bytes[4])
-        let height = Int(bytes[5])
-        guard width > 0, height > 0, bytes.count == 6 + width * height * 4 else {
-            throw ImageDecodingError.invalidData
-        }
-        return Image(width: width, height: height, data: Data(bytes.dropFirst(6)))
+        _ = try decodedRGBAByteCount(data)
+        let header = Array(data.prefix(6))
+        return Image(width: Int(header[4]), height: Int(header[5]), data: Data(data.dropFirst(6)))
     }
 }
 
@@ -62,6 +69,73 @@ are unaffected. A decoder's error propagates once it recognizes the input.
 
 Registration adds decoding only; it does not add an image encoder. WebP, GIF,
 TIFF, HDR/EXR and KTX2 are not built-in raster decoders.
+
+## Texture arrays
+
+Once the renderer is configured, `TextureDescriptor` can initialize a 2D texture
+array. Set `textureType` to `.texture2DArray`, set `arrayLength`, and provide a
+`TextureSubresource` for every slice and mip level. Images in each mip level need
+matching dimensions and formats. Slice numbers start at zero. Sample the result
+with a 2D-array shader binding, including when the array contains one slice.
+
+```swift
+let slices = [
+    Image(width: 2, height: 2, color: .red, format: .rgba8),
+    Image(width: 2, height: 2, color: .blue, format: .rgba8)
+]
+var descriptor = TextureDescriptor(
+    width: 2, height: 2, pixelFormat: .rgba8,
+    textureUsage: [.read], textureType: .texture2DArray, mipmapLevel: 1
+)
+descriptor.arrayLength = slices.count
+descriptor.subresources = slices.enumerated().map {
+    TextureSubresource(image: $0.element, mipLevel: 0, slice: $0.offset)
+}
+let arrayTexture = Texture2D(descriptor: descriptor)
+```
+
+## Bounded model and image imports
+
+Model pipelines can install `ModelImportLimits` for one structured resource
+request. The bounded native paths accept glTF/GLB, OBJ and static VOX data. Terrain palette readers retain their limits across actor calls,
+reader forks and save adoption. The root/dependency byte limit applies before
+resource reads; decoded geometry and texture preparation share a conservative
+budget. Pixel checks happen before decoding, mip conversion and GPU texture creation.
+
+Optional `.meshlets` and `.meshletlod` files share the encoded allowance. Their
+parsed records and staging copies use the remaining decoded allowance after
+mandatory model textures. If a derived file is invalid or exceeds these limits,
+the model keeps its original geometry and materials and reports an import warning.
+
+```swift
+import AdaEngine
+
+let limits = ModelImportLimits(
+    maximumEncodedBytes: 16 * 1024 * 1024,
+    maximumDecodedBytes: 64 * 1024 * 1024
+)
+let model = try await ModelImportContext.$limits.withValue(limits) {
+    try await AssetsManager.loadFresh(ModelAsset3D.self, at: "@res://Models/rock.glb")
+}
+```
+
+`decodedRGBAByteCount(_:)` must inspect only bounded header data and return the
+RGBA8 pixel size without allocating pixel buffers. Check dimensions and arithmetic
+before multiplying them. Built-in PNG, JPEG, BMP and TGA decoders provide this
+inspection. The custom decoder above opts in too. The default implementation
+rejects bounded inspection explicitly; ordinary image loading keeps its existing
+behavior when no import limits are installed. Header readers must honor `Data`
+slices whose `startIndex` is nonzero.
+
+Bounded OBJ loading uses the built-in parser and meters text/token expansion before
+allocation. Repeated faces and distinct materials use shared buffers and indexed
+primitive selection; nonfinite coordinates reject before GPU preparation. Bounded
+VOX loading admits raw records, dense grids and conservative meshing work before
+allocation. It requires a static, acyclic visible hierarchy with bounded depth;
+static subtree merging is unavailable under these limits. Ordinary imports without
+limits preserve the existing loader/options path. Conservative estimates can reject
+an asset that would fit after geometry reduction; raise the scoped limit when needed.
+
 
 ## Adding a different resource type
 

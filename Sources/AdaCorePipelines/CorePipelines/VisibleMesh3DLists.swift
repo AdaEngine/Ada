@@ -57,6 +57,16 @@ public struct VisibleMesh3DLists: Resource {
     private struct SelectionKey: Hashable {
         var view: Entity.ID
         var entity: Entity.ID
+        var instance: UInt64
+        var instanced: Bool
+    }
+    private struct SelectionSource: Hashable {
+        let entity: Entity.ID
+        let instanced: Bool
+    }
+    private struct Membership {
+        let revision: RID
+        let ids: Set<UInt64>?
     }
     private struct BatchKey: Hashable {
         var vertex: ObjectIdentifier
@@ -95,6 +105,7 @@ public struct VisibleMesh3DLists: Resource {
     /// reference counting.
     private struct Record {
         var source: Int32
+        var instance: Int32
         var lod: Int32
         var model: Int32
         var part: Int32
@@ -107,6 +118,9 @@ public struct VisibleMesh3DLists: Resource {
     /// Passes prepared since creation, for tests that check which lists a frame rebuilt.
     private(set) var preparedPassCount = 0
     private var history: [SelectionKey: Int] = [:]
+    private var membership: [SelectionSource: Membership] = [:]
+    var cachedLODSelectionCount: Int { history.count }
+    private(set) var historyReconciliationCount = 0
     public init() {}
 
     public mutating func retainViews(_ views: [Entity.ID]) {
@@ -125,6 +139,7 @@ public struct VisibleMesh3DLists: Resource {
         device: RenderDevice,
         materials: inout PBR3DUniforms
     ) {
+        reconcileHistory(sources: sources)
         preparedPassCount &+= 1
         let key = Key(view: view, pass: pass)
         var entry = entries.removeValue(forKey: key) ?? Entry()
@@ -147,120 +162,140 @@ public struct VisibleMesh3DLists: Resource {
         // with several references, and copying it for every pass and every mesh dominated this function.
         for sourceIndex in sources.indices {
             if isShadowPass && !sources[sourceIndex].castShadows { continue }
-            entry.count.candidates += 1
-            if settings.frustumCulling, !sources[sourceIndex].forceVisible, let bounds = sources[sourceIndex].bounds,
-                !frustum.intersects(bounds) {
-                entry.count.frustumRejected += 1
-                continue
+            var prototypeBounds = sources[sourceIndex].mesh.bounds
+            for alternative in sources[sourceIndex].alternatives {
+                prototypeBounds = AABB(min: min(prototypeBounds.min, alternative.bounds.min), max: max(prototypeBounds.max, alternative.bounds.max))
             }
-            var fade: Float = 1
-            if settings.distanceCulling, let maximum = sources[sourceIndex].maximumDistance, maximum.isFinite, maximum > 0 {
-                let center = sources[sourceIndex].bounds?.center ?? sources[sourceIndex].transform.origin
-                let distance = (center - cameraPosition).length
-                if distance >= maximum {
-                    entry.count.distanceRejected += 1
+            let count = sources[sourceIndex].instances?.count ?? 1
+            for ordinal in 0..<count {
+                let placement = sources[sourceIndex].instances == nil ? -1 : ordinal
+                let instanceTransform = Self.transform(sources[sourceIndex], placement: placement)
+                let instanceBounds = placement >= 0 ? MeshVisibility3DMath.transformed(prototypeBounds, by: instanceTransform) : sources[sourceIndex].bounds
+                entry.count.candidates += 1
+                if settings.frustumCulling, !sources[sourceIndex].forceVisible, let bounds = instanceBounds,
+                    !frustum.intersects(bounds) {
+                    entry.count.frustumRejected += 1
                     continue
                 }
-                let fadeDistance = finiteRenderValue(sources[sourceIndex].fadeDistance, fallback: 4, range: 0...maximum)
-                if fadeDistance > 0 { fade = min(max((maximum - distance) / fadeDistance, 0), 1) }
-            }
-            var lod = 0
-            // A mesh with no alternatives is always level zero; skipping the selection also keeps it out of the
-            // hysteresis history, which only matters for meshes that can change level.
-            if settings.lod, !sources[sourceIndex].alternatives.isEmpty, let bounds = sources[sourceIndex].bounds {
-                let selectionKey = SelectionKey(view: view, entity: sources[sourceIndex].entity)
-                lod = MeshVisibility3DMath.selectLOD(
-                    size: MeshVisibility3DMath.projectedDiameter(bounds, view: viewMatrix, projection: projection),
-                    thresholds: sources[sourceIndex].thresholds,
-                    levels: sources[sourceIndex].alternatives.count + 1,
-                    previous: history[selectionKey],
-                    hysteresis: sources[sourceIndex].hysteresis
-                )
-                history[selectionKey] = lod
-            }
-            entry.count.visibleMeshes += 1
-            entry.count.lodInstances[min(lod, 2)] += 1
-            let sourceMesh = sources[sourceIndex].mesh
-            for modelIndex in sourceMesh.models.indices {
-                for partIndex in sourceMesh.models[modelIndex].parts.indices {
-                    entry.count.lod0Triangles += sourceMesh.models[modelIndex].parts[partIndex].indexCount / 3
-                }
-            }
-            let mesh = lod == 0 ? sourceMesh : sources[sourceIndex].alternatives[lod - 1]
-            for modelIndex in mesh.models.indices {
-                let parts = mesh.models[modelIndex].parts
-                for partIndex in parts.indices {
-                    let materialIndex = parts[partIndex].materialIndex
-                    guard sources[sourceIndex].materials.indices.contains(materialIndex) else { continue }
-                    let material = sources[sourceIndex].materials[materialIndex]
-                    let pbr = material as? PBRMaterial
-                    if isShadowPass && pbr?.effectiveAlphaMode == .blend { continue }
-                    // Batches never mix vertex layouts: the descriptor is interned per call so the key stays cheap.
-                    let descriptor = parts[partIndex].vertexDescriptor
-                    var descriptorID = -1
-                    if let last = descriptors.indices.last, descriptors[last] == descriptor {
-                        descriptorID = last
-                    } else if let found = descriptors.firstIndex(of: descriptor) {
-                        descriptorID = found
-                    } else {
-                        descriptorID = descriptors.count
-                        descriptors.append(descriptor)
+                var fade: Float = 1
+                if settings.distanceCulling, let maximum = sources[sourceIndex].maximumDistance, maximum.isFinite, maximum > 0 {
+                    let center = instanceBounds?.center ?? instanceTransform.origin
+                    let distance = (center - cameraPosition).length
+                    if distance >= maximum {
+                        entry.count.distanceRejected += 1
+                        continue
                     }
-                    let materialKey: MaterialKey
-                    if isShadowPass {
-                        // The parameter buffer must exist before it can be part of the key.
-                        materials.write(material: material, descriptor: descriptor, device: device)
-                        if let pbr, pbr.graphMaterial == nil || pbr.effectiveAlphaMode != .mask, let buffer = materials.buffer(for: material) {
-                            materialKey = .shadow(ObjectIdentifier(buffer), pbr.baseColorTexture.map(ObjectIdentifier.init))
+                    let fadeDistance = finiteRenderValue(sources[sourceIndex].fadeDistance, fallback: 4, range: 0...maximum)
+                    if fadeDistance > 0 { fade = min(max((maximum - distance) / fadeDistance, 0), 1) }
+                }
+                var lod = 0
+                // A mesh with no alternatives is always level zero; skipping the selection also keeps it out of the
+                // hysteresis history, which only matters for meshes that can change level.
+                if settings.lod, !sources[sourceIndex].alternatives.isEmpty, let bounds = instanceBounds {
+                    let selectionKey = SelectionKey(
+                        view: view,
+                        entity: sources[sourceIndex].entity,
+                        instance: placement >= 0 ? sources[sourceIndex].instances?[placement].id ?? 0 : 0,
+                        instanced: placement >= 0
+                    )
+                    lod = MeshVisibility3DMath.selectLOD(
+                        size: MeshVisibility3DMath.projectedDiameter(bounds, view: viewMatrix, projection: projection),
+                        thresholds: sources[sourceIndex].thresholds,
+                        levels: sources[sourceIndex].alternatives.count + 1,
+                        previous: history[selectionKey],
+                        hysteresis: sources[sourceIndex].hysteresis
+                    )
+                    history[selectionKey] = lod
+                }
+                entry.count.visibleMeshes += 1
+                entry.count.lodInstances[min(lod, 2)] += 1
+                let sourceMesh = sources[sourceIndex].mesh
+                for modelIndex in sourceMesh.models.indices {
+                    for partIndex in sourceMesh.models[modelIndex].parts.indices {
+                        entry.count.lod0Triangles += sourceMesh.models[modelIndex].parts[partIndex].indexCount / 3
+                    }
+                }
+                let mesh = lod == 0 ? sourceMesh : sources[sourceIndex].alternatives[lod - 1]
+                for modelIndex in mesh.models.indices {
+                    let parts = mesh.models[modelIndex].parts
+                    for partIndex in parts.indices {
+                        let materialIndex = parts[partIndex].materialIndex
+                        guard sources[sourceIndex].materials.indices.contains(materialIndex) else { continue }
+                        let material = sources[sourceIndex].materials[materialIndex]
+                        let pbr = material as? PBRMaterial
+                        if isShadowPass && pbr?.effectiveAlphaMode == .blend { continue }
+                        // Batches never mix vertex layouts: the descriptor is interned per call so the key stays cheap.
+                        let descriptor = parts[partIndex].vertexDescriptor
+                        var descriptorID = -1
+                        if let last = descriptors.indices.last, descriptors[last] == descriptor {
+                            descriptorID = last
+                        } else if let found = descriptors.firstIndex(of: descriptor) {
+                            descriptorID = found
+                        } else {
+                            descriptorID = descriptors.count
+                            descriptors.append(descriptor)
+                        }
+                        let materialKey: MaterialKey
+                        if isShadowPass {
+                            // The parameter buffer must exist before it can be part of the key.
+                            materials.write(material: material, descriptor: descriptor, device: device)
+                            if let pbr, pbr.graphMaterial == nil || pbr.effectiveAlphaMode != .mask, let buffer = materials.buffer(for: material) {
+                                materialKey = .shadow(ObjectIdentifier(buffer), pbr.baseColorTexture.map(ObjectIdentifier.init))
+                            } else {
+                                materialKey = .identity(material.rid)
+                            }
                         } else {
                             materialKey = .identity(material.rid)
                         }
-                    } else {
-                        materialKey = .identity(material.rid)
+                        let batchKey = BatchKey(
+                            vertex: ObjectIdentifier(parts[partIndex].vertexBuffer),
+                            index: ObjectIdentifier(parts[partIndex].indexBuffer),
+                            indexCount: parts[partIndex].indexCount,
+                            material: materialKey,
+                            descriptor: Int32(descriptorID),
+                            skin: sources[sourceIndex].skinningBuffer.map(ObjectIdentifier.init),
+                            morph: sources[sourceIndex].morphBuffers[Mesh3DRenderSource.morphKey(model: modelIndex, part: partIndex)].map(ObjectIdentifier.init),
+                            cast: sources[sourceIndex].castShadows,
+                            receive: sources[sourceIndex].receiveShadows
+                        )
+                        let template: Int32
+                        if let existing = templateIndex[batchKey] {
+                            template = existing
+                        } else {
+                            // Written once per batch: the uniform depends only on the material and vertex layout.
+                            if !isShadowPass { materials.write(material: material, descriptor: descriptor, device: device) }
+                            template = Int32(templates.count)
+                            templateIndex[batchKey] = template
+                            let templateHash = UInt64(bitPattern: Int64(batchKey.hashValue))
+                            templates.append(
+                                Self.makeTemplate(
+                                    material: material,
+                                    descriptor: descriptor,
+                                    receivesShadows: sources[sourceIndex].receiveShadows,
+                                    blended: pbr?.effectiveAlphaMode == .blend,
+                                    shadowOnly: isShadowPass
+                                )
+                            )
+                            templates[Int(template)].batchHash = templateHash
+                        }
+                        if templates[Int(template)].rank < 0 {
+                            templates[Int(template)].rank = rankCount
+                            rankCount += 1
+                        }
+                        entry.records.append(
+                            Record(
+                                source: Int32(sourceIndex),
+                                instance: Int32(placement),
+                                lod: Int32(lod),
+                                model: Int32(modelIndex),
+                                part: Int32(partIndex),
+                                material: Int32(materialIndex),
+                                template: template,
+                                fade: fade
+                            )
+                        )
+                        entry.count.triangles += parts[partIndex].indexCount / 3
                     }
-                    let batchKey = BatchKey(
-                        vertex: ObjectIdentifier(parts[partIndex].vertexBuffer),
-                        index: ObjectIdentifier(parts[partIndex].indexBuffer),
-                        indexCount: parts[partIndex].indexCount,
-                        material: materialKey,
-                        descriptor: Int32(descriptorID),
-                        skin: sources[sourceIndex].skinningBuffer.map(ObjectIdentifier.init),
-                        morph: sources[sourceIndex].morphBuffers[Mesh3DRenderSource.morphKey(model: modelIndex, part: partIndex)].map(ObjectIdentifier.init),
-                        cast: sources[sourceIndex].castShadows,
-                        receive: sources[sourceIndex].receiveShadows
-                    )
-                    let template: Int32
-                    if let existing = templateIndex[batchKey] {
-                        template = existing
-                    } else {
-                        // Written once per batch: the uniform depends only on the material and vertex layout.
-                        if !isShadowPass { materials.write(material: material, descriptor: descriptor, device: device) }
-                        template = Int32(templates.count)
-                        templateIndex[batchKey] = template
-                        let templateHash = UInt64(bitPattern: Int64(batchKey.hashValue))
-                        templates.append(Self.makeTemplate(
-                            material: material,
-                            descriptor: descriptor,
-                            receivesShadows: sources[sourceIndex].receiveShadows,
-                            blended: pbr?.effectiveAlphaMode == .blend,
-                            shadowOnly: isShadowPass
-                        ))
-                        templates[Int(template)].batchHash = templateHash
-                    }
-                    if templates[Int(template)].rank < 0 {
-                        templates[Int(template)].rank = rankCount
-                        rankCount += 1
-                    }
-                    entry.records.append(Record(
-                        source: Int32(sourceIndex),
-                        lod: Int32(lod),
-                        model: Int32(modelIndex),
-                        part: Int32(partIndex),
-                        material: Int32(materialIndex),
-                        template: template,
-                        fade: fade
-                    ))
-                    entry.count.triangles += parts[partIndex].indexCount / 3
                 }
             }
         }
@@ -286,6 +321,11 @@ public struct VisibleMesh3DLists: Resource {
             let record = entry.records[Int(orderIndex)]
             let sourceIndex = Int(record.source)
             let template = templates[Int(record.template)]
+            let placement = Int(record.instance)
+            let selectedMesh = record.lod == 0 ? sources[sourceIndex].mesh : sources[sourceIndex].alternatives[Int(record.lod) - 1]
+            let transform = Self.transform(sources[sourceIndex], placement: placement)
+            let previousTransform = Self.previousTransform(sources[sourceIndex], placement: placement)
+            let tint = placement >= 0 ? sources[sourceIndex].instances?[placement].color ?? .one : .one
             var shadowFlags = template.shadowFlags
             shadowFlags.w = 1 - record.fade
             // Positive Y belongs to atmospheres. Negative values carry an exact
@@ -295,7 +335,8 @@ public struct VisibleMesh3DLists: Resource {
                 // A skinned pose changes without any CPU-visible identity change, so such a face is never reusable.
                 if sources[sourceIndex].skinningBuffer != nil || !sources[sourceIndex].morphBuffers.isEmpty { entry.isDynamic = true }
                 entry.digest.combine(template.batchHash)
-                entry.digest.combine(sources[sourceIndex].transform)
+                entry.digest.combine(transform)
+                entry.digest.combine(tint)
                 entry.digest.combine((sources[sourceIndex].materials[Int(record.material)] as? PBRMaterial)?.baseColorFactor ?? .one)
                 if let pbr = sources[sourceIndex].materials[Int(record.material)] as? PBRMaterial,
                     pbr.effectiveAlphaMode == .mask, let graph = pbr.graphMaterial {
@@ -303,20 +344,21 @@ public struct VisibleMesh3DLists: Resource {
                 }
                 entry.digest.combine(shadowFlags.w)
             }
-            let instanceIndex = entry.buffers.append(Flat3DInstanceData(
-                modelMatrix: sources[sourceIndex].transform,
-                // Shadow batches can mix materials that only differ in colour, so that comes from the record itself.
-                color: isShadowPass ? (sources[sourceIndex].materials[Int(record.material)] as? PBRMaterial)?.baseColorFactor ?? .one : template.color,
-                material: template.material,
-                textureFlags: template.textureFlags,
-                shadowFlags: shadowFlags,
-                previousModelMatrix: isShadowPass ? nil : sources[sourceIndex].previousTransform
-            ))
+            let instanceIndex = entry.buffers.append(
+                Flat3DInstanceData(
+                    modelMatrix: transform,
+                    // Shadow batches can mix materials that only differ in colour, so that comes from the record itself.
+                    color: (isShadowPass ? (sources[sourceIndex].materials[Int(record.material)] as? PBRMaterial)?.baseColorFactor ?? .one : template.color) * tint,
+                    material: template.material,
+                    textureFlags: template.textureFlags,
+                    shadowFlags: shadowFlags,
+                    previousModelMatrix: isShadowPass ? nil : previousTransform
+                )
+            )
             if !template.blended, previousTemplate == record.template, let last = entry.items.indices.last {
                 let lower = entry.items[last].batchRange?.lowerBound ?? instanceIndex
                 entry.items[last].batchRange = lower..<(instanceIndex + 1)
             } else {
-                let mesh = record.lod == 0 ? sources[sourceIndex].mesh : sources[sourceIndex].alternatives[Int(record.lod) - 1]
                 entry.items.append(
                     Opaque3DRenderItem(
                         entity: sources[sourceIndex].entity,
@@ -324,9 +366,9 @@ public struct VisibleMesh3DLists: Resource {
                         sortKey: 0,
                         modelIndex: Int(record.model),
                         partIndex: Int(record.part),
-                        mesh: mesh,
+                        mesh: selectedMesh,
                         material: sources[sourceIndex].materials[Int(record.material)],
-                        worldTransform: sources[sourceIndex].transform,
+                        worldTransform: transform,
                         castShadows: sources[sourceIndex].castShadows,
                         receiveShadows: sources[sourceIndex].receiveShadows,
                         batchRange: instanceIndex..<(instanceIndex + 1),
@@ -337,13 +379,16 @@ public struct VisibleMesh3DLists: Resource {
                 entry.items[entry.items.count - 1].forceVisible = sources[sourceIndex].forceVisible
             }
             if pass < 0 && settings.gpuOcclusion, let item = entry.items.last, let range = item.batchRange {
+                // Automatic LOD submits its own CPU-selected indices against the
+                // compacted instance buffer. Always preserve its instance slot.
+                let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
                 entry.candidates.append(
                     GPUVisibilityCandidate(
-                        bounds: sources[sourceIndex].bounds,
+                        bounds: placement >= 0 ? MeshVisibility3DMath.transformed(selectedMesh.bounds, by: transform) : sources[sourceIndex].bounds,
                         draw: UInt32(entry.items.count - 1),
                         source: UInt32(instanceIndex),
                         destination: UInt32(range.lowerBound),
-                        forceVisible: sources[sourceIndex].forceVisible || template.blended
+                        forceVisible: sources[sourceIndex].forceVisible || template.blended || part.meshletLOD?.automaticPixelError != nil
                     )
                 )
             }
@@ -377,6 +422,54 @@ public struct VisibleMesh3DLists: Resource {
             result.defaults = entry.buffers.defaultVertexBuffer
         }
         return result
+    }
+
+    // Keep IDs alive independently of camera visibility. Rebuild a membership set only when its
+    // placement revision changes, so unchanged 100k-placement arrays are not scanned per camera/pass.
+    private mutating func reconcileHistory(sources: [Mesh3DRenderSource]) {
+        var next: [SelectionSource: Membership] = [:]
+        var changed = false
+        for source in sources where !source.alternatives.isEmpty {
+            let key = SelectionSource(entity: source.entity, instanced: source.instances != nil)
+            if let previous = membership[key], !key.instanced || previous.revision == source.instanceRevision {
+                next[key] = previous
+            } else {
+                next[key] = Membership(revision: source.instanceRevision, ids: source.instances.map { Set($0.lazy.map(\.id)) })
+                changed = true
+            }
+        }
+        changed = changed || next.count != membership.count
+        membership = next
+        guard changed else {
+            return
+        }
+        historyReconciliationCount += 1
+        for key in history.keys {
+            let source = SelectionSource(entity: key.entity, instanced: key.instanced)
+            if let current = membership[source] {
+                if let ids = current.ids, !ids.contains(key.instance) { history.removeValue(forKey: key) }
+            } else {
+                history.removeValue(forKey: key)
+            }
+        }
+    }
+
+    private static func transform(_ source: borrowing Mesh3DRenderSource, placement: Int) -> Transform3D {
+        guard placement >= 0, let instances = source.instances else {
+            return source.transform
+        }
+        return source.transform * instances[placement].transform
+    }
+
+    private static func previousTransform(_ source: borrowing Mesh3DRenderSource, placement: Int) -> Transform3D {
+        guard placement >= 0, let instances = source.instances else {
+            return source.previousTransform
+        }
+        let previous = source.previousInstances
+        let local =
+            previous?.indices.contains(placement) == true && previous?[placement].id == instances[placement].id
+            ? previous?[placement].transform ?? instances[placement].transform : instances[placement].transform
+        return source.previousTransform * local
     }
 
     private static func makeTemplate(material: Material, descriptor: VertexDescriptor, receivesShadows: Bool, blended: Bool, shadowOnly: Bool) -> BatchTemplate {

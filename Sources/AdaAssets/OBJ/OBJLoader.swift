@@ -11,6 +11,13 @@ public protocol OBJLoader: Sendable {
     func load(url: URL) async throws -> OBJImportResult
 }
 
+/// Per-import observations of real parser buffer replacement work.
+@_spi(Internal) public struct OBJImportDiagnostics: Sendable {
+    public let faces: Int
+    public let copiedIndexBytes: UInt64
+    public let materialComparisons: UInt64
+}
+
 /// The result of importing a Wavefront OBJ file.
 public struct OBJImportResult: Sendable {
     public struct Material: Sendable {
@@ -55,6 +62,7 @@ public struct OBJImportResult: Sendable {
 
     public let meshes: [Mesh]
     public let materials: [Material]
+    @_spi(Internal) public var importDiagnostics: OBJImportDiagnostics?
 
     public init(meshes: [Mesh], materials: [Material]) {
         self.meshes = meshes

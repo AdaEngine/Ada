@@ -2,8 +2,8 @@
 """Build the editor's offline guide snapshot from repository documentation."""
 import argparse
 import json
-from pathlib import Path
 import re
+from pathlib import Path
 
 EDITOR = Path(__file__).resolve().parents[1]
 ROOT = EDITOR.parent
@@ -12,7 +12,7 @@ OUTPUT = EDITOR / 'Sources/AdaEditor/Assets/Documentation/catalog.json'
 
 def articles():
     sources = [(EDITOR / f'Documentation/{name}.md', 'Editor')
-               for name in ['EditorGuide', 'Agent3DWorkflow', 'A2UI', 'AdaScriptGameplayRecipes', 'InspectorGroups', 'BuildExport']]
+               for name in ['EditorGuide', 'Agent3DWorkflow', 'A2UI', 'AdaScriptGameplayRecipes', 'InspectorGroups', 'BuildExport', 'Terrain']]
     for module, section in [('AdaEngine', 'AdaEngine'), ('AdaScripting', 'AdaScript')]:
         catalog = ROOT / f'Sources/{module}/{module}.docc'
         sources += [(path, section) for path in sorted(catalog.rglob('*.md'))
@@ -21,7 +21,11 @@ def articles():
              'SPMDebug', 'Contributing', 'AdaScripting', 'GettingStartedWithAdaScript',
              'AdaScriptLanguage', 'AdaScriptECS', 'AdaScriptDiagnosticsAndPerformance']
     sources.sort(key=lambda entry: order.index(entry[0].stem) if entry[0].stem in order else len(order))
-    titles = {path.stem: re.sub(r'`', '', path.read_text(encoding='utf-8').splitlines()[0].removeprefix('# '))
+    identifiers = {path.resolve(): ('EditorTerrain' if path == EDITOR / 'Documentation/Terrain.md' else path.stem)
+                   for path, _ in sources}
+    if len(set(identifiers.values())) != len(sources):
+        raise ValueError('Offline documentation article IDs must be unique')
+    titles = {identifiers[path.resolve()]: re.sub(r'`', '', path.read_text(encoding='utf-8').splitlines()[0].removeprefix('# '))
               .replace('Ada Script', 'AdaScript') for path, _ in sources}
     titles['AdaScripting'] = 'AdaScript'
     result = []
@@ -29,7 +33,7 @@ def articles():
         text = path.read_text(encoding='utf-8')
         blocks, pending, code, language = [], [], None, ''
 
-        def flush():
+        def flush(pending=pending, path=path, blocks=blocks):
             if not pending:
                 return
             value = '\n'.join(pending).replace('Ada Script', 'AdaScript')
@@ -47,9 +51,20 @@ def articles():
                 links.append({'title': match[1], 'destination': match[2]})
                 return match[1]
 
+            def local_link(match):
+                destination = match[2].strip().strip('<>').split('#', 1)[0]
+                if not destination or re.match(r'[a-zA-Z][a-zA-Z0-9+.-]*:', destination):
+                    return match[0]
+                identifier = identifiers.get((path.parent / destination).resolve())
+                if identifier is None:
+                    return match[0]
+                links.append({'title': match[1], 'destination': identifier})
+                return match[1]
+
             value = re.sub(r'<doc:([^>]+)>', doc_link, value)
             value = re.sub(r'\[([^\]]+)\]\((https?://[^)]+)\)', web_link, value)
             value = re.sub(r'<(https?://[^>]+)>', lambda m: web_link(['', m[1], m[1]]), value)
+            value = re.sub(r'\[([^\]]+)\]\(([^)\n]+)\)', local_link, value)
             value = re.sub(r'``([^`]+)``', r'`\1`', value)
             value = re.sub(r'(?m)^- ', '• ', value)
             value = re.sub(r'(?m)^(\d+)\. ', r'\1\\. ', value)
@@ -59,8 +74,8 @@ def articles():
                            'level': len(heading[1]) if heading else 0, 'links': links})
 
         # DocC metadata is presentation configuration, not article text.
-        text = re.sub(r'(?m)^@Metadata \{\n.*?^\}\n', '', text, flags=re.S)
-        text = re.sub(r'<!--.*?-->', '', text, flags=re.S)
+        text = re.sub(r'(?m)^@Metadata \{\n.*?^\}\n', '', text, flags=re.DOTALL)
+        text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
         for line in text.splitlines()[1:]:
             if line.startswith('```'):
                 if code is None:
@@ -82,7 +97,8 @@ def articles():
         if code is not None:
             raise ValueError(f'Unclosed code fence: {path}')
         flush()
-        result.append({'id': path.stem, 'title': titles[path.stem], 'section': section,
+        identifier = identifiers[path.resolve()]
+        result.append({'id': identifier, 'title': titles[identifier], 'section': section,
                        'source': path.relative_to(ROOT).as_posix(), 'blocks': blocks})
     return result
 

@@ -29,9 +29,7 @@ Reusable nested scenes through `SceneInstance` already exist.
 and Move/Scale/Rotate tools. Scene edits have undo/redo.
 The native viewport's Terrain tool creates height-field ground and sculpts it
 with Raise/Lower/Smooth/Flatten brushes, radius/strength controls and a surface
-ring. Brush controls and Create Terrain live in the contextual Inspector, share
-the active viewport's state and clear with its action owner. The viewport retains
-its full height. A stroke commits one document-history edit; Escape restores its original
+ring. Brush controls and Create Terrain live in a dock below the viewport. Its Sculpt, Materials, Mesh Instancing and Height Generator tabs share the active viewport's state and clear with its action owner. Source strokes publish coherent worker batches while dragging and save one resource URI version on release. The blue surface ring invalidates captured annotations when hover or published geometry changes. A stroke commits one document-history edit; Escape restores its original
 heights. `Terrain3DSystem` generates meshes and, with `Physics3DPlugin`, matching
 static triangle colliders. Height samples persist in `AdaScene.Terrain3D` through
 scene loading and native export. Imported-mesh sculpting, texture painting and

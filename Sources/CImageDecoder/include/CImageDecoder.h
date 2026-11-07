@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 int ada_image_can_decode(const unsigned char *data, int length);
+int ada_image_info(const unsigned char *data, int length, int *width, int *height);
 unsigned char *ada_image_decode(const unsigned char *data, int length, int *width, int *height);
 void ada_image_free(unsigned char *pixels);
 

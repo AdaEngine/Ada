@@ -45,6 +45,10 @@ enum ComponentStorage {
 
     /// Return registered component or try to find it by NSClassFromString (works only for objc runtime)
     static func getRegisteredComponent(for name: String) -> (any Component.Type)? {
+        // Hierarchy is intrinsic to a World snapshot, including one decoded before any app plugins.
+        if name == RelationshipComponent.swiftName {
+            return RelationshipComponent.self
+        }
         let registered = lock.withLock { unsafe registeredComponents[name] }
         return registered ?? (NSClassFromString(name) as? (any Component.Type))
     }

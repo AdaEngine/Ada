@@ -11,7 +11,11 @@ struct Model3DIncrementalExtractionTests {
     func renderNodesDoNotRetainSourceArray() async throws {
         let (app, render) = try await makeApp(core3D: true)
         let mesh = cube(), material = PBRMaterial()
-        let entities = (0..<128).map { _ in app.main.spawn { Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: .identity) } }
+        let entities = (0..<128).map { _ in
+            app.main.spawn {
+                Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: .identity)
+            }
+        }
         await render.runScheduler(.extract)
         let main = Main3DRenderNode(), directional = DirectionalShadow3DRenderNode(), local = LocalShadow3DRenderNode()
         main.update(from: render)
@@ -35,9 +39,13 @@ struct Model3DIncrementalExtractionTests {
         let mesh = cube()
         let material = PBRMaterial()
         let entities = (0..<128).map { index in
-            app.main.spawn { Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: Transform3D(translation: [Float(index), 0, 3])) }
+            app.main.spawn {
+                Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: Transform3D(translation: [Float(index), 0, 3]))
+            }
         }
-        let camera = app.main.spawn { Camera(); Transform() }
+        let camera = app.main.spawn {
+            Camera(); Transform()
+        }
         await render.runScheduler(.extract)
         let initial = try sources(render)
         let builds = render.getResource(Model3DExtractionCache.self)?.geometryBuildCount
@@ -70,7 +78,9 @@ struct Model3DIncrementalExtractionTests {
         let (app, render) = try await makeApp()
         let red = PBRMaterial(), green = PBRMaterial()
         let mesh = cube(), wider = cube(size: [4, 4, 4])
-        let entity = app.main.spawn { Mesh3DComponent(mesh: mesh, materials: [red]); GlobalTransform(matrix: .identity) }
+        let entity = app.main.spawn {
+            Mesh3DComponent(mesh: mesh, materials: [red]); GlobalTransform(matrix: .identity)
+        }
         await render.runScheduler(.extract)
         let tick = app.main.currentTick
         let edit = Query<Ref<Mesh3DComponent>>(from: app.main)
@@ -110,14 +120,20 @@ struct Model3DIncrementalExtractionTests {
     func membershipChanges() async throws {
         let (app, render) = try await makeApp()
         let mesh = cube(), material = PBRMaterial()
-        let entities = (0..<12).map { _ in app.main.spawn { Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: .identity) } }
+        let entities = (0..<12).map { _ in
+            app.main.spawn {
+                Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: .identity)
+            }
+        }
         await render.runScheduler(.extract)
         entities[2].components[Visibility.self] = .hidden
         entities[7].components.remove(Mesh3DComponent.self)
         await render.runScheduler(.extract)
         #expect(Set(try sources(render).map(\.entity)) == Set(entities.enumerated().filter { $0.offset != 2 && $0.offset != 7 }.map { $0.element.id }))
         entities[2].components.remove(Visibility.self)
-        let extra = app.main.spawn { Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: Transform3D(translation: [50, 0, 0])) }
+        let extra = app.main.spawn {
+            Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: Transform3D(translation: [50, 0, 0]))
+        }
         await render.runScheduler(.extract)
         let result = try sources(render)
         #expect(result.count == 12 && Set(result.map(\.entity)).count == 12)
@@ -136,11 +152,19 @@ struct Model3DIncrementalExtractionTests {
     func sharedMaterialClocks() async throws {
         let (app, render) = try await makeApp()
         let mesh = cube(), material = PBRMaterial()
-        let entities = (0..<24).map { _ in app.main.spawn { Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: .identity) } }
+        let entities = (0..<24).map { _ in
+            app.main.spawn {
+                Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: .identity)
+            }
+        }
         await render.runScheduler(.extract)
-        let graph = ShaderGraph(target: .pbrSurface, output: "output", nodes: [
-            .init(id: "time", operation: .time), .init(id: "output", operation: .output, inputs: ["roughness": .init("time")])
-        ])
+        let graph = ShaderGraph(
+            target: .pbrSurface,
+            output: "output",
+            nodes: [
+                .init(id: "time", operation: .time), .init(id: "output", operation: .output, inputs: ["roughness": .init("time")]),
+            ]
+        )
         let animated = try ShaderGraphMaterial(source: .init(graph: graph))
         material.graphMaterial = animated
         var clock = ShaderGraphClock()
@@ -174,14 +198,18 @@ struct Model3DIncrementalExtractionTests {
     func replacementWorld() async throws {
         let (app, render) = try await makeApp()
         let mesh = cube(), material = PBRMaterial()
-        let first = app.main.spawn { Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: .identity) }
+        let first = app.main.spawn {
+            Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: .identity)
+        }
         await render.runScheduler(.extract)
         #expect(try sources(render).count == 1)
         let replacement = World()
         render.insertResource(MainWorld(world: replacement))
         await render.runScheduler(.extract)
         #expect(try sources(render).isEmpty)
-        let next = replacement.spawn { Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: Transform3D(translation: [15, 0, 0])) }
+        let next = replacement.spawn {
+            Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: Transform3D(translation: [15, 0, 0]))
+        }
         #expect(first.id == next.id)
         await render.runScheduler(.extract)
         #expect(try sources(render).first?.transform.origin.x == 15)
@@ -194,7 +222,7 @@ struct Model3DIncrementalExtractionTests {
         }
         let app = AppWorlds(main: World())
         app.addPlugin(MainSchedulerPlugin()).addPlugin(TransformPlugin()).addPlugin(RenderWorldPlugin()).addPlugin(Model3DPlugin())
-        if core3D { app.addPlugin(Core3DPlugin()) }
+        if core3D { app.addPlugin(CameraPlugin()).addPlugin(Core3DPlugin()) }
         try await app.build()
         let render = try #require(app.getSubworldBuilder(by: .renderWorld)?.main)
         render.insertResource(MainWorld(world: app.main))

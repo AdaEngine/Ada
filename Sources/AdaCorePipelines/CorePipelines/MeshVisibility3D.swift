@@ -1,5 +1,6 @@
 import AdaECS
 import AdaRender
+import AdaUtils
 import Math
 import Synchronization
 
@@ -45,6 +46,11 @@ public struct MeshVisibilitySettings3D: Codable, Sendable {
 
 /// One extracted mesh entity, before camera/cascade visibility and static LOD selection.
 public struct Mesh3DRenderSource: Sendable {
+    /// Nil draws the ordinary source once; a nonnil array supplies static local placements.
+    public var instances: [Mesh3DInstance]? { didSet { instanceRevision = RID() } }
+    /// Stable across camera-only frames; editing placements invalidates cached membership.
+    public private(set) var instanceRevision = RID()
+    public var previousInstances: [Mesh3DInstance]?
     public var drawPass: any DrawPass
     public var entity: Entity.ID
     public var mesh: Mesh
@@ -215,7 +221,9 @@ public struct MeshVisibilityFrustum3D: Sendable {
         for plane in planes {
             let radius = abs(plane.x) * bounds.halfExtents.x + abs(plane.y) * bounds.halfExtents.y + abs(plane.z) * bounds.halfExtents.z
             let distance = plane.xyz.dot(bounds.center) + plane.w
-            if !distance.isFinite || !radius.isFinite || distance - radius < 0.0001 { return false }
+            if !distance.isFinite || !radius.isFinite || distance - radius < 0.0001 {
+                return false
+            }
         }
         return true
     }

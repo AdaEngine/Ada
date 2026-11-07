@@ -7,6 +7,7 @@ struct EditorSceneToolbarButton: View {
     let identifier: String
     var isSelected = false
     var isEnabled = true
+    var compact = false
     let action: () -> Void
 
     @State private var isHovered = false
@@ -17,7 +18,7 @@ struct EditorSceneToolbarButton: View {
             Text(symbol)
                 .font(AdaEditorMaterialSymbolFont.font(size: 17))
                 .foregroundColor(isSelected ? theme.editorColors.blue : theme.editorColors.text)
-                .frame(width: 28, height: 26)
+                .frame(width: compact ? 24 : 28, height: 26)
         }
         .buttonStyle(EditorPickerRowButtonStyle(
             theme: theme,

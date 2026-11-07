@@ -170,7 +170,9 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     /// When supplied, `exactName` selects a single function name instead of substring matching.
     public func runTests(matching filter: String? = nil, exactName: String? = nil, onResult: ((AdaScriptTestResult) -> Void)? = nil) -> [AdaScriptTestResult] {
         let selected = tests.filter { test in
-            if let exactName { return test.name == exactName }
+            if let exactName {
+                return test.name == exactName
+            }
             guard let filter, !filter.isEmpty else {
                 return true
             }
@@ -344,7 +346,9 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
     /// Decodes authored AdaScript component fields without exposing the module's mutable runtime.
     @MainActor
     public func decodeSceneComponent(named name: String, data: Data) throws -> (any Component)? {
-        guard let descriptor = runtimeComponents.first(where: { $0.name == name || $0.stableID == name || $0.aliases.contains(name) }) else { return nil }
+        guard let descriptor = runtimeComponents.first(where: { $0.name == name || $0.stableID == name || $0.aliases.contains(name) }) else {
+            return nil
+        }
         guard let fields = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AdaScriptError.invalidManifest("Scene component must be an object: \(name)")
         }
@@ -387,7 +391,9 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
                 let prepared = try Self.prepare(plan, pluginIdentifier: name, world: world)
                 world.schedulers.addSystem(
                     AnnotatedGravityScriptSystem(
-                        pluginIdentifier: name, runtime: runtime, preparedSystem: prepared,
+                        pluginIdentifier: name,
+                        runtime: runtime,
+                        preparedSystem: prepared,
                         nativeSystem: try nativeSystemFactories[plan.identifier]?(world)
                     ),
                     for: prepared.scheduler
@@ -450,6 +456,8 @@ public final class AdaScriptPlugin: Plugin, @unchecked Sendable {
                     .before(AnnotatedGravityScriptSystem.makeIdentifier(plugin: pluginIdentifier, system: identifier))
                 case let .after(identifier):
                     .after(AnnotatedGravityScriptSystem.makeIdentifier(plugin: pluginIdentifier, system: identifier))
+                case let .afterIfPresent(identifier):
+                    .afterIfPresent(AnnotatedGravityScriptSystem.makeIdentifier(plugin: pluginIdentifier, system: identifier))
                 }
             },
             identifier: plan.identifier,
@@ -1380,11 +1388,21 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
     private func snapshotGlobals() -> [(name: String, value: GlobalScalar)] {
         globalVariableNames.compactMap { name in
             let value = virtualMachine.getValue(forKey: name)
-            if value.isInteger { return (name, .integer(value.toInteger)) }
-            if value.isDouble { return (name, .double(value.toDouble)) }
-            if value.isBool { return (name, .bool(value.toBoolean)) }
-            if value.isString { return (name, .string(value.toString)) }
-            if value.isNull { return (name, .null) }
+            if value.isInteger {
+                return (name, .integer(value.toInteger))
+            }
+            if value.isDouble {
+                return (name, .double(value.toDouble))
+            }
+            if value.isBool {
+                return (name, .bool(value.toBoolean))
+            }
+            if value.isString {
+                return (name, .string(value.toString))
+            }
+            if value.isNull {
+                return (name, .null)
+            }
             return nil
         }
     }
@@ -1446,7 +1464,9 @@ private final class AnnotatedGravityRuntime: @unchecked Sendable {
         return AdaScriptTestExecution(
             failures: failures,
             runtimeErrors: Array(delegate.errors.dropFirst(errorsBefore)).map { error in
-                guard let testTimeoutSeconds, error.contains("Community execution limit exceeded") else { return error }
+                guard let testTimeoutSeconds, error.contains("Community execution limit exceeded") else {
+                    return error
+                }
                 return "\(name): test timed out after \(testTimeoutSeconds) seconds"
             },
             didAbort: reply.first?.toInteger == 1

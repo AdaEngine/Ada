@@ -24,7 +24,10 @@ public final class Body3D: @unchecked Sendable {
         self.entity = entity
     }
 
-    deinit {
+    deinit { destroyImmediately() }
+
+    /// Serialized world publication can replace collision before the next simulation step.
+    func destroyImmediately() {
         if world != nil, b3Body_IsValid(bodyId) {
             b3DestroyBody(bodyId)
         }
@@ -35,12 +38,15 @@ public final class Body3D: @unchecked Sendable {
         _ shapeResource: Shape3DResource,
         shapeDef: b3ShapeDef
     ) -> BoxShape3D? {
-        guard let shapeId = BoxShape3D.makeShape(
-            for: shapeResource,
-            shapeDef: shapeDef,
-            bodyId: bodyId,
-            retainedMeshes: &collisionMeshes
-        ) else { return nil }
+        guard
+            let shapeId = BoxShape3D.makeShape(
+                for: shapeResource,
+                shapeDef: shapeDef,
+                bodyId: bodyId,
+                retainedMeshes: &collisionMeshes,
+                preparationMetrics: world?.collisionPreparationMetrics
+            )
+        else { return nil }
         return BoxShape3D(shape: shapeId)
     }
 
@@ -78,6 +84,13 @@ public final class Body3D: @unchecked Sendable {
     func getWorldCenter() -> Vector3 {
         b3Body_GetWorldCenterOfMass(bodyId).asVector3
     }
+
+    func getWorldBounds() -> AABB {
+        let bounds = b3Body_ComputeAABB(bodyId)
+        return AABB(min: bounds.lowerBound.asVector3, max: bounds.upperBound.asVector3)
+    }
+
+    func getMode() -> PhysicsBodyMode { PhysicsBodyMode(b3BodyType: b3Body_GetType(bodyId)) }
 
     func setTransform(position: Vector3, rotation: Quat) {
         b3Body_SetTransform(bodyId, position.b3Vec, rotation.b3Quat)
@@ -158,7 +171,8 @@ final class BoxShape3D {
         for shape: Shape3DResource,
         shapeDef: b3ShapeDef,
         bodyId: b3BodyId,
-        retainedMeshes: inout [NativeTriangleMesh3D]
+        retainedMeshes: inout [NativeTriangleMesh3D],
+        preparationMetrics: PhysicsCollisionPreparationMetrics?
     ) -> b3ShapeId? {
         switch shape.fixture {
         case let .box(shape):
@@ -180,8 +194,8 @@ final class BoxShape3D {
                     b3CreateSphereShape(bodyId, shapeDefPtr, spherePtr)
                 }
             }
-        case let .triangleMesh(mesh):
-            guard b3Body_GetType(bodyId) == b3_staticBody, let native = unsafe NativeTriangleMesh3D(mesh) else {
+        case .triangleMesh:
+            guard b3Body_GetType(bodyId) == b3_staticBody, let native = unsafe shape.nativeTriangleMesh(metrics: preparationMetrics) else {
                 return nil
             }
             let shape = unsafe withUnsafePointer(to: shapeDef) {

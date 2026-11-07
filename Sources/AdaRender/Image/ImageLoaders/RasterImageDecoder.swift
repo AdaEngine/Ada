@@ -14,6 +14,17 @@ struct RasterImageDecoder: ImageDecoder {
         }
     }
 
+    func decodedRGBAByteCount(_ data: Data) throws -> Int {
+        guard let length = Int32(exactly: data.count) else { throw ImageDecodingError.inputTooLarge }
+        var width: Int32 = 0
+        var height: Int32 = 0
+        let valid = unsafe data.withUnsafeBytes { bytes in
+            unsafe ada_image_info(bytes.baseAddress?.assumingMemoryBound(to: UInt8.self), length, &width, &height)
+        }
+        guard valid != 0 else { throw ImageDecodingError.invalidData }
+        return try Image.decodedRGBABytes(width: Int64(width), height: Int64(height))
+    }
+
     func decode(_ data: Data) throws -> Image {
         guard let length = Int32(exactly: data.count) else {
             throw ImageDecodingError.inputTooLarge

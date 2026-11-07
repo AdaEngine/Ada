@@ -5,6 +5,7 @@
 
 import AdaUtils
 import Math
+import Synchronization
 
 final class HeadlessRenderBackend: RenderBackend, @unchecked Sendable {
     let renderDevice: RenderDevice = HeadlessRenderDevice()
@@ -170,21 +171,25 @@ private final class HeadlessRenderDevice: RenderDevice, @unchecked Sendable {
     }
 }
 
-private final class HeadlessGPUTexture: GPUTexture, @unchecked Sendable {
+private final class HeadlessGPUTexture: GPUTexture, TextureSubresourceUploading, @unchecked Sendable {
     let size: SizeInt
     var label: String?
-    private var image: Image?
+    private let image: Mutex<Image?>
 
     init(descriptor: TextureDescriptor) {
         self.size = SizeInt(width: descriptor.width, height: descriptor.height)
         self.label = descriptor.debugLabel
-        self.image = descriptor.image
+        self.image = Mutex(descriptor.image)
     }
 
     func replaceRegion(_: RectInt, mipmapLevel _: Int, withBytes _: UnsafeRawPointer, bytesPerRow _: Int) {}
 
+    func uploadSubresource(_ resource: TextureSubresource) throws {
+        if resource.slice == 0 && resource.mipLevel == 0 { image.withLock { $0 = resource.image } }
+    }
+
     func getImage() -> Image? {
-        self.image
+        image.withLock { $0 }
     }
 }
 

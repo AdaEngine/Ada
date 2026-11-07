@@ -97,12 +97,22 @@ public struct SystemsGraph: Sendable {
                 return
             }
         #endif
+        // Rebuild edges from the current registrations, including removed optional targets.
+        for var node in nodes {
+            node.inputEdges.removeAll(keepingCapacity: true)
+            node.outputEdges.removeAll(keepingCapacity: true)
+            nodes[node.name] = node
+        }
         for node in nodes {
             let systemName = node.name
             for dependency in node.dependencies {
                 switch dependency {
                 case let .after(system):
                     for dependencyName in nodeNames(matching: system) {
+                        self.tryAddEdge(from: dependencyName, to: systemName)
+                    }
+                case let .afterIfPresent(system):
+                    for dependencyName in nodeNames(matching: system) where nodes[dependencyName] != nil {
                         self.tryAddEdge(from: dependencyName, to: systemName)
                     }
                 case let .before(system):

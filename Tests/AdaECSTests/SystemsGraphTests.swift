@@ -4,6 +4,7 @@
 //
 
 @testable import AdaECS
+import Synchronization
 import Testing
 
 @Suite("Systems graph identity")
@@ -77,6 +78,54 @@ struct SystemsGraphTests {
         #expect(graph.getOuputNodes(for: "dynamic.first").map(\.name) == ["dynamic.second"])
         #expect(graph.getInputNodes(for: "dynamic.second").map(\.name) == ["dynamic.first"])
     }
+
+    @Test("Optional ordering skips an absent type and follows every registered custom identifier")
+    func optionalDependencyResolvesOnlyRegisteredSystems() {
+        var graph = SystemsGraph()
+        graph.addSystem(DynamicDependencySystem(dependencies: [.afterIfPresent(CustomIdentifierSystem.self)], identifier: "optional.follower"))
+        graph.linkSystems()
+        #expect(graph.getInputNodes(for: "optional.follower").isEmpty)
+        graph.addSystem(CustomIdentifierSystem(identifier: "optional.first"))
+        graph.addSystem(CustomIdentifierSystem(identifier: "optional.second"))
+        graph.linkSystems()
+        #expect(Set(graph.getInputNodes(for: "optional.follower").map(\.name)) == ["optional.first", "optional.second"])
+        graph.removeSystem(CustomIdentifierSystem.self)
+        graph.linkSystems()
+        #expect(graph.getInputNodes(for: "optional.follower").isEmpty)
+        #expect(SystemDependency.afterIfPresent("target") != .after("target"))
+        #expect(SystemDependency.afterIfPresent("target") != .before("target"))
+        #expect(SystemDependency.afterIfPresent("target") == .afterIfPresent("target"))
+    }
+    @Test("Optional followers execute before registration and after target removal in both executors", arguments: [false, true])
+    func optionalDependencySurvivesTargetLifecycle(parallel: Bool) async {
+        if parallel {
+            var executor = MultiThreadedSystemsGraphExecutor()
+            await exerciseOptionalLifecycle(executor: &executor)
+        } else {
+            var executor = SingleThreadedSystemsGraphExecutor()
+            await exerciseOptionalLifecycle(executor: &executor)
+        }
+    }
+
+    private func exerciseOptionalLifecycle<Executor: SystemsGraphExecutor>(executor: inout Executor) async {
+        let counter = OptionalExecutionCounter()
+        let world = World()
+        var graph = SystemsGraph()
+        graph.addSystem(OptionalExecutionFollower(counter: counter))
+        for phase in 0..<3 {
+            if phase == 1 {
+                graph.addSystem(CustomIdentifierSystem(identifier: "lifecycle.first"))
+                graph.addSystem(CustomIdentifierSystem(identifier: "lifecycle.second"))
+            } else if phase == 2 {
+                graph.removeSystem(CustomIdentifierSystem.self)
+            }
+            graph.linkSystems()
+            executor.initialize(graph)
+            await executor.execute(graph, world: world, scheduler: .update)
+            let actual = counter.value.withLock { $0 }
+            #expect(actual == phase + 1)
+        }
+    }
 }
 
 private struct CustomIdentifierSystem: System {
@@ -135,4 +184,25 @@ private struct DynamicDependencySystem: System {
     }
 
     func update(context: UpdateContext) async {}
+}
+
+private final class OptionalExecutionCounter: Sendable {
+    let value = Mutex(0)
+}
+
+private struct OptionalExecutionFollower: System {
+    static let dependencies: [SystemDependency] = [.afterIfPresent(CustomIdentifierSystem.self)]
+    let counter: OptionalExecutionCounter
+
+    init(counter: OptionalExecutionCounter) {
+        self.counter = counter
+    }
+
+    init(world: World) {
+        counter = OptionalExecutionCounter()
+    }
+
+    func update(context: UpdateContext) async {
+        counter.value.withLock { $0 += 1 }
+    }
 }

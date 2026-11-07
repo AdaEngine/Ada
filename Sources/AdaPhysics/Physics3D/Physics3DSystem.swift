@@ -17,9 +17,13 @@ struct PhysicsBody3DInitialized: Sendable {}
 @System
 public func Physics3DUpdate(
     _ physicsWorld: Res<Physics3DWorldHolder>,
+    _ gate: Res<PhysicsSimulationGate3D?>,
     _ performance: Res<PhysicsPerformanceMetrics?>,
     _ fixedTime: Res<FixedTime>
 ) {
+    guard gate.wrappedValue?.isReady != false else {
+        return
+    }
     let deltaTime = fixedTime.deltaTime
     let world = physicsWorld.world
     world.updateSimulation(deltaTime)
@@ -59,41 +63,64 @@ public struct Physics3DSyncSystem: Sendable {
 
     private func syncPhysicsBodyEntities(in world: PhysicsWorld3D) {
         self.physicsBodyQuery.forEach { entity, physicsBody, transform in
-            if physicsBody.runtimeBody == nil {
-                var def = b3DefaultBodyDef()
-                def.position = transform.position.b3Vec
-                def.rotation = transform.rotation.b3Quat
-                def.type = physicsBody.mode.b3Type
-                def.gravityScale = physicsBody.gravityScale
-                def.linearVelocity = physicsBody.linearVelocity.b3Vec
-                def.angularVelocity = physicsBody.angularVelocity.b3Vec
-
-                let body = world.createBody(with: def, for: entity)
-                physicsBody.runtimeBody = body
-
-                for shapeResource in physicsBody.wrappedValue.shapes {
-                    var shapeDef = b3DefaultShapeDef()
-                    shapeDef.density = physicsBody.material.density
-                    shapeDef.baseMaterial.restitution = physicsBody.material.restitution
-                    shapeDef.baseMaterial.friction = physicsBody.material.friction
-
-                    if physicsBody.wrappedValue.isTrigger {
-                        shapeDef.isSensor = true
-                    }
-
-                    body.appendShape(
-                        shapeResource,
-                        shapeDef: shapeDef
-                    )
-                }
-
-                var massData = body.massData
-                massData.mass = physicsBody.massProperties.mass
-                body.massData = massData
-
-                commands.entity(entity.id).insert(PhysicsBody3DInitialized())
+            guard physicsBody.runtimeBody == nil else {
+                return
             }
+            var component = physicsBody.wrappedValue
+            Self.initialize(&component, transform: transform, entity: entity, world: world)
+            physicsBody.wrappedValue = component
+            commands.entity(entity.id).insert(PhysicsBody3DInitialized())
         }
+    }
+
+    /// Initializes a prepared entity's native body before a coherent scene generation becomes ready.
+    /// Call only in the serialized world-mutation phase; this method does not step simulation.
+    @_spi(Internal)
+    public static func initializeImmediately(_ entity: Entity, in world: PhysicsWorld3D) {
+        guard var component = entity.components[PhysicsBody3DComponent.self],
+            let transform = entity.components[Transform.self]
+        else { return }
+        if component.runtimeBody == nil {
+            initialize(&component, transform: transform, entity: entity, world: world)
+            entity.components[PhysicsBody3DComponent.self] = component
+        }
+        entity.components[PhysicsBody3DInitialized.self] = .init()
+    }
+
+    /// Removes a body's native collision and initialization marker at a serialized world boundary.
+    /// The returned value owns only authored settings and immutable shape resources.
+    @_spi(Internal)
+    public static func suspendImmediately(_ entity: Entity) -> PhysicsBody3DComponent? {
+        guard let component = entity.components[PhysicsBody3DComponent.self] else { return nil }
+        let authored = component.authoredCopy()
+        component.runtimeBody?.destroyImmediately()
+        entity.components.remove(PhysicsBody3DComponent.self)
+        entity.components.remove(PhysicsBody3DInitialized.self)
+        return authored
+    }
+
+    private static func initialize(_ component: inout PhysicsBody3DComponent, transform: Transform, entity: Entity, world: PhysicsWorld3D) {
+        var def = b3DefaultBodyDef()
+        def.position = transform.position.b3Vec
+        def.rotation = transform.rotation.b3Quat
+        def.type = component.mode.b3Type
+        def.gravityScale = component.gravityScale
+        def.linearVelocity = component.linearVelocity.b3Vec
+        def.angularVelocity = component.angularVelocity.b3Vec
+
+        let body = world.createBody(with: def, for: entity)
+        component.runtimeBody = body
+        for shapeResource in component.shapes {
+            var shapeDef = b3DefaultShapeDef()
+            shapeDef.density = component.material.density
+            shapeDef.baseMaterial.restitution = component.material.restitution
+            shapeDef.baseMaterial.friction = component.material.friction
+            if component.isTrigger { shapeDef.isSensor = true }
+            body.appendShape(shapeResource, shapeDef: shapeDef)
+        }
+        var massData = body.massData
+        massData.mass = component.massProperties.mass
+        body.massData = massData
     }
 }
 

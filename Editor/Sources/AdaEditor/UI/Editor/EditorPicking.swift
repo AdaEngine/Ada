@@ -4,8 +4,8 @@ import Math
 enum EditorPicking {
     /// Input can arrive before transform propagation after a scene edit or reload.
     /// Compose current local transforms rather than reading a previous frame's global cache.
-    static func worldMatrix(for entity: Entity, requiringVisible: Bool = false) -> Transform3D? {
-        guard let transform = entity.components[Transform.self],
+    static func worldMatrix(for entity: Entity, requiringVisible: Bool = false, overriding poses: [Entity.ID: Transform] = [:]) -> Transform3D? {
+        guard let transform = poses[entity.id] ?? entity.components[Transform.self],
             !requiringVisible || (entity.isActive && entity.components[Visibility.self] != .hidden) else {
             return nil
         }
@@ -17,7 +17,7 @@ enum EditorPicking {
                 !requiringVisible || (parent.isActive && parent.components[Visibility.self] != .hidden) else {
                 return nil
             }
-            guard let parentTransform = parent.components[Transform.self] else {
+            guard let parentTransform = poses[parent.id] ?? parent.components[Transform.self] else {
                 break
             }
             matrix = parentTransform.matrix * matrix
