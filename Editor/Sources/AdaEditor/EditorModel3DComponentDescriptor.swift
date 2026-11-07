@@ -30,8 +30,13 @@ extension EditorComponentRegistry {
                     return try JSONDecoder().decode(Model3DSourceLOD.self, from: Data(value.jsonString.utf8))
                 },
                 voxel: voxelSettings(in: payload),
-                morphWeights: EditorMorphWeightsPayload.decode(payload["morphWeights"])
+                morphWeights: EditorMorphWeightsPayload.decode(payload["morphWeights"]),
+                animationLibraries: try payload["animationLibraries"].map { try JSONDecoder().decode([String].self, from: JSONEncoder().encode($0)) } ?? []
             )
+            if let path = payload["animationModifiers"]?.stringValue, !path.isEmpty { source.animationModifiers = path }
+            if let bindings = payload["modifierBindings"], bindings != .null {
+                source.modifierBindings = try JSONDecoder().decode([String: AnimationIKBinding3D].self, from: JSONEncoder().encode(bindings))
+            }
             if let overrides = payload["graphMaterials"], overrides != .null {
                 source.graphMaterials = try JSONDecoder().decode(
                     [String: ShaderGraphMaterialSource].self, from: JSONEncoder().encode(overrides)

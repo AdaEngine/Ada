@@ -30,7 +30,7 @@ struct EditorAnimationGraphTests {
         let track = try SkeletalAnimationTrack(nodeIndex: 0, path: .translation, interpolation: .linear, times: [0, 1], values: [.zero, .zero])
         author.clips = [.init(name: "Move", tracks: [track])]
         author.graph = EditorAnimationGraphModel.defaultGraph(clip: "Move")
-        let container = UIContainerView(rootView: EditorAnimationGraphEditor(model: author))
+        let container = UIContainerView(rootView: EditorAnimationGraphEditor(model: author, presentation: .properties))
         container.frame = Rect(x: 0, y: 0, width: 960, height: 360)
         container.bounds.size = container.frame.size
         func settle() async throws {
@@ -89,14 +89,14 @@ struct EditorAnimationGraphTests {
         let content = try scene.encodedYAML()
         try content.write(to: sceneURL, atomically: true, encoding: .utf8)
         let document = EditorSceneDocument(
-            id: "Scene", 
-            title: "Main", 
-            relativePath: "Main.ascn", 
+            id: "Scene",
+            title: "Main",
+            relativePath: "Main.ascn",
             absolutePath: sceneURL.path,
-            content: content, 
-            lastSavedContent: content, 
-            sceneModel: scene, 
-            isDirty: false, 
+            content: content,
+            lastSavedContent: content,
+            sceneModel: scene,
+            isDirty: false,
             loadSummary: .init(entityCount: 0, warnings: [])
         )
         let workbench = EditorWorkbenchViewModel(openDocuments: [.scene(document)], activeDocumentID: "Scene")
@@ -108,9 +108,9 @@ struct EditorAnimationGraphTests {
         #expect(author.validationMessage == nil)
         let graph = try #require(author.validGraph)
         let target = EditorSkeletalAnimationTarget(
-            documentID: "Scene", 
+            documentID: "Scene",
             entityID: entity.id,
-            source: .init(source: "@res://TwoBoneRibbon.glb"), 
+            source: .init(source: "@res://TwoBoneRibbon.glb"),
             sceneURL: sceneURL
         )
         #expect(try workbench.setAnimationGraph(graph, target: target, autoplay: true))

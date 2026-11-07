@@ -331,7 +331,9 @@ final class EditorViewModel {
         self.workbench.setActiveDocumentWillChangeHandler { [weak self] in
             self?.saveActiveDocumentIfNeeded()
         }
+        self.workbench.onRevealAnimationInspector = { [weak self] in self?.presentSceneInspector() }
         self.workbench.setActiveDocumentChangedHandler { [weak self] in
+            self?.revealAssetAnimatorIfNeeded()
             self?.synchronizeAgentSceneContext()
             self?.rememberDebugSource()
             self?.rememberActiveProjectDocument()
@@ -347,6 +349,9 @@ final class EditorViewModel {
         }
         self.workbench.achievements = EditorAchievementBootstrap.center
         self.workbench.achievementResourceRoot = projectAssetsURL
+        if let projectURL, let assetsURL = projectAssetsURL {
+            self.workbench.configureAnimationAuthoring(projectURL: projectURL, assetsURL: assetsURL)
+        }
         self.workbench.achievementAdaScriptProject = savedProject?.build.system.isAdaScript == true
         libraries.load(for: self)
         configureDebugger()

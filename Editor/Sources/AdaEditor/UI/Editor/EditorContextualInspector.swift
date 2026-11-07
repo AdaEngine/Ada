@@ -46,6 +46,9 @@ struct EditorContextualInspector: View {
         case let .text(document):
             return AnyView(EditorFileInspector(document: .text(document)))
         case let .asset(document):
+            if document.kind == .animationLibrary || document.kind == .animationModifiers || document.kind == .model3D && ["glb", "gltf"].contains(document.fileExtension.lowercased()) {
+                return AnyView(EditorAnimationInspector(workspace: workbench.animationWorkspace(for: document)).id(document.id))
+            }
             if document.kind == .shaderGraph {
                 return AnyView(EditorShaderGraphEditor(
                     model: workbench.shaderGraphModel(for: document), presentation: .inspector,

@@ -14,7 +14,9 @@ extension EditorViewModel {
     }
 
     func scheduleAutosave(documentID: String) {
-        autosaveTasks[documentID]?.cancel()
+        autosaveTasks.removeValue(forKey: documentID)?.cancel()
+        if case let .asset(document)? = workbench.openDocuments.first(where: { $0.id == documentID }),
+           document.kind == .animationLibrary || document.kind == .animationModifiers { return }
         let delay = autosaveDelay
         autosaveTasks[documentID] = Task { [weak self] in
             do {

@@ -12,6 +12,42 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct SkeletalPlaybackTests {
+    @Test func failedLibraryReplacementPreservesTheLiveModelAndSkin() async throws {
+        if unsafe RenderEngine.shared == nil {
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            try RenderEngine.setupRenderEngine()
+        }
+        GLTFLoaderResolver.shared.setLoader(NativeGLTFLoader())
+        let tests = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let modelURL = tests.appendingPathComponent("AdaEngineTests/Fixtures/SkeletalGardenAssets/GardenRobot.glb")
+        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("BadLibrary-\(UUID()).animlib")
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        let incompatible = AnimationLibrary(binding: .init(sourceAsset: "Robot.glb", nodes: []), clips: [.init(name: "Invalid rig", duration: 1)])
+        try incompatible.encodedData().write(to: temporary)
+        let world = World()
+        let app = AppWorlds(main: world)
+        app.addPlugin(TransformPlugin()).addPlugin(Model3DPlugin())
+        let owner = world.spawn("Owner") { Transform(); Model3DSource(source: modelURL.path, animation: "Walk", autoplay: true) }
+        try await app.build()
+        for _ in 0..<200 where owner.components[Model3DSourceState.self]?.rootEntityID == nil {
+            await world.runScheduler(.preUpdate, deltaTime: 0.01)
+            await world.runScheduler(.postUpdate, deltaTime: 0.01)
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let originalRoot = try #require(owner.components[Model3DSourceState.self]?.rootEntityID)
+        let originalChildren = owner.children.map(\.id)
+        owner.components[Model3DSource.self]?.animationLibraries = [temporary.path]
+        for _ in 0..<200 where owner.components[Model3DSourceState.self]?.error == nil {
+            await world.runScheduler(.preUpdate, deltaTime: 0.01)
+            await world.runScheduler(.postUpdate, deltaTime: 0.01)
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(owner.components[Model3DSourceState.self]?.error != nil)
+        #expect(owner.components[Model3DSourceState.self]?.rootEntityID == originalRoot)
+        #expect(owner.children.map(\.id) == originalChildren)
+        #expect(world.getEntityByID(originalRoot)?.components[ModelAnimation3DComponent.self] != nil)
+    }
+
     @Test
     func sceneReplacementReservesExclusiveWorldAccess() {
         let system = SceneNavigationSystem(world: World())

@@ -23,12 +23,15 @@ public struct ModelAnimation3DEvent: Event, Sendable {
 public struct ModelAnimation3DComponent: Component {
     public var player: SkeletalAnimationPlayer
     public var evaluationLOD: AnimationLOD3DSettings?
+    /// Scene-local stable marker bindings, separate from reusable model-space modifier resources.
+    public var modifierBindings: [String: AnimationIKBinding3D] = [:]
+    public var modifierNamespace = ""
     var lodState = AnimationLOD3DState()
     var appliedGeneration: UInt64?
     var appliedPlayer: UUID?
 
     var canSkipUpdate: Bool {
-        evaluationLOD == nil && !player.isPlaying && !player.hasPendingGraphEvents
+        evaluationLOD == nil && !player.isPlaying && !player.hasPendingGraphEvents && !player.hasActivePoseModifiers
             && appliedPlayer == player.instanceID && appliedGeneration == player.poseGeneration
     }
 
@@ -90,7 +93,7 @@ public struct SkinnedMesh3DComponent: Component {
 }
 
 /// Evaluates poses before transform propagation so extraction and shadows observe the same frame.
-@PlainSystem(dependencies: [.before(TransformSystem.self)])
+@PlainSystem(dependencies: [.before(TransformSystem.self), .after(VoxelAnimation3DSystem.self)])
 public struct SkeletalAnimation3DSystem {
     @Query<Entity, Ref<ModelAnimation3DComponent>> private var models
     @Query<ModelNode3DComponent, Ref<Transform>> private var nodes
@@ -100,11 +103,25 @@ public struct SkeletalAnimation3DSystem {
     @EventsSender<ModelAnimation3DEvent> private var animationEvents
     @Query<Camera, CameraRenderGraph> private var cameras
     @Query<GlobalTransform> private var transformAccess
+    @Query<Entity, Transform> private var currentTransforms
+    @Query<Entity, RelationshipComponent> private var currentRelationships
+    @Query<Entity, AnimationSceneIdentity3D> private var sceneIdentities
 
     public init(world _: World) {}
 
     public func update(context _: UpdateContext) {
         _ = transformAccess.wrappedValue
+        var snapshot = AnimationIKSnapshot3D()
+        var needsSnapshot = false
+        models.batched().forEach { root, animation in
+            snapshot.roots.insert(root.id)
+            needsSnapshot = needsSnapshot || animation.wrappedValue.player.hasActivePoseModifiers
+        }
+        if needsSnapshot {
+            currentTransforms.batched().forEach { entity, transform in snapshot.locals[entity.id] = transform.matrix }
+            currentRelationships.batched().forEach { entity, relationship in snapshot.parents[entity.id] = relationship.parent }
+            sceneIdentities.batched().forEach { entity, identity in snapshot.insert(identity, entity: entity.id) }
+        }
         var observers: [AnimationLOD3DObserver] = []
         cameras.batched().forEach { camera, graph in
             if camera.isActive, graph.subgraphLabel == .main3D {
@@ -127,7 +144,11 @@ public struct SkeletalAnimation3DSystem {
                     observers: observers
                 )
             } else {
-                value.player.advance(by: Double(time.deltaTime))
+                value.player.advance(by: Double(time.deltaTime), evaluatePose: true, finalizeModifiers: false)
+            }
+            if value.player.hasActivePoseModifiers {
+                let inputs = snapshot.inputs(for: value, root: root.id)
+                value.player.finalizePoseModifiers(inputs: inputs)
             }
             for event in value.player.drainGraphEvents() {
                 animationEvents.send(ModelAnimation3DEvent(modelRoot: root.id, animation: event))

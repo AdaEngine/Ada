@@ -70,16 +70,19 @@ public struct SkeletalRig: Sendable {
     }
 }
 
-/// A validated glTF-style TRS track. Cubic keys retain in/value/out triples.
+/// A validated TRS track. Imported cubic keys retain in/value/out triples; native Bézier uses key curves.
 public struct SkeletalAnimationTrack: Sendable {
     public enum Path: String, Sendable { case translation, rotation, scale }
-    public enum Interpolation: String, Sendable { case linear, step, cubicSpline }
+    public enum Interpolation: String, Sendable { case linear, step, cubicSpline, bezier }
 
     public let nodeIndex: Int
     public let path: Path
     public let interpolation: Interpolation
     public let times: [Double]
     public let values: [Vector4]
+    var authoredCurves: CompiledAnimationCurves?
+    /// Native key metadata, or `nil` for raw/imported tracks. Sample through `sample(at:)` to apply it.
+    public var keyCurves: [AnimationKeyCurve?]? { authoredCurves?.metadata }
 
     public init(
         nodeIndex: Int,
@@ -89,7 +92,7 @@ public struct SkeletalAnimationTrack: Sendable {
         values: [Vector4]
     ) throws(SkeletalAnimationError) {
         let multiplier = interpolation == .cubicSpline ? 3 : 1
-        guard nodeIndex >= 0, !times.isEmpty, times.allSatisfy({ $0.isFinite && $0 >= 0 }),
+        guard nodeIndex >= 0, !(path == .rotation && interpolation == .bezier), !times.isEmpty, times.allSatisfy({ $0.isFinite && $0 >= 0 }),
             zip(times, times.dropFirst()).allSatisfy({ $0 < $1 }),
             values.count / multiplier == times.count, values.count.isMultiple(of: multiplier),
             values.allSatisfy({ $0.x.isFinite && $0.y.isFinite && $0.z.isFinite && $0.w.isFinite })
@@ -126,9 +129,12 @@ public struct SkeletalAnimationTrack: Sendable {
             return start
         }
         let end = value(at: upper)
+        if let curves = authoredCurves, curves.requiresSampling, curves.hasCustomSegment(lower) {
+            return sampleNative(curves, at: time, lower: lower, start: start, end: end)
+        }
         let span = Float(times[upper] - times[lower])
         let amount = Float((time - times[lower]) / (times[upper] - times[lower]))
-        if interpolation == .linear {
+        if interpolation == .linear || interpolation == .bezier {
             if path == .rotation {
                 return vector(slerpQuat(quaternion(start), quaternion(end), t: amount))
             }
@@ -147,6 +153,23 @@ public struct SkeletalAnimationTrack: Sendable {
             return lengthSquared > 0.000001 ? result / sqrt(lengthSquared) : start
         }
         return result
+    }
+
+    private func sampleNative(_ curves: CompiledAnimationCurves, at time: Double, lower: Int, start: Vector4, end: Vector4) -> Vector4 {
+        if path == .rotation, interpolation == .linear {
+            return vector(slerpQuat(quaternion(start), quaternion(end), t: Float(curves.amount(at: time, lower: lower))))
+        }
+        let x = curves.sample(at: time, lower: lower, component: 0)
+        let y = curves.sample(at: time, lower: lower, component: 1)
+        let z = curves.sample(at: time, lower: lower, component: 2)
+        if path == .rotation {
+            let w = curves.sample(at: time, lower: lower, component: 3)
+            let squared = x * x + y * y + z * z + w * w
+            guard squared > 0.000001 else { return start }
+            let length = squared.squareRoot()
+            return Vector4(Float(x / length), Float(y / length), Float(z / length), Float(w / length))
+        }
+        return Vector4(Float(x), Float(y), Float(z), 0)
     }
 
     private func value(at index: Int) -> Vector4 {
@@ -174,5 +197,16 @@ public struct SkeletalAnimationClip: Sendable {
         self.tracks = tracks
         self.morphTracks = morphTracks
         self.duration = (tracks.compactMap { $0.times.last } + morphTracks.compactMap { $0.times.last }).max() ?? 0
+    }
+
+    /// An authored timeline may hold the final pose after its last key, including an empty pose clip.
+    /// The explicit duration must include every key. Legacy initializers retain their derived duration.
+    public init(name: String, tracks: [SkeletalAnimationTrack], morphTracks: [MorphWeightsTrack] = [], duration: Double) throws(SkeletalAnimationError) {
+        let lastKey = (tracks.compactMap { $0.times.last } + morphTracks.compactMap { $0.times.last }).max() ?? 0
+        guard duration.isFinite, duration >= lastKey else { throw .invalidTrack }
+        self.name = name
+        self.tracks = tracks
+        self.morphTracks = morphTracks
+        self.duration = duration
     }
 }

@@ -35,6 +35,11 @@ public struct Model3DSource: Codable, Equatable, Sendable {
     public var repeats: Bool
     /// Optional authored pose graph. When present it takes precedence over the single clip.
     public var animationGraph: AnimationGraph?
+    /// Project-owned `.animlib` resources. Authored graph clips use their qualified stable runtime names.
+    public var animationLibraries: [String]
+    /// Optional reusable `.animmod` stack and instance-local stable scene target bindings.
+    public var animationModifiers: String?
+    public var modifierBindings: [String: AnimationIKBinding3D]
     public var lod: Model3DSourceLOD?
     /// Import settings for MagicaVoxel (`.vox`) sources; ignored for other formats.
     public var voxel: VoxelImportSettings?
@@ -49,7 +54,11 @@ public struct Model3DSource: Codable, Equatable, Sendable {
 
     public init(source: String = "", animation: String = "", autoplay: Bool = false, repeats: Bool = true,
                 animationGraph: AnimationGraph? = nil, lod: Model3DSourceLOD? = nil, voxel: VoxelImportSettings? = nil,
-                morphWeights: [String: Float] = [:]) {
+                morphWeights: [String: Float] = [:], animationLibraries: [String] = [], animationModifiers: String? = nil,
+                modifierBindings: [String: AnimationIKBinding3D] = [:]) {
+        self.animationModifiers = animationModifiers
+        self.modifierBindings = modifierBindings
+        self.animationLibraries = animationLibraries
         self.morphWeights = morphWeights
         self.voxel = voxel
         self.source = source
@@ -61,7 +70,8 @@ public struct Model3DSource: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: CodingKey {
-        case source, animation, autoplay, repeats, animationGraph, lod, voxel, morphWeights, graphMaterials, lightmapSource, lightmapIntensity
+        case source, animation, autoplay, repeats, animationGraph, animationLibraries, animationModifiers, modifierBindings
+        case lod, voxel, morphWeights, graphMaterials, lightmapSource, lightmapIntensity
     }
 
     public init(from decoder: Decoder) throws {
@@ -74,6 +84,9 @@ public struct Model3DSource: Codable, Equatable, Sendable {
         autoplay = try container.decode(Bool.self, forKey: .autoplay)
         repeats = try container.decode(Bool.self, forKey: .repeats)
         animationGraph = try container.decodeIfPresent(AnimationGraph.self, forKey: .animationGraph)
+        animationLibraries = try container.decodeIfPresent([String].self, forKey: .animationLibraries) ?? []
+        animationModifiers = try container.decodeIfPresent(String.self, forKey: .animationModifiers)
+        modifierBindings = try container.decodeIfPresent([String: AnimationIKBinding3D].self, forKey: .modifierBindings) ?? [:]
         lod = try container.decodeIfPresent(Model3DSourceLOD.self, forKey: .lod)
         voxel = try container.decodeIfPresent(VoxelImportSettings.self, forKey: .voxel)
         // Scenes written before morph targets have no weights.
@@ -90,19 +103,58 @@ public struct Model3DSource: Codable, Equatable, Sendable {
         return "\(source)#\(voxel.assetQuery)"
     }
 
-    /// Installs an already loaded asset. Used by hosts that prepare models before their first frame.
-    /// An invalid clip fails before creating entities. Each call creates an independent animation player.
-    @discardableResult
-    public func instantiate(_ model: ModelAsset3D, alternatives: [ModelAsset3D] = [], in world: World, under owner: Entity) throws -> Entity {
-        if let lod, alternatives.count != lod.sources.count {
-            throw AssetError.message("Model LOD alternatives have not been loaded.")
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(source, forKey: .source)
+        try container.encode(animation, forKey: .animation)
+        try container.encode(autoplay, forKey: .autoplay)
+        try container.encode(repeats, forKey: .repeats)
+        try container.encodeIfPresent(animationGraph, forKey: .animationGraph)
+        try container.encode(animationLibraries, forKey: .animationLibraries)
+        try container.encodeIfPresent(animationModifiers, forKey: .animationModifiers)
+        if !modifierBindings.isEmpty { try container.encode(modifierBindings, forKey: .modifierBindings) }
+        try container.encodeIfPresent(lod, forKey: .lod)
+        try container.encodeIfPresent(voxel, forKey: .voxel)
+        try container.encode(morphWeights, forKey: .morphWeights)
+        try container.encode(graphMaterials, forKey: .graphMaterials)
+        try container.encode(lightmapSource, forKey: .lightmapSource)
+        try container.encode(lightmapIntensity, forKey: .lightmapIntensity)
+    }
+
+    /// Validates the complete imported/authored clip set and graph without allocating runtime entities.
+    /// Editor binding uses the same checks as scene instantiation.
+    public func resolvedAnimationClips(importedClips: [SkeletalAnimationClip], rig: SkeletalRig?, libraries: [AnimationLibrary]) throws -> [SkeletalAnimationClip] {
+        guard libraries.count == animationLibraries.count else { throw AssetError.message("Animation libraries have not been loaded.") }
+        var clips = importedClips
+        var libraryIDs: Set<String> = []
+        for library in libraries {
+            guard let rig, libraryIDs.insert(library.id).inserted else {
+                throw AssetError.message("Animation libraries need a rig and unique library IDs.")
+            }
+            let compiled = try library.compiledClips(for: rig)
+            guard !compiled.contains(where: { authored in clips.contains { $0.name == authored.name } }) else {
+                throw AssetError.message("An authored animation reference conflicts with an existing clip.")
+            }
+            clips.append(contentsOf: compiled)
         }
-        guard animationGraph != nil || animation.isEmpty || model.animationClips.contains(where: { $0.name == animation }) else {
+        guard animationGraph != nil || animation.isEmpty || clips.contains(where: { $0.name == animation }) else {
             throw AssetError.message("Model has no animation named '\(animation)'.")
         }
         if let animationGraph {
-            guard let rig = model.animationRig else { throw AssetError.message("Model has no animation rig.") }
-            try animationGraph.validate(rig: rig, clips: model.animationClips)
+            guard let rig else { throw AssetError.message("Model has no animation rig.") }
+            try animationGraph.validate(rig: rig, clips: clips)
+        }
+        return clips
+    }
+
+    /// Installs an already loaded asset. An invalid animation fails before creating entities.
+    @discardableResult
+    public func instantiate(_ model: ModelAsset3D, alternatives: [ModelAsset3D] = [], libraries: [AnimationLibrary] = [], modifiers: AnimationModifierStack? = nil,
+                            in world: World, under owner: Entity) throws -> Entity {
+        let clips = try resolvedAnimationClips(importedClips: model.animationClips, rig: model.animationRig, libraries: libraries)
+        try validateModifiers(modifiers, rig: model.animationRig)
+        if let lod, alternatives.count != lod.sources.count {
+            throw AssetError.message("Model LOD alternatives have not been loaded.")
         }
         var graphOverrides: [Int: PBRMaterial] = [:]
         for key in graphMaterials.keys.sorted() {
@@ -136,6 +188,15 @@ public struct Model3DSource: Codable, Equatable, Sendable {
             }
         }
         let root = model.instantiate(in: world)
+        if !libraries.isEmpty, let rig = model.animationRig {
+            root.components[ModelAnimation3DComponent.self] = ModelAnimation3DComponent(player: try SkeletalAnimationPlayer(rig: rig, clips: clips))
+        }
+        if let modifiers, var animation = root.components[ModelAnimation3DComponent.self] {
+            try animation.player.setPoseModifiers(modifiers.modifiers, binding: modifiers.binding)
+            animation.modifierBindings = modifierBindings
+            animation.modifierNamespace = owner.components[AnimationSceneIdentity3D.self]?.namespace ?? ""
+            root.components[ModelAnimation3DComponent.self] = animation
+        }
         if !graphOverrides.isEmpty {
             var pending = [root]
             while let node = pending.popLast() {
@@ -194,6 +255,25 @@ public struct Model3DSource: Codable, Equatable, Sendable {
         owner.components[Model3DSourceState.self] = .init(reference: self, rootEntityID: root.id)
         return root
     }
+
+    /// Checks reusable configuration and scene overrides before a replacement creates any entities.
+    public func validateModifiers(_ stack: AnimationModifierStack?, rig: SkeletalRig?) throws {
+        guard animationModifiers != nil || stack == nil else { throw AssetError.message("Unexpected animation modifier resource.") }
+        guard let reference = animationModifiers else {
+            guard modifierBindings.isEmpty else { throw AssetError.message("Modifier bindings require an animation modifier resource.") }
+            return
+        }
+        guard !reference.isEmpty, reference.utf8.count <= 4_096, let stack, let rig else {
+            throw AssetError.message("Animation modifier resource or rig has not loaded.")
+        }
+        try stack.validate()
+        guard stack.binding.isCompatible(with: rig) else { throw AnimationPoseModifierError.incompatibleRig }
+        let ids = Set(stack.modifiers.map(\.id))
+        guard modifierBindings.count <= 32, modifierBindings.keys.allSatisfy({ ids.contains($0) }) else {
+            throw AssetError.message("Scene modifier bindings must reference modifiers in the loaded stack.")
+        }
+        for binding in modifierBindings.values { try binding.validate() }
+    }
 }
 
 /// Runtime status of a model reference. Generated nodes are not part of the authored scene.
@@ -218,19 +298,27 @@ public struct Model3DSourceSystem {
     // The asset cache keeps weak handles. Retaining only handle.asset drops the
     // cache key and reimports the same mesh/textures for every scene instance.
     @Local private var modelHandles: [String: AssetHandle<ModelAsset3D>] = [:]
+    @Local private var libraryHandles: [String: AssetHandle<AnimationLibraryResource>] = [:]
+    @Local private var modifierHandles: [String: AssetHandle<AnimationModifierResource>] = [:]
 
     public init(world _: World) {}
 
     public func update(context _: UpdateContext) async {
         var pending: [(Entity.ID, Model3DSource)] = []
         var livePaths: Set<String> = []
+        var liveLibraries: Set<String> = []
+        var liveModifiers: Set<String> = []
         sources.forEach { entity, reference in
             if !reference.source.isEmpty { livePaths.insert(reference.assetPath) }
             livePaths.formUnion(reference.lod?.sources ?? [])
+            liveLibraries.formUnion(reference.animationLibraries)
+            if let path = reference.animationModifiers { liveModifiers.insert(path) }
             let state = entity.components[Model3DSourceState.self]
             if state?.reference != reference { pending.append((entity.id, reference)) }
         }
         for path in modelHandles.keys where !livePaths.contains(path) { modelHandles.removeValue(forKey: path) }
+        for path in libraryHandles.keys where !liveLibraries.contains(path) { libraryHandles.removeValue(forKey: path) }
+        for path in modifierHandles.keys where !liveModifiers.contains(path) { modifierHandles.removeValue(forKey: path) }
         instances.forEach { entity, state in
             guard entity.components[Model3DSource.self] == nil else {
                 return
@@ -245,7 +333,7 @@ public struct Model3DSourceSystem {
             }
         }
         for (id, reference) in pending {
-            let result: Result<(ModelAsset3D?, [ModelAsset3D]), AssetError>
+            let result: Result<(ModelAsset3D?, [ModelAsset3D], [AnimationLibrary], AnimationModifierStack?), AssetError>
             do {
                 let model = reference.source.isEmpty ? nil : try await loadModel(reference.assetPath)
                 var alternatives: [ModelAsset3D] = []
@@ -255,25 +343,42 @@ public struct Model3DSourceSystem {
                     }
                     alternatives.append(level)
                 }
-                result = .success((model, alternatives))
+                var libraries: [AnimationLibrary] = []
+                for path in reference.animationLibraries {
+                    let handle: AssetHandle<AnimationLibraryResource>
+                    if let cached = libraryHandles[path] { handle = cached }
+                    else { handle = try await AssetsManager.load(AnimationLibraryResource.self, at: path) }
+                    guard let library = handle.asset?.library else { throw AssetError.message("Animation library has not loaded: \(path)") }
+                    libraryHandles[path] = handle
+                    libraries.append(library)
+                }
+                var modifiers: AnimationModifierStack?
+                if let path = reference.animationModifiers {
+                    let handle: AssetHandle<AnimationModifierResource>
+                    if let cached = modifierHandles[path] { handle = cached }
+                    else { handle = try await AssetsManager.load(AnimationModifierResource.self, at: path) }
+                    guard let stack = handle.asset?.stack else { throw AssetError.message("Animation modifiers have not loaded: \(path)") }
+                    modifierHandles[path] = handle
+                    modifiers = stack
+                }
+                result = .success((model, alternatives, libraries, modifiers))
             } catch {
                 result = .failure(.message(error.localizedDescription))
             }
             commands.queue.push { world in
                 guard let owner = world.getEntityByID(id), owner.components[Model3DSource.self] == reference,
                     owner.components[Model3DSourceState.self]?.reference != reference else { return }
-                if let rootID = owner.components[Model3DSourceState.self]?.rootEntityID {
-                    world.removeEntity(rootID, recursively: true)
-                }
+                let previousRoot = owner.components[Model3DSourceState.self]?.rootEntityID
                 do {
-                    let (model, alternatives) = try result.get()
+                    let (model, alternatives, libraries, modifiers) = try result.get()
                     if let model {
-                        try reference.instantiate(model, alternatives: alternatives, in: world, under: owner)
+                        try reference.instantiate(model, alternatives: alternatives, libraries: libraries, modifiers: modifiers, in: world, under: owner)
                     } else {
                         owner.components[Model3DSourceState.self] = .init(reference: reference)
                     }
+                    if let previousRoot { world.removeEntity(previousRoot, recursively: true) }
                 } catch {
-                    owner.components[Model3DSourceState.self] = .init(reference: reference, error: error.localizedDescription)
+                    owner.components[Model3DSourceState.self] = .init(reference: reference, rootEntityID: previousRoot, error: error.localizedDescription)
                 }
             }
         }

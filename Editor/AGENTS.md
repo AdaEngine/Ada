@@ -16,6 +16,8 @@ before editing. Do not load the whole capability inventory by default.
   [visual design rules](../AGENTS.md#ada-studio-visual-design-rules) and use
   [adaengine-studio-design](../.agents/skills/adaengine-studio-design/SKILL.md):
   present a visual before implementation and inspect the rendered result before completion.
+- Native controls follow [the control design rules](Documentation/Design/Controls.md):
+  visible button surfaces/states, themed fields, inline colored axis badges and overflow indicators.
 - Every UI change includes English and Russian text in the same change. Native
   UI uses `L10n` and the shared language preference; read the
   [localization rules](Documentation/AgentGuides/localization.md) before changing it.

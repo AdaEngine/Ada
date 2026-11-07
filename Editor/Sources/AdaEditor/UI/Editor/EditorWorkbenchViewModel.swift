@@ -51,6 +51,9 @@ final class EditorWorkbenchViewModel {
     @ObservationIgnored var spriteAnimationModels: [String: EditorSpriteAnimationEditorModel] = [:]
     @ObservationIgnored var textureSettingsModels: [String: EditorTextureSettingsModel] = [:]
     @ObservationIgnored var shaderGraphModels: [String: EditorShaderGraphModel] = [:]
+    @ObservationIgnored var animationService: EditorAnimationAuthoringService?
+    @ObservationIgnored var onRevealAnimationInspector: (() -> Void)?
+    @ObservationIgnored var animationWorkspaces: [String: EditorAnimationAssetWorkspace] = [:]
     @ObservationIgnored var sceneUndoHistory: [String: [EditorSceneDocument]] = [:]
     @ObservationIgnored var sceneRedoHistory: [String: [EditorSceneDocument]] = [:]
     @ObservationIgnored var sceneDecodeTasks: [String: Task<Void, Never>] = [:]
@@ -145,6 +148,13 @@ final class EditorWorkbenchViewModel {
 
     func open(_ document: EditorWorkbenchDocument) {
         if let index = openDocuments.firstIndex(where: { $0.id == document.id }) {
+            if case let .asset(asset) = document, asset.kind == .animationLibrary,
+                let model = try? animationService?.open(asset.relativePath), model.isDirty {
+                selectDocument(id: document.id)
+                return
+            }
+            if case let .asset(asset) = document, asset.kind == .animationModifiers,
+                let draft = try? animationService?.openModifiers(asset.relativePath), draft.isDirty { selectDocument(id: document.id); return }
             if let graph = shaderGraphModels[document.id] {
                 if graph.isDirty { selectDocument(id: document.id); return }
                 graph.reload()
@@ -244,11 +254,20 @@ final class EditorWorkbenchViewModel {
     }
 
     func closeDocument(id documentID: String) {
+        if let workspace = animationWorkspaces[documentID], workspace.timeline.hasUnkeyedPose {
+            workspace.timeline.error = L10n.tr("Insert or discard the unkeyed pose first.")
+            return
+        }
         guard let closingIndex = openDocuments.firstIndex(where: { $0.id == documentID }) else {
             return
         }
 
         let closingDocument = openDocuments[closingIndex]
+        if case var .asset(asset) = closingDocument, (asset.kind == .animationLibrary || asset.kind == .animationModifiers), asset.isDirty {
+            asset.errorMessage = L10n.tr("Save the animation draft explicitly or discard it before closing.")
+            openDocuments[closingIndex] = .asset(asset)
+            return
+        }
         if case let .git(document) = closingDocument {
             document.close()
         }
@@ -271,6 +290,9 @@ final class EditorWorkbenchViewModel {
         spriteAnimationModels.removeValue(forKey: documentID)?.cancelPreview()
         textureSettingsModels.removeValue(forKey: documentID)
         shaderGraphModels.removeValue(forKey: documentID)
+        animationWorkspaces.removeValue(forKey: documentID)?.cancel()
+        if case let .asset(asset) = closingDocument, asset.kind == .animationLibrary { try? animationService?.close(asset.relativePath) }
+        releaseUnreferencedModifierDocuments()
         sceneUndoHistory.removeValue(forKey: documentID)
         sceneRedoHistory.removeValue(forKey: documentID)
         reconcilePanes()
@@ -291,6 +313,7 @@ final class EditorWorkbenchViewModel {
     }
 
     func discardDocuments(atOrBelow relativePath: String) {
+        animationService?.discardDocuments(atOrBelow: relativePath)
         let discardedIDs = openDocuments.compactMap { document -> String? in
             document.relativePath == relativePath || document.relativePath.hasPrefix("\(relativePath)/") ? document.id : nil
         }
@@ -306,6 +329,7 @@ final class EditorWorkbenchViewModel {
         tileSourceModels = tileSourceModels.filter { !discardedIDSet.contains($0.key) }
         tileMapModels = tileMapModels.filter { !discardedIDSet.contains($0.key) }
         for id in discardedIDSet {
+            animationWorkspaces.removeValue(forKey: id)?.cancel()
             particleEffectModels.removeValue(forKey: id)?.cancelPreview()
             spriteAnimationModels.removeValue(forKey: id)?.cancelPreview()
         }

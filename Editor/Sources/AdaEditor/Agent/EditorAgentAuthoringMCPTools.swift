@@ -5,7 +5,7 @@ import MCP
 @MainActor
 enum EditorAgentAuthoringMCPTools {
     static func tools() -> [Tool] {
-        EditorAgentPublicationTools.tools() + EditorAgentKnowledgeTools.tools() + EditorAgentAssetTools.tools().filter {
+        EditorAgentAnimationTools.tools() + EditorAgentPublicationTools.tools() + EditorAgentKnowledgeTools.tools() + EditorAgentAssetTools.tools().filter {
             // Desktop scene edits must enter the open document's revision/undo path.
             // Image analysis requires a provider callback installed by the mobile host.
             !["editor.scene.asset.assign", "editor.image.read"].contains($0.name)
@@ -42,14 +42,17 @@ enum EditorAgentAuthoringMCPTools {
 
     static func execute(name: String, arguments: [String: Value], projectURL: URL) async throws -> CallTool.Result {
         let payload: [String: Any]
-        if name == "editor.community.submit" {
+        if name.hasPrefix("editor.animation."), let viewModel = EditorAgentMCPTools.shared.activeViewModel {
+            payload = try await EditorAgentAnimationTools.execute(name: name, arguments: arguments, viewModel: viewModel)
+        } else if name == "editor.community.submit" {
             payload = try await EditorAgentPublicationTools.submit(projectURL: projectURL, arguments: arguments)
         } else if EditorAgentKnowledgeTools.tools().contains(where: { $0.name == name }) {
             payload = try EditorAgentKnowledge.query(name: name, arguments: arguments)
         } else {
             payload = try await EditorAgentAssetToolService(projectURL: projectURL).execute(name: name, arguments: arguments)
         }
-        let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+        let data = try name.hasPrefix("editor.animation.") ? EditorAnimationAuthoringService.responseData(payload)
+            : JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
         return .init(content: [.text(text: try EditorAgentToolEncoding.string(data), annotations: nil, _meta: nil)], isError: false)
     }
 

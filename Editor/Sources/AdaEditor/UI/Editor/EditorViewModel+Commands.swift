@@ -745,7 +745,7 @@ extension EditorViewModel {
         case .save:
             saveActiveDocument()
         case .saveAll:
-            if workbench.saveAllDocuments() {
+            if workbench.saveAllDocuments(includeAnimationDrafts: true) {
                 refreshSourceControl()
                 reloadScriptableObjectSupport()
             }

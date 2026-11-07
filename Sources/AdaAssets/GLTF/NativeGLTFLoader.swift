@@ -9,10 +9,40 @@ import Foundation
 import Math
 
 public struct NativeGLTFLoader: GLTFLoader {
-    public init() {}
+    private let resourceBoundary: URL?
+    private let maximumTotalBytes: Int?
+
+    public init() {
+        resourceBoundary = nil
+        maximumTotalBytes = nil
+    }
+
+    /// Restricts external dependencies and bounds input/resource bytes plus cumulative accessor decoding work.
+    /// The ordinary loader retains its existing project-scope behavior when this initializer is unused.
+    public init(resourceRoot: URL, maximumTotalBytes: Int = 32 * 1024 * 1024) {
+        resourceBoundary = resourceRoot.resolvingSymlinksInPath().standardizedFileURL
+        self.maximumTotalBytes = max(0, maximumTotalBytes)
+    }
 
     public func load(url: URL) async throws -> GLTFImportResult {
-        let data = try Data(contentsOf: url)
+        if let root = resourceBoundary {
+            // Authoring callers resolve a canonical regular file before loading. Recheck immediately
+            // before opening it so a replaced parent junction cannot redirect the primary model.
+            let canonical = url.resolvingSymlinksInPath().standardizedFileURL
+            guard url.isFileURL, root.isFileURL,
+                root.resolvingSymlinksInPath().standardizedFileURL.path == root.path,
+                canonical.path == url.standardizedFileURL.path,
+                canonical.path.hasPrefix(root.path + "/"),
+                try canonical.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
+                throw GLTFError.invalidDataURI
+            }
+        }
+        let data: Data
+        if let maximumTotalBytes {
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            data = try handle.read(upToCount: min(maximumTotalBytes, Int.max - 1) + 1) ?? Data()
+        } else { data = try Data(contentsOf: url) }
         return try load(data: data, baseURL: url.deletingLastPathComponent())
     }
 
@@ -46,6 +76,7 @@ public struct NativeGLTFLoader: GLTFLoader {
     }
 
     public func load(data: Data, baseURL: URL? = nil) throws -> GLTFImportResult {
+        if let maximumTotalBytes, data.count > maximumTotalBytes { throw GLTFError.bufferOutOfBounds }
         let resourceBaseURL = baseURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 
         let gltf: GLTF
@@ -64,9 +95,68 @@ public struct NativeGLTFLoader: GLTFLoader {
             throw GLTFError.unsupportedRequiredExtension(unsupportedExtension)
         }
 
+        if let maximumTotalBytes {
+            try validateDecodedWork(gltf, maximumBytes: maximumTotalBytes)
+            var remaining = maximumTotalBytes - data.count
+            let uris = (gltf.buffers ?? []).compactMap(\.uri) + (gltf.images ?? []).compactMap(\.uri)
+            for uri in uris {
+                let count: Int
+                if uri.hasPrefix("data:") {
+                    guard let comma = uri.firstIndex(of: ",") else { throw GLTFError.invalidDataURI }
+                    let payloadBytes = uri[uri.index(after: comma)...].utf8.count
+                    count = uri[..<comma].hasSuffix(";base64") ? payloadBytes / 4 * 3 : payloadBytes
+                } else {
+                    let url = try resourceURL(uri, relativeTo: resourceBaseURL)
+                    count = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? remaining + 1
+                }
+                guard count <= remaining else { throw GLTFError.bufferOutOfBounds }
+                remaining -= count
+            }
+        }
         let buffers = try loadBuffers(gltf.buffers ?? [], baseURL: resourceBaseURL, binaryBuffer: binaryBuffer)
 
         return try convertToImportResult(gltf, buffers: buffers, baseURL: resourceBaseURL)
+    }
+
+    /// Bounds allocations before decodeAccessor creates zero-filled storage, including sparse/unused accessors.
+    /// Charge every decode reference: sharing an accessor does not make repeated decoding free.
+    private func validateDecodedWork(_ gltf: GLTF, maximumBytes: Int) throws {
+        let inventories = [gltf.nodes?.count, gltf.meshes?.count, gltf.materials?.count, gltf.skins?.count,
+                           gltf.animations?.count, gltf.textures?.count, gltf.images?.count, gltf.accessors?.count,
+                           gltf.bufferViews?.count, gltf.buffers?.count]
+        guard inventories.allSatisfy({ ($0 ?? 0) <= 16_384 }) else { throw GLTFError.bufferOutOfBounds }
+        let maximumElements = maximumBytes / MemoryLayout<Double>.stride
+        let costs = try (gltf.accessors ?? []).map { accessor -> Int in
+            let components = try componentCount(for: accessor.type)
+            guard accessor.count > 0, accessor.count <= maximumElements / components else { throw GLTFError.bufferOutOfBounds }
+            var cost = accessor.count * components
+            if let sparse = accessor.sparse {
+                guard sparse.count > 0, sparse.count <= accessor.count else { throw GLTFError.bufferOutOfBounds }
+                // decodeAccessor retains the dense values while decoding sparse values and Int indices.
+                let temporary = sparse.count * (components + 1)
+                guard temporary <= maximumElements - cost else { throw GLTFError.bufferOutOfBounds }
+                cost += temporary
+            }
+            return cost
+        }
+        var remaining = maximumElements
+        func charge(_ index: Int) throws {
+            guard costs.indices.contains(index), costs[index] <= remaining else { throw GLTFError.bufferOutOfBounds }
+            remaining -= costs[index]
+        }
+        for mesh in gltf.meshes ?? [] {
+            guard mesh.primitives.count <= 4_096 else { throw GLTFError.bufferOutOfBounds }
+            for primitive in mesh.primitives {
+                for index in primitive.attributes.values { try charge(index) }
+                if let index = primitive.indices { try charge(index) }
+                for target in primitive.targets ?? [] { for index in target.values { try charge(index) } }
+            }
+        }
+        for animation in gltf.animations ?? [] {
+            guard animation.samplers.count <= 4_096, animation.channels.count <= 4_096 else { throw GLTFError.bufferOutOfBounds }
+            for sampler in animation.samplers { try charge(sampler.input); try charge(sampler.output) }
+        }
+        for skin in gltf.skins ?? [] { if let index = skin.inverseBindMatrices { try charge(index) } }
     }
 
     private func parseGLB(_ data: Data) throws -> (GLTF, Data?) {
@@ -282,7 +372,7 @@ public struct NativeGLTFLoader: GLTFLoader {
     private func resourceURL(_ uri: String, relativeTo base: URL) throws -> URL {
         let decoded = uri.removingPercentEncoding ?? uri
         let target = base.appendingPathComponent(decoded).standardizedFileURL
-        if let root = AssetsManager.restrictedResourceRoot {
+        if let root = resourceBoundary ?? AssetsManager.restrictedResourceRoot {
             let canonicalRoot = root.resolvingSymlinksInPath().standardizedFileURL.path
             let canonicalTarget = target.resolvingSymlinksInPath().standardizedFileURL.path
             guard !decoded.hasPrefix("/"), !decoded.contains(":"), !decoded.contains("\\"),

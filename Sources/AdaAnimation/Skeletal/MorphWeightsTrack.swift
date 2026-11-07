@@ -10,6 +10,9 @@ public struct MorphWeightsTrack: Sendable {
     public let targetCount: Int
     /// `times.count * targetCount` values, or three times that for cubic keys.
     public let values: [Float]
+    var authoredCurves: CompiledAnimationCurves?
+    /// Native key metadata, preserved when a compiled clip is extracted for editing.
+    public var keyCurves: [AnimationKeyCurve?]? { authoredCurves?.metadata }
 
     public init(
         nodeIndex: Int,
@@ -49,6 +52,10 @@ public struct MorphWeightsTrack: Sendable {
             let middle = (lower + upper) / 2
             if times[middle] <= time { lower = middle } else { upper = middle }
         }
+        if let curves = authoredCurves, curves.requiresSampling, curves.hasCustomSegment(lower) {
+            for target in 0..<targetCount { output[target] = Float(curves.sample(at: time, lower: lower, component: target)) }
+            return
+        }
         let span = Float(times[upper] - times[lower])
         let amount = Float((time - times[lower]) / (times[upper] - times[lower]))
         let squared = amount * amount
@@ -58,7 +65,7 @@ public struct MorphWeightsTrack: Sendable {
             switch interpolation {
             case .step:
                 output[target] = start
-            case .linear:
+            case .linear, .bezier:
                 output[target] = start + (value(key: upper, target: target) - start) * amount
             case .cubicSpline:
                 let end = value(key: upper, target: target)

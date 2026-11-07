@@ -1,0 +1,44 @@
+format: ada.ui
+schemaVersion: 1
+inputs:
+  - {name: path, type: string, defaultValue: Assets/Arm.animmod}
+  - {name: modelPath, type: string, defaultValue: Assets/Robot.glb}
+  - {name: rootBone, type: string, defaultValue: ''}
+  - {name: middleBone, type: string, defaultValue: ''}
+  - {name: endBone, type: string, defaultValue: ''}
+  - {name: entityID, type: string, defaultValue: robot}
+  - {name: targetEntity, type: string, defaultValue: target}
+  - {name: status, type: string, defaultValue: Ready}
+actions:
+  - {name: create}
+  - {name: inspect}
+  - {name: addTwoBone}
+  - {name: sample}
+  - {name: save}
+  - {name: undo}
+  - {name: preview}
+  - {name: bind}
+  - {name: poll}
+root:
+  id: ik-helper
+  type: VStack
+  arguments:
+    spacing: {value: 8}
+  children:
+    - {id: path, type: TextField, arguments: {text: {binding: path}}}
+    - {id: model-path, type: TextField, arguments: {text: {binding: modelPath}}}
+    - {id: root, type: TextField, arguments: {text: {binding: rootBone}}}
+    - {id: middle, type: TextField, arguments: {text: {binding: middleBone}}}
+    - {id: end, type: TextField, arguments: {text: {binding: endBone}}}
+    - {id: entity, type: TextField, arguments: {text: {binding: entityID}}}
+    - {id: target, type: TextField, arguments: {text: {binding: targetEntity}}}
+    - {id: create, type: Button, arguments: {title: {value: Create IK Resource}}, actions: {action: create}}
+    - {id: inspect, type: Button, arguments: {title: {value: Inspect}}, actions: {action: inspect}}
+    - {id: add, type: Button, arguments: {title: {value: Add Two-Bone IK}}, actions: {action: addTwoBone}}
+    - {id: sample, type: Button, arguments: {title: {value: Sample}}, actions: {action: sample}}
+    - {id: save, type: Button, arguments: {title: {value: Save}}, actions: {action: save}}
+    - {id: undo, type: Button, arguments: {title: {value: Undo}}, actions: {action: undo}}
+    - {id: preview, type: Button, arguments: {title: {value: Preview}}, actions: {action: preview}}
+    - {id: bind, type: Button, arguments: {title: {value: Bind IK to Scene}}, actions: {action: bind}}
+    - {id: poll, type: Button, arguments: {title: {value: Poll}}, actions: {action: poll}}
+    - {id: status, type: Text, arguments: {text: {binding: status}}}

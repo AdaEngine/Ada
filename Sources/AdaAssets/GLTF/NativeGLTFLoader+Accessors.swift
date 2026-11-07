@@ -152,7 +152,7 @@ extension NativeGLTFLoader {
         }
     }
 
-    private func componentCount(for accessorType: String) throws -> Int {
+    func componentCount(for accessorType: String) throws -> Int {
         switch accessorType {
         case "SCALAR": return 1
         case "VEC2": return 2

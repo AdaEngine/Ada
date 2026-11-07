@@ -59,7 +59,7 @@ import Observation
         switch operation {
         case .nodes(let positions):
             let delta = (point - origin) / geometry.zoom
-            if delta.squaredLength > 0 {
+            if didMove || delta.squaredLength > 0 {
                 if !didMove {
                     begin()
                     didMove = true

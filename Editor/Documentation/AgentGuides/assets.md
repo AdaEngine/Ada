@@ -119,3 +119,15 @@ Coverage: [EditorTextureAtlasTests.swift](../../Tests/AdaEditorTests/EditorTextu
   import, preview, placement and clip playback exist; visual imported-material
   editing, skeleton editing and skeletal-clip authoring remain incomplete.
   The shared-workbench model preview has not established iPhone UI parity.
+
+
+### 3D IK authoring
+
+`.animmod` resources use the shared revisioned modifier draft and ordered two-bone/FABRIK
+runtime. Model panel selection, Inspector settings and viewport handles use the same edit
+commands as `editor.animation.modifier*` and API 2 Tool jobs. Save is explicit; saved resources
+bind to compatible `Model3DSource` instances with separate current scene revisions and stable
+marker IDs. Marker snapshots use current local transforms, including while paused/under LOD.
+The actual `IKHelper` Tool example is in `Documentation/Examples/StudioTools/IKHelper`.
+See [Animation authoring](../../Documentation/AnimationAuthoring.md#ik-modifiers).
+Native 2D weighted/spline deformation and typed IK timeline bindings remain separate stages.

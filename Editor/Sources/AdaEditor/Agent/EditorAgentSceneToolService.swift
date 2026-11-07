@@ -397,7 +397,7 @@ final class EditorAgentSceneToolService {
 
     private static let sceneExtensions: Set<String> = ["ascn", "scene", "scn"]
 
-    static func revision(for content: String) -> String {
+    nonisolated static func revision(for content: String) -> String {
         var hash: UInt64 = 14_695_981_039_346_656_037
         for byte in content.utf8 {
             hash ^= UInt64(byte)

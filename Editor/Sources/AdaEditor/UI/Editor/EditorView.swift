@@ -360,6 +360,7 @@ struct EditorWindowContentView: View {
                 viewModel.playerPairingWindow = nil
                 viewModel.stopProjectFileWatching()
                 viewModel.studioTools.close()
+                viewModel.workbench.animationService?.invalidatePendingWork()
                 viewModel.movieMaker.cancel()
                 EditorNotificationRouter.shared.detach(viewModel)
                 viewModel.debugger.stop()

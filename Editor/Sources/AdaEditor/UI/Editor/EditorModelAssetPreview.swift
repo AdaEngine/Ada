@@ -12,9 +12,18 @@ final class EditorModelAssetPreviewModel {
     var isLoading = true
     var selectedAnimation = "Rest pose" { didSet { updatePlayback() } }
     var showsBones = false
+    var selectedNodeIndices: Set<Int> = []
+    var playbackSpeed: Double = 1 { didSet { updatePlayback() } }
+    @ObservationIgnored var bonePress: Point?
+    @ObservationIgnored var boneMoved = false
+    @ObservationIgnored var onSelectBone: ((Int, Bool) -> Void)?
+    @ObservationIgnored var onModifierInput: ((any InputEvent, EditorModelPreviewCamera) -> Bool)?
+    var selectedPoseModifierID: String?
     var playsAnimation = true { didSet { updatePlayback() } }
     var animationGraph: AnimationGraph? { didSet { updatePlayback() } }
+    var animationRepeats = true { didSet { updatePlayback() } }
     var graphEventLog: [String] = []
+    var modifierDiagnostics: [AnimationPoseModifierDiagnostic] = []
     /// Morph target weights by name that the preview shows; every target the entity has is set to its entry, so a target removed from
     /// the map needs its default put back by the caller.
     var morphWeights: [String: Float] = [:] { didSet { applyMorphWeights() } }
@@ -23,28 +32,77 @@ final class EditorModelAssetPreviewModel {
     @ObservationIgnored private weak var world: World?
     @ObservationIgnored private var animationRoot: Entity.ID?
     @ObservationIgnored private var voxelRoot: Entity.ID?
+    @ObservationIgnored private var authoredClips: [SkeletalAnimationClip] = []
+    @ObservationIgnored private var libraryGeneration: UInt64 = 0
+    @ObservationIgnored private var appliedLibraryGeneration: UInt64?
+    @ObservationIgnored private var pendingSeekTime: Double?
+    @ObservationIgnored private var modifierStack: AnimationModifierStack?
+    @ObservationIgnored private var modifierNodeIndices: [String: Int] = [:]
+
+    func modifierNodeIndex(_ id: String) -> Int? { modifierNodeIndices[id] }
+
+    func installPoseModifiers(_ stack: AnimationModifierStack?) throws {
+        if let stack {
+            try stack.validate()
+            guard let rig = asset?.animationRig, stack.binding.isCompatible(with: rig) else { throw AnimationPoseModifierError.incompatibleRig }
+        }
+        modifierStack = stack
+        modifierNodeIndices = stack.map { Dictionary(uniqueKeysWithValues: $0.binding.nodes.enumerated().map { ($0.element.id, $0.offset) }) } ?? [:]
+        updatePlayback()
+    }
+
+    /// Compiles before publication. A bad library leaves the previous rendered player intact.
+    func installAnimationLibraries(_ libraries: [AnimationLibrary]) throws {
+        guard let rig = asset?.animationRig else {
+            if libraries.isEmpty { return }
+            throw AssetError.message("Model has no animation rig.")
+        }
+        var clips: [SkeletalAnimationClip] = []
+        var names = Set(asset?.animationClips.map(\.name) ?? [])
+        for library in libraries {
+            for clip in try library.compiledClips(for: rig) {
+                guard names.insert(clip.name).inserted else { throw AssetError.message("Animation reference collision.") }
+                clips.append(clip)
+            }
+        }
+        authoredClips = clips
+        libraryGeneration &+= 1
+        updatePlayback()
+    }
+
+    func capturedAnimationPlayer() -> SkeletalAnimationPlayer? {
+        guard let world, let animationRoot else { return nil }
+        return world.getEntityByID(animationRoot)?.components[ModelAnimation3DComponent.self]?.player
+    }
+
+    var playbackTime: Double { capturedAnimationPlayer()?.time ?? pendingSeekTime ?? 0 }
 
     func load(_ document: EditorAssetDocument) {
         load(path: document.absolutePath)
     }
 
-    func load(path: String?) {
+    func load(path: String?, resourceRoot: URL? = nil) {
         loadTask?.cancel()
         asset = nil
         normalizationCache = nil
         world = nil
+        authoredClips = []
+        appliedLibraryGeneration = nil
         animationRoot = nil
         voxelRoot = nil
+        pendingSeekTime = nil
         error = nil
         isLoading = true
         loadTask = Task { [weak self] in
             do {
                 guard let path else { throw AssetError.message("Model file is unavailable.") }
-                let handle = try await AssetsManager.load(ModelAsset3D.self, at: path)
+                let loaded: ModelAsset3D?
+                if let resourceRoot { loaded = try await Self.loadAuthoringModel(path: path, resourceRoot: resourceRoot) }
+                else { loaded = try await AssetsManager.load(ModelAsset3D.self, at: path).asset }
                 let lightingPath = Bundle.editor.resourceURL?.appendingPathComponent("Assets/PreviewLighting/Studio.ibl").path
                 let lighting = try await AssetsManager.load(ImageBasedLighting3D.self, at: lightingPath ?? "Assets/PreviewLighting/Studio.ibl")
                 try Task.checkCancellation()
-                guard let asset = handle.asset else { throw AssetError.message("Model has not loaded.") }
+                guard let asset = loaded else { throw AssetError.message("Model has not loaded.") }
                 self?.previewLighting = lighting
                 self?.asset = asset
             } catch is CancellationError {
@@ -58,11 +116,23 @@ final class EditorModelAssetPreviewModel {
 
     func cancel() { loadTask?.cancel() }
 
+    @concurrent
+    private static func loadAuthoringModel(path: String, resourceRoot: URL) async throws -> ModelAsset3D {
+        try Task.checkCancellation()
+        let url = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+        let model = try await ModelAsset3D(gltfAt: url,
+                                          loader: NativeGLTFLoader(resourceRoot: resourceRoot, maximumTotalBytes: 32 * 1024 * 1024))
+        try Task.checkCancellation()
+        return model
+    }
+
     func bind(to world: World) {
         self.world = world
+        appliedLibraryGeneration = nil
         animationRoot = world.getEntities().first { $0.components[ModelAnimation3DComponent.self] != nil }?.id
         voxelRoot = world.getEntities().first { $0.components[VoxelAnimationPlayback3DComponent.self] != nil }?.id
         updatePlayback()
+        if let time = pendingSeekTime { seekGraph(to: time) }
         applyMorphWeights()
     }
 
@@ -98,9 +168,18 @@ final class EditorModelAssetPreviewModel {
         guard let world, let animationRoot, let root = world.getEntityByID(animationRoot),
             var component = root.components[ModelAnimation3DComponent.self] else { return }
         do {
+            let priorClock = component.player.time
+            let replacedLibrary = appliedLibraryGeneration != libraryGeneration
+            if appliedLibraryGeneration != libraryGeneration {
+                let clock = component.player.time
+                component.player = try SkeletalAnimationPlayer(rig: component.player.rig, clips: (asset?.animationClips ?? []) + authoredClips)
+                component.player.seek(to: clock)
+            }
+            component.player.repeats = animationRepeats
+            component.player.speed = playbackSpeed.isFinite ? playbackSpeed : 1
             if let animationGraph {
                 if component.player.graph != animationGraph {
-                    let clock = component.player.graph == nil ? 0 : component.player.time
+                    let clock = replacedLibrary ? priorClock : component.player.graph == nil ? 0 : component.player.time
                     try component.player.play(animationGraph, transitionDuration: 0)
                     component.player.seek(to: clock)
                 }
@@ -109,26 +188,40 @@ final class EditorModelAssetPreviewModel {
                 component.player = try SkeletalAnimationPlayer(rig: component.player.rig, clips: component.player.clips)
             } else {
                 if component.player.clipIndex.map({ component.player.clips[$0].name }) != animation {
-                    try component.player.play(animation, transitionDuration: 0)
+                    try component.player.play(animation, transitionDuration: 0, startTime: replacedLibrary ? priorClock : 0)
                 }
                 component.player.isPlaying = playsAnimation
             }
+            let modifiers = modifierStack?.modifiers ?? []
+            if component.player.poseModifiers != modifiers {
+                let binding = modifierStack?.binding ?? AnimationRigBinding(rig: component.player.rig, sourceAsset: "")
+                try component.player.setPoseModifiers(modifiers, binding: binding)
+            }
             root.components[ModelAnimation3DComponent.self] = component
+            modifierDiagnostics = component.player.modifierDiagnostics
+            appliedLibraryGeneration = libraryGeneration
+            self.error = nil
         } catch {
             self.error = error.localizedDescription
         }
     }
 
     func seekGraph(to time: Double) {
+        guard time.isFinite else { return }
         guard let world, let animationRoot, let root = world.getEntityByID(animationRoot),
             var component = root.components[ModelAnimation3DComponent.self] else {
+            pendingSeekTime = time
             return
         }
+        pendingSeekTime = nil
         component.player.seek(to: time)
         root.components[ModelAnimation3DComponent.self] = component
+        modifierDiagnostics = component.player.modifierDiagnostics
     }
 
     func pollGraphEvents(in world: World) {
+        if let animationRoot, let player = world.getEntityByID(animationRoot)?.components[ModelAnimation3DComponent.self]?.player,
+           modifierDiagnostics != player.modifierDiagnostics { modifierDiagnostics = player.modifierDiagnostics }
         guard animationGraph != nil, world.supportsEventDelivery else {
             return
         }
@@ -196,12 +289,10 @@ final class EditorModelAssetPreviewModel {
 struct EditorModelAssetPreview: View {
     let document: EditorAssetDocument
     let workbench: EditorWorkbenchViewModel
-    let resourceRootURL: URL?
-    @State private var model = EditorModelAssetPreviewModel()
-    @State private var camera = EditorModelPreviewCamera()
+    private var workspace: EditorAnimationAssetWorkspace { workbench.animationWorkspace(for: document) }
+    private var model: EditorModelAssetPreviewModel { workspace.preview }
+    private var camera: EditorModelPreviewCamera { workspace.camera }
     @State private var showsScenePicker = false
-    @State private var showsGraph = false
-    @State private var graphModel = EditorAnimationGraphModel()
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -225,36 +316,14 @@ struct EditorModelAssetPreview: View {
                 }
                 ZStack {
                     RoundedRectangleShape(cornerRadius: 10).fill(Color.fromHex(0x24282F))
-                    if model.isLoading {
-                        Text(L10n.text("Loading model…")).foregroundColor(theme.editorColors.muted)
-                    } else if let error = model.error {
-                        Text(error).foregroundColor(.red).padding(24)
-                    } else if model.asset != nil {
-                        if showsGraph {
-                            HStack(spacing: 8) {
-                                EditorModelPreviewViewport(model: model, camera: camera).frame(width: max(180, geometry.size.width * 0.35))
-                                EditorAnimationGraphEditor(model: graphModel)
-                            }
-                        } else {
-                            EditorModelPreviewViewport(model: model, camera: camera)
-                        }
-                    }
+                    EditorAnimationAssetViewport(workspace: workspace)
                 }
-                .frame(height: max(180, geometry.size.height - (showsScenePicker ? 210 : 110)))
-                animationControls
+                .frame(height: max(0, geometry.size.height - (showsScenePicker ? 168 : 56)))
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityIdentifier("AdaEditor.ModelPreview")
-        .onAppear { model.load(document) }
-        .onDisappear { model.cancel() }
-        .onChange(of: model.asset.map(ObjectIdentifier.init)) { _, _ in
-            if let asset = model.asset { graphModel.configure(asset: asset) }
-        }
-        .onChange(of: graphModel.graph) { _, _ in
-            if showsGraph, let graph = graphModel.validGraph { model.animationGraph = graph }
-        }
     }
 
     private var header: some View {
@@ -273,45 +342,13 @@ struct EditorModelAssetPreview: View {
             }
             Spacer()
             Button(action: { camera.reset() }) {
-                Text(L10n.text("Frame model")).font(.system(size: 12)).foregroundColor(theme.editorColors.text).padding(8)
+                Text(L10n.text("Frame model")).font(.system(size: 12))
             }
-            .buttonStyle(DefaultButtonStyle())
+            .buttonStyle(EditorAnimationButtonStyle(colors: theme.editorColors))
             .accessibilityIdentifier("AdaEditor.ModelPreview.Frame")
             addToScene
         }
         .frame(height: 44)
-    }
-
-    private var animationControls: some View {
-        HStack(spacing: 8) {
-            Text(L10n.text("Animation")).font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
-            Button(action: {
-                showsGraph.toggle()
-                model.animationGraph = showsGraph ? graphModel.validGraph : nil
-            }) { Text(showsGraph ? L10n.text("Clips") : L10n.text("Animation Graph")).font(.system(size: 11)) }
-                .buttonStyle(DefaultButtonStyle())
-                .disabled(model.asset?.animationClips.isEmpty != false)
-                .accessibilityIdentifier("AdaEditor.ModelPreview.Graph")
-            EditorEnumField(
-                cases: model.animationNames,
-                selection: Binding(get: { model.selectedAnimation }, set: { model.selectedAnimation = $0 }),
-                accessibilityID: "AdaEditor.ModelPreview.Animation"
-            )
-                .frame(maxWidth: 260)
-            Button(action: { model.playsAnimation.toggle() }) {
-                Text(model.playsAnimation ? L10n.text("Pause") : L10n.text("Play")).font(.system(size: 11))
-            }
-            .buttonStyle(DefaultButtonStyle())
-            .disabled(model.animation.isEmpty && model.animationGraph == nil && !model.hasVoxelAnimation)
-            .accessibilityIdentifier("AdaEditor.ModelPreview.PlayAnimation")
-            Button(action: { model.showsBones.toggle() }) {
-                Text(model.showsBones ? "Hide bones" : "Show bones").font(.system(size: 11))
-            }
-            .buttonStyle(DefaultButtonStyle())
-            .disabled(model.asset?.skins.isEmpty != false)
-            .accessibilityIdentifier("AdaEditor.ModelPreview.Bones")
-            Spacer()
-        }
     }
 
     private var targetScenes: [EditorSceneDocument] {
@@ -332,24 +369,36 @@ struct EditorModelAssetPreview: View {
             }
         }) {
             Text(targetScenes.count == 1 ? L10n.text("Add to Scene") : L10n.text("Add to Scene…"))
-                .font(.system(size: 12)).foregroundColor(theme.editorColors.blue)
-                .padding(8)
-                .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.12)))
+                .font(.system(size: 12))
         }
-        .buttonStyle(DefaultButtonStyle())
-        .disabled(model.asset == nil || targetScenes.isEmpty || document.assetReference == nil || showsGraph && graphModel.validGraph == nil)
+        .buttonStyle(EditorAnimationButtonStyle(colors: theme.editorColors, prominent: true))
+        .disabled(model.asset == nil || targetScenes.isEmpty || document.assetReference == nil || workspace.library?.isDirty == true
+            || workspace.mode == .graph && workspace.graph.validGraph == nil)
         .accessibilityIdentifier("AdaEditor.ModelPreview.AddToScene")
     }
 
     private func place(in sceneID: String) {
-        workbench.addModelAsset(document, to: sceneID, animation: model.animation, autoplay: model.playsAnimation, animationGraph: showsGraph ? graphModel.validGraph : nil)
+        if ["glb", "gltf"].contains(document.fileExtension.lowercased()) {
+            let animation = model.animation
+            let autoplay = model.playsAnimation
+            let repeats = model.animationRepeats
+            let graph = workspace.mode == .graph ? workspace.graph.validGraph : nil
+            let library = workspace.library
+            workspace.run {
+                _ = try await workbench.addAnimatedModelAsset(document, to: sceneID, animation: animation,
+                    autoplay: autoplay, repeats: repeats, graph: graph, library: library)
+            }
+        } else {
+            workbench.addModelAsset(document, to: sceneID, animation: model.animation, autoplay: model.playsAnimation)
+        }
         showsScenePicker = false
     }
 }
 
 extension EditorWorkbenchViewModel {
     @discardableResult
-    func addModelAsset(_ asset: EditorAssetDocument, to documentID: String, animation: String = "", autoplay: Bool = false, animationGraph: AnimationGraph? = nil) -> Bool {
+    func addModelAsset(_ asset: EditorAssetDocument, to documentID: String, animation: String = "", autoplay: Bool = false,
+                       animationGraph: AnimationGraph? = nil, animationLibraries: [String] = [], repeats: Bool = true) -> Bool {
         guard let reference = asset.assetReference, asset.kind == .model3D,
             let document = sceneDocument(id: documentID), !document.isReadOnly, document.sceneModel != nil else {
                 return false
@@ -364,9 +413,12 @@ extension EditorWorkbenchViewModel {
             }
             scene.entities[index].name = URL(fileURLWithPath: asset.title).deletingPathExtension().lastPathComponent
             scene.entities[index].components[EditorBuiltInComponentType.model3DSource] = [
-                "source": .string(reference), "animation": .string(animation), "autoplay": .bool(autoplay), "repeats": .bool(true),
+                "source": .string(reference), "animation": .string(animation), "autoplay": .bool(autoplay), "repeats": .bool(repeats),
             ]
             scene.entities[index].components[EditorBuiltInComponentType.model3DSource]?["animationGraph"] = graphValue
+            if !animationLibraries.isEmpty {
+                scene.entities[index].components[EditorBuiltInComponentType.model3DSource]?["animationLibraries"] = .array(animationLibraries.map(EditorSceneValue.string))
+            }
         }
         return true
     }

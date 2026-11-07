@@ -38,5 +38,7 @@ For more details and guides, check out the tutorials below.
 - <doc:Contributing>
 - <doc:AdaUIIdentity>
 - <doc:ImageDecoders>
+- <doc:AnimationAuthoring>
+- <doc:AnimationIK>
 - <doc:MovieMaker>
 - <doc:VisionOSWindowed>

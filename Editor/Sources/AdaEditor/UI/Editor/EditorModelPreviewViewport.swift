@@ -1,24 +1,31 @@
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 import Math
+import Observation
 
 /// Camera state for an asset viewer. Navigation never changes the authored model transform.
-@MainActor
+@Observable @MainActor
 final class EditorModelPreviewCamera {
     static let fieldOfView = Angle.degrees(35)
-    private weak var world: World?
-    private var cameraID: Entity.ID?
-    private var previousPointer: Point?
-    private var activeButton: MouseButton?
-    private var pressedKeys: Set<KeyCode> = []
-    private var pinchScale: Float?
-    private var lighting: AssetHandle<ImageBasedLighting3D>?
-    private(set) var viewportSize = Size.zero
-    private(set) var halfExtents = Vector3(1.5)
-    private(set) var yaw: Float = -0.22
-    private(set) var pitch: Float = 0.08
-    private(set) var zoom: Float = 1
-    private(set) var target = Vector3.zero
+    @ObservationIgnored private weak var world: World?
+    @ObservationIgnored private var cameraID: Entity.ID?
+    @ObservationIgnored private var previousPointer: Point?
+    @ObservationIgnored private var activeButton: MouseButton?
+    @ObservationIgnored private var pressedKeys: Set<KeyCode> = []
+    @ObservationIgnored private var pinchScale: Float?
+    @ObservationIgnored private var lighting: AssetHandle<ImageBasedLighting3D>?
+    @ObservationIgnored private var selectionRadius: Float?
+    @ObservationIgnored private(set) var viewportSize = Size.zero
+    @ObservationIgnored private(set) var halfExtents = Vector3(1.5)
+    @ObservationIgnored private(set) var yaw: Float = -0.22
+    @ObservationIgnored private(set) var pitch: Float = 0.08
+    @ObservationIgnored private(set) var zoom: Float = 1
+    @ObservationIgnored private(set) var target = Vector3.zero
+    var isOrthographic = false { didSet { applyCamera() } }
+    var backgroundStyle = "dark" { didSet { applyCamera() } }
+    var lightingIntensity: Float = 1 { didSet { applyCamera() } }
+    var showsGrid = true
+    var showsAxes = true
 
     func attach(to world: World, bounds: AABB, lighting: AssetHandle<ImageBasedLighting3D>? = nil) {
         endNavigation()
@@ -40,6 +47,7 @@ final class EditorModelPreviewCamera {
         pitch = 0.08
         zoom = 1
         target = .zero
+        selectionRadius = nil
         endNavigation()
         applyCamera()
     }
@@ -55,7 +63,7 @@ final class EditorModelPreviewCamera {
     var distance: Float {
         let aspect = max(0.1, viewportSize.width / max(1, viewportSize.height))
         // Fit a sphere to keep tall and wide models inside the frame while orbiting.
-        let radius = max(0.1, halfExtents.length)
+        let radius = max(0.1, selectionRadius ?? halfExtents.length)
         let verticalHalfAngle = Self.fieldOfView.radians * 0.5
         let horizontalHalfAngle = Float(Foundation.atan(Foundation.tan(Double(verticalHalfAngle)) * Double(aspect)))
         return radius / Math.sin(min(verticalHalfAngle, horizontalHalfAngle)) * 1.12 * zoom
@@ -68,6 +76,50 @@ final class EditorModelPreviewCamera {
         let right = Vector3(front.z, 0, -front.x).normalized
         let up = front.cross(right).normalized
         return Transform(matrix: Transform3D(columns: [Vector4(right, 0), Vector4(up, 0), Vector4(front, 0), Vector4(eye, 1)]))
+    }
+
+    func frameSelection(_ points: [Vector3]) {
+        guard let first = points.first else { return }
+        var lower = first
+        var upper = first
+        for point in points {
+            lower = Vector3(min(lower.x, point.x), min(lower.y, point.y), min(lower.z, point.z))
+            upper = Vector3(max(upper.x, point.x), max(upper.y, point.y), max(upper.z, point.z))
+        }
+        target = (lower + upper) * 0.5
+        selectionRadius = max(0.1, (upper - lower).length * 0.65)
+        zoom = 1
+        applyCamera()
+    }
+
+    func project(_ position: Vector3) -> Vector2? {
+        let clip = makeProjection().cameraProjection.makeClipView() * cameraTransform().matrix.inverse * Vector4(position, 1)
+        guard clip.w > 0.000001, clip.z / clip.w >= 0, clip.z / clip.w <= 1 else { return nil }
+        return Vector2((clip.x / clip.w + 1) * viewportSize.width * 0.5, (1 - clip.y / clip.w) * viewportSize.height * 0.5)
+    }
+
+    /// Projects the pointer onto a camera-facing plane through a world-space handle.
+    func unproject(_ point: Point, atDepthOf position: Vector3) -> Vector3? {
+        guard viewportSize.width > 0, viewportSize.height > 0 else { return nil }
+        let matrix = makeProjection().cameraProjection.makeClipView() * cameraTransform().matrix.inverse
+        let depth = matrix * Vector4(position, 1)
+        guard depth.w > 1e-6 else { return nil }
+        let clip = Vector4((point.x / viewportSize.width * 2 - 1) * depth.w,
+                           (1 - point.y / viewportSize.height * 2) * depth.w, depth.z, depth.w)
+        let world = matrix.inverse * clip
+        guard world.w.isFinite, abs(world.w) > 1e-6 else { return nil }
+        let value = world.xyz / world.w
+        return value.x.isFinite && value.y.isFinite && value.z.isFinite ? value : nil
+    }
+
+    private func makeProjection() -> Projection {
+        if isOrthographic {
+            let height = 2 * distance * Math.tanf(Self.fieldOfView.radians * 0.5)
+            return .orthographic(.init(near: 0.01, far: max(100, distance + halfExtents.length * 4),
+                                      scale: max(0.1, viewportSize.height / max(0.01, height)), viewportSize: viewportSize))
+        }
+        return .perspective(.init(near: 0.01, far: max(100, cameraTransform().position.length + halfExtents.length * 4),
+                                  fieldOfView: Self.fieldOfView, aspectRation: max(0.1, viewportSize.width / max(1, viewportSize.height))))
     }
 
     func orbit(by delta: Point) {
@@ -171,21 +223,22 @@ final class EditorModelPreviewCamera {
             cameraID = world.getEntities().first { $0.name == "SceneView_Camera" && $0.components[Camera.self] != nil }?.id
         }
         guard let cameraID, let entity = world.getEntityByID(cameraID), var camera = entity.components[Camera.self] else { return }
-        camera.projection = .perspective(PerspectiveProjection(
-            near: 0.01,
-            far: max(100, cameraTransform().position.length + halfExtents.length * 4),
-            fieldOfView: Self.fieldOfView,
-            aspectRation: max(0.1, viewportSize.width / max(1, viewportSize.height))
-        ))
-        camera.backgroundColor = Color.fromHex(0x24282F)
+        camera.projection = makeProjection()
+        camera.backgroundColor = Color.fromHex(backgroundStyle == "light" ? 0xD9DDE2 : backgroundStyle == "gray" ? 0x62656B : 0x24282F)
         entity.components[Camera.self] = camera
         entity.components[Transform.self] = cameraTransform()
         entity.components[CameraRenderGraph.self] = CameraRenderGraph(subgraphLabel: .main3D, inputSlot: "view")
         entity.components[Environment3D.self] = Environment3D(
             skybox: Skybox3D(isEnabled: false),
             screenSpaceReflection: ScreenSpaceReflection(isEnabled: false),
-            imageBasedLighting: lighting.map { ImageBasedLightingSettings(asset: $0) }
+            imageBasedLighting: lighting.map { ImageBasedLightingSettings(asset: $0, intensity: max(0, min(8, lightingIntensity))) }
         )
+        for light in world.getEntities() {
+            guard var component = light.components[DirectionalLightComponent.self] else { continue }
+            let base: Float = light.name == "Preview key light" ? 2.8 : 2.2
+            component.intensity = base * max(0, min(8, lightingIntensity))
+            light.components[DirectionalLightComponent.self] = component
+        }
     }
 }
 
@@ -237,19 +290,30 @@ struct EditorModelPreviewViewport: View {
                     },
                     updateContent: { world, deltaTime in
                         if let input = world.getResource(Input.self) {
-                            for event in input.getInputEvents() { camera.handleInput(event) }
+                            for event in input.getInputEvents() {
+                                if model.onModifierInput?(event, camera) == true { continue }
+                                camera.handleInput(event)
+                                model.handleBoneSelection(event, camera: camera)
+                            }
                         }
                         camera.update(deltaTime: Float(deltaTime))
                         model.pollGraphEvents(in: world)
                         world.getResource(EditorSkeleton3DOverlay.self)?.isEnabled = model.showsBones
+                        world.getResource(EditorSkeleton3DOverlay.self)?.selectedNodes = model.selectedNodeIndices
+                        world.getResource(EditorSkeleton3DOverlay.self)?.showsGrid = camera.showsGrid
+                        world.getResource(EditorSkeleton3DOverlay.self)?.showsAxes = camera.showsAxes
+                        world.getResource(EditorSkeleton3DOverlay.self)?.gridHeight = model.normalizedBounds.min.y
+                        world.getResource(EditorSkeleton3DOverlay.self)?.modifierHandles = model.modifierHandleSegments()
                     }
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
-                Text(L10n.text("Drag: orbit · Middle drag: pan · Scroll: zoom\nRight drag: look · WASD: move · Q/E: down/up · Shift: faster"))
+                if geometry.size.width >= 360, geometry.size.height >= 240 {
+                    Text(L10n.text("Drag: orbit · Middle drag: pan · Scroll: zoom\nRight drag: look · WASD: move · Q/E: down/up · Shift: faster"))
                     .font(.system(size: 11))
                     .foregroundColor(theme.editorColors.muted)
                     .padding(16)
                     .allowsHitTesting(false)
+                }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .mask(RoundedRectangleShape(cornerRadius: 10))

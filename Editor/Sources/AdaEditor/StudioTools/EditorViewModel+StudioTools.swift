@@ -2,7 +2,7 @@ import Foundation
 
 extension EditorViewModel {
     func startStudioTools() {
-        #if os(macOS)
+        #if os(macOS) || os(Windows)
             guard let projectURL else {
                 return
             }

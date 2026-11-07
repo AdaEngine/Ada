@@ -227,6 +227,8 @@ enum EditorProjectFileKind: Equatable, Sendable {
 }
 
 enum EditorAssetPreviewKind: String, Equatable, Sendable {
+    case animationLibrary
+    case animationModifiers
     case shaderGraph
     case spine2D
     case particleEffect

@@ -15,6 +15,14 @@ public struct SkeletalAnimationPlayer: Sendable {
     public var isPlaying = false
     public var repeats = true
     public private(set) var poses: [SkeletalJointPose]
+    /// Animation/graph/LOD output before procedural constraints. Never contains IK corrections.
+    public private(set) var basePoses: [SkeletalJointPose]
+    public private(set) var basePoseGeneration: UInt64 = 0
+    public private(set) var modifierDiagnostics: [AnimationPoseModifierDiagnostic] = []
+    private var poseModifierState: CompiledPoseModifiers?
+    public var poseModifiers: [AnimationPoseModifier] { poseModifierState?.entries.map(\.configuration) ?? [] }
+    /// Enabled constraints require finalization even when base animation sampling is skipped.
+    public var hasActivePoseModifiers: Bool { poseModifierState?.entries.contains(where: { $0.configuration.enabled }) ?? false }
     public private(set) var localTransforms: [Transform3D]
     public private(set) var globalTransforms: [Transform3D]
     /// Morph target weights by rig node: the weights of the mesh on that node, or an empty array for a node without morph targets.
@@ -43,6 +51,7 @@ public struct SkeletalAnimationPlayer: Sendable {
         self.rig = rig
         self.clips = clips
         self.poses = rig.nodes.map { $0.restPose ?? SkeletalJointPose() }
+        self.basePoses = self.poses
         self.localTransforms = rig.nodes.map(\.restMatrix)
         self.globalTransforms = Array(repeating: .identity, count: rig.nodes.count)
         self.morphWeights = rig.nodes.map { $0.morphRestWeights ?? [] }
@@ -61,7 +70,7 @@ public struct SkeletalAnimationPlayer: Sendable {
         guard let index = clips.firstIndex(where: { $0.name == name }) else { throw .unknownClip(name) }
         graphState = nil
         pendingGraphEvents.removeAll(keepingCapacity: true)
-        self.transitionSource = poses
+        self.transitionSource = basePoses
         self.transitionMorphSource = morphWeights
         self.transitionDuration = transitionDuration.isFinite ? max(0, transitionDuration) : 0
         self.transitionTime = 0
@@ -85,7 +94,7 @@ public struct SkeletalAnimationPlayer: Sendable {
     public mutating func advance(by deltaTime: Double) { advance(by: deltaTime, evaluatePose: true) }
 
     /// Advances playback and transitions independently from the visual pose sampling rate.
-    public mutating func advance(by deltaTime: Double, evaluatePose: Bool) {
+    public mutating func advance(by deltaTime: Double, evaluatePose: Bool, finalizeModifiers: Bool = true) {
         guard isPlaying, deltaTime.isFinite, deltaTime >= 0, speed.isFinite else {
             return
         }
@@ -115,7 +124,7 @@ public struct SkeletalAnimationPlayer: Sendable {
             pendingGraphEvents.append(contentsOf: crossings.events)
             droppedGraphEventCount += min(Int.max / 2 - droppedGraphEventCount, crossings.dropped)
         }
-        if evaluatePose { evaluate() }
+        if evaluatePose { evaluate(finalizeModifiers: finalizeModifiers) }
     }
 
     /// Installs a validated graph atomically. Invalid edits leave current playback unchanged.
@@ -123,7 +132,7 @@ public struct SkeletalAnimationPlayer: Sendable {
         let compiled = try CompiledAnimationGraph(graph: graph, rig: rig, clips: clips)
         graphState = compiled
         clipIndex = nil
-        transitionSource = poses
+        transitionSource = basePoses
         transitionMorphSource = morphWeights
         self.transitionDuration = transitionDuration.isFinite ? max(0, transitionDuration) : 0
         transitionTime = 0
@@ -151,10 +160,26 @@ public struct SkeletalAnimationPlayer: Sendable {
     }
 
     /// Evaluates the current playback clock without advancing gameplay time.
-    public mutating func sampleCurrentPose() { evaluate() }
+    public mutating func sampleCurrentPose(finalizeModifiers: Bool = true) { evaluate(finalizeModifiers: finalizeModifiers) }
+
+    /// Installs an ordered stack atomically. Rejected configurations preserve the previous stack and pose.
+    public mutating func setPoseModifiers(_ modifiers: [AnimationPoseModifier], binding: AnimationRigBinding) throws(AnimationPoseModifierError) {
+        let compiled = try CompiledPoseModifiers(modifiers, rig: rig, binding: binding)
+        poseModifierState = compiled
+        finalizePoseModifiers()
+    }
+
+    /// Rebuilds the final pose from the unchanged presented animation pose.
+    /// Call after updating model-space targets, including while playback is paused.
+    public mutating func finalizePoseModifiers(inputs: [String: AnimationPoseModifierInput] = [:]) {
+        for index in poses.indices { poses[index] = basePoses[index] }
+        rebuildTransforms()
+        poseModifierState?.apply(rig: rig, inputs: inputs, poses: &poses, locals: &localTransforms,
+                                 globals: &globalTransforms, diagnostics: &modifierDiagnostics)
+    }
 
     /// Interpolates visual poses; playback/transition clocks remain unchanged.
-    public mutating func presentPose(from source: [SkeletalJointPose], to target: [SkeletalJointPose], amount: Float) {
+    public mutating func presentPose(from source: [SkeletalJointPose], to target: [SkeletalJointPose], amount: Float, finalizeModifiers: Bool = true) {
         guard source.count == poses.count, target.count == poses.count else {
             return
         }
@@ -164,10 +189,10 @@ public struct SkeletalAnimationPlayer: Sendable {
             poses[index].scale = source[index].scale + (target[index].scale - source[index].scale) * t
             poses[index].rotation = slerpQuat(source[index].rotation, target[index].rotation, t: t)
         }
-        rebuildTransforms()
+        captureBasePose(finalizeModifiers: finalizeModifiers)
     }
 
-    private mutating func evaluate() {
+    private mutating func evaluate(finalizeModifiers: Bool = true) {
         for index in rig.nodes.indices {
             poses[index] = rig.nodes[index].restPose ?? SkeletalJointPose()
             if let rest = rig.nodes[index].morphRestWeights {
@@ -220,7 +245,14 @@ public struct SkeletalAnimationPlayer: Sendable {
             transitionMorphSource.removeAll(keepingCapacity: true)
             transitionDuration = 0
         }
-        rebuildTransforms()
+        captureBasePose(finalizeModifiers: finalizeModifiers)
+    }
+
+    private mutating func captureBasePose(finalizeModifiers: Bool) {
+        for index in poses.indices { basePoses[index] = poses[index] }
+        basePoseGeneration &+= 1
+        if finalizeModifiers { finalizePoseModifiers() }
+        else { rebuildTransforms() }
     }
 
     private mutating func rebuildTransforms() {
