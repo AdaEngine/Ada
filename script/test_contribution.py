@@ -4,6 +4,7 @@ import json
 import importlib.util
 import contextlib
 import io
+import os
 import shlex
 import shutil
 from pathlib import Path
@@ -176,6 +177,14 @@ class RepositoryTests(RepositoryFixture):
 
 
 class ExecutionTests(RepositoryFixture):
+    def test_checks_discover_their_own_git_repository_when_run_from_a_hook(self):
+        foreign_git_dir = str(self.root / "foreign.git")
+        check = Check("git-root", "tests", ["git", "rev-parse", "--show-toplevel"])
+        with patch.dict(os.environ, {"GIT_DIR": foreign_git_dir}):
+            result = execute(check, self.root, self.root / "logs")
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(Path(Path(result["log"]).read_text().strip()).resolve(), self.root.resolve())
+
     def test_deferred_check_does_not_pass_complete_validation(self):
         report = {"purpose": "publication", "checks": [{"status": "deferred"}]}
         self.assertEqual(status_code(report), 2)
