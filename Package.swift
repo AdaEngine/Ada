@@ -173,7 +173,6 @@ var products: [Product] = [
     ])
 ]
 
-
 // MARK: - Targets
 
 // MARK: Editor Target
@@ -401,7 +400,14 @@ var targets: [Target] = [
             .define("MANIFOLD_PAR", to: "-1"), .define("MANIFOLD_NO_IOSTREAM"), .define("MANIFOLD_NO_FILESYSTEM")
         ]
     ),
-    .target(name: "AdaGeometry", dependencies: ["Math", .target(name: "CManifold", condition: .when(platforms: [.macOS, .windows, .linux], traits: ["MeshTerrainAuthoring"]))], swiftSettings: swiftSettings),
+    .target(
+        name: "AdaGeometry",
+        dependencies: [
+            "Math",
+            .target(name: "CManifold", condition: .when(platforms: [.macOS, .windows, .linux], traits: ["MeshTerrainAuthoring"]))
+        ],
+        swiftSettings: swiftSettings
+    ),
     .adaTarget(name: "AdaSpatial", dependencies: ["AdaECS", "AdaTransform", "Math"]),
     .testTarget(name: "AdaSpatialTests", dependencies: ["AdaSpatial", "AdaECS", "AdaTransform", "Math"], swiftSettings: swiftSettings),
     .adaTarget(
@@ -930,10 +936,11 @@ targets += [
 #endif
 
 #if os(Android) || os(Linux)
-targets += [
-    .testTarget(name: "AdaEngineEmbeddableTests", dependencies: ["AdaEngineEmbeddable"]),
-    .testTarget(name: "AdaScriptCompilerCoreTests", dependencies: ["AdaScriptCompilerCore"]),
-]
+targets.append(.testTarget(name: "AdaEngineEmbeddableTests", dependencies: ["AdaEngineEmbeddable"]))
+#endif
+
+#if os(Android) || os(Linux) || os(Windows)
+targets.append(.testTarget(name: "AdaScriptCompilerCoreTests", dependencies: ["AdaScriptCompilerCore"]))
 #endif
 
 // The target must exist on every host because AdaPlatform's dependency is conditional.

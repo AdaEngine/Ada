@@ -13,9 +13,13 @@ struct EditorViewportPresentationTests {
         let presentation = EditorViewportPresentation()
         let viewport = EditorSceneViewportModel()
         let model = EditorSceneModel.default(projectName: "Frame synchronization")
-        viewport.configure(sceneContent: try model.encodedYAML(),
-                           onSelectionChanged: { _ in }, onDocumentContentChanged: { _ in })
+        viewport.configure(
+            sceneContent: try model.encodedYAML(),
+            onSelectionChanged: { _ in },
+            onDocumentContentChanged: { _ in }
+        )
         viewport.setViewportSize(Size(width: 640, height: 400))
+        viewport.showsEntityMarkers = true
         let container = UIContainerView(rootView: EditorViewportDrawingLayer(
             viewportModel: viewport, presentation: presentation, kind: .gizmos
         ))
@@ -28,7 +32,9 @@ struct EditorViewportPresentationTests {
             container.viewTree.rootNode.draw(with: context)
             context.commitDraw()
             return context.getDrawCommands().compactMap {
-                if case let .drawQuad(transform, _, _) = $0 { return transform }
+                if case let .drawQuad(transform, _, _) = $0 {
+                    return transform
+                }
                 return nil
             }
         }
@@ -106,6 +112,8 @@ struct EditorViewportPresentationTests {
         }
         let presentation = EditorViewportPresentation()
         let viewport = EditorSceneViewportModel()
+        viewport.setViewportSize(Size(width: 640, height: 400))
+        presentation.refresh(viewportModel: viewport)
         let builds = HostBuildCounter()
         let host = PresentationHost(presentation: presentation, viewport: viewport, builds: builds)
         let container = UIContainerView(rootView: host)
@@ -115,20 +123,26 @@ struct EditorViewportPresentationTests {
         let initialBuilds = builds.count
         let initialGeometryBuilds = builds.geometryCount
         let initialLabels = labels(in: container)
-        #expect(initialLabels.contains("Loaded 1 entities · \(viewport.statusSuffix)"))
+        let initialRulerRevision = presentation.rulerRevision
+        let initialStatusRevision = presentation.statusRevision
+        #expect(initialLabels.contains("Loaded 1 entities · "))
+        #expect(presentation.statusSuffix == viewport.statusSuffix)
 
         viewport.twoDZoom = 75
         viewport.twoDCenter = Vector2(3, 2)
         host.requestRedraw()
-        for _ in 0..<3 {
+        for _ in 0..<10 {
             await Task.yield()
-            container.layoutIfNeeded()
             container.update(0)
+            container.layoutIfNeeded()
         }
         let updatedLabels = labels(in: container)
         #expect(builds.count == initialBuilds)
         #expect(builds.geometryCount == initialGeometryBuilds)
-        #expect(updatedLabels.contains("Loaded 1 entities · \(viewport.statusSuffix)"))
+        #expect(updatedLabels.contains("Loaded 1 entities · "))
+        #expect(presentation.rulerRevision > initialRulerRevision)
+        #expect(presentation.statusRevision > initialStatusRevision)
+        #expect(presentation.statusSuffix == viewport.statusSuffix)
         #expect(updatedLabels != initialLabels)
     }
 
@@ -148,7 +162,9 @@ struct EditorViewportPresentationTests {
             container.viewTree.rootNode.draw(with: context)
             context.commitDraw()
             return try #require(context.getDrawCommands().compactMap { command -> UInt64? in
-                if case let .beginLayer(_, version, cacheable) = command, cacheable { return version }
+                if case let .beginLayer(_, version, cacheable) = command, cacheable {
+                    return version
+                }
                 return nil
             }.first)
         }
