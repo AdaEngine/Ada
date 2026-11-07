@@ -67,14 +67,14 @@ class ProfileTests(unittest.TestCase):
         checks = build_checks(REPO, ["Sources/AdaUI/View.swift", "Editor/Package.swift"], CONFIG, REPO / "files.json", REPO)
         self.assertTrue({"swift-tests", "editor-tests"}.issubset({check.name for check in checks}))
 
-    def test_windows_swift_checks_limit_compiler_jobs_and_test_workers(self):
+    def test_windows_swift_checks_limit_compiler_jobs_and_run_tests_serially(self):
         with patch.object(sys, "platform", "win32"):
             checks = build_checks(REPO, ["Sources/AdaUI/View.swift"], CONFIG, REPO / "files.json", REPO)
         commands = {check.name: check.argv for check in checks}
         for prefix in ("swift", "editor"):
             self.assertIn("--jobs", commands[prefix + "-build"])
             self.assertIn("--jobs", commands[prefix + "-tests"])
-            self.assertIn("--num-workers", commands[prefix + "-tests"])
+            self.assertIn("--no-parallel", commands[prefix + "-tests"])
 
     def test_document_change_does_not_build_engine(self):
         checks = build_checks(REPO, ["Documentation/Designs/example.md"], CONFIG, REPO / "files.json", REPO)

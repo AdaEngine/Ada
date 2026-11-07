@@ -31,9 +31,8 @@ jobs:
           run: swift -version
 
         - name: Test
-          # Swift Testing on Windows becomes unstable when all tests are
-          # scheduled at once. Keep bounded parallelism so the suite still
-          # makes progress without exhausting the runner.
+          # Rendering and application tests share process-wide engine state.
+          # Run suites serially so their frame updates cannot race on Windows.
           # Build the test product directly: SwiftPM otherwise compiles the
           # WASI-only JavaScriptKit command plugin, which cannot build on Windows.
           run: |
@@ -41,11 +40,11 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             swift build -j 2 --product TextureAtlasBuilderTool
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            swift test --skip-build --parallel --num-workers 2
+            swift test --skip-build --no-parallel
 
         - name: Test Mesh Terrain authoring kernel
           # Authoring is optional for compiled players; explicitly exercise it in CI.
           run: |
             swift build -j 2 --traits MeshTerrainAuthoring --product AdaEnginePackageTests
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            swift test --traits MeshTerrainAuthoring --skip-build --parallel --num-workers 2 --filter "MeshTerrain|TriangleBoolean|TriangleIndexEdges"
+            swift test --traits MeshTerrainAuthoring --skip-build --no-parallel --filter "MeshTerrain|TriangleBoolean|TriangleIndexEdges"

@@ -25,6 +25,7 @@ final class EditorViewportPresentation {
     struct Annotations {
         let generation: UInt64
         let revision: UInt
+        let brushRevision: UInt64
         let size: Size
         let theme: Theme
         let grid: UIGraphicsContext
@@ -48,8 +49,12 @@ final class EditorViewportPresentation {
             statusRevision &+= 1
         }
         let state = viewportModel.smoothPerspectiveBlend < 1
-            ? RulerState(center: viewportModel.twoDCenter, zoom: viewportModel.twoDZoom,
-                         blend: viewportModel.smoothPerspectiveBlend, size: viewportModel.viewportSize)
+            ? RulerState(
+                center: viewportModel.twoDCenter,
+                zoom: viewportModel.twoDZoom,
+                blend: viewportModel.smoothPerspectiveBlend,
+                size: viewportModel.viewportSize
+            )
             : nil
         if rulerState != state {
             rulerState = state
@@ -66,8 +71,10 @@ final class EditorViewportPresentation {
         // logical size and stretch with that texture until the new target arrives.
         let cameraSize = viewportModel.cameraEntity()?.components[Camera.self]?.logicalViewport.rect.size
         let size = cameraSize.flatMap { $0.width > 0 && $0.height > 0 ? $0 : nil } ?? viewportModel.viewportSize
+        let brushRevision = viewportModel.terrainEditing.brushRevision
         let annotations: Annotations
         if let preparedAnnotations, preparedAnnotations.revision == revision,
+            preparedAnnotations.brushRevision == brushRevision,
             preparedAnnotations.size == size, preparedAnnotations.theme == theme {
             annotations = preparedAnnotations
         } else {
@@ -81,13 +88,22 @@ final class EditorViewportPresentation {
             let orientation = viewportModel.displayMode == .threeD
                 ? CompassOrientation(right: viewportModel.right3D, up: viewportModel.up3D, front: viewportModel.front3D) : nil
             annotations = Annotations(
-                generation: annotationGeneration, revision: revision, size: size, theme: theme, grid: grid, gizmos: gizmos,
-                interactionGizmo: viewportModel.captureGizmo(gizmo), compassOrientation: orientation
+                generation: annotationGeneration,
+                revision: revision,
+                brushRevision: brushRevision,
+                size: size,
+                theme: theme,
+                grid: grid,
+                gizmos: gizmos,
+                interactionGizmo: viewportModel.captureGizmo(gizmo),
+                compassOrientation: orientation
             )
             preparedAnnotations = annotations
         }
         return { [weak self, weak viewportModel] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             self.presentedAnnotations = annotations
             viewportModel?.presentedGizmo = annotations.interactionGizmo
             if self.compassOrientation != annotations.compassOrientation {
