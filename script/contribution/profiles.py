@@ -104,12 +104,14 @@ def build_checks(root, paths, config, paths_file, logs, quick=False, runtime=Non
                 prefix = "editor" if package == "Editor" else "swift"
                 scratch = config["swift_scratch"] + ("-editor" if package == "Editor" else "")
                 common = ["--package-path", package, "--scratch-path", scratch]
-                checks.append(Check(prefix + "-build", "analysis", ["swift", "build", "--build-tests", "-v", *common], timeout=timeout))
+                jobs = ["--jobs", "2"] if sys.platform == "win32" else []
+                workers = ["--num-workers", "2"] if sys.platform == "win32" else []
+                checks.append(Check(prefix + "-build", "analysis", ["swift", "build", "--build-tests", "-v", *jobs, *common], timeout=timeout))
                 selected = [p for p in swift_paths if p.startswith("Editor/") == (package == "Editor")]
                 checks.append(adapter(prefix + "-analysis", "analysis") if selected else
                               Check(prefix + "-analysis", "analysis", status="not_applicable",
                                     reason="No existing Swift source changed in " + package))
-                checks.append(Check(prefix + "-tests", "tests", ["swift", "test", "--parallel", *common], tests=True, timeout=timeout))
+                checks.append(Check(prefix + "-tests", "tests", ["swift", "test", "--parallel", *jobs, *workers, *common], tests=True, timeout=timeout))
     if "web" in profiles:
         selected = [str(root / p) for p in paths if p.startswith("Editor/WebUI/")
                     and Path(p).suffix in (".js", ".jsx", ".mjs", ".ts", ".tsx", ".css") and (root / p).is_file()]
