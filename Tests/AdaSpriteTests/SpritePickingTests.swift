@@ -110,6 +110,7 @@ struct SpritePickingTests {
         #expect(hit(Sprite(texture: namedSlice, size: sprite.size), at: [-5, 0]) == nil)
         #expect(hit(Sprite(texture: namedSlice, size: sprite.size), at: [5, 0]) != nil)
         let animation = AnimatedTexture()
+        animation.isPaused = true
         animation.framesCount = 2
         animation[0] = slice
         animation[1] = .whiteTexture

@@ -67,11 +67,13 @@ struct AdaWebPlayerTests {
     func unsupportedSystems() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        try makeProject(at: root)
-        try (source("First") + "\n@system class Tick { func update(context) {} }").write(
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("Sources"), withIntermediateDirectories: true)
+        let legacyProject = AdaWebPlayerProject(title: "Game", entryView: "Game", sources: ["Sources/Main.ada"])
+        try JSONEncoder().encode(legacyProject).write(to: root.appendingPathComponent("project.json"))
+        try "@system class Tick { func update(context) {} }".write(
             to: root.appendingPathComponent("Sources/Main.ada"), atomically: true, encoding: .utf8
         )
-        #expect(throws: AdaWebPlayerProjectError.self) {
+        #expect(throws: AdaWebPlayerProjectError.invalid("This Web Player profile supports views without ECS systems or custom native data.")) {
             try AdaWebPlayerBundle.assemble(template: root.appendingPathComponent("missing"), project: root, output: root.appendingPathComponent("out"))
         }
         #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("out").path))
@@ -86,7 +88,6 @@ struct AdaWebPlayerTests {
         try FileManager.default.createDirectory(at: projectRoot.appendingPathComponent("Sources"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: projectRoot.appendingPathComponent("Assets/Scenes"), withIntermediateDirectories: true)
         try makeTemplate(at: template)
-        try Data(#"{"runtimeAPI":4,"profile":"universal"}"#.utf8).write(to: template.appendingPathComponent("ada-web-player.json"))
         let script = "@system class Tick { func update(context) {} }"
         try script.write(to: projectRoot.appendingPathComponent("Sources/Main.ada"), atomically: true, encoding: .utf8)
         let scene = "format: ada.scene\nschemaVersion: 1\nscene:\n  id: test\n  name: Test\nentities: []\n"
@@ -114,9 +115,15 @@ struct AdaWebPlayerTests {
         try FileManager.default.createDirectory(at: project.appendingPathComponent("Sources"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: project.appendingPathComponent("Assets/Scenes"), withIntermediateDirectories: true)
         try makeTemplate(at: template)
-        try Data(#"{"runtimeAPI":4,"profile":"universal"}"#.utf8).write(to: template.appendingPathComponent("ada-web-player.json"))
         try Data("lobby".utf8).write(to: template.appendingPathComponent("player-lobby.js"))
-        let settings = #"{"build":{"system":"adascript"},"project":{"name":"SceneGame"},"paths":{"sources":"Sources","assets":"Assets"},"runtime":{"moduleName":"SceneGame","entry":{"scene":"Assets/Scenes/Main.ascn"}}}"#
+        let settings = #"""
+        {
+          "build": {"system": "adascript"},
+          "project": {"name": "SceneGame"},
+          "paths": {"sources": "Sources", "assets": "Assets"},
+          "runtime": {"moduleName": "SceneGame", "entry": {"scene": "Assets/Scenes/Main.ascn"}}
+        }
+        """#
         try settings.write(to: project.appendingPathComponent(".ada/project.json"), atomically: true, encoding: .utf8)
         try "@system class Tick { func update(context) {} }".write(to: project.appendingPathComponent("Sources/Main.ada"), atomically: true, encoding: .utf8)
         try "format: ada.scene\n".write(to: project.appendingPathComponent("Assets/Scenes/Main.ascn"), atomically: true, encoding: .utf8)
@@ -154,9 +161,7 @@ struct AdaWebPlayerTests {
         let template = root.appendingPathComponent("template")
         try makeProject(at: projectRoot)
         try makeTemplate(at: template)
-        try Data(#"{"runtimeAPI":2,"profile":"views"}"#.utf8).write(to: template.appendingPathComponent("ada-web-player.json"))
         var project = try AdaWebPlayerProject.load(at: projectRoot)
-        project.runtimeAPI = 2
         project.assets = [
             .init(id: "picture", kind: .texture, path: "Assets/My #picture.png"),
             .init(id: "font", kind: .font, path: "Assets/Font.ttf"),
@@ -207,7 +212,12 @@ struct AdaWebPlayerTests {
 
     private func makeProject(at directory: URL) throws {
         try FileManager.default.createDirectory(at: directory.appendingPathComponent("Sources"), withIntermediateDirectories: true)
-        let project = AdaWebPlayerProject(title: "Game", entryView: "Game", sources: ["Sources/Main.ada"])
+        let scene = "Assets/Scenes/Main.ascn"
+        let sceneURL = directory.appendingPathComponent(scene)
+        try FileManager.default.createDirectory(at: sceneURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "format: ada.scene\n".write(to: sceneURL, atomically: true, encoding: .utf8)
+        var project = AdaWebPlayerProject(title: "Game", entryScene: scene, moduleName: "Game", sources: ["Sources/Main.ada"])
+        project.files = [scene]
         try JSONEncoder().encode(project).write(to: directory.appendingPathComponent("project.json"))
         try source("First").write(to: directory.appendingPathComponent("Sources/Main.ada"), atomically: true, encoding: .utf8)
     }
@@ -219,11 +229,11 @@ struct AdaWebPlayerTests {
             try Data("test player bytes".utf8).write(to: file)
         }
         try Data("[]".utf8).write(to: directory.appendingPathComponent("ada-resource-manifest.json"))
-        try Data(#"{"runtimeAPI":1,"profile":"views"}"#.utf8).write(to: directory.appendingPathComponent("ada-web-player.json"))
+        try Data(#"{"runtimeAPI":4,"profile":"universal"}"#.utf8).write(to: directory.appendingPathComponent("ada-web-player.json"))
     }
 
     private func source(_ text: String) -> String {
-        "@view class Game { func body() { Text(\"\(text)\"); } }"
+        "class Game { func title() { return \"\(text)\"; } }"
     }
 
     private struct Entry: Decodable, Equatable {

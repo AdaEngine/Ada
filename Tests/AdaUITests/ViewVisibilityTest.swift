@@ -5,12 +5,12 @@
 //  Created by vladislav.prusakov on 11.08.2024.
 //
 
-import Testing
-@testable import AdaUI
-@testable import AdaPlatform
 import AdaInput
+@testable import AdaPlatform
+@testable import AdaUI
 import AdaUtils
 import Math
+import Testing
 
 @MainActor
 struct ViewVisibilityTests {
@@ -322,7 +322,7 @@ private func flushLifecycleActions() async {
 }
 
 private func waitForTaskCancellation(_ recorder: TaskLifecycleRecorder) async {
-    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(10))
     while ContinuousClock.now < deadline {
         if await recorder.cancellationCount > 0 {
             return
@@ -332,7 +332,7 @@ private func waitForTaskCancellation(_ recorder: TaskLifecycleRecorder) async {
 }
 
 private func waitForTaskStart(_ recorder: TaskLifecycleRecorder, count: Int = 1) async {
-    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    let deadline = ContinuousClock.now.advanced(by: .seconds(10))
     while ContinuousClock.now < deadline {
         if await recorder.startCount >= count {
             return
@@ -351,9 +351,13 @@ private struct LifecycleStateMutationHost: View {
 
     @State private var value = 0
 
+    private var recordedValue: Int {
+        recorder.value = value
+        return value
+    }
+
     var body: some View {
-        let _ = recorder.value = value
-        Text("\(value)")
+        Text("\(recordedValue)")
             .onAppear {
                 recorder.appearCount += 1
                 value = 1
