@@ -24,6 +24,9 @@ public enum SystemDependency: Sendable {
 
     /// Run the system after the specified system by name.
     case after(String)
+
+    /// Run after the specified system if it is registered in this scheduler.
+    case afterIfPresent(String)
 }
 
 extension SystemDependency {
@@ -35,6 +38,11 @@ extension SystemDependency {
     /// Run the system after the specified system.
     public static func after<T: System>(_ system: T.Type) -> SystemDependency {
         return .after(system.swiftName)
+    }
+
+    /// Run after every registered instance of this system type, allowing the owning plugin to be absent.
+    public static func afterIfPresent<T: System>(_ system: T.Type) -> SystemDependency {
+        return .afterIfPresent(system.swiftName)
     }
 }
 
@@ -49,15 +57,22 @@ extension SystemDependency: Equatable {
             switch rhs {
             case let .before(rhsSystem):
                 return system == rhsSystem
-            case .after:
+            case .after, .afterIfPresent:
                 return false
             }
         case let .after(system):
             switch rhs {
-            case .before:
+            case .before, .afterIfPresent:
                 return false
             case let .after(rhsSystem):
                 return system == rhsSystem
+            }
+        case let .afterIfPresent(system):
+            switch rhs {
+            case let .afterIfPresent(rhsSystem):
+                return system == rhsSystem
+            case .before, .after:
+                return false
             }
         }
     }

@@ -1,4 +1,4 @@
-import AdaAssets
+@_spi(Internal) import AdaAssets
 @_spi(Internal) import AdaRender
 import AdaUtils
 import Foundation
@@ -35,7 +35,22 @@ extension ModelAsset3D {
     private static let importedTextures = Mutex<[ImportedTextureKey: WeakBox<Texture2D>]>([:])
 
     static func makeMaterials(_ result: GLTFImportResult) throws -> [Material] {
+        var accounted = result
+        return try makeMaterialsAccounting(&accounted)
+    }
+
+    /// Mandatory textures reserve their staging cost before optional derived geometry is admitted.
+    static func makeMaterialsAccounting(_ result: inout GLTFImportResult) throws -> [Material] {
         var textures: [TextureKey: Texture2D] = [:]
+        var chargedTextures: Set<ImportedTextureKey> = []
+        var remaining: Int?
+        if let limits = ModelImportContext.limits {
+            let geometryBytes = result.importFootprint?.decodedBytes ?? 0
+            guard geometryBytes >= 0, geometryBytes <= limits.maximumDecodedBytes else { throw ModelImportLimitError.decodedBudgetExceeded }
+            remaining = limits.maximumDecodedBytes - geometryBytes
+        } else {
+            remaining = nil
+        }
         func texture(_ index: Int?, sRGB: Bool) throws -> Texture2D? {
             guard let index else {
                 return nil
@@ -51,25 +66,40 @@ extension ModelAsset3D {
             }
             let input = source.sampler.flatMap { result.samplers.indices.contains($0) ? result.samplers[$0] : nil } ?? .init()
             let sampler = samplerDescriptor(input)
-            let sharedKey = ImportedTextureKey(data: data, sRGB: sRGB, sampler: sampler,
-                                               device: ObjectIdentifier(unsafe RenderEngine.shared.renderDevice))
+            let sharedKey = ImportedTextureKey(
+                data: data,
+                sRGB: sRGB,
+                sampler: sampler,
+                device: ObjectIdentifier(unsafe RenderEngine.shared.renderDevice)
+            )
+            if let available = remaining, chargedTextures.insert(sharedKey).inserted {
+                let baseBytes = try Image.decodedImportByteCount(from: data)
+                // Include decoded pixels, ImageMipmaps conversion arrays/Data, GPU pixels
+                // and the alpha mask. Thin mip chains approach twice the base pixels;
+                // six times the base covers their staging peak as well as retained resources.
+                let factor = sampler.mipFilter == .notMipmapped ? 4 : 6
+                guard baseBytes > 0, baseBytes <= available / factor else { throw ModelImportLimitError.decodedBudgetExceeded }
+                remaining = available - baseBytes * factor
+            }
             if let value = importedTextures.withLock({ $0[sharedKey]?.value }) {
                 textures[key] = value
                 return value
             }
             let image = try Image.decode(from: data)
             let levels = try ImageMipmaps.make(from: image, colorSpace: sRGB ? .sRGB : .linear, includeMipmaps: sampler.mipFilter != .notMipmapped)
-            let value = Texture2D(descriptor: TextureDescriptor(
-                width: image.width,
-                height: image.height,
-                pixelFormat: .rgba8,
-                textureUsage: [.read],
-                textureType: .texture2D,
-                mipmapLevel: levels.count,
-                image: levels[0],
-                debugLabel: "glTF Texture \(index)",
-                samplerDescription: sampler
-            ))
+            let value = Texture2D(
+                descriptor: TextureDescriptor(
+                    width: image.width,
+                    height: image.height,
+                    pixelFormat: .rgba8,
+                    textureUsage: [.read],
+                    textureType: .texture2D,
+                    mipmapLevel: levels.count,
+                    image: levels[0],
+                    debugLabel: "glTF Texture \(index)",
+                    samplerDescription: sampler
+                )
+            )
             for (level, mip) in levels.enumerated() where level > 0 {
                 unsafe mip.data.withUnsafeBytes { bytes in
                     guard let base = bytes.baseAddress else {
@@ -79,7 +109,9 @@ extension ModelAsset3D {
                 }
             }
             let shared = importedTextures.withLock { cache in
-                if let existing = cache[sharedKey]?.value { return existing }
+                if let existing = cache[sharedKey]?.value {
+                    return existing
+                }
                 cache = cache.filter { $0.value.value != nil }
                 cache[sharedKey] = WeakBox(value)
                 return value
@@ -143,6 +175,9 @@ extension ModelAsset3D {
             }
             return material
         }
+        if let remaining, let limits = ModelImportContext.limits, let previous = result.importFootprint {
+            result.importFootprint = .init(encodedBytes: previous.encodedBytes, decodedBytes: limits.maximumDecodedBytes - remaining)
+        }
         return materials.isEmpty ? [PBRMaterial()] : materials
     }
 
@@ -155,11 +190,12 @@ extension ModelAsset3D {
             }
         }
         let minFilter: SamplerMinMagFilter = [9728, 9984, 9986].contains(source.minFilter) ? .nearest : .linear
-        let mip: SamplerMipFilter = switch source.minFilter {
-        case 9728, 9729: .notMipmapped
-        case 9984, 9985: .nearest
-        default: .linear
-        }
+        let mip: SamplerMipFilter =
+            switch source.minFilter {
+            case 9728, 9729: .notMipmapped
+            case 9984, 9985: .nearest
+            default: .linear
+            }
         return SamplerDescriptor(
             minFilter: minFilter,
             magFilter: source.magFilter == 9728 ? .nearest : .linear,

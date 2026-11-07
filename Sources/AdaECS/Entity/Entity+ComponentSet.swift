@@ -69,6 +69,10 @@ extension Entity {
         /// Encode the component set to an encoder.
         /// - Parameter encoder: The encoder to encode the component set to.
         public func encode(to encoder: Encoder) throws {
+            try encode(to: encoder, excludingEntities: [])
+        }
+
+        func encode(to encoder: Encoder, excludingEntities identifiers: Set<Entity.ID>) throws {
             var container = encoder.container(keyedBy: CodingName.self)
             guard let world else {
                 throw CodableError.worldIsNil
@@ -82,9 +86,15 @@ extension Entity {
                 .chunks.chunks[location.chunkIndex]
             let components = chunk.getComponents(for: entity)
             for (_, component) in components {
+                // Runtime-only state is non-Codable. Skip it without formatting cached geometry
+                // into a potentially enormous encoding error.
+                guard var encodable = component as? any Encodable else { continue }
+                if !identifiers.isEmpty, let relationship = component as? RelationshipComponent {
+                    encodable = relationship.excludingEntities(identifiers)
+                }
                 do {
                     try container.encode(
-                        AnyEncodable(component),
+                        AnyEncodable(encodable),
                         forKey: CodingName(stringValue: type(of: component).swiftName)
                     )
                 } catch {

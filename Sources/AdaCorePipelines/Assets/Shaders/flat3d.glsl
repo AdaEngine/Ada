@@ -102,7 +102,13 @@ void flat3d_vertex()
     Output.WorldPosition = worldPosition.xyz;
     Output.ViewPosition = (u_ViewMatrix * worldPosition).xyz;
     Output.ViewNormal = normalize(mat3(u_ViewMatrix) * normal);
+#ifdef ADA_TERRAIN
+    // Reuse the terrain-unused tangent slot to stay below WebGPU's inter-stage variable limit.
+    // X/Z already travel in TextureCoordinate; this packs the local normal and local height.
+    Output.ViewTangent = vec4(localNormal, localPosition.y);
+#else
     Output.ViewTangent = vec4(normalize(mat3(u_ViewMatrix) * worldTangent), a_Tangent.w * ModelOrientation);
+#endif
     Output.TextureCoordinate = a_TextureCoordinate;
     Output.TextureCoordinate1 = a_TextureCoordinate1;
     Output.TextureFlags = a_TextureFlags;
@@ -116,6 +122,16 @@ void flat3d_vertex()
     Output.EmissiveStrength = max(a_Material.z, 0.0);
     Output.EmissiveLightThreshold = a_Material.w;
     gl_Position = u_ViewProjection * worldPosition;
+#ifdef ADA_WIREFRAME
+    // WebGPU disallows pipeline depth bias on lines. Offset along view depth
+    // by a bounded scene distance, then keep the original screen position.
+    // A fixed NDC offset can pull distant hidden edges through their occluder.
+    float depthOffset = min(0.002, abs(Output.ViewPosition.z) * 0.01);
+    vec2 nearer = gl_Position.zw - sign(Output.ViewPosition.z) * depthOffset * u_Projection[2].zw;
+    if (nearer.y > 0.0 && nearer.x >= 0.0) {
+        gl_Position.z = min(gl_Position.z, gl_Position.w * (nearer.x / nearer.y));
+    }
+#endif
 }
 
 #version 450 core
@@ -149,7 +165,11 @@ layout (binding = 1) uniform DirectionalLight3DUniform {
     vec4 u_ShadowAtlas;
 };
 
+#ifdef ADA_TERRAIN
+layout (binding = 4) uniform texture2DArray u_TerrainAlbedo;
+#else
 layout (binding = 4) uniform texture2D u_BaseColorTexture;
+#endif
 layout (binding = 5) uniform texture2D u_MetallicRoughnessTexture;
 layout (binding = 6) uniform texture2D u_NormalTexture;
 layout (binding = 7) uniform sampler u_BaseColorSampler;
@@ -158,7 +178,11 @@ layout (binding = 9) uniform sampler u_NormalSampler;
 layout (binding = 10) uniform texture2D u_DirectionalShadowTexture;
 layout (binding = 11) uniform sampler u_DirectionalShadowSampler;
 #include <AdaEngine/ShadowPCF.glsl>
+#ifdef ADA_TERRAIN
+layout (binding = 12) uniform texture2DArray u_TerrainNormal;
+#else
 layout (binding = 12) uniform texture2D u_EmissiveTexture;
+#endif
 layout (binding = 13) uniform sampler u_EmissiveSampler;
 
 layout (binding = 15) uniform PBR3DUniform {
@@ -215,7 +239,11 @@ vec2 applyTextureTransform(vec2 uv, int slot) {
     vec4 matrix = u_TextureTransforms[slot * 2];
     return vec2(dot(matrix.xy, uv), dot(matrix.zw, uv)) + u_TextureTransforms[slot * 2 + 1].xy;
 }
+#ifdef ADA_TERRAIN
+layout (binding = 16) uniform texture2DArray u_TerrainORM;
+#else
 layout (binding = 16) uniform texture2D u_OcclusionTexture;
+#endif
 layout (binding = 17) uniform texture2D u_HeightTexture;
 layout (binding = 0) uniform sampler u_OcclusionSampler;
 layout (binding = 18) uniform texture2D u_Irradiance;
@@ -804,6 +832,139 @@ float reachingLightCount() {
 // Surface evaluation is independent of the shared lighting implementation.
 #define ADA_GRAPH_SOURCE_MARKER 1
 
+#ifdef ADA_TERRAIN
+layout(binding = 51) uniform TerrainMaterialUniform {
+    vec4 u_TerrainGrid;
+    vec4 u_TerrainTints[32];
+    vec4 u_TerrainSurfaces[32];
+    vec4 u_TerrainVariation[32];
+    vec4 u_TerrainVariationScale[32];
+};
+layout(binding = 52) uniform TerrainNormalTransform {
+    mat4 u_TerrainNormalToWorld;
+};
+
+struct TerrainTexel {
+    vec4 albedo;
+    vec3 normal;
+    vec3 orm;
+    float height;
+};
+
+uint terrainHash(vec2 cell, uint seed) {
+    // Wrapping before conversion also gives stable nonnegative integer hashes for negative local coordinates.
+    uvec2 p = uvec2(mod(cell, vec2(16777216.0)));
+    uint h = seed ^ (p.x * 0x9e3779b9u) ^ (p.y * 0x85ebca6bu);
+    h ^= h >> 16u;
+    h *= 0x7feb352du;
+    h ^= h >> 15u;
+    h *= 0x846ca68bu;
+    return h ^ (h >> 16u);
+}
+
+TerrainTexel terrainRead(int layer, vec2 uv, vec2 dx, vec2 dy, mat2 transform, vec2 offset) {
+    vec2 q = transform * uv + offset;
+    vec2 qx = transform * dx, qy = transform * dy;
+    vec4 albedo = textureGrad(sampler2DArray(u_TerrainAlbedo, u_BaseColorSampler), vec3(q, float(layer)), qx, qy);
+    vec3 normal = textureGrad(sampler2DArray(u_TerrainNormal, u_BaseColorSampler), vec3(q, float(layer)), qx, qy).xyz * 2.0 - 1.0;
+    // For q=M*uv, tangent-space gradients and normals return through transpose(M), including reflection handedness.
+    normal.xy = transpose(transform) * normal.xy;
+    vec4 orm = textureGrad(sampler2DArray(u_TerrainORM, u_BaseColorSampler), vec3(q, float(layer)), qx, qy);
+    return TerrainTexel(vec4(srgbToLinear(albedo.rgb), albedo.a), normal, orm.rgb, u_TerrainVariationScale[layer].w > 0.5 ? orm.a : 0.5);
+}
+
+float terrainMacro(vec2 coordinate, uint seed) {
+    vec2 cell = floor(coordinate), f = smoothstep(vec2(0.0), vec2(1.0), fract(coordinate));
+    float a = float(terrainHash(cell, seed) & 65535u) / 65535.0;
+    float b = float(terrainHash(cell + vec2(1.0, 0.0), seed) & 65535u) / 65535.0;
+    float c = float(terrainHash(cell + vec2(0.0, 1.0), seed) & 65535u) / 65535.0;
+    float d = float(terrainHash(cell + vec2(1.0), seed) & 65535u) / 65535.0;
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+TerrainTexel terrainCoarsest(int layer) {
+    vec3 q = vec3(0.5, 0.5, float(layer));
+    vec4 albedo = textureLod(sampler2DArray(u_TerrainAlbedo, u_BaseColorSampler), q,
+        float(textureQueryLevels(sampler2DArray(u_TerrainAlbedo, u_BaseColorSampler)) - 1));
+    vec3 normal = textureLod(sampler2DArray(u_TerrainNormal, u_BaseColorSampler), q,
+        float(textureQueryLevels(sampler2DArray(u_TerrainNormal, u_BaseColorSampler)) - 1)).xyz * 2.0 - 1.0;
+    vec4 orm = textureLod(sampler2DArray(u_TerrainORM, u_BaseColorSampler), q,
+        float(textureQueryLevels(sampler2DArray(u_TerrainORM, u_BaseColorSampler)) - 1));
+    uint flags = uint(u_TerrainVariation[layer].x);
+    if ((flags & 16u) != 0u) {
+        if ((flags & 5u) != 0u) { normal.x = 0.0; }
+        if ((flags & 6u) != 0u) { normal.y = 0.0; }
+    }
+    return TerrainTexel(vec4(srgbToLinear(albedo.rgb), albedo.a), normal, orm.rgb, u_TerrainVariationScale[layer].w > 0.5 ? orm.a : 0.5);
+}
+
+TerrainTexel terrainMacroColor(int layer, TerrainTexel value, vec2 localPosition) {
+    vec4 settings = u_TerrainVariation[layer];
+    if (settings.w > 0.0) {
+        uint seed = uint(settings.y) | (uint(settings.z) << 16u);
+        float macro = terrainMacro(localPosition / u_TerrainVariationScale[layer].y, seed ^ 0x68bc21ebu);
+        value.albedo.rgb = clamp(value.albedo.rgb * (1.0 + (macro * 2.0 - 1.0) * settings.w), vec3(0.0), vec3(1.0));
+    }
+    return value;
+}
+
+TerrainTexel terrainSample(int layer, vec2 uv, vec2 dx, vec2 dy, vec2 localPosition) {
+    vec4 settings = u_TerrainVariation[layer];
+    uint flags = uint(settings.x);
+    if (u_TerrainVariationScale[layer].z > 0.5) { return terrainMacroColor(layer, terrainCoarsest(layer), localPosition); }
+    if ((flags & 16u) == 0u) { return terrainRead(layer, uv, dx, dy, mat2(1.0), vec2(0.0)); }
+    uint seed = uint(settings.y) | (uint(settings.z) << 16u);
+    vec2 coordinate = uv / u_TerrainVariationScale[layer].x;
+    vec2 cell = floor(coordinate), f = smoothstep(vec2(0.0), vec2(1.0), fract(coordinate));
+    TerrainTexel result = TerrainTexel(vec4(0.0), vec3(0.0), vec3(0.0), 0.0);
+    for (int corner = 0; corner < 4; ++corner) {
+        int x = corner & 1, y = corner >> 1;
+        float weight = (x == 0 ? 1.0 - f.x : f.x) * (y == 0 ? 1.0 - f.y : f.y);
+        uint random = terrainHash(cell + vec2(float(x), float(y)), seed);
+        float flipU = (flags & 1u) != 0u && (random & 1u) != 0u ? -1.0 : 1.0;
+        float flipV = (flags & 2u) != 0u && (random & 2u) != 0u ? -1.0 : 1.0;
+        mat2 transform = mat2(flipU, 0.0, 0.0, flipV);
+        uint rotation = (flags & 4u) != 0u ? (random >> 2u) & 3u : 0u;
+        if (rotation == 1u) { transform = mat2(0.0, 1.0, -1.0, 0.0) * transform; }
+        if (rotation == 2u) { transform = -transform; }
+        if (rotation == 3u) { transform = mat2(0.0, -1.0, 1.0, 0.0) * transform; }
+        vec2 offset = (flags & 8u) != 0u ? vec2(float((random >> 8u) & 255u), float((random >> 16u) & 255u)) / 256.0 : vec2(0.0);
+        TerrainTexel sampleValue = terrainRead(layer, uv, dx, dy, transform, offset);
+        result.albedo += sampleValue.albedo * weight;
+        result.normal += sampleValue.normal * weight;
+        result.orm += sampleValue.orm * weight;
+        result.height += sampleValue.height * weight;
+    }
+    return terrainMacroColor(layer, result, localPosition);
+}
+
+TerrainTexel terrainProjected(int layer, vec3 position, vec3 dx, vec3 dy, vec3 geometric, vec2 macroPosition) {
+    vec3 weights = pow(abs(geometric), vec3(4.0));
+    weights /= max(weights.x + weights.y + weights.z, 0.00001);
+    TerrainTexel result = TerrainTexel(vec4(0.0), vec3(0.0), vec3(0.0), 0.0);
+    for (int axis = 0; axis < 3; ++axis) {
+        float weight = weights[axis];
+        if (weight <= 0.00001) { continue; }
+        vec2 uv = axis == 0 ? position.zy : (axis == 1 ? position.xz : position.xy);
+        vec2 gradientX = axis == 0 ? dx.zy : (axis == 1 ? dx.xz : dx.xy);
+        vec2 gradientY = axis == 0 ? dy.zy : (axis == 1 ? dy.xz : dy.xy);
+        TerrainTexel value = terrainSample(layer, uv, gradientX, gradientY, macroPosition);
+        vec3 mapped = length(value.normal) > 0.00001 ? normalize(value.normal) : vec3(0.0, 0.0, 1.0);
+        // Whiteout correction: every flat-map axis produces the same original geometric normal.
+        vec3 projected;
+        if (axis == 0) { projected = vec3(mapped.z * geometric.x, mapped.y + geometric.y, mapped.x + geometric.z); }
+        else if (axis == 1) { projected = vec3(mapped.x + geometric.x, mapped.z * geometric.y, mapped.y + geometric.z); }
+        else { projected = vec3(mapped.x + geometric.x, mapped.y + geometric.y, mapped.z * geometric.z); }
+        result.albedo += value.albedo * weight;
+        result.normal += projected * weight;
+        result.orm += value.orm * weight;
+        result.height += value.height * weight;
+    }
+    result.normal = length(result.normal) > 0.00001 ? normalize(result.normal) : geometric;
+    return result;
+}
+#endif
+
 struct AdaPBRSurface {
     vec4 baseColor;
     vec3 normal;
@@ -815,7 +976,113 @@ struct AdaPBRSurface {
 };
 
 AdaPBRSurface ada_material_surface() {
-    #ifdef ADA_SHADER_GRAPH
+    #ifdef ADA_TERRAIN
+    // Stable IDs are mapped to this generation's array slots on upload. Never interpolate indices.
+    bool volumeField = u_TerrainGrid.z < 0.0;
+    vec2 grid = volumeField ? Input.TextureCoordinate1 : max((Input.TextureCoordinate - u_TerrainGrid.xy) * u_TerrainGrid.z, vec2(0.0));
+    ivec2 extent = textureSize(sampler2D(u_MetallicRoughnessTexture, u_MetallicRoughnessSampler), 0) - ivec2(1);
+    grid = min(grid, vec2(extent));
+    ivec2 start = volumeField ? ivec2(floor(grid / 2.0)) * 2 : ivec2(floor(grid));
+    vec2 fraction = volumeField ? clamp(grid - vec2(start), vec2(0.0), vec2(1.0)) : fract(grid);
+    // Binding17 is a terrain-only vertical atlas: premixed tint/premultiplied roughness, then mask.
+    // The shared neutral1x2 atlas keeps unpainted tiles allocation-free.
+    ivec2 paintSize = textureSize(sampler2D(u_HeightTexture, u_BaseColorSampler), 0);
+    ivec2 paintExtent = ivec2(paintSize.x, max(paintSize.y / 2, 1));
+    vec4 paintedSurface = vec4(0.0);
+    float paintedRoughnessMask = 0.0;
+    float contributions[32];
+    for (int slot = 0; slot < 32; ++slot) { contributions[slot] = 0.0; }
+    for (int z = 0; z < 2; ++z) {
+        for (int x = 0; x < 2; ++x) {
+            if (volumeField && x == 1 && z == 1) { continue; }
+            ivec2 at = min(start + ivec2(x, z), extent);
+            ivec4 ids = ivec4(round(texelFetch(sampler2D(u_MetallicRoughnessTexture, u_MetallicRoughnessSampler), at, 0) * 255.0));
+            vec4 weights = texelFetch(sampler2D(u_NormalTexture, u_NormalSampler), at, 0);
+            float corner = volumeField
+                ? (x == 1 ? fraction.x : (z == 1 ? fraction.y : max(0.0, 1.0 - fraction.x - fraction.y)))
+                : (x == 0 ? 1.0 - fraction.x : fraction.x) * (z == 0 ? 1.0 - fraction.y : fraction.y);
+            ivec2 paintAt = min(at, paintExtent - ivec2(1));
+            paintedSurface += texelFetch(sampler2D(u_HeightTexture, u_BaseColorSampler), paintAt, 0) * corner;
+            paintedRoughnessMask += texelFetch(sampler2D(u_HeightTexture, u_BaseColorSampler), paintAt + ivec2(0, paintExtent.y), 0).r * corner;
+            for (int channel = 0; channel < 4; ++channel) {
+                contributions[clamp(ids[channel], 0, 31)] += weights[channel] * corner;
+            }
+        }
+    }
+    vec4 tint = vec4(0.0);
+    vec2 gradientX = dFdx(Input.TextureCoordinate);
+    vec2 gradientY = dFdy(Input.TextureCoordinate);
+    vec3 geometric = normalize(Input.ViewNormal);
+    vec3 localPosition = vec3(Input.TextureCoordinate.x, Input.ViewTangent.w, Input.TextureCoordinate.y);
+    vec3 localGeometric = normalize(Input.ViewTangent.xyz);
+    // Derivatives are evaluated unconditionally, before per-layer and axis selection.
+    vec3 localGradientX = dFdx(localPosition), localGradientY = dFdy(localPosition);
+    mat3 planarFrame = cotangentFrame(geometric, Input.ViewPosition, Input.TextureCoordinate);
+    mat3 localToViewNormal = inverse(mat3(u_EnvironmentInverseView)) * mat3(u_TerrainNormalToWorld);
+    float normalTransformScale = max(length(localToViewNormal * localGeometric), 0.00001);
+    vec2 surface = vec2(0.0);
+    vec3 normalSum = vec3(0.0);
+    float occlusion = 0.0;
+    float total = 0.0;
+    TerrainTexel layerTexels[4];
+    vec3 layerNormals[4];
+    float layerWeights[4];
+    int layerSlots[4];
+    int layerCount = 0;
+    // Bilinear corners can introduce sixteen IDs; resolve the strongest four before shading.
+    for (int outputSlot = 0; outputSlot < 4; ++outputSlot) {
+        int selected = 0;
+        for (int slot = 1; slot < int(u_TerrainGrid.w); ++slot) {
+            if (contributions[slot] > contributions[selected]) { selected = slot; }
+        }
+        float weight = contributions[selected];
+        if (weight <= 0.0) { break; }
+        bool coarse = u_TerrainVariationScale[selected].z > 0.5;
+        float scale = coarse ? 1.0 : u_TerrainSurfaces[selected].z;
+        TerrainTexel texel;
+        vec3 layerNormal;
+        if (u_TerrainSurfaces[selected].w > 0.5) {
+            texel = terrainProjected(selected, coarse ? vec3(0.0) : localPosition / scale,
+                coarse ? vec3(0.0) : localGradientX / scale, coarse ? vec3(0.0) : localGradientY / scale, localGeometric, Input.TextureCoordinate);
+            // Preserve the vertex-normalized/interpolated geometric baseline; transform only the map perturbation.
+            layerNormal = geometric + localToViewNormal * (texel.normal - localGeometric) / normalTransformScale;
+        } else {
+            texel = terrainSample(selected, coarse ? vec2(0.0) : Input.TextureCoordinate / scale,
+                coarse ? vec2(0.0) : gradientX / scale, coarse ? vec2(0.0) : gradientY / scale, Input.TextureCoordinate);
+            layerNormal = planarFrame * texel.normal;
+        }
+        layerTexels[outputSlot] = texel;
+        layerNormals[outputSlot] = layerNormal;
+        layerWeights[outputSlot] = weight;
+        layerSlots[outputSlot] = selected;
+        layerCount += 1;
+        total += weight;
+        contributions[selected] = 0.0;
+    }
+    float baseTotal = max(total, 0.00001);
+    total = 0.0;
+    for (int index = 0; index < layerCount; ++index) {
+        float weight = layerWeights[index] / baseTotal;
+        // A bounded positive bias preserves equal-height ratios and the continuous zero-weight limit.
+        // Missing maps supply exactly 0.5, so ordinary blending is unchanged (factor 1).
+        weight *= exp2(8.0 * (layerTexels[index].height - 0.5));
+        int selected = layerSlots[index];
+        TerrainTexel texel = layerTexels[index];
+        tint += u_TerrainTints[selected] * texel.albedo * weight;
+        normalSum += layerNormals[index] * weight;
+        surface += u_TerrainSurfaces[selected].xy * texel.orm.gb * weight;
+        occlusion += texel.orm.r * weight;
+        total += weight;
+    }
+    total = max(total, 0.00001);
+    vec3 normal = length(normalSum) > 0.00001 ? normalize(normalSum) : geometric;
+    if (!surfaceFrontFacing() && u_SurfaceFlags.x > 0.5) { normal = -normal; }
+    vec4 baseColor = Input.Color * tint / total;
+    baseColor.rgb *= paintedSurface.rgb;
+    float roughness = surface.x / total * (1.0 - paintedRoughnessMask) + paintedSurface.a;
+    return AdaPBRSurface(baseColor, normal, clamp(roughness, 0.04, 1.0),
+        clamp(surface.y / total, 0.0, 1.0), 1.0, clamp(occlusion / total, 0.0, 1.0), vec3(0.0));
+    #elif defined(ADA_SHADER_GRAPH)
     AdaGraphSurface graph = ada_graph_evaluate(Input.TextureCoordinate);
     vec4 baseColor = Input.Color * graph.color;
     baseColor.a *= graph.alpha;
@@ -865,8 +1132,26 @@ void flat3d_fragment()
 {
     if (u_SurfaceFlags.z > 0.5) { g_ParallaxDelta = parallaxDelta(); }
     if (Input.ShadowFlags.w > 0.0 && visibilityDither(gl_FragCoord.xy) < Input.ShadowFlags.w) { discard; }
+#ifndef ADA_WIREFRAME
     if (u_SurfaceFlags.x < 0.5 && !surfaceFrontFacing()) { discard; }
+#endif
     AdaPBRSurface surface = ada_material_surface();
+#ifdef ADA_WIREFRAME
+    // This shader declares a depth output for the atmosphere path below.
+    // Every live return must initialize it, including the line variant.
+    gl_FragDepth = gl_FragCoord.z;
+    color = vec4(0.88, 0.93, 1.0, 1.0);
+    normalRoughness = vec4(surface.normal, surface.roughness);
+    viewPositionMetallic = vec4(Input.ViewPosition, surface.metallic);
+    indirectLighting = vec4(0.0);
+#ifdef ADA_HYBRID_REFLECTION
+    reflectionResponse = vec4(0.0);
+#endif
+#ifdef ADA_DIFFUSE_SURFACE
+    diffuseSurface = vec4(0.0);
+#endif
+    return;
+#endif
     vec4 baseColor = surface.baseColor;
     float opacity = surface.opacity;
     float roughness = surface.roughness;
@@ -899,7 +1184,11 @@ void flat3d_fragment()
     if (dot(sampledDirection, sampledDirection) > 0.0001) { anisotropyDirection = normalize(sampledDirection); }
 #endif
     if (hasAnisotropy()) {
+#ifdef ADA_TERRAIN
+        bool authored = false; // This slot packs local terrain data, not an authored tangent.
+#else
         bool authored = Input.TextureFlags.w > 0.5;
+#endif
         vec3 tangent = authored ? Input.ViewTangent.xyz : cotangentFrame(normalize(Input.ViewNormal), Input.ViewPosition, materialUV(u_UVSets.x, 0))[0];
         tangent = normalize(tangent - normal * dot(normal, tangent));
         vec3 bitangent = normalize(cross(normal, tangent)) * (authored ? Input.ViewTangent.w : 1.0);
@@ -998,7 +1287,7 @@ void flat3d_fragment()
         bakedPart=bakedAmbient*baked.a;
     }
 #endif
-    #ifdef ADA_SHADER_GRAPH
+    #if defined(ADA_SHADER_GRAPH) || defined(ADA_TERRAIN)
     float occlusion = surface.occlusion;
     #else
     float occlusion = u_SurfaceFlags.y > 0.5 ? texture(sampler2D(u_OcclusionTexture, u_OcclusionSampler), materialUV(u_UVSets.w, 3)).r : 1.0;
@@ -1017,7 +1306,7 @@ void flat3d_fragment()
             normalLight
         );
     }
-    #ifdef ADA_SHADER_GRAPH
+    #if defined(ADA_SHADER_GRAPH) || defined(ADA_TERRAIN)
     vec3 emissive = surface.emission * emissiveVisibility;
     #else
     vec3 emissive = srgbToLinear(texture(
@@ -1040,7 +1329,7 @@ void flat3d_fragment()
     if (u_ShadowAtlas.w > 0.5) {
         vec3 debugColor = u_ShadowAtlas.w < 1.5 ? adaLinearToSrgb(baseColor.rgb)
             : (u_ShadowAtlas.w < 2.5 ? cascadeTint(normalLight) : (u_ShadowAtlas.w < 3.5 ? heatRamp(reachingLightCount() / 8.0) : vec3(0.3)));
-        color = vec4(debugColor, opacity);
+        color = vec4(u_ShadowAtlas.w > 4.5 ? vec3(0.025) : debugColor, opacity);
     }
     // Transparent surfaces attenuate the opaque indirect buffer but do not contribute to it.
     indirectLighting = vec4(u_SurfaceProperties.w > 1.5 ? vec3(0.0) : ambient, opacity);

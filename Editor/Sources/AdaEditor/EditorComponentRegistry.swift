@@ -25,6 +25,7 @@ enum EditorBuiltInComponentType {
     static let mesh2D = String(reflecting: Mesh2D.self)
     static let mesh3D = String(reflecting: Mesh3DComponent.self)
     static let model3DSource = String(reflecting: Model3DSource.self)
+    static let terrain3DSource = String(reflecting: Terrain3DSource.self)
     static let audioSource = String(reflecting: AudioSource.self)
     static let physicsBody3D = String(reflecting: PhysicsBody3DComponent.self)
     static let directionalLight3D = String(reflecting: DirectionalLightComponent.self)
@@ -101,7 +102,9 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
     }
 
     func displayValue(in payload: EditorComponentPayload) -> String {
-        if coding == .shaderGraphValue { return EditorShaderGraphFields.display(self, in: payload) }
+        if coding == .shaderGraphValue {
+            return EditorShaderGraphFields.display(self, in: payload)
+        }
         if coding == .spriteAnchorPreset {
             return EditorSpriteLayoutFields.anchorPreset(in: payload)
         }
@@ -283,6 +286,7 @@ enum EditorComponentRegistry {
         mesh2DDescriptor,
         mesh3DDescriptor,
         terrainDescriptor,
+        terrainSourceDescriptor,
         model3DSourceDescriptor,
         spineSourceDescriptor,
         audioSourceDescriptor,
@@ -303,7 +307,9 @@ enum EditorComponentRegistry {
 
     @MainActor
     static func registerBuiltIns() {
-        guard !hasRegisteredBuiltIns else { return }
+        guard !hasRegisteredBuiltIns else {
+            return
+        }
         DisplayLayout.registerRuntimeType()
         RuntimeTypeRegistry.registerComponent(ParticleEmitter.self, names: ["ParticleEmitter"])
         RuntimeTypeRegistry.registerComponent(ParticleEmitter3D.self, names: ["ParticleEmitter3D"])
@@ -355,6 +361,9 @@ enum EditorComponentRegistry {
         RuntimeTypeRegistry.registerComponent(Mesh2D.self, names: ["Mesh2D"])
         RuntimeTypeRegistry.registerComponent(Mesh3DComponent.self, names: ["Mesh3DComponent"])
         RuntimeTypeRegistry.registerComponent(Terrain3D.self, names: ["Terrain3D"])
+        RuntimeTypeRegistry.registerComponent(Terrain3DSource.self, names: ["Terrain3DSource"])
+        RuntimeTypeRegistry.registerComponent(MeshTerrain3DIdentity.self, names: ["MeshTerrain3DIdentity"])
+        RuntimeTypeRegistry.registerComponent(MeshTerrain3DBinding.self, names: ["MeshTerrain3DBinding"])
         RuntimeTypeRegistry.registerComponent(PhysicsBody3DComponent.self, names: ["PhysicsBody3DComponent"])
         RuntimeTypeRegistry.registerComponent(DirectionalLightComponent.self, names: ["DirectionalLightComponent"])
         RuntimeTypeRegistry.registerComponent(PointLightComponent.self, names: ["PointLightComponent"])

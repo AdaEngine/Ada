@@ -24,6 +24,9 @@ public struct TextureDescriptor {
     /// The dimension and arrangement of texture image data.
     public var textureType: Texture.TextureType
 
+    /// Number of images in a 2D array texture. Other texture types retain their existing dimensions.
+    public var arrayLength: Int = 1
+
     /// The number of mipmap levels for this texture.
     public var mipmapLevel: Int
 
@@ -35,6 +38,10 @@ public struct TextureDescriptor {
 
     /// Requests GPU-only storage when a backend-native effect requires private textures.
     public var usesPrivateStorage: Bool = false
+
+    /// Disable long-lived WebGPU bind-group ownership for derived resources whose generations are budgeted by their source.
+    /// Other backends retain their existing resource binding behavior.
+    @_spi(Internal) public var allowsBindingCache: Bool = true
 
     /// The label marked texture for debug reason.
     public var debugLabel: String?

@@ -5,8 +5,8 @@ import AdaECS
 /// Most modes replace the final image with data the main pass already writes (normals, view position,
 /// roughness/metallic, indirect light) or that SSAO produces. ``albedo``, ``cascades`` and ``lightCount``
 /// instead make the main pass write their colors into scene color, which the same fullscreen pass shows.
-/// Enabling a view adds one fullscreen pass and `.none` adds nothing. ``wireframe`` draws the main pass with
-/// line fill; backends without polygon fill modes (WebGPU) render it solid.
+/// Data views add a fullscreen pass. Wireframe uses portable indexed lines over
+/// depth-tested surface coverage on Metal and WebGPU.
 public enum DebugView3D: String, Codable, Sendable, CaseIterable {
     /// Normal rendering.
     case none
@@ -23,8 +23,12 @@ public enum DebugView3D: String, Codable, Sendable, CaseIterable {
     /// Ambient and image-based light the main pass accumulated before reflections, brightened with an
     /// exponential curve so the usually dim values are readable.
     case indirectLighting
-    /// Main pass rendered with line fill.
+    /// Neutral surface coverage with the actual rendered triangle edges.
     case wireframe
+    /// Lit materials with the actual rendered triangle edges.
+    case shadedWireframe
+
+    public var showsWireframe: Bool { self == .wireframe || self == .shadedWireframe }
     /// Base color (texture times factor) before lighting, sRGB encoded.
     case albedo
     /// Directional-shadow cascade each pixel samples: red, green and blue for cascades 0 to 2, dark gray
@@ -38,7 +42,7 @@ public enum DebugView3D: String, Codable, Sendable, CaseIterable {
     /// Shader selector; ``none`` and ``wireframe`` never reach the debug pass.
     var shaderMode: Float {
         switch self {
-        case .none, .wireframe: 0
+        case .none, .wireframe, .shadedWireframe: 0
         case .normals: 1
         case .depth: 2
         case .roughness: 3
@@ -57,6 +61,7 @@ public enum DebugView3D: String, Codable, Sendable, CaseIterable {
         case .cascades: 2
         case .lightCount: 3
         case .meshlets: 4
+        case .wireframe: 5
         default: 0
         }
     }
@@ -64,7 +69,7 @@ public enum DebugView3D: String, Codable, Sendable, CaseIterable {
     /// Whether the fullscreen debug pass replaces the final image.
     var replacesFinalImage: Bool {
         switch self {
-        case .none, .wireframe: false
+        case .none, .wireframe, .shadedWireframe: false
         default: true
         }
     }

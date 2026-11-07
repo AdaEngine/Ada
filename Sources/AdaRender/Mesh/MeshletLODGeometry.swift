@@ -43,11 +43,15 @@ public struct MeshletLODGeometry: Sendable {
     public let sourceDigest: UInt64
     public let baseIndexCount: Int
     public let vertexCount: Int
+    /// Select this CPU hierarchy automatically when view LOD is enabled.
+    public let automaticPixelError: Float?
 
-    public init(positions: [Vector3], sourceIndices: [UInt32], geometry: MeshletGeometry, nodes: [MeshletLODNode], roots: [Int]) throws {
+    public init(positions: [Vector3], sourceIndices: [UInt32], geometry: MeshletGeometry, nodes: [MeshletLODNode], roots: [Int],
+                automaticPixelError: Float? = nil) throws {
         guard geometry.matches(positions: positions, indices: geometry.indices), sourceIndices.count % 3 == 0,
             sourceIndices.allSatisfy({ value in Int(exactly: value).map { $0 < positions.count } == true }),
-            nodes.count <= 1_000_000, roots.count <= nodes.count else { throw MeshletDataError.invalidGeometry }
+            nodes.count <= 1_000_000, roots.count <= nodes.count,
+            automaticPixelError.map({ $0.isFinite && $0 > 0 }) ?? true else { throw MeshletDataError.invalidGeometry }
         var expectedCluster = 0
         var childrenUsed = Set<Int>()
         for (index, node) in nodes.enumerated() {
@@ -121,6 +125,7 @@ public struct MeshletLODGeometry: Sendable {
         self.sourceDigest = MeshletGeometry.digest(positions: positions, indices: sourceIndices)
         self.baseIndexCount = sourceIndices.count
         self.vertexCount = positions.count
+        self.automaticPixelError = automaticPixelError
     }
 
     public func matches(positions: [Vector3], indices: [UInt32]) -> Bool {

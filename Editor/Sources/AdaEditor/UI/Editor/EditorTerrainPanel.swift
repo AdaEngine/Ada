@@ -29,6 +29,14 @@ struct EditorTerrainPanel: View {
             }
             .buttonStyle(DefaultButtonStyle())
             .accessibilityIdentifier("AdaEditor.Terrain.Create")
+            .disabled(state.isSourceBusy)
+            if let status = state.sourceStatus {
+                Text(L10n.tr(status))
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.editorColors.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("AdaEditor.Terrain.Source.Status")
+            }
             Text(L10n.text("Drag on the ground to shape it. Escape cancels the stroke."))
                 .font(.system(size: 11))
                 .foregroundColor(theme.editorColors.muted)

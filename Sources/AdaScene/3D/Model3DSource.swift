@@ -150,7 +150,7 @@ public struct Model3DSource: Codable, Equatable, Sendable {
     /// Installs an already loaded asset. An invalid animation fails before creating entities.
     @discardableResult
     public func instantiate(_ model: ModelAsset3D, alternatives: [ModelAsset3D] = [], libraries: [AnimationLibrary] = [], modifiers: AnimationModifierStack? = nil,
-                            in world: World, under owner: Entity) throws -> Entity {
+                            preloadedLightmap: LightmapSet3D? = nil, in world: World, under owner: Entity) throws -> Entity {
         let clips = try resolvedAnimationClips(importedClips: model.animationClips, rig: model.animationRig, libraries: libraries)
         try validateModifiers(modifiers, rig: model.animationRig)
         if let lod, alternatives.count != lod.sources.count {
@@ -167,8 +167,18 @@ public struct Model3DSource: Codable, Equatable, Sendable {
             guard model.animationRig == nil, lod == nil else {
                 throw AssetError.message("Lightmaps require a static model without skeletal animation or LOD alternatives")
             }
-            let handle = try AssetsManager.loadSync(LightmapSet3D.self, at: lightmapSource)
-            guard let maps = handle.asset else { throw AssetError.message("Lightmap sidecar was not loaded") }
+            let maps: LightmapSet3D
+            if let preloadedLightmap {
+                maps = preloadedLightmap
+            } else {
+                #if WASM
+                    throw AssetError.message("Load the lightmap sidecar asynchronously before instantiating a Web model")
+                #else
+                    let handle = try AssetsManager.loadSync(LightmapSet3D.self, at: lightmapSource)
+                    guard let loaded = handle.asset else { throw AssetError.message("Lightmap sidecar was not loaded") }
+                    maps = loaded
+                #endif
+            }
             guard maps.modelFile.isEmpty || URL(fileURLWithPath: source).lastPathComponent == maps.modelFile else {
                 throw AssetError.message("Lightmap sidecar belongs to another derived model")
             }
@@ -333,7 +343,7 @@ public struct Model3DSourceSystem {
             }
         }
         for (id, reference) in pending {
-            let result: Result<(ModelAsset3D?, [ModelAsset3D], [AnimationLibrary], AnimationModifierStack?), AssetError>
+            let result: Result<(ModelAsset3D?, [ModelAsset3D], [AnimationLibrary], AnimationModifierStack?, LightmapSet3D?), AssetError>
             do {
                 let model = reference.source.isEmpty ? nil : try await loadModel(reference.assetPath)
                 var alternatives: [ModelAsset3D] = []
@@ -361,7 +371,15 @@ public struct Model3DSourceSystem {
                     modifierHandles[path] = handle
                     modifiers = stack
                 }
-                result = .success((model, alternatives, libraries, modifiers))
+                let maps: LightmapSet3D?
+                if model != nil, !reference.lightmapSource.isEmpty {
+                    let handle = try await AssetsManager.load(LightmapSet3D.self, at: reference.lightmapSource)
+                    guard let loaded = handle.asset else { throw AssetError.message("Lightmap sidecar was not loaded") }
+                    maps = loaded
+                } else {
+                    maps = nil
+                }
+                result = .success((model, alternatives, libraries, modifiers, maps))
             } catch {
                 result = .failure(.message(error.localizedDescription))
             }
@@ -370,9 +388,9 @@ public struct Model3DSourceSystem {
                     owner.components[Model3DSourceState.self]?.reference != reference else { return }
                 let previousRoot = owner.components[Model3DSourceState.self]?.rootEntityID
                 do {
-                    let (model, alternatives, libraries, modifiers) = try result.get()
+                    let (model, alternatives, libraries, modifiers, maps) = try result.get()
                     if let model {
-                        try reference.instantiate(model, alternatives: alternatives, libraries: libraries, modifiers: modifiers, in: world, under: owner)
+                        try reference.instantiate(model, alternatives: alternatives, libraries: libraries, modifiers: modifiers, preloadedLightmap: maps, in: world, under: owner)
                     } else {
                         owner.components[Model3DSourceState.self] = .init(reference: reference)
                     }

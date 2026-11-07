@@ -10,6 +10,8 @@ import PackagePlugin
 struct AdaWebExportPlugin: CommandPlugin {
     // Runtime files belong to the plugin package, including when used by a dependent game.
     private static var assetsDirectory: URL { URL(fileURLWithPath: #filePath).deletingLastPathComponent() }
+    private static let flat3DBundle = "AdaEngine_AdaCorePipelines.resources"
+    private static let flat3DVariants = [["ADA_TERRAIN"], ["ADA_WIREFRAME"], ["ADA_TERRAIN", "ADA_WIREFRAME"]]
 
     func performCommand(context: PluginContext, arguments: [String]) async throws {
         let options: ExportOptions
@@ -539,33 +541,37 @@ struct AdaWebExportPlugin: CommandPlugin {
             ]
             arguments.append(contentsOf: moduleIncludeArguments)
 
-            do {
-                let generatedOutput = try WebExportSupport.captureStandardOutput(
-                    executable: shaderTranspiler.path(),
-                    arguments: arguments,
-                    workingDirectory: packageDirectory
-                )
-                let generatedEntries = generatedOutput
-                    .split(whereSeparator: \.isNewline)
-                    .map(String.init)
-                    .compactMap { outputPath -> ResourceManifestEntry? in
-                        let outputURL = URL(fileURLWithPath: outputPath)
-                        guard FileManager.default.fileExists(atPath: outputURL.path()) else {
-                            return nil
+            let needsVariants = resourceBundle.source.lastPathComponent == Self.flat3DBundle
+                && shaderURL.relativePath(from: resourceBundle.source) == "Shaders/flat3d.glsl"
+            for defines in [[]] + (needsVariants ? Self.flat3DVariants : []) {
+                do {
+                    let generatedOutput = try WebExportSupport.captureStandardOutput(
+                        executable: shaderTranspiler.path(),
+                        arguments: arguments + defines.flatMap { ["--define", $0] },
+                        workingDirectory: packageDirectory
+                    )
+                    let generatedEntries = generatedOutput
+                        .split(whereSeparator: \.isNewline)
+                        .map(String.init)
+                        .compactMap { outputPath -> ResourceManifestEntry? in
+                            let outputURL = URL(fileURLWithPath: outputPath)
+                            guard FileManager.default.fileExists(atPath: outputURL.path()) else {
+                                return nil
+                            }
+                            let absoluteBuildURL = shaderURL
+                                .deletingLastPathComponent()
+                                .appending(component: outputURL.lastPathComponent, directoryHint: .notDirectory)
+                            return ResourceManifestEntry(
+                                path: absoluteBuildURL.path(),
+                                // The WGSL exists in the export, not in the SwiftPM resource bundle.
+                                url: browserRelativeURL(forRelativePath: outputURL.relativePath(from: outputDirectory))
+                            )
                         }
-                        let absoluteBuildURL = shaderURL
-                            .deletingLastPathComponent()
-                            .appending(component: outputURL.lastPathComponent, directoryHint: .notDirectory)
-                        return ResourceManifestEntry(
-                            path: absoluteBuildURL.path(),
-                            // The WGSL exists in the export, not in the SwiftPM resource bundle.
-                            url: browserRelativeURL(forRelativePath: outputURL.relativePath(from: outputDirectory))
-                        )
-                    }
-                entries.append(contentsOf: generatedEntries)
-            } catch {
-                if requiresAllShaders { throw error }
-                Diagnostics.warning("Skipping WGSL generation for \(shaderURL.lastPathComponent): \(error)")
+                    entries.append(contentsOf: generatedEntries)
+                } catch {
+                    if requiresAllShaders || !defines.isEmpty { throw error }
+                    Diagnostics.warning("Skipping WGSL generation for \(shaderURL.lastPathComponent): \(error)")
+                }
             }
         }
 
@@ -587,6 +593,13 @@ struct AdaWebExportPlugin: CommandPlugin {
             let manifest = try? JSONDecoder().decode(CachedShaderManifest.self, from: manifestData),
             manifest.schemaVersion == 1
         else { return nil }
+        if resourceBundles.contains(where: { $0.source.lastPathComponent == Self.flat3DBundle }) {
+            let requiredVariants = Self.flat3DVariants.flatMap { defines in
+                let stem = Self.flat3DBundle + "/Shaders/flat3d." + defines.joined(separator: ".")
+                return [stem + ".vert.wgsl", stem + ".frag.wgsl"]
+            }
+            guard Set(requiredVariants).isSubset(of: manifest.wgslPaths) else { return nil }
+        }
 
         var currentSources: [String: URL] = [:]
         for bundle in resourceBundles {

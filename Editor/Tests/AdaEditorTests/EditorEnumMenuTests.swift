@@ -45,6 +45,72 @@ struct EditorEnumMenuTests {
         #expect(selected == "one")
     }
 
+    @Test func fieldShowsHoverPressAndKeyboardFocusWithoutChangingItsValue() throws {
+        let previousPresenter = ContextMenuPresentationCenter.present
+        ContextMenuPresentationCenter.present = { _ in }
+        defer { ContextMenuPresentationCenter.present = previousPresenter }
+        let container = UIContainerView(rootView: EditorEnumField(cases: ["one", "two"], selection: .constant("one")).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 220, height: 100)
+        container.layoutSubviews()
+        let selector = UINodeSelector.accessibilityIdentifier("AdaEditor.Enum.Toggle")
+        let frame = try container.uiNode(matching: selector).absoluteFrame
+        let point = Point(frame.midX, frame.midY)
+        let hover = Theme.adaEditor.editorColors.text.opacity(0.10)
+        let pressed = Theme.adaEditor.editorColors.text.opacity(0.16)
+        let focused = Theme.adaEditor.editorColors.blue.opacity(0.12)
+        #expect(fillCount(container, color: hover) == 0)
+        container.onMouseEvent(MouseEvent(window: .empty, button: .none, mousePosition: point, phase: .changed, modifierKeys: [], time: 0))
+        container.update(1 / 60); container.layoutIfNeeded()
+        #expect(fillCount(container, color: hover) > 0)
+        container.onMouseEvent(MouseEvent(window: .empty, button: .left, mousePosition: point, phase: .began, modifierKeys: [], time: 0))
+        container.update(1 / 60); container.layoutIfNeeded()
+        #expect(fillCount(container, color: pressed) > 0)
+        container.onMouseEvent(MouseEvent(window: .empty, button: .left, mousePosition: point, phase: .cancelled, modifierKeys: [], time: 0))
+        container.onMouseEvent(MouseEvent(window: .empty, button: .none, mousePosition: Point(219, 99), phase: .changed, modifierKeys: [], time: 0))
+        _ = try container.uiFocusNode(matching: selector)
+        container.update(1 / 60); container.layoutIfNeeded()
+        #expect(fillCount(container, color: focused) > 0)
+        #expect(try container.uiNode(matching: selector).absoluteFrame == frame)
+    }
+
+    @Test func keyboardActivationAcceptsCapsLockWithoutRepeatingOrHandlingCommandKeys() throws {
+        var count = 0
+        let previousPresenter = ContextMenuPresentationCenter.present
+        ContextMenuPresentationCenter.present = { _ in count += 1 }
+        defer { ContextMenuPresentationCenter.present = previousPresenter }
+        let field = EditorEnumField(cases: ["one", "two"], selection: .constant("one"))
+        let container = UIContainerView(rootView: field)
+        container.frame = Rect(x: 0, y: 0, width: 220, height: 100)
+        container.layoutSubviews()
+        _ = try container.uiFocusNode(matching: .accessibilityIdentifier("AdaEditor.Enum.Toggle"))
+        container.onKeyEvent(KeyEvent(window: .empty, keyCode: .enter, modifiers: [.capsLock], status: .down, time: 0, isRepeated: false))
+        #expect(count == 1)
+        container.onKeyEvent(KeyEvent(window: .empty, keyCode: .enter, modifiers: [.capsLock], status: .down, time: 0, isRepeated: true))
+        #expect(count == 1)
+        container.onKeyEvent(KeyEvent(window: .empty, keyCode: .enter, modifiers: [.capsLock], status: .up, time: 0, isRepeated: false))
+        #expect(count == 1)
+        container.onKeyEvent(KeyEvent(window: .empty, keyCode: .space, modifiers: [], status: .down, time: 0, isRepeated: false))
+        #expect(count == 2)
+        container.onKeyEvent(KeyEvent(window: .empty, keyCode: .space, modifiers: [.main], status: .down, time: 0, isRepeated: false))
+        #expect(count == 2)
+        let disabled = UIContainerView(rootView: field.disabled(true))
+        disabled.frame = container.frame
+        disabled.layoutSubviews()
+        disabled.onKeyEvent(KeyEvent(window: .empty, keyCode: .space, modifiers: [], status: .down, time: 0, isRepeated: false))
+        #expect(count == 2)
+    }
+
+    private func fillCount<Content: View>(_ container: UIContainerView<Content>, color target: Color) -> Int {
+        let context = UIGraphicsContext()
+        container.draw(in: container.bounds, with: context)
+        return context.getDrawCommands().filter { command in
+            switch command {
+            case let .drawPath(_, _, .fill(color)), let .drawQuad(_, _, color): color == target
+            default: false
+            }
+        }.count
+    }
+
     @Test func primaryMenuCancelsDragAndIgnoresDisabledClicks() throws {
         var presentations = 0
         let previousPresenter = ContextMenuPresentationCenter.present

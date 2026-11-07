@@ -15,6 +15,11 @@ int ada_image_can_decode(const unsigned char *data, int length) {
     return stbi_info_from_memory(data, length, &width, &height, &channels);
 }
 
+int ada_image_info(const unsigned char *data, int length, int *width, int *height) {
+    int channels;
+    return stbi_info_from_memory(data, length, width, height, &channels);
+}
+
 unsigned char *ada_image_decode(const unsigned char *data, int length, int *width, int *height) {
     int channels;
     return stbi_load_from_memory(data, length, width, height, &channels, STBI_rgb_alpha);

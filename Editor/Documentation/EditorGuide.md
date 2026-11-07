@@ -80,6 +80,14 @@ and stay at their defaults for other formats:
 Voxel materials are not imported yet: colors come from the palette and the model
 uses one diffuse material. The model tools of the AI agent work with glTF only.
 
+## Shape terrain
+
+Open a scene and choose **Terrain** in the viewport toolbar. In the dock, choose
+**Mesh Terrain** to join a static model to the ground or **Heightfield** to sculpt
+height samples with Raise, Lower, Smooth or Flatten. Inspect the triangles with
+the 3D viewport's **Wireframe** mode. See the [Terrain guide](Terrain.md) for a
+worked join, heightfield tools, saved versions, and collision.
+
 ## Build and run
 
 Choose **Build > Build Project** to build the project. **Build > Run** runs the active scene inside the editor when a scene is selected; otherwise it runs the selected target. **Build > Stop** stops the current operation. Build Output and Problems show progress and diagnostics.

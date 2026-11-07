@@ -40,14 +40,15 @@ struct AdaShaderTranspilerTool {
                 moduleIncludes: options.moduleIncludes
             )
             let (entryPoint, mainSource) = GLSLProcessor.dropEntryPoint(in: processedSource)
-            let spirv = try compileSPIRV(source: mainSource, stage: stageSource.stage)
+            let spirv = try compileSPIRV(source: mainSource, stage: stageSource.stage, defines: options.defines)
             let wgsl = try runTint(
                 tintExecutable: options.tintExecutable,
                 spirv: spirv,
                 entryPoint: entryPoint
             )
+            let stem = ([options.input.deletingPathExtension().lastPathComponent] + options.defines).joined(separator: ".")
             let output = options.outputDirectory
-                .appending(component: options.input.deletingPathExtension().lastPathComponent, directoryHint: .notDirectory)
+                .appending(component: stem, directoryHint: .notDirectory)
                 .appendingPathExtension(stageSource.stage.fileExtension)
                 .appendingPathExtension("wgsl")
 
@@ -56,9 +57,9 @@ struct AdaShaderTranspilerTool {
         }
     }
 
-    private static func compileSPIRV(source: String, stage: ShaderStage) throws -> Data {
+    private static func compileSPIRV(source: String, stage: ShaderStage, defines: [String]) throws -> Data {
         var error: UnsafePointer<CChar>?
-        let source = source.insertingDefaultVertexDefines()
+        let source = source.insertingDefines(defines)
         let options = spirv_options(preamble: nil)
         let binary = source.withCString { sourcePointer in
             compile_shader_glsl(
@@ -81,36 +82,37 @@ struct AdaShaderTranspilerTool {
     }
 
     private static func runTint(tintExecutable: URL, spirv: Data, entryPoint: String) throws -> String {
-        let temporaryFile = FileManager.default.temporaryDirectory
-            .appending(component: UUID().uuidString, directoryHint: .notDirectory)
-            .appendingPathExtension("spv")
-        try spirv.write(to: temporaryFile)
+        let directory = FileManager.default.temporaryDirectory.appending(component: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
         defer {
-            try? FileManager.default.removeItem(at: temporaryFile)
+            try? FileManager.default.removeItem(at: directory)
         }
+        let temporaryFile = directory.appendingPathComponent("input.spv")
+        let outputFile = directory.appendingPathComponent("output.wgsl")
+        let errorFile = directory.appendingPathComponent("diagnostics.txt")
+        try spirv.write(to: temporaryFile)
+        try Data().write(to: errorFile)
 
         let process = Process()
-        let standardOutput = Pipe()
-        let standardError = Pipe()
+        let standardError = try FileHandle(forWritingTo: errorFile)
+        defer { try? standardError.close() }
         process.executableURL = tintExecutable
         // GLSL materials may compute derivatives under data-dependent control flow.
         // Preserve that source behavior when translating SPIR-V; Tint emits the
         // corresponding WGSL derivative_uniformity diagnostic directive.
-        process.arguments = ["--format", "wgsl", "--allow-non-uniform-derivatives", "true", temporaryFile.path()]
-        process.standardOutput = standardOutput
+        // A generated shader or diagnostic can exceed a pipe's buffer before the child exits.
+        process.arguments = ["--format", "wgsl", "--allow-non-uniform-derivatives", "true", "-o", outputFile.path(), temporaryFile.path()]
+        process.standardOutput = FileHandle.nullDevice
         process.standardError = standardError
         try process.run()
         process.waitUntilExit()
 
-        let outputData = standardOutput.fileHandleForReading.readDataToEndOfFile()
-        let errorData = standardError.fileHandleForReading.readDataToEndOfFile()
-        let errorOutput = String(decoding: errorData, as: UTF8.self)
-
         guard process.terminationStatus == 0 else {
+            let errorOutput = String(decoding: try Data(contentsOf: errorFile), as: UTF8.self)
             throw ToolError.tintFailed(errorOutput.isEmpty ? "Tint exited with status \(process.terminationStatus)." : errorOutput)
         }
 
-        let output = String(decoding: outputData, as: UTF8.self)
+        let output = String(decoding: try Data(contentsOf: outputFile), as: UTF8.self)
         guard !output.isEmpty else {
             throw ToolError.tintFailed("Tint produced no WGSL output.")
         }
@@ -128,12 +130,14 @@ private struct Options {
     let outputDirectory: URL
     let tintExecutable: URL
     let moduleIncludes: [String: URL]
+    let defines: [String]
 
     init(arguments: ArraySlice<String>) throws {
         var input: URL?
         var outputDirectory: URL?
         var tintExecutable: URL?
         var moduleIncludes: [String: URL] = [:]
+        var defines: Set<String> = []
         var iterator = arguments.makeIterator()
 
         while let argument = iterator.next() {
@@ -144,6 +148,12 @@ private struct Options {
                 outputDirectory = try Self.nextURL(from: &iterator, for: argument)
             case "--tint":
                 tintExecutable = try Self.nextURL(from: &iterator, for: argument)
+            case "--define":
+                let name = try Self.nextValue(from: &iterator, for: argument)
+                guard name.range(of: #"^[A-Z_][A-Z0-9_]*$"#, options: .regularExpression) != nil else {
+                    throw ToolError.invalidArgument("--define expects a GLSL macro name")
+                }
+                defines.insert(name)
             case "--module-include":
                 let value = try Self.nextValue(from: &iterator, for: argument)
                 let parts = value.split(separator: "=", maxSplits: 1).map(String.init)
@@ -172,6 +182,7 @@ private struct Options {
         self.outputDirectory = outputDirectory
         self.tintExecutable = tintExecutable
         self.moduleIncludes = moduleIncludes
+        self.defines = defines.sorted()
     }
 
     private static func nextURL<I: IteratorProtocol>(from iterator: inout I, for argument: String) throws -> URL where I.Element == String {
@@ -387,19 +398,20 @@ private enum GLSLProcessor {
 }
 
 private extension String {
-    func insertingDefaultVertexDefines() -> String {
+    func insertingDefines(_ additionalDefines: [String]) -> String {
         let defines = """
         #define VERTEX_POSITIONS 1
         #define VERTEX_NORMALS 1
         #define VERTEX_UVS 1
         #define VERTEX_COLORS 1
         """
+        let preamble = ([defines] + additionalDefines.map { "#define \($0) 1" }).joined(separator: "\n")
         guard let versionRange = range(of: #"^\s*#version[^\n]*(?:\n|$)"#, options: .regularExpression) else {
-            return "\(defines)\n\(self)"
+            return "\(preamble)\n\(self)"
         }
 
         var output = self
-        output.insert(contentsOf: "\(defines)\n", at: versionRange.upperBound)
+        output.insert(contentsOf: "\(preamble)\n", at: versionRange.upperBound)
         return output
     }
 }
@@ -462,7 +474,7 @@ private enum ToolError: LocalizedError, CustomStringConvertible {
     var description: String {
         switch self {
         case .help:
-            "Usage: AdaShaderTranspilerTool --input shader.glsl --output-directory <dir> --tint <path> [--module-include AdaEngine=<dir>]"
+            "Usage: AdaShaderTranspilerTool --input shader.glsl --output-directory <dir> --tint <path> [--define NAME] [--module-include AdaEngine=<dir>]"
         case .invalidArgument(let message):
             message
         case .glslangInitializationFailed:

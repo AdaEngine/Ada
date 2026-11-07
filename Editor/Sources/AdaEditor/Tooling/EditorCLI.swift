@@ -301,6 +301,10 @@ enum EditorCLI {
         if invocation.options["target"] == "web", let web = EditorBuildExportConfiguration.load().swiftExecutable(for: .web) {
             return web
         }
+        #if os(Windows)
+            // An empty override lets the WSL worker select its installed Linux Swift.
+            if invocation.options["target"] == "web" { return "" }
+        #endif
         return await SwiftToolchainLocator.locate().swiftExecutablePath
     }
 

@@ -36,6 +36,7 @@ public struct Main3DRenderNode: RenderNode {
     @ResMut<Meshlet3DState> private var meshlets
     @Res<Render3DMeshletStatistics> private var meshletStatistics
     @ResMut<MeshletMap3DResources> private var meshletMap
+    @ResMut<Wireframe3DResources> private var wireframe
     @Res<ExtractedCameraRenderViewTargets> private var cameraTargets
 
     @Res<ExtractedLighting3D>
@@ -80,6 +81,7 @@ public struct Main3DRenderNode: RenderNode {
         _meshlets.update(from: world)
         _meshletStatistics.update(from: world)
         _meshletMap.update(from: world)
+        _wireframe.update(from: world)
         _cameraTargets.update(from: world)
         _lightingScratch.update(from: world)
         _viewUniforms.update(from: world)
@@ -122,8 +124,9 @@ public struct Main3DRenderNode: RenderNode {
             if entity != view {
                 return
             }
+            let showsWireframe = environments.environments[source.entityId]?.debugView.showsWireframe == true
             let tracingRequested = environments.environments[source.entityId]?.pathTracing.isEnabled == true
-                && environments.environments[source.entityId]?.debugView != .meshlets
+                && environments.environments[source.entityId]?.debugView != .meshlets && !showsWireframe
             if pathTracingOverlaysOnly && !tracingRequested { return }
             let uniformPass = pathTracingOverlaysOnly ? 1 : 0
             let localPass = pathTracingOverlaysOnly ? 1000 : 0
@@ -162,7 +165,7 @@ public struct Main3DRenderNode: RenderNode {
 
             let drawUniform = temporalViewUniform(uniform, target: target)
             if !pathTracingOverlaysOnly && !tracingRequested && environments.environments[source.entityId]?.meshVisibility.gpuOcclusion == true
-                && environments.environments[source.entityId]?.debugView != .meshlets {
+                && environments.environments[source.entityId]?.debugView != .meshlets && !showsWireframe {
                 visibilityCommand = gpuVisibility.encode(
                     view: source.entityId,
                     size: sceneColor.size,
@@ -248,8 +251,10 @@ public struct Main3DRenderNode: RenderNode {
 
             let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
             if !pathTracingOverlaysOnly && !tracingRequested {
+                var meshletSettings = environments.environments[source.entityId]?.meshVisibility ?? .init()
+                if showsWireframe { meshletSettings.meshlets = .cpuReference; meshletSettings.gpuOcclusion = false }
                 let count = meshlets.prepare(items: &visibleItems, view: source.entityId, projection: drawUniform.viewProjectionMatrix,
-                    settings: environments.environments[source.entityId]?.meshVisibility ?? .init(), command: commandBuffer, device: renderDevice.renderDevice,
+                    settings: meshletSettings, command: commandBuffer, device: renderDevice.renderDevice,
                     map: environments.environments[source.entityId]?.debugView == .meshlets,
                     viewport: target.outputTexture?.size ?? sceneColor.size, lodProjection: uniform.viewProjectionMatrix,
                     requiresMotionGuides: target.temporalUpscalingActive)
@@ -427,9 +432,8 @@ public struct Main3DRenderNode: RenderNode {
                 pixelError: environments.environments[source.entityId]?.meshVisibility.meshletLODPixelError ?? 0,
                 requiresMotionGuides: target.temporalUpscalingActive, motionLODIDs: meshlets.preparedMotionLODIDs, view: source.entityId)
             defer { meshletMap.isEnabled = false }
-            if environments.environments[source.entityId]?.debugView == .wireframe {
-                renderPass.setTriangleFillMode(.lines)
-            }
+            wireframe.isEnabled = showsWireframe && !pathTracingOverlaysOnly
+            defer { wireframe.isEnabled = false; wireframe.drawingEdges = false }
 
             if !visibleItems.isEmpty {
                 // Resolve blend state and view depth once per item instead of inside the comparator.

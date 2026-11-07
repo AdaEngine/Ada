@@ -11,8 +11,7 @@ extension NativeGLTFLoader {
         guard accessor.count >= 1, accessor.count <= Int.max / componentCount else {
             throw GLTFError.bufferOutOfBounds
         }
-        var values = [Double](repeating: 0, count: accessor.count * componentCount)
-
+        let layout: (buffer: Data, offset: Int, stride: Int)?
         if let bufferViewIndex = accessor.bufferView {
             guard let bufferViews = gltf.bufferViews, bufferViews.indices.contains(bufferViewIndex) else {
                 throw GLTFError.invalidBufferViewIndex(bufferViewIndex)
@@ -32,15 +31,41 @@ extension NativeGLTFLoader {
             // Validate the entire strided range once, using subtraction/division
             // so malformed lengths cannot overflow before reaching the bounds check.
             guard bufferViewOffset >= 0, bufferView.byteLength >= 0, bufferViewOffset <= buffer.count,
-                  bufferView.byteLength <= buffer.count - bufferViewOffset,
-                  accessorOffset >= 0, accessorOffset <= bufferView.byteLength else {
+                bufferView.byteLength <= buffer.count - bufferViewOffset,
+                accessorOffset >= 0, accessorOffset <= bufferView.byteLength
+            else {
                 throw GLTFError.bufferOutOfBounds
             }
             let remaining = bufferView.byteLength - accessorOffset
             guard elementSize <= remaining, accessor.count - 1 <= (remaining - elementSize) / byteStride else {
                 throw GLTFError.bufferOutOfBounds
             }
-            let startOffset = bufferViewOffset + accessorOffset
+            layout = (buffer, bufferViewOffset + accessorOffset, byteStride)
+        } else {
+            layout = nil
+        }
+        // Validate sparse storage and destinations before allocating the full accessor too.
+        let sparseData: (indices: [Int], values: [Double])?
+        if let sparse = accessor.sparse {
+            guard sparse.count >= 1, sparse.count <= accessor.count else { throw GLTFError.sparseIndexOutOfBounds }
+            let indices = try decodeSparseIndices(sparse.indices, count: sparse.count, gltf: gltf, buffers: buffers)
+            guard indices.allSatisfy({ $0 >= 0 && $0 < accessor.count }) else { throw GLTFError.sparseIndexOutOfBounds }
+            let decoded = try decodeSparseValues(
+                sparse.values,
+                count: sparse.count,
+                componentType: accessor.componentType,
+                componentCount: componentCount,
+                normalized: accessor.normalized ?? false,
+                gltf: gltf,
+                buffers: buffers
+            )
+            sparseData = (indices, decoded)
+        } else {
+            sparseData = nil
+        }
+        var values = [Double](repeating: 0, count: accessor.count * componentCount)
+        if let layout {
+            let buffer = layout.buffer, startOffset = layout.offset, byteStride = layout.stride
             try buffer.withUnsafeBytes { bytes in
                 if accessor.componentType == 5126 {
                     // The common position/normal/UV path avoids four Foundation
@@ -57,8 +82,10 @@ extension NativeGLTFLoader {
                         let elementOffset = startOffset + elementIndex * byteStride
                         for componentIndex in 0..<componentCount {
                             values[elementIndex * componentCount + componentIndex] = unsafe try readComponent(
-                                bytes, at: elementOffset + componentIndex * componentSize,
-                                componentType: accessor.componentType, normalized: accessor.normalized ?? false
+                                bytes,
+                                at: elementOffset + componentIndex * componentSize,
+                                componentType: accessor.componentType,
+                                normalized: accessor.normalized ?? false
                             )
                         }
                     }
@@ -66,27 +93,11 @@ extension NativeGLTFLoader {
             }
         }
 
-        if let sparse = accessor.sparse {
-            guard sparse.count >= 1, sparse.count <= accessor.count else {
-                throw GLTFError.sparseIndexOutOfBounds
-            }
-            let sparseIndices = try decodeSparseIndices(sparse.indices, count: sparse.count, gltf: gltf, buffers: buffers)
-            let sparseValues = try decodeSparseValues(
-                sparse.values,
-                count: sparse.count,
-                componentType: accessor.componentType,
-                componentCount: componentCount,
-                normalized: accessor.normalized ?? false,
-                gltf: gltf,
-                buffers: buffers
-            )
-            for sparseIndex in 0..<sparse.count {
-                let destinationIndex = sparseIndices[sparseIndex]
-                guard destinationIndex < accessor.count else {
-                    throw GLTFError.sparseIndexOutOfBounds
-                }
+        if let sparseData {
+            for sparseIndex in sparseData.indices.indices {
+                let destinationIndex = sparseData.indices[sparseIndex]
                 for componentIndex in 0..<componentCount {
-                    values[destinationIndex * componentCount + componentIndex] = sparseValues[sparseIndex * componentCount + componentIndex]
+                    values[destinationIndex * componentCount + componentIndex] = sparseData.values[sparseIndex * componentCount + componentIndex]
                 }
             }
         }
@@ -106,12 +117,14 @@ extension NativeGLTFLoader {
         let data = try getBufferViewData(indices.bufferView, gltf: gltf, buffers: buffers)
         let size = try componentSize(for: indices.componentType)
         let offset = indices.byteOffset ?? 0
-        guard offset >= 0, offset + count * size <= data.count else {
+        guard offset >= 0, offset <= data.count, count <= (data.count - offset) / size else {
             throw GLTFError.bufferOutOfBounds
         }
         return try (0..<count)
             .map {
-                Int(try readComponent(data, at: offset + $0 * size, componentType: indices.componentType, normalized: false))
+                let value = try readComponent(data, at: offset + $0 * size, componentType: indices.componentType, normalized: false)
+                guard let index = Int(exactly: value) else { throw GLTFError.sparseIndexOutOfBounds }
+                return index
             }
     }
 
@@ -128,7 +141,7 @@ extension NativeGLTFLoader {
         let size = try componentSize(for: componentType)
         let offset = sparseValues.byteOffset ?? 0
         let valueCount = count * componentCount
-        guard offset >= 0, offset + valueCount * size <= data.count else {
+        guard offset >= 0, offset <= data.count, valueCount <= (data.count - offset) / size else {
             throw GLTFError.bufferOutOfBounds
         }
         return try (0..<valueCount)

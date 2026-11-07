@@ -128,7 +128,9 @@
         var cachedBindGroupCount: Int { bindingLock.withLock { bindingCache.count } }
 
         func cachedBindGroup(key: WGPUBindGroupKey, owners: [AnyObject], cacheable: Bool = true, create: () -> WebGPU.GPUBindGroup?) -> WebGPU.GPUBindGroup? {
-            guard cacheable else { return create() }
+            guard cacheable else {
+                return create()
+            }
             return bindingLock.withLock {
                 bindingCache.value(for: key, owners: owners, create: create)
             }
@@ -307,7 +309,7 @@
                             visibility: texture.shaderStage.toWebGPU,
                             texture: WebGPU.GPUTextureBindingLayout(
                                 sampleType: .float,
-                                viewDimension: ._2D,
+                                viewDimension: texture.textureType.toWebGPUTextureViewDimension,
                                 multisampled: false
                             )
                         )

@@ -41,4 +41,5 @@ For more details and guides, check out the tutorials below.
 - <doc:AnimationAuthoring>
 - <doc:AnimationIK>
 - <doc:MovieMaker>
+- <doc:Terrain>
 - <doc:VisionOSWindowed>

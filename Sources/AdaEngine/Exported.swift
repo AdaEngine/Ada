@@ -15,6 +15,7 @@
 @_exported import AdaAudio
 @_exported import AdaCorePipelines
 @_exported import AdaECS
+@_exported import AdaGeometry
 @_exported import AdaInput
 @_exported import AdaNavigation
 @_exported import AdaPhysics

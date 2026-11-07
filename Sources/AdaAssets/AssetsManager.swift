@@ -22,6 +22,7 @@ import Tracing
 public enum AssetError: LocalizedError {
     case notExistAtPath(String)
     case message(String)
+    case encodedSizeLimitExceeded(path: String, limit: Int)
 
     public var errorDescription: String? {
         switch self {
@@ -29,6 +30,8 @@ public enum AssetError: LocalizedError {
             return "Asset not exists at path: \(path)"
         case let .message(message):
             return message
+        case let .encodedSizeLimitExceeded(path, limit):
+            return "Asset exceeds the encoded byte limit of \(limit): \(path)"
         }
     }
 }
@@ -343,13 +346,10 @@ public struct AssetsManager: Resource {
         _ asset: R,
         at path: String
     ) async throws {
-        try validateVirtualPath(path)
-        if currentProjectDirectories?.restrictToVirtualRoots == true, path.hasPrefix(resourcePathPrefix) {
-            throw AssetError.message("Community package resources are read-only")
-        }
+        let writablePath = try resolveWritableAssetPath(at: path)
         try await AdaTrace.span("Assets.save.\(String(reflecting: R.self))") {
             let fileSystem = FileSystem.current
-            var processedPath = self.processPath(path)
+            var processedPath = writablePath
 
             if processedPath.url.pathExtension.isEmpty {
                 processedPath.url.appendPathExtension(R.extensions().first ?? "")
@@ -687,7 +687,7 @@ public struct AssetsManager: Resource {
         from path: Path,
         originalPath _: String
     ) async throws {
-        let data = try await self.readData(from: path)
+        let data = try await self.readData(from: path, maximumBytes: assetType.maximumEncodedBytes)
         let meta = AssetMeta(filePath: path.url, queryParams: path.query)
         let decoder = TextAssetDecoder(meta: meta, data: data)
         try await assetType.loadAndUpdateInternal(from: decoder, oldResource: oldResource)
@@ -696,7 +696,7 @@ public struct AssetsManager: Resource {
     @AssetActor
     private static func load<A: Asset>(from path: Path, originalPath: String, bundle: Bundle?)
         async throws -> A {
-        let data = try await self.readData(from: path)
+        let data = try await self.readData(from: path, maximumBytes: A.maximumEncodedBytes)
 
         let meta = AssetMeta(filePath: path.url, queryParams: path.query)
         let decoder = TextAssetDecoder(meta: meta, data: data)
@@ -712,7 +712,15 @@ public struct AssetsManager: Resource {
         return resource
     }
 
-    private static func readData(from path: Path) async throws -> Data {
+    private static func readData(from path: Path, maximumBytes: Int?) async throws -> Data {
+        if let maximumBytes {
+            guard maximumBytes >= 0 else { throw AssetError.message("Asset byte limit must be nonnegative") }
+            #if WASM && canImport(JavaScriptFoundationCompat) && canImport(JavaScriptKit)
+                return try await readBoundedResponse(url: browserFetchURL(for: path.url), maximumBytes: maximumBytes)
+            #else
+                return try await readBoundedFile(url: path.url, maximumBytes: maximumBytes)
+            #endif
+        }
         #if WASM && canImport(JavaScriptFoundationCompat) && canImport(JavaScriptKit)
             let fetchURL = self.browserFetchURL(for: path.url)
             let responseValue: JSValue
@@ -799,8 +807,10 @@ public struct AssetsManager: Resource {
     }
 
     /// Resource boundary for decoders with model-relative dependencies.
-    static var restrictedResourceRoot: URL? {
-        guard let directories = currentProjectDirectories, directories.restrictToVirtualRoots else { return nil }
+    @_spi(Internal) public static var restrictedResourceRoot: URL? {
+        guard let directories = currentProjectDirectories, directories.restrictToVirtualRoots else {
+            return nil
+        }
         return directories.assetsDirectory
     }
 
@@ -845,6 +855,15 @@ public struct AssetsManager: Resource {
 }
 
 extension AssetsManager {
+    @AssetActor
+    static func resolveWritableAssetPath(at path: String) throws -> Path {
+        try validateVirtualPath(path)
+        if currentProjectDirectories?.restrictToVirtualRoots == true, path.hasPrefix(resourcePathPrefix) {
+            throw AssetError.message("Community package resources are read-only")
+        }
+        return processPath(path)
+    }
+
     struct Path: Sendable, Hashable {
         var url: URL
         let query: [AssetQuery]
@@ -942,23 +961,33 @@ extension AssetsManager {
     }
 
     private static var isRetiredRestrictedScope: Bool {
-        guard let scopeID = AppWorldsExecutionContext.currentID else { return false }
+        guard let scopeID = AppWorldsExecutionContext.currentID else {
+            return false
+        }
         return scopeConfigurations.withLock { $0.retiredRestrictedScopes.contains(scopeID) }
     }
 
     private static func isContainedVirtualPath(_ path: String) -> Bool {
-        guard !isRetiredRestrictedScope else { return false }
-        guard let root = virtualRoot(for: path) else { return false }
+        guard !isRetiredRestrictedScope else {
+            return false
+        }
+        guard let root = virtualRoot(for: path) else {
+            return false
+        }
         let relative = String(path.dropFirst(root.prefix.count).split(separator: "#", maxSplits: 1).first ?? "")
         guard !relative.hasPrefix("/"), !relative.contains("\\"), !relative.contains(":"),
               !relative.split(separator: "/", omittingEmptySubsequences: false).contains("..") else { return false }
         // URL canonicalization can leave a nonexistent leaf unresolved. Reject links
         // component by component, including broken links, before reads or writes.
         var cursor = root.url
-        if (try? FileManager.default.destinationOfSymbolicLink(atPath: cursor.path)) != nil { return false }
+        if (try? FileManager.default.destinationOfSymbolicLink(atPath: cursor.path)) != nil {
+            return false
+        }
         for component in relative.split(separator: "/") {
             cursor.appendPathComponent(String(component))
-            if (try? FileManager.default.destinationOfSymbolicLink(atPath: cursor.path)) != nil { return false }
+            if (try? FileManager.default.destinationOfSymbolicLink(atPath: cursor.path)) != nil {
+                return false
+            }
         }
         // Resolve the existing root before appending a possibly missing asset.
         // Windows expands 8.3 names only for existing paths; resolving the full
@@ -1232,7 +1261,8 @@ public struct ProjectDirectories: Sendable {
     public init(source: URL, assetsDirectory: URL, storageIdentifier: String, restrictToVirtualRoots: Bool = false) throws(ProjectDirectoriesError) {
         try Self.validateStorageIdentifier(storageIdentifier)
         self.init(
-            source: source, assetsDirectory: assetsDirectory,
+            source: source,
+            assetsDirectory: assetsDirectory,
             userDataDirectory: Self.defaultDirectory(for: .applicationSupportDirectory, namespace: storageIdentifier, fallbackRoot: source.appendingPathComponent(".ada/user")),
             cacheDirectory: Self.defaultDirectory(for: .cachesDirectory, namespace: storageIdentifier, fallbackRoot: source.appendingPathComponent(".ada/cache")),
             restrictToVirtualRoots: restrictToVirtualRoots

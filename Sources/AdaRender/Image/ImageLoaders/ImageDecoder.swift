@@ -1,3 +1,4 @@
+import AdaAssets
 import Foundation
 
 /// Decodes an external raster format into CPU image pixels.
@@ -14,6 +15,16 @@ public protocol ImageDecoder: Sendable {
 
     /// Decodes a complete image, throwing if its contents are invalid.
     func decode(_ data: Data) throws -> Image
+
+    /// Inspects the header without allocating pixels and returns the RGBA8 byte count.
+    /// Bounded model imports call this before decoding. Custom decoders must opt in.
+    func decodedRGBAByteCount(_ data: Data) throws -> Int
+}
+
+public extension ImageDecoder {
+    func decodedRGBAByteCount(_: Data) throws -> Int {
+        throw AssetError.message("This image decoder does not support bounded header inspection")
+    }
 }
 
 /// Errors produced while selecting or invoking an image decoder.

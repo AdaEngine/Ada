@@ -1,6 +1,6 @@
-import Foundation
 @_spi(Scripting) import AdaECS
 import AdaScriptCompilerCore
+import Foundation
 import Gravity
 
 enum AdaScriptSystemPlanBuilder {
@@ -282,6 +282,9 @@ enum AdaScriptSystemDependencyValidator {
         for system in systems {
             for dependency in system.dependencies {
                 let targetIdentifier = dependency.identifier
+                if case .afterIfPresent = dependency, systemsByIdentifier[targetIdentifier]?.scheduler != system.scheduler {
+                    continue
+                }
                 guard let target = systemsByIdentifier[targetIdentifier] else {
                     throw AdaScriptError.invalidManifest(
                         "system '\(system.identifier)' depends on unknown system '\(targetIdentifier)'"
@@ -298,7 +301,7 @@ enum AdaScriptSystemDependencyValidator {
                 switch dependency {
                 case .before:
                     outgoing[system.identifier, default: []].append(targetIdentifier)
-                case .after:
+                case .after, .afterIfPresent:
                     outgoing[targetIdentifier, default: []].append(system.identifier)
                 }
             }
@@ -343,7 +346,8 @@ extension SystemDependency {
     var identifier: String {
         switch self {
         case let .before(identifier),
-            let .after(identifier):
+            let .after(identifier),
+            let .afterIfPresent(identifier):
             identifier
         }
     }

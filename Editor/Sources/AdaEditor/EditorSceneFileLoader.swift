@@ -47,8 +47,14 @@ enum EditorSceneFileLoader {
             registerEditorSceneComponents(loadsScriptableObjects: loadsScriptableObjects)
             let sceneModel = try EditorSceneModel.decode(from: content)
             let sourceURL = sourceURL?.resolvingSymlinksInPath().standardizedFileURL
-            return load(model: sceneModel, into: world, loadsScriptableObjects: loadsScriptableObjects, loadsPhysicsBodies: loadsPhysicsBodies,
-                        sourceURL: sourceURL, resourceRootURL: resourceRootURL)
+            return load(
+                model: sceneModel,
+                into: world,
+                loadsScriptableObjects: loadsScriptableObjects,
+                loadsPhysicsBodies: loadsPhysicsBodies,
+                sourceURL: sourceURL,
+                resourceRootURL: resourceRootURL
+            )
         } catch {
             return .emptyWithWarnings([error.localizedDescription])
         }
@@ -134,6 +140,9 @@ enum EditorSceneFileLoader {
             }
             resolvedPayload["imageBasedLightingSource"] = .string(url.path)
         }
+        if typeName == EditorBuiltInComponentType.terrain3DSource, let reference = payload["source"]?.stringValue, !reference.isEmpty {
+            resolvedPayload["source"] = .string(try EditorTerrainResource.resolve(reference, sourceURL: sourceURL, resourceRootURL: resourceRootURL).path)
+        }
         if typeName == EditorBuiltInComponentType.model3DSource, let reference = payload["source"]?.stringValue, !reference.isEmpty {
             resolvedPayload["source"] = .string(try EditorModelResource.resolve(reference, sourceURL: sourceURL, resourceRootURL: resourceRootURL).path)
             if let path = payload["animationModifiers"]?.stringValue, !path.isEmpty {
@@ -216,9 +225,18 @@ enum EditorSceneFileLoader {
         var assets = world.getResource(EditorSceneAssetCache.self) ?? EditorSceneAssetCache()
         assets.beginLoad()
         return try await ShaderGraphResourceScope.$rootPath.withValue(resourceRootURL?.path) {
-            let state = Instantiation(model, world: world, loadsScriptableObjects: false, loadsPhysicsBodies: false,
-                                      sourceURL: sourceURL, resourceRootURL: resourceRootURL, parentEntity: nil,
-                                      idPrefix: "", ancestry: sourceURL.map { Set([$0]) } ?? [], assets: assets)
+            let state = Instantiation(
+                model,
+                world: world,
+                loadsScriptableObjects: false,
+                loadsPhysicsBodies: false,
+                sourceURL: sourceURL,
+                resourceRootURL: resourceRootURL,
+                parentEntity: nil,
+                idPrefix: "",
+                ancestry: sourceURL.map { Set([$0]) } ?? [],
+                assets: assets
+            )
             defer {
                 state.assets.finishLoad()
                 world.insertResource(state.assets)
@@ -256,9 +274,18 @@ enum EditorSceneFileLoader {
         ancestry: Set<URL>,
         assets: inout EditorSceneAssetCache
     ) -> EditorSceneRuntimeLoadResult {
-        let state = Instantiation(sceneModel, world: world, loadsScriptableObjects: loadsScriptableObjects,
-                                  loadsPhysicsBodies: loadsPhysicsBodies, sourceURL: sourceURL, resourceRootURL: resourceRootURL,
-                                  parentEntity: parentEntity, idPrefix: idPrefix, ancestry: ancestry, assets: assets)
+        let state = Instantiation(
+            sceneModel,
+            world: world,
+            loadsScriptableObjects: loadsScriptableObjects,
+            loadsPhysicsBodies: loadsPhysicsBodies,
+            sourceURL: sourceURL,
+            resourceRootURL: resourceRootURL,
+            parentEntity: parentEntity,
+            idPrefix: idPrefix,
+            ancestry: ancestry,
+            assets: assets
+        )
         defer { assets = state.assets }
         for entity in sceneModel.entities { state.instantiateEntity(entity) }
         return state.finish()
@@ -283,9 +310,18 @@ enum EditorSceneFileLoader {
         var runtimeEntityIDsByEditorID: [String: Entity.ID] = [:]
         var editorIDsByRuntimeEntityID: [Entity.ID: String] = [:]
 
-        init(_ sceneModel: EditorSceneModel, world: World, loadsScriptableObjects: Bool, loadsPhysicsBodies: Bool,
-             sourceURL: URL?, resourceRootURL: URL?, parentEntity: Entity?, idPrefix: String,
-             ancestry: Set<URL>, assets: EditorSceneAssetCache) {
+        init(
+            _ sceneModel: EditorSceneModel,
+            world: World,
+            loadsScriptableObjects: Bool,
+            loadsPhysicsBodies: Bool,
+            sourceURL: URL?,
+            resourceRootURL: URL?,
+            parentEntity: Entity?,
+            idPrefix: String,
+            ancestry: Set<URL>,
+            assets: EditorSceneAssetCache
+        ) {
             self.sceneModel = sceneModel
             self.world = world
             self.loadsScriptableObjects = loadsScriptableObjects
@@ -359,7 +395,22 @@ enum EditorSceneFileLoader {
                                 _ = try ui.resolveView(runtime: runtime)
                             }
                         }
-                        EditorSceneFileLoader.insertComponent(component, into: entity, in: world)
+                        if !loadsPhysicsBodies, var terrain = component as? Terrain3DSource {
+                            // Preview-only admission must never rewrite the scene's Play settings.
+                            terrain.generatesCollision = false
+                            terrain.queries = terrain.queries ?? .init()
+                            EditorSceneFileLoader.insertComponent(terrain, into: entity, in: world)
+                        } else {
+                            EditorSceneFileLoader.insertComponent(component, into: entity, in: world)
+                            if let model = component as? Model3DSource, let root = resourceRootURL?.resolvingSymlinksInPath().standardizedFileURL {
+                                let path = URL(fileURLWithPath: model.source).resolvingSymlinksInPath().standardizedFileURL.path
+                                if path.hasPrefix(root.path + "/") {
+                                    entity.components[MeshTerrain3DSourceModelResource.self] = .init(
+                                        resolvedPath: model.source, resourcePath: "@res://" + path.dropFirst(root.path.count + 1)
+                                    )
+                                }
+                            }
+                        }
                     } else {
                         warnings.append("Component is not decodable: \(componentName)")
                     }
@@ -556,17 +607,23 @@ enum EditorSceneFileLoader {
         let root = resourceRootURL ?? sourceURL?.deletingLastPathComponent().deletingLastPathComponent()
         let url: URL
         if reference.hasPrefix("@res://") {
-            guard let root else { return nil }
+            guard let root else {
+                return nil
+            }
             url = root.appendingPathComponent(String(reference.dropFirst("@res://".count)))
         } else {
-            guard let sourceURL else { return nil }
+            guard let sourceURL else {
+                return nil
+            }
             url = sourceURL.deletingLastPathComponent().appendingPathComponent(reference)
         }
         let resolved = url.resolvingSymlinksInPath().standardizedFileURL
         guard resolved.pathExtension == fileExtension else { return nil }
         if reference.hasPrefix("@res://") || fileExtension == "particles" || fileExtension == "animlib" || fileExtension == "animmod", let root {
             let rootPath = root.resolvingSymlinksInPath().standardizedFileURL.path
-            guard resolved.path.hasPrefix(rootPath + "/") else { return nil }
+            guard resolved.path.hasPrefix(rootPath + "/") else {
+                return nil
+            }
         }
         return resolved
     }

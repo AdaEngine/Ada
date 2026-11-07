@@ -100,7 +100,7 @@ public struct PathTracing3DRenderNode: RenderNode {
         guard let (target,uniform,id) = selected else { return [] }
         let environment = environments.environments[id] ?? .init()
         let settings = environment.pathTracing.sanitized
-        guard settings.isEnabled, environment.debugView != .meshlets, let color = target.sceneColor3DTexture,
+        guard settings.isEnabled, environment.debugView != .meshlets, !environment.debugView.showsWireframe, let color = target.sceneColor3DTexture,
             let normal = target.normalRoughness3DTexture, let position = target.viewPositionMetallic3DTexture else {
             resources.entries.removeValue(forKey:id); statistics.discard(id)
             if resources.entries.isEmpty { resources.scene = PathTracing3DScene() }

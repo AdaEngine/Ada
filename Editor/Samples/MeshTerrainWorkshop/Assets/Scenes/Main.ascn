@@ -1,0 +1,207 @@
+{
+  "format": "ada.scene",
+  "schemaVersion": 1,
+  "engineVersion": "1.0.0",
+  "scene": {
+    "id": "mesh-terrain-workshop",
+    "name": "Mesh Terrain Workshop"
+  },
+  "entities": [
+    {
+      "id": "Camera",
+      "name": "Camera",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            11,
+            -19
+          ],
+          "rotation": [
+            0.258819,
+            0,
+            0,
+            0.965926
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaRender.Camera": {
+          "projection": "perspective",
+          "isActive": true,
+          "renderOrder": 0,
+          "backgroundColor": {
+            "red": 0.05,
+            "green": 0.07,
+            "blue": 0.1,
+            "alpha": 1
+          }
+        },
+        "AdaCorePipelines.Environment3D": {}
+      }
+    },
+    {
+      "id": "Sun",
+      "name": "Sun",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            4,
+            -3
+          ],
+          "rotation": [
+            0.2661003137748674,
+            -0.4155384462484667,
+            -0.1285411045311107,
+            0.8602299734049316
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.DirectionalLightComponent": {
+          "radiance": [
+            1,
+            1,
+            1
+          ],
+          "intensity": 3,
+          "castShadows": true,
+          "shadowDistance": 30,
+          "shadowBias": 0.0008,
+          "shadowSlopeBias": 0.003
+        }
+      }
+    },
+    {
+      "id": "Terrain",
+      "name": "Mesh Terrain",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.MeshTerrain3DIdentity": {
+          "id": "D17A8658-AD33-4C26-A314-FD40C37203F9"
+        },
+        "AdaScene.Terrain3DSource": {
+          "source": "@res://Terrain/Workshop.aterrain",
+          "generatesCollision": true
+        }
+      }
+    },
+    {
+      "id": "RootTree",
+      "name": "Join and move this tree",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            3,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.Model3DSource": {
+          "source": "@res://Models/root-tree.glb"
+        }
+      }
+    },
+    {
+      "id": "PlayBall",
+      "name": "Play: drops onto the joined rock",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            -2.5,
+            5.0,
+            1.7
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.Mesh3DComponent": {
+          "mesh": "Sphere",
+          "size": 0.8,
+          "color": {
+            "red": 1,
+            "green": 0.18,
+            "blue": 0.04,
+            "alpha": 1
+          },
+          "metallic": 0.0,
+          "roughness": 0.55
+        },
+        "AdaPhysics.PhysicsBody3DComponent": {
+          "mode": {
+            "dynamic": {}
+          },
+          "shapes": [
+            {
+              "fixture": {
+                "sphere": {
+                  "_0": {
+                    "radius": 0.4,
+                    "center": {
+                      "x": 0,
+                      "y": 0,
+                      "z": 0
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "editor": {
+    "selectedEntity": "Terrain",
+    "expandedEntities": []
+  }
+}

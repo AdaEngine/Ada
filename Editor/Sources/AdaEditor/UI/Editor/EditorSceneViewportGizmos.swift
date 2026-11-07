@@ -29,7 +29,7 @@ extension EditorSceneViewportModel {
     func transformGizmo(size: Size? = nil) -> EditorTransformGizmo? {
         guard
             !isAnnotating,
-            !terrainEditing.isEnabled,
+            !terrainEditing.usesBrush,
             !isPerspectiveTransitionActive,
             let selectedEditorID,
             let entity = sceneModel?.entities.first(where: { $0.id == selectedEditorID }), entity.enabled,
