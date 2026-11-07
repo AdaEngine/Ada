@@ -88,3 +88,7 @@ remaining checks. It does not require a new planning ceremony for each feature.
 The public [make-game workflow](https://github.com/PlayableIntelligence/game-creator/tree/main/skills/make-game)
 was reviewed as a reference for game-development phases and iteration; the
 bundled instructions are written for AdaEngine's own authoring and runtime paths.
+
+## Studio interaction flows
+
+Use a separate macOS workbench session to replay [Studio interaction flows](StudioInteractionFlows.md) from YAML. The same file can run through the CLI or the host's AdaMCP tool.

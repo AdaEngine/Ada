@@ -282,7 +282,7 @@ layout (binding = 29) uniform LightTileMasks3DUniform {
     uvec4 u_TileMasks[1024];
 };
 layout (binding = 41) uniform texture2D u_ContactSceneDepth;
-layout (binding = 42) uniform SurfaceLighting3DUniform {
+layout (binding = 23) uniform SurfaceLighting3DUniform {
     mat4 u_ContactProjection;
     mat4 u_ContactInverseProjection;
     vec4 u_Contact; // enabled, ray length, thickness, bias (view-space meters)

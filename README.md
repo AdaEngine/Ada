@@ -160,3 +160,5 @@ python ada_tool.py install studio --debug  # Debug alongside Release
 
 Requires Python 3.9+ (`python3` on macOS/Linux if needed). See the
 [CLI guide](Documentation/Tooling.md) for build, WASM, playground and preview commands.
+
+For editor interaction testing, see [Studio interaction flows](Editor/Documentation/StudioInteractionFlows.md).

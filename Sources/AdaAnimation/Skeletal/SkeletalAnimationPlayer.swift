@@ -174,6 +174,7 @@ public struct SkeletalAnimationPlayer: Sendable {
     public mutating func finalizePoseModifiers(inputs: [String: AnimationPoseModifierInput] = [:]) {
         for index in poses.indices { poses[index] = basePoses[index] }
         rebuildTransforms()
+        let rig = self.rig
         poseModifierState?.apply(rig: rig, inputs: inputs, poses: &poses, locals: &localTransforms,
                                  globals: &globalTransforms, diagnostics: &modifierDiagnostics)
     }

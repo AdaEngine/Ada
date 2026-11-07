@@ -262,6 +262,20 @@ public protocol UIInspectableViewContainer: AnyObject {
 }
 
 extension UIWindow {
+    /// Inspects the same container that receives a pointer press in this window.
+    @_spi(Internal)
+    public func uiInspectionHitTest(at point: Point) -> UIHitTestResult? {
+        let event = MouseEvent(window: id, button: .left, mousePosition: point, phase: .began, modifierKeys: [], time: 0)
+        var responder = findFirstResponder(for: event)
+        while let view = responder {
+            if let container = view as? any UIInspectableViewContainer {
+                return container.uiHitTest(at: point)
+            }
+            responder = view.parentView
+        }
+        return nil
+    }
+
     public func uiInspectableContainers() -> [any UIInspectableViewContainer] {
         var result: [any UIInspectableViewContainer] = []
 

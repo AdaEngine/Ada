@@ -34,7 +34,7 @@ layout (binding = 15) uniform texture2D u_ExposureState;
 layout (binding = 16) uniform texture2D u_Volumetric;
 layout (binding = 17) uniform texture2D u_ReflectionResponse;
 layout (binding = 18) uniform texture2D u_PrefilteredEnvironment;
-layout (binding = 19) uniform sampler u_IBLSampler;
+layout (binding = 10) uniform sampler u_IBLSampler;
 
 layout (binding = 4) uniform Environment3DUniform {
     mat4 u_Projection;
