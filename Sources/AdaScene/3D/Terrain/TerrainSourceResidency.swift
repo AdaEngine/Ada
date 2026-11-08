@@ -51,6 +51,16 @@ struct TerrainManifestLoadFailure: LocalizedError {
 }
 
 extension TerrainSourceResidency {
+    static func openManifest(at path: String, limits: TerrainRegionCache.Limits = .init()) async throws -> TerrainRegionCache {
+        do {
+            return try await TerrainRegionCache.open(manifestAt: path, limits: limits)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw TerrainManifestLoadFailure(message: error.localizedDescription)
+        }
+    }
+
     func pinning(_ coordinates: Set<TerrainRegionCoordinate>) -> Self {
         var value = self
         value.transactionPins = coordinates
@@ -93,15 +103,13 @@ extension TerrainSourceResidency {
         if let previous {
             baseCache = previous.cache
         } else {
-            do {
-                baseCache = try await TerrainRegionCache.open(
-                    manifestAt: source.source,
-                    limits: .init(
-                        maximumResidentHeightBytes: source.maximumResidentHeightBytes,
-                        maximumResidentRegions: source.maximumResidentRegions
-                    )
+            baseCache = try await openManifest(
+                at: source.source,
+                limits: .init(
+                    maximumResidentHeightBytes: source.maximumResidentHeightBytes,
+                    maximumResidentRegions: source.maximumResidentRegions
                 )
-            } catch is CancellationError { throw CancellationError() } catch { throw TerrainManifestLoadFailure(message: error.localizedDescription) }
+            )
         }
         let manifest = baseCache.manifest
         let declared = Set(manifest.heightRegions.map { TerrainRegionCoordinate(x: Int($0.x), z: Int($0.z)) })

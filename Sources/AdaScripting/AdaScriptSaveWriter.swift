@@ -1,4 +1,7 @@
 import Foundation
+#if os(Linux)
+    import Glibc
+#endif
 import Gravity
 #if os(Windows)
     import WinSDK
@@ -158,6 +161,14 @@ private actor AdaScriptSaveStreamState {
                 }
             }
             guard moved else { throw SaveStreamError.commitFailed(GetLastError()) }
+        #elseif os(Linux)
+            // Rename replaces the destination in one operation on the same filesystem.
+            let result = unsafe temporary.path.withCString { source in
+                unsafe destination.path.withCString { target in
+                    unsafe Glibc.rename(source, target)
+                }
+            }
+            guard result == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         #else
             let fileManager = FileManager.default
             if fileManager.fileExists(atPath: destination.path) {

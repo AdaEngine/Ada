@@ -12,6 +12,7 @@ import Testing
 
 @Suite("Path tracing settings and BVH")
 struct Render3DPathTracingSettingsTests {
+    #if canImport(WebGPU) && !WASM && !os(Android)
     @Test(.enabled(if:ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_TINT"] == "1"))
     func pathShadersCompileFreshWithoutAGPU() async throws {
         let root = URL(fileURLWithPath:#filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -24,6 +25,8 @@ struct Render3DPathTracingSettingsTests {
             }
         }
     }
+    #endif
+
     @Test func oldScenesStayOptedOutAndSettingsRoundTrip() throws {
         #expect(try JSONDecoder().decode(Environment3D.self,from:Data("{}".utf8)).pathTracing.isEnabled == false)
         var environment = Environment3D()
@@ -44,14 +47,14 @@ struct Render3DPathTracingSettingsTests {
 
     @Test func stacklessBVHCoversEveryTriangleAndHasValidEscapes() {
         let input: [PathTracing3DBVH.Triangle] = (0..<39).map { index in
-            let x = Float(index%7)-4, z = Float(index/7)-3
-            return .init(vertices:[Vector4(x,0,z,Float(index)),Vector4(x+0.3,0,z,0),Vector4(x,0.3,z,0)]+Array(repeating:.zero,count:9))
+            let x = Float(index % 7) - 4, z = Float(index / 7) - 3
+            return .init(vertices:[Vector4(x,0,z,Float(index)),Vector4(x + 0.3,0,z,0),Vector4(x,0.3,z,0)] + Array(repeating:.zero,count:9))
         }
         let bvh = PathTracing3DBVH(input)
         #expect(bvh.nodes.first?.escape == bvh.nodes.count)
         #expect(bvh.triangles.count == input.count)
         #expect(Set(bvh.triangles.map { $0.vertices[0].w }) == Set((0..<39).map(Float.init)))
-        #expect(bvh.nodes.filter { $0.count > 0 }.reduce(0) { $0+$1.count } == input.count)
+        #expect(bvh.nodes.reduce(0) { $0 + $1.count } == input.count)
         for (index,node) in bvh.nodes.enumerated() {
             #expect(node.escape > index && node.escape <= bvh.nodes.count)
             #expect(node.count <= 4)
@@ -62,11 +65,11 @@ struct Render3DPathTracingSettingsTests {
         }
         #expect(PathTracing3DBVH([]).nodes.isEmpty)
         var refitted = bvh
-        var moved = input.reversed().map { $0 }
-        for t in moved.indices { for v in 0..<3 { moved[t].vertices[v] += Vector4(20,3,-10,0) } }
+        var moved = Array(input.reversed())
+        for t in moved.indices { for v in 0..<3 { moved[t].vertices[v] += Vector4(20, 3, -10, 0) } }
         refitted.refit(moved)
-        #expect(refitted.nodes[0].minimum == bvh.nodes[0].minimum+Vector3(20,3,-10))
-        #expect(refitted.nodes[0].maximum == bvh.nodes[0].maximum+Vector3(20,3,-10))
+        #expect(refitted.nodes[0].minimum == bvh.nodes[0].minimum + Vector3(20, 3, -10))
+        #expect(refitted.nodes[0].maximum == bvh.nodes[0].maximum + Vector3(20, 3, -10))
         #expect(Set(refitted.triangles.map { $0.vertices[0].w }) == Set(bvh.triangles.map { $0.vertices[0].w }))
         refitted.refit(Array(moved.prefix(5)))
         #expect(refitted.triangles.count == 5)
@@ -96,7 +99,7 @@ extension Render3DGPUTests {
         static func red(_ image: Image) -> Float {
             var sum: Float = 0
             for y in 225..<255 { for x in 305..<335 { sum += image.getPixel(x:x,y:y).red } }
-            return sum/900
+            return sum / 900
         }
 
         @Test(.enabled(if: GoldenFrame.activeBackend != nil))
@@ -170,15 +173,15 @@ extension Render3DGPUTests {
                 Transform(position:[-4,0,-4])
             }
             let blocked = try await s.render(.none,frames:2)
-            #expect(Self.red(lit) > Self.red(blocked)+0.1,"Actual offscreen triangles must block a light without a shadow atlas")
+            #expect(Self.red(lit) > Self.red(blocked) + 0.1,"Actual offscreen triangles must block a light without a shadow atlas")
             var mesh = try #require(blocker.components[Mesh3DComponent.self]); mesh.castShadows = false; blocker.components[Mesh3DComponent.self] = mesh
             let restored = try await s.render(.none,frames:2)
-            #expect(Self.red(restored) > Self.red(blocked)+0.1)
+            #expect(Self.red(restored) > Self.red(blocked) + 0.1)
             let stats = try Self.stats(s)
             #expect(stats.snapshots.values.allSatisfy { $0.failure == nil && $0.encodedFrames >= 7 && $0.historyResets >= 3 && $0.triangles >= 14 })
             lamp.components[PointLightComponent.self] = PointLightComponent(intensity:0,range:20)
             let off = try await s.render(.none,frames:1)
-            #expect(Self.red(off)<0.01,"Turning the lamp off must discard the previous lit history immediately")
+            #expect(Self.red(off) < 0.01,"Turning the lamp off must discard the previous lit history immediately")
             try s.configure { $0.pathTracing.isEnabled = false }
             _ = try await s.render(.none,frames:1)
             #expect(stats.snapshots.isEmpty)
@@ -197,13 +200,13 @@ extension Render3DGPUTests {
             let direct = try await s.render(.none,frames:3)
             try s.configure { $0.pathTracing.maximumBounces = 3; $0.pathTracing.samplesPerPixel = 8 }
             let bounce = try await s.render(.none,frames:16)
-            #expect(Self.red(bounce)>Self.red(direct)+0.02,"A receiver outside the light range must see bounce from a wall behind the camera")
+            #expect(Self.red(bounce) > Self.red(direct) + 0.02,"A receiver outside the light range must see bounce from a wall behind the camera")
             red.emissiveFactor = [1,0.005,0.001]; red.emissiveStrength = 3
             lamp.components[PointLightComponent.self] = PointLightComponent(intensity:0,range:2)
             receiver.metallicFactor = 1; receiver.roughnessFactor = 0.04
             let reflection = try await s.render(.none,frames:4)
             let pixel = reflection.getPixel(x:320,y:240)
-            #expect(pixel.red>pixel.green+0.1 && pixel.red>0.2,"A mirror must reflect offscreen emissive triangles")
+            #expect(pixel.red > pixel.green + 0.1 && pixel.red > 0.2,"A mirror must reflect offscreen emissive triangles")
             try bounce.writePNG(to:GoldenFrame.outputDirectory.appendingPathComponent("path-hidden-bounce.png"))
             try reflection.writePNG(to:GoldenFrame.outputDirectory.appendingPathComponent("path-hidden-reflection.png"))
         }
@@ -212,12 +215,12 @@ extension Render3DGPUTests {
         func atlasQualityChangeRetainsFineTextureDetailAndResetsHistory() async throws {
             let s = try await Self.scene()
             let pbr = Self.receiver(s)
-            var pixels = [UInt8](repeating: 255, count: 512*512*4)
+            var pixels = [UInt8](repeating: 255, count: 512 * 512 * 4)
             for y in 0..<512 { for x in 0..<512 {
-                let i = (y*512+x)*4
-                pixels[i] = x%4<2 ? 255 : 0
-                pixels[i+1] = 0
-                pixels[i+2] = x%4<2 ? 0 : 255
+                let i = (y * 512 + x) * 4
+                pixels[i] = x % 4 < 2 ? 255 : 0
+                pixels[i + 1] = 0
+                pixels[i + 2] = x % 4 < 2 ? 0 : 255
             } }
             pbr.baseColorTexture = Texture2D(image: Image(width:512,height:512,data:Data(pixels)))
             _ = try await s.render(.none,frames:3)
@@ -240,15 +243,15 @@ extension Render3DGPUTests {
             pbr.baseColorTexture = Texture2D(image:Image(width:2,height:2,color:Color(0.9,0.01,0.005,1)))
             let lamp = s.app.main.spawn("Spot behind camera") {
                 SpotLightComponent(intensity:400,range:20,innerConeAngle:15,outerConeAngle:25)
-                Transform(rotation:Quat(axis:.up,angle:Float.pi/4),position:[-6,0,-6])
+                Transform(rotation:Quat(axis:.up,angle:Float.pi / 4),position:[-6,0,-6])
             }
             let on = try await s.render(.none,frames:3)
             #expect(try Self.stats(s).snapshots.values.allSatisfy { $0.failure == nil && $0.encodedFrames > 0 })
             let pixel = on.getPixel(x:320,y:240)
-            #expect(pixel.red>pixel.green+0.1)
-            lamp.components[Transform.self] = Transform(rotation:Quat(axis:.up,angle:Float.pi*1.25),position:[-6,0,-6])
+            #expect(pixel.red > pixel.green + 0.1)
+            lamp.components[Transform.self] = Transform(rotation:Quat(axis:.up,angle:Float.pi * 1.25),position:[-6,0,-6])
             let off = try await s.render(.none,frames:1)
-            #expect(Self.red(off)<0.01)
+            #expect(Self.red(off) < 0.01)
             try s.configure { $0.pathTracing.resolutionScale = 0.25 }
             _ = try await s.render(.none,frames:1)
             #expect(try Self.stats(s).snapshots.values.allSatisfy { $0.width == 160 && $0.height == 120 && $0.accumulatedFrames == 1 && $0.failure == nil })
@@ -272,12 +275,12 @@ extension Render3DGPUTests {
             }
             let front = try await s.render(.none,frames:6)
             let pixel = front.getPixel(x:320,y:240)
-            #expect(pixel.green>pixel.red+0.3 && pixel.green>0.5)
+            #expect(pixel.green > pixel.red + 0.3 && pixel.green > 0.5)
             #expect(try Self.stats(s).snapshots.values.allSatisfy { $0.failure == nil && $0.encodedFrames >= 6 && $0.triangles == 2 })
             #expect(instance.compilationError == nil && instance.hasPreparedPipeline)
             card.components[Transform.self] = Transform(position:[0,0,0.5])
             let behind = try await s.render(.none,frames:2)
-            #expect(behind.getPixel(x:320,y:240).green<0.01,"The graph pass must load opaque depth and never clear traced HDR")
+            #expect(behind.getPixel(x:320,y:240).green < 0.01,"The graph pass must load opaque depth and never clear traced HDR")
         }
     }
 }

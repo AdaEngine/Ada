@@ -204,22 +204,28 @@ struct TerrainSourceRequest: Sendable {
 
     @concurrent
     func build() async -> TerrainSourceOutcome {
-        if let meshEdit { return await buildMeshEdit(meshEdit) }
+        if let meshEdit {
+            return await buildMeshEdit(meshEdit)
+        }
         if let edit {
             return await buildHeightEdit(edit)
         }
         do {
             try Task.checkCancellation()
             let requested = TerrainSourceKey(source)
-            if loadedKey != requested || residency == nil {
-                let cache = try await TerrainRegionCache.open(manifestAt: source.source)
+            let failure = failedLoad.flatMap { $0.key == requested ? $0 : nil }
+            if failure == nil, loadedKey != requested || residency == nil {
+                let cache = try await TerrainSourceResidency.openManifest(at: source.source)
                 if cache.manifest.meshDocumentFileName != nil {
-                    let build = try await MeshTerrainSourcePreparation.prepare(cache: cache, source: source, request: self,
-                                                                              assetOverride: loadedKey == requested ? meshAsset : nil)
+                    let build = try await MeshTerrainSourcePreparation.prepare(
+                        cache: cache,
+                        source: source,
+                        request: self,
+                        assetOverride: loadedKey == requested ? meshAsset : nil
+                    )
                     return .prepared(.init(build: build, key: requested, failure: nil))
                 }
             }
-            let failure = failedLoad.flatMap { $0.key == requested ? $0 : nil }
             let retained = failure != nil && loadedKey != requested && storage != nil
             let sameData = loadedKey == requested || retained
             let input: TerrainResidencyInput

@@ -6,8 +6,8 @@ import Testing
 
 @MainActor
 extension EditorLocalizationTests {
-    @Test("Brush controls fit a narrow Inspector, update the active brush and survive language changes")
-    func mountedInspector() async throws {
+    @Test("The viewport terrain dock updates the active brush and survives language changes")
+    func mountedTerrainDock() async throws {
         if unsafe RenderEngine.shared == nil {
             unsafe RenderEngine.configurations.preferredBackend = .headless
             RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "TerrainInspector")))
@@ -16,13 +16,20 @@ extension EditorLocalizationTests {
         defer { EditorLocalization.shared.preference = previousLanguage }
         let viewport = EditorSceneViewportModel()
         viewport.setTerrainEditing(true)
-        let inspector = EditorInspectorSidebarViewModel()
-        attach(inspector, to: viewport)
         var creations = 0
         var changes = 0
-        inspector.setTerrainTools(owner: viewport, state: viewport.terrainEditing, create: { creations += 1 }, settingsChanged: { changes += 1 })
-        let container = UIContainerView(rootView: EditorInspectorSidebar(viewModel: inspector).theme(.adaEditor))
-        container.frame = Rect(x: 0, y: 0, width: 300, height: 720)
+        viewport.terrainEditing.sourceActions = .init(
+            create: { creations += 1 },
+            materials: {},
+            variation: {},
+            mesh: {},
+            texture: {},
+            extend: {},
+            generate: {}
+        )
+        let dock = EditorTerrainDockPanel(state: viewport.terrainEditing, onChange: { changes += 1 })
+        let container = UIContainerView(rootView: dock.theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 680, height: 300)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
         let controls = EditorTerrainBrushMode.allCases.map { "AdaEditor.Terrain.Mode.\($0.rawValue)" }
@@ -33,9 +40,9 @@ extension EditorLocalizationTests {
             for identifier in controls {
                 let node = try container.uiNode(matching: .accessibilityIdentifier(identifier))
                 #expect(node.absoluteFrame.origin.x >= 0)
-                #expect(node.absoluteFrame.origin.x + node.absoluteFrame.size.width <= 300.5)
+                #expect(node.absoluteFrame.origin.x + node.absoluteFrame.size.width <= 680.5)
                 #expect(node.absoluteFrame.size.width > 0)
-                #expect(node.absoluteFrame.origin.y + node.absoluteFrame.size.height <= 720)
+                #expect(node.absoluteFrame.origin.y + node.absoluteFrame.size.height <= 300)
             }
             let slider = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Terrain.Radius"))
             #expect(slider.absoluteFrame.size.width > 200)
@@ -45,13 +52,6 @@ extension EditorLocalizationTests {
         #expect(changes == 1)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Terrain.Create"))
         #expect(creations == 1)
-        inspector.isInspectingPlayMode = true
-        await refresh(container)
-        #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Terrain.Panel")).isEmpty)
-        inspector.isInspectingPlayMode = false
-        viewport.setTerrainEditing(false)
-        await refresh(container)
-        #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Terrain.Panel")).isEmpty)
     }
 
     @Test("Switching scenes replaces brush ownership and closing an old viewport preserves the current controls")
@@ -82,8 +82,14 @@ extension EditorLocalizationTests {
 
     private func attach(_ inspector: EditorInspectorSidebarViewModel, to viewport: EditorSceneViewportModel) {
         inspector.setSceneViewportActions(
-            owner: viewport, applyGizmoChange: { _ in }, addEntity: { _ in }, addComponent: { _ in }, removeComponent: { _ in },
-            updateComponentField: { _, _, _ in }, addScriptableObject: { _ in }, removeScriptableObject: { _ in },
+            owner: viewport,
+            applyGizmoChange: { _ in },
+            addEntity: { _ in },
+            addComponent: { _ in },
+            removeComponent: { _ in },
+            updateComponentField: { _, _, _ in },
+            addScriptableObject: { _ in },
+            removeScriptableObject: { _ in },
             updateScriptableObjectField: { _, _, _ in }
         )
     }

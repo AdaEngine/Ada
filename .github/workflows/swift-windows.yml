@@ -14,8 +14,6 @@ defaults:
 jobs:
   Windows:
     name: Windows with SwiftPM
-    # Swift 6.2.3 ships Clang 19, while the Visual Studio 2026 STL on
-    # windows-latest requires Clang 20 or newer.
     runs-on: windows-2022
     env:
       ADAENGINE_HEADLESS: "1"
@@ -24,8 +22,8 @@ jobs:
         - name: Setup
           uses: compnerd/gha-setup-swift@v0.2.3
           with:
-            branch: swift-6.2.3-release
-            tag: 6.2.3-RELEASE
+            branch: swift-6.3.1-release
+            tag: 6.3.1-RELEASE
         - name: Checkout
           uses: actions/checkout@v4
 
@@ -33,9 +31,8 @@ jobs:
           run: swift -version
 
         - name: Test
-          # Swift Testing 6.2.3 on Windows becomes unstable when all tests are
-          # scheduled at once. Keep bounded parallelism so the suite still
-          # makes progress without exhausting the runner.
+          # Rendering and application tests share process-wide engine state.
+          # Run suites serially so their frame updates cannot race on Windows.
           # Build the test product directly: SwiftPM otherwise compiles the
           # WASI-only JavaScriptKit command plugin, which cannot build on Windows.
           run: |
@@ -43,11 +40,11 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             swift build -j 2 --product TextureAtlasBuilderTool
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            swift test --skip-build --parallel --num-workers 2
+            swift test --skip-build --no-parallel
 
         - name: Test Mesh Terrain authoring kernel
           # Authoring is optional for compiled players; explicitly exercise it in CI.
           run: |
             swift build -j 2 --traits MeshTerrainAuthoring --product AdaEnginePackageTests
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            swift test --traits MeshTerrainAuthoring --skip-build --parallel --num-workers 2 --filter "MeshTerrain|TriangleBoolean|TriangleIndexEdges"
+            swift test --traits MeshTerrainAuthoring --skip-build --no-parallel --filter "MeshTerrain|TriangleBoolean|TriangleIndexEdges"

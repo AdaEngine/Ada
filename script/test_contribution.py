@@ -4,6 +4,7 @@ import json
 import importlib.util
 import contextlib
 import io
+import os
 import shlex
 import shutil
 from pathlib import Path
@@ -11,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from contribution import adapters, hooks, workflow
 from contribution.cli import main
@@ -64,6 +66,16 @@ class ProfileTests(unittest.TestCase):
     def test_editor_and_root_tests_both_selected_for_shared_change(self):
         checks = build_checks(REPO, ["Sources/AdaUI/View.swift", "Editor/Package.swift"], CONFIG, REPO / "files.json", REPO)
         self.assertTrue({"swift-tests", "editor-tests"}.issubset({check.name for check in checks}))
+
+    def test_windows_swift_checks_limit_compiler_jobs_and_run_tests_serially(self):
+        with patch.object(sys, "platform", "win32"):
+            checks = build_checks(REPO, ["Sources/AdaUI/View.swift"], CONFIG, REPO / "files.json", REPO)
+        commands = {check.name: check.argv for check in checks}
+        for prefix in ("swift", "editor"):
+            self.assertIn("--jobs", commands[prefix + "-build"])
+            self.assertIn("--jobs", commands[prefix + "-tests"])
+            self.assertIn("--no-parallel", commands[prefix + "-tests"])
+            self.assertIn("--skip-build", commands[prefix + "-tests"])
 
     def test_document_change_does_not_build_engine(self):
         checks = build_checks(REPO, ["Documentation/Designs/example.md"], CONFIG, REPO / "files.json", REPO)
@@ -166,6 +178,14 @@ class RepositoryTests(RepositoryFixture):
 
 
 class ExecutionTests(RepositoryFixture):
+    def test_checks_discover_their_own_git_repository_when_run_from_a_hook(self):
+        foreign_git_dir = str(self.root / "foreign.git")
+        check = Check("git-root", "tests", ["git", "rev-parse", "--show-toplevel"])
+        with patch.dict(os.environ, {"GIT_DIR": foreign_git_dir}):
+            result = execute(check, self.root, self.root / "logs")
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(Path(Path(result["log"]).read_text().strip()).resolve(), self.root.resolve())
+
     def test_deferred_check_does_not_pass_complete_validation(self):
         report = {"purpose": "publication", "checks": [{"status": "deferred"}]}
         self.assertEqual(status_code(report), 2)

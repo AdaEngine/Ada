@@ -92,10 +92,18 @@ def execute(check, root, logs):
     log.parent.mkdir(parents=True, exist_ok=True)
     result["log"] = str(log)
     try:
+        environment = os.environ.copy()
+        # Git hooks export repository paths that would override a check's working directory.
+        if any(name.startswith("GIT_") for name in environment):
+            local_git_vars = subprocess.check_output(
+                ["git", "rev-parse", "--local-env-vars"], cwd=root, text=True, timeout=10
+            )
+            for name in local_git_vars.splitlines():
+                environment.pop(name, None)
         with log.open("wb") as output:
             process = subprocess.Popen(
                 check.argv, cwd=Path(root) / check.cwd, stdout=output, stderr=subprocess.STDOUT,
-                env={**os.environ, **check.env, "PYTHONUTF8": "1"},
+                env={**environment, **check.env, "PYTHONUTF8": "1"},
                 start_new_session=os.name != "nt",
             )
             try:

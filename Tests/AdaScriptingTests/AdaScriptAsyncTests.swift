@@ -36,8 +36,8 @@ struct AdaScriptAsyncTests {
     @Test("Real-time timers complete without a world update")
     func realTimeTimerCompletes() async throws {
         let timer = AdaScriptAsyncHost().sleepRealTime(0.01)
-        try await Task.sleep(for: .milliseconds(30))
-        #expect(timer.result().isSuccess())
+        let result = try await waitForOperation(timer)
+        #expect(result.isSuccess())
     }
 
     @Test("A background save rejects paths outside writable roots")

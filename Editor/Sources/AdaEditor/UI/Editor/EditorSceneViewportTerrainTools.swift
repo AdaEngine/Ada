@@ -30,7 +30,9 @@ extension EditorSceneViewportModel {
             join: { [weak self] in self?.joinSelectedMeshTerrain() },
             detach: { [weak self] in self?.detachSelectedMeshTerrain() },
             cancel: { [weak self] in
-                guard let self else { return }
+                guard let self else {
+                    return
+                }
                 if !self.cancelActiveMeshTerrainTransform() { self.endTerrainStroke(cancelled: true) }
             }
         )
@@ -125,12 +127,21 @@ extension EditorSceneViewportModel {
 
     private func configureTerrainMaterials(addRules: Bool = true) {
         let variation = TerrainTextureVariation(isEnabled: terrainEditing.usesTextureVariation, seed: terrainEditing.noise.seed)
-        let palette = EditorTerrainAutoPalette.make(existing: terrainEditing.sourceManifest?.materials, variation: variation, addRules: addRules)
+        guard let palette = EditorTerrainAutoPalette.make(
+            existing: terrainEditing.sourceManifest?.materials,
+            variation: variation,
+            addRules: addRules
+        ) else {
+            terrainEditing.sourceStatus = "Terrain material palette has no room for automatic layers or rules."
+            return
+        }
         performTerrainResourceCommand(.materials(palette))
     }
 
     private func registerTerrainMesh() {
-        guard !terrainEditing.isSourceBusy else { return }
+        guard !terrainEditing.isSourceBusy else {
+            return
+        }
         if let file = terrainProjectFile(terrainEditing.meshReference) {
             performTerrainResourceCommand(.mesh(file))
             return
@@ -147,7 +158,9 @@ extension EditorSceneViewportModel {
     }
 
     private func registerTerrainTexture() {
-        guard !terrainEditing.isSourceBusy else { return }
+        guard !terrainEditing.isSourceBusy else {
+            return
+        }
         let used = Set(terrainEditing.sourceManifest?.materials?.layers.map(\.id) ?? [])
         guard let id = (UInt16(0)...UInt16(31)).first(where: { !used.contains($0) }) else {
             return
@@ -182,7 +195,9 @@ extension EditorSceneViewportModel {
     }
 
     private func rejectHeightfieldTool() -> Bool {
-        guard isMeshTerrainSource(for: selectedEditorID) else { return false }
+        guard isMeshTerrainSource(for: selectedEditorID) else {
+            return false
+        }
         terrainEditing.sourceFailure = nil
         terrainEditing.sourceStatus = "Choose a Heightfield for this tool."
         return true
@@ -237,8 +252,11 @@ extension EditorSceneViewportModel {
             var meshReceipt: EditorMeshTerrainCreation.Receipt?
             do {
                 let file = context.assetsRoot.appendingPathComponent("terrain-\(UUID().uuidString.lowercased()).aterrain")
-                if backend == .mesh { meshReceipt = try await EditorMeshTerrainCreation.create(at: file, noise: settings) }
-                else { try await Self.writeNewTerrain(at: file, noise: settings) }
+                if backend == .mesh {
+                    meshReceipt = try await EditorMeshTerrainCreation.create(at: file, noise: settings)
+                } else {
+                    try await Self.writeNewTerrain(at: file, noise: settings)
+                }
                 guard !Task.isCancelled, self.terrainEditing.sourceGeneration == generation, self.sceneModel == baseline else {
                     if let meshReceipt { await EditorMeshTerrainCreation.discard(meshReceipt) }
                     return

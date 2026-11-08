@@ -2934,6 +2934,7 @@
   "Saving terrain stroke…": "Сохраняем поверхность…",
   "Release to apply the terrain stroke.": "Отпустите кнопку, чтобы применить мазок.",
   "Terrain stroke could not be saved. Try again.": "Не удалось сохранить мазок. Попробуйте ещё раз.",
+  "Terrain material palette has no room for automatic layers or rules.": "В палитре рельефа нет места для автоматических слоёв или правил.",
   "Sculpt": "Рельеф",
   "Mesh Instancing": "Инстансинг мешей",
   "Height Generator": "Генератор высот",
