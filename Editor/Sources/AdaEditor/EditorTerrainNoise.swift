@@ -7,9 +7,13 @@ struct EditorTerrainNoise: Sendable {
     var frequency: Float = 0.035
 
     func height(x: Float, z: Float) -> Float {
-        var result: Float = 0, weight: Float = 1, scale = frequency, total: Float = 0
+        guard x.isFinite, z.isFinite, frequency.isFinite else {
+            return 0
+        }
+        var result: Float = 0, weight: Float = 1, total: Float = 0
+        var scale = Double(frequency)
         for octave in 0..<5 {
-            result += value(x * scale, z * scale, seed: seed &+ UInt64(octave) &* 7919) * weight
+            result += value(Double(x) * scale, Double(z) * scale, seed: seed &+ UInt64(octave) &* 7919) * weight
             total += weight
             weight *= 0.5
             scale *= 2
@@ -17,12 +21,15 @@ struct EditorTerrainNoise: Sendable {
         return result / total * amplitude
     }
 
-    private func value(_ x: Float, _ z: Float, seed: UInt64) -> Float {
-        let ix = Int64(floor(Double(x))), iz = Int64(floor(Double(z)))
-        var u = x - Float(ix), v = z - Float(iz)
+    private func value(_ x: Double, _ z: Double, seed: UInt64) -> Float {
+        let ix = floor(x), iz = floor(z)
+        var u = Float(x - ix), v = Float(z - iz)
         u = u * u * (3 - 2 * u); v = v * v * (3 - 2 * v)
-        func hash(_ x: Int64, _ z: Int64) -> Float {
-            var h = UInt64(bitPattern: x) &* 0x9e3779b97f4a7c15 ^ UInt64(bitPattern: z) &* 0xbf58476d1ce4e5b9 ^ seed
+        func coordinateBits(_ coordinate: Double) -> UInt64 {
+            Int64(exactly: coordinate).map(UInt64.init(bitPattern:)) ?? coordinate.bitPattern
+        }
+        func hash(_ x: Double, _ z: Double) -> Float {
+            var h = coordinateBits(x) &* 0x9e3779b97f4a7c15 ^ coordinateBits(z) &* 0xbf58476d1ce4e5b9 ^ seed
             h = (h ^ (h >> 30)) &* 0xbf58476d1ce4e5b9
             h = (h ^ (h >> 27)) &* 0x94d049bb133111eb
             h ^= h >> 31

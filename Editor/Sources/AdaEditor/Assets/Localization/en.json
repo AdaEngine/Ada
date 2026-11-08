@@ -2934,6 +2934,7 @@
   "Saving terrain stroke…": "Saving terrain stroke…",
   "Release to apply the terrain stroke.": "Release to apply the terrain stroke.",
   "Terrain stroke could not be saved. Try again.": "Terrain stroke could not be saved. Try again.",
+  "Terrain material palette has no room for automatic layers or rules.": "Terrain material palette has no room for automatic layers or rules.",
   "Sculpt": "Sculpt",
   "Mesh Instancing": "Mesh Instancing",
   "Height Generator": "Height Generator",
