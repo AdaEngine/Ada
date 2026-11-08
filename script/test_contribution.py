@@ -75,6 +75,7 @@ class ProfileTests(unittest.TestCase):
             self.assertIn("--jobs", commands[prefix + "-build"])
             self.assertIn("--jobs", commands[prefix + "-tests"])
             self.assertIn("--no-parallel", commands[prefix + "-tests"])
+            self.assertIn("--skip-build", commands[prefix + "-tests"])
 
     def test_document_change_does_not_build_engine(self):
         checks = build_checks(REPO, ["Documentation/Designs/example.md"], CONFIG, REPO / "files.json", REPO)

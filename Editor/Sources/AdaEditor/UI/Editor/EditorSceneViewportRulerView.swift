@@ -152,9 +152,6 @@ struct EditorViewportRulerLayer: View {
     var body: some View {
         let revision = presentation.rulerRevision
         return GeometryReader { proxy in
-            // A declaration is required inside AdaUI's result builder.
-            // swiftlint:disable:next redundant_discardable_let
-            let _ = revision
             let ruler = viewportModel.coordinateRuler(in: proxy.size)
             ZStack(anchor: .topLeading) {
                 RectangleShape()
@@ -178,6 +175,7 @@ struct EditorViewportRulerLayer: View {
                     .offset(x: 2, y: max(20, proxy.size.height - 20))
             }
         }
+        .id(revision)
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
     }
 

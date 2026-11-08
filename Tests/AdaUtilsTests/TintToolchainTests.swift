@@ -13,7 +13,9 @@ struct TintToolchainTests {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             #if os(Windows)
                 // Discovery needs a real executable, but never launches it.
-                let systemRoot = try #require(ProcessInfo.processInfo.environment["SystemRoot"])
+                let systemRoot = try #require(ProcessInfo.processInfo.environment.first {
+                    $0.key.caseInsensitiveCompare("SystemRoot") == .orderedSame
+                }?.value)
                 let hostTool = URL(fileURLWithPath: systemRoot, isDirectory: true).appendingPathComponent("System32/where.exe")
                 try FileManager.default.copyItem(at: hostTool, to: url)
             #else
