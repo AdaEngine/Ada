@@ -36,6 +36,9 @@ struct NativeGLTFBudget {
         encodedRemaining = remaining - count
     }
 
+    /// True when no encoded-byte limit applies, so dependencies may be read ahead of accounting.
+    var isUnbounded: Bool { encodedRemaining == nil }
+
     mutating func read(_ url: URL) throws -> Data {
         guard let limit = encodedRemaining else {
             return try Data(contentsOf: url)

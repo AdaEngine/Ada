@@ -22,6 +22,7 @@
         // shadow cascades. Keep that working set warm instead of recreating Dawn
         // bind groups every frame once a moderately sized scene exceeds 512 keys.
         private var bindingCache = BoundedResourceCache<WGPUBindGroupKey, WebGPU.GPUBindGroup>(capacity: 8_192)
+        private var transientBindingCache = TransientResourceCache<WGPUBindGroupKey, WebGPU.GPUBindGroup>()
         let vertexBufferSlots: [Int: UInt32]
         let descriptor: RenderPipelineDescriptor
         let renderPipeline: WebGPU.GPURenderPipeline
@@ -127,12 +128,25 @@
 
         var cachedBindGroupCount: Int { bindingLock.withLock { bindingCache.count } }
 
-        func cachedBindGroup(key: WGPUBindGroupKey, owners: [AnyObject], cacheable: Bool = true, create: () -> WebGPU.GPUBindGroup?) -> WebGPU.GPUBindGroup? {
-            guard cacheable else {
+        /// - Parameter transient: Cache a group that is not `cacheable` only for a few submissions after its last use.
+        ///   Use it for groups that reference render attachments; never for one-use inline uniform buffers.
+        func cachedBindGroup(
+            key: WGPUBindGroupKey,
+            owners: () -> [AnyObject],
+            cacheable: Bool = true,
+            transient: Bool = false,
+            create: () -> WebGPU.GPUBindGroup?
+        ) -> WebGPU.GPUBindGroup? {
+            if cacheable {
+                return bindingLock.withLock {
+                    bindingCache.value(for: key, owners: owners, create: create)
+                }
+            }
+            guard transient else {
                 return create()
             }
             return bindingLock.withLock {
-                bindingCache.value(for: key, owners: owners, create: create)
+                transientBindingCache.value(for: key, epoch: WGPUSubmissionEpoch.current, owners: owners, create: create)
             }
         }
 

@@ -7,6 +7,7 @@
 
 import Foundation
 import Math
+import Synchronization
 
 public struct NativeGLTFLoader: GLTFLoader {
     private let resourceBoundary: URL?
@@ -249,7 +250,30 @@ public struct NativeGLTFLoader: GLTFLoader {
         return buffers
     }
 
+    /// Reads external image files concurrently. Failed reads are omitted, so the serial path reports their errors.
+    private func prefetchExternalImages(_ images: [GLTF.Image], baseURL: URL) -> [URL: Data] {
+        #if WASM
+            return [:]
+        #else
+            let urls = Array(Set(images.compactMap { image -> URL? in
+                guard let uri = image.uri, !uri.starts(with: "data:") else { return nil }
+                return try? resourceURL(uri, relativeTo: baseURL)
+            }))
+            guard urls.count > 1 else { return [:] }
+            let output = Mutex<[URL: Data]>([:])
+            let workers = min(urls.count, 8)
+            DispatchQueue.concurrentPerform(iterations: workers) { worker in
+                for index in stride(from: worker, to: urls.count, by: workers) {
+                    guard let data = try? Data(contentsOf: urls[index]) else { continue }
+                    output.withLock { $0[urls[index]] = data }
+                }
+            }
+            return output.withLock { $0 }
+        #endif
+    }
+
     private func convertToImportResult(_ gltf: GLTF, buffers: [Data], baseURL: URL, budget: inout NativeGLTFBudget) throws -> GLTFImportResult {
+        let prefetched = budget.isUnbounded ? prefetchExternalImages(gltf.images ?? [], baseURL: baseURL) : [:]
         let images = try (gltf.images ?? [])
             .map { image -> GLTFImportResult.Image in
                 if let uri = image.uri {
@@ -260,7 +284,7 @@ public struct NativeGLTFLoader: GLTFLoader {
                         return GLTFImportResult.Image(uri: nil, data: data, mimeType: image.mimeType)
                     }
                     let imageURL = try resourceURL(uri, relativeTo: baseURL)
-                    return try GLTFImportResult.Image(uri: imageURL, data: budget.read(imageURL), mimeType: image.mimeType)
+                    return try GLTFImportResult.Image(uri: imageURL, data: prefetched[imageURL] ?? budget.read(imageURL), mimeType: image.mimeType)
                 } else if let bufferViewIndex = image.bufferView {
                     let data = try getBufferViewData(bufferViewIndex, gltf: gltf, buffers: buffers)
                     return GLTFImportResult.Image(uri: nil, data: data, mimeType: image.mimeType)

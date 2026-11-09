@@ -28,6 +28,9 @@
         // Render attachments can be replaced every frame. A long-lived bind-group
         // cache must not keep their full GPU allocations alive through its owners.
         let allowsBindingCache: Bool
+        /// Render attachments may be cached briefly (see ``TransientResourceCache``); textures whose
+        /// descriptor opts out of binding caches are never cached.
+        let allowsTransientBindingCache: Bool
 
         init(texture: WebGPU.GPUTexture, textureView: WebGPU.GPUTextureView, device: WebGPU.GPUDevice? = nil) {
             self.texture = texture
@@ -35,6 +38,7 @@
             self.textureView = textureView
             self.device = device
             self.allowsBindingCache = false
+            self.allowsTransientBindingCache = true
             #if WASM
             self.allowsReadback = false
             #else
@@ -100,6 +104,7 @@
 
         init(descriptor: TextureDescriptor, device: WebGPU.GPUDevice) {
             self.allowsBindingCache = descriptor.allowsBindingCache && !descriptor.textureUsage.contains(.renderTarget)
+            self.allowsTransientBindingCache = descriptor.allowsBindingCache
             self.size = SizeInt(width: descriptor.width, height: descriptor.height)
             var wgpuUsage: WebGPU.GPUTextureUsage = []
 

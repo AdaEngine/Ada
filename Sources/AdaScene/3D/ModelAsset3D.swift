@@ -194,7 +194,9 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
             }
             result = try native.load(data: boundedData, baseURL: fileURL.deletingLastPathComponent())
         } else {
+            let loadStall = PerformanceStallProbe.begin()
             result = try await loader.load(url: fileURL)
+            PerformanceStallProbe.end("Model.GLTFLoad", since: loadStall)
         }
         try result.validateGeometry()
         importWarnings = result.warnings
@@ -207,7 +209,15 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         animationClips = try Self.makeClips(result.animations, nodes: result.nodes, meshes: result.meshes)
         let device = unsafe RenderEngine.shared.renderDevice
 
-        let materials = try Self.makeMaterialsAccounting(&result)
+        let materialStall = PerformanceStallProbe.begin()
+        // Without import limits, texture decoding does not depend on geometry, so it overlaps sidecar decoding and
+        // mesh conversion. Bounded imports keep the serial order: textures are admitted before derived geometry.
+        // In the concurrent case a geometry error is reported before (and instead of) a texture error.
+        let concurrentTextures = importLimits == nil
+        let materialSource = result
+        async let pendingMaterials = Self.makeMaterials(materialSource, if: concurrentTextures)
+        var materials = concurrentTextures ? [] : try Self.makeMaterialsAccounting(&result)
+        let sidecarStall = PerformanceStallProbe.begin()
         var sidecarBudget = ModelSidecarBudget(footprint: result.importFootprint)
         var preparedMeshlets: MeshletSidecar?
         let sidecarURL = fileURL.appendingPathExtension("meshlets")
@@ -232,6 +242,8 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
             }
         }
         result.importFootprint = sidecarBudget.footprint
+        PerformanceStallProbe.end("Model.Sidecars", since: sidecarStall)
+        let meshStall = PerformanceStallProbe.begin()
 
         // 2. Convert Meshes
         var meshes: [Mesh] = []
@@ -348,6 +360,7 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
             meshes.append(Mesh(models: [Mesh.Model(name: gltfMesh.name ?? "", parts: parts)]))
             meshMorphWeights.append(gltfMesh.defaultWeights)
         }
+        PerformanceStallProbe.end("Model.Meshes", since: meshStall, count: meshes.count)
         if incompatibleMeshletParts > 0 {
             importWarnings.append("Ignored \(incompatibleMeshletParts) stale or invalid meshlet parts. Original geometry is retained.")
         }
@@ -358,6 +371,10 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         nodes = result.nodes.map {
             Node(name: $0.name, transform: $0.transform, meshIndex: $0.meshIndex, children: $0.children, skinIndex: $0.skinIndex, restPose: $0.restPose, morphWeights: $0.weights)
         }
+        if concurrentTextures {
+            materials = try await pendingMaterials ?? []
+        }
+        PerformanceStallProbe.end("Model.Materials", since: materialStall, count: materials.count)
         self.meshes = meshes
         self.materials = materials
         scenes = result.scenes

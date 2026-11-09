@@ -15,6 +15,11 @@ struct BoundedResourceCache<Key: Hashable, Value> {
     var count: Int { entries.count }
 
     mutating func value(for key: Key, owners: [AnyObject], create: () -> Value?) -> Value? {
+        value(for: key, owners: { owners }, create: create)
+    }
+
+    /// Builds the owner list only when a new entry is inserted, keeping cache hits allocation-free.
+    mutating func value(for key: Key, owners: () -> [AnyObject], create: () -> Value?) -> Value? {
         if let entry = entries[key] {
             return entry.value
         }
@@ -31,7 +36,7 @@ struct BoundedResourceCache<Key: Hashable, Value> {
         } else {
             insertionOrder.append(key)
         }
-        entries[key] = Entry(value: value, owners: owners)
+        entries[key] = Entry(value: value, owners: owners())
         return value
     }
 }

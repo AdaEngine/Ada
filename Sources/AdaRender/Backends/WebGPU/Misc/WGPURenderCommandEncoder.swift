@@ -409,35 +409,49 @@
 
                 let expectedResources = expectedResourceKinds(for: pipeline, setIndex: setIndex)
                 var keys: [WGPUBindingKey] = []
-                var owners: [AnyObject] = []
                 var cacheable = true
+                // Inline-byte uniforms and opted-out textures are never cached. Render attachments may be
+                // cached briefly (see TransientResourceCache) instead of creating a bind group every draw.
+                var transientCacheable = true
                 keys.reserveCapacity(expectedResources.count)
-                owners.reserveCapacity(expectedResources.count)
                 let sortedSlots = pipeline.sortedBindingSlots.indices.contains(setIndex) ? pipeline.sortedBindingSlots[setIndex] : []
                 for slot in sortedSlots {
                     switch expectedResources[slot] {
                     case .uniformBuffer:
                         if let uniform = resources.uniformBuffers[slot] {
                             cacheable = cacheable && uniform.cacheable
+                            transientCacheable = transientCacheable && uniform.cacheable
                             keys.append(.init(slot: slot, owner: ObjectIdentifier(uniform.buffer), offset: uniform.offset, size: uniform.size))
-                            owners.append(uniform.buffer)
                         }
                     case .texture:
                         if let texture = resources.textures[slot] {
                             cacheable = cacheable && texture.allowsBindingCache
+                            transientCacheable = transientCacheable && texture.allowsTransientBindingCache
                             keys.append(.init(slot: slot, owner: ObjectIdentifier(texture)))
-                            owners.append(texture)
                         }
                     case .sampler:
                         if let sampler = resources.samplers[slot] {
                             keys.append(.init(slot: slot, owner: ObjectIdentifier(sampler)))
-                            owners.append(sampler)
                         }
                     case nil: break
                     }
                 }
                 let key = WGPUBindGroupKey(set: setIndex, bindings: keys)
-                let bindGroup = pipeline.cachedBindGroup(key: key, owners: owners, cacheable: cacheable) {
+                // Owners keep ObjectIdentifier keys unique while an entry lives; only collected on insertion.
+                let owners = { () -> [AnyObject] in
+                    var owners: [AnyObject] = []
+                    owners.reserveCapacity(sortedSlots.count)
+                    for slot in sortedSlots {
+                        switch expectedResources[slot] {
+                        case .uniformBuffer: if let uniform = resources.uniformBuffers[slot] { owners.append(uniform.buffer) }
+                        case .texture: if let texture = resources.textures[slot] { owners.append(texture) }
+                        case .sampler: if let sampler = resources.samplers[slot] { owners.append(sampler) }
+                        case nil: break
+                        }
+                    }
+                    return owners
+                }
+                let bindGroup = pipeline.cachedBindGroup(key: key, owners: owners, cacheable: cacheable, transient: transientCacheable) {
                     #if WASM
                         var entries: [WebGPU.GPUBindGroupEntryEx] = []
                     #else

@@ -41,6 +41,7 @@
             let commandBuffer: WebGPU.GPUCommandBuffer = webGPUDeviceLock.withLock { _ in
                 commandEncoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
             }
+            WGPUSubmissionEpoch.advance()
             var handlers = completedHandlers
             completedHandlers.removeAll()
             if let submitted = PerformanceStallProbe.begin() {

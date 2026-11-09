@@ -141,6 +141,7 @@ public struct Main3DRenderNode: RenderNode {
                 return
             }
 
+            let prepareStall = PerformanceStallProbe.begin()
             if !pathTracingOverlaysOnly { lists.prepare(
                 sources: candidates.meshes,
                 view: source.entityId,
@@ -153,6 +154,7 @@ public struct Main3DRenderNode: RenderNode {
                 materials: &_materials.wrappedValue
             ) }
             var visibleItems = lists.items(view: source.entityId, pass: -1)
+            PerformanceStallProbe.end("Main3D.PrepareVisible", since: prepareStall, count: visibleItems.count)
             if tracingRequested {
                 visibleItems.removeAll { item in
                     let overlay = PathTracing3DScene.isRasterOverlay(item.material, castsShadows: item.castShadows)
@@ -253,6 +255,8 @@ public struct Main3DRenderNode: RenderNode {
             if !pathTracingOverlaysOnly && !tracingRequested {
                 var meshletSettings = environments.environments[source.entityId]?.meshVisibility ?? .init()
                 if showsWireframe { meshletSettings.meshlets = .cpuReference; meshletSettings.gpuOcclusion = false }
+                let meshletStall = PerformanceStallProbe.begin()
+                defer { PerformanceStallProbe.end("Main3D.Meshlets", since: meshletStall, count: visibleItems.count) }
                 let count = meshlets.prepare(items: &visibleItems, view: source.entityId, projection: drawUniform.viewProjectionMatrix,
                     settings: meshletSettings, command: commandBuffer, device: renderDevice.renderDevice,
                     map: environments.environments[source.entityId]?.debugView == .meshlets,
@@ -273,6 +277,8 @@ public struct Main3DRenderNode: RenderNode {
             if contactEnabled {
                 let depth = surfaceLighting.target(view: source.entityId, size: sceneColor.size, scale: sceneColor.scaleFactor)
                 contactTexture = depth.color
+                let contactStall = PerformanceStallProbe.begin()
+                defer { PerformanceStallProbe.end("Main3D.ContactPrepass", since: contactStall) }
                 let encoder = commandBuffer.beginRenderPass(.init(label: "Contact depth prepass", colorAttachments: [
                     .init(texture: depth.color, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .white)
                 ], depthStencilAttachment: .init(texture: depth.depth,
@@ -435,11 +441,14 @@ public struct Main3DRenderNode: RenderNode {
             wireframe.isEnabled = showsWireframe && !pathTracingOverlaysOnly
             defer { wireframe.isEnabled = false; wireframe.drawingEdges = false }
 
+            let drawStall = PerformanceStallProbe.begin()
+            defer { PerformanceStallProbe.end("Main3D.EncodeDraws", since: drawStall, count: visibleItems.count) }
             if !visibleItems.isEmpty {
                 // Resolve blend state and view depth once per item instead of inside the comparator.
                 let blendFlags = visibleItems.map { ($0.material as? PBRMaterial)?.effectiveAlphaMode == .blend }
                 if blendFlags.contains(true) {
                     let viewMatrix = uniform.viewMatrix
+                    let materialGroups = Self.materialGroups(visibleItems)
                     let keys: [(isBlend: Bool, depth: Float)] = visibleItems.indices.map { index in
                         blendFlags[index] ? (true, (viewMatrix * visibleItems[index].worldTransform.w).z) : (false, 0)
                     }
@@ -450,13 +459,14 @@ public struct Main3DRenderNode: RenderNode {
                             return !leftKey.isBlend
                         }
                         if !leftKey.isBlend {
-                            return left < right
+                            // Opaque draws are grouped by material; see groupedByMaterial(_:).
+                            return materialGroups[left] != materialGroups[right] ? materialGroups[left] < materialGroups[right] : left < right
                         }
                         return leftKey.depth == rightKey.depth ? left < right : leftKey.depth > rightKey.depth
                     }.map { visibleItems[$0] }
                     try RenderItems<Opaque3DRenderItem>(items: sorted).render(with: renderPass, world: context.world, view: view)
                 } else {
-                    try RenderItems<Opaque3DRenderItem>(items: visibleItems).render(with: renderPass, world: context.world, view: view)
+                    try RenderItems<Opaque3DRenderItem>(items: Self.groupedByMaterial(visibleItems)).render(with: renderPass, world: context.world, view: view)
                 }
             }
 
@@ -477,5 +487,37 @@ public struct Main3DRenderNode: RenderNode {
             if let metrics { await metrics.commit(submitted) } else { submitted.commit() }
         }
         return []
+    }
+
+    /// Orders opaque draws so items sharing a material are consecutive, keeping the first-appearance order of
+    /// materials and the original order within each material. Consecutive draws then reuse the material bind
+    /// group instead of switching it per draw. Order is deterministic for a given input.
+    static func groupedByMaterial(_ items: [Opaque3DRenderItem]) -> [Opaque3DRenderItem] {
+        guard items.count > 2 else { return items }
+        return groupedOrder(items) { $0.material }.map { items[$0] }
+    }
+
+    /// Indices of `items`, grouped by owner in first-appearance order and stable within each group.
+    static func groupedOrder<Item>(_ items: [Item], owner: (Item) -> AnyObject) -> [Int] {
+        let keys = firstAppearanceGroups(items, owner: owner)
+        return items.indices.sorted { keys[$0] != keys[$1] ? keys[$0] < keys[$1] : $0 < $1 }
+    }
+
+    /// The first-appearance index of each item's material.
+    static func materialGroups(_ items: [Opaque3DRenderItem]) -> [Int] {
+        firstAppearanceGroups(items) { $0.material }
+    }
+
+    /// For each item, the index of its owner object in order of first appearance.
+    static func firstAppearanceGroups<Item>(_ items: [Item], owner: (Item) -> AnyObject) -> [Int] {
+        var groups: [ObjectIdentifier: Int] = [:]
+        groups.reserveCapacity(items.count)
+        return items.map { item -> Int in
+            let id = ObjectIdentifier(owner(item))
+            if let group = groups[id] { return group }
+            let group = groups.count
+            groups[id] = group
+            return group
+        }
     }
 }
