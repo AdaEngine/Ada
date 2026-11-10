@@ -260,16 +260,7 @@ extension TextEditorViewNode {
         in context: inout UIGraphicsContext,
         at point: Point
     ) {
-        let lineSpans =
-            tokenSpans
-            .filter { $0.line == lineIndex && $0.length > 0 }
-            .sorted { lhs, rhs in
-                if lhs.startColumn == rhs.startColumn {
-                    lhs.length < rhs.length
-                } else {
-                    lhs.startColumn < rhs.startColumn
-                }
-            }
+        let lineSpans = self.tokenSpans(forLine: lineIndex)
 
         guard !lineText.isEmpty else {
             return
@@ -287,6 +278,42 @@ extension TextEditorViewNode {
         )
         let cached = self.cachedRenderedLine(key: key, lineIndex: lineIndex)
         self.drawTextLayout(cached.layout, verticalOffset: cached.verticalOffset, in: &context, at: point)
+    }
+
+    /// Token spans of one line, sorted by column. The per-line index is built once per span set,
+    /// so drawing visible rows does not scan every span in the document for each row.
+    func tokenSpans(forLine lineIndex: Int) -> [TextEditorTokenSpan] {
+        self.tokenSpanIndex().sorted[lineIndex] ?? []
+    }
+
+    /// Token spans of one line in their original order, including empty spans (wrapped rows draw these).
+    func documentOrderTokenSpans(forLine lineIndex: Int) -> [TextEditorTokenSpan] {
+        self.tokenSpanIndex().documentOrder[lineIndex] ?? []
+    }
+
+    private func tokenSpanIndex() -> TokenSpanLineIndex {
+        if let index = self.tokenSpansByLineCache {
+            return index
+        }
+        var index = TokenSpanLineIndex()
+        for span in self.tokenSpans {
+            index.documentOrder[span.line, default: []].append(span)
+            if span.length > 0 {
+                index.sorted[span.line, default: []].append(span)
+            }
+        }
+        for line in index.sorted.keys {
+            index.sorted[line]?.sort { lhs, rhs in
+                if lhs.startColumn == rhs.startColumn {
+                    lhs.length < rhs.length
+                } else {
+                    lhs.startColumn < rhs.startColumn
+                }
+            }
+        }
+        self.tokenSpansByLineCache = index
+        self.tokenSpanIndexBuilds += 1
+        return index
     }
 
     func attributedLineText(
@@ -517,7 +544,11 @@ extension TextEditorViewNode {
     }
 
     static func normalizeInputText(_ value: String) -> String {
-        value.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+        // Runs for every view update; most text has no carriage returns, so skip Foundation's rewrite.
+        guard value.utf8.contains(UInt8(ascii: "\r")) else {
+            return value
+        }
+        return value.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
     }
 
     static func verticalTextOffset(for layout: TextLayoutManager, height: Float) -> Float {

@@ -149,6 +149,16 @@ public func UIRenderPreparing(
         component.view.draw(with: context)
         context.commitDraw()
         contexts.graphicContexts.append(context)
+        if let window = component.view as? UIWindow {
+            for case let overlay as UIWindowOverlayView in window.subviews {
+                var overlayContext = UIGraphicsContext()
+                overlayContext.windowId = window.id
+                overlayContext.isWindowOverlay = true
+                overlay.drawOverlay(with: overlayContext)
+                overlayContext.commitDraw()
+                contexts.graphicContexts.append(overlayContext)
+            }
+        }
     }
     contexts.graphicContexts.append(contentsOf: extractedUIContexts.contexts)
 }
@@ -215,7 +225,7 @@ public struct UIRenderTesselationSystem {
                     // Flush current state to preserve draw order.
                     if layerStack.isEmpty {
                         flushStateIfNeeded(&rootState, renderDevice: renderDevice.renderDevice).map { rootState.drawDataItems.append($0) }
-                        appendRenderItems(rootState.drawDataItems, sortKey: &sortKey, windowId: windowId)
+                        appendRenderItems(rootState.drawDataItems, sortKey: &sortKey, context: graphicsContext)
                         rootState.drawDataItems.removeAll(keepingCapacity: true)
                         inheritedState = rootState
                     } else if layerStack[layerStack.count - 1].mode == .building {
@@ -223,7 +233,7 @@ public struct UIRenderTesselationSystem {
                             .map {
                                 layerStack[layerStack.count - 1].state.drawDataItems.append($0)
                             }
-                        appendRenderItems(layerStack[layerStack.count - 1].state.drawDataItems, sortKey: &sortKey, windowId: windowId)
+                        appendRenderItems(layerStack[layerStack.count - 1].state.drawDataItems, sortKey: &sortKey, context: graphicsContext)
                         layerStack[layerStack.count - 1].state.drawDataItems.removeAll(keepingCapacity: true)
                         inheritedState = layerStack[layerStack.count - 1].state
                     }
@@ -235,7 +245,7 @@ public struct UIRenderTesselationSystem {
                         cached.cacheable,
                         cached.clipRect == inheritedState.currentClipRect,
                         cached.clipPolygons == inheritedState.currentClipPolygons {
-                        appendRenderItems(cached.drawDataItems, sortKey: &sortKey, windowId: windowId)
+                        appendRenderItems(cached.drawDataItems, sortKey: &sortKey, context: graphicsContext)
                         layerStack.append(ActiveLayer(id: id, version: version, mode: .skipping, cacheable: cacheable, state: inheritedState))
                     } else {
                         layerStack.append(ActiveLayer(id: id, version: version, mode: .building, cacheable: canUseLayerCache, state: inheritedState))
@@ -255,7 +265,7 @@ public struct UIRenderTesselationSystem {
                         break
                     case .building:
                         flushStateIfNeeded(&layer.state, renderDevice: renderDevice.renderDevice).map { layer.state.drawDataItems.append($0) }
-                        appendRenderItems(layer.state.drawDataItems, sortKey: &sortKey, windowId: windowId)
+                        appendRenderItems(layer.state.drawDataItems, sortKey: &sortKey, context: graphicsContext)
 
                         cacheLayer(layer, windowId: windowId)
                     }
@@ -289,7 +299,7 @@ public struct UIRenderTesselationSystem {
                 renderDevice: renderDevice.renderDevice
             )
             .map { rootState.drawDataItems.append($0) }
-            appendRenderItems(rootState.drawDataItems, sortKey: &sortKey, windowId: windowId)
+            appendRenderItems(rootState.drawDataItems, sortKey: &sortKey, context: graphicsContext)
         }
 
         if !layerDrawCache.entries.isEmpty {
@@ -394,20 +404,20 @@ public struct UIRenderTesselationSystem {
     private func appendRenderItems(
         _ items: [UIDrawData],
         sortKey: inout Float,
-        windowId: WindowID?
+        context: UIGraphicsContext
     ) {
         for drawData in items {
-            self.renderItems.items.append(
-                UITransparentRenderItem(
-                    sortKey: sortKey,
-                    windowId: windowId,
-                    entity: .zero,
-                    drawPass: uiDrawPass,
-                    primitiveType: .quad,
-                    renderPipeline: renderPipelines,
-                    drawData: drawData
-                )
+            var item = UITransparentRenderItem(
+                sortKey: sortKey,
+                windowId: context.windowId,
+                entity: .zero,
+                drawPass: uiDrawPass,
+                primitiveType: .quad,
+                renderPipeline: renderPipelines,
+                drawData: drawData
             )
+            item.isWindowOverlay = context.isWindowOverlay
+            self.renderItems.items.append(item)
             sortKey += 1
         }
     }
@@ -968,6 +978,7 @@ public struct UITransparentRenderItem: RenderItem {
     public var batchRange: Range<Int32>?
     public var renderPipeline: UIRenderPipelines
     public var drawData: UIDrawData
+    var isWindowOverlay = false
 
     /// Type of UI primitive being rendered.
     public enum PrimitiveType: Sendable {

@@ -62,7 +62,7 @@ extension TextEditorViewNode {
     }
 
     func moveCaretHorizontally(delta: Int, extendSelection: Bool) {
-        let characterCount = self.text.count
+        let characterCount = self.textCharacterCount
 
         if extendSelection {
             self.selectionHead = max(0, min(characterCount, self.caretOffset + delta))
@@ -143,7 +143,7 @@ extension TextEditorViewNode {
 
     func moveCaret(to offset: Int, extendSelection: Bool) {
         if extendSelection {
-            self.selectionHead = max(0, min(offset, self.text.count))
+            self.selectionHead = max(0, min(offset, self.textCharacterCount))
         } else {
             self.setSelection(to: offset)
         }
@@ -276,7 +276,7 @@ extension TextEditorViewNode {
             return
         }
 
-        guard self.caretOffset < self.text.count else {
+        guard self.caretOffset < self.textCharacterCount else {
             return
         }
 
@@ -299,7 +299,7 @@ extension TextEditorViewNode {
 
     func selectAll() {
         self.selectionAnchor = 0
-        self.selectionHead = self.text.count
+        self.selectionHead = self.textCharacterCount
         self.ensureCaretVisibleIfNeeded()
         self.requestDisplay()
     }
@@ -415,19 +415,24 @@ extension TextEditorViewNode {
     }
 
     func clampSelectionToBounds() {
-        let upperBound = self.text.count
+        let upperBound = self.textCharacterCount
         self.selectionAnchor = max(0, min(self.selectionAnchor, upperBound))
         self.selectionHead = max(0, min(self.selectionHead, upperBound))
     }
 
     func setSelection(to offset: Int) {
-        let clamped = max(0, min(offset, self.text.count))
+        let clamped = max(0, min(offset, self.textCharacterCount))
         self.selectionAnchor = clamped
         self.selectionHead = clamped
     }
 
     func index(forOffset offset: Int) -> String.Index {
-        let clamped = max(0, min(offset, self.text.count))
-        return self.text.index(self.text.startIndex, offsetBy: clamped)
+        let lines = self.lines()
+        let clamped = max(0, min(offset, self.textCharacterCount))
+        let line = lines[self.lineIndex(containingOffset: clamped, lines: lines)]
+        guard let lineStart = line.startIndex else {
+            return self.text.index(self.text.startIndex, offsetBy: clamped)
+        }
+        return self.text.index(lineStart, offsetBy: clamped - line.startOffset)
     }
 }

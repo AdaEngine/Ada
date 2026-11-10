@@ -282,14 +282,15 @@ public struct UIDrawPass: DrawPass {
         item: UITransparentRenderItem
     ) throws {
         let uiDrawData = item.drawData
-        let renderBounds = resolveRenderBounds(world: world, view: view)
-        let viewportOrigin = resolveViewportOrigin(world: world, view: view)
+        let renderBounds = resolveRenderBounds(world: world, view: view, windowOutput: item.isWindowOverlay)
+        let viewportOrigin = item.isWindowOverlay ? .zero : resolveViewportOrigin(world: world, view: view)
+        let clipScale = item.isWindowOverlay ? .one : world.get(Camera.self, from: view.id).map(Self.clipScale(for:)) ?? .one
 
         switch resolveScissorDecision(
             clipRect: uiDrawData.clipRect,
             renderBounds: renderBounds,
             viewportOrigin: viewportOrigin,
-            clipScale: world.get(Camera.self, from: view.id).map(Self.clipScale(for:)) ?? .one
+            clipScale: clipScale
         ) {
         case .none:
             break
@@ -650,8 +651,8 @@ public struct UIDrawPass: DrawPass {
         }
     }
 
-    private func resolveRenderBounds(world: World, view: Entity) -> Rect? {
-        if let target = world.get(RenderViewTarget.self, from: view.id), let texture = target.mainTexture {
+    private func resolveRenderBounds(world: World, view: Entity, windowOutput: Bool) -> Rect? {
+        if let target = world.get(RenderViewTarget.self, from: view.id), let texture = windowOutput ? target.outputTexture : target.mainTexture {
             if texture.width > 0, texture.height > 0 {
                 return Rect(x: 0, y: 0, width: Float(texture.width), height: Float(texture.height))
             }

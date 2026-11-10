@@ -21,6 +21,11 @@ public struct DefaultAppWindow: AppScene {
                     DefaultPlugins(filePath: filePath, assetBundle: assetBundle),
                     after: MainSchedulerPlugin.self
                 )
+                #if os(macOS) || os(Windows) || os(Linux)
+                    if ProcessInfo.processInfo.environment["ADAENGINE_DIAGNOSTICS_OVERLAY"] == "1" {
+                        world.addPlugin(GameDiagnosticsPlugin())
+                    }
+                #endif
             }
     }
 
