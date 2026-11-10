@@ -128,11 +128,79 @@ python ada_tool.py build studio --debug --scratch-path /path/to/isolated-build
 `build engine` compiles the AdaEngine target. `build studio` prepares native
 dependencies and builds the app; it prints the binary directory or macOS `.app`.
 Use `install studio` for a complete runnable distribution on Windows/Linux.
+On Windows, a build linked with the DLSS bridge (`script/build_dlss.py`) copies NVIDIA's
+`nvngx_dlss.dll`, `nvngx_dlssd.dll` and license next to the executable, and the packager includes them;
+see [DLSS](DLSS.md).
 Build logs are saved in the host CLI cache. Build stages appear in the terminal
 as they run; the last 30 log lines are also printed when compilation finishes.
 A failing compiler exits nonzero with the log location. Default builds use their
 own scratch directory, leaving the shared SwiftPM `.build` intact. If an explicitly
 reused scratch cache belongs to another compiler, choose a new `--scratch-path`.
+
+
+## Profile Studio with native CPU profilers
+
+`--profile` builds the release configuration with debug symbols, so sampling
+profilers show Swift function names while timing stays representative:
+
+```sh
+python ada_tool.py install studio --profile --launch
+python ada_tool.py run studio --profile
+python ada_tool.py build engine --profile
+```
+
+The profiling installation lives beside the release and Debug ones (for example
+`%LOCALAPPDATA%/Programs/Ada Studio Profile` on Windows) and uses its own
+`<target>-profile` build cache, so it never invalidates the release cache.
+`--profile` cannot be combined with `--debug`.
+
+- **Windows:** symbols are CodeView PDBs next to the build products; the
+  executables reference them by absolute path, so keep the build cache while
+  analyzing. Record with Windows Performance Recorder, reproduce the slow action,
+  and open the trace in Windows Performance Analyzer (CPU Usage (Sampled),
+  grouped by stack):
+
+  ```sh
+  wpr -start CPU -filemode
+  wpr -stop studio.etl
+  ```
+
+  Superluminal and the Visual Studio profiler read the same PDBs.
+- **macOS:** the Release app includes a dSYM; use Instruments' Time Profiler.
+- **Linux:** DWARF symbols are embedded; use `perf record -g` and `perf report`.
+
+For coarse frame timing without a profiler, set `ADAENGINE_STALL_PROBE=1`
+(optionally `ADAENGINE_STALL_THRESHOLD_MS=4`): operations slower than the
+threshold print tab-separated `ADA_STALL` lines with their duration.
+Besides engine phases (`App.Update.*`, `RenderNode.*`, `WGPU.*`), Studio reports
+`Studio.OpenFile`, `Studio.SceneDecode`, `Studio.Highlight` and
+`Studio.ProjectTree.Refresh` (columns: start ms, duration ms, phase, bytes, count).
+
+### WebGPU pipeline cache
+
+Native WebGPU (Dawn) builds keep translated and compiled shaders on disk, so a
+pipeline variant compiled once is not compiled again on the next launch. The first
+launch on a machine, and the first launch after a driver, Dawn or shader change,
+still compiles; `WGPU.CreateRenderPipeline.*` stall lines show those compiles.
+
+- Location: `%LOCALAPPDATA%/AdaEngine/PipelineCache/<adapter>` on Windows and the
+  user caches directory elsewhere (for example `~/Library/Caches` on macOS), one
+  folder per GPU, backend and driver.
+- At startup the current folder is trimmed to 512 MB, least recently used entries
+  first, and adapter folders unused for 30 days (for example after a driver update)
+  are removed. Deleting the cache is always safe.
+- `ADAENGINE_PIPELINE_CACHE=0` disables it (for measuring cold compiles);
+  `ADAENGINE_PIPELINE_CACHE_DIR=<path>` stores it elsewhere.
+
+### GPU-driven shadows
+
+Static shadow casters are culled on the GPU with WebGPU (see
+[shadow casting cost](RenderingFoundation.md#shadow-casting-cost)). For comparisons
+and bug reports:
+
+- `ADAENGINE_SHADOW_GPU=0` draws every caster through the CPU-culled path.
+- `ADAENGINE_SHADOW_MULTIDRAW=0` keeps GPU culling but replaces multi-draw with one
+  indirect draw per mesh.
 
 ## Playground and WebAssembly
 

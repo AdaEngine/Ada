@@ -225,7 +225,9 @@ public struct DefaultSchedulerRunner: Sendable {
         }
         let order = order?.order ?? []
         for scheduler in order {
+            let stall = PerformanceStallProbe.begin()
             await world.runScheduler(scheduler)
+            if stall != nil { PerformanceStallProbe.end("Schedule.\(world.name ?? "world").\(scheduler.rawValue)", since: stall) }
         }
     }
 }

@@ -65,6 +65,31 @@ excluded. The R32F depth copy supports nonfilterable sampling. Maximum 32 steps,
 skip this supplement. At 1080p its color/depth pair takes approximately 25 MB
 plus an additional geometry pass; disabled views allocate neither target.
 
+### Shadow casting cost
+
+Shadow maps are redrawn every frame they change; a moving point light redraws
+all six of its faces. With WebGPU (native and browser), ordinary static casters
+are culled on the GPU for every shadow view at once (point and spot faces, sun
+cascades), so the CPU no longer culls them per view. The shadow image is
+identical to the CPU-culled path.
+
+- **Casters that stay CPU-culled:** skinned or morphing meshes, meshes with
+  level-of-detail alternatives, meshes with a finite maximum draw distance,
+  alpha-masked shader-graph materials, and meshes without 32-bit indices. Their
+  per-view result depends on CPU state. Blended materials cast no shadows, as before.
+- **Draw calls:** where the native adapter supports Dawn's multi-draw
+  (`multi-draw-indirect` with `indirect-first-instance`), one call draws each
+  group of meshes per view, which removes most of the CPU cost. Without it
+  (the browser, or adapters lacking those features) each mesh is still one
+  indirect draw per view, so the saving is small. Native Metal and headless keep
+  the CPU-culled path.
+- **Memory:** each static caster's vertex and index data is copied once into
+  shared shadow buffers, one pair per vertex layout, with up to 50% headroom for
+  growth (at least 64 KiB each), plus per-view buffers of the culled instances.
+  A layout whose shadow geometry would exceed 256 MiB keeps the CPU path.
+- **Switches:** `ADAENGINE_SHADOW_GPU=0` draws every caster on the CPU-culled path;
+  `ADAENGINE_SHADOW_MULTIDRAW=0` keeps GPU culling but issues one draw per mesh.
+
 ## Local volumetrics
 
 Up to eight overlapping world-axis-aligned boxes add density and scattering

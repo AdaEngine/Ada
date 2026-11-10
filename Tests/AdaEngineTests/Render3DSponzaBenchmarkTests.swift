@@ -35,6 +35,12 @@ extension Render3DGPUTests {
             var listPreparationMilliseconds: [Double]
             var mainNodeMilliseconds: [Double]
             var gpuPasses: [Render3DPerformanceMetrics.Sample]
+            /// Shadow-casting point lights that follow the camera (`ADAENGINE_SPONZA_FLYING_LIGHTS`), and per measured
+            /// frame the local shadow faces drawn, kept from earlier frames, and skipped as unsampled.
+            var flyingLights = 0
+            var renderedShadowFaces: [Int] = []
+            var reusedShadowFaces: [Int] = []
+            var culledShadowFaces: [Int] = []
         }
 
         struct Report: Codable {
@@ -69,20 +75,43 @@ extension Render3DGPUTests {
 
         @discardableResult
         private static func setPose(
-            _ scene: MeshletBaselineFixtures.Scene, route: SponzaBenchmarkData.Route, sample: Int, count: Int
+            _ scene: MeshletBaselineFixtures.Scene, route: SponzaBenchmarkData.Route, sample: Int, count: Int, lights: [Entity] = []
         ) -> Transform {
             let transform = route.transform(sample: sample, count: count)
             scene.camera.components[Transform.self] = transform
             // This benchmark controls an unparented camera outside the scheduler. CameraSystem runs
             // in preUpdate, before postUpdate transform propagation: publish this frame's world pose.
             scene.camera.components[GlobalTransform.self] = GlobalTransform(matrix: transform.matrix)
+            // Flying lights circle the camera, deterministically per route sample, so every face matrix changes
+            // each frame like a light carried through the scene.
+            for (index, light) in lights.enumerated() {
+                let angle = Float(sample) * 0.05 + Float(index) * 2 * .pi / Float(lights.count)
+                let position = transform.position + Vector3(Math.cos(angle) * 2.5, 0.8, Math.sin(angle) * 2.5)
+                light.components[Transform.self] = Transform(position: position)
+                light.components[GlobalTransform.self] = GlobalTransform(matrix: Transform(position: position).matrix)
+            }
             return transform
         }
 
+        private static func spawnFlyingLights(_ scene: MeshletBaselineFixtures.Scene, count: Int) -> [Entity] {
+            guard count > 0 else { return [] }
+            var environment = scene.camera.components[Environment3D.self] ?? Environment3D()
+            environment.localShadows.isEnabled = true
+            environment.localShadows.maximumLights = count
+            scene.camera.components[Environment3D.self] = environment
+            return (0..<count).map { index in
+                scene.app.main.spawn("Flying light \(index)") {
+                    Transform()
+                    GlobalTransform(matrix: .identity)
+                    PointLightComponent(radiance: [1, 0.85, 0.7], intensity: 6, castShadows: true, range: 10)
+                }
+            }
+        }
+
         private static func capture(
-            _ scene: MeshletBaselineFixtures.Scene, route: SponzaBenchmarkData.Route, samples: Int, frame: Int
+            _ scene: MeshletBaselineFixtures.Scene, route: SponzaBenchmarkData.Route, samples: Int, frame: Int, lights: [Entity] = []
         ) async throws -> Image {
-            let pose = setPose(scene, route: route, sample: frame, count: samples)
+            let pose = setPose(scene, route: route, sample: frame, count: samples, lights: lights)
             try await scene.app.update()
             await Baseline.drain(scene.device)
             let camera = try #require(scene.camera.components[Camera.self])
@@ -109,25 +138,35 @@ extension Render3DGPUTests {
             var environment = try #require(scene.camera.components[Environment3D.self])
             environment.gpuOcclusionEnabled = hiZ
             scene.camera.components[Environment3D.self] = environment
-            setPose(scene, route: route, sample: 0, count: samples)
+            let lights = spawnFlyingLights(scene, count: try integer("FLYING_LIGHTS", fallback: 0, range: 0...4))
+            defer { for light in lights { scene.app.main.removeEntity(light) } }
+            setPose(scene, route: route, sample: 0, count: samples, lights: lights)
             let window = GoldenFrame.activeBackend == .webgpu ? min(frames, 90) : max(1, unsafe RenderEngine.configurations.maxFramesInFlight)
             for frame in 0..<warmup {
                 try await scene.app.update()
+                // Warm the per-frame face redraws too; the plain baseline keeps its static warmup pose.
+                if !lights.isEmpty { setPose(scene, route: route, sample: frame % samples, count: samples, lights: lights) }
                 if (frame + 1) % window == 0 { await Baseline.drain(scene.device) }
             }
             await Baseline.drain(scene.device)
             let metrics = Render3DPerformanceMetrics(warmupSamples: 0, synchronizesPasses: false)
             world.insertResource(metrics)
             var updates: [Double] = [], windows: [Double] = []
+            var rendered: [Int] = [], reused: [Int] = [], culled: [Int] = []
             var frame = 0, elapsed: Double = 0
             while frame < frames {
                 let count = min(window, frames - frame), start = ContinuousClock.now
                 for offset in 0..<count {
                     let tick = ContinuousClock.now
                     let index = (frame + offset) * (samples - 1) / (frames - 1)
-                    setPose(scene, route: route, sample: index, count: samples)
+                    setPose(scene, route: route, sample: index, count: samples, lights: lights)
                     try await scene.app.update()
                     updates.append(Baseline.milliseconds(since: tick))
+                    if !lights.isEmpty, let shadows = world.getResource(LocalShadow3DViews.self)?.entries.values.first {
+                        rendered.append(shadows.renderedFaces)
+                        reused.append(shadows.reusedFaces)
+                        culled.append(shadows.culledFaces)
+                    }
                 }
                 await Baseline.drain(scene.device)
                 let duration = Baseline.milliseconds(since: start)
@@ -143,14 +182,15 @@ extension Render3DGPUTests {
             let gpuPasses = metrics.samples
             var captures: [Image] = []
             for index in [0, (samples - 1) / 2, samples - 1] {
-                captures.append(try await capture(scene, route: route, samples: samples, frame: index))
+                captures.append(try await capture(scene, route: route, samples: samples, frame: index, lights: lights))
             }
             let diagnostics = try await Baseline.cpuDiagnostics(scene, world: world)
             return (Sample(preset: preset, quality: quality, route: route.id, round: round, hiZ: hiZ,
                 importMilliseconds: importMilliseconds, updateMilliseconds: updates, windowMillisecondsPerFrame: windows,
                 drainInclusiveMillisecondsPerFrame: elapsed / Double(frames), census: census,
                 extractionMilliseconds: diagnostics.0, listPreparationMilliseconds: diagnostics.1,
-                mainNodeMilliseconds: diagnostics.2, gpuPasses: gpuPasses), captures)
+                mainNodeMilliseconds: diagnostics.2, gpuPasses: gpuPasses, flyingLights: lights.count,
+                renderedShadowFaces: rendered, reusedShadowFaces: reused, culledShadowFaces: culled), captures)
         }
 
         @Test(.enabled(if: Self.enabled))
@@ -191,7 +231,9 @@ extension Render3DGPUTests {
                                     samples: routes.samples, frames: frames, warmup: warmup, round: round, hiZ: hiZ, importMilliseconds: importMilliseconds)
                                 report.measurements.append(sample)
                                 images.append(captures)
-                                print("SPONZA \(preset) \(quality) \(route.id) round=\(round) hiz=\(hiZ) ms=\(sample.drainInclusiveMillisecondsPerFrame)")
+                                let faces = sample.renderedShadowFaces.isEmpty ? "" : " shadowFaces drawn=\(sample.renderedShadowFaces.reduce(0, +))"
+                                    + " reused=\(sample.reusedShadowFaces.reduce(0, +)) culled=\(sample.culledShadowFaces.reduce(0, +))"
+                                print("SPONZA \(preset) \(quality) \(route.id) round=\(round) hiz=\(hiZ) ms=\(sample.drainInclusiveMillisecondsPerFrame)" + faces)
                                 if round == 0 {
                                     for (index, image) in captures.enumerated() {
                                         try image.writePNG(to: output.appendingPathComponent("\(preset)-\(quality)-\(route.id)-\(index)-hiz-\(hiZ).png"))

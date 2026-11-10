@@ -66,6 +66,8 @@ public struct Mesh3DRenderSource: Sendable {
     public var forceVisible: Bool
     public var castShadows: Bool
     public var receiveShadows: Bool
+    /// The resolved ``PathTracingGeometry3D`` of the mesh entity or its nearest ancestor.
+    public var pathTracing: PathTracingGeometry3D?
     public var skinningBuffer: (any UniformBuffer)?
     /// First joint of this instance inside a packed GPU palette.
     public var skinningOffset: Int
@@ -119,8 +121,17 @@ public struct Mesh3DRenderSource: Sendable {
 }
 
 public struct ExtractedMesh3DSources: Resource {
+    /// Meshes drawn by raster passes, including ``PathTracingGeometry3D/rasterOnly`` ones.
     public var meshes: [Mesh3DRenderSource] = []
+    /// ``PathTracingGeometry3D/pathTracingOnly`` proxies, intersected by the path tracer only.
+    public var pathTracingProxies: [Mesh3DRenderSource] = []
     public init() {}
+
+    /// The meshes the path tracer intersects: raster meshes that are not raster-only, plus the proxies.
+    public var pathTracedMeshes: [Mesh3DRenderSource] {
+        guard meshes.contains(where: { $0.pathTracing == PathTracingGeometry3D.rasterOnly }) || !pathTracingProxies.isEmpty else { return meshes }
+        return meshes.filter { $0.pathTracing != PathTracingGeometry3D.rasterOnly } + pathTracingProxies
+    }
 }
 
 public struct Visibility3DCount: Codable, Sendable {

@@ -21,6 +21,10 @@ layout(binding=8) uniform sampler u_Nearest;
 layout(binding=9) uniform sampler u_Linear;
 layout(binding=10) uniform texture2D u_Normal;
 layout(binding=11) uniform texture2D u_Position;
+layout(binding=12) uniform texture2D u_Albedo;   // G-buffer base colour (path-tracing surface outputs)
+layout(binding=13) uniform texture2D u_Emission; // G-buffer emission
+layout(binding=14) uniform texture2D u_InputB;   // pass-specific second input
+layout(binding=15) uniform texture2D u_InputC;   // pass-specific third input
 layout(binding=4) uniform PathUniform {
     mat4 u_InverseProjection;
     mat4 u_InverseView;
@@ -31,6 +35,10 @@ layout(binding=4) uniform PathUniform {
     vec4 u_Horizon;
     vec4 u_Ground;
     vec4 u_Sky; // environment texture enabled, intensity, rotation, procedural enabled
+    vec4 u_Hybrid; // x: first hit from the raster G-buffer
+    mat4 u_PreviousViewProjection; // unjittered, previous frame of this view
+    mat4 u_PreviousView;
+    vec4 u_Denoise; // x: wavelet step, y: minimum history weight, z: trace writes demodulated light, w: final remodulates
 };
 const float PI=3.141592653589793;
 uint randomState;
@@ -197,37 +205,41 @@ vec3 directLight(Surface s,vec3 view) {
     for(int index=0;index<int(u_Counts.y);++index) result+=sampleLight(s,view,index);
     return result;
 }
-vec3 path(vec3 origin,vec3 direction) {
+// Samples the next direction from a diffuse/GGX mixture and updates the throughput; false ends the path.
+bool scatter(Surface s,vec3 view,inout vec3 throughput,out vec3 nextDirection) {
+    vec3 f0=mix(vec3(0.04),s.color,s.metal);
+    float chance=clamp(max(f0.r,max(f0.g,f0.b)),0.1,0.9);
+    if(randomValue()<chance) {
+        float u=randomValue(),phi=2.0*PI*randomValue(),a=s.roughness*s.roughness;
+        float cosine=sqrt((1.0-u)/max(1.0+(a*a-1.0)*u,0.000001));
+        vec3 halfVector=normalize(basis(s.normal)*vec3(sqrt(max(0.0,1.0-cosine*cosine))*vec2(cos(phi),sin(phi)),cosine));
+        nextDirection=reflect(-view,halfVector);
+    } else {
+        float r=sqrt(randomValue()),phi=2.0*PI*randomValue();
+        nextDirection=normalize(basis(s.normal)*vec3(r*cos(phi),r*sin(phi),sqrt(max(0.0,1.0-r*r))));
+    }
+    float nl=dot(s.normal,nextDirection);
+    if(nl<=0.0 || dot(s.geometric,nextDirection)<=0.0) return false;
+    vec3 h=normalize(view+nextDirection);
+    float nh=max(dot(s.normal,h),0.0),a=s.roughness*s.roughness,a2=a*a;
+    float denominator=nh*nh*(a2-1.0)+1.0;
+    float d=a2/max(PI*denominator*denominator,1e-10);
+    float pdf=(1.0-chance)*nl/PI+chance*d*nh/max(4.0*abs(dot(view,h)),0.00001);
+    throughput*=brdf(s,view,nextDirection)/max(pdf,1e-8);
+    return true;
+}
+// Traces from `origin`; `firstBounce` counts interactions already shaded by the caller.
+vec3 path(vec3 origin,vec3 direction,int firstBounce) {
     vec3 throughput=vec3(1),radiance=vec3(0);
-    for(int bounce=0;bounce<8;++bounce) {
+    for(int bounce=firstBounce;bounce<8;++bounce) {
         if(bounce>=int(u_Counts.w)) break;
         float distance=u_Trace.x; vec3 bary;
         int hit=intersectScene(origin,direction,distance,bary,false);
         if(hit<0) { radiance+=throughput*sky(direction); break; }
         Surface s=surfaceAt(hit,bary,origin,direction,distance);
         radiance+=throughput*(s.emission+directLight(s,-direction));
-        vec3 view=-direction;
-        vec3 f0=mix(vec3(0.04),s.color,s.metal);
-        float chance=clamp(max(f0.r,max(f0.g,f0.b)),0.1,0.9);
         vec3 nextDirection;
-        float pdf;
-        if(randomValue()<chance) {
-            float u=randomValue(),phi=2.0*PI*randomValue(),a=s.roughness*s.roughness;
-            float cosine=sqrt((1.0-u)/max(1.0+(a*a-1.0)*u,0.000001));
-            vec3 halfVector=normalize(basis(s.normal)*vec3(sqrt(max(0.0,1.0-cosine*cosine))*vec2(cos(phi),sin(phi)),cosine));
-            nextDirection=reflect(-view,halfVector);
-        } else {
-            float r=sqrt(randomValue()),phi=2.0*PI*randomValue();
-            nextDirection=normalize(basis(s.normal)*vec3(r*cos(phi),r*sin(phi),sqrt(max(0.0,1.0-r*r))));
-        }
-        float nl=dot(s.normal,nextDirection);
-        if(nl<=0.0 || dot(s.geometric,nextDirection)<=0.0) break;
-        vec3 h=normalize(view+nextDirection);
-        float nh=max(dot(s.normal,h),0.0),a=s.roughness*s.roughness,a2=a*a;
-        float denominator=nh*nh*(a2-1.0)+1.0;
-        float d=a2/max(PI*denominator*denominator,1e-10);
-        pdf=(1.0-chance)*nl/PI+chance*d*nh/max(4.0*abs(dot(view,h)),0.00001);
-        throughput*=brdf(s,view,nextDirection)/max(pdf,1e-8);
+        if(!scatter(s,-direction,throughput,nextDirection)) break;
         if(bounce>=2) {
             float survive=clamp(max(throughput.r,max(throughput.g,throughput.b)),0.05,0.95);
             if(randomValue()>survive) break;
@@ -235,57 +247,177 @@ vec3 path(vec3 origin,vec3 direction) {
         }
         origin=s.position+s.geometric*u_Trace.y*2.0; direction=nextDirection;
     }
-    return clamp(radiance,vec3(0),vec3(u_Trace.z));
+    return radiance;
+}
+// The raster G-buffer's surface at `uv`: full model detail, independent of the traced LOD geometry.
+bool gbufferSurface(vec2 uv,out Surface s,out vec3 view) {
+    if(u_Hybrid.x<0.5) return false;
+    vec4 normalRoughness=textureLod(sampler2D(u_Normal,u_Nearest),uv,0);
+    if(dot(normalRoughness.xyz,normalRoughness.xyz)<0.01) return false;
+    vec4 positionMetallic=textureLod(sampler2D(u_Position,u_Nearest),uv,0);
+    s.position=(u_InverseView*vec4(positionMetallic.xyz,1)).xyz;
+    s.normal=normalize(mat3(u_InverseView)*normalRoughness.xyz);
+    view=normalize(u_InverseView[3].xyz-s.position);
+    if(dot(s.normal,view)<0.0) s.normal=-s.normal;
+    // The G-buffer has no geometric normal; the shading normal also offsets continuation rays.
+    s.geometric=s.normal;
+    s.color=textureLod(sampler2D(u_Albedo,u_Nearest),uv,0).rgb;
+    s.emission=max(textureLod(sampler2D(u_Emission,u_Nearest),uv,0).rgb,vec3(0));
+    s.roughness=clamp(normalRoughness.w,0.04,1.0); s.metal=clamp(positionMetallic.w,0.0,1.0); s.receives=true;
+    return true;
+}
+bool hasSurface(vec2 uv) {
+    vec3 n=textureLod(sampler2D(u_Normal,u_Nearest),uv,0).xyz;
+    return dot(n,n)>0.01;
+}
+// Base colour that divides lighting before filtering, so texture detail is never blurred. 1 off surfaces.
+vec3 demodulation(vec2 uv) {
+    if(u_Hybrid.x<0.5 || !hasSurface(uv)) return vec3(1);
+    return max(textureLod(sampler2D(u_Albedo,u_Nearest),uv,0).rgb,vec3(0.03));
+}
+vec3 emissionAt(vec2 uv) {
+    if(u_Hybrid.x<0.5 || !hasSurface(uv)) return vec3(0);
+    return max(textureLod(sampler2D(u_Emission,u_Nearest),uv,0).rgb,vec3(0));
+}
+float luminance(vec3 c) { return dot(c,vec3(0.2126,0.7152,0.0722)); }
+// Pass 1: reproject the previous frame's accumulated light (input B) through this pixel's world position, reject it
+// where the previous guide (input C: world normal and camera distance) disagrees, and blend the new sample (input A).
+vec4 temporalPass() {
+    vec3 current=textureLod(sampler2D(u_History,u_Nearest),v_UV,0).rgb;
+    vec4 normal=textureLod(sampler2D(u_Normal,u_Nearest),v_UV,0);
+    if(dot(normal.xyz,normal.xyz)<0.01 || u_Trace.w<0.5) return vec4(current,1);
+    vec3 viewPosition=textureLod(sampler2D(u_Position,u_Nearest),v_UV,0).xyz;
+    vec3 world=(u_InverseView*vec4(viewPosition,1)).xyz;
+    vec3 worldNormal=normalize(mat3(u_InverseView)*normal.xyz);
+    vec4 clip=u_PreviousViewProjection*vec4(world,1);
+    vec4 history=vec4(0);
+    if(clip.w>0.0001) {
+        vec2 uv=clip.xy/clip.w*vec2(0.5,-0.5)+0.5;
+        if(all(greaterThanEqual(uv,vec2(0))) && all(lessThanEqual(uv,vec2(1)))) {
+            vec4 guide=textureLod(sampler2D(u_InputC,u_Nearest),uv,0);
+            float expected=length((u_PreviousView*vec4(world,1)).xyz);
+            if(dot(guide.xyz,worldNormal)>0.9 && abs(guide.w-expected)<0.05*expected+0.02)
+                history=textureLod(sampler2D(u_InputB,u_Linear),uv,0);
+        }
+    }
+    if(history.a>0.0) {
+        // Clamp history to the current neighbourhood (mean +- 2 sigma per channel): a light that switches off or
+        // turns away is followed at once, while ordinary sample noise keeps the range wide enough to converge.
+        vec2 texel=1.0/vec2(textureSize(sampler2D(u_History,u_Nearest),0));
+        vec3 mean=vec3(0),square=vec3(0);
+        for(int y=-1;y<=1;++y) for(int x=-1;x<=1;++x) {
+            vec3 value=textureLod(sampler2D(u_History,u_Nearest),clamp(v_UV+vec2(x,y)*texel,vec2(0),vec2(1)),0).rgb;
+            mean+=value; square+=value*value;
+        }
+        mean/=9.0;
+        vec3 sigma=sqrt(max(square/9.0-mean*mean,vec3(0)));
+        history.rgb=clamp(history.rgb,mean-2.0*sigma,mean+2.0*sigma);
+    }
+    float frames=min(history.a+1.0,1024.0);
+    return vec4(mix(history.rgb,current,max(1.0/frames,u_Denoise.y)),frames);
+}
+// Pass 2: this frame's guide for the next frame's reprojection.
+vec4 guidePass() {
+    vec4 normal=textureLod(sampler2D(u_Normal,u_Nearest),v_UV,0);
+    if(dot(normal.xyz,normal.xyz)<0.01) return vec4(0);
+    vec3 viewPosition=textureLod(sampler2D(u_Position,u_Nearest),v_UV,0).xyz;
+    return vec4(normalize(mat3(u_InverseView)*normal.xyz),length(viewPosition));
+}
+// Pass 3: one edge-aware a-trous wavelet iteration with spacing u_Denoise.x, guided by normal, depth and the
+// local luminance variance, so flat noisy regions smooth while edges and texture-independent detail stay.
+vec4 waveletPass() {
+    vec4 center=textureLod(sampler2D(u_History,u_Nearest),v_UV,0);
+    vec4 normal=textureLod(sampler2D(u_Normal,u_Nearest),v_UV,0);
+    if(dot(normal.xyz,normal.xyz)<0.01) return center;
+    vec2 texel=1.0/vec2(textureSize(sampler2D(u_History,u_Nearest),0));
+    float mean=0.0,square=0.0;
+    for(int y=-1;y<=1;++y) for(int x=-1;x<=1;++x) {
+        float l=luminance(textureLod(sampler2D(u_History,u_Nearest),clamp(v_UV+vec2(x,y)*texel,vec2(0),vec2(1)),0).rgb);
+        mean+=l; square+=l*l;
+    }
+    mean/=9.0;
+    float sigma=4.0*sqrt(max(square/9.0-mean*mean,0.0))+0.0001;
+    float depth=length(textureLod(sampler2D(u_Position,u_Nearest),v_UV,0).xyz);
+    float centerLuminance=luminance(center.rgb);
+    const float kernel[3]=float[3](0.375,0.25,0.0625);
+    vec3 sum=vec3(0); float weights=0.0;
+    for(int y=-2;y<=2;++y) for(int x=-2;x<=2;++x) {
+        vec2 uv=v_UV+vec2(x,y)*texel*u_Denoise.x;
+        if(any(lessThan(uv,vec2(0))) || any(greaterThan(uv,vec2(1)))) continue;
+        vec4 otherNormal=textureLod(sampler2D(u_Normal,u_Nearest),uv,0);
+        if(dot(otherNormal.xyz,otherNormal.xyz)<0.01) continue;
+        vec3 value=textureLod(sampler2D(u_History,u_Nearest),uv,0).rgb;
+        float otherDepth=length(textureLod(sampler2D(u_Position,u_Nearest),uv,0).xyz);
+        float weight=kernel[abs(x)]*kernel[abs(y)];
+        weight*=pow(max(dot(normalize(normal.xyz),normalize(otherNormal.xyz)),0.0),128.0);
+        weight*=exp(-abs(depth-otherDepth)/(0.01*depth*u_Denoise.x+0.001));
+        weight*=exp(-abs(centerLuminance-luminance(value))/sigma);
+        sum+=value*weight; weights+=weight;
+    }
+    return vec4(weights>0.00001?sum/weights:center.rgb,center.a);
+}
+// Pass 4: geometry-aware reconstruction at output resolution, then remodulation with the full-resolution surface.
+vec4 finalPass() {
+    vec3 n=textureLod(sampler2D(u_Normal,u_Nearest),v_UV,0).xyz;
+    vec3 p=textureLod(sampler2D(u_Position,u_Nearest),v_UV,0).xyz;
+    vec2 size=vec2(textureSize(sampler2D(u_History,u_Nearest),0));
+    vec2 center=floor(v_UV*size-0.5),fraction=fract(v_UV*size-0.5);
+    vec3 sum=vec3(0); float weightSum=0.0;
+    for(int y=0;y<2;++y) for(int x=0;x<2;++x) {
+        vec2 uv=clamp((center+vec2(x,y)+0.5)/size,vec2(0.0),vec2(1.0));
+        vec3 otherN=textureLod(sampler2D(u_Normal,u_Nearest),uv,0).xyz;
+        vec3 otherP=textureLod(sampler2D(u_Position,u_Nearest),uv,0).xyz;
+        float weight=(x==0?1.0-fraction.x:fraction.x)*(y==0?1.0-fraction.y:fraction.y);
+        bool surface=dot(n,n)>0.01,otherSurface=dot(otherN,otherN)>0.01;
+        if(surface!=otherSurface) weight=0.0;
+        if(surface && otherSurface) weight*=pow(max(dot(normalize(n),normalize(otherN)),0.0),16.0)*exp(-abs(p.z-otherP.z)/max(0.02,p.z*0.01));
+        sum+=textureLod(sampler2D(u_History,u_Nearest),uv,0).rgb*weight; weightSum+=weight;
+    }
+    vec3 result=weightSum>0.00001?sum/weightSum:textureLod(sampler2D(u_History,u_Nearest),v_UV,0).rgb;
+    if(u_Denoise.w>0.5) result=result*demodulation(v_UV)+emissionAt(v_UV);
+    return vec4(result,1);
+}
+// Pass 5: Ray Reconstruction guides; u_Denoise.x selects diffuse albedo (0), specular albedo (1) or world normal
+// with roughness (2).
+vec4 rayReconstructionGuidePass() {
+    vec4 normal=textureLod(sampler2D(u_Normal,u_Nearest),v_UV,0);
+    if(dot(normal.xyz,normal.xyz)<0.01) return vec4(0);
+    if(u_Denoise.x>1.5) return vec4(normalize(mat3(u_InverseView)*normal.xyz),normal.w);
+    vec3 base=textureLod(sampler2D(u_Albedo,u_Nearest),v_UV,0).rgb;
+    float metal=textureLod(sampler2D(u_Position,u_Nearest),v_UV,0).w;
+    return vec4(u_Denoise.x<0.5 ? base*(1.0-metal) : mix(vec3(0.04),base,metal),1);
 }
 [[main]]
 void path_fragment() {
-    if(u_Frame.y>1.5) {
-        // Geometry-aware reconstruction; filtering happens after, never inside, static accumulation.
-        vec3 n=textureLod(sampler2D(u_Normal,u_Nearest),v_UV,0).xyz;
-        vec3 p=textureLod(sampler2D(u_Position,u_Nearest),v_UV,0).xyz;
-        vec2 size=vec2(textureSize(sampler2D(u_History,u_Nearest),0));
-        vec2 center=floor(v_UV*size-0.5),fraction=fract(v_UV*size-0.5);
-        vec3 sum=vec3(0); float weightSum=0.0;
-        for(int y=0;y<2;++y) for(int x=0;x<2;++x) {
-            vec2 uv=clamp((center+vec2(x,y)+0.5)/size,vec2(0.0),vec2(1.0));
-            vec3 otherN=textureLod(sampler2D(u_Normal,u_Nearest),uv,0).xyz;
-            vec3 otherP=textureLod(sampler2D(u_Position,u_Nearest),uv,0).xyz;
-            float weight=(x==0?1.0-fraction.x:fraction.x)*(y==0?1.0-fraction.y:fraction.y);
-            bool surface=dot(n,n)>0.01,otherSurface=dot(otherN,otherN)>0.01;
-            if(surface!=otherSurface) weight=0.0;
-            if(surface && otherSurface) weight*=pow(max(dot(normalize(n),normalize(otherN)),0.0),16.0)*exp(-abs(p.z-otherP.z)/max(0.02,p.z*0.01));
-            sum+=textureLod(sampler2D(u_History,u_Nearest),uv,0).rgb*weight; weightSum+=weight;
-        }
-        vec3 fallback=textureLod(sampler2D(u_History,u_Nearest),v_UV,0).rgb;
-        o_Color=vec4(weightSum>0.00001?sum/weightSum:fallback,1); return;
-    }
-    if(u_Frame.y>0.5) {
-        vec4 normal=textureLod(sampler2D(u_Normal,u_Nearest),v_UV,0);
-        vec3 position=textureLod(sampler2D(u_Position,u_Nearest),v_UV,0).xyz;
-        vec3 center=textureLod(sampler2D(u_History,u_Nearest),v_UV,0).rgb;
-        if(dot(normal.xyz,normal.xyz)<0.01 || normal.w<0.15) { o_Color=vec4(center,1); return; }
-        vec2 size=vec2(textureSize(sampler2D(u_History,u_Nearest),0));
-        vec3 sum=vec3(0); float weights=0.0;
-        for(int y=-2;y<=2;++y) for(int x=-2;x<=2;++x) {
-            vec2 uv=clamp(v_UV+vec2(x,y)/size,vec2(0),vec2(1));
-            vec4 otherNormal=textureLod(sampler2D(u_Normal,u_Nearest),uv,0);
-            vec3 otherPosition=textureLod(sampler2D(u_Position,u_Nearest),uv,0).xyz;
-            if(dot(otherNormal.xyz,otherNormal.xyz)<0.01) continue;
-            vec3 value=textureLod(sampler2D(u_History,u_Nearest),uv,0).rgb;
-            float weight=exp(-float(x*x+y*y)*0.25)*pow(max(dot(normalize(normal.xyz),normalize(otherNormal.xyz)),0.0),32.0);
-            weight*=exp(-abs(position.z-otherPosition.z)/max(0.015,position.z*0.005));
-            weight*=exp(-abs(normal.w-otherNormal.w)*12.0);
-            // Bounded anti-firefly weighting; raw sample accumulation remains unfiltered.
-            weight/=sqrt(1.0+dot(value,vec3(0.2126,0.7152,0.0722)));
-            sum+=value*weight; weights+=weight;
-        }
-        o_Color=vec4(weights>0.00001?sum/weights:center,1); return;
-    }
+    // Pass 0 traces; 1 temporal, 2 guide and 3 wavelet denoise; 4 reconstructs the output; 5 writes RR guides.
+    if(u_Frame.y>4.5) { o_Color=rayReconstructionGuidePass(); return; }
+    if(u_Frame.y>3.5) { o_Color=finalPass(); return; }
+    if(u_Frame.y>2.5) { o_Color=waveletPass(); return; }
+    if(u_Frame.y>1.5) { o_Color=guidePass(); return; }
+    if(u_Frame.y>0.5) { o_Color=temporalPass(); return; }
     uvec2 pixel=uvec2(gl_FragCoord.xy);
     randomState=pixel.x*1973u+pixel.y*9277u+uint(u_Frame.x)*26699u+911u;
     vec3 color=vec3(0);
+    Surface first; vec3 firstView;
+    bool hybrid=gbufferSurface(v_UV,first,firstView);
+    if(u_Hybrid.x>0.5 && !hybrid) {
+        // The raster pass drew nothing here: the sky. Never trace it, so path-tracing-only proxies stay invisible.
+        vec2 ndc=v_UV*vec2(2,-2)+vec2(-1,1);
+        vec4 nearPoint=u_InverseProjection*vec4(ndc,0,1),farPoint=u_InverseProjection*vec4(ndc,1,1);
+        vec3 direction=normalize(mat3(u_InverseView)*(farPoint.xyz/farPoint.w-nearPoint.xyz/nearPoint.w));
+        o_Color=vec4(clamp(sky(direction),vec3(0),vec3(u_Trace.z)),1); return;
+    }
     for(int sampleIndex=0;sampleIndex<8;++sampleIndex) {
         if(sampleIndex>=int(u_Counts.z)) break;
+        if(hybrid) {
+            vec3 throughput=vec3(1),nextDirection;
+            vec3 lighting=directLight(first,firstView);
+            if(int(u_Counts.w)>1 && scatter(first,firstView,throughput,nextDirection))
+                lighting+=throughput*path(first.position+first.geometric*u_Trace.y*2.0,nextDirection,1);
+            // Clamp only the light: emission is added after, so demodulation removes it exactly.
+            color+=clamp(lighting,vec3(0),vec3(u_Trace.z))+first.emission;
+            continue;
+        }
         vec2 size=vec2(textureSize(sampler2D(u_History,u_Nearest),0));
         vec2 uv=v_UV+(vec2(randomValue(),randomValue())-0.5)/size;
         vec2 ndc=uv*vec2(2,-2)+vec2(-1,1);
@@ -293,9 +425,14 @@ void path_fragment() {
         vec3 viewOrigin=nearPoint.xyz/nearPoint.w;
         vec3 direction=normalize(mat3(u_InverseView)*(farPoint.xyz/farPoint.w-viewOrigin));
         vec3 origin=(u_InverseView*vec4(viewOrigin,1)).xyz;
-        color+=path(origin,direction);
+        color+=clamp(path(origin,direction,0),vec3(0),vec3(u_Trace.z));
     }
     color/=u_Counts.z;
+    if(u_Denoise.z>0.5) {
+        // Denoisers filter light without the surface's own colour and emission; the final pass restores both.
+        o_Color=vec4(max(color-emissionAt(v_UV),vec3(0))/demodulation(v_UV),1); return;
+    }
+    // Plain accumulation of a still view (reference mode).
     if(u_Trace.w>0.0) color=mix(color,textureLod(sampler2D(u_History,u_Nearest),v_UV,0).rgb,u_Trace.w/(u_Trace.w+1.0));
     o_Color=vec4(color,1);
 }

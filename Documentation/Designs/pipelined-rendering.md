@@ -207,3 +207,44 @@ This is a user-facing option, so it ships with documentation:
 | D3 | Material snapshot at extraction, rather than locking inside `Material` (§5, R3). |
 | D4 | First version enables pipelining only for SceneView render worlds. The UI window stays serial. |
 | D5 | The §8 render-path items are separate improvements, measured one by one after this lands. |
+
+## 13. Implementation notes and deviations (pending human review)
+
+Revision 2 (2026-11-09), written during implementation. Items marked **deviation** differ from the text above.
+
+- **Deviation, §4.5 API:** SceneView uses a modifier, `.pipelinedRendering()`, like `frameCaptureLabel(_:)`,
+  instead of an initializer parameter.
+- **Deviation, §4.3 executors:** a per-world executor for the graph was not enough. The `RenderNode.execute`
+  requirement itself was `@RenderGraphActor`, so every node of every graph still ran on one actor. The
+  requirement is now nonisolated: a pipelined graph runs on the concurrent executor, a serial graph is still
+  started from `RenderGraphActor`, and nodes of one graph still run one after another. Nothing else used
+  `RenderGraphActor`.
+- **Deviation, R5:** not enforced at runtime. A `@MainActor` system in a pipelined render world hops to the
+  main actor, so it cannot race with main-actor state, but it can delay the main loop. SceneView's own
+  main-actor `FrameSubmissionSystem` is replaced in pipelined mode by a main-world system that checks
+  the main world's cameras; the render-world version would have dropped frame N+1's reservation while frame N
+  was still rendering. The UI window's `UIRenderPreparing` stays in its serial render world (D4).
+- **R1/R2:** `MainWorld` is removed after `.extract` in pipelined worlds; `Extract` asserts in debug builds
+  when read later. The only system that read the main world after extraction, `CreateWindowSurfacesSystem`,
+  now reads `PrimaryWindowId` and `WindowFrameRequests` copied at extraction.
+- **R3, D3:** `PBRMaterial.stateRevision` changes with every stored property; pipelined extraction replaces
+  materials in the extracted sources with `renderSnapshot()` copies, reused until the revision changes.
+  Subclasses (`AtmosphereMaterial`) are passed through unchanged. Meshes and textures follow the documented
+  replace-not-mutate rule; there is no runtime check.
+- **R4:** the render statistics resources already use `Mutex`. `RenderGraphDiagnostics` is unsynchronized
+  but is only read through `withExclusiveWorldAccess`, which now waits for the frame in flight.
+- **§8, first item:** release builds pass Dawn `skip_validation` (`ADAENGINE_WEBGPU_VALIDATION=0|1` overrides).
+
+### Measurements so far (Sponza, flying light off, 0 local lights, release)
+
+| Scene size | Serial | Pipelined | GPU busy (pipelined) |
+| --- | ---: | ---: | ---: |
+| 1170×484 | — | 106 FPS | 73% |
+| 1890×784 | 95 FPS | 103–108 FPS | 90% |
+| 2850×1204 | 94 FPS | 97 FPS | 100% |
+
+The SceneView step on the main thread drops from ~8 ms to ~1 ms, so the overlap works. Two limits remain:
+the scene render path takes ~9.5 ms when overlapped (it encodes ~0.7 ms slower while the UI graph runs at
+the same time), and the GPU needs ~9 ms per frame at 1890×784. `skip_validation` made no measurable
+difference at this point. Criterion 1 (≤ 8.0 ms) is **not met yet**. Lower shadow resolution, coarser
+meshlet LOD and disabled meshlets each changed the result by less than 3%.

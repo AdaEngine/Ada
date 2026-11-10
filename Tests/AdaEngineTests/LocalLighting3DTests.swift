@@ -46,6 +46,50 @@ struct LocalLighting3DMathTests {
     }
 
     @Test
+    func shadowFaceBoundsContainEverythingTheFaceCanSee() {
+        let id = World().spawn().id
+        let light = ExtractedLocalLight3D(entity: id, kind: .point, position: [2, 3, 4], range: 6)
+        var generator = SystemRandomNumberGenerator()
+        for _ in 0..<2_000 {
+            let direction = Vector3(Float.random(in: -1...1, using: &generator), Float.random(in: -1...1, using: &generator),
+                Float.random(in: -1...1, using: &generator))
+            guard direction.length > 0.01 else { continue }
+            let point = light.position + direction.normalized * Float.random(in: 0...light.range, using: &generator)
+            let bounds = LocalLighting3DMath.shadowFaceBounds(light, face: LocalLighting3DMath.pointFace(direction: direction))
+            #expect(point.x >= bounds.min.x - 1e-4 && point.x <= bounds.max.x + 1e-4)
+            #expect(point.y >= bounds.min.y - 1e-4 && point.y <= bounds.max.y + 1e-4)
+            #expect(point.z >= bounds.min.z - 1e-4 && point.z <= bounds.max.z + 1e-4)
+        }
+        let spot = ExtractedLocalLight3D(entity: id, kind: .spot, position: [0, 4, 0], direction: [0, -1, 0], range: 10, outerConeAngle: 35)
+        let spotBounds = LocalLighting3DMath.shadowFaceBounds(spot, face: 0)
+        #expect(spotBounds.min == Vector3(-10, -6, -10) && spotBounds.max == Vector3(10, 14, 10))
+    }
+
+    @Test
+    func onlyFacesThatVisibleOrIrradianceLitSurfacesCanSampleAreRedrawn() {
+        let id = World().spawn().id
+        let projection = Transform3D.perspective(fieldOfView: .degrees(60), aspectRatio: 1, zNear: 0.1, zFar: 100)
+        let frustum = MeshVisibilityFrustum3D(viewProjection: projection)
+        // Independent of the forward-axis convention: exactly one of two mirrored lights is in front of the camera.
+        let lights = [Float(20), -20].map { ExtractedLocalLight3D(entity: id, kind: .point, position: [0, 0, $0], range: 2) }
+        let sampled = lights.map { light in
+            (0..<6).filter { LocalLighting3DMath.shadowFaceIsSampled(
+                LocalLighting3DMath.shadowFaceBounds(light, face: $0), viewFrustum: frustum, irradianceBounds: nil) }
+        }
+        #expect(sampled.filter { $0.count == 6 }.count == 1)
+        #expect(sampled.filter(\.isEmpty).count == 1)
+        let hidden = lights[sampled[0].isEmpty ? 0 : 1]
+        let bounce = AABB(center: hidden.position, halfExtents: [1, 1, 1])
+        for face in 0..<6 {
+            #expect(LocalLighting3DMath.shadowFaceIsSampled(
+                LocalLighting3DMath.shadowFaceBounds(hidden, face: face), viewFrustum: frustum, irradianceBounds: bounce))
+        }
+        let far = AABB(center: [500, 500, 500], halfExtents: [1, 1, 1])
+        #expect(!LocalLighting3DMath.shadowFaceIsSampled(
+            LocalLighting3DMath.shadowFaceBounds(hidden, face: 0), viewFrustum: frustum, irradianceBounds: far))
+    }
+
+    @Test
     func perCameraSelectionIsBoundedAndShadowSlotsSurviveRankingChanges() {
         let world = World()
         var lights: [ExtractedLocalLight3D] = []

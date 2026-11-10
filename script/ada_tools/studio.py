@@ -16,10 +16,24 @@ def configuration(args):
     return "debug" if args.debug else "release"
 
 
+def profiling(args):
+    return getattr(args, "profile", False)
+
+
+def symbol_flags(host):
+    """Debug information for an optimized build, in the host profilers' native format."""
+    flags = ["-Xswiftc", "-g"]
+    if host == "windows":
+        # WPA/Superluminal/Visual Studio read CodeView PDBs; lld-link writes them with -debug.
+        flags += ["-Xswiftc", "-debug-info-format=codeview", "-Xcc", "-gcodeview", "-Xlinker", "-debug"]
+    return flags
+
+
 def build(ctx, args):
     require_swift(ctx)
     mode = configuration(args)
-    scratch = (args.scratch_path or ctx.cache / "build" / args.target).resolve()
+    label = args.target + ("-profile" if profiling(args) else "")
+    scratch = (args.scratch_path or ctx.cache / "build" / label).resolve()
     if ctx.host == "windows":
         windows_environment(ctx)
     if args.target == "studio":
@@ -31,7 +45,8 @@ def build(ctx, args):
             ctx.run(["xcodegen", "generate", "--spec", ctx.root / "Editor/project.yml"])
             ctx.run(["xcodebuild", "-project", ctx.root / "Editor/AdaEditor.xcodeproj", "-scheme", "AdaEditor-Standalone",
                      "-configuration", mode.capitalize(), "-destination", "platform=macOS", "-derivedDataPath", scratch,
-                     "CODE_SIGNING_ALLOWED=NO", "CODE_SIGNING_REQUIRED=NO", "build"], log=ctx.cache / f"studio-{mode}-build.log")
+                     *(["DEBUG_INFORMATION_FORMAT=dwarf-with-dsym"] if profiling(args) else []),
+                     "CODE_SIGNING_ALLOWED=NO", "CODE_SIGNING_REQUIRED=NO", "build"], log=ctx.cache / f"{label}-{mode}-build.log")
             app = scratch / "Build/Products" / mode.capitalize() / "Ada Studio.app"
             ctx.run(["/usr/bin/codesign", "--force", "--deep", "--sign", "-", "--entitlements",
                      ctx.root / "Editor/Platforms/AdaEditor-Standalone.entitlements", app])
@@ -39,6 +54,8 @@ def build(ctx, args):
             return app
     package = ctx.root / "Editor" if args.target == "studio" else ctx.root
     command = [ctx.swift, "build", "--package-path", package, "--scratch-path", scratch, "--configuration", mode]
+    if profiling(args):
+        command += symbol_flags(ctx.host)
     selection = []
     if args.target == "engine":
         selection = ["--target", "AdaEngine"]
@@ -46,11 +63,18 @@ def build(ctx, args):
         # Building every product also tries WASI-only command plugins on Windows.
         selection = ["--product", "AdaEditor"]
     # Linux packaging also needs gravity-lsp and AdaPackageTool, so build its products together.
-    ctx.run([*command, *selection, "--jobs", ctx.jobs], log=ctx.cache / f"{args.target}-{mode}-build.log")
+    ctx.run([*command, *selection, "--jobs", ctx.jobs], log=ctx.cache / f"{label}-{mode}-build.log")
     output = ctx.run([*command, "--show-bin-path"], capture=True)
     binary = Path(output.splitlines()[-1]) if output else scratch / mode
     if ctx.host == "windows" and args.target == "studio" and not ctx.dry:
         shutil.copy2(Path(ctx.env["LORE_WINDOWS_SDK_PATH"]) / "lore.dll", binary)
+        # Builds linked with the optional DLSS bridge load NVIDIA's NGX runtimes from the executable folder.
+        dlss = ctx.root / ".build-tools/dlss-interop"
+        if (dlss / "build.json").is_file():
+            for name in ("nvngx_dlss.dll", "nvngx_dlssd.dll", "NVIDIA-DLSS-LICENSE.txt"):
+                if not (dlss / name).is_file():
+                    raise ToolError(f"DLSS runtime is missing: {name}; rerun script/build_dlss.py")
+                shutil.copy2(dlss / name, binary)
     return binary
 
 
@@ -103,13 +127,19 @@ def validate(source, host):
                 raise ToolError("Studio executable permission is missing: " + relative)
 
 
-def default_destination(ctx, debug=False):
-    suffix = " Debug" if debug else ""
+def variant(debug=False, profile=False):
+    """Installed variants live side by side: release, Debug and Profile (release + symbols)."""
+    return "Debug" if debug else "Profile" if profile else ""
+
+
+def default_destination(ctx, debug=False, profile=False):
+    name = variant(debug, profile)
+    suffix = " " + name if name else ""
     if ctx.host == "macos":
         return Path.home() / "Applications" / ("Ada Studio" + suffix + ".app")
     if ctx.host == "windows":
         return Path(ctx.env.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / "Programs" / ("Ada Studio" + suffix)
-    return Path(ctx.env.get("XDG_DATA_HOME", Path.home() / ".local/share")) / ("ada-studio-debug" if debug else "ada-studio")
+    return Path(ctx.env.get("XDG_DATA_HOME", Path.home() / ".local/share")) / ("ada-studio-" + name.lower() if name else "ada-studio")
 
 
 def atomic_install(source, destination, host):
@@ -158,8 +188,9 @@ def atomic_install(source, destination, host):
     return destination
 
 
-def register(ctx, destination, debug=False):
-    name = "Ada Studio Debug" if debug else "Ada Studio"
+def register(ctx, destination, debug=False, profile=False):
+    suffix = variant(debug, profile)
+    name = "Ada Studio " + suffix if suffix else "Ada Studio"
     if ctx.host == "windows":
         # Paths are passed via environment, never interpolated into PowerShell code.
         ctx.env["ADA_TOOL_INSTALL_DIRECTORY"] = str(destination)
@@ -172,7 +203,7 @@ def register(ctx, destination, debug=False):
     elif ctx.host == "macos":
         ctx.run(["/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister", "-f", destination])
     else:
-        desktop = Path(ctx.env.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "applications" / ("ada-studio-debug.desktop" if debug else "ada-studio.desktop")
+        desktop = Path(ctx.env.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "applications" / (("ada-studio-" + suffix.lower() if suffix else "ada-studio") + ".desktop")
         if not ctx.dry:
             # Desktop-entry quoting has different escaping rules from a shell.
             executable = str(destination / "ada-studio")
@@ -204,7 +235,7 @@ def launch(ctx, destination):
 
 
 def install(ctx, args):
-    destination = (args.destination or default_destination(ctx, args.debug)).absolute()
+    destination = (args.destination or default_destination(ctx, args.debug, profiling(args))).absolute()
     if args.source:
         source = args.source.resolve()
         validate(source, ctx.host)
@@ -248,7 +279,7 @@ def install_source(ctx, args, source, destination):
             atomic_install(source, destination, ctx.host)
     if not args.no_shortcut:
         try:
-            register(ctx, destination, args.debug)
+            register(ctx, destination, args.debug, profiling(args))
         except (OSError, ToolError) as error:
             print("warning: Studio is installed, but application registration failed: " + str(error), file=sys.stderr)
     if args.launch:

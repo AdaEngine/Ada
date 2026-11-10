@@ -5,6 +5,7 @@
 //  Created by Vladislav Prusakov on 25.11.2025.
 //
 
+import AdaApp
 import AdaECS
 
 /// A property wrapper that allows you to extract a resource from the main world.
@@ -38,6 +39,10 @@ extension Extract: SystemParameter {
                 _value = T(from: mainWorld)
             }
             _value?.update(from: mainWorld)
+        } else {
+            // A pipelined render world drops `MainWorld` after `.extract`: the main world is already simulating
+            // the next frame, and queries read its storage live. Copy the data during extraction instead.
+            assert(!RenderPipelining.isActive(in: world), "Extract<\(T.self)> is only valid in the .extract schedule of a pipelined render world")
         }
     }
 }

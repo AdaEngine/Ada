@@ -26,6 +26,8 @@ struct Model3DExtractionCache: Resource {
     private var seen: [Bool] = []
     private var materialOwners: [Key: RID] = [:]
     private var uniqueMaterials: [RID: Material] = [:]
+    /// Every extracted mesh, indexed by ``Entry/index``; ``ExtractedMesh3DSources`` publishes views of it.
+    private var storage: [Mesh3DRenderSource] = []
     private(set) var geometryBuildCount = 0
 
     mutating func extract(
@@ -40,17 +42,22 @@ struct Model3DExtractionCache: Resource {
         skins: Query<Entity, SkinnedMesh3DComponent>,
         morphs: Query<Entity, MorphWeights3DComponent>,
         terrainMasks: Query<Entity, MeshTerrain3DSourceMask>,
+        pathTracingRoles: Query<Entity, PathTracingGeometry3D>? = nil,
         sources: inout ExtractedMesh3DSources,
         animatedBounds: inout AnimatedBounds3D,
         skinning: inout Skinning3DUniforms,
         morphUniforms: inout Morph3DUniforms,
         materials: inout PBR3DUniforms,
         device: RenderDevice,
-        drawPass: Model3DDrawPass
+        drawPass: Model3DDrawPass,
+        snapshotsMaterials: Bool = false
     ) {
+        // Drop the published share first, so in-place updates of `storage` do not copy the whole array.
+        sources.meshes = []
+        sources.pathTracingProxies = []
         if worldID != sourceWorldID {
             entries.removeAll(keepingCapacity: true)
-            sources.meshes.removeAll(keepingCapacity: true)
+            storage.removeAll(keepingCapacity: true)
             seen.removeAll(keepingCapacity: true)
             materialOwners.removeAll(keepingCapacity: true)
             uniqueMaterials.removeAll(keepingCapacity: true)
@@ -102,6 +109,22 @@ struct Model3DExtractionCache: Resource {
         if !hidden.isEmpty {
             hierarchy.batched().forEach { entity, relationship in parents[entity.id] = relationship.parent }
         }
+        var roleComponents: [Entity.ID: PathTracingGeometry3D] = [:]
+        pathTracingRoles?.batched().forEach { entity, role in roleComponents[entity.id] = role }
+        if !roleComponents.isEmpty, parents.isEmpty {
+            hierarchy.batched().forEach { entity, relationship in parents[entity.id] = relationship.parent }
+        }
+        var resolvedRoles: [Entity.ID: PathTracingGeometry3D?] = [:]
+        func role(_ id: Entity.ID) -> PathTracingGeometry3D? {
+            if roleComponents.isEmpty { return nil }
+            if let value = resolvedRoles[id] { return value }
+            // A provisional value also bounds malformed cyclic hierarchies.
+            resolvedRoles[id] = .some(nil)
+            let value = roleComponents[id] ?? parents[id].flatMap(role)
+            resolvedRoles[id] = .some(value)
+            return value
+        }
+        var roles = false
         var resolvedHidden: [Entity.ID: Bool] = [:]
         func isHidden(_ id: Entity.ID) -> Bool {
             if hidden.isEmpty {
@@ -134,22 +157,25 @@ struct Model3DExtractionCache: Resource {
             let palette = skinning.buffer(for: entity.id)
             let forceVisible = forced.contains(entity.id)
             let matrix = global.matrix
+            let pathTracing = role(entity.id)
+            if pathTracing != nil { roles = true }
             if let entry = entries[key], entry.isStatic, palette == nil, morphByEntity[entity.id] == nil,
+                storage[entry.index].pathTracing == pathTracing,
                 entry.meshRevision == component.extractionRevision, entry.lodRevision == lod?.extractionRevision,
                 entry.terrainMaskRevision == mask?.revision {
                 let index = entry.index
                 seen[index] = true
                 // Do not write unchanged array elements: render nodes retain the last array snapshot.
                 // A camera-only frame can consequently keep the entire source buffer without a COW copy.
-                if sources.meshes[index].transform != matrix {
-                    sources.meshes[index].previousTransform = sources.meshes[index].transform
-                    sources.meshes[index].transform = matrix
-                    sources.meshes[index].bounds = entry.localBounds.map { MeshVisibility3DMath.transformed($0, by: matrix) }
-                } else if sources.meshes[index].previousTransform != matrix {
+                if storage[index].transform != matrix {
+                    storage[index].previousTransform = storage[index].transform
+                    storage[index].transform = matrix
+                    storage[index].bounds = entry.localBounds.map { MeshVisibility3DMath.transformed($0, by: matrix) }
+                } else if storage[index].previousTransform != matrix {
                     // Motion vectors settle on the frame after a mesh stops moving.
-                    sources.meshes[index].previousTransform = matrix
+                    storage[index].previousTransform = matrix
                 }
-                if sources.meshes[index].forceVisible != forceVisible { sources.meshes[index].forceVisible = forceVisible }
+                if storage[index].forceVisible != forceVisible { storage[index].forceVisible = forceVisible }
                 return
             }
 
@@ -174,9 +200,9 @@ struct Model3DExtractionCache: Resource {
                     bounds = AABB(min: current.min - growth, max: current.max + growth)
                 }
             }
-            let index = entries[key]?.index ?? sources.meshes.count
-            let previous = index < sources.meshes.count ? sources.meshes[index].transform : matrix
-            let source = Mesh3DRenderSource(
+            let index = entries[key]?.index ?? storage.count
+            let previous = index < storage.count ? storage[index].transform : matrix
+            var source = Mesh3DRenderSource(
                 entity: entity.id,
                 drawPass: drawPass,
                 mesh: mesh,
@@ -196,11 +222,12 @@ struct Model3DExtractionCache: Resource {
                 morphBuffers: morphBuffers,
                 skinningOffset: skinning.packedOffset(for: entity.id)
             )
-            if index == sources.meshes.count {
-                sources.meshes.append(source)
+            source.pathTracing = pathTracing
+            if index == storage.count {
+                storage.append(source)
                 seen.append(true)
             } else {
-                sources.meshes[index] = source
+                storage[index] = source
                 seen[index] = true
             }
             entries[key] = Entry(
@@ -223,21 +250,24 @@ struct Model3DExtractionCache: Resource {
             let matrix = global.matrix
             let lod = lodByEntity[entity.id]
             let forced = forced.contains(entity.id)
-            if let entry = entries[key], entry.meshRevision == component.extractionRevision, entry.lodRevision == lod?.extractionRevision {
+            let pathTracing = role(entity.id)
+            if pathTracing != nil { roles = true }
+            if let entry = entries[key], entry.meshRevision == component.extractionRevision, entry.lodRevision == lod?.extractionRevision,
+                storage[entry.index].pathTracing == pathTracing {
                 let index = entry.index
                 seen[index] = true
-                if sources.meshes[index].transform != matrix {
-                    sources.meshes[index].previousTransform = sources.meshes[index].transform
-                    sources.meshes[index].transform = matrix
-                    sources.meshes[index].bounds = entry.localBounds.map { MeshVisibility3DMath.transformed($0, by: matrix) }
-                } else if sources.meshes[index].previousTransform != matrix {
-                    sources.meshes[index].previousTransform = matrix
+                if storage[index].transform != matrix {
+                    storage[index].previousTransform = storage[index].transform
+                    storage[index].transform = matrix
+                    storage[index].bounds = entry.localBounds.map { MeshVisibility3DMath.transformed($0, by: matrix) }
+                } else if storage[index].previousTransform != matrix {
+                    storage[index].previousTransform = matrix
                 }
                 if entry.settlesInstances {
-                    sources.meshes[index].previousInstances = sources.meshes[index].instances
+                    storage[index].previousInstances = storage[index].instances
                     entries[key]?.settlesInstances = false
                 }
-                if sources.meshes[index].forceVisible != forced { sources.meshes[index].forceVisible = forced }
+                if storage[index].forceVisible != forced { storage[index].forceVisible = forced }
                 return
             }
             var prototypeBounds = component.mesh.bounds
@@ -247,9 +277,9 @@ struct Model3DExtractionCache: Resource {
                 let bounds = MeshVisibility3DMath.transformed(prototypeBounds, by: instance.transform)
                 if let current = localBounds { localBounds = AABB(min: min(current.min, bounds.min), max: max(current.max, bounds.max)) } else { localBounds = bounds }
             }
-            let index = entries[key]?.index ?? sources.meshes.count
-            let previousTransform = index < sources.meshes.count ? sources.meshes[index].transform : matrix
-            let oldInstances = index < sources.meshes.count ? sources.meshes[index].instances : nil
+            let index = entries[key]?.index ?? storage.count
+            let previousTransform = index < storage.count ? storage[index].transform : matrix
+            let oldInstances = index < storage.count ? storage[index].instances : nil
             var previousByID: [UInt64: Transform3D] = [:]
             for instance in oldInstances ?? [] { previousByID[instance.id] = instance.transform }
             let previousInstances = component.instances.map { instance -> Mesh3DInstance in
@@ -276,7 +306,8 @@ struct Model3DExtractionCache: Resource {
             )
             source.instances = component.instances
             source.previousInstances = previousInstances
-            if index == sources.meshes.count { sources.meshes.append(source); seen.append(true) } else { sources.meshes[index] = source; seen[index] = true }
+            source.pathTracing = pathTracing
+            if index == storage.count { storage.append(source); seen.append(true) } else { storage[index] = source; seen[index] = true }
             entries[key] = Entry(
                 index: index,
                 meshRevision: component.extractionRevision,
@@ -309,10 +340,10 @@ struct Model3DExtractionCache: Resource {
         if let firstMissing = seen.firstIndex(of: false) {
             var destination = firstMissing
             for index in firstMissing..<seen.count {
-                let id = Key(entity: sources.meshes[index].entity, instanced: sources.meshes[index].instances != nil)
+                let id = Key(entity: storage[index].entity, instanced: storage[index].instances != nil)
                 if seen[index] {
                     if destination != index {
-                        sources.meshes[destination] = sources.meshes[index]
+                        storage[destination] = storage[index]
                         entries[id]?.index = destination
                     }
                     destination += 1
@@ -320,10 +351,55 @@ struct Model3DExtractionCache: Resource {
                     entries.removeValue(forKey: id)
                 }
             }
-            sources.meshes.removeLast(seen.count - destination)
+            storage.removeLast(seen.count - destination)
             seen.removeLast(seen.count - destination)
         }
+        if snapshotsMaterials { Self.useRenderSnapshots(in: &storage) }
+        publish(into: &sources, roles: roles)
         animatedBounds.finishFrame()
+    }
+
+    /// Publishes the raster meshes and, when any mesh is ``PathTracingGeometry3D/pathTracingOnly``, the tracer's proxies.
+    /// Without roles the published array shares `storage` without copying.
+    private func publish(into sources: inout ExtractedMesh3DSources, roles: Bool) {
+        guard roles, storage.contains(where: { $0.pathTracing == PathTracingGeometry3D.pathTracingOnly }) else {
+            sources.meshes = storage
+            sources.pathTracingProxies = []
+            return
+        }
+        sources.meshes = storage.filter { $0.pathTracing != PathTracingGeometry3D.pathTracingOnly }
+        sources.pathTracingProxies = storage.filter { $0.pathTracing == PathTracingGeometry3D.pathTracingOnly }
+    }
+
+    static func useRenderSnapshots(in sources: inout ExtractedMesh3DSources) {
+        useRenderSnapshots(in: &sources.meshes)
+        useRenderSnapshots(in: &sources.pathTracingProxies)
+    }
+
+    /// Replaces live materials with their render snapshots (see `PBRMaterial.renderSnapshot()`), so a pipelined
+    /// render world never reads an object that gameplay edits for the next frame. Sources persist between
+    /// frames and already hold snapshots, which lead back to their live material.
+    static func useRenderSnapshots(in meshes: inout [Mesh3DRenderSource]) {
+        var resolved: [ObjectIdentifier: Material] = [:]
+        for index in meshes.indices {
+            let current = meshes[index].materials
+            var replacement: [Material]?
+            for (slot, material) in current.enumerated() {
+                let snapshot: Material
+                if let known = resolved[ObjectIdentifier(material)] {
+                    snapshot = known
+                } else {
+                    let pbr = material as? PBRMaterial
+                    snapshot = (pbr?.snapshotSource ?? pbr)?.renderSnapshot() ?? material
+                    resolved[ObjectIdentifier(material)] = snapshot
+                }
+                if snapshot !== material {
+                    if replacement == nil { replacement = current }
+                    replacement?[slot] = snapshot
+                }
+            }
+            if let replacement { meshes[index].materials = replacement }
+        }
     }
 
 }

@@ -10,6 +10,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 SDK_REVISION = "9981c6350dc58c0ce21f024fd65e31e851c31689"
+RUNTIMES = ("nvngx_dlss.dll", "nvngx_dlssd.dll")
 
 
 def run(*args, **kwargs):
@@ -41,7 +42,9 @@ def main():
     sdk, dawn = paths()
     if args.stage_runtime:
         args.stage_runtime.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(sdk / "lib/Windows_x86_64/rel/nvngx_dlss.dll", args.stage_runtime)
+        # Super Resolution and Ray Reconstruction (DLSS-D) runtimes.
+        for runtime in RUNTIMES:
+            shutil.copy2(sdk / "lib/Windows_x86_64/rel" / runtime, args.stage_runtime)
         shutil.copy2(sdk / "LICENSE.txt", args.stage_runtime / "NVIDIA-DLSS-LICENSE.txt")
         return
     output = args.output.resolve()
@@ -64,7 +67,8 @@ def main():
                     dawnLibrarySHA256=hashlib.sha256((dawn / "webgpu_dawn.lib").read_bytes()).hexdigest(),
                     includePaths=[str(path) for path in includes], libraries=[str(ngx), str(kernel)])
     (output / "build.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    shutil.copy2(sdk / "lib/Windows_x86_64/rel/nvngx_dlss.dll", output)
+    for runtime in RUNTIMES:
+        shutil.copy2(sdk / "lib/Windows_x86_64/rel" / runtime, output)
     shutil.copy2(sdk / "LICENSE.txt", output / "NVIDIA-DLSS-LICENSE.txt")
     if args.smoke:
         # Match the production executable's native dependencies, including bundled DXC.

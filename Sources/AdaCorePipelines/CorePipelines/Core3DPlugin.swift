@@ -148,6 +148,7 @@ public struct Core3DPlugin: Plugin {
             .insertResource(RenderPipelines(configurator: LocalShadow3DPipeline()))
             .insertResource(ExtractedMesh3DSources())
             .insertResource(VisibleMesh3DLists())
+            .insertResource(ShadowCasterRegistry3D())
             .insertResource(GPUVisibility3DState())
             .insertResource(Meshlet3DState())
             .insertResource(MeshletMap3DResources())

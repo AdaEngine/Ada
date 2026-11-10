@@ -28,7 +28,10 @@ public protocol RenderNode: Sendable {
 
     /// Execute the graph node logic, issues draw calls, updates the output slots and optionally queues up subgraphs for execution. The graph data, input and output values are
     /// passed via the ``RenderGraphContext``.
-    @RenderGraphActor
+    ///
+    /// Nodes of one graph run one after another. Graphs of different render worlds may run at the same time
+    /// (see `RenderPipelining`), so a node must not share mutable state with nodes of other worlds except
+    /// through synchronized types such as the render device.
     func execute(
         context: inout Context,
         renderContext: RenderContext

@@ -121,6 +121,7 @@ func ExtractModel3D(
     _ morphs: Extract<Query<Entity,
     MorphWeights3DComponent>>,
     _ terrainMasks: Extract<Query<Entity, MeshTerrain3DSourceMask>>,
+    _ pathTracingRoles: Extract<Query<Entity, PathTracingGeometry3D>>,
     _ morphUniforms: ResMut<Morph3DUniforms>,
     _ sources: ResMut<ExtractedMesh3DSources>,
     _ animatedBounds: ResMut<AnimatedBounds3D>,
@@ -131,7 +132,8 @@ func ExtractModel3D(
     _ drawPass: Res<Model3DDrawPass>,
     _ cache: ResMut<Model3DExtractionCache>,
     _ mainWorld: Res<MainWorld?>,
-    _ clock: Res<ShaderGraphClock?>
+    _ clock: Res<ShaderGraphClock?>,
+    _ pipelining: Res<RenderPipelining?>
 ) {
     terrainUniforms.wrappedValue.beginFrame()
     cache.wrappedValue.extract(
@@ -146,17 +148,33 @@ func ExtractModel3D(
         skins: skins.wrappedValue,
         morphs: morphs.wrappedValue,
         terrainMasks: terrainMasks.wrappedValue,
+        pathTracingRoles: pathTracingRoles.wrappedValue,
         sources: &sources.wrappedValue,
         animatedBounds: &animatedBounds.wrappedValue,
         skinning: &skinningUniforms.wrappedValue,
         morphUniforms: &morphUniforms.wrappedValue,
         materials: &materialUniforms.wrappedValue,
         device: renderDevice.renderDevice,
-        drawPass: drawPass.wrappedValue
+        drawPass: drawPass.wrappedValue,
+        snapshotsMaterials: pipelining.wrappedValue?.isActive == true
     )
 }
 
 public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable {
+    /// The path-tracing surface variant writes both optional outputs, so it needs both targets attached.
+    static func writesPathTracingSurface(_ target: RenderViewTarget?) -> Bool {
+        guard let target else { return false }
+        return writesPathTracingSurface(
+            active: target.pathTracingSurfaceActive,
+            albedo: target.diffuseSurface3DTexture != nil,
+            emission: target.reflectionResponse3DTexture != nil
+        )
+    }
+
+    static func writesPathTracingSurface(active: Bool, albedo: Bool, emission: Bool) -> Bool {
+        active && albedo && emission
+    }
+
     private static let flatNormalTexture = Texture2D(
         image: Image(width: 1, height: 1, color: Color(red: 0.5, green: 0.5, blue: 1))
     )
@@ -202,6 +220,7 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
             features: (isMotion || isContact ? [] : hasLightmapUV ? shadingFeatures : shadingFeatures.subtracting(.lightmap)).union(morphed ? .morph : [])
                 .union(!isMotion && !isContact && view.components[RenderViewTarget.self]?.reflectionResponse3DTexture != nil ? .hybridReflection : [])
                 .union(!isMotion && !isContact && view.components[RenderViewTarget.self]?.diffuseSurface3DTexture != nil ? .diffuseSurface : [])
+                .union(!isMotion && !isContact && Self.writesPathTracingSurface(view.components[RenderViewTarget.self]) ? .pathTracingSurface : [])
                 .union(!isMotion && !isContact && view.components[RenderViewTarget.self]?.irradianceGridActive == true ? .irradianceGrid : [])
                 .union(edges ? .wireframe : [])
         )

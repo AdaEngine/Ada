@@ -1338,4 +1338,10 @@ void flat3d_fragment()
 #endif
     normalRoughness = vec4(normal, roughness);
     viewPositionMetallic = vec4(Input.ViewPosition, metallic);
+#if defined(ADA_PATH_TRACING_SURFACE) && defined(ADA_DIFFUSE_SURFACE) && defined(ADA_HYBRID_REFLECTION)
+    // Path-traced views start their paths at this surface: base colour and emission replace the
+    // raster diffuse/specular responses, which screen-space GI and reflections do not use while tracing.
+    diffuseSurface = vec4(clamp(baseColor.rgb, vec3(0.0), vec3(1.0)), opacity);
+    reflectionResponse = vec4(u_SurfaceProperties.w > 1.5 ? vec3(0.0) : emissive, opacity);
+#endif
 }

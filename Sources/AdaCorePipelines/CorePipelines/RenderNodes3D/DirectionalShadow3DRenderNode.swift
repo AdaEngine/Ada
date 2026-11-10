@@ -76,6 +76,9 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
     @ResMut<DirectionalShadow3DScratch>
     private var scratch
 
+    @ResMut<ShadowCasterRegistry3D>
+    private var registry
+
     @ResMut<RenderPipelines<DirectionalShadow3DPipeline>>
     private var pipelines
 
@@ -97,6 +100,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
         _materialUniforms.update(from: world)
         _shadow.update(from: world)
         _scratch.update(from: world)
+        _registry.update(from: world)
         _pipelines.update(from: world)
         _renderDevice.update(from: world)
         let activeViews: [Entity.ID]
@@ -109,6 +113,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             activeViews = extracted
         }
         scratch.cache.retainViews(activeViews)
+        scratch.gpuCull.retainViews(activeViews)
     }
 
     public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
@@ -166,6 +171,27 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             }
             let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
             commandBuffer.label = "Directional Shadow 3D Pass"
+            let visibility = environments.environments[source.entityId]?.meshVisibility ?? MeshVisibilitySettings3D()
+            // Static casters are culled for every cascade in one GPU pass; the rest keep the CPU lists.
+            registry.update(
+                sources: candidates.meshes,
+                materials: &_materialUniforms.wrappedValue,
+                identityPalette: skinningUniforms.identityBuffer,
+                device: renderDevice.renderDevice
+            )
+            var culled: GPUShadowCullResult?
+            if scratch.gpuCull.isAvailable(camera: source.entityId, registry: registry, viewCount: cascades.count, device: renderDevice.renderDevice) {
+                culled = scratch.gpuCull.cull(
+                    camera: source.entityId,
+                    registry: &_registry.wrappedValue,
+                    views: cascades.map { GPUShadowCullView(viewProjection: $0.viewProjection, culls: visibility.frustumCulling) },
+                    command: commandBuffer,
+                    device: renderDevice.renderDevice
+                )
+            }
+            // Pool copies are encoded even when this camera does not cull on the GPU, so they never accumulate.
+            registry.flushCopies(on: commandBuffer)
+            let cpuSources = culled == nil ? candidates.meshes : registry.cpuSources
             let pass = commandBuffer.beginRenderPass(
                 RenderPassDescriptor(
                     label: "Directional Shadow 3D Pass",
@@ -184,25 +210,28 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                 )
             )
             let resolution = Float(tileResolution)
+            // Cascades draw overlapping batch sets: resolve each batch's draw state once.
+            var batches = ShadowBatchEncoder3D(requiresMaterialBuffer: false)
             for cascadeIndex in cascades.indices {
                 pass.setViewport(Rect(x: Float(cascadeIndex) * resolution, y: 0, width: resolution, height: resolution))
                 let preparationSpan = AdaTrace.startSpan("Render3D.ShadowPrepare")
                 lists.prepare(
-                    sources: candidates.meshes,
+                    sources: cpuSources,
                     view: source.entityId,
                     pass: cascadeIndex,
                     viewMatrix: viewUniform.viewMatrix,
                     projection: viewUniform.projectionMatrix,
                     cullingProjection: cascades[cascadeIndex].viewProjection,
-                    settings: environments.environments[source.entityId]?.meshVisibility ?? MeshVisibilitySettings3D(),
+                    settings: visibility,
                     device: renderDevice.renderDevice,
                     materials: &_materialUniforms.wrappedValue
                 )
                 preparationSpan.end()
                 let visibleItems = lists.items(view: source.entityId, pass: cascadeIndex)
                 let buffers = lists.buffers(view: source.entityId, pass: cascadeIndex)
-                statistics.record(lists.count(view: source.entityId, pass: cascadeIndex), view: source.entityId, pass: cascadeIndex)
-                guard let instances = buffers.instances else { continue }
+                var count = lists.count(view: source.entityId, pass: cascadeIndex)
+                if culled != nil { count.drawCalls += registry.partCount + registry.clusterParts.count }
+                statistics.record(count, view: source.entityId, pass: cascadeIndex)
                 let constants = scratch.cache.write(
                     DirectionalShadowViewUniform(
                         viewProjection: cascades[cascadeIndex].viewProjection,
@@ -215,47 +244,26 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                 pass.setVertexBuffer(constants, offset: 0, slot: GlobalBufferIndex.viewUniform)
 
                 let encodingSpan = AdaTrace.startSpan("Render3D.ShadowEncode")
-                for item in visibleItems {
-                    let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
-                    guard item.castShadows, (item.material as? PBRMaterial)?.effectiveAlphaMode != .blend, let batchRange = item.batchRange else {
-                        continue
-                    }
-                    let morphed = item.morphBuffer != nil && part.morphTargets != nil
-                    let pipeline = pipelines.pipeline(for: Shadow3DConfiguration(vertex: part.vertexDescriptor, morph: morphed), device: renderDevice.renderDevice)
-                    guard ShaderGraph3DPipeline.bindShadow(encoder: pass, base: pipeline, material: item.material, device: renderDevice.renderDevice, morph: morphed) else { continue }
-                    pass.setVertexBuffer(part.vertexBuffer, offset: 0, slot: 0)
-                    if let material = materialUniforms.buffer(for: item.material) {
-                        let base = (item.material as? PBRMaterial)?.baseColorTexture ?? Texture2D.whiteTexture
-                        pass.setResourceSet(RenderResourceSet(bindings: [
-                            .init(binding: 15, shaderStages: .fragment, resource: .uniformBuffer(material, offset: 0)),
-                            .init(binding: 4, shaderStages: .fragment, resource: .texture(base)),
-                            .init(binding: 7, shaderStages: .fragment, resource: .sampler(base.sampler)),
-                        ]), index: 0)
-                    }
-                    if let palette = item.skinningBuffer ?? skinningUniforms.identityBuffer {
-                        pass.setResourceSet(RenderResourceSet(bindings: [
-                            .init(binding: Skinning3DUniforms.binding, shaderStages: .vertex, resource: .uniformBuffer(palette, offset: 0)),
-                        ]), index: 0)
-                    }
-                    if morphed, let morphBuffer = item.morphBuffer, let morphSet = part.morphTargets {
-                        pass.setResourceSet(RenderResourceSet(bindings: [
-                            .init(binding: Morph3DUniforms.binding, shaderStages: .vertex, resource: .uniformBuffer(morphBuffer, offset: 0)),
-                            .init(binding: Morph3DUniforms.textureBinding, shaderStages: .vertex, resource: .texture(morphSet.deltaTexture)),
-                        ]), index: 0)
-                    }
-                    if let defaults = buffers.defaults {
-                        pass.setVertexBuffer(defaults, offset: 0, slot: 4)
-                    }
-                    pass.setVertexBuffer(
-                        instances,
-                        offset: Int(batchRange.lowerBound) * MemoryLayout<Flat3DInstanceData>.stride,
-                        slot: 3
+                if let instances = buffers.instances {
+                    batches.encode(
+                        items: visibleItems,
+                        instances: instances,
+                        defaults: buffers.defaults,
+                        pass: pass,
+                        pipelines: &_pipelines.wrappedValue,
+                        materials: materialUniforms,
+                        identityPalette: skinningUniforms.identityBuffer,
+                        device: renderDevice.renderDevice
                     )
-                    pass.setIndexBuffer(part.indexBuffer, offset: 0)
-                    pass.drawIndexed(
-                        indexCount: part.indexCount,
-                        indexBufferOffset: 0,
-                        instanceCount: Int(batchRange.count)
+                }
+                if let culled {
+                    GPUShadowCull3D.draw(
+                        registry: registry,
+                        output: culled,
+                        view: cascadeIndex,
+                        pass: pass,
+                        pipelines: &_pipelines.wrappedValue,
+                        device: renderDevice.renderDevice
                     )
                 }
                 encodingSpan.end()

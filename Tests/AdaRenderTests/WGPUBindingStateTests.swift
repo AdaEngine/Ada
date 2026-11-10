@@ -127,6 +127,77 @@ struct WGPUBindingStateTests {
         #expect(image.getPixel(x: 7, y: 3) == .init(red: 1, green: 1, blue: 0, alpha: 1))
     }
 
+    /// Shadow passes select each batch's instances with `firstInstance` instead of rebinding the
+    /// instance buffer at a new offset for every draw.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_WGPU_SMOKE"] == "1"))
+    func indexedDrawsReadInstanceDataFromTheFirstInstance() async throws {
+        let device = try makeDevice()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let source = directory.appendingPathComponent("first-instance.glsl")
+        try """
+        #version 450 core
+        #pragma stage : vert
+        layout(location=0) in vec4 a_Color;
+        layout(location=0) out vec4 v_Color;
+        [[main]]
+        void first_instance_vertex() {
+            vec2 p[3] = vec2[](vec2(-1,-1), vec2(3,-1), vec2(-1,3));
+            v_Color = a_Color;
+            gl_Position = vec4(p[gl_VertexIndex], 0, 1);
+        }
+        #version 450 core
+        #pragma stage : frag
+        layout(location=0) in vec4 v_Color;
+        layout(location=0) out vec4 o_Color;
+        [[main]]
+        void first_instance_fragment() { o_Color = v_Color; }
+        """.write(to: source, atomically: true, encoding: .utf8)
+        let module = try ShaderCompiler(from: source).compileShaderModule()
+        var vertex = VertexDescriptor()
+        vertex.attributes[0] = .attribute(.vector4, name: "color", bufferIndex: 0, offset: 0)
+        vertex.layouts[0] = .init(stride: MemoryLayout<Vector4>.stride, stepFunction: .perInstance)
+        let pipeline = device.createRenderPipeline(from: RenderPipelineDescriptor(
+            vertex: try #require(module.getShader(for: .vertex)),
+            fragment: try module.getShader(for: .fragment),
+            debugName: "First instance",
+            backfaceCulling: false,
+            vertexDescriptor: vertex,
+            colorAttachments: [.init(format: .rgba8)]
+        ))
+        var colors: [Vector4] = [[1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 1], [1, 1, 0, 1]]
+        let instances = device.createVertexBuffer(label: "First instance colors", length: MemoryLayout<Vector4>.stride * colors.count, binding: 0)
+        unsafe colors.withUnsafeMutableBytes { unsafe instances.setData($0.baseAddress!, byteCount: $0.count, offset: 0) }
+        var indices: [UInt32] = [0, 1, 2]
+        let indexBuffer = unsafe indices.withUnsafeBytes {
+            unsafe device.createIndexBuffer(label: "First instance indices", format: .uInt32, bytes: $0.baseAddress!, length: $0.count)
+        }
+        let target = RenderTexture(size: [8, 2], scaleFactor: 1, format: .rgba8)
+        let command = device.createCommandQueue().makeCommandBuffer()
+        let pass = command.beginRenderPass(.init(colorAttachments: [
+            .init(texture: target, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .black)
+        ]))
+        pass.setViewport(Rect(x: 0, y: 0, width: 8, height: 2))
+        pass.setRenderPipelineState(pipeline)
+        pass.setVertexBuffer(instances, offset: 0, slot: 0)
+        pass.setIndexBuffer(indexBuffer, offset: 0)
+        for instance in colors.indices.reversed() {
+            pass.setScissorRect(Rect(x: Float(instance * 2), y: 0, width: 2, height: 2))
+            pass.drawIndexed(indexCount: 3, indexBufferOffset: 0, instanceCount: 1, firstInstance: instance)
+        }
+        pass.endRenderPass()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            command.addCompletedHandler { continuation.resume() }
+            command.commit()
+        }
+        let image = try #require(try await device.readImage(from: target))
+        #expect(image.getPixel(x: 1, y: 1) == .red)
+        #expect(image.getPixel(x: 3, y: 1) == .green)
+        #expect(image.getPixel(x: 5, y: 1) == .blue)
+        #expect(image.getPixel(x: 7, y: 1) == .init(red: 1, green: 1, blue: 0, alpha: 1))
+    }
+
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_WGPU_SMOKE"] == "1"))
     func transientRenderAttachmentsAreNotRetainedByBindings() async throws {
         let device = try makeDevice()

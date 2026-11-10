@@ -25,25 +25,61 @@
         private let spatialScaler: WGPUFSRSpatialScaler
         private let instance: WebGPU.GPUInstance?
         private var completedHandlers: [@Sendable () -> Void] = []
+        private var timingHandlers: [@Sendable (Double?) -> Void] = []
+        private var firstPassLabel: String?
+        #if !WASM
+        private let timestampQuery: WGPUTimestampQuery?
+        #endif
 
         init(device: WebGPU.GPUDevice, spatialScaler: WGPUFSRSpatialScaler, instance: WebGPU.GPUInstance? = nil) {
             self.spatialScaler = spatialScaler
             self.device = device
             self.instance = instance
-            self.commandEncoder = webGPUDeviceLock.withLock { _ in
+            let encoder = webGPUDeviceLock.withLock { _ in
                 device.createCommandEncoder(descriptor: nil)
             }
+            self.commandEncoder = encoder
+            #if !WASM
+            self.timestampQuery = WGPUTimestampQuery.isRequested
+                ? webGPUDeviceLock.withLock { _ in WGPUTimestampQuery(device: device, encoder: encoder, instance: instance) }
+                : nil
+            #endif
         }
 
         func commit() {
             let submitStart = PerformanceStallProbe.begin()
             defer { PerformanceStallProbe.end("WGPU.SubmitCPU", since: submitStart) }
+            #if !WASM
+            // Profiling resolves every buffer so the ledger also covers passes without timing handlers.
+            let timing = timestampQuery
+            let ledgerName = label ?? firstPassLabel ?? "unlabeled"
+            #endif
             let commandBuffer: WebGPU.GPUCommandBuffer = webGPUDeviceLock.withLock { _ in
-                commandEncoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
+                #if !WASM
+                timing?.encodeEnd(on: commandEncoder)
+                #endif
+                return commandEncoder.finish(descriptor: nil as WebGPU.GPUCommandBufferDescriptor?)
             }
             WGPUSubmissionEpoch.advance()
             var handlers = completedHandlers
             completedHandlers.removeAll()
+            let timed = timingHandlers
+            timingHandlers.removeAll()
+            #if WASM
+            if !timed.isEmpty { handlers.append { timed.forEach { $0(nil) } } }
+            #else
+            if let timing {
+                handlers.append {
+                    Task.detached {
+                        let seconds = await timing.readElapsedSeconds()
+                        if let seconds { WGPUGPUTimeLedger.record(ledgerName, seconds: seconds) }
+                        timed.forEach { $0(seconds) }
+                    }
+                }
+            } else if !timed.isEmpty {
+                handlers.append { timed.forEach { $0(nil) } }
+            }
+            #endif
             if let submitted = PerformanceStallProbe.begin() {
                 handlers.append { PerformanceStallProbe.end("WGPU.CompletionLatency", since: submitted) }
             }
@@ -83,6 +119,12 @@
             completedHandlers.append(handler)
         }
 
+        /// Reports GPU time from this buffer's creation to its commit when `ADAENGINE_GPU_TIMINGS=1`
+        /// and the device supports timestamp queries; otherwise reports nil.
+        func addCompletedTimingHandler(_ handler: @escaping @Sendable (Double?) -> Void) {
+            timingHandlers.append(handler)
+        }
+
         /// Ends this command segment before an external GPU pass, then resumes
         /// encoding. Completion handlers cover every segment and the external pass.
         func withExternalGPUWork(_ work: () -> Bool) -> Bool {
@@ -96,6 +138,7 @@
         }
 
         func beginRenderPass(_ desc: RenderPassDescriptor) -> RenderCommandEncoder {
+            if firstPassLabel == nil { firstPassLabel = desc.label }
             var wgpuAttachment: WebGPU.GPURenderPassDepthStencilAttachment?
             if let depthStencilAttachment = desc.depthStencilAttachment {
                 let view = (depthStencilAttachment.texture.gpuTexture as! WGPUGPUTexture).textureView

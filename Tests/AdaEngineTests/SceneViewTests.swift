@@ -126,7 +126,7 @@ struct SceneViewTests {
         let appWorlds = try #require(coordinator.appWorlds)
         coordinator.updateSize(SizeInt(width: 16, height: 16), scaleFactor: 1)
 
-        let poolSize = max(3, unsafe RenderEngine.configurations.maxFramesInFlight + 2)
+        let poolSize = SceneViewCoordinator.renderTexturePoolSize
         var submittedTargets = Set<ObjectIdentifier>()
         for _ in 0..<poolSize {
             coordinator.tick(0.016)

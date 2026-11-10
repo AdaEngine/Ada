@@ -74,6 +74,23 @@ public protocol RenderDevice: AnyObject, Sendable {
     /// Creates independent per-view meshlet frustum/compaction resources, or nil on unsupported backends.
     func createMeshletVisibilityProcessor() -> (any MeshletVisibilityProcessor)?
 
+    /// Creates GPU frustum culling for shadow views, or nil to keep CPU-culled shadow lists.
+    func createGPUShadowCullProcessor() -> (any GPUShadowCullProcessor)?
+
+    /// Whether ``createGPUShadowCullProcessor()`` returns a processor; otherwise shadows stay CPU-culled.
+    var supportsGPUShadowCull: Bool { get }
+
+    /// Creates GPU meshlet-cluster culling for shadow views, or nil to keep whole-part shadow culling.
+    func createGPUShadowClusterCullProcessor() -> (any GPUShadowClusterCullProcessor)?
+
+    /// Whether ``createGPUShadowClusterCullProcessor()`` returns a processor and render passes support
+    /// ``RenderCommandEncoder/multiDrawIndexedIndirect(arguments:offset:maxDrawCount:drawCountBuffer:drawCountOffset:)``.
+    var supportsGPUShadowClusterCull: Bool { get }
+
+    /// Whether render passes can issue ``RenderCommandEncoder/multiDrawIndexedIndirect(arguments:offset:drawCount:)``
+    /// with a non-zero `firstInstance` in the indirect arguments.
+    var supportsMultiDrawIndirect: Bool { get }
+
     // MARK: - Buffers
 
     /// Create a new GPU buffer with specific length and options.
@@ -141,6 +158,11 @@ extension RenderDevice {
 
     public func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? { nil }
     public func createMeshletVisibilityProcessor() -> (any MeshletVisibilityProcessor)? { nil }
+    public func createGPUShadowCullProcessor() -> (any GPUShadowCullProcessor)? { nil }
+    public var supportsGPUShadowCull: Bool { false }
+    public func createGPUShadowClusterCullProcessor() -> (any GPUShadowClusterCullProcessor)? { nil }
+    public var supportsGPUShadowClusterCull: Bool { false }
+    public var supportsMultiDrawIndirect: Bool { false }
     public var supportsSpatialUpscaling: Bool { false }
     public var supportsTemporalUpscaling: Bool { false }
     public var supportsHybridReflections: Bool { false }

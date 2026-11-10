@@ -116,7 +116,11 @@ public struct Temporal3DRenderNode: RenderNode {
             }
             mesh.endRenderPass()
 
-            let encoded = scaler.encode(
+            let guides = context.world.getResource(PathTracing3DViews.self)?.entries[source.entityId]?.rayReconstructionGuides
+            let encoded = guides.map {
+                scaler.encodeDenoised(commandBuffer: command, color: input, depth: depth, motion: motion, reactive: reactive,
+                    guides: $0, output: output, jitter: target.temporalJitter, reset: target.temporalReset || $0.reset)
+            } == true || scaler.encode(
                 commandBuffer: command,
                 color: input,
                 depth: depth,

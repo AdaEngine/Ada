@@ -17,6 +17,9 @@
         let renderEncoder: WebGPU.GPURenderPassEncoder
         private var currentIndexBuffer: WebGPU.GPUBuffer?
         private var currentIndexType: WebGPU.GPUIndexFormat = .uint32
+        private var currentIndexOwner: WGPUIndexBuffer?
+        private var currentIndexOffset: UInt64 = 0
+        private var currentIndexSize: UInt64 = 0
         private var currentPipeline: WGPURenderPipeline?
         private var genericBuffers: [Int: (buffer: WGPUBuffer, offset: UInt64, size: UInt64)] = [:]
         private var vertexBuffers: [Int: (buffer: WGPUBuffer, offset: UInt64, size: UInt64)] = [:]
@@ -186,6 +189,9 @@
             }
             currentIndexBuffer = wgpuBuffer.buffer
             currentIndexType = indexFormat == .uInt32 ? .uint32 : .uint16
+            currentIndexOwner = nil
+            currentIndexOffset = 0
+            currentIndexSize = UInt64(wgpuBuffer.length)
             renderEncoder.setIndexBuffer(
                 buffer: wgpuBuffer.buffer,
                 format: currentIndexType,
@@ -321,8 +327,18 @@
             guard let wgpuIndexBuffer = buffer as? WGPUIndexBuffer else {
                 fatalError("IndexBuffer is not a WGPUIndexBuffer")
             }
+            let indexType: WebGPU.GPUIndexFormat = (wgpuIndexBuffer.indexFormat == .uInt32) ? .uint32 : .uint16
+            let size = UInt64(buffer.length - offset)
+            // Consecutive draws of one mesh part share its index buffer; Dawn validates every rebind.
+            if currentIndexOwner === wgpuIndexBuffer, currentIndexBuffer != nil, currentIndexType == indexType,
+                currentIndexOffset == UInt64(offset), currentIndexSize == size {
+                return
+            }
             self.currentIndexBuffer = wgpuIndexBuffer.buffer
-            self.currentIndexType = (wgpuIndexBuffer.indexFormat == .uInt32) ? .uint32 : .uint16
+            self.currentIndexOwner = wgpuIndexBuffer
+            self.currentIndexType = indexType
+            self.currentIndexOffset = UInt64(offset)
+            self.currentIndexSize = size
             renderEncoder.setIndexBuffer(
                 buffer: wgpuIndexBuffer.buffer,
                 format: currentIndexType,
@@ -332,6 +348,10 @@
         }
 
         func drawIndexed(indexCount: Int, indexBufferOffset: Int, instanceCount: Int) {
+            drawIndexed(indexCount: indexCount, indexBufferOffset: indexBufferOffset, instanceCount: instanceCount, firstInstance: 0)
+        }
+
+        func drawIndexed(indexCount: Int, indexBufferOffset: Int, instanceCount: Int, firstInstance: Int) {
             guard currentIndexBuffer != nil else {
                 fatalError("Index buffer is not set. Call setIndexBuffer(_:offset:) before drawIndexed().")
             }
@@ -346,7 +366,7 @@
                 instanceCount: UInt32(instanceCount),
                 firstIndex: UInt32(indexBufferOffset / (currentIndexType == .uint32 ? 4 : 2)),
                 baseVertex: 0,
-                firstInstance: 0
+                firstInstance: UInt32(firstInstance)
             )
         }
 
@@ -365,6 +385,49 @@
                 renderEncoder.drawIndexedIndirect(indirectBuffer: arguments.buffer, indirectOffset: UInt64(offset))
             #endif
             return true
+        }
+
+        func multiDrawIndexedIndirect(arguments: any Buffer, offset: Int, drawCount: Int) -> Bool {
+            #if WASM
+                return false
+            #else
+                let stride = MemoryLayout<IndexedIndirectArguments>.stride
+                guard drawCount > 0, let arguments = arguments as? WGPUBuffer, currentIndexBuffer != nil,
+                    offset >= 0, offset % 4 == 0, offset + drawCount * stride <= arguments.length,
+                    device.hasFeature(feature: .multiDrawIndirect)
+                else { return false }
+                if bindGroupDirty { commitBindGroup() }
+                renderEncoder.multiDrawIndexedIndirect(
+                    indirectBuffer: arguments.buffer,
+                    indirectOffset: UInt64(offset),
+                    maxDrawCount: UInt32(drawCount),
+                    drawCountBuffer: nil,
+                    drawCountBufferOffset: 0
+                )
+                return true
+            #endif
+        }
+
+        func multiDrawIndexedIndirect(arguments: any Buffer, offset: Int, maxDrawCount: Int, drawCountBuffer: any Buffer, drawCountOffset: Int) -> Bool {
+            #if WASM
+                return false
+            #else
+                let stride = MemoryLayout<IndexedIndirectArguments>.stride
+                guard maxDrawCount > 0, let arguments = arguments as? WGPUBuffer, let counts = drawCountBuffer as? WGPUBuffer,
+                    currentIndexBuffer != nil, offset >= 0, offset % 4 == 0, offset + maxDrawCount * stride <= arguments.length,
+                    drawCountOffset >= 0, drawCountOffset % 4 == 0, drawCountOffset + 4 <= counts.length,
+                    device.hasFeature(feature: .multiDrawIndirect)
+                else { return false }
+                if bindGroupDirty { commitBindGroup() }
+                renderEncoder.multiDrawIndexedIndirect(
+                    indirectBuffer: arguments.buffer,
+                    indirectOffset: UInt64(offset),
+                    maxDrawCount: UInt32(maxDrawCount),
+                    drawCountBuffer: counts.buffer,
+                    drawCountBufferOffset: UInt64(drawCountOffset)
+                )
+                return true
+            #endif
         }
 
         func draw(type _: IndexPrimitive, vertexStart: Int, vertexCount: Int, instanceCount: Int) {

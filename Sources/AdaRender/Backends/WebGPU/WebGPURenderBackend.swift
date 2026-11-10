@@ -114,6 +114,22 @@
                 return adapter
             }
 
+            /// Release builds skip Dawn's per-call WebGPU validation, which costs about 1 ms of CPU per frame in large
+            /// scenes; the engine's own usage is validated by debug builds and tests. `ADAENGINE_WEBGPU_VALIDATION=1`
+            /// keeps validation in a release build, `=0` skips it in a debug build.
+            private static var skipsValidation: Bool {
+                switch ProcessInfo.processInfo.environment["ADAENGINE_WEBGPU_VALIDATION"] {
+                case "1": return false
+                case "0": return true
+                default:
+                    #if DEBUG
+                        return false
+                    #else
+                        return true
+                    #endif
+                }
+            }
+
             private static var adapterOptions: WebGPU.GPURequestAdapterOptions {
                 #if os(Windows) && canImport(CWebGPUDLSS)
                     WebGPU.GPURequestAdapterOptions(
@@ -173,14 +189,65 @@
                     maxColorAttachmentBytesPerSample: min(48, supportedLimits.maxColorAttachmentBytesPerSample)
                 )
                 var features: [WebGPU.GPUFeatureName] = [.depth32FloatStencil8, .float32Filterable]
+                #if !WASM
+                // GPU-driven shadow batching issues one multi-draw per draw group when both are available.
+                features += [.multiDrawIndirect, .indirectFirstInstance].filter { adapter.hasFeature(feature: $0) }
+                // Profiling only: per-command-buffer GPU timings (WGPUTimestampQuery).
+                if WGPUTimestampQuery.isRequested, adapter.hasFeature(feature: .timestampQuery) {
+                    features.append(.timestampQuery)
+                }
+                #endif
                 var nativeToggles: (any WebGPU.GPUChainedStruct)?
+                var enabledToggles: [String] = []
                 #if os(Windows) && canImport(CWebGPUDLSS)
                 // Native-only Dawn extensions. This is never requested by browser WebGPU.
                 features += [.sharedTextureMemoryD3D12Resource, .sharedFenceDXGISharedHandle].filter {
                     adapter.hasFeature(feature: $0)
                 }
-                nativeToggles = WebGPU.DawnTogglesDescriptor(enabledToggles: ["allow_unsafe_apis"])
+                enabledToggles.append("allow_unsafe_apis")
                 #endif
+                if Self.skipsValidation {
+                    enabledToggles.append("skip_validation")
+                }
+                var disabledToggles: [String] = []
+                #if !WASM
+                if WGPUTimestampQuery.isRequested {
+                    // Profiling needs microsecond timestamps, not the privacy-quantized ones.
+                    disabledToggles.append("timestamp_quantization")
+                }
+                #endif
+                if !enabledToggles.isEmpty || !disabledToggles.isEmpty {
+                    nativeToggles = WebGPU.DawnTogglesDescriptor(enabledToggles: enabledToggles, disabledToggles: disabledToggles)
+                }
+                let pipelineCache = makePipelineCache(adapter: adapter, logger: logger)
+                // Dawn may call the cache until the device is destroyed, which can outlive
+                // this backend, so the device chain owns one retain for the process lifetime.
+                let pipelineCacheUserdata = unsafe pipelineCache.map { unsafe Unmanaged.passRetained($0).toOpaque() }
+                if let pipelineCacheUserdata = unsafe pipelineCacheUserdata {
+                    nativeToggles = unsafe WebGPU.DawnCacheDeviceDescriptor(
+                        isolationKey: "AdaEngine",
+                        loadDataFunction: { key, keySize, value, valueSize, userdata in
+                            guard let key = unsafe key, let userdata = unsafe userdata else {
+                                return 0
+                            }
+                            let cache = unsafe Unmanaged<PipelineDiskCache>.fromOpaque(userdata).takeUnretainedValue()
+                            let output = unsafe value.map { unsafe UnsafeMutableRawBufferPointer(start: $0, count: valueSize) }
+                            return unsafe cache.load(key: UnsafeRawBufferPointer(start: key, count: keySize), into: output)
+                        },
+                        storeDataFunction: { key, keySize, value, valueSize, userdata in
+                            guard let key = unsafe key, let value = unsafe value, let userdata = unsafe userdata else {
+                                return
+                            }
+                            let cache = unsafe Unmanaged<PipelineDiskCache>.fromOpaque(userdata).takeUnretainedValue()
+                            unsafe cache.store(
+                                key: UnsafeRawBufferPointer(start: key, count: keySize),
+                                value: UnsafeRawBufferPointer(start: value, count: valueSize)
+                            )
+                        },
+                        functionUserdata: pipelineCacheUserdata,
+                        nextInChain: nativeToggles
+                    )
+                }
                 let descriptor = WebGPU.GPUDeviceDescriptor(
                     label: "AdaEngine WebGPU Device",
                     requiredFeatures: features,
@@ -232,10 +299,51 @@
                 }
 
                 guard requestStatus == .success, let device = requestedDevice else {
+                    if let pipelineCacheUserdata = unsafe pipelineCacheUserdata {
+                        unsafe Unmanaged<PipelineDiskCache>.fromOpaque(pipelineCacheUserdata).release()
+                    }
                     throw WebGPUBackendError.requestDeviceFailed(requestMessage ?? "unknown error")
                 }
 
                 return device
+            }
+
+            /// User cache root. On Windows Foundation's caches directory is %TEMP%, which
+            /// Disk Cleanup empties, so the per-user %LOCALAPPDATA% is used instead.
+            private static func pipelineCacheRoot() -> URL? {
+                #if os(Windows)
+                    if let localAppData = ProcessInfo.processInfo.environment["LOCALAPPDATA"], !localAppData.isEmpty {
+                        return URL(fileURLWithPath: localAppData, isDirectory: true)
+                    }
+                #endif
+                return try? FileSystem.current.url(for: .cachesDirectory)
+            }
+
+            /// Persistent Dawn blob cache, so translated and compiled shaders survive restarts.
+            private static func makePipelineCache(adapter: WebGPU.GPUAdapter, logger: Logger) -> PipelineDiskCache? {
+                var info = WebGPU.GPUAdapterInfo()
+                guard adapter.getInfo(info: &info) == .success else {
+                    return nil
+                }
+                let fingerprint = [
+                    "\(info.backendType.rawValue)",
+                    String(info.vendorID, radix: 16),
+                    String(info.deviceID, radix: 16),
+                    info.vendor,
+                    info.architecture,
+                    info.device,
+                    info.description
+                ].joined(separator: "|")
+                guard let directory = PipelineDiskCache.directory(
+                    environment: ProcessInfo.processInfo.environment,
+                    cachesDirectory: pipelineCacheRoot(),
+                    adapterFingerprint: fingerprint
+                ) else {
+                    logger.info("WebGPU pipeline disk cache disabled.")
+                    return nil
+                }
+                logger.info("WebGPU pipeline disk cache: \(directory.path)")
+                return PipelineDiskCache(directory: directory)
             }
         #endif
     }

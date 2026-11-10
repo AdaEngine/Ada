@@ -180,7 +180,8 @@ public struct PBR3DUniforms: Resource {
     }
     private var entries: [Key: Entry] = [:]
     private var materialBuffers: [ObjectIdentifier: MaterialEntry] = [:]
-    private var frame = 0
+    /// Advances once per extracted frame.
+    private(set) var frame = 0
 
     public init() {}
 

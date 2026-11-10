@@ -19,6 +19,7 @@
         public let context: WGPUContext
         public let supportsHybridReflections: Bool
         public let supportsLightingSurfaceBuffer: Bool
+        public let supportsMultiDrawIndirect: Bool
         #if !WASM
         private let meshletGeometryCache = WGPUMeshletGeometryCache()
         #endif
@@ -47,15 +48,44 @@
             // Until hybrid WGSL variants ship, retain the four-target IBL path rather than an undefined MRT.
             supportsHybridReflections = false
             supportsLightingSurfaceBuffer = false
+            supportsMultiDrawIndirect = false // Standard WebGPU has no multi-draw.
             #else
             var limits = WebGPU.GPULimits()
             supportsHybridReflections = context.device.getLimits(limits: &limits) == .success && limits.maxColorAttachmentBytesPerSample >= 40
             supportsLightingSurfaceBuffer = limits.maxColorAttachmentBytesPerSample >= 48 && limits.maxColorAttachments >= 6
+            // Multi-draw arguments select each draw's instances with firstInstance, which needs both features.
+            supportsMultiDrawIndirect = ProcessInfo.processInfo.environment["ADAENGINE_SHADOW_MULTIDRAW"] != "0"
+                && context.device.hasFeature(feature: .multiDrawIndirect)
+                && context.device.hasFeature(feature: .indirectFirstInstance)
             #endif
         }
 
         public func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? {
             WGPUVisibilityProcessor(context: context)
+        }
+
+        public var supportsGPUShadowCull: Bool { true }
+
+        public func createGPUShadowCullProcessor() -> (any GPUShadowCullProcessor)? {
+            WGPUShadowCullProcessor(context: context)
+        }
+
+        /// Native only: the draws read GPU-written counts and select instances through `firstInstance`.
+        /// `ADAENGINE_SHADOW_MESHLETS=0` keeps whole-part shadow culling.
+        public var supportsGPUShadowClusterCull: Bool {
+            #if WASM
+            false
+            #else
+            supportsMultiDrawIndirect && ProcessInfo.processInfo.environment["ADAENGINE_SHADOW_MESHLETS"] != "0"
+            #endif
+        }
+
+        public func createGPUShadowClusterCullProcessor() -> (any GPUShadowClusterCullProcessor)? {
+            #if WASM
+            nil
+            #else
+            supportsGPUShadowClusterCull ? WGPUShadowClusterCullProcessor(context: context) : nil
+            #endif
         }
 
         public func createMeshletVisibilityProcessor() -> (any MeshletVisibilityProcessor)? {
@@ -103,7 +133,8 @@
                     context.device.createBuffer(
                         descriptor: WebGPU.GPUBufferDescriptor(
                             label: label,
-                            usage: [.index, .copyDst],
+                            // Copy source for the pooled shadow geometry.
+                            usage: [.index, .copyDst, .copySrc],
                             size: UInt64(length)
                         )
                     )

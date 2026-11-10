@@ -76,14 +76,19 @@ public struct PrepareEnvironment3DTexturesSystem {
             let environment = environments.environments[source.entityId] ?? Environment3D()
             activeViews.insert(source.entityId)
             colorCorrection.prepare(environment.postProcess.colorGrading, view: source.entityId)
-            let hybrid = environment.imageBasedLighting?.asset.asset != nil && environment.screenSpaceReflection.isEnabled
-                && environment.debugView == .none && device.renderDevice.supportsHybridReflections
+            // Path tracing takes its first hit from the G-buffer. Its surface needs both optional outputs, which
+            // screen-space reflections and GI do not use while tracing.
+            let pathSurface = environment.pathTracing.sanitized.isEnabled && environment.debugView == .none
+                && device.renderDevice.supportsHybridReflections && device.renderDevice.supportsLightingSurfaceBuffer
+            target.pathTracingSurfaceActive = pathSurface
+            let hybrid = pathSurface || (environment.imageBasedLighting?.asset.asset != nil && environment.screenSpaceReflection.isEnabled
+                && environment.debugView == .none && device.renderDevice.supportsHybridReflections)
             if hybrid && target.reflectionResponse3DTexture?.size != size {
                 target.reflectionResponse3DTexture = RenderTexture(size: size, scaleFactor: scale, format: .rgba_16f, debugLabel: "3D Opaque Reflection Response")
             } else if !hybrid {
                 target.reflectionResponse3DTexture = nil
             }
-            if environment.screenSpaceGI.isEnabled && device.renderDevice.supportsLightingSurfaceBuffer && environment.debugView == .none {
+            if pathSurface || (environment.screenSpaceGI.isEnabled && device.renderDevice.supportsLightingSurfaceBuffer && environment.debugView == .none) {
                 if target.diffuseSurface3DTexture?.size != size {
                     target.diffuseSurface3DTexture = RenderTexture(size: size, scaleFactor: scale, format: .rgba8, debugLabel: "3D Diffuse Surface Response")
                 }

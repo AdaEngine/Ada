@@ -136,6 +136,14 @@ def package(binary_directory, compiler, tint, output, version, smoke_test=True, 
             if not source.is_file():
                 raise RuntimeError(f"Dawn runtime is missing: {name_dll}")
             shutil.copy2(source, directory)
+        # A build linked with the optional DLSS bridge (script/build_dlss.py) needs NVIDIA's signed NGX runtimes
+        # beside the executable: Super Resolution and Ray Reconstruction, plus their license.
+        dlss = ROOT / ".build-tools/dlss-interop"
+        if (dlss / "build.json").is_file():
+            for name in ["nvngx_dlss.dll", "nvngx_dlssd.dll", "NVIDIA-DLSS-LICENSE.txt"]:
+                if not (dlss / name).is_file():
+                    raise RuntimeError(f"DLSS runtime is missing: {name}; rerun script/build_dlss.py")
+                shutil.copy2(dlss / name, directory)
         lore_sdk = Path(run("python", ROOT / "script/ensure_windows_lore.py"))
         search = [binary_directory, lore_sdk] + runtime + [Path(path) for path in os.environ.get("PATH", "").split(os.pathsep) if path]
         binaries = list(directory.glob("*.dll")) + [directory / "AdaEditor.exe", directory / "adastudio.exe", directory / "BuildSDK/AdaScript/gravity.exe",

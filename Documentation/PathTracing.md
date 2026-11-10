@@ -40,15 +40,62 @@ come from the same current CPU poses used to prepare raster skinning, not GPU
 buffer mapping. Cast/receive flags and alpha tests are respected; alpha blending
 uses stochastic straight-through coverage, without glass refraction.
 
-Each camera owns two HDR accumulation textures and one spatial filter target. Unjittered camera/projection,
-geometry/pose/material/light/sky changes reset accumulation; presentation jitter
-can still vary between accumulated samples. Resize and disabling release a
-view's history. Changed geometry refits the CPU hierarchy; count changes and
-periodic rebuilds refresh its partitioning. Bounds/centers are cached during
-building. A normal/depth/roughness-guided 5x5 filter with bounded anti-firefly
-weighting runs after raw accumulation, retaining sharp mirror samples. A
-geometry-aware four-tap reconstruction follows it; DLSS/TAA can reconstruct the
-finished frame using the existing raster depth and motion guides.
+## First hit from the G-buffer
+
+On devices with the extra G-buffer outputs (verified on native WebGPU; Metal is not yet verified), a traced view takes its first hit
+from the raster G-buffer: position, normal, roughness and metallic as before, plus base colour and emission,
+which the main pass writes for traced views only. Paths start tracing at the first bounce. The image keeps
+the full detail of the rasterized model, and the denoisers' guides match the traced light exactly. Pixels the raster
+pass left empty show the sky directly, so tracer-only proxies are never visible. Devices without the outputs trace
+their primary ray as before.
+`Render3DPathTracingStatistics` reports this as `hybridFirstHit`.
+
+Because the first hit comes from raster, a scene can draw a detailed model while the tracer intersects a lighter
+proxy for bounces and shadows. `PathTracingGeometry3D` marks an entity and its descendants:
+
+```swift
+detailed.components += PathTracingGeometry3D.rasterOnly      // drawn, not traced
+proxy.components += PathTracingGeometry3D.pathTracingOnly    // traced, never drawn
+```
+
+The Sponza example rasters the full 8.8 M-triangle model and traces its 122 K-triangle lighting LOD this way.
+
+## Denoising
+
+`PathTracing3D.denoiser` selects how a view removes the noise of its few samples per pixel:
+
+| Value | Behaviour |
+| --- | --- |
+| `.automatic` (default) | DLSS Ray Reconstruction when the camera uses DLSS temporal upscaling on a supported NVIDIA GPU and the tracer runs at input size (`resolutionScale` 1); otherwise `.portable`. |
+| `.rayReconstruction` | Ray Reconstruction, falling back to `.portable` with `denoiserFallback` set in the statistics. |
+| `.portable` | Temporal reprojection and an edge-aware wavelet filter, on every backend. |
+| `.off` | Plain accumulation of a still view, for reference renders. |
+
+**Portable denoiser.** The tracer divides its light by the surface's base colour (so texture detail is never blurred),
+then:
+
+1. reprojects last frame's light through the world position;
+2. rejects it where normal or camera distance disagree;
+3. clamps it to the current neighbourhood's mean ± 2σ;
+4. blends with weight `max(1/frames, minimumHistoryWeight)` (default 1/32);
+5. filters with four à-trous iterations guided by normal, depth and local luminance variance;
+6. multiplies the base colour back and adds emission.
+
+Camera and light motion keep history; adding, removing, switching or retuning a light, scene, material or setting
+changes restart it. On an RTX 4070 at 1260×523 the chain costs about 1.1 ms of GPU time.
+
+**Ray Reconstruction.** The tracer writes one fresh sample per frame and diffuse albedo, specular albedo and world
+normals with roughness as guides. DLSS Ray Reconstruction then denoises and upscales in one step, replacing Super
+Resolution for that view. See [DLSS](DLSS.md) for its runtime.
+
+**`.off`.** Plain accumulation restarts on any camera, projection, geometry, pose, material, light or sky change.
+
+Ray Reconstruction always traces at its DLSS input size; `resolutionScale` applies to the other denoisers.
+The portable history age is capped at 1024 frames.
+
+Each camera owns its accumulation, guide and filter textures; resizing or disabling releases them. Changed
+geometry refits the CPU hierarchy; count changes and periodic rebuilds refresh its partitioning. A geometry-aware
+four-tap reconstruction brings a reduced `resolutionScale` back to output resolution.
 
 `Render3DPathTracingStatistics.snapshots` reports actual encoded frames, resets,
 accumulation, triangles, lights, traced dimensions, implementation name and a
@@ -70,10 +117,11 @@ Current limits:
   address modes, mip gradients, HDR material texture values and in-place texture
   edits are not reproduced. Replacing a texture refreshes its atlas tile.
 - Emissive surfaces and the environment have no next-event importance sampling;
-  small emitters can be very noisy. There is no ReSTIR/MIS or dedicated temporal
-  denoiser. Radiance clamping, anti-firefly filtering and finite path length introduce bias.
-- Continuous camera/pose changes restart static accumulation. Temporal
-  reconstruction is not a replacement for a lighting denoiser.
+  small emitters can be very noisy. There is no ReSTIR/MIS. Radiance clamping and finite path length introduce bias.
+- The denoisers trade noise for lag: the portable history weight and clamp follow moving lights within a few frames,
+  and disocclusions start from one sample. Every light is still sampled at every bounce, which dominates trace cost.
+- The G-buffer first hit uses base metallic/roughness, base colour and emission; clearcoat, sheen and anisotropy
+  are not reproduced there either.
 - Cosmetic shader graphs, particles, analytic/volumetric fog, raster depth/motion guides and overlays
   remain in the existing renderer. This is surface transport, not a completely
   ray-traced renderer for every effect.

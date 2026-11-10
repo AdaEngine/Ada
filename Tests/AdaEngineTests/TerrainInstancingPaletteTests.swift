@@ -121,6 +121,7 @@ private final class TerrainPaletteRecordingEncoder: RenderCommandEncoder {
     func setTriangleFillMode(_: TriangleFillMode) {}
     func setIndexBuffer(_: IndexBuffer, offset _: Int) {}
     func drawIndexed(indexCount _: Int, indexBufferOffset _: Int, instanceCount _: Int) { drawCount += 1 }
+    func drawIndexed(indexCount _: Int, indexBufferOffset _: Int, instanceCount _: Int, firstInstance _: Int) { drawCount += 1 }
     func draw(type _: IndexPrimitive, vertexStart _: Int, vertexCount _: Int, instanceCount _: Int) {}
     func endRenderPass() {}
 }

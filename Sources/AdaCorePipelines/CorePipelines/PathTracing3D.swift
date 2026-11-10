@@ -1,5 +1,18 @@
 import Foundation
 
+/// How a path-traced view removes the noise of its few samples per pixel.
+public enum PathTracingDenoiser: String, Codable, Sendable, CaseIterable {
+    /// DLSS Ray Reconstruction where the device supports it and the camera uses DLSS temporal upscaling;
+    /// the portable denoiser everywhere else.
+    case automatic
+    /// DLSS Ray Reconstruction; falls back to ``portable`` with a status reason when unavailable.
+    case rayReconstruction
+    /// Temporal reprojection and an edge-aware wavelet filter, on every backend.
+    case portable
+    /// Plain accumulation of a still view, which any camera, light or scene change restarts. For reference renders.
+    case off
+}
+
 /// Experimental world-space path tracing on the portable GPU backend.
 /// Intersections run in a shader BVH; this does not claim hardware RT acceleration.
 public struct PathTracing3D: Codable, Equatable, Sendable {
@@ -12,9 +25,15 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
     public var textureTileSize: Int = 128
     public var maximumDistance: Float = 200
     public var maximumRadiance: Float = 64
-    /// Static views accumulate samples; changes to camera, geometry, materials or lights reset history.
+    /// Frames accumulated by the `.off` denoiser, whose history any camera, geometry, material or light change restarts.
+    /// The portable denoiser's history is bounded by ``minimumHistoryWeight`` instead.
     public var historyLimit: Int = 32
     public var rayBias: Float = 0.002
+    /// Denoiser selection. See ``PathTracingDenoiser``.
+    public var denoiser: PathTracingDenoiser = .automatic
+    /// Smallest weight a new frame gets in the portable denoiser's history. Smaller values converge to less noise
+    /// in still views; larger ones follow moving lights faster.
+    public var minimumHistoryWeight: Float = 1.0 / 32
 
     public init(isEnabled: Bool = false, samplesPerPixel: Int = 1, maximumBounces: Int = 3,
                 resolutionScale: Float = 0.5, historyLimit: Int = 32) {
@@ -35,11 +54,13 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
         result.maximumRadiance = finiteRenderValue(maximumRadiance, fallback: 64, range: 1...10000)
         result.rayBias = finiteRenderValue(rayBias, fallback: 0.002, range: 0.0001...0.1)
         result.historyLimit = min(max(historyLimit, 1), 1024)
+        result.minimumHistoryWeight = finiteRenderValue(minimumHistoryWeight, fallback: 1.0 / 32, range: 0.005...1)
         return result
     }
 
     private enum CodingKeys: CodingKey {
         case isEnabled, samplesPerPixel, maximumBounces, resolutionScale, textureTileSize, maximumDistance, maximumRadiance, historyLimit, rayBias
+        case denoiser, minimumHistoryWeight
     }
 
     public init(from decoder: Decoder) throws {
@@ -53,5 +74,7 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
         maximumRadiance = try c.decodeIfPresent(Float.self, forKey: .maximumRadiance) ?? 64
         historyLimit = try c.decodeIfPresent(Int.self, forKey: .historyLimit) ?? 32
         rayBias = try c.decodeIfPresent(Float.self, forKey: .rayBias) ?? 0.002
+        denoiser = try c.decodeIfPresent(PathTracingDenoiser.self, forKey: .denoiser) ?? .automatic
+        minimumHistoryWeight = try c.decodeIfPresent(Float.self, forKey: .minimumHistoryWeight) ?? 1.0 / 32
     }
 }
