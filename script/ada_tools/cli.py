@@ -39,14 +39,20 @@ def parser():
     prepare.add_argument("components", nargs="*", type=component, metavar="COMPONENT", help="studio, swift, tint, wasm, playground")
     prepare.add_argument("--skip-system", action="store_true", help="Skip apt/brew/winget system prerequisites")
 
-    def build_options(command):
-        command.add_argument("--debug", action="store_true", help="Debug configuration (default: release)")
+    def build_options(command, profile=False):
+        if profile:
+            mode = command.add_mutually_exclusive_group()
+            mode.add_argument("--debug", action="store_true", help="Debug configuration (default: release)")
+            mode.add_argument("--profile", action="store_true",
+                              help="Release optimizations plus debug symbols for CPU profilers (separate cache)")
+        else:
+            command.add_argument("--debug", action="store_true", help="Debug configuration (default: release)")
         command.add_argument("--scratch-path", type=Path, help="Isolated build cache (default: .build-tools/ada-tool/<host>/build/<target>)")
 
     install = commands.add_parser("install", parents=[common], help="Build and install a complete standalone distribution, or copy --source")
     targets = install.add_subparsers(dest="target", required=True)
     app = targets.add_parser("studio", parents=[common], help="Install Studio for the current user")
-    build_options(app)
+    build_options(app, profile=True)
     app.add_argument("--source", type=Path, help="Complete extracted distribution or macOS .app; skips compilation")
     app.add_argument("--destination", type=Path, help="Exact installed application directory (.app on macOS)")
     app.add_argument("--launch", action="store_true")
@@ -55,7 +61,7 @@ def parser():
     targets = builder.add_subparsers(dest="target", required=True)
     for target in ("studio", "engine"):
         command = targets.add_parser(target, parents=[common])
-        build_options(command)
+        build_options(command, profile=True)
     command = targets.add_parser("playground", parents=[common], help="Build the existing Studio DOM frontend")
     command.add_argument("--cloud-panels", type=Path, help="adawebsite dist-panels directory")
     command = targets.add_parser("wasm", parents=[common], help="Export release DOM Studio + AdaWebPlayer (WSL on Windows)")
@@ -66,7 +72,9 @@ def parser():
     command.add_argument("--studio-origin", action="append", default=None, help="Allowed Studio origin (repeatable; default: http://127.0.0.1:8080)")
     runner = commands.add_parser("run", parents=[common], help="Open the installed Studio")
     runner.add_argument("target", choices=("studio",))
-    runner.add_argument("--debug", action="store_true")
+    variants = runner.add_mutually_exclusive_group()
+    variants.add_argument("--debug", action="store_true")
+    variants.add_argument("--profile", action="store_true", help="Open the profiling installation")
     runner.add_argument("--destination", type=Path)
     preview = commands.add_parser("serve", parents=[common], help="Serve built playground files on loopback; no Cloud backend")
     preview.add_argument("target", choices=("playground", "wasm"))
@@ -95,7 +103,7 @@ def main(argv=None):
                 result = studio.build(ctx, args)
             print(result)
         elif args.command == "run":
-            destination = args.destination or studio.default_destination(ctx, args.debug)
+            destination = args.destination or studio.default_destination(ctx, args.debug, args.profile)
             if not ctx.dry:
                 studio.validate(destination, ctx.host)
             studio.launch(ctx, destination)

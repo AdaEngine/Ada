@@ -42,9 +42,27 @@ enum EditorWindowsAgentCommand {
                     return try node(script: script, arguments: arguments, paths: [directory.path] + paths)
                 }
             }
+            if let executable = nativeNpmExecutable(in: source, relativeTo: directory) {
+                return (executable, arguments)
+            }
             throw EditorAgentCatalogError(message: "Select the agent's .exe or its Node.js entry point. This batch file is not an npm launcher: \(path)")
         }
         return (url, arguments)
+    }
+
+    private static func nativeNpmExecutable(in source: String, relativeTo directory: URL) -> URL? {
+        // Native global npm shims forward argv directly to an exe in node_modules.
+        let pattern = #"(?im)^[ \t]*@?"%dp0%[\\/](node_modules[\\/][^"%:\r\n]+\.exe)"[ \t]+%\*[ \t]*$"#
+        guard let expression = try? NSRegularExpression(pattern: pattern),
+              let match = expression.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)),
+              let range = Range(match.range(at: 1), in: source) else { return nil }
+        let relativePath = source[range].replacingOccurrences(of: "\\", with: "/")
+        guard relativePath.split(separator: "/").allSatisfy({ $0 != "." && $0 != ".." }) else { return nil }
+        let executable = directory.appendingPathComponent(relativePath).standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: executable.path, isDirectory: &isDirectory),
+              !isDirectory.boolValue else { return nil }
+        return executable
     }
 
     private static func node(script: URL, arguments: [String], paths: [String]) throws -> (executable: URL, arguments: [String]) {

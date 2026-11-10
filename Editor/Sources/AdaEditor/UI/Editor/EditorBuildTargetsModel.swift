@@ -61,7 +61,10 @@ final class EditorBuildTargetsModel {
             suffix += 1
         }
         target.name = name
-        if !copy { target.build.configuration = "debug" }
+        if !copy {
+            target.build.configuration = "debug"
+            target.run.diagnosticsOverlay = false
+        }
         project.buildTargets.append(target)
         project.activeBuildTargetID = target.id
         target.apply(to: &project)

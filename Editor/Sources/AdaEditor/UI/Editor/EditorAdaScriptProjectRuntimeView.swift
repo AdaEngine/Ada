@@ -26,6 +26,7 @@ struct EditorAdaScriptProjectRuntimeView: View {
     private let scriptPlugin: AdaScriptPlugin?
     private let objectCatalog: AdaScriptObjectCatalog
     private let directories: ProjectDirectories
+    private let diagnosticsSession: GameDiagnosticsSession?
     @State private var overlaySession = EditorSceneUIOverlaySession()
 
     var diagnostics: [String] { (scriptPlugin?.diagnostics ?? []) + objectCatalog.diagnostics }
@@ -33,11 +34,13 @@ struct EditorAdaScriptProjectRuntimeView: View {
     init(
         artifact: EditorAdaScriptProjectBuildArtifact,
         controls: EditorGameWindowControls? = nil,
-        previewCapture: EditorProjectPreviewCapture? = nil
+        previewCapture: EditorProjectPreviewCapture? = nil,
+        diagnosticsOverlay: Bool = false
     ) throws {
         self.artifact = artifact
         self.controls = controls
         self.previewCapture = previewCapture
+        diagnosticsSession = diagnosticsOverlay ? GameDiagnosticsSession() : nil
         directories = try artifact.assetDirectories()
         EditorComponentRegistry.registerBuiltIns()
         // Scriptable UI resolves resource types before the world's plugins start.
@@ -85,6 +88,16 @@ struct EditorAdaScriptProjectRuntimeView: View {
                         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
                         .allowsHitTesting(controls?.inputEnabled ?? true)
                 }
+
+                if let diagnosticsSession {
+                    GameDiagnosticsOverlay(
+                        session: diagnosticsSession,
+                        frameTimeLabel: L10n.text("Frame time"),
+                        millisecondsUnit: L10n.text("ms")
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .allowsHitTesting(false)
+                }
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }
@@ -105,6 +118,7 @@ struct EditorAdaScriptProjectRuntimeView: View {
 
     /// Installs the game's plugins and scene. Shared by the Play window and offscreen automation runs.
     func configureRuntime(_ app: inout AppWorlds, includesEntryScene: Bool = true) {
+        diagnosticsSession?.attach(to: app)
         performanceSession.attach(app, title: artifact.report.entryDescription)
         app.addPlugin(TransformPlugin())
         app.addPlugin(InputPlugin(actions: artifact.scenePlayRuntime.inputActions))

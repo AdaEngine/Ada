@@ -58,6 +58,8 @@ extension EditorViewModel {
     }
 
     func refreshProjectFiles(logsRefresh: Bool = true) {
+        let stall = PerformanceStallProbe.begin()
+        defer { PerformanceStallProbe.end("Studio.ProjectTree.Refresh", since: stall, count: projectSidebar.items.count) }
         studioTools.scheduleReload()
         let selectedID = projectSidebar.selectedItem?.id
         let items = Self.projectTreeItems(for: project, fileManager: fileManager)

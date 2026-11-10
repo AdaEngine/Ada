@@ -98,6 +98,7 @@ struct EditorBuildTargetsTests {
             toolchain: SwiftToolchain(swiftExecutablePath: "swift", sourceKitLSPExecutablePath: nil))
         #expect(command.arguments == ["run", "-c", "release", "Game", "--", "--debug"])
         #expect(command.environment["TARGET_ENV"] == "test")
+        #expect(command.environment["ADAENGINE_DIAGNOSTICS_OVERLAY"] == "0")
     }
 
 }

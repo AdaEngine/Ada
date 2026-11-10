@@ -27,6 +27,13 @@ This inventory was originally recorded on **2026-10-04** and subsequently mainta
   Live text selections are kept outside the observed document array; command
   snapshots merge them through `textDocument(id:)` and pane/active accessors.
   Caret geometry is observed by the completion overlay, not the whole code view.
+  Code views highlight sources over 24 KB off the UI actor (`EditorCodeHighlightState`):
+  edits keep the previous spans until one coalesced pass for the latest text finishes;
+  smaller sources stay synchronous. TextEditor splits lines once per text revision,
+  stores per-line lengths/indices for offset conversion, and indexes token spans by
+  line once per span set; never filter all spans per drawn row. Coverage:
+  `EditorCodeHighlightStateTests` and `TextEditorLargeDocumentTests`; opt-in timing:
+  `ADAEDITOR_PERF_CODE=1` (`largeSwiftFileTypingBenchmark`).
   Consecutive captured text-selection moves coalesce within a UI input batch;
   other drags and the raw scene input stream retain every event. Coverage:
   `EditorTextInteractionPerformanceTests` and `EditorWindowHoverInputTests`.

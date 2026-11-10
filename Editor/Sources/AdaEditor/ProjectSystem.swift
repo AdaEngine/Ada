@@ -630,22 +630,25 @@ public struct AdaProjectRun: Codable, Equatable, Sendable {
     public var arguments: [String]
     public var environment: [String: String]
     public var workingDirectory: String?
+    public var diagnosticsOverlay: Bool
 
     public init(
         destination: AdaProjectRunDestination = .macOS,
         executable: String? = nil,
         arguments: [String] = [],
         environment: [String: String] = [:],
-        workingDirectory: String? = nil
+        workingDirectory: String? = nil,
+        diagnosticsOverlay: Bool = false
     ) {
         self.destination = destination
         self.executable = executable
         self.arguments = arguments
         self.environment = environment
         self.workingDirectory = workingDirectory
+        self.diagnosticsOverlay = diagnosticsOverlay
     }
 
-    private enum CodingKeys: String, CodingKey { case destination, executable, arguments, environment, workingDirectory }
+    private enum CodingKeys: String, CodingKey { case destination, executable, arguments, environment, workingDirectory, diagnosticsOverlay }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -654,6 +657,7 @@ public struct AdaProjectRun: Codable, Equatable, Sendable {
         arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
         environment = try container.decodeIfPresent([String: String].self, forKey: .environment) ?? [:]
         workingDirectory = try container.decodeIfPresent(String.self, forKey: .workingDirectory)
+        diagnosticsOverlay = try container.decodeIfPresent(Bool.self, forKey: .diagnosticsOverlay) ?? false
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -663,6 +667,9 @@ public struct AdaProjectRun: Codable, Equatable, Sendable {
         try container.encode(arguments, forKey: .arguments)
         try container.encode(environment, forKey: .environment)
         try container.encodeIfPresent(workingDirectory, forKey: .workingDirectory)
+        if diagnosticsOverlay {
+            try container.encode(diagnosticsOverlay, forKey: .diagnosticsOverlay)
+        }
     }
 }
 
@@ -674,6 +681,13 @@ public enum AdaProjectRunDestination: String, Codable, CaseIterable, Equatable, 
     case visionOS = "visionos"
     case web
     case android
+
+    var supportsDiagnosticsOverlay: Bool {
+        switch self {
+        case .macOS, .windows, .linux: true
+        case .iPadOS, .visionOS, .web, .android: false
+        }
+    }
 }
 
 public struct AdaProjectEditor: Codable, Equatable, Sendable {

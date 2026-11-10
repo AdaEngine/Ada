@@ -9,6 +9,8 @@ extension EditorViewModel {
     }
 
     func openProjectItem(_ item: EditorProjectSidebarViewModel.Item, preparedDocument: EditorWorkbenchDocument?) {
+        let stall = PerformanceStallProbe.begin()
+        defer { PerformanceStallProbe.end("Studio.OpenFile", since: stall) }
         if item.isFolder {
             projectSidebar.select(item)
             projectSidebar.toggleFolder(item)

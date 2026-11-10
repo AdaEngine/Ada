@@ -33,6 +33,7 @@ struct EditorCodeFileView: View {
     var appearanceSettings: EditorAppearanceSettings = .shared
 
     @State private var caret = EditorCodeCaretState()
+    @State private var highlighting = EditorCodeHighlightState()
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -438,12 +439,13 @@ extension EditorCodeFileView {
             size: fontSize
         )
         if document.semanticTokens.isEmpty {
-            return EditorSyntaxHighlighter.spans(
-                for: document.content,
+            return highlighting.spans(for: EditorCodeHighlightState.Request(
+                documentID: document.id,
+                source: document.content,
                 language: document.language,
                 palette: colorPalette,
                 keywordFont: keywordFont
-            )
+            ))
         }
 
         return document.semanticTokens.map { token in

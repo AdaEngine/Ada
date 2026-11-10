@@ -108,6 +108,7 @@ import Testing
                     if supportsHTTP {
                         #expect(server["type"] as? String == "http")
                         #expect(server["url"] as? String == EditorMCPServerAddress.url)
+                        #expect((server["headers"] as? [[String: String]])?.isEmpty == true)
                     } else {
                         #expect(server["type"] as? String == "stdio")
                         #expect((server["command"] as? String)?.isEmpty == false)
